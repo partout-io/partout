@@ -58,7 +58,13 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     functions.hmac_do = Fake.hmac;
     const session_id = try allocator.dupe(u8, "12345678");
     const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");
-    var prf = try PRF.init(allocator, functions, &handshake, session_id, remote_session_id);
+    var prf = try PRF.testing.initWithFunctions(
+        allocator,
+        functions,
+        &handshake,
+        session_id,
+        remote_session_id,
+    );
     defer prf.deinit(allocator);
 
     handshake.deinit(allocator);
@@ -87,6 +93,7 @@ test "Authenticator frames auth and buffers replies and messages" {
     const framed = auth_data.bytes;
     try std.testing.expectEqualSlices(u8, &ControlConstants.tls_prefix, framed[0..ControlConstants.tls_prefix.len]);
     try std.testing.expect(framed.len > ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
+    try std.testing.expect(std.mem.indexOf(u8, framed, "IV_MTU=1600\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, framed, "IV_PLAT_VER=") != null);
 
     const server_options = "V4,cipher AES-256-GCM,auth SHA256\x00";
@@ -132,4 +139,10 @@ test "server OCC extracts only runtime-relevant values" {
 test "explicit cipher wins over fallback alias" {
     const options = ServerOptions.parse("cipher AES-256-GCM,data-ciphers-fallback AES-128-CBC");
     try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, options.cipher.?);
+}
+
+test "server OCC accepts the data ciphers fallback alias" {
+    const options = ServerOptions.parse("V4,data-ciphers-fallback AES-128-CBC,auth SHA1");
+    try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, options.cipher.?);
+    try std.testing.expectEqual(api.OpenVPNDigest.sha1, options.digest.?);
 }

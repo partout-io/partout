@@ -11,6 +11,7 @@ const push_mod = @import("push.zig");
 const session_negotiator_mod = @import("session_negotiator.zig");
 
 const api = core_mod.api;
+const log = core_mod.logging;
 
 const BidirectionalState = helpers_mod.BidirectionalState;
 const ControlConstants = constants_mod.Control;
@@ -95,11 +96,14 @@ pub const ActiveContext = struct {
     /// Transfers ownership of `negotiator` to this context.
     pub fn addNegotiator(self: *ActiveContext, negotiator: *Negotiator) void {
         std.debug.assert(negotiator.key < self.negotiators.len);
+        log.writef(.info, "Replace negotiator with key {d}", .{negotiator.key});
         if (self.negotiators[negotiator.key]) |old| {
             if (old != negotiator) old.destroy();
         }
         self.negotiators[negotiator.key] = negotiator;
+        self.logNegotiatorKeys();
         self.current_negotiator_key = negotiator.key;
+        log.writef(.info, "Negotiator: Current key is {d}", .{negotiator.key});
     }
 
     /// Transfers ownership of `channel` and makes `key` the outbound key.
@@ -116,12 +120,14 @@ pub const ActiveContext = struct {
         }
         self.data_channels[key] = channel;
         self.current_data_pair = .{ .link = &self.data_link, .key = key };
+        log.writef(.info, "Data: Current key is {d}", .{key});
     }
 
     /// Keeps one former key alive for in-flight packets and removes older ones.
     pub fn removeOldNegotiators(self: *ActiveContext) void {
         while (self.old_keys.items.len > 1) {
             const key = self.old_keys.orderedRemove(0);
+            log.writef(.info, "Remove key {d} from negotiators and data channels", .{key});
             if (self.negotiators[key]) |negotiator| negotiator.destroy();
             if (self.data_channels[key]) |channel| channel.destroy();
             self.negotiators[key] = null;
@@ -152,6 +158,30 @@ pub const ActiveContext = struct {
         self.last_received_ns = null;
         self.last_data_count_ns = null;
         self.data_count.reset();
+    }
+
+    pub fn logNegotiatorKeys(self: *const ActiveContext) void {
+        var keys: [ControlConstants.number_of_keys]u8 = undefined;
+        var count: usize = 0;
+        for (self.negotiators, 0..) |negotiator, key| {
+            if (negotiator != null) {
+                keys[count] = @intCast(key);
+                count += 1;
+            }
+        }
+        log.writef(.info, "Negotiators: {any}", .{keys[0..count]});
+    }
+
+    pub fn logDataKeys(self: *const ActiveContext) void {
+        var keys: [ControlConstants.number_of_keys]u8 = undefined;
+        var count: usize = 0;
+        for (self.data_channels, 0..) |channel, key| {
+            if (channel != null) {
+                keys[count] = @intCast(key);
+                count += 1;
+            }
+        }
+        log.writef(.info, "Data channels: {any}", .{keys[0..count]});
     }
 };
 

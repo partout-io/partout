@@ -363,6 +363,7 @@ set(PARTOUT_SOURCES
 ./PartoutOpenVPN/V3/Internal/OpenVPNSessionV3.swift
 ./PartoutOpenVPN/V3/_OpenVPNConnectionV3+Default.swift
 ./PartoutOpenVPN/V3/_OpenVPNConnectionV3.swift
+./PartoutRuntime/NetworkMonitor.swift
 ./PartoutRuntime/PartoutProviderRuntime.swift
 ./PartoutRuntime/PartoutTunnelController.swift
 ./PartoutWireGuard/Internal/Configuration+WgQuickConfig.swift

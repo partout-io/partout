@@ -66,7 +66,7 @@ pub const PlatformDNS = struct {
     }
 
     pub fn resolve(
-        self: *PlatformDNS,
+        self: *const PlatformDNS,
         allocator: std.mem.Allocator,
         hostname: []const u8,
         flags: std.EnumSet(DNSResolver.Flag),
@@ -77,7 +77,7 @@ pub const PlatformDNS = struct {
     }
 
     fn resolveWith(
-        _: *PlatformDNS,
+        _: *const PlatformDNS,
         allocator: std.mem.Allocator,
         hostname: []const u8,
         flags: std.EnumSet(DNSResolver.Flag),
@@ -100,7 +100,7 @@ pub const PlatformDNS = struct {
         timer.init(timeout_ms, Query.timeout, query) catch |err| {
             timer.deinit();
             query_pool.releaseUnstarted(query);
-            log.writef(.err, "Unable to start DNS timeout: {}", .{err});
+            log.writef(.err, "Unable to start DNS timeout: {s}", .{@errorName(err)});
             return if (err == error.OutOfMemory) error.OutOfMemory else error.ResolutionFailure;
         };
 
@@ -108,7 +108,7 @@ pub const PlatformDNS = struct {
             timer.cancel();
             timer.deinit();
             query_pool.releaseUnstarted(query);
-            log.writef(.err, "Unable to start DNS resolution: {}", .{err});
+            log.writef(.err, "Unable to start DNS resolution: {s}", .{@errorName(err)});
             return if (err == error.OutOfMemory) error.OutOfMemory else error.ResolutionFailure;
         };
 
@@ -158,7 +158,10 @@ pub const PlatformDNS = struct {
             const addr = current.ai_addr;
             if (addr == null) continue;
             const numeric = numericHostAlloc(allocator, addr, current.ai_addrlen) catch |err| {
-                log.writef(.err, "getnameinfo() failed for {s}: {}", .{ hostname, err });
+                log.writef(.err, "getnameinfo() failed for {s}: {s}", .{
+                    hostname,
+                    @errorName(err),
+                });
                 continue;
             };
             records.append(allocator, .{

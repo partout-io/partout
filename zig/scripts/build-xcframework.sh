@@ -144,25 +144,40 @@ find_xcframework() {
     printf '%s/%s\n' "$(pwd)" "$(basename "$result")"
 }
 
-framework_search_path() {
+resolve_xcframework_paths() {
     local xcframework=$1
     local identifier=$2
     local product=$3
-    local header=$4
+    local framework_header=$4
+    local library_header=$5
+    local library_name=$6
+    local slice="$xcframework/$identifier"
     local framework="$xcframework/$identifier/$product.framework"
     local headers
+    local header
 
     if [[ -d "$framework/Headers" ]]; then
         headers="$framework/Headers"
+        header=$framework_header
+        xcframework_include_path=$slice
+        xcframework_library_path=$slice
     elif [[ -d "$framework/Versions/A/Headers" ]]; then
         headers="$framework/Versions/A/Headers"
+        header=$framework_header
+        xcframework_include_path=$slice
+        xcframework_library_path=$slice
+    elif [[ -d "$slice/Headers" ]]; then
+        headers="$slice/Headers"
+        header=$library_header
+        [[ -f "$slice/$library_name" ]] ||
+            fail "$product artifact slice $identifier must contain $library_name"
+        xcframework_include_path=$(cd "$headers" && pwd -P)
+        xcframework_library_path=$(cd "$slice" && pwd -P)
     else
         fail "missing headers for $product slice $identifier"
     fi
     [[ -f "$headers/$header" ]] ||
         fail "$product artifact slice $identifier must contain Headers/$header"
-    cd "$xcframework/$identifier"
-    pwd -P
 }
 
 openssl_xcframework=$(find_xcframework openssl-apple openssl)
@@ -192,17 +207,27 @@ build_slice() {
     local wg_go_identifier=$5
     local install_root="$work_dir/install/$name"
     local openssl_include
+    local openssl_lib
     local wg_go_include
+    local wg_go_lib
 
-    openssl_include=$(framework_search_path "$openssl_xcframework" "$openssl_identifier" openssl rand.h)
-    wg_go_include=$(framework_search_path "$wg_go_xcframework" "$wg_go_identifier" wg_go wg_go.h)
+    resolve_xcframework_paths \
+        "$openssl_xcframework" "$openssl_identifier" openssl \
+        rand.h rand.h libopenssl.a
+    openssl_include=$xcframework_include_path
+    openssl_lib=$xcframework_library_path
+    resolve_xcframework_paths \
+        "$wg_go_xcframework" "$wg_go_identifier" wg_go \
+        wg_go.h wg_go/wg_go.h libwg-go.a
+    wg_go_include=$xcframework_include_path
+    wg_go_lib=$xcframework_library_path
     mkdir -p "$install_root"
     chmod 755 "$work_dir/install" "$install_root"
 
     echo "Building $name ($target)"
     (
         cd "$zig_dir"
-        zig build \
+        zig build install \
             -j1 \
             --prefix "$install_root" \
             --cache-dir "$cache_dir" \
@@ -211,9 +236,11 @@ build_slice() {
             -Dtarget="$target" \
             -Dapple-sdk-path="$sdk" \
             -Dopenssl-include="$openssl_include" \
+            -Dopenssl-lib="$openssl_lib" \
             -Dopenvpn=true \
             -Dwireguard=true \
-            -Dwg-go-include="$wg_go_include"
+            -Dwg-go-include="$wg_go_include" \
+            -Dwg-go-lib="$wg_go_lib"
     )
 }
 

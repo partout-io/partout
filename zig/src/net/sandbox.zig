@@ -11,6 +11,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const api = core.api;
 const TunWrapper = io.TunWrapper;
 
@@ -21,13 +22,16 @@ pub const Sandbox = struct {
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
-    monitor: NetworkMonitor,
-    /// Executes connection-owned work in the same serialized context as the
-    /// connection lifecycle. The daemon supplies its actor-backed executor;
-    /// direct users and tests default to immediate execution. The sandbox
-    /// owner must keep this capability alive until the connection and every
-    /// producer of submitted work have been drained.
-    serialized_executor: SerializedExecutor = .{},
+    /// Daemon-owned I/O loop shared by its connections. Protocols that do not
+    /// multiplex link and tunnel descriptors may ignore it.
+    looper: *looper.Looper,
+    /// Borrowed runtime cache directory. Connections that retain it must copy
+    /// it during creation.
+    cache_dir: []const u8 = "",
+    /// Executes connection-owned work on the daemon actor. The daemon must
+    /// keep this capability alive until the connection and every producer of
+    /// submitted work have been drained.
+    serialized_executor: SerializedExecutor,
     options: ConnectionOptions = .{},
 };
 
@@ -178,7 +182,7 @@ pub const SocketFactory = struct {
             endpoint: api.ExtendedEndpoint,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-        ) Error!io.IOInterface,
+        ) Error!looper.Looper.Descriptor,
     };
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
@@ -191,8 +195,18 @@ pub const SocketFactory = struct {
         endpoint: api.ExtendedEndpoint,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
-    ) Error!io.IOInterface {
-        return self.vtable.create(self.ptr, allocator, endpoint, reachability, timeout);
+    ) Error!looper.Looper.Descriptor {
+        const native_timeout: c_int = @intCast(@min(
+            timeout,
+            @as(u32, @intCast(std.math.maxInt(c_int))),
+        ));
+        return self.vtable.create(
+            self.ptr,
+            allocator,
+            endpoint,
+            reachability,
+            native_timeout,
+        );
     }
 };
 
@@ -250,15 +264,11 @@ pub const NetworkMonitor = struct {
 pub const SerializedExecutor = struct {
     pub const Block = *const fn (*anyopaque) void;
 
-    ptr: ?*anyopaque = null,
-    run_block: *const fn (?*anyopaque, *anyopaque, Block) void = runInline,
+    ptr: *anyopaque,
+    run_block: *const fn (*anyopaque, *anyopaque, Block) void,
 
     pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
         self.run_block(self.ptr, block_ptr, block);
-    }
-
-    fn runInline(_: ?*anyopaque, block_ptr: *anyopaque, block: Block) void {
-        block(block_ptr);
     }
 };
 

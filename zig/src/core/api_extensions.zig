@@ -107,6 +107,20 @@ pub fn moduleId(module: *const gen.TaggedModule) uuid.UUID {
     };
 }
 
+/// Allocates a cache filename scoped to a module as `<module-id>-<filename>`.
+///
+/// The caller owns the returned memory.
+pub fn moduleCacheFilename(
+    allocator: std.mem.Allocator,
+    module_id: uuid.UUID,
+    filename: []const u8,
+) std.mem.Allocator.Error![]u8 {
+    return std.fmt.allocPrint(allocator, "{s}-{s}", .{
+        module_id[0..],
+        filename,
+    });
+}
+
 /// Returns the module type represented by a tagged union case.
 pub fn moduleType(module: *const gen.TaggedModule) gen.ModuleType {
     return switch (module.*) {

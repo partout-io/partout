@@ -6,9 +6,11 @@ const std = @import("std");
 const builtin = @import("builtin");
 const core_mod = @import("../../core/exports.zig");
 const parser_mod = @import("../parser.zig");
+const constants_mod = @import("constants.zig");
 
 const api = core_mod.api;
 
+const DataConstants = constants_mod.Data;
 const Parser = parser_mod.Parser;
 
 pub const PushReply = struct {
@@ -48,6 +50,29 @@ pub const PushReply = struct {
             .original = original,
             .options = try self.options.clone(allocator),
         };
+    }
+
+    /// Mirrors Swift's `PushReply.description`, removing the auth-token value
+    /// even when private logging is enabled.
+    pub fn logDescriptionAlloc(
+        self: PushReply,
+        allocator: std.mem.Allocator,
+    ) ![]u8 {
+        const marker = "auth-token ";
+        const start = std.mem.indexOf(u8, self.original, marker) orelse
+            return allocator.dupe(u8, self.original);
+        const value_start = start + marker.len;
+        const value_end = std.mem.indexOfScalarPos(
+            u8,
+            self.original,
+            value_start,
+            ',',
+        ) orelse self.original.len;
+        return std.mem.concat(allocator, u8, &.{
+            self.original[0..start],
+            "auth-token",
+            self.original[value_end..],
+        });
     }
 
     pub fn deinit(self: *PushReply, allocator: std.mem.Allocator) void {
@@ -186,6 +211,10 @@ fn formatPeerInfoAlloc(
         .{ .name = "IV_UI_VER", .value = ui_version },
         .{ .name = "IV_PROTO", .value = "2" },
         .{ .name = "IV_NCP", .value = "2" },
+        .{
+            .name = "IV_MTU",
+            .value = std.fmt.comptimePrint("{d}", .{DataConstants.tun_max_mtu}),
+        },
         .{ .name = "IV_LZO_STUB", .value = "1" },
         .{ .name = "IV_LZO", .value = "0" },
         .{ .name = "IV_SSL", .value = ssl_version },

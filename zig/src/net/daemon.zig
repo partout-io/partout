@@ -18,6 +18,7 @@
 //! - `DNSResolver`: Performs DNS resolution.
 //! - `SocketFactory`: Creates sockets.
 //! - `NetworkMonitor`: Observes network reachability and better path events.
+//! - `Looper`: A daemon-owned link/tunnel I/O loop borrowed by the connection.
 //!
 //! It also creates a `ConnectionGate` to convert network signals into
 //! actions to perform on the current connection.
@@ -57,6 +58,7 @@ const log = core.logging;
 const Connection = conn_mod.Connection;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
+const Looper = @import("looper.zig").Looper;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
@@ -65,6 +67,21 @@ pub const Error = api.DecodeError || conn_mod.CreateError || error{
     Closed,
     IdGeneration,
     InvalidProfile,
+    LooperFailure,
+};
+
+pub const EventKey = enum {
+    connection_status,
+    data_count,
+    last_error_code,
+};
+
+pub const Events = struct {
+    ctx: *anyopaque,
+    status: *const fn (*anyopaque, api.ConnectionStatus) void,
+    last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
+    data_count: *const fn (*anyopaque, api.DataCount) void,
+    remove_key: *const fn (*anyopaque, EventKey) void,
 };
 
 pub const Context = struct {
@@ -82,7 +99,8 @@ pub const Context = struct {
         stop_delay_ms: u32 = 2000,
         reconnection_delay_ms: u32 = 2000,
         min_data_count_delta: u64 = 0,
-        events: ?Connection.Events = null,
+        events: ?Events = null,
+        cache_dir: []const u8 = "",
         connection_options: sandbox.ConnectionOptions = .{},
     };
 
@@ -98,21 +116,37 @@ pub const Daemon = struct {
         stopped,
     };
 
+    const StopMode = enum {
+        clear_environment,
+        preserve_environment,
+    };
+
+    const ConnectionRuntime = struct {
+        connection: Connection,
+        looper: *Looper,
+    };
+
     // Input parameters
+    allocator: std.mem.Allocator,
     profile: api.Profile,
+    registry: *const ConnectionRegistry,
     controller: sandbox.TunnelController,
+    resolver: sandbox.DNSResolver,
+    factory: sandbox.SocketFactory,
     monitor: sandbox.NetworkMonitor,
     options: Context.Options,
 
     // Internal state
     actor: *Actor,
     state: State = .initial,
-    connection: ?Connection = null,
+    stop_mode: StopMode = .clear_environment,
+    connection_runtime: ?ConnectionRuntime = null,
     gate: ?ConnectionGate = null,
     snapshot_publisher: SnapshotPublisher,
     resume_gate_timer: core.RunAfter = .{},
     is_evaluating_connection: bool = false,
-    on_hold: bool = false,
+    cancellation_requested: bool = false,
+    is_deinitializing: bool = false,
 
     // Testing only
     test_status_history: [64]api.ConnectionStatus = undefined,
@@ -131,12 +165,15 @@ pub const Daemon = struct {
         const daemon = try allocator.create(Daemon);
         errdefer allocator.destroy(daemon);
         const actor = Actor.create(allocator, daemon) catch return error.OutOfMemory;
-        errdefer actor.deinit();
 
         daemon.* = .{
+            .allocator = allocator,
             .actor = actor,
             .profile = profile,
+            .registry = context.objects.registry,
             .controller = context.objects.controller,
+            .resolver = context.objects.resolver,
+            .factory = context.objects.factory,
             .monitor = context.objects.monitor,
             .options = context.options,
             .snapshot_publisher = SnapshotPublisher.init(
@@ -146,27 +183,18 @@ pub const Daemon = struct {
                 context.options.min_data_count_delta,
             ),
         };
+        errdefer {
+            daemon.is_deinitializing = true;
+            actor.deinit();
+        }
 
-        // The connection sandbox contains an actor-backed executor whose
-        // context is this daemon. Allocate and initialize the stable daemon
-        // address before constructing the connection that retains it.
-        if (activeConnectionModule(&profile)) |module| {
-            const sb: sandbox.Sandbox = .{
-                .profile = &daemon.profile,
-                .controller = context.objects.controller,
-                .factory = context.objects.factory,
-                .resolver = context.objects.resolver,
-                .monitor = context.objects.monitor,
-                .serialized_executor = daemon.serializedExecutor(),
-                .options = context.options.connection_options,
-            };
-            daemon.connection = try context.objects.registry.createConnection(allocator, module, sb);
+        if (activeConnectionModule(&profile) != null) {
             daemon.gate = ConnectionGate.init(null);
         }
         return daemon;
     }
 
-    pub fn deinit(self: *Daemon, allocator: std.mem.Allocator) void {
+    pub fn deinit(self: *Daemon) void {
         // This is crucial to guarantee that there will not be in-flight
         // handlers (reachability, better path, connection events) still calling
         // into the daemon.
@@ -178,7 +206,9 @@ pub const Daemon = struct {
         // Also cancels the timer
         self.resume_gate_timer.deinit();
 
-        // Also shuts down the actor
+        // Suppress the actor's unexpected-termination path: stop() already
+        // dismantled the connection runtime.
+        self.is_deinitializing = true;
         self.actor.deinit();
 
         self.monitor.setEventHandler(null);
@@ -187,20 +217,15 @@ pub const Daemon = struct {
             gate.stopObserving();
             gate.deinit();
         }
-        if (self.connection) |conn| {
-            conn.deinit(allocator);
-            self.connection = null;
-        }
-        self.profile.deinit(allocator);
-        allocator.destroy(self);
+        std.debug.assert(self.connection_runtime == null);
+        self.profile.deinit(self.allocator);
+        self.allocator.destroy(self);
 
         log.write(.debug, "Deinit daemon");
     }
 
-    // This is safe because connection is not modified
-    // during the daemon lifecycle
     pub fn isConnectionProfile(self: Daemon) bool {
-        return self.connection != null;
+        return activeConnectionModule(&self.profile) != null;
     }
 
     pub fn isSettingsOnly(self: Daemon) bool {
@@ -209,17 +234,16 @@ pub const Daemon = struct {
 
     // #region Actor interface
 
-    const Actor = core.Actor(
+    const Actor = core.actor.ActorWithFinish(
         Daemon,
         Message,
         Error,
         perform,
+        actorDidFinish,
     );
 
     const Message = union(enum) {
-        start: struct {
-            allocator: std.mem.Allocator,
-        },
+        start,
         hold,
         stop,
         evaluateConnection,
@@ -229,6 +253,9 @@ pub const Daemon = struct {
         onConnectionStatus: api.ConnectionStatus,
         onConnectionLastError: api.PartoutErrorCode,
         onConnectionDataCount: api.DataCount,
+        onConnectionCancel: ?api.PartoutErrorCode,
+        onLooperFinish: ?Looper.Failure,
+        recoverConnection,
         onConnectionBlock: struct {
             ptr: *anyopaque,
             block: sandbox.SerializedExecutor.Block,
@@ -237,9 +264,9 @@ pub const Daemon = struct {
 
     fn perform(self: *Daemon, message: Message) Error!void {
         switch (message) {
-            .start => |payload| try self.doStart(payload.allocator),
+            .start => try self.doStart(),
             .hold => self.doHold(),
-            .stop => self.doStop(),
+            .stop => self.doStop(.clear_environment),
             .evaluateConnection => self.doEvaluateConnection(),
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachability(reachability),
@@ -247,17 +274,15 @@ pub const Daemon = struct {
             .onConnectionStatus => |status| self.handleConnectionStatus(status),
             .onConnectionLastError => |code| self.handleLastError(code),
             .onConnectionDataCount => |count| self.handleDataCount(count),
+            .onConnectionCancel => |code| self.handleConnectionCancel(code),
+            .onLooperFinish => |failure| self.handleLooperFinish(failure),
+            .recoverConnection => self.recoverConnectionRuntime(),
             .onConnectionBlock => |payload| self.handleConnectionBlock(payload.ptr, payload.block),
         }
     }
 
-    pub fn start(
-        self: *const Daemon,
-        allocator: std.mem.Allocator,
-    ) Error!void {
-        return self.actor.perform(.{ .start = .{
-            .allocator = allocator,
-        } });
+    pub fn start(self: *const Daemon) Error!void {
+        return self.actor.perform(.start);
     }
 
     pub fn hold(self: *const Daemon) void {
@@ -276,7 +301,7 @@ pub const Daemon = struct {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
         self.actor.perform(.evaluateConnection) catch |err| {
-            log.writef(.err, "Unable to evaluate connection: {}", .{err});
+            log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
         };
     }
 
@@ -284,7 +309,7 @@ pub const Daemon = struct {
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         self.actor.perform(.resumeGate) catch |err| {
-            log.writef(.err, "Unable to resume connection gate: {}", .{err});
+            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
         };
     }
 
@@ -295,7 +320,7 @@ pub const Daemon = struct {
             _ = gate.updateReachability(reachability.reachable);
         }
         self.actor.perform(.{ .onReachability = reachability }) catch |err| {
-            log.writef(.err, "Unable to handle reachability: {}", .{err});
+            log.writef(.err, "Unable to handle reachability: {s}", .{@errorName(err)});
         };
     }
 
@@ -303,7 +328,7 @@ pub const Daemon = struct {
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         self.actor.perform(.onBetterPath) catch |err| {
-            log.writef(.err, "Unable to handle better path: {}", .{err});
+            log.writef(.err, "Unable to handle better path: {s}", .{@errorName(err)});
         };
     }
 
@@ -314,7 +339,7 @@ pub const Daemon = struct {
             .status = onConnectionStatus,
             .last_error = onConnectionLastError,
             .data_count = onConnectionDataCount,
-            .remove_key = onConnectionRemoveKey,
+            .cancel = onConnectionCancel,
         };
     }
 
@@ -329,32 +354,37 @@ pub const Daemon = struct {
     fn onConnectionStatus(ctx: *anyopaque, status: api.ConnectionStatus) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionStatus = status }) catch |err| {
-            log.writef(.err, "Unable to report connection status: {}", .{err});
+            log.writef(.err, "Unable to report connection status: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionLastError = code }) catch |err| {
-            log.writef(.err, "Unable to report connection last error: {}", .{err});
+            log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(.{ .onConnectionDataCount = data_count }) catch |err| {
-            log.writef(.err, "Unable to report connection data count: {}", .{err});
+            log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
         };
     }
 
-    fn onConnectionRemoveKey(_: *anyopaque, _: conn_mod.Connection.EventKey) void {}
+    fn onConnectionCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
+        const self: *Daemon = @ptrCast(@alignCast(ctx));
+        self.actor.perform(.{ .onConnectionCancel = code }) catch |err| {
+            log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
+        };
+    }
 
     fn onConnectionBlock(
-        ctx: ?*anyopaque,
+        ctx: *anyopaque,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
     ) void {
-        const self: *Daemon = @ptrCast(@alignCast(ctx.?));
+        const self: *Daemon = @ptrCast(@alignCast(ctx));
         // RunAfter callbacks must return without waiting for the actor. This
         // lets cancellation drain a callback even when stop currently owns the
         // actor, and preserves FIFO ordering with a later restart.
@@ -362,7 +392,7 @@ pub const Daemon = struct {
             .ptr = ptr,
             .block = block,
         } }) catch |err| {
-            log.writef(.err, "Unable to enqueue serialized connection work: {}", .{err});
+            log.writef(.err, "Unable to enqueue serialized connection work: {s}", .{@errorName(err)});
         };
     }
 
@@ -370,24 +400,22 @@ pub const Daemon = struct {
 
     // #region Actor handlers
 
-    fn doStart(
-        self: *Daemon,
-        allocator: std.mem.Allocator,
-    ) Error!void {
+    fn doStart(self: *Daemon) Error!void {
         if (self.state != .initial) return error.AlreadyStarted;
+        if (self.isConnectionProfile()) try self.initConnectionRuntime();
         self.state = .started;
 
         log.write(.notice, "Start daemon");
         self.clearEvents();
 
         // Establish settings-only tunnel if no connection
-        if (self.connection == null) {
-            var maybe_info = buildSettingsOnlyTunnelInfo(allocator, &self.profile) catch |err| {
+        if (self.isSettingsOnly()) {
+            var maybe_info = buildSettingsOnlyTunnelInfo(self.allocator, &self.profile) catch |err| {
                 self.handleStartError(err);
                 return;
             };
             if (maybe_info) |*info| {
-                defer info.deinit(allocator);
+                defer info.deinit(self.allocator);
                 _ = self.controller.setTunnelSettings(info.*) catch |err| {
                     self.handleStartError(err);
                     return;
@@ -436,27 +464,28 @@ pub const Daemon = struct {
     }
 
     fn handleStartError(self: *Daemon, err: anyerror) void {
-        log.writef(.fault, "Unable to start daemon: {}", .{err});
+        log.writef(.fault, "Unable to start daemon: {s}", .{@errorName(err)});
         const code = api.codeForError(err);
         self.handleLastError(code);
         self.controller.setReasserting(false);
-        if (self.options.cancels_unrecoverable) {
-            self.controller.cancelTunnelConnection(code);
-        }
+        self.requestCancellation(code, false);
     }
 
     fn doHold(self: *Daemon) void {
-        if (self.on_hold) return;
-        self.on_hold = true;
-        self.doStop();
+        self.doStop(.preserve_environment);
     }
 
-    fn doStop(self: *Daemon) void {
+    fn doStop(self: *Daemon, mode: StopMode) void {
         switch (self.state) {
-            .stopping => return,
+            .stopping => {
+                // A reentrant hold may upgrade an in-progress normal stop.
+                if (mode == .preserve_environment) self.stop_mode = mode;
+                return;
+            },
             .stopped => return,
             .initial, .started => {},
         }
+        self.stop_mode = mode;
         self.state = .stopping;
 
         log.write(.notice, "Stop daemon");
@@ -471,7 +500,7 @@ pub const Daemon = struct {
         }
 
         // Settings-only, stop immediately
-        if (self.connection == null) {
+        if (self.isSettingsOnly()) {
             log.write(.notice, "Non-connection profile, nothing to disconnect from");
             self.controller.clearTunnelSettings(false);
             self.finishStop();
@@ -482,13 +511,18 @@ pub const Daemon = struct {
         log.writef(.notice, "Connection profile, disconnect with a timeout of {} milliseconds", .{
             self.options.stop_delay_ms,
         });
-        self.connection.?.stop(self.options.stop_delay_ms, self.events());
+        const runtime = self.connection_runtime orelse {
+            self.finishStop();
+            return;
+        };
+        runtime.connection.stop(self.options.stop_delay_ms, self.events());
+        self.deinitConnectionRuntime();
         self.finishStop();
     }
 
     fn finishStop(self: *Daemon) void {
         self.state = .stopped;
-        self.clearEvents();
+        if (self.stop_mode == .clear_environment) self.clearEvents();
         log.write(.notice, "Daemon stopped successfully");
     }
 
@@ -505,7 +539,8 @@ pub const Daemon = struct {
             log.write(.info, "Ignore evaluation, daemon not started");
             return;
         }
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         if (self.is_evaluating_connection) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
@@ -513,11 +548,6 @@ pub const Daemon = struct {
 
         self.is_evaluating_connection = true;
         defer self.is_evaluating_connection = false;
-
-        if (self.on_hold) {
-            log.write(.info, "Ignore evaluation, daemon on hold");
-            return;
-        }
 
         if (!force and !self.monitor.isReachable()) {
             log.write(.info, "Ignore evaluation, wait for reachable network");
@@ -534,13 +564,10 @@ pub const Daemon = struct {
 
         log.write(.notice, "Start connection");
         const did_start = conn.start(self.events()) catch |err| {
-            log.writef(.err, "Unable to start connection: {}", .{err});
+            log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             const code = api.codeForError(err);
             self.handleLastError(code);
             self.controller.setReasserting(false);
-            if (self.options.cancels_unrecoverable) {
-                self.controller.cancelTunnelConnection(code);
-            }
             return;
         };
         if (!did_start) {
@@ -554,17 +581,12 @@ pub const Daemon = struct {
             log.write(.info, "Ignore resume connection gate, daemon not started");
             return;
         }
-        if (self.on_hold) {
-            log.write(.info, "Ignore resume connection gate, daemon on hold");
-            return;
-        }
-
         const delay_ms = self.options.reconnection_delay_ms;
         log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
 
         // Contextually cancels the previous attempt
         self.resume_gate_timer.init(delay_ms, onResumeGate, self) catch |err| {
-            log.writef(.err, "Unable to schedule resume connection gate, resume now: {}", .{err});
+            log.writef(.err, "Unable to schedule resume connection gate, resume now: {s}", .{@errorName(err)});
             self.doResumeGate();
         };
     }
@@ -572,10 +594,6 @@ pub const Daemon = struct {
     fn doResumeGate(self: *Daemon) void {
         if (self.state != .started) {
             log.write(.info, "Ignore resume connection gate, daemon not started");
-            return;
-        }
-        if (self.on_hold) {
-            log.write(.info, "Ignore resume connection gate, daemon on hold");
             return;
         }
         log.write(.info, "Resume connection gate now");
@@ -587,14 +605,16 @@ pub const Daemon = struct {
     // Forwards the event to the underlying connection
     fn handleReachability(self: *Daemon, reachability: io.ReachabilityInfo) void {
         if (self.state != .started) return;
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         conn.networkChange(reachability, self.events());
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *Daemon) void {
         if (self.state != .started) return;
-        const conn = self.connection orelse return;
+        const runtime = self.connection_runtime orelse return;
+        const conn = runtime.connection;
         conn.betterPath(self.events());
     }
 
@@ -609,6 +629,7 @@ pub const Daemon = struct {
             },
             .disconnecting => {},
             .disconnected => {
+                self.resetDataCount();
                 self.controller.setReasserting(false);
                 self.scheduleResumeGate();
             },
@@ -621,6 +642,7 @@ pub const Daemon = struct {
     }
 
     fn handleLastError(self: *Daemon, code: api.PartoutErrorCode) void {
+        self.resetDataCount();
         self.snapshot_publisher.setLastError(code);
         self.snapshot_publisher.publishCurrentSnapshot(true);
         if (self.options.events) |e| e.last_error(e.ctx, code);
@@ -630,6 +652,70 @@ pub const Daemon = struct {
         self.snapshot_publisher.setDataCount(data_count);
         self.snapshot_publisher.publishCurrentSnapshot(false);
         if (self.options.events) |e| e.data_count(e.ctx, data_count);
+    }
+
+    fn handleConnectionCancel(self: *Daemon, code: ?api.PartoutErrorCode) void {
+        self.controller.setReasserting(false);
+        self.requestCancellation(code, false);
+    }
+
+    fn resetDataCount(self: *Daemon) void {
+        self.snapshot_publisher.setDataCount(.{});
+        self.emitRemove(.data_count);
+    }
+
+    fn handleLooperFinish(
+        self: *Daemon,
+        failure: ?Looper.Failure,
+    ) void {
+        if (self.state == .stopping or self.state == .stopped) return;
+
+        log.write(.fault, "Daemon-owned looper terminated");
+
+        // An unrecoverable connection may already have requested provider
+        // cancellation while synchronously handling the looper finish.
+        if (self.cancellation_requested) return;
+
+        if (looperFailureCode(failure)) |code| {
+            self.handleLastError(code);
+        }
+
+        // Stop every producer before placing the replacement behind any work
+        // it already submitted to the actor. The queued recovery message is
+        // therefore a simple FIFO drain barrier for the old connection.
+        if (self.connection_runtime) |runtime| {
+            runtime.connection.stop(0, self.events());
+        }
+        self.resume_gate_timer.cancel();
+        self.actor.schedule(.recoverConnection) catch |err| {
+            log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
+            self.controller.setReasserting(false);
+            self.requestCancellation(looperFailureCode(failure), true);
+        };
+    }
+
+    fn requestCancellation(
+        self: *Daemon,
+        code: ?api.PartoutErrorCode,
+        force: bool,
+    ) void {
+        if (self.cancellation_requested) return;
+        if (!force and !self.options.cancels_unrecoverable) return;
+        self.cancellation_requested = true;
+        self.controller.cancelTunnelConnection(code);
+    }
+
+    fn actorDidFinish(self: *Daemon) void {
+        if (self.is_deinitializing) return;
+
+        log.write(.fault, "Daemon actor terminated");
+
+        // The callback still runs on the actor thread, so it can complete the
+        // normal serialized stop before the worker exits. The host cancellation
+        // then owns final Daemon/Looper deinitialization.
+        self.doStop(.preserve_environment);
+        self.controller.setReasserting(false);
+        self.requestCancellation(null, true);
     }
 
     fn handleConnectionBlock(
@@ -653,12 +739,11 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.status(e.ctx, status);
     }
 
-    fn emitRemove(self: *const Daemon, key: conn_mod.Connection.EventKey) void {
+    fn emitRemove(self: *const Daemon, key: EventKey) void {
         if (self.options.events) |e| e.remove_key(e.ctx, key);
     }
 
     fn clearEvents(self: *Daemon) void {
-        if (self.on_hold) return;
         log.write(.notice, "Clear connection events");
         self.snapshot_publisher.clearEnvironment();
         self.emitRemove(.connection_status);
@@ -680,6 +765,105 @@ pub const Daemon = struct {
         self.controller.reportSnapshot(snapshot);
     }
 
+    fn initConnectionRuntime(self: *Daemon) Error!void {
+        std.debug.assert(self.connection_runtime == null);
+        const module = activeConnectionModule(&self.profile) orelse return;
+
+        const looper = try self.allocator.create(Looper);
+        errdefer self.allocator.destroy(looper);
+        looper.* = Looper.init(self.allocator, .{
+            .on_finish = .{
+                .context = self,
+                .callback = onLooperFinish,
+            },
+        }) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.MuxFailure => return error.LooperFailure,
+        };
+        errdefer looper.deinit();
+
+        const sb: sandbox.Sandbox = .{
+            .profile = &self.profile,
+            .controller = self.controller,
+            .factory = self.factory,
+            .resolver = self.resolver,
+            .looper = looper,
+            .cache_dir = self.options.cache_dir,
+            .serialized_executor = self.serializedExecutor(),
+            .options = self.options.connection_options,
+        };
+        const connection = try self.registry.createConnection(
+            self.allocator,
+            module,
+            sb,
+        );
+        errdefer connection.deinit();
+
+        // Publish a complete runtime before the looper can invoke onFinish.
+        self.connection_runtime = .{
+            .connection = connection,
+            .looper = looper,
+        };
+        looper.start() catch |err| {
+            self.connection_runtime = null;
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.LooperFailure,
+            };
+        };
+    }
+
+    fn recoverConnectionRuntime(self: *Daemon) void {
+        if (self.state == .stopping or self.state == .stopped) return;
+        if (self.cancellation_requested) return;
+
+        log.write(.notice, "Replace connection after terminal looper");
+        self.deinitConnectionRuntime();
+        self.initConnectionRuntime() catch |err| {
+            log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
+            const code = api.codeForError(err);
+            self.handleLastError(code);
+            self.controller.setReasserting(false);
+            self.requestCancellation(code, true);
+            return;
+        };
+
+        if (self.state == .started) {
+            self.startConnection();
+        }
+    }
+
+    fn deinitConnectionRuntime(self: *Daemon) void {
+        const runtime = self.connection_runtime orelse return;
+
+        // Keep the borrowed looper object alive until the connection has
+        // released every Session that refers to it, but first join its worker
+        // so onFinish cannot race connection deinitialization.
+        runtime.looper.stop() catch |err| switch (err) {
+            error.TerminalFailure => {},
+            else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
+        };
+        runtime.connection.deinit();
+        runtime.looper.deinit();
+        self.allocator.destroy(runtime.looper);
+        self.connection_runtime = null;
+    }
+
+    fn onLooperFinish(
+        ctx: ?*anyopaque,
+        failure: ?Looper.Failure,
+    ) void {
+        const self: *Daemon = @ptrCast(@alignCast(ctx.?));
+        if (self.connection_runtime) |runtime| {
+            // Session teardown must stay on the looper queue. It may enqueue
+            // connection work first; actor FIFO preserves that ordering.
+            runtime.connection.looperDidFinish(failure);
+        }
+        self.actor.schedule(.{ .onLooperFinish = failure }) catch |err| {
+            log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});
+        };
+    }
+
     // #endregion
 
     // #region Testing
@@ -697,6 +881,14 @@ pub const Daemon = struct {
 
     // #endregion
 };
+
+fn looperFailureCode(failure: ?Looper.Failure) ?api.PartoutErrorCode {
+    const value = failure orelse return null;
+    return switch (value) {
+        .wait, .system, .io => .ioFailure,
+        .user => .unhandled,
+    };
+}
 
 fn buildSettingsOnlyTunnelInfo(
     allocator: std.mem.Allocator,

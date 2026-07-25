@@ -7,6 +7,7 @@ const std = @import("std");
 const c_common = @import("../c/exports.zig").common;
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
+const log = core.logging;
 const util = core.util;
 
 const c = @cImport({
@@ -110,6 +111,7 @@ fn cTurnOn(
     tunnel: StartTunnel,
 ) Error!i32 {
     if (c.pp_wg_init() != 0) return error.BackendUnavailable;
+    c.pp_wg_set_logger(cLog, null);
 
     var c_settings: util.TemporaryCString = .{};
     try c_settings.init(allocator, settings);
@@ -127,6 +129,16 @@ fn cTurnOn(
 
     const fd = tunnel.descriptor() orelse return error.CannotLocateTunnelFileDescriptor;
     return c.pp_wg_turn_on(c_settings.ptr(), fd);
+}
+
+fn cLog(
+    _: ?*anyopaque,
+    level: c_int,
+    message: [*c]const u8,
+) callconv(.c) void {
+    if (message == null) return;
+    const text = std.mem.trimEnd(u8, std.mem.span(message), "\r\n");
+    log.write(if (level == 1) .err else .debug, text);
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {

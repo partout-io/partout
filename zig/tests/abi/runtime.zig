@@ -3,17 +3,20 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const source = @import("source");
 
-const core = @import("source").core;
-const conn = @import("source").net_connection;
-const net_daemon = @import("source").net_daemon;
-const helpers = @import("source").abi_helpers;
-const abi_runtime = @import("source").abi_runtime;
-const mock = @import("source").mock;
+const core = source.core;
+const conn = source.net_connection;
+const net_daemon = source.net_daemon;
+const helpers = source.abi_helpers;
+const abi_runtime = source.abi_runtime;
+const mock = source.mock;
 
 const api = core.api;
 const c = helpers.c;
 const MockDaemonRuntime = mock.MockDaemonRuntime;
+
+const profile_cache_directory = "partout-00000000-0000-4000-8000-000000000000";
 
 fn createDaemonWithJson(
     allocator: std.mem.Allocator,
@@ -47,7 +50,10 @@ test "daemon options parse DNS-only profile" {
     );
     defer options.deinit(allocator);
 
-    try std.testing.expectEqualStrings("/tmp", options.cache_dir);
+    try std.testing.expectEqualStrings(
+        "/tmp/" ++ profile_cache_directory,
+        options.cache_dir,
+    );
     try std.testing.expect(!options.is_daemon);
     try std.testing.expectEqual(@as(u64, 4096), options.min_data_count_delta);
 }
@@ -72,11 +78,23 @@ test "daemon options default cache directory" {
     );
     defer options.deinit(allocator);
 
-    try std.testing.expect(options.cache_dir.len > 0);
+    try std.testing.expectEqualStrings(
+        profile_cache_directory,
+        std.fs.path.basename(options.cache_dir),
+    );
 }
 
 test "daemon options reject missing connection implementation" {
     const allocator = std.testing.allocator;
+    if (source.openvpn_enabled) {
+        var options = try abi_runtime.DaemonOptions.init(
+            allocator,
+            daemonStartArgs(mock.connectionProfileJson().ptr),
+            null,
+        );
+        defer options.deinit(allocator);
+        return;
+    }
     try std.testing.expectError(
         error.MissingConnectionImplementation,
         abi_runtime.DaemonOptions.init(
@@ -89,14 +107,33 @@ test "daemon options reject missing connection implementation" {
 
 test "daemon runtime owns options during lifecycle" {
     const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_root = try std.fmt.allocPrint(
+        allocator,
+        ".zig-cache/tmp/{s}",
+        .{tmp.sub_path},
+    );
+    defer allocator.free(cache_root);
+    const cache_root_z = try allocator.dupeZ(u8, cache_root);
+    defer allocator.free(cache_root_z);
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.cache_dir = cache_root_z.ptr;
     const options = try abi_runtime.DaemonOptions.init(
         allocator,
-        daemonStartArgs(mock.dnsOnlyProfileJson().ptr),
+        args,
         null,
     );
+    try std.testing.expectEqualStrings(
+        profile_cache_directory,
+        std.fs.path.basename(options.cache_dir),
+    );
     const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
+    const io = std.Io.Threaded.global_single_threaded.io();
+    const stat = try std.Io.Dir.cwd().statFile(io, runtime.options.cache_dir, .{});
+    try std.testing.expectEqual(.directory, stat.kind);
 
-    try runtime.start(allocator);
+    try runtime.start();
     runtime.stop();
     runtime.deinit(allocator);
 }
@@ -111,9 +148,9 @@ test "starts DNS-only profile through tunnel controller" {
         mock.dnsOnlyProfileJson(),
         runtime.context(&registry),
     );
-    defer daemon.deinit(allocator);
+    defer daemon.deinit();
 
-    try daemon.start(allocator);
+    try daemon.start();
 
     try std.testing.expect(daemon.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), runtime.controller.set_tunnel_settings_count);
@@ -144,9 +181,9 @@ test "starts profile without active modules without tunnel settings" {
         empty_profile_json,
         runtime.context(&registry),
     );
-    defer daemon.deinit(allocator);
+    defer daemon.deinit();
 
-    try daemon.start(allocator);
+    try daemon.start();
     defer daemon.stop();
 
     try std.testing.expect(daemon.isSettingsOnly());
@@ -159,13 +196,16 @@ test "requires a connection implementation for active connection profiles" {
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
     defer registry.deinit(allocator);
+    var daemon = try createDaemonWithJson(
+        allocator,
+        mock.connectionProfileJson(),
+        runtime.context(&registry),
+    );
+    defer daemon.deinit();
+
     try std.testing.expectError(
         error.MissingConnectionImplementation,
-        createDaemonWithJson(
-            allocator,
-            mock.connectionProfileJson(),
-            runtime.context(&registry),
-        ),
+        daemon.start(),
     );
 }
 
@@ -175,11 +215,12 @@ test "starts and stops connection profile through injected dependencies" {
     var registry = try mockConnectionRegistry(allocator);
     defer registry.deinit(allocator);
     var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.deinit(allocator);
+    defer daemon.deinit();
 
     try std.testing.expect(daemon.isConnectionProfile());
 
-    try daemon.start(allocator);
+    try daemon.start();
+    defer daemon.stop();
 
     try std.testing.expectEqual(@as(usize, 1), runtime.monitor.start_count);
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
@@ -189,8 +230,8 @@ test "starts and stops connection profile through injected dependencies" {
     }, daemon.testStatuses());
     try std.testing.expectEqual(.connected, runtime.events.connection_status.?);
     try std.testing.expectEqual(.authentication, runtime.events.last_error_code.?);
-    try std.testing.expectEqual(@as(u64, 10), runtime.events.data_count.received);
-    try std.testing.expectEqual(@as(u64, 20), runtime.events.data_count.sent);
+    try std.testing.expect(!runtime.events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, runtime.events.data_count);
     try std.testing.expect(!runtime.controller.reasserting);
 
     daemon.stop();
@@ -218,9 +259,9 @@ test "stop blocks until connection teardown finishes" {
         mock.connectionProfileJson(),
         runtime.context(&registry),
     );
-    defer daemon.deinit(allocator);
+    defer daemon.deinit();
 
-    try daemon.start(allocator);
+    try daemon.start();
 
     daemon.stop();
 
@@ -235,9 +276,9 @@ test "network monitor gates immediate connection evaluation" {
     var registry = try mockConnectionRegistry(allocator);
     defer registry.deinit(allocator);
     var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.deinit(allocator);
+    defer daemon.deinit();
 
-    try daemon.start(allocator);
+    try daemon.start();
     defer daemon.stop();
 
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{.disconnected}, daemon.testStatuses());

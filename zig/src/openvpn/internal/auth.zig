@@ -13,11 +13,13 @@ const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
 const c_crypto = c_exports_mod.crypto;
+const log = core_mod.logging;
 
 const ControlConstants = constants_mod.Control;
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
-const Keys = constants_mod.Keys;
+const KeysConstants = constants_mod.Keys;
 const PRNG = crypto_mod.PRNG;
 const TLSWrapper = tls_mod.TLSWrapper;
 const ZeroingData = crypto_mod.ZeroingData;
@@ -61,7 +63,7 @@ pub const Handshake = struct {
 
 /// Parameters for deriving the four OpenVPN key-method 2 keys.
 pub const PRF = struct {
-    fnt: c_crypto.pp_crypto_fnt,
+    functions: c_crypto.pp_crypto_fnt,
     handshake: ?Handshake,
     session_id: ?[]u8,
     remote_session_id: ?[]u8,
@@ -70,7 +72,23 @@ pub const PRF = struct {
     /// produced it.
     pub fn init(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        backend: CryptoBackend,
+        handshake: *const Handshake,
+        session_id: []const u8,
+        remote_session_id: []const u8,
+    ) !PRF {
+        return initWithFunctions(
+            allocator,
+            c_exports_mod.cryptoFunctionTable(backend),
+            handshake,
+            session_id,
+            remote_session_id,
+        );
+    }
+
+    fn initWithFunctions(
+        allocator: std.mem.Allocator,
+        functions: c_crypto.pp_crypto_fnt,
         handshake: *const Handshake,
         session_id: []const u8,
         remote_session_id: []const u8,
@@ -81,7 +99,7 @@ pub const PRF = struct {
         errdefer allocator.free(owned_session_id);
         const owned_remote_session_id = try allocator.dupe(u8, remote_session_id);
         return .{
-            .fnt = fnt,
+            .functions = functions,
             .handshake = owned_handshake,
             .session_id = owned_session_id,
             .remote_session_id = owned_remote_session_id,
@@ -104,36 +122,36 @@ pub const PRF = struct {
         const handshake = self.handshake.?;
 
         var master_data = try prfData(allocator, .{
-            .fnt = self.fnt,
-            .label = Keys.label1,
+            .functions = self.functions,
+            .label = KeysConstants.label1,
             .secret = handshake.pre_master.bytes,
             .client_seed = handshake.random1.bytes,
             .server_seed = handshake.server_random1.bytes,
-            .size = Keys.pre_master_length,
+            .size = KeysConstants.pre_master_length,
         });
         defer master_data.deinit(allocator);
 
         var keys_data = try prfData(allocator, .{
-            .fnt = self.fnt,
-            .label = Keys.label2,
+            .functions = self.functions,
+            .label = KeysConstants.label2,
             .secret = master_data.bytes,
             .client_seed = handshake.random2.bytes,
             .server_seed = handshake.server_random2.bytes,
             .client_session_id = self.session_id.?,
             .server_session_id = self.remote_session_id.?,
-            .size = Keys.keys_count * Keys.key_length,
+            .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);
-        std.debug.assert(keys_data.bytes.len == Keys.keys_count * Keys.key_length);
+        std.debug.assert(keys_data.bytes.len == KeysConstants.keys_count * KeysConstants.key_length);
 
-        var parts: [Keys.keys_count]ZeroingData = undefined;
+        var parts: [KeysConstants.keys_count]ZeroingData = undefined;
         var initialized: usize = 0;
         errdefer for (parts[0..initialized]) |*part| part.deinit(allocator);
         for (&parts, 0..) |*part, index| {
             part.* = keys_data.sliceCopy(
                 allocator,
-                index * Keys.key_length,
-                Keys.key_length,
+                index * KeysConstants.key_length,
+                KeysConstants.key_length,
             ) catch unreachable;
             initialized += 1;
         }
@@ -156,7 +174,7 @@ pub const PRF = struct {
         const half_rounded_up = half + (input.secret.len & 1);
         var hash1 = try keysHash(
             allocator,
-            input.fnt,
+            input.functions,
             "MD5",
             input.secret[0..half_rounded_up],
             seed.bytes,
@@ -165,7 +183,7 @@ pub const PRF = struct {
         defer hash1.deinit(allocator);
         var hash2 = try keysHash(
             allocator,
-            input.fnt,
+            input.functions,
             "SHA1",
             input.secret[half..][0..half_rounded_up],
             seed.bytes,
@@ -180,7 +198,7 @@ pub const PRF = struct {
 
     fn keysHash(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        functions: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         seed: []const u8,
@@ -188,7 +206,7 @@ pub const PRF = struct {
     ) !ZeroingData {
         var output = try ZeroingData.init(allocator, 0);
         errdefer output.deinit(allocator);
-        var chain = try hmac(allocator, fnt, digest_name, secret, seed);
+        var chain = try hmac(allocator, functions, digest_name, secret, seed);
         defer chain.deinit(allocator);
 
         while (output.bytes.len < size) {
@@ -196,11 +214,11 @@ pub const PRF = struct {
             defer chain_and_seed.deinit(allocator);
             try chain_and_seed.append(allocator, seed);
 
-            var block = try hmac(allocator, fnt, digest_name, secret, chain_and_seed.bytes);
+            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.bytes);
             defer block.deinit(allocator);
             try output.append(allocator, block.bytes);
 
-            var next_chain = try hmac(allocator, fnt, digest_name, secret, chain.bytes);
+            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.bytes);
             chain.deinit(allocator);
             chain = next_chain.move();
         }
@@ -212,7 +230,7 @@ pub const PRF = struct {
 
     fn hmac(
         allocator: std.mem.Allocator,
-        fnt: c_crypto.pp_crypto_fnt,
+        functions: c_crypto.pp_crypto_fnt,
         digest_name: [*:0]const u8,
         secret: []const u8,
         data: []const u8,
@@ -229,13 +247,31 @@ pub const PRF = struct {
             .data = data.ptr,
             .data_len = data.len,
         };
-        const hmac_do = fnt.hmac_do orelse return error.UnsupportedAlgorithm;
+        const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.bytes.len) return error.UnsupportedAlgorithm;
         const result = buffer.sliceCopy(allocator, 0, length) catch unreachable;
         buffer.deinit(allocator);
         return result;
     }
+
+    pub const testing = struct {
+        pub fn initWithFunctions(
+            allocator: std.mem.Allocator,
+            functions: c_crypto.pp_crypto_fnt,
+            handshake: *const Handshake,
+            session_id: []const u8,
+            remote_session_id: []const u8,
+        ) !PRF {
+            return PRF.initWithFunctions(
+                allocator,
+                functions,
+                handshake,
+                session_id,
+                remote_session_id,
+            );
+        }
+    };
 };
 
 pub const Authenticator = struct {
@@ -258,11 +294,11 @@ pub const Authenticator = struct {
         username: ?[]const u8,
         password: ?[]const u8,
     ) !Authenticator {
-        var pre_master = try prng.safeData(allocator, Keys.pre_master_length);
+        var pre_master = try prng.safeData(allocator, KeysConstants.pre_master_length);
         errdefer pre_master.deinit(allocator);
-        var random1 = try prng.safeData(allocator, Keys.random_length);
+        var random1 = try prng.safeData(allocator, KeysConstants.random_length);
         errdefer random1.deinit(allocator);
-        var random2 = try prng.safeData(allocator, Keys.random_length);
+        var random2 = try prng.safeData(allocator, KeysConstants.random_length);
         errdefer random2.deinit(allocator);
         var control_buffer = try ZeroingData.init(allocator, 0);
         errdefer control_buffer.deinit(allocator);
@@ -324,6 +360,7 @@ pub const Authenticator = struct {
     ) !void {
         var raw = try self.authData(configuration);
         defer raw.deinit(self.allocator);
+        log.write(.info, "TLS.auth: Put plaintext");
         try tls.putRawPlainText(raw.bytes);
     }
 
@@ -345,6 +382,7 @@ pub const Authenticator = struct {
             self.with_local_options,
         );
         defer allocator.free(local_options);
+        log.writef(.info, "TLS.auth: Local options: {s}", .{local_options});
         var local_options_data = try ZeroingData.initString(allocator, local_options, true);
         defer local_options_data.deinit(allocator);
         try appendSized(&raw, allocator, local_options_data);
@@ -392,7 +430,7 @@ pub const Authenticator = struct {
 
     pub fn parseAuthReply(self: *Authenticator) !bool {
         const prefix_length = ControlConstants.tls_prefix.len;
-        const minimum_length = prefix_length + 2 * Keys.random_length + 2;
+        const minimum_length = prefix_length + 2 * KeysConstants.random_length + 2;
         if (self.control_buffer.bytes.len < minimum_length) return false;
         if (!std.mem.eql(
             u8,
@@ -402,9 +440,9 @@ pub const Authenticator = struct {
 
         var offset = prefix_length;
         const random1_offset = offset;
-        offset += Keys.random_length;
+        offset += KeysConstants.random_length;
         const random2_offset = offset;
-        offset += Keys.random_length;
+        offset += KeysConstants.random_length;
         const options_length = self.control_buffer.networkU16(offset) catch unreachable;
         offset += 2;
         if (self.control_buffer.bytes.len - offset < options_length) return false;
@@ -412,13 +450,13 @@ pub const Authenticator = struct {
         var server_random1 = self.control_buffer.sliceCopy(
             self.allocator,
             random1_offset,
-            Keys.random_length,
+            KeysConstants.random_length,
         ) catch unreachable;
         errdefer server_random1.deinit(self.allocator);
         var server_random2 = self.control_buffer.sliceCopy(
             self.allocator,
             random2_offset,
-            Keys.random_length,
+            KeysConstants.random_length,
         ) catch unreachable;
         errdefer server_random2.deinit(self.allocator);
         var server_options_data = self.control_buffer.sliceCopy(
@@ -429,10 +467,17 @@ pub const Authenticator = struct {
         defer server_options_data.deinit(self.allocator);
         offset += options_length;
 
-        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value|
-            ServerOCC.parse(value)
-        else
-            null;
+        log.write(.info, "TLS.auth: Parsed server random");
+
+        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value| blk: {
+            log.writef(.info, "TLS.auth: Parsed server options (string): \"{s}\"", .{value});
+            const options = ServerOCC.parse(value);
+            log.writef(.info, "TLS.auth: Server options: cipher={s}, digest={s}", .{
+                if (options.cipher) |cipher| cipher.raw() else "nil",
+                if (options.digest) |digest| digest.raw() else "nil",
+            });
+            break :blk options;
+        } else null;
         try self.control_buffer.removePrefix(self.allocator, offset);
 
         if (self.server_random1) |*value| value.deinit(self.allocator);
@@ -532,7 +577,7 @@ pub const testing = struct {
 };
 
 const PRFInput = struct {
-    fnt: c_crypto.pp_crypto_fnt,
+    functions: c_crypto.pp_crypto_fnt,
     label: []const u8,
     secret: []const u8,
     client_seed: []const u8,

@@ -11,12 +11,14 @@ const api = core_mod.api;
 const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const TLSConstants = constants_mod.TLS;
 
 /// Borrowed arguments used to create a TLS engine.
 pub const TLSParameters = struct {
-    fnt: c_crypto.pp_crypto_tls_fnt,
+    backend: CryptoBackend,
     caches_directory: []const u8,
+    ca_filename: []const u8,
     configuration: *const api.OpenVPNConfiguration,
     verification: Verification = .{},
 
@@ -39,7 +41,7 @@ pub const TLSParameters = struct {
 /// the TLS object itself.
 pub const TLSWrapper = struct {
     allocator: std.mem.Allocator,
-    fnt: c_crypto.pp_crypto_tls_fnt,
+    functions: c_crypto.pp_crypto_tls_fnt,
     tls: c_crypto.pp_tls,
     ca_path: [:0]u8,
     verification_context: *VerificationContext,
@@ -52,10 +54,22 @@ pub const TLSWrapper = struct {
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
     ) !*TLSWrapper {
+        return createWithFunctions(
+            allocator,
+            parameters,
+            c_exports_mod.cryptoFunctionTable(parameters.backend).tls,
+        );
+    }
+
+    fn createWithFunctions(
+        allocator: std.mem.Allocator,
+        parameters: TLSParameters,
+        functions: c_crypto.pp_crypto_tls_fnt,
+    ) !*TLSWrapper {
         const configuration = parameters.configuration.*;
         const ca = configuration.ca orelse return error.TLSFailure;
-        const create_tls = parameters.fnt.create orelse return error.TLSFailure;
-        const free_tls = parameters.fnt.free orelse return error.TLSFailure;
+        const create_tls = functions.create orelse return error.TLSFailure;
+        const free_tls = functions.free orelse return error.TLSFailure;
 
         const ca_path_plain = try std.fmt.allocPrint(
             allocator,
@@ -63,7 +77,7 @@ pub const TLSWrapper = struct {
             .{
                 parameters.caches_directory,
                 if (std.mem.endsWith(u8, parameters.caches_directory, "/")) "" else "/",
-                TLSConstants.ca_filename,
+                parameters.ca_filename,
             },
         );
         defer allocator.free(ca_path_plain);
@@ -115,7 +129,7 @@ pub const TLSWrapper = struct {
         const self = try allocator.create(TLSWrapper);
         self.* = .{
             .allocator = allocator,
-            .fnt = parameters.fnt,
+            .functions = functions,
             .tls = tls,
             .ca_path = ca_path,
             .verification_context = verification_context,
@@ -125,7 +139,7 @@ pub const TLSWrapper = struct {
 
     pub fn destroy(self: *const TLSWrapper) void {
         const allocator = self.allocator;
-        self.fnt.free.?(self.tls);
+        self.functions.free.?(self.tls);
         allocator.destroy(self.verification_context);
         _ = c_common.remove(self.ca_path.ptr);
         allocator.free(self.ca_path);
@@ -133,12 +147,12 @@ pub const TLSWrapper = struct {
     }
 
     pub fn start(self: *const TLSWrapper) !void {
-        const start_tls = self.fnt.start orelse return error.TLSFailure;
+        const start_tls = self.functions.start orelse return error.TLSFailure;
         if (!start_tls(self.tls)) return error.TLSFailure;
     }
 
     pub fn isConnected(self: *const TLSWrapper) bool {
-        const is_connected = self.fnt.is_connected orelse return false;
+        const is_connected = self.functions.is_connected orelse return false;
         return is_connected(self.tls);
     }
 
@@ -152,7 +166,7 @@ pub const TLSWrapper = struct {
 
     pub fn putCipherText(self: *const TLSWrapper, data: []const u8) !void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
-        const put_cipher = self.fnt.put_cipher orelse return error.TLSFailure;
+        const put_cipher = self.functions.put_cipher orelse return error.TLSFailure;
         if (!put_cipher(self.tls, data.ptr, data.len, &code))
             return tlsOperationError(code);
     }
@@ -162,7 +176,7 @@ pub const TLSWrapper = struct {
         allocator: std.mem.Allocator,
     ) ![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
-        const pull_plain = self.fnt.pull_plain orelse return error.TLSFailure;
+        const pull_plain = self.functions.pull_plain orelse return error.TLSFailure;
         const data = pull_plain(self.tls, &code) orelse {
             if (code == c_crypto.PPTLSErrorNone) return error.TLSNoData;
             return tlsOperationError(code);
@@ -176,7 +190,7 @@ pub const TLSWrapper = struct {
         allocator: std.mem.Allocator,
     ) ![]u8 {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
-        const pull_cipher = self.fnt.pull_cipher orelse return error.TLSFailure;
+        const pull_cipher = self.functions.pull_cipher orelse return error.TLSFailure;
         const data = pull_cipher(self.tls, &code) orelse {
             if (code == c_crypto.PPTLSErrorNone) return error.TLSNoData;
             return tlsOperationError(code);
@@ -189,7 +203,7 @@ pub const TLSWrapper = struct {
         self: *const TLSWrapper,
         allocator: std.mem.Allocator,
     ) ![]u8 {
-        const ca_md5 = self.fnt.ca_md5 orelse return error.TLSFailure;
+        const ca_md5 = self.functions.ca_md5 orelse return error.TLSFailure;
         const value = ca_md5(self.tls) orelse return error.TLSFailure;
         defer c_common.pp_free(value);
         return allocator.dupe(u8, std.mem.span(@as([*:0]u8, @ptrCast(value))));
@@ -197,7 +211,7 @@ pub const TLSWrapper = struct {
 
     fn putPlain(self: *const TLSWrapper, data: []const u8) !void {
         var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
-        const put_plain = self.fnt.put_plain orelse return error.TLSFailure;
+        const put_plain = self.functions.put_plain orelse return error.TLSFailure;
         if (!put_plain(self.tls, data.ptr, data.len, &code))
             return tlsOperationError(code);
     }
@@ -217,4 +231,18 @@ pub const TLSWrapper = struct {
     fn tlsOperationError(_: c_crypto.pp_tls_error_code) error{TLSFailure} {
         return error.TLSFailure;
     }
+
+    pub const testing = struct {
+        pub fn createWithFunctions(
+            allocator: std.mem.Allocator,
+            parameters: TLSParameters,
+            functions: c_crypto.pp_crypto_tls_fnt,
+        ) !*TLSWrapper {
+            return TLSWrapper.createWithFunctions(
+                allocator,
+                parameters,
+                functions,
+            );
+        }
+    };
 };

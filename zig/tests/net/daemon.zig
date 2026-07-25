@@ -148,7 +148,7 @@ test "connection daemon starts settings-only profile" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -159,9 +159,9 @@ test "connection daemon starts settings-only profile" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     try std.testing.expect(sut.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
 
@@ -177,7 +177,7 @@ test "connection daemon starts connection and publishes lifecycle status" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -188,20 +188,19 @@ test "connection daemon starts connection and publishes lifecycle status" {
         &monitor,
         .{ .stop_delay_ms = 100 },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     try std.testing.expect(sut.isConnectionProfile());
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
         .connecting,
         .connected,
     }, sut.testStatuses());
-    try std.testing.expectEqual(@as(usize, 4), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 5), events.remove_count);
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
-    try std.testing.expect(events.has_data_count);
-    try std.testing.expectEqual(@as(u64, 10), events.data_count.received);
-    try std.testing.expectEqual(@as(u64, 20), events.data_count.sent);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
     try std.testing.expectEqual(api.PartoutErrorCode.authentication, events.last_error_code.?);
     try std.testing.expectEqual(@as(usize, 1), monitor.start_count);
 
@@ -214,10 +213,77 @@ test "connection daemon starts connection and publishes lifecycle status" {
         .disconnected,
     }, sut.testStatuses());
     try std.testing.expectEqual(@as(usize, 1), monitor.stop_count);
-    try std.testing.expectEqual(@as(usize, 7), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 9), events.remove_count);
     try std.testing.expect(events.connection_status == null);
     try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
     try std.testing.expect(events.last_error_code == null);
+}
+
+test "connection daemon hold preserves published environment" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .stop_delay_ms = 100 },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    const remove_count_before_hold = events.remove_count;
+
+    sut.hold();
+
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.authentication, events.last_error_code.?);
+    try std.testing.expectEqual(remove_count_before_hold + 1, events.remove_count);
+
+    // A later stop cannot retroactively clear an environment preserved by hold.
+    sut.stop();
+    try std.testing.expectEqual(remove_count_before_hold + 1, events.remove_count);
+}
+
+test "connection daemon does not cancel tunnel when connection fails to start" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var failing_connection = FailingStartConnection{};
+    var implementations = [_]net.ConnectionImplementation{failing_connection.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .starts_immediately = true },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    try std.testing.expectEqual(@as(usize, 1), failing_connection.start_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, events.last_error_code.?);
+
+    sut.stop();
 }
 
 test "connection daemon passes connection options into sandbox" {
@@ -229,7 +295,7 @@ test "connection daemon passes connection options into sandbox" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -238,22 +304,185 @@ test "connection daemon passes connection options into sandbox" {
         &controller,
         &events,
         &monitor,
-        .{ .connection_options = .{
-            .dns_timeout = 1234,
-            .link_activity_timeout = 2345,
-            .link_write_timeout = 3456,
-            .min_data_count_interval = 4567,
-            .user_info = .{ .bytes = "{\"source\":\"test\"}" },
-        } },
+        .{
+            .connection_options = .{
+                .dns_timeout = 1234,
+                .link_activity_timeout = 2345,
+                .link_write_timeout = 3456,
+                .min_data_count_interval = 4567,
+                .user_info = .{ .bytes = "{\"source\":\"test\"}" },
+            },
+            .cache_dir = "/tmp/openvpn-cache",
+        },
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
+    try sut.start();
+    defer sut.stop();
     const options = capture.options orelse return error.TestUnexpectedResult;
+    const looper = capture.looper orelse return error.TestUnexpectedResult;
+    try std.testing.expect(!capture.looper_ready_during_create);
+    try std.testing.expect(try looper.perform(bool, null, SandboxCapture.confirmLooperReady));
+    try std.testing.expectEqualStrings(
+        "/tmp/openvpn-cache",
+        capture.cache_dir,
+    );
     try std.testing.expectEqual(@as(u32, 1234), options.dns_timeout);
     try std.testing.expectEqual(@as(u32, 2345), options.link_activity_timeout);
     try std.testing.expectEqual(@as(u32, 3456), options.link_write_timeout);
     try std.testing.expectEqual(@as(u32, 4567), options.min_data_count_interval);
     try std.testing.expectEqualStrings("{\"source\":\"test\"}", options.user_info.?.bytes);
+}
+
+test "connection daemon resets data count when connection disconnects" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .disconnect_on_start = true };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{
+            .starts_immediately = true,
+            .reconnection_delay_ms = 60_000,
+        },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    defer sut.stop();
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expect(!events.has_data_count);
+    try std.testing.expectEqual(api.DataCount{}, events.data_count);
+}
+
+test "connection daemon honors disabled cancellation for connection requests" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .cancel_on_start = .authentication };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{ .reasserting = true };
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{
+            .starts_immediately = true,
+            .cancels_unrecoverable = false,
+        },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    defer sut.stop();
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    try std.testing.expect(!controller.reasserting);
+}
+
+test "connection daemon replaces a terminal looper and reconnects" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var capture = SandboxCapture{ .queue_work_on_stop = true };
+    var implementations = [_]net.ConnectionImplementation{capture.implementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{
+            .starts_immediately = true,
+            .cancels_unrecoverable = false,
+            .reconnection_delay_ms = 60_000,
+        },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    defer sut.stop();
+    try std.testing.expectEqual(@as(usize, 1), capture.create_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.start_count);
+
+    const terminal_looper = capture.looper orelse return error.TestUnexpectedResult;
+    try terminal_looper.stop();
+
+    // Flush onLooperFinish and its queued FIFO recovery barrier.
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(@as(usize, 2), capture.create_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.deinit_count);
+    try std.testing.expectEqual(@as(usize, 2), capture.start_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.stop_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.serialized_count);
+    try std.testing.expect(capture.serialized_before_deinit);
+    const recovered_looper = capture.looper orelse return error.TestUnexpectedResult;
+    try std.testing.expect(try recovered_looper.perform(
+        bool,
+        null,
+        SandboxCapture.confirmLooperReady,
+    ));
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+}
+
+test "connection daemon terminates when its actor finishes" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{ .cancels_unrecoverable = false },
+    );
+    defer sut.deinit();
+
+    try sut.start();
+    sut.actor.shutdown();
+
+    try std.testing.expectError(error.Closed, sut.start());
+    try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+    try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), controller.last_cancel_code);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .disconnected,
+        .connecting,
+        .connected,
+        .disconnecting,
+        .disconnected,
+    }, sut.testStatuses());
 }
 
 test "connection daemon connects when previously unreachable network becomes reachable" {
@@ -264,7 +493,7 @@ test "connection daemon connects when previously unreachable network becomes rea
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{ .reachable = false };
     var sut = try newDaemon(
         allocator,
@@ -275,9 +504,9 @@ test "connection daemon connects when previously unreachable network becomes rea
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     defer sut.stop();
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
@@ -301,7 +530,7 @@ test "connection daemon forwards better path events to current connection" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -312,12 +541,12 @@ test "connection daemon forwards better path events to current connection" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
     monitor.onBetterPath();
     try std.testing.expectEqual(@as(usize, 0), blocking_connection.better_path_count);
 
-    try sut.start(allocator);
+    try sut.start();
     monitor.onBetterPath();
     try std.testing.expectEqual(@as(usize, 1), blocking_connection.better_path_count);
 
@@ -336,7 +565,7 @@ test "connection daemon runs delayed connection work on its actor" {
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -347,9 +576,9 @@ test "connection daemon runs delayed connection work on its actor" {
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
 
-    try sut.start(allocator);
+    try sut.start();
     while (!delayed_connection.did_run.load(.acquire)) {
         std.Thread.yield() catch {};
     }
@@ -368,7 +597,7 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
-    var events = mock.ConnectionEventRecorder{};
+    var events = mock.DaemonEventRecorder{};
     var monitor = mock.MockNetworkMonitor{};
     var sut = try newDaemon(
         allocator,
@@ -379,11 +608,11 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
         &monitor,
         .{},
     );
-    defer sut.deinit(allocator);
+    defer sut.deinit();
     defer sut.stop();
     defer delayed_connection.allow_timer_enqueue.store(true, .release);
 
-    try sut.start(allocator);
+    try sut.start();
     while (!delayed_connection.timer_started.load(.acquire)) {
         std.Thread.yield() catch {};
     }
@@ -407,7 +636,7 @@ fn stopDaemon(sut: *Daemon) void {
 
 const DelayedConnection = struct {
     timer: core.RunAfter = .{},
-    serialized_executor: net.SerializedExecutor = .{},
+    serialized_executor: ?net.SerializedExecutor = null,
     start_thread: ?std.Thread.Id = null,
     timer_thread: ?std.Thread.Id = null,
     ran_on_start_thread: bool = false,
@@ -460,7 +689,7 @@ const DelayedConnection = struct {
         while (self.pause_timer_before_enqueue and !self.allow_timer_enqueue.load(.acquire)) {
             std.Thread.yield() catch {};
         }
-        self.serialized_executor.run(self, onSerialized);
+        self.serialized_executor.?.run(self, onSerialized);
     }
 
     fn onSerialized(ctx: *anyopaque) void {
@@ -485,7 +714,7 @@ const DelayedConnection = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+    fn deinit(ptr: *anyopaque) void {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
         self.timer.deinit();
     }
@@ -504,8 +733,78 @@ const DelayedConnection = struct {
     };
 };
 
+const FailingStartConnection = struct {
+    start_count: usize = 0,
+
+    fn implementation(self: *FailingStartConnection) net.ConnectionImplementation {
+        return .{
+            .ptr = self,
+            .vtable = &implementation_vtable,
+        };
+    }
+
+    fn moduleType(_: ?*anyopaque) api.ModuleType {
+        return .OpenVPN;
+    }
+
+    fn create(
+        ptr: ?*anyopaque,
+        _: std.mem.Allocator,
+        _: net.ConnectionModule,
+        _: net.Sandbox,
+    ) net.ConnectionCreateError!net.Connection {
+        const self: *FailingStartConnection = @ptrCast(@alignCast(ptr.?));
+        return .{
+            .ptr = self,
+            .vtable = &vtable,
+        };
+    }
+
+    fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
+        const self: *FailingStartConnection = @ptrCast(@alignCast(ptr));
+        self.start_count += 1;
+        events.status(events.ctx, .connecting);
+        events.status(events.ctx, .disconnected);
+        return error.UnableToStart;
+    }
+
+    fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
+
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+
+    fn deinit(_: *anyopaque) void {}
+
+    const vtable = net.Connection.VTable{
+        .start = start,
+        .stop = stop,
+        .network_change = networkChange,
+        .better_path = betterPath,
+        .deinit = deinit,
+    };
+
+    const implementation_vtable = net.ConnectionImplementation.VTable{
+        .module_type = moduleType,
+        .create_connection = create,
+    };
+};
+
 const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
+    looper: ?*net.Looper = null,
+    looper_ready_during_create: bool = false,
+    serialized_executor: ?net.SerializedExecutor = null,
+    disconnect_on_start: bool = false,
+    cancel_on_start: ?api.PartoutErrorCode = null,
+    queue_work_on_stop: bool = false,
+    cache_dir: []const u8 = "",
+    create_count: usize = 0,
+    start_count: usize = 0,
+    stop_count: usize = 0,
+    deinit_count: usize = 0,
+    serialized_count: usize = 0,
+    serialized_before_deinit: bool = false,
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
         return .{
@@ -525,24 +824,64 @@ const SandboxCapture = struct {
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr.?));
+        const looper = sandbox.looper;
+        self.create_count += 1;
         self.options = sandbox.options;
+        self.looper = looper;
+        self.looper_ready_during_create = looper.perform(
+            bool,
+            null,
+            confirmLooperReady,
+        ) catch false;
+        self.serialized_executor = sandbox.serialized_executor;
+        self.cache_dir = sandbox.cache_dir;
         return .{
             .ptr = self,
             .vtable = &vtable,
         };
     }
 
-    fn start(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
+    fn confirmLooperReady(_: ?*anyopaque) !bool {
+        return true;
+    }
+
+    fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.start_count += 1;
+        if (self.cancel_on_start) |code| {
+            events.cancel(events.ctx, code);
+        }
+        if (self.disconnect_on_start) {
+            events.status(events.ctx, .connecting);
+            events.data_count(events.ctx, .{ .received = 10, .sent = 20 });
+            events.status(events.ctx, .disconnected);
+            return true;
+        }
         return false;
     }
 
-    fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
+    fn stop(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.stop_count += 1;
+        if (self.queue_work_on_stop) {
+            self.serialized_executor.?.run(self, onSerialized);
+        }
+    }
+
+    fn onSerialized(ptr: *anyopaque) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.serialized_count += 1;
+        self.serialized_before_deinit = self.deinit_count == 0;
+    }
 
     fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(_: *anyopaque, _: std.mem.Allocator) void {}
+    fn deinit(ptr: *anyopaque) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.deinit_count += 1;
+    }
 
     const vtable = net.Connection.VTable{
         .start = start,
@@ -563,7 +902,7 @@ fn newDaemon(
     profile_json: []const u8,
     registry: *const net.ConnectionRegistry,
     controller: *mock_mod.MockTunnelController,
-    events: *mock_mod.ConnectionEventRecorder,
+    events: *mock_mod.DaemonEventRecorder,
     monitor: *mock_mod.MockNetworkMonitor,
     options: daemon.Context.Options,
 ) !*Daemon {
@@ -583,7 +922,7 @@ fn newDaemon(
 
 fn withEvents(
     options: daemon.Context.Options,
-    events: *mock_mod.ConnectionEventRecorder,
+    events: *mock_mod.DaemonEventRecorder,
 ) daemon.Context.Options {
     var updated = options;
     updated.events = events.events();

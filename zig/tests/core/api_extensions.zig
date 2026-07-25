@@ -6,6 +6,18 @@ const std = @import("std");
 
 const api = @import("source").core_api;
 
+test "module cache filenames prefix arbitrary filenames with the module id" {
+    const allocator = std.testing.allocator;
+    const module_id: api.UUID = "11111111-1111-4111-8111-111111111111".*;
+    const filename = try api.moduleCacheFilename(allocator, module_id, "state.json");
+    defer allocator.free(filename);
+
+    try std.testing.expectEqualStrings(
+        "11111111-1111-4111-8111-111111111111-state.json",
+        filename,
+    );
+}
+
 test "recognizes connection-building module types" {
     try std.testing.expect(!api.typeBuildsConnection(.DNS));
     try std.testing.expect(!api.typeBuildsConnection(.HTTPProxy));

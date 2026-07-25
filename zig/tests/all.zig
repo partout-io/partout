@@ -8,6 +8,14 @@ comptime {
     _ = @import("abi/helpers.zig");
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
+    _ = @import("c/exports.zig");
+    if (@hasDecl(source.c_crypto, "PARTOUT_CRYPTO_OPENSSL") or
+        @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+    {
+        _ = @import("c/crypto/aead.zig");
+        _ = @import("c/crypto/cbc.zig");
+        _ = @import("c/crypto/ctr.zig");
+    }
     _ = @import("core/actor.zig");
     _ = @import("core/concurrency.zig");
     _ = @import("core/logging.zig");
@@ -25,6 +33,8 @@ comptime {
     _ = @import("net/platform.zig");
     _ = @import("net/platform_dns.zig");
     if (source.openvpn_enabled) {
+        _ = @import("openvpn/configuration.zig");
+        _ = @import("openvpn/connection.zig");
         _ = @import("openvpn/exports.zig");
         _ = @import("openvpn/internal/auth.zig");
         _ = @import("openvpn/internal/configuration.zig");

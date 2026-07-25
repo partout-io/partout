@@ -75,6 +75,9 @@ test "reports interactive OpenVPN connections" {
 test "empty connection registry reports absent implementation" {
     const mock = mock_mod;
     const allocator = std.testing.allocator;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     var registry = try ConnectionRegistry.init(allocator, &.{});
     defer registry.deinit(allocator);
     var profile = try api.Profile.parse(allocator, mock.connectionProfileJson());
@@ -88,7 +91,8 @@ test "empty connection registry reports absent implementation" {
             .controller = mock.noopTunnelController(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
-            .monitor = mock.alwaysReachableMonitor(),
+            .looper = &environment.looper,
+            .serialized_executor = environment.serializedExecutor(),
         }),
     );
 }

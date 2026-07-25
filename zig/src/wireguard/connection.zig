@@ -103,13 +103,13 @@ const WireGuardConnection = struct {
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        log.writef(.notice, "WireGuard: Using v2-style connection for module {s}", .{module_id[0..]});
+        log.write(.notice, "Using v2 connection");
         return created.asConnection();
     }
 
     fn deinit(self: *WireGuardConnection) void {
         const allocator = self.allocator;
-        log.write(.debug, "WireGuard: Deinit connection");
+        log.write(.debug, "Deinit _WireGuardConnectionV2");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         self.data_count_timer.deinit();
@@ -132,11 +132,11 @@ const WireGuardConnection = struct {
         events: net.Connection.Events,
     ) net.ConnectionStartError!bool {
         if (!self.adapter.isStopped()) {
-            log.write(.debug, "WireGuard: Start ignored, adapter is already active");
+            log.write(.debug, "Start ignored, adapter is already active");
             return false;
         }
 
-        log.write(.info, "WireGuard: Start tunnel");
+        log.write(.info, "Start tunnel");
         self.events = events;
         events.status(events.ctx, .connecting);
         errdefer events.status(events.ctx, .disconnected);
@@ -145,13 +145,16 @@ const WireGuardConnection = struct {
             // Adapter activation errors are the local diagnostic signal. The
             // generic connection contract deliberately exposes no WireGuard-
             // specific categories, so log the concrete error before erasing it.
-            log.writef(.fault, "WireGuard: Unable to start adapter: {}", .{err});
+            log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
+        log.writef(.info, "Tunnel interface is {s}", .{
+            self.adapter.interfaceName() orelse "unknown",
+        });
         events.status(events.ctx, .connected);
         self.reportDataCount(allocator, events);
         self.startDataCountTimer() catch |err| {
-            log.writef(.err, "WireGuard: Unable to start data count timer: {}", .{err});
+            log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
         };
         return true;
     }
@@ -166,17 +169,16 @@ const WireGuardConnection = struct {
         // connection timeout has nothing useful to interrupt here.
         _ = timeout_ms;
         if (self.adapter.isStopped()) {
-            log.write(.debug, "WireGuard: Stop ignored, adapter is stopped");
+            log.write(.debug, "Stop ignored, adapter is stopped");
             return;
         }
 
-        log.write(.info, "WireGuard: Stop tunnel");
+        log.write(.info, "Stop tunnel");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         events.status(events.ctx, .disconnecting);
         self.adapter.stop(allocator);
         events.status(events.ctx, .disconnected);
-        log.write(.info, "WireGuard: Tunnel disconnected");
     }
 
     fn networkChange(
@@ -198,7 +200,7 @@ const WireGuardConnection = struct {
         _: std.mem.Allocator,
         _: net.Connection.Events,
     ) void {
-        log.write(.debug, "WireGuard: Better path notification ignored");
+        log.write(.debug, "Better path notification ignored");
     }
 
     fn reportDataCount(
@@ -214,7 +216,7 @@ const WireGuardConnection = struct {
         allocator: std.mem.Allocator,
     ) ?api.DataCount {
         return self.adapter.dataCountFromRuntimeConfig(allocator) catch |err| {
-            log.writef(.debug, "WireGuard: Unable to fetch runtime configuration: {}", .{err});
+            log.writef(.debug, "Unable to fetch runtime configuration: {s}", .{@errorName(err)});
             return null;
         };
     }
@@ -228,12 +230,16 @@ const WireGuardConnection = struct {
     }
 
     fn stopDataCountTimer(self: *WireGuardConnection) void {
+        const was_active = self.data_count_timer_active;
         self.data_count_timer_active = false;
         self.data_count_timer.cancel();
         // The raw callback only posts asynchronously, so waiting cannot
         // deadlock with the daemon actor. Once drained, a later start cannot
         // inherit a callback from the previous timer generation.
         self.data_count_timer.wait();
+        if (was_active) {
+            log.write(.debug, "Cancelled WireGuardConnection.dataCountTimer");
+        }
     }
 
     fn onDataCountTimer(ctx: ?*anyopaque) void {
@@ -249,7 +255,7 @@ const WireGuardConnection = struct {
         self.reportDataCount(self.allocator, events);
         if (!self.data_count_timer_active) return;
         self.data_count_timer.init(self.data_count_interval_ms, onDataCountTimer, self) catch |err| {
-            log.writef(.err, "WireGuard: Unable to reschedule data count timer: {}", .{err});
+            log.writef(.err, "Unable to reschedule data count timer: {s}", .{@errorName(err)});
             self.data_count_timer_active = false;
         };
     }
@@ -257,7 +263,7 @@ const WireGuardConnection = struct {
     fn scheduleTemporaryShutdownRetry(self: *WireGuardConnection) void {
         // `.retry` is an authoritative adapter outcome. The connection owns
         // when to retry and does not inspect the adapter's internal state.
-        log.writef(.debug, "WireGuard: Retry backend restart in {} milliseconds", .{
+        log.writef(.debug, "Retry backend restart in {} milliseconds", .{
             self.temporary_shutdown_retry_delay_ms,
         });
         self.temporary_shutdown_retry_timer.init(
@@ -265,7 +271,7 @@ const WireGuardConnection = struct {
             onTemporaryShutdownRetry,
             self,
         ) catch |err| {
-            log.writef(.err, "WireGuard: Unable to schedule backend restart retry: {}", .{err});
+            log.writef(.err, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
         };
     }
 
@@ -460,7 +466,7 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(self.allocator, events);
 }
 
-fn deinit(ptr: *anyopaque, _: std.mem.Allocator) void {
+fn deinit(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     self.deinit();
 }

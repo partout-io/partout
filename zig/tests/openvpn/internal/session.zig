@@ -5,11 +5,11 @@
 const std = @import("std");
 const source = @import("source");
 
-const c_crypto = source.c_crypto;
 const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
 const forAuthentication = source.openvpn_internal.session.testing.forAuthentication;
+const shouldSendExitNotification = source.openvpn_internal.session.testing.shouldSendExitNotification;
 
 test "Session declarations are semantically analyzed" {
     std.testing.refAllDecls(Session);
@@ -34,12 +34,12 @@ test "Session borrows an externally managed Looper" {
     const session = try Session.create(
         allocator,
         &looper,
-        c_crypto.pp_crypto_fnt_mock(),
         .{},
         null,
         PRNG.system(),
         "",
-        .{},
+        "11111111-1111-4111-8111-111111111111-ca.pem",
+        .{ .backend = .mock },
     );
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
@@ -72,4 +72,26 @@ test "forAuthentication appends and encodes OTP" {
     });
     defer encoded.deinit(allocator);
     try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
+}
+
+test "session sends exit notification only for requested and network-change shutdowns" {
+    try std.testing.expect(shouldSendExitNotification(null));
+    try std.testing.expect(shouldSendExitNotification(error.NetworkChanged));
+
+    const other_causes = [_]Session.Error{
+        error.BadCredentials,
+        error.BadCredentialsWithLocalOptions,
+        error.CompressionMismatch,
+        error.ConnectionFailure,
+        error.CryptoFailure,
+        error.NoRouting,
+        error.ServerShutdown,
+        error.Timeout,
+        error.TLSFailure,
+        error.UnsupportedAlgorithm,
+        error.Reconnect,
+    };
+    for (other_causes) |cause| {
+        try std.testing.expect(!shouldSendExitNotification(cause));
+    }
 }

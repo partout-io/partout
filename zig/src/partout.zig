@@ -101,7 +101,7 @@ pub export fn partout_daemon_start(
     };
     errdefer runtime.deinit(allocator);
 
-    runtime.start(allocator) catch |err| return mapErrorToCode(err);
+    runtime.start() catch |err| return mapErrorToCode(err);
     daemon_runtime = runtime;
     return c.PartoutCompletionCodeOK;
 }
@@ -119,7 +119,7 @@ pub export fn partout_daemon_stop() callconv(.c) void {
 }
 
 fn mapErrorToCode(err: abi.RuntimeError) c_int {
-    log.writef(.err, "Unable to start daemon: {}", .{err});
+    log.writef(.err, "Unable to start daemon: {s}", .{@errorName(err)});
     return switch (err) {
         error.InvalidArgs => c.PartoutCompletionCodeArgs,
         else => c.PartoutCompletionCodeFailure,

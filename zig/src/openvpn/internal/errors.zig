@@ -21,6 +21,7 @@ pub const SessionError = error{
     CompressionMismatch,
     ConnectionFailure,
     CryptoFailure,
+    NetworkChanged,
     NoRouting,
     ServerShutdown,
     Timeout,
@@ -45,6 +46,7 @@ pub fn sessionError(err: anyerror) SessionError {
         error.CompressionMismatch => error.CompressionMismatch,
         error.ConnectionFailure, error.DataPathFailure, error.Assertion => error.ConnectionFailure,
         error.CryptoFailure => error.CryptoFailure,
+        error.NetworkChanged => error.NetworkChanged,
         error.NoRouting => error.NoRouting,
         error.ServerShutdown => error.ServerShutdown,
         error.Timeout => error.Timeout,
@@ -64,6 +66,7 @@ pub fn sessionError(err: anyerror) SessionError {
 pub fn partoutCode(err: SessionError) ?api.PartoutErrorCode {
     return switch (err) {
         error.Reconnect => null,
+        error.NetworkChanged => .networkChanged,
         error.Timeout => .timeout,
         error.BadCredentials => .authentication,
         error.BadCredentialsWithLocalOptions => .openVPNRecoverableAuthentication,

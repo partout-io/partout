@@ -4,11 +4,18 @@
 
 const std = @import("std");
 
-const core = @import("source").core;
-const exports = @import("source").openvpn_exports;
-const parser = @import("source").openvpn_parser;
+const source = @import("source");
+
+const core = source.core;
+const exports = source.openvpn_exports;
+const parser = source.openvpn_parser;
 
 const api = core.api;
+const has_openssl_backend =
+    @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_OPENSSL");
+const has_real_default_crypto_backend =
+    has_openssl_backend or
+    @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_MBEDTLS");
 
 test "OpenVPN module exports import tagged module" {
     const allocator = std.testing.allocator;
@@ -25,6 +32,11 @@ test "OpenVPN module exports import tagged module" {
         \\client
         \\remote vpn.example.com 1194 udp
         \\auth-user-pass
+        \\<ca>
+        \\-----BEGIN CERTIFICATE-----
+        \\abc
+        \\-----END CERTIFICATE-----
+        \\</ca>
     ,
         null,
     );
@@ -40,6 +52,34 @@ test "OpenVPN module exports import tagged module" {
 
     try std.testing.expect(std.mem.indexOf(u8, encoded, "\"type\":\"OpenVPN\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, encoded, "\"remotes\":[\"vpn.example.com:UDP:1194\"]") != null);
+}
+
+test "OpenVPN module importer requires CA and at least one remote" {
+    const allocator = std.testing.allocator;
+    const module_implementation = exports.impl.module;
+
+    try std.testing.expectError(
+        error.Parsing,
+        module_implementation.importModule(
+            allocator,
+            "client\nremote vpn.example.com 1194 udp",
+            null,
+        ),
+    );
+    try std.testing.expectError(
+        error.Parsing,
+        module_implementation.importModule(
+            allocator,
+            \\client
+            \\<ca>
+            \\-----BEGIN CERTIFICATE-----
+            \\abc
+            \\-----END CERTIFICATE-----
+            \\</ca>
+        ,
+            null,
+        ),
+    );
 }
 
 test "OpenVPN module importer reports generic parse error info" {
@@ -78,6 +118,11 @@ test "OpenVPN module importer accepts protocol context pointer" {
         allocator,
         \\client
         \\remote vpn.example.com 1194 udp
+        \\<ca>
+        \\-----BEGIN CERTIFICATE-----
+        \\abc
+        \\-----END CERTIFICATE-----
+        \\</ca>
     ,
         import_context,
     );
@@ -109,6 +154,65 @@ test "OpenVPN module importer reports passphrase requirement" {
     // );
 }
 
+test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {
+    if (!has_real_default_crypto_backend) return error.SkipZigTest;
+    try expectDefaultImporterDecrypts(tunnelbear_pkcs1);
+}
+
+test "OpenVPN module importer decrypts PKCS#8 client keys" {
+    if (!has_real_default_crypto_backend) return error.SkipZigTest;
+    try expectDefaultImporterDecrypts(tunnelbear_aes256_pkcs8);
+}
+
+test "OpenVPN module importer decrypts legacy TripleDES PKCS#8 client keys with OpenSSL" {
+    if (!has_openssl_backend) return error.SkipZigTest;
+    try expectDefaultImporterDecrypts(tunnelbear_legacy_pkcs8);
+}
+
+test "OpenVPN module importer rejects a wrong encrypted-key passphrase" {
+    if (!has_real_default_crypto_backend) return error.SkipZigTest;
+
+    const allocator = std.testing.allocator;
+    var parser_context = parser.Parser.Context{ .passphrase = "wrong" };
+    if (exports.impl.module.importModule(
+        allocator,
+        tunnelbear_aes256_pkcs8,
+        core.ImportContext.init(
+            null,
+            null,
+            @ptrCast(&parser_context),
+        ).withModuleType(.OpenVPN),
+    )) |imported| {
+        var module = imported;
+        module.deinit(allocator);
+        return error.TestUnexpectedResult;
+    } else |_| {}
+}
+
+fn expectDefaultImporterDecrypts(contents: []const u8) !void {
+    const allocator = std.testing.allocator;
+    const module_implementation = exports.impl.module;
+    var parser_context = parser.Parser.Context{ .passphrase = "foobar" };
+    var module = try module_implementation.importModule(
+        allocator,
+        contents,
+        core.ImportContext.init(
+            null,
+            null,
+            @ptrCast(&parser_context),
+        ).withModuleType(.OpenVPN),
+    );
+    defer module.deinit(allocator);
+
+    const openvpn = switch (module) {
+        .OpenVPN => |value| value,
+        else => return error.TestUnexpectedResult,
+    };
+    const client_key = openvpn.configuration.?.client_key.?;
+    try std.testing.expect(!client_key.isEncrypted());
+    try std.testing.expectEqualStrings(tunnelbear_decrypted, client_key.pem);
+}
+
 const encrypted_key_configuration =
     \\client
     \\<key>
@@ -119,3 +223,21 @@ const encrypted_key_configuration =
     \\-----END PRIVATE KEY-----
     \\</key>
 ;
+
+const encrypted_client_prefix =
+    \\client
+    \\remote vpn.example.com 1194 udp
+    \\<ca>
+    \\-----BEGIN CERTIFICATE-----
+    \\test
+    \\-----END CERTIFICATE-----
+    \\</ca>
+    \\<key>
+;
+const tunnelbear_pkcs1 = encrypted_client_prefix ++ "\n" ++
+    @embedFile("fixtures/tunnelbear.enc.1.key") ++ "\n</key>";
+const tunnelbear_aes256_pkcs8 = encrypted_client_prefix ++ "\n" ++
+    @embedFile("fixtures/tunnelbear.aes256.enc.8.key") ++ "\n</key>";
+const tunnelbear_legacy_pkcs8 = encrypted_client_prefix ++ "\n" ++
+    @embedFile("fixtures/tunnelbear.enc.8.key") ++ "\n</key>";
+const tunnelbear_decrypted = @embedFile("fixtures/tunnelbear.key");

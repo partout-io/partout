@@ -19,6 +19,7 @@ const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
+const CryptoBackend = c_exports_mod.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
@@ -28,7 +29,7 @@ const PRNG = crypto_mod.PRNG;
 const ZeroingData = crypto_mod.ZeroingData;
 
 pub const DataPathParameters = struct {
-    fnt: c_crypto.pp_crypto_enc_fnt,
+    backend: CryptoBackend,
     cipher: ?api.OpenVPNCipher,
     digest: ?api.OpenVPNDigest,
     compression_framing: api.OpenVPNCompressionFraming,
@@ -321,16 +322,18 @@ pub const DataPathWrapper = struct {
         prf: *const PRF,
         seed: ZeroingData,
     ) !DataPathWrapper {
-        const init_seed = parameters.fnt.init_seed orelse return error.UnsupportedAlgorithm;
+        const functions = c_exports_mod.cryptoFunctionTable(parameters.backend).enc;
+        const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
         _ = init_seed(seed.bytes.ptr, seed.bytes.len);
         var keys = try prf.derive(allocator);
         defer keys.deinit(allocator);
-        return createWithKeys(allocator, parameters, &keys);
+        return createWithKeys(allocator, parameters, functions, &keys);
     }
 
     fn createWithKeys(
         allocator: std.mem.Allocator,
         parameters: DataPathParameters,
+        functions: c_crypto.pp_crypto_enc_fnt,
         keys: *const CryptoKeys,
     ) !DataPathWrapper {
         var bridge = try CryptoKeysBridge.init(allocator, keys);
@@ -351,7 +354,7 @@ pub const DataPathWrapper = struct {
         const mode: *c.openvpn_dp_mode = if (isAEAD(parameters.cipher)) blk: {
             const name = cipher_name orelse return error.UnsupportedAlgorithm;
             break :blk c.openvpn_dp_mode_ad_create_aead(
-                @ptrCast(&parameters.fnt),
+                @ptrCast(&functions),
                 name.ptr,
                 DataConstants.aead_tag_length,
                 DataConstants.aead_id_length,
@@ -361,7 +364,7 @@ pub const DataPathWrapper = struct {
         } else blk: {
             const digest = digest_name orelse return error.UnsupportedAlgorithm;
             break :blk c.openvpn_dp_mode_hmac_create_cbc(
-                @ptrCast(&parameters.fnt),
+                @ptrCast(&functions),
                 if (cipher_name) |value| value.ptr else null,
                 digest.ptr,
                 @ptrCast(bridge.native()),
@@ -442,6 +445,8 @@ pub const DataChannel = struct {
         packets: []const []const u8,
     ) ![][]u8 {
         const result = try self.data_path.decrypt(allocator, packets);
+        if (result.keep_alive)
+            log.write(.debug, "Data: Received ping, do nothing");
         return result.packets;
     }
 };
@@ -486,7 +491,10 @@ pub const DataLink = struct {
         key: u8,
     ) !void {
         const channel = self.callbacks.data_channel(self.context, key) orelse return;
-        const decrypted = try channel.decrypt(self.allocator, packets);
+        const decrypted = channel.decrypt(self.allocator, packets) catch |err| {
+            log.write(.err, "Unable to decrypt packets, is DataChannel properly configured?");
+            return err;
+        };
         defer DataLink.freePackets(self.allocator, decrypted);
         if (decrypted.len == 0) return;
 
@@ -504,7 +512,10 @@ pub const DataLink = struct {
         timeout_ms: ?u64,
     ) !void {
         const channel = self.callbacks.data_channel(self.context, key) orelse return;
-        const encrypted = try channel.encrypt(self.allocator, packets);
+        const encrypted = channel.encrypt(self.allocator, packets) catch |err| {
+            log.write(.err, "Unable to encrypt packets, is DataChannel properly configured?");
+            return err;
+        };
         defer DataLink.freePackets(self.allocator, encrypted);
         if (encrypted.len == 0) return;
 
@@ -517,7 +528,12 @@ pub const DataLink = struct {
         defer processed.deinit();
 
         const timeout = timeout_ms orelse {
-            try self.looper.writeQueued(processed.packets(), .link);
+            self.looper.writeQueued(processed.packets(), .link) catch |err| {
+                log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
+                    @errorName(err),
+                });
+                return err;
+            };
             return;
         };
         if (!self.looper.isOnQueue()) return error.ReentrantCall;
@@ -527,7 +543,9 @@ pub const DataLink = struct {
         while (true) {
             self.looper.write(processed.packets(), .link, true) catch |err| {
                 if (core_mod.concurrency.monotonicNs() < deadline) continue;
-                log.writef(.err, "OpenVPN write timed out after: {s}", .{@errorName(err)});
+                log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
+                    @errorName(err),
+                });
                 return error.Timeout;
             };
             return;
@@ -581,7 +599,25 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         peer_id: u32,
     ) !*DataPath {
-        const mode = c.openvpn_dp_mode_ad_create_mock(c.OpenVPNCompressionFramingDisabled);
+        return createMockDataPathWithFraming(
+            allocator,
+            peer_id,
+            .disabled,
+            false,
+        );
+    }
+
+    pub fn createMockDataPathWithFraming(
+        allocator: std.mem.Allocator,
+        peer_id: u32,
+        framing: api.OpenVPNCompressionFraming,
+        authenticated: bool,
+    ) !*DataPath {
+        const native_framing = DataPathWrapper.nativeFraming(framing);
+        const mode = if (authenticated)
+            c.openvpn_dp_mode_hmac_create_mock(native_framing)
+        else
+            c.openvpn_dp_mode_ad_create_mock(native_framing);
         return DataPath.create(allocator, mode, peer_id);
     }
 };

@@ -20,6 +20,11 @@ test "ABI registry imports raw OpenVPN profile through parser implementation" {
         \\client
         \\remote vpn.example.com 1194 udp
         \\auth-user-pass
+        \\<ca>
+        \\-----BEGIN CERTIFICATE-----
+        \\abc
+        \\-----END CERTIFICATE-----
+        \\</ca>
     ,
         "Imported OpenVPN",
     );
@@ -76,6 +81,11 @@ test "ABI registry imports raw OpenVPN module through parser implementation" {
         \\client
         \\remote vpn.example.com 1194 udp
         \\auth-user-pass
+        \\<ca>
+        \\-----BEGIN CERTIFICATE-----
+        \\abc
+        \\-----END CERTIFICATE-----
+        \\</ca>
     );
     defer allocator.free(imported);
 

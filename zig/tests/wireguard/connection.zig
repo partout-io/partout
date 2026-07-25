@@ -189,14 +189,18 @@ test "WireGuard connection erases adapter activation errors at the generic bound
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .monitor = mock.alwaysReachableMonitor(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
@@ -222,15 +226,19 @@ test "WireGuard connection starts and stops through backend and controller" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .monitor = mock.alwaysReachableMonitor(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .min_data_count_interval = 2345 },
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expectEqual(@as(u32, 2345), connection.testing.dataCountIntervalMs(created));
     try std.testing.expect(try created.start(recorder.events()));
@@ -274,15 +282,19 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
-        .monitor = mock.alwaysReachableMonitor(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .dns_timeout = 1234 },
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expect(try created.start(recorder.events()));
     adapter.testing.setNetworkChangeBehavior(
@@ -421,14 +433,18 @@ test "WireGuard connection handles network monitor events" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .monitor = mock.alwaysReachableMonitor(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
 
     try std.testing.expect(try created.start(recorder.events()));
     created.betterPath(recorder.events());
@@ -494,14 +510,18 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
-        .monitor = mock.alwaysReachableMonitor(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
     });
-    defer created.deinit(allocator);
+    defer created.deinit();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
     try std.testing.expect(try created.start(recorder.events()));
@@ -514,6 +534,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     created.networkChange(.{ .reachable = false }, recorder.events());
     created.networkChange(.{ .reachable = true }, recorder.events());
     connection.testing.waitForTemporaryShutdownRetry(created);
+    environment.executor.drain();
 
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
@@ -725,7 +746,7 @@ const EventRecorder = struct {
             .status = recordStatus,
             .last_error = recordLastError,
             .data_count = recordDataCount,
-            .remove_key = recordRemoveKey,
+            .cancel = recordCancel,
         };
     }
 };
@@ -744,4 +765,4 @@ fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     self.has_data_count.store(true, .release);
 }
 
-fn recordRemoveKey(_: *anyopaque, _: conn.Connection.EventKey) void {}
+fn recordCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {}

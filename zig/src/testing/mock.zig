@@ -16,6 +16,98 @@ const net_sandbox = @import("../net/sandbox.zig");
 const api = core.api;
 const util = core.util;
 
+pub const MockSerializedExecutor = struct {
+    const Message = struct {
+        ptr: *anyopaque,
+        block: net.SerializedExecutor.Block,
+    };
+    const ExecutorActor = core.Actor(MockSerializedExecutor, Message, error{}, perform);
+
+    allocator: std.mem.Allocator,
+    actor: *ExecutorActor,
+
+    pub fn create(allocator: std.mem.Allocator) !*MockSerializedExecutor {
+        const self = try allocator.create(MockSerializedExecutor);
+        errdefer allocator.destroy(self);
+        self.* = .{
+            .allocator = allocator,
+            .actor = try ExecutorActor.create(allocator, self),
+        };
+        return self;
+    }
+
+    pub fn deinit(self: *MockSerializedExecutor) void {
+        self.actor.deinit();
+        const allocator = self.allocator;
+        self.* = undefined;
+        allocator.destroy(self);
+    }
+
+    pub fn interface(self: *MockSerializedExecutor) net.SerializedExecutor {
+        return .{
+            .ptr = self,
+            .run_block = run,
+        };
+    }
+
+    pub fn drain(self: *MockSerializedExecutor) void {
+        self.actor.perform(.{
+            .ptr = self,
+            .block = drainBarrier,
+        }) catch @panic("Unable to drain mock serialized work");
+    }
+
+    fn run(
+        ptr: *anyopaque,
+        block_ptr: *anyopaque,
+        block: net.SerializedExecutor.Block,
+    ) void {
+        const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
+        self.actor.schedule(.{
+            .ptr = block_ptr,
+            .block = block,
+        }) catch @panic("Unable to schedule mock serialized work");
+    }
+
+    fn perform(_: *MockSerializedExecutor, message: Message) error{}!void {
+        message.block(message.ptr);
+    }
+
+    fn drainBarrier(_: *anyopaque) void {}
+};
+
+pub const MockConnectionEnvironment = struct {
+    looper: net.Looper,
+    executor: *MockSerializedExecutor,
+
+    pub fn init(
+        self: *MockConnectionEnvironment,
+        allocator: std.mem.Allocator,
+    ) !void {
+        const executor = try MockSerializedExecutor.create(allocator);
+        errdefer executor.deinit();
+        self.* = .{
+            .looper = try net.Looper.init(allocator, .{
+                .on_finish = .{ .callback = onLooperFinish },
+            }),
+            .executor = executor,
+        };
+    }
+
+    pub fn deinit(self: *MockConnectionEnvironment) void {
+        self.looper.deinit();
+        self.executor.deinit();
+    }
+
+    pub fn serializedExecutor(
+        self: *MockConnectionEnvironment,
+    ) net.SerializedExecutor {
+        return self.executor.interface();
+    }
+
+    fn onLooperFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+};
+
 // ZIGME: Hardcode until only Zig ABI
 pub export fn partout_log(_: i32, message: [*:0]const u8) void {
     std.debug.print("{s}\n", .{message});
@@ -35,8 +127,7 @@ pub const MockRuntime = struct {
         runtime: *MockDaemonRuntime,
 
         fn finishTeardown(self: *const Instance, allocator: std.mem.Allocator) void {
-            self.daemon.deinit(allocator);
-            allocator.destroy(self.daemon);
+            self.daemon.deinit();
             self.runtime.deinit(allocator);
             if (self.bindings) |*bindings| {
                 if (bindings.release) |release| {
@@ -85,13 +176,14 @@ pub const MockRuntime = struct {
                 error.InvalidJson, error.InvalidModel, error.UnsupportedModel => error.InvalidProfile,
                 error.AlreadyStarted => error.AlreadyStarted,
                 error.Closed => error.Closed,
+                error.LooperFailure => error.Closed,
                 error.MissingConnectionImplementation => error.MissingConnectionImplementation,
                 error.OutOfMemory => error.OutOfMemory,
             };
         };
-        errdefer new_daemon.deinit(allocator);
+        errdefer new_daemon.deinit();
 
-        new_daemon.start(allocator) catch {
+        new_daemon.start() catch {
             return error.InvalidProfile;
         };
 
@@ -134,7 +226,7 @@ pub const MockDaemonRuntime = struct {
     wireguard_connection: NoopConnectionImplementation = .{ .module_type = .WireGuard },
     registry: net_conn.ConnectionRegistry = undefined,
     controller: MockTunnelController = .{},
-    events: ConnectionEventRecorder = .{},
+    events: DaemonEventRecorder = .{},
     monitor: MockNetworkMonitor = .{},
 
     pub fn create(
@@ -191,7 +283,7 @@ pub const MockDaemonRuntime = struct {
         return self.monitor.interface();
     }
 
-    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_conn.Connection.Events {
+    pub fn daemonEvents(self: *const MockDaemonRuntime) ?net_daemon.Events {
         return self.events.events();
     }
 
@@ -328,7 +420,7 @@ fn noopSocketFactoryCreate(
     _: api.ExtendedEndpoint,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-) net.SocketFactory.Error!net_io.IOInterface {
+) net.SocketFactory.Error!net.Looper.Descriptor {
     return error.LinkNotActive;
 }
 
@@ -355,7 +447,7 @@ fn noopSetReasserting(_: ?*anyopaque, _: bool) void {}
 
 fn noopCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorCode) void {}
 
-pub const ConnectionEventRecorder = struct {
+pub const DaemonEventRecorder = struct {
     connection_status: ?api.ConnectionStatus = null,
     statuses: [16]api.ConnectionStatus = undefined,
     status_count: usize = 0,
@@ -364,7 +456,7 @@ pub const ConnectionEventRecorder = struct {
     last_error_code: ?api.PartoutErrorCode = null,
     remove_count: usize = 0,
 
-    pub fn events(self: *ConnectionEventRecorder) net_conn.Connection.Events {
+    pub fn events(self: *DaemonEventRecorder) net_daemon.Events {
         return .{
             .ctx = self,
             .status = recordConnectionStatus,
@@ -374,13 +466,13 @@ pub const ConnectionEventRecorder = struct {
         };
     }
 
-    pub fn statusHistory(self: *const ConnectionEventRecorder) []const api.ConnectionStatus {
+    pub fn statusHistory(self: *const DaemonEventRecorder) []const api.ConnectionStatus {
         return self.statuses[0..self.status_count];
     }
 };
 
 fn recordConnectionStatus(ptr: *anyopaque, status: api.ConnectionStatus) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.connection_status = status;
     if (self.status_count < self.statuses.len) {
         self.statuses[self.status_count] = status;
@@ -389,18 +481,18 @@ fn recordConnectionStatus(ptr: *anyopaque, status: api.ConnectionStatus) void {
 }
 
 fn recordDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.has_data_count = true;
     self.data_count = data_count;
 }
 
 fn recordLastErrorCode(ptr: *anyopaque, code: api.PartoutErrorCode) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.last_error_code = code;
 }
 
-fn recordRemove(ptr: *anyopaque, key: net_conn.Connection.EventKey) void {
-    const self: *ConnectionEventRecorder = @ptrCast(@alignCast(ptr));
+fn recordRemove(ptr: *anyopaque, key: net_daemon.EventKey) void {
+    const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
     self.remove_count += 1;
     switch (key) {
         .connection_status => self.connection_status = null,
@@ -412,7 +504,7 @@ fn recordRemove(ptr: *anyopaque, key: net_conn.Connection.EventKey) void {
     }
 }
 
-pub fn resetConnectionEventRecorder(self: *ConnectionEventRecorder) void {
+pub fn resetDaemonEventRecorder(self: *DaemonEventRecorder) void {
     self.connection_status = null;
     self.status_count = 0;
     self.has_data_count = false;
@@ -439,6 +531,7 @@ fn alwaysReachable(_: ?*anyopaque) bool {
 }
 
 const MockConnection = struct {
+    allocator: std.mem.Allocator,
     controller: net.TunnelController,
     module_id: api.UUID,
     module_type: api.ModuleType,
@@ -456,6 +549,7 @@ const MockConnection = struct {
         errdefer tunnel_info.deinit(allocator);
 
         created.* = .{
+            .allocator = allocator,
             .controller = parameters.controller,
             .module_id = module.id(),
             .module_type = module.typeOf(),
@@ -512,10 +606,10 @@ fn networkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connecti
 
 fn betterPath(_: *anyopaque, _: net_conn.Connection.Events) void {}
 
-fn deinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
+fn deinit(ptr: *anyopaque) void {
     const self: *MockConnection = @ptrCast(@alignCast(ptr));
-    self.tunnel_info.deinit(allocator);
-    allocator.destroy(self);
+    self.tunnel_info.deinit(self.allocator);
+    self.allocator.destroy(self);
 }
 
 fn buildTunnelInfo(
@@ -711,6 +805,7 @@ fn mockIsReachable(ptr: ?*anyopaque) bool {
 }
 
 const DaemonMockConnection = struct {
+    allocator: std.mem.Allocator,
     timeout_ms: u32 = 0,
 
     fn asConnection(self: *DaemonMockConnection) net_conn.Connection {
@@ -759,9 +854,9 @@ fn daemonMockNetworkChange(
     _: net_conn.Connection.Events,
 ) void {}
 
-fn daemonMockDeinit(ptr: *anyopaque, allocator: std.mem.Allocator) void {
+fn daemonMockDeinit(ptr: *anyopaque) void {
     const self: *DaemonMockConnection = @ptrCast(@alignCast(ptr));
-    allocator.destroy(self);
+    self.allocator.destroy(self);
 }
 
 pub fn mockConnectionImplementation() net_conn.ConnectionImplementation {
@@ -786,9 +881,8 @@ fn mockCreate(
     std.debug.assert(module.typeOf() == .OpenVPN);
     std.debug.assert(api.hasConnection(parameters.profile));
     std.debug.assert(parameters.controller.ptr != null);
-    std.debug.assert(parameters.monitor.ptr != null);
     var created = try allocator.create(DaemonMockConnection);
-    created.* = .{};
+    created.* = .{ .allocator = allocator };
     return created.asConnection();
 }
 
@@ -836,7 +930,7 @@ fn blockingBetterPath(ptr: *anyopaque, _: net_conn.Connection.Events) void {
 
 fn blockingNetworkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connection.Events) void {}
 
-fn blockingDeinit(_: *anyopaque, _: std.mem.Allocator) void {}
+fn blockingDeinit(_: *anyopaque) void {}
 
 pub fn blockingConnectionImplementation(blocking_connection: *BlockingStopConnection) net_conn.ConnectionImplementation {
     return .{
