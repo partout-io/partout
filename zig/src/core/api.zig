@@ -73,6 +73,7 @@ pub const TaggedModuleIP = gen.TaggedModuleIP;
 pub const TaggedModuleOnDemand = gen.TaggedModuleOnDemand;
 pub const TaggedModuleOpenVPN = gen.TaggedModuleOpenVPN;
 pub const TaggedModuleWireGuard = gen.TaggedModuleWireGuard;
+pub const TunnelControllerOptions = gen.TunnelControllerOptions;
 pub const TunnelRemoteInfoWrapper = gen.TunnelRemoteInfoWrapper;
 pub const TunnelSnapshot = gen.TunnelSnapshot;
 pub const TunnelSnapshotEnvironment = gen.TunnelSnapshotEnvironment;

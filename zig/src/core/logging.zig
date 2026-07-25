@@ -4,8 +4,7 @@
 
 const std = @import("std");
 
-const gen = @import("api_generated.zig");
-const manual = @import("api_manual.zig");
+const api = @import("api.zig");
 const concurrency = @import("concurrency.zig");
 const util = @import("util.zig");
 
@@ -226,38 +225,38 @@ const LogFormat = union(enum) {
 // API models cannot retroactively declare a logging formatter. Keep their
 // type identity and representation together in this comptime adapter registry.
 const model_adapters = .{
-    .{ manual.Address, ModelAdapter.raw },
-    .{ manual.Endpoint, ModelAdapter.raw_alloc },
-    .{ manual.ExtendedEndpoint, ModelAdapter.raw_alloc },
-    .{ manual.OpenVPNCryptoContainer, ModelAdapter.pem },
-    .{ manual.SecureData, ModelAdapter.hex },
-    .{ manual.Subnet, ModelAdapter.raw_alloc },
-    .{ manual.WireGuardKey, ModelAdapter.raw },
-    .{ gen.IPSettings, ModelAdapter.ip_settings },
-    .{ gen.DNSModule, ModelAdapter.json },
-    .{ gen.DNSModuleProtocolType, ModelAdapter.json },
-    .{ gen.DNSModuleProtocolTypeHttps, ModelAdapter.json },
-    .{ gen.DNSModuleProtocolTypeTls, ModelAdapter.json },
-    .{ gen.HTTPProxyModule, ModelAdapter.json },
-    .{ gen.IPModule, ModelAdapter.json },
-    .{ gen.OnDemandModule, ModelAdapter.json },
-    .{ gen.OpenVPNConfiguration, ModelAdapter.json },
-    .{ gen.OpenVPNCredentials, ModelAdapter.json },
-    .{ gen.OpenVPNModule, ModelAdapter.json },
-    .{ gen.OpenVPNObfuscationMethod, ModelAdapter.json },
-    .{ gen.OpenVPNObfuscationMethodObfuscate, ModelAdapter.json },
-    .{ gen.OpenVPNObfuscationMethodXormask, ModelAdapter.json },
-    .{ gen.OpenVPNStaticKey, ModelAdapter.json },
-    .{ gen.OpenVPNTLSWrap, ModelAdapter.json },
-    .{ gen.Profile, ModelAdapter.json },
-    .{ gen.Route, ModelAdapter.json },
-    .{ gen.TaggedModule, ModelAdapter.json },
-    .{ gen.TunnelControllerOptions, ModelAdapter.json },
-    .{ gen.TunnelRemoteInfoWrapper, ModelAdapter.json },
-    .{ gen.WireGuardConfiguration, ModelAdapter.json },
-    .{ gen.WireGuardLocalInterface, ModelAdapter.json },
-    .{ gen.WireGuardModule, ModelAdapter.json },
-    .{ gen.WireGuardRemoteInterface, ModelAdapter.json },
+    .{ api.Address, ModelAdapter.raw },
+    .{ api.Endpoint, ModelAdapter.raw_alloc },
+    .{ api.ExtendedEndpoint, ModelAdapter.raw_alloc },
+    .{ api.OpenVPNCryptoContainer, ModelAdapter.pem },
+    .{ api.SecureData, ModelAdapter.hex },
+    .{ api.Subnet, ModelAdapter.raw_alloc },
+    .{ api.WireGuardKey, ModelAdapter.raw },
+    .{ api.IPSettings, ModelAdapter.ip_settings },
+    .{ api.DNSModule, ModelAdapter.json },
+    .{ api.DNSModuleProtocolType, ModelAdapter.json },
+    .{ api.DNSModuleProtocolTypeHttps, ModelAdapter.json },
+    .{ api.DNSModuleProtocolTypeTls, ModelAdapter.json },
+    .{ api.HTTPProxyModule, ModelAdapter.json },
+    .{ api.IPModule, ModelAdapter.json },
+    .{ api.OnDemandModule, ModelAdapter.json },
+    .{ api.OpenVPNConfiguration, ModelAdapter.json },
+    .{ api.OpenVPNCredentials, ModelAdapter.json },
+    .{ api.OpenVPNModule, ModelAdapter.json },
+    .{ api.OpenVPNObfuscationMethod, ModelAdapter.json },
+    .{ api.OpenVPNObfuscationMethodObfuscate, ModelAdapter.json },
+    .{ api.OpenVPNObfuscationMethodXormask, ModelAdapter.json },
+    .{ api.OpenVPNStaticKey, ModelAdapter.json },
+    .{ api.OpenVPNTLSWrap, ModelAdapter.json },
+    .{ api.Profile, ModelAdapter.json },
+    .{ api.Route, ModelAdapter.json },
+    .{ api.TaggedModule, ModelAdapter.json },
+    .{ api.TunnelControllerOptions, ModelAdapter.json },
+    .{ api.TunnelRemoteInfoWrapper, ModelAdapter.json },
+    .{ api.WireGuardConfiguration, ModelAdapter.json },
+    .{ api.WireGuardLocalInterface, ModelAdapter.json },
+    .{ api.WireGuardModule, ModelAdapter.json },
+    .{ api.WireGuardRemoteInterface, ModelAdapter.json },
 };
 
 fn prepareArguments(
@@ -386,7 +385,7 @@ fn formatExplicitSensitive(
 
 fn formatIPSettings(
     allocator: std.mem.Allocator,
-    value: gen.IPSettings,
+    value: api.IPSettings,
 ) ![]const u8 {
     var output: std.Io.Writer.Allocating = .init(allocator);
     errdefer output.deinit();
