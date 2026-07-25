@@ -147,7 +147,7 @@ const OpenVPNConnection = struct {
             .endpoint_resolver = EndpointResolver.init(endpoints),
             .cache_dir = cache_dir,
         };
-        log.write(.notice, "OpenVPN: Using v3 connection");
+        log.write(.notice, "Using v3 connection");
         return created.asConnection();
     }
 
@@ -203,7 +203,7 @@ const OpenVPNConnection = struct {
             self.module_id,
             TLSConstants.ca_filename,
         ) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to create session: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to create session: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
         defer self.allocator.free(ca_filename);
@@ -217,7 +217,7 @@ const OpenVPNConnection = struct {
             ca_filename,
             self.session_options,
         ) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to create session: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to create session: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
         session.setDelegate(self.sessionDelegate());
@@ -237,7 +237,7 @@ const OpenVPNConnection = struct {
             };
         };
         session.setLink(descriptor, self.current_endpoint.?) catch |err| {
-            log.writef(.err, "OpenVPN: Unable to attach link: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to attach link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(err, null) catch {};
@@ -296,7 +296,7 @@ const OpenVPNConnection = struct {
         if (self.status == .disconnected or self.status == .disconnecting) return;
         log.write(.notice, "Link has a better path, shut down session to reconnect");
         session.shutdown(error.NetworkChanged, null) catch |err| {
-            log.writef(.err, "OpenVPN: Better-path shutdown failed: {s}", .{@errorName(err)});
+            log.writef(.err, "Better-path shutdown failed: {s}", .{@errorName(err)});
         };
     }
 
@@ -360,7 +360,7 @@ const OpenVPNConnection = struct {
         const node = self.allocator.create(DelegateEventNode) catch {
             var owned_event = event;
             owned_event.deinit(self.allocator);
-            log.write(.err, "OpenVPN: Unable to enqueue session delegate event");
+            log.write(.err, "Unable to enqueue session delegate event");
             return;
         };
         node.* = .{ .event = event };
@@ -405,7 +405,7 @@ const OpenVPNConnection = struct {
         event: DelegateEvent,
     ) void {
         const current = self.current_session orelse {
-            log.write(.debug, "OpenVPN: Ignore event without current session");
+            log.write(.debug, "Ignore event without current session");
             return;
         };
         if (event.session() != @as(*anyopaque, @ptrCast(current))) {
@@ -642,12 +642,12 @@ fn sessionDidStart(
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
     const endpoint = cloneEndpoint(self.allocator, remote_endpoint) catch {
-        log.write(.err, "OpenVPN: Unable to copy started endpoint");
+        log.write(.err, "Unable to copy started endpoint");
         return;
     };
     const options = remote_options.clone(self.allocator) catch {
         endpoint.deinit(self.allocator);
-        log.write(.err, "OpenVPN: Unable to copy pushed options");
+        log.write(.err, "Unable to copy pushed options");
         return;
     };
     self.enqueueDelegateEvent(.{ .did_start = .{
@@ -962,7 +962,7 @@ const EndpointResolver = struct {
                 error.ResolutionFailure,
                 error.Timeout,
                 => {
-                    log.writef(.err, "OpenVPN: Unable to resolve {s}: {s}", .{
+                    log.writef(.err, "Unable to resolve {s}: {s}", .{
                         source.address,
                         @errorName(err),
                     });

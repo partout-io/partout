@@ -161,8 +161,8 @@ pub const PeerEndpointResolver = struct {
                 flags,
                 reachability,
             ) catch |err| {
-                log.writef(.err, "WireGuard: Failed to resolve endpoint {s}: {s}", .{
-                    endpoint.address,
+                log.writef(.err, "Failed to resolve endpoint {s}: {s}", .{
+                    if (log.logsPrivateData()) endpoint.address else "<redacted>",
                     @errorName(err),
                 });
                 if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -199,17 +199,16 @@ pub const PeerEndpointResolver = struct {
             ) catch |err| switch (err) {
                 error.OutOfMemory => return error.OutOfMemory,
                 error.NetworkUnreachable, error.ResolutionFailure, error.Timeout => fallback: {
-                    log.writef(.err, "WireGuard: Unable to remap endpoint {s}: {s}", .{
-                        entry.base.address,
-                        @errorName(err),
-                    });
+                    log.writef(.err, "Unable to re-resolve endpoint: {s}", .{@errorName(err)});
                     break :fallback try allocator.dupe(u8, entry.base.address);
                 },
             };
 
             const parsed = api.Address.parseRaw(mapped);
             if (parsed == null or !parsed.?.isIPAddress()) {
-                log.writef(.err, "WireGuard: Resolver returned invalid mapped address for {s}", .{entry.base.address});
+                log.writef(.err, "Unable to re-resolve endpoint: {s}", .{
+                    @errorName(error.InvalidEndpoint),
+                });
                 allocator.free(mapped);
                 mapped = try allocator.dupe(u8, entry.base.address);
             }
@@ -277,8 +276,8 @@ fn preferredAddress(records: []const net.DNSRecord) ?[]const u8 {
 
 fn logMapping(source: []const u8, target: []const u8) void {
     if (std.mem.eql(u8, source, target)) {
-        log.writef(.debug, "WireGuard: DNS64 mapped {s} to itself", .{source});
+        log.writef(.debug, "DNS64: mapped {s} to itself.", .{source});
     } else {
-        log.writef(.debug, "WireGuard: DNS64 mapped {s} to {s}", .{ source, target });
+        log.writef(.debug, "DNS64: mapped {s} to {s}", .{ source, target });
     }
 }
