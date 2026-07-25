@@ -42,6 +42,7 @@ pub const openvpn_internal = if (openvpn_enabled) struct {
     pub const data = @import("openvpn/internal/data.zig");
     pub const errors = @import("openvpn/internal/errors.zig");
     pub const helpers = @import("openvpn/internal/helpers.zig");
+    pub const logging = @import("openvpn/internal/logging.zig");
     pub const packet = @import("openvpn/internal/packet.zig");
     pub const processing = @import("openvpn/internal/processing.zig");
     pub const push = @import("openvpn/internal/push.zig");

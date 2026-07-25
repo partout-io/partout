@@ -157,10 +157,10 @@ pub const Daemon = struct {
         original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
-        // Clone profile for safety, then log it
+        // Clone profile for safety, then log it.
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
-        api.logDecodedProfile(allocator, &profile);
+        log.writef(.notice, "Decoded profile: {s}", .{&profile});
 
         const daemon = try allocator.create(Daemon);
         errdefer allocator.destroy(daemon);

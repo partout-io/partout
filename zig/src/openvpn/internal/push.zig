@@ -5,8 +5,9 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const core_mod = @import("../../core/exports.zig");
-const parser_mod = @import("../parser.zig");
 const constants_mod = @import("constants.zig");
+const logging = @import("logging.zig");
+const parser_mod = @import("../parser.zig");
 
 const api = core_mod.api;
 
@@ -18,6 +19,7 @@ pub const PushReply = struct {
     options: api.OpenVPNConfiguration,
 
     pub const prefix = "PUSH_REPLY,";
+    pub const logging_formatter = logging.pushReply;
 
     pub fn parse(
         allocator: std.mem.Allocator,
@@ -50,29 +52,6 @@ pub const PushReply = struct {
             .original = original,
             .options = try self.options.clone(allocator),
         };
-    }
-
-    /// Mirrors Swift's `PushReply.description`, removing the auth-token value
-    /// even when private logging is enabled.
-    pub fn logDescriptionAlloc(
-        self: PushReply,
-        allocator: std.mem.Allocator,
-    ) ![]u8 {
-        const marker = "auth-token ";
-        const start = std.mem.indexOf(u8, self.original, marker) orelse
-            return allocator.dupe(u8, self.original);
-        const value_start = start + marker.len;
-        const value_end = std.mem.indexOfScalarPos(
-            u8,
-            self.original,
-            value_start,
-            ',',
-        ) orelse self.original.len;
-        return std.mem.concat(allocator, u8, &.{
-            self.original[0..start],
-            "auth-token",
-            self.original[value_end..],
-        });
     }
 
     pub fn deinit(self: *PushReply, allocator: std.mem.Allocator) void {

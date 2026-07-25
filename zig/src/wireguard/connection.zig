@@ -142,10 +142,33 @@ const WireGuardConnection = struct {
         errdefer events.status(events.ctx, .disconnected);
 
         self.adapter.start(allocator) catch |err| {
-            // Adapter activation errors are the local diagnostic signal. The
-            // generic connection contract deliberately exposes no WireGuard-
-            // specific categories, so log the concrete error before erasing it.
-            log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
+            switch (err) {
+                error.CannotLocateTunnelFileDescriptor => {
+                    log.write(
+                        .fault,
+                        "Starting tunnel failed: could not determine file descriptor",
+                    );
+                },
+                error.DNSResolutionFailure, error.InvalidEndpoint => {
+                    log.write(.fault, "DNS resolution failed");
+                },
+                error.TunNotAvailable => {
+                    log.writef(
+                        .fault,
+                        "Starting tunnel failed with setTunnelNetworkSettings returning {s}",
+                        .{@errorName(err)},
+                    );
+                },
+                error.CouldNotStartBackend => {
+                    log.write(.fault, "Starting tunnel backend failed");
+                },
+                else => {
+                    // Adapter activation errors are the local diagnostic signal. The
+                    // generic connection contract deliberately exposes no WireGuard-
+                    // specific categories, so log the concrete error before erasing it.
+                    log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
+                },
+            }
             return error.UnableToStart;
         };
         log.writef(.info, "Tunnel interface is {s}", .{

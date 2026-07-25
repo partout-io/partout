@@ -5,7 +5,6 @@
 const std = @import("std");
 
 const gen = @import("api_generated.zig");
-const log = @import("logging.zig");
 const util = @import("util.zig");
 const uuid = @import("uuid.zig");
 
@@ -74,24 +73,6 @@ pub fn isActiveProfileModule(profile: *const gen.Profile, module_id: uuid.UUID) 
     return false;
 }
 
-/// Logs a decoded profile using the core logging facility.
-pub fn logDecodedProfile(allocator: std.mem.Allocator, profile: *const gen.Profile) void {
-    if (!log.hasLogger()) return;
-
-    log.write(.notice, "Decoded profile:");
-    log.writef(.notice, "\tID: {s}", .{profile.id[0..]});
-    log.writef(.notice, "\tName: {s}", .{profile.name});
-    if (profile.behavior) |behavior| {
-        const encoded = util.encodeJsonValue(allocator, behavior) catch return;
-        defer allocator.free(encoded);
-        log.writef(.notice, "\tBehavior: {s}", .{encoded});
-    }
-    log.write(.notice, "\tModules:");
-    for (profile.modules) |*module| {
-        logProfileModule(allocator, profile, module);
-    }
-}
-
 /// Returns the schema id stored in a tagged module.
 ///
 /// Custom modules currently do not have a schema-level id, so they use the zero
@@ -155,23 +136,4 @@ pub fn typeBuildsConnection(value: gen.ModuleType) bool {
 /// Reports whether `module` is both active in the profile and connection-capable.
 fn isActiveConnectionModule(profile: *const gen.Profile, module: *const gen.TaggedModule) bool {
     return isActiveProfileModule(profile, moduleId(module)) and typeBuildsConnection(moduleType(module));
-}
-
-fn logProfileModule(
-    allocator: std.mem.Allocator,
-    profile: *const gen.Profile,
-    module: *const gen.TaggedModule,
-) void {
-    const active_marker: u8 = if (isActiveProfileModule(profile, moduleId(module))) '+' else '-';
-    const type_name = moduleType(module).raw();
-    if (log.logsPrivateData()) {
-        const encoded = util.encodeJsonValue(allocator, module) catch {
-            log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(module).raw() });
-            return;
-        };
-        defer allocator.free(encoded);
-        log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, encoded });
-        return;
-    }
-    log.writef(.notice, "\t\t{c} {s}: {s}", .{ active_marker, type_name, moduleType(module).raw() });
 }

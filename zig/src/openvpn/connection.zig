@@ -323,7 +323,7 @@ const OpenVPNConnection = struct {
 
         var owned_endpoint = try cloneEndpoint(self.allocator, endpoint);
         errdefer owned_endpoint.deinit(self.allocator);
-        logSensitiveEndpoint(.notice, "Connect to ", owned_endpoint);
+        log.writef(.notice, "Connect to {s}", .{owned_endpoint});
         const descriptor = self.factory.create(
             self.allocator,
             owned_endpoint,
@@ -438,15 +438,16 @@ const OpenVPNConnection = struct {
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         log.write(.notice, "Session did start");
-        openvpn_log.sensitiveString(.info, "\tEndpoint: ", remote_endpoint.address);
+        const remote_address = api.Address.parseRaw(remote_endpoint.address) orelse unreachable;
+        log.writef(.info, "\tEndpoint: {s}", .{remote_address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
             remote_endpoint.proto.socket_type.raw(),
             remote_endpoint.proto.port,
         });
         log.write(.notice, "Local options:");
-        logConfiguration(&self.configuration, true);
+        openvpn_log.logConfiguration(&self.configuration, true);
         log.write(.notice, "Remote options:");
-        logConfiguration(remote_options, false);
+        openvpn_log.logConfiguration(remote_options, false);
         const events = self.events orelse return;
 
         const builder = NetworkSettingsBuilder.init(
@@ -687,231 +688,6 @@ const session_delegate_vtable = SessionDelegate.VTable{
     .did_update_data_count = sessionDidUpdateDataCount,
 };
 
-fn logConfiguration(
-    configuration: *const api.OpenVPNConfiguration,
-    is_local: bool,
-) void {
-    if (is_local) {
-        if (configuration.remotes) |remotes| {
-            if (log.logsPrivateData()) {
-                log.writef(.notice, "\tRemotes: {any}", .{remotes});
-            } else {
-                log.writef(.notice, "\tRemotes: [<redacted> x {d}]", .{remotes.len});
-            }
-        }
-    } else {
-        logSensitiveValue("\tIPv4: ", configuration.ipv4);
-        logSensitiveValue("\tIPv6: ", configuration.ipv6);
-    }
-    if (configuration.routes4) |routes|
-        log.writef(.notice, "\tRoutes (IPv4): {any}", .{routes});
-    if (configuration.routes6) |routes|
-        log.writef(.notice, "\tRoutes (IPv6): {any}", .{routes});
-
-    if (configuration.cipher) |cipher| {
-        log.writef(.notice, "\tCipher: {s}", .{cipher.raw()});
-    } else if (is_local) {
-        log.writef(.notice, "\tCipher: {s}", .{
-            configuration_mod.fallbackCipher(configuration).raw(),
-        });
-    }
-    if (configuration.digest) |digest| {
-        log.writef(.notice, "\tDigest: {s}", .{digest.raw()});
-    } else if (is_local) {
-        log.writef(.notice, "\tDigest: {s}", .{
-            configuration_mod.fallbackDigest(configuration).raw(),
-        });
-    }
-    if (configuration.compression_framing) |framing| {
-        log.writef(.notice, "\tCompression framing: {s}", .{@tagName(framing)});
-    } else if (is_local) {
-        log.writef(.notice, "\tCompression framing: {s}", .{
-            @tagName(configuration_mod.fallbackCompressionFraming(configuration)),
-        });
-    }
-    if (configuration.compression_algorithm) |algorithm| {
-        log.writef(.notice, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
-    } else if (is_local) {
-        log.writef(.notice, "\tCompression algorithm: {s}", .{
-            @tagName(configuration_mod.fallbackCompressionAlgorithm(configuration)),
-        });
-    }
-
-    if (is_local) {
-        log.writef(.notice, "\tUsername authentication: {}", .{
-            configuration.auth_user_pass orelse false,
-        });
-        log.writef(.notice, "\tStatic challenge: {}", .{
-            configuration.static_challenge orelse false,
-        });
-        log.write(
-            .notice,
-            if (configuration.client_certificate != null)
-                "\tClient verification: enabled"
-            else
-                "\tClient verification: disabled",
-        );
-        if (configuration.tls_wrap) |wrap| {
-            log.writef(.notice, "\tTLS wrapping: {s}", .{wrap.strategy.raw()});
-        } else {
-            log.write(.notice, "\tTLS wrapping: disabled");
-        }
-        if (configuration.tls_security_level) |level| {
-            log.writef(.notice, "\tTLS security level: {d}", .{level});
-        } else {
-            log.write(.notice, "\tTLS security level: default");
-        }
-    }
-
-    logPositiveSeconds(
-        "\tKeep-alive interval: ",
-        configuration.keep_alive_interval,
-        is_local,
-    );
-    logPositiveSeconds(
-        "\tKeep-alive timeout: ",
-        configuration.keep_alive_timeout,
-        is_local,
-    );
-    logPositiveSeconds(
-        "\tRenegotiation: ",
-        configuration.renegotiates_after,
-        is_local,
-    );
-    if (configuration.checks_eku orelse false) {
-        log.write(.notice, "\tServer EKU verification: enabled");
-    } else if (is_local) {
-        log.write(.notice, "\tServer EKU verification: disabled");
-    }
-    if (configuration.checks_san_host orelse false) {
-        if (configuration.san_host) |host| {
-            if (log.logsPrivateData()) {
-                log.writef(.notice, "\tHost SAN verification: enabled ({s})", .{host});
-            } else {
-                log.write(.notice, "\tHost SAN verification: enabled (<redacted>)");
-            }
-        } else {
-            log.write(.notice, "\tHost SAN verification: enabled (-)");
-        }
-    } else if (is_local) {
-        log.write(.notice, "\tHost SAN verification: disabled");
-    }
-
-    if (configuration.randomize_endpoint orelse false)
-        log.write(.notice, "\tRandomize endpoint: true");
-    if (configuration.randomize_hostnames orelse false)
-        log.write(.notice, "\tRandomize hostnames: true");
-
-    if (configuration.routing_policies) |policies| {
-        log.writef(.notice, "\tGateway: {any}", .{policies});
-    } else if (is_local) {
-        log.write(.notice, "\tGateway: not configured");
-    }
-
-    if (configuration.dns_servers) |servers| {
-        if (servers.len > 0) {
-            logSensitiveStrings(.notice, "\tDNS: ", servers);
-        } else if (is_local) {
-            log.write(.notice, "\tDNS: not configured");
-        }
-    } else if (is_local) {
-        log.write(.notice, "\tDNS: not configured");
-    }
-    if (configuration.dns_domain) |domain|
-        openvpn_log.sensitiveString(.notice, "\tDNS domain: ", domain);
-    if (configuration.search_domains) |domains| {
-        if (domains.len > 0)
-            logSensitiveStrings(.notice, "\tSearch domains: ", domains);
-    }
-
-    if (configuration.http_proxy) |proxy|
-        logSensitiveProxy(.notice, "\tHTTP proxy: ", proxy);
-    if (configuration.https_proxy) |proxy|
-        logSensitiveProxy(.notice, "\tHTTPS proxy: ", proxy);
-    if (configuration.proxy_auto_configuration_url) |url|
-        openvpn_log.sensitiveString(.notice, "\tPAC: ", url);
-    if (configuration.proxy_bypass_domains) |domains| {
-        if (domains.len > 0)
-            logSensitiveStrings(.notice, "\tProxy bypass domains: ", domains);
-    }
-
-    if (configuration.mtu) |mtu| {
-        log.writef(.notice, "\tMTU: {d}", .{mtu});
-    } else if (is_local) {
-        log.write(.notice, "\tMTU: default");
-    }
-    if (configuration.xor_method) |method|
-        log.writef(.notice, "\tXOR: {s}", .{@tagName(std.meta.activeTag(method))});
-    if (configuration.no_pull_mask) |mask|
-        log.writef(.notice, "\tNot pulled: {any}", .{mask});
-}
-
-fn logPositiveSeconds(
-    comptime prefix: []const u8,
-    value: ?f64,
-    print_never: bool,
-) void {
-    if (value) |seconds| {
-        if (seconds > 0) {
-            openvpn_log.timeSeconds(.notice, prefix, seconds);
-            return;
-        }
-    }
-    if (print_never) log.write(.notice, prefix ++ "never");
-}
-
-fn logSensitiveValue(comptime prefix: []const u8, value: anytype) void {
-    if (value) |unwrapped| {
-        if (log.logsPrivateData()) {
-            log.writef(.notice, prefix ++ "{any}", .{unwrapped});
-        } else {
-            log.write(.notice, prefix ++ "<redacted>");
-        }
-    } else {
-        log.write(.notice, prefix ++ "not configured");
-    }
-}
-
-fn logSensitiveStrings(
-    level: core.logging.Level,
-    comptime prefix: []const u8,
-    values: []const []const u8,
-) void {
-    if (log.logsPrivateData()) {
-        log.writef(level, prefix ++ "{any}", .{values});
-    } else {
-        log.writef(level, prefix ++ "[<redacted> x {d}]", .{values.len});
-    }
-}
-
-fn logSensitiveProxy(
-    level: core.logging.Level,
-    comptime prefix: []const u8,
-    endpoint: api.Endpoint,
-) void {
-    if (log.logsPrivateData()) {
-        log.writef(level, prefix ++ "{s}:{d}", .{ endpoint.address, endpoint.port });
-    } else {
-        log.write(level, prefix ++ "<redacted>");
-    }
-}
-
-fn logSensitiveEndpoint(
-    level: core.logging.Level,
-    comptime prefix: []const u8,
-    endpoint: api.ExtendedEndpoint,
-) void {
-    if (log.logsPrivateData()) {
-        log.writef(level, prefix ++ "{s}:{s}:{d}", .{
-            endpoint.address,
-            endpoint.proto.socket_type.raw(),
-            endpoint.proto.port,
-        });
-    } else {
-        log.write(level, prefix ++ "<redacted>");
-    }
-}
-
 const EndpointResolver = struct {
     endpoints: []const api.ExtendedEndpoint,
     next_endpoint_index: usize = 0,
@@ -963,7 +739,7 @@ const EndpointResolver = struct {
                 error.Timeout,
                 => {
                     log.writef(.err, "Unable to resolve {s}: {s}", .{
-                        source.address,
+                        log.sensitive(source.address),
                         @errorName(err),
                     });
                     continue;

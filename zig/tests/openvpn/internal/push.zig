@@ -6,7 +6,23 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
+const logging = source.core_logging;
 const push = source.openvpn_internal.push;
+
+const CapturingLogger = struct {
+    var message: [512]u8 = undefined;
+    var message_len: usize = 0;
+
+    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+        const value = std.mem.span(raw_message);
+        message_len = @min(value.len, message.len);
+        @memcpy(message[0..message_len], value[0..message_len]);
+    }
+
+    fn lastMessage() []const u8 {
+        return message[0..message_len];
+    }
+};
 
 test "PUSH_REPLY without negotiated options preserves nil values" {
     var reply = (try push.PushReply.parse(
@@ -183,21 +199,34 @@ test "PUSH_REPLY clone owns independent storage" {
     try std.testing.expect(reply.original.ptr != copy.original.ptr);
 }
 
-test "PUSH_REPLY log description strips auth-token values" {
+test "writef formats PUSH_REPLY and always strips auth-token values" {
     const allocator = std.testing.allocator;
     var reply = (try push.PushReply.parse(
         allocator,
         "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM",
     )).?;
     defer reply.deinit(allocator);
-    const description = try reply.logDescriptionAlloc(allocator);
-    defer allocator.free(description);
+    logging.init(true, CapturingLogger.log);
+    defer logging.deinit();
+
+    logging.writef(.info, "{s}", .{reply});
 
     try std.testing.expectEqualStrings(
         "PUSH_REPLY,ping 10,auth-token,cipher AES-256-GCM",
-        description,
+        CapturingLogger.lastMessage(),
     );
-    try std.testing.expect(std.mem.indexOf(u8, description, "somethingsecret") == null);
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        CapturingLogger.lastMessage(),
+        "somethingsecret",
+    ) == null);
+
+    logging.init(false, CapturingLogger.log);
+    logging.writef(.info, "{s}", .{reply});
+    try std.testing.expectEqualStrings(
+        "<redacted>",
+        CapturingLogger.lastMessage(),
+    );
 }
 
 test "PUSH_REPLY distinguishes a route gateway from redirect gateway policy" {

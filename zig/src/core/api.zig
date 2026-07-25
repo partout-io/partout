@@ -91,7 +91,6 @@ pub const encodeProfileZ = extensions.encodeProfileZ;
 pub const findActiveConnectionModule = extensions.findActiveConnectionModule;
 pub const hasConnection = extensions.hasConnection;
 pub const isActiveProfileModule = extensions.isActiveProfileModule;
-pub const logDecodedProfile = extensions.logDecodedProfile;
 pub const moduleCacheFilename = extensions.moduleCacheFilename;
 pub const moduleId = extensions.moduleId;
 pub const moduleType = extensions.moduleType;
