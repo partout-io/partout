@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-const core = @import("../core/exports.zig");
-const net = @import("../net/exports.zig");
+const core = @import("../../core/exports.zig");
+const net = @import("../../net/exports.zig");
 
 const api = core.api;
 const log = core.logging;

@@ -9,8 +9,8 @@ const net = @import("../net/exports.zig");
 const api = core.api;
 const log = core.logging;
 
-const adapter_mod = @import("adapter.zig");
-const impl = @import("backend.zig");
+const adapter_mod = @import("internal/adapter.zig");
+const impl = @import("internal/backend.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
 

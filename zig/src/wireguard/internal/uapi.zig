@@ -4,7 +4,7 @@
 
 const std = @import("std");
 
-const core = @import("../core/exports.zig");
+const core = @import("../../core/exports.zig");
 const api = core.api;
 
 const resolver = @import("resolver.zig");

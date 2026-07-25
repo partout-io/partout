@@ -5,15 +5,16 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const adapter = @import("source").wireguard_adapter;
-const backend_mod = @import("source").wireguard_backend;
+const wireguard_internal = @import("source").wireguard_internal;
+const adapter = wireguard_internal.adapter;
+const backend_mod = wireguard_internal.backend;
 const connection = @import("source").wireguard_connection;
 const conn = @import("source").net_connection;
 const core = @import("source").core;
 const io = @import("source").net_io;
 const sandbox = @import("source").net_sandbox;
-const tunnel_info = @import("source").wireguard_tunnel_info;
-const uapi = @import("source").wireguard_uapi;
+const tunnel_info = wireguard_internal.tunnel_info;
+const uapi = wireguard_internal.uapi;
 
 const api = core.api;
 const AtomicBool = std.atomic.Value(bool);

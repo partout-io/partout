@@ -4,9 +4,9 @@
 
 const std = @import("std");
 
-const c_common = @import("../c/exports.zig").common;
-const core = @import("../core/exports.zig");
-const net = @import("../net/exports.zig");
+const c_common = @import("../../c/exports.zig").common;
+const core = @import("../../core/exports.zig");
+const net = @import("../../net/exports.zig");
 const log = core.logging;
 const util = core.util;
 

@@ -5,7 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const core = @import("../core/exports.zig");
+const core = @import("../../core/exports.zig");
 const api = core.api;
 const util = core.util;
 
