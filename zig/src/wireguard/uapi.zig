@@ -6,7 +6,6 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const api = core.api;
-const log = core.logging;
 
 const resolver = @import("resolver.zig");
 
@@ -76,13 +75,7 @@ pub fn buildEndpointConfiguration(
     const writer = &aw.writer;
 
     for (configuration.peers) |*peer| {
-        const public_key = peer.public_key.hexAlloc(allocator) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidModel, error.Stringify => {
-                log.writef(.err, "Unable to parse peer public key: {s}", .{peer.public_key.raw});
-                continue;
-            },
-        };
+        const public_key = try peer.public_key.hexAlloc(allocator);
         defer allocator.free(public_key);
         try writer.print("public_key={s}\n", .{public_key});
 
