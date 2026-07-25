@@ -369,7 +369,7 @@ pub const Negotiator = struct {
         if (self.state != .connected) return false;
         const seconds = self.options.configuration.renegotiates_after orelse return false;
         if (seconds <= 0) return false;
-        return self.elapsedMs() >= secondsToMilliseconds(seconds);
+        return self.elapsedMs() >= secondsToMs(seconds);
     }
 
     const EnqueueCipherText = *const fn (
@@ -661,9 +661,7 @@ pub const Negotiator = struct {
         if (self.continued_push_reply_message) |old| self.allocator.free(old);
         self.continued_push_reply_message = null;
 
-        const reply_description = try reply.logDescriptionAlloc(self.allocator);
-        defer self.allocator.free(reply_description);
-        log.writef(.info, "Received PUSH_REPLY: \"{s}\"", .{reply_description});
+        log.writef(.info, "Received PUSH_REPLY: \"{s}\"", .{reply});
 
         if (reply.options.compression_framing != null) {
             if (reply.options.compression_algorithm) |algorithm| {
@@ -798,7 +796,7 @@ pub const Negotiator = struct {
             delay_ms *| @as(u64, std.time.ns_per_ms);
     }
 
-    fn secondsToMilliseconds(seconds: f64) u64 {
+    fn secondsToMs(seconds: f64) u64 {
         if (!(seconds > 0)) return 0;
         const milliseconds = seconds * 1000.0;
         if (milliseconds >= @as(f64, @floatFromInt(std.math.maxInt(u64))))

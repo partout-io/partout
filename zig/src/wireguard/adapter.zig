@@ -252,11 +252,8 @@ pub const WireGuardAdapter = struct {
             }
             return;
         }
-        logSocketDescriptors(descriptors);
-        self.controller.configureSockets(descriptors) catch |err| {
-            log.writef(.err, "Unable to configure backend sockets: {s}", .{@errorName(err)});
-            return err;
-        };
+        log.writef(.info, "Socket descriptors: {any}", .{descriptors});
+        try self.controller.configureSockets(descriptors);
     }
 
     pub fn didUpdateReachable(
@@ -405,22 +402,6 @@ pub const WireGuardAdapter = struct {
         return uapi.parseRuntimeDataCount(text);
     }
 };
-
-fn logSocketDescriptors(descriptors: []const net.SocketDescriptor) void {
-    const allocator = std.heap.c_allocator;
-    var output: std.Io.Writer.Allocating = .init(allocator);
-    defer output.deinit();
-    const writer = &output.writer;
-    writer.writeAll("Socket descriptors: [") catch return;
-    for (descriptors, 0..) |descriptor, index| {
-        if (index > 0) writer.writeAll(", ") catch return;
-        writer.print("{any}", .{descriptor}) catch return;
-    }
-    writer.writeByte(']') catch return;
-    const message = output.toOwnedSlice() catch return;
-    defer allocator.free(message);
-    log.write(.info, message);
-}
 
 fn buildConfiguration(
     allocator: std.mem.Allocator,

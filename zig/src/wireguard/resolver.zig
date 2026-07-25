@@ -162,7 +162,7 @@ pub const PeerEndpointResolver = struct {
                 reachability,
             ) catch |err| {
                 log.writef(.err, "Failed to resolve endpoint {s}: {s}", .{
-                    if (log.logsPrivateData()) endpoint.address else "<redacted>",
+                    endpoint,
                     @errorName(err),
                 });
                 if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -220,7 +220,25 @@ pub const PeerEndpointResolver = struct {
                 .owned = true,
             };
             previous.deinit(allocator);
-            logMapping(entry.base.address, entry.target.address);
+            const source_address = api.Address.parseRaw(
+                entry.base.address,
+            ) orelse unreachable;
+            const target_address = api.Address.parseRaw(
+                entry.target.address,
+            ) orelse unreachable;
+            if (std.mem.eql(u8, source_address.raw, target_address.raw)) {
+                log.writef(
+                    .debug,
+                    "DNS64: mapped {s} to itself.",
+                    .{source_address},
+                );
+            } else {
+                log.writef(
+                    .debug,
+                    "DNS64: mapped {s} to {s}",
+                    .{ source_address, target_address },
+                );
+            }
         }
     }
 
@@ -236,7 +254,7 @@ pub const PeerEndpointResolver = struct {
             // Numeric endpoints bypass hostname resolution, but still pass
             // through `resolveAddress` when UAPI is built so DNS64 synthesis
             // can adapt an IPv4 literal to the active network.
-            logMapping(endpoint.address, endpoint.address);
+            log.writef(.debug, "DNS64: mapped {s} to itself.", .{address});
             return endpoint.clone(allocator);
         }
 
@@ -253,7 +271,8 @@ pub const PeerEndpointResolver = struct {
         defer util.freeSlice(net.DNSRecord, allocator, records);
 
         const target_address = preferredAddress(records) orelse return error.DNSResolutionFailure;
-        logMapping(endpoint.address, target_address);
+        const target = api.Address.parseRaw(target_address) orelse unreachable;
+        log.writef(.debug, "DNS64: mapped {s} to {s}", .{ address, target });
         return (api.Endpoint{
             .address = target_address,
             .port = endpoint.port,
@@ -272,12 +291,4 @@ fn preferredAddress(records: []const net.DNSRecord) ?[]const u8 {
         if (address.family == .v4) return address.raw;
     }
     return first;
-}
-
-fn logMapping(source: []const u8, target: []const u8) void {
-    if (std.mem.eql(u8, source, target)) {
-        log.writef(.debug, "DNS64: mapped {s} to itself.", .{source});
-    } else {
-        log.writef(.debug, "DNS64: mapped {s} to {s}", .{ source, target });
-    }
 }

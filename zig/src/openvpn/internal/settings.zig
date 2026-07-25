@@ -30,7 +30,7 @@ pub const NetworkSettingsBuilder = struct {
         self: NetworkSettingsBuilder,
         allocator: std.mem.Allocator,
     ) ![]api.TaggedModule {
-        self.print();
+        openvpn_log.logNegotiatedOptions(self.remote_options);
         log.write(.info, "Build modules from local/remote options");
         var result: std.ArrayList(api.TaggedModule) = .empty;
         errdefer {
@@ -58,20 +58,6 @@ pub const NetworkSettingsBuilder = struct {
         };
         if (http_proxy) |module| try result.append(allocator, .{ .HTTPProxy = module });
         return result.toOwnedSlice(allocator);
-    }
-
-    pub fn print(self: NetworkSettingsBuilder) void {
-        log.write(.notice, "Negotiated options (remote overrides local)");
-        if (self.remote_options.cipher) |cipher|
-            log.writef(.notice, "\tCipher: {s}", .{cipher.raw()});
-        if (self.remote_options.compression_framing) |framing|
-            log.writef(.notice, "\tCompression framing: {s}", .{@tagName(framing)});
-        if (self.remote_options.compression_algorithm) |algorithm|
-            log.writef(.notice, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
-        if (self.remote_options.keep_alive_interval) |interval|
-            openvpn_log.timeSeconds(.notice, "\tKeep-alive interval: ", interval);
-        if (self.remote_options.keep_alive_timeout) |timeout|
-            openvpn_log.timeSeconds(.notice, "\tKeep-alive timeout: ", timeout);
     }
 
     pub fn deinitModules(allocator: std.mem.Allocator, modules_value: []api.TaggedModule) void {
@@ -169,15 +155,24 @@ pub const NetworkSettingsBuilder = struct {
                 .gateway = route.gateway orelse default_gateway,
             };
             if (resolved.destination) |destination| {
-                log.writef(.info, "\t" ++ family ++ ": Add route {s}/{d} -> {s}", .{
-                    destination.address.raw,
-                    destination.prefix_length,
-                    if (resolved.gateway) |gateway| gateway.raw else "*",
-                });
+                if (resolved.gateway) |gateway| {
+                    log.writef(.info, "\t" ++ family ++ ": Add route {s} -> {s}", .{
+                        destination,
+                        gateway,
+                    });
+                } else {
+                    log.writef(.info, "\t" ++ family ++ ": Add route {s} -> *", .{
+                        destination,
+                    });
+                }
             } else {
-                log.writef(.info, "\t" ++ family ++ ": Set default gateway -> {s}", .{
-                    if (resolved.gateway) |gateway| gateway.raw else "*",
-                });
+                if (resolved.gateway) |gateway| {
+                    log.writef(.info, "\t" ++ family ++ ": Set default gateway -> {s}", .{
+                        gateway,
+                    });
+                } else {
+                    log.write(.info, "\t" ++ family ++ ": Set default gateway -> *");
+                }
             }
             try effective.append(allocator, resolved);
         }
@@ -208,7 +203,7 @@ pub const NetworkSettingsBuilder = struct {
             );
             return null;
         }
-        logSensitiveStrings("\tDNS: Set servers ", raw_servers.items);
+        log.writef(.info, "\tDNS: Set servers {s}", .{raw_servers.items});
 
         const servers = try addressesAlloc(allocator, raw_servers.items);
         errdefer freeAddresses(allocator, servers);
@@ -221,8 +216,8 @@ pub const NetworkSettingsBuilder = struct {
             (try api.Address.parseRawAlloc(allocator, domain)) orelse return error.InvalidAddress
         else
             null;
-        if (raw_domain) |domain|
-            openvpn_log.sensitiveString(.info, "\tDNS: Set domain: ", domain);
+        if (domain_name) |domain|
+            log.writef(.info, "\tDNS: Set domain: {s}", .{domain});
         errdefer if (domain_name) |*domain| domain.deinit(allocator);
 
         var raw_search: std.ArrayList([]const u8) = .empty;
@@ -237,7 +232,11 @@ pub const NetworkSettingsBuilder = struct {
             }
         }
         if (raw_search.items.len > 0)
-            logSensitiveStrings("\tDNS: Set search domains: ", raw_search.items);
+            log.writef(
+                .info,
+                "\tDNS: Set search domains: {s}",
+                .{raw_search.items},
+            );
 
         const search_domains: ?[]api.Address = if (raw_search.items.len > 0)
             try addressesAlloc(allocator, raw_search.items)
@@ -272,16 +271,12 @@ pub const NetworkSettingsBuilder = struct {
             self.local_options.proxy_auto_configuration_url;
         if (proxy_source == null and secure_source == null and pac_source == null) return null;
 
-        if (secure_source) |value| logSensitiveEndpoint(
-            "\tHTTPProxy: Set HTTPS proxy ",
-            value,
-        );
-        if (proxy_source) |value| logSensitiveEndpoint(
-            "\tHTTPProxy: Set HTTP proxy ",
-            value,
-        );
+        if (secure_source) |value|
+            log.writef(.info, "\tHTTPProxy: Set HTTPS proxy {s}", .{value});
+        if (proxy_source) |value|
+            log.writef(.info, "\tHTTPProxy: Set HTTP proxy {s}", .{value});
         if (pac_source) |value|
-            openvpn_log.sensitiveString(.info, "\tHTTPProxy: Set PAC ", value);
+            log.writef(.info, "\tHTTPProxy: Set PAC {s}", .{log.sensitive(value)});
 
         var proxy = if (proxy_source) |value| try value.clone(allocator) else null;
         errdefer if (proxy) |*value| value.deinit(allocator);
@@ -297,7 +292,11 @@ pub const NetworkSettingsBuilder = struct {
             if (self.remote_options.proxy_bypass_domains) |domains| try raw_bypass.appendSlice(allocator, domains);
         }
         if (raw_bypass.items.len > 0)
-            logSensitiveStrings("\tHTTPProxy: Set by-pass list: ", raw_bypass.items);
+            log.writef(
+                .info,
+                "\tHTTPProxy: Set by-pass list: {s}",
+                .{raw_bypass.items},
+            );
         const bypass = try addressesAlloc(allocator, raw_bypass.items);
         errdefer freeAddresses(allocator, bypass);
 
@@ -310,22 +309,6 @@ pub const NetworkSettingsBuilder = struct {
         };
     }
 };
-
-fn logSensitiveStrings(comptime prefix: []const u8, values: []const []const u8) void {
-    if (!log.logsPrivateData()) {
-        log.writef(.info, prefix ++ "[<redacted> x {d}]", .{values.len});
-        return;
-    }
-    log.writef(.info, prefix ++ "{any}", .{values});
-}
-
-fn logSensitiveEndpoint(comptime prefix: []const u8, endpoint: api.Endpoint) void {
-    if (!log.logsPrivateData()) {
-        log.write(.info, prefix ++ "<redacted>");
-        return;
-    }
-    log.writef(.info, prefix ++ "{s}:{d}", .{ endpoint.address, endpoint.port });
-}
 
 fn addressesAlloc(
     allocator: std.mem.Allocator,

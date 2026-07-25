@@ -14,6 +14,7 @@ public final class PartoutProviderRuntime: Sendable {
     private let environment: UserDefaultsEnvironment
     private let messageHandler: DefaultMessageHandler
     private let options: TunnelControllerOptions
+    private let logsPrivateData: Bool
     private let logger: partout_logger_cb?
 
     public init(
@@ -21,6 +22,7 @@ public final class PartoutProviderRuntime: Sendable {
         decoder: NEProtocolDecoder,
         options: TunnelControllerOptions,
         defaults: UserDefaults,
+        logsPrivateData: Bool,
         logger: partout_logger_cb?
     ) throws {
         profile = try Profile(withNEProvider: provider, decoder: decoder)
@@ -29,6 +31,7 @@ public final class PartoutProviderRuntime: Sendable {
         environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
         messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
+        self.logsPrivateData = logsPrivateData
         self.logger = logger
     }
 
@@ -47,7 +50,7 @@ public final class PartoutProviderRuntime: Sendable {
         pp_log(ctx, .os, .notice, "Start runtime")
 
         var init_args = partout_init_args(
-            logs_private_data: true,
+            logs_private_data: logsPrivateData,
             logger: logger
         )
         pp_log(ctx, .os, .info, "Initialize Partout library")

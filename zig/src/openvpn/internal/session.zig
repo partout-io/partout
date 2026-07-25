@@ -13,7 +13,6 @@ const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
 const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
-const logging_mod = @import("logging.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
 const push_mod = @import("push.zig");
@@ -26,7 +25,6 @@ const session_mod = @This();
 const api = core_mod.api;
 const c = helpers_mod.c;
 const log = core_mod.logging;
-const openvpn_log = logging_mod;
 
 const ActiveContext = session_context_mod.ActiveContext;
 const ActivePhase = session_context_mod.ActivePhase;
@@ -770,8 +768,10 @@ pub const Session = struct {
         context.setPushReply(reply);
         reply_transferred = true;
         context.removeOldNegotiators();
-        context.logNegotiatorKeys();
-        context.logDataKeys();
+        const negotiator_keys = context.negotiatorKeys();
+        log.writef(.info, "Negotiators: {any}", .{negotiator_keys.slice()});
+        const data_keys = context.dataKeys();
+        log.writef(.info, "Data channels: {any}", .{data_keys.slice()});
         if (active.phase == .started) return;
         active.phase = .started;
         self.scheduleNextPing(context) catch |err|
@@ -824,7 +824,7 @@ pub const Session = struct {
     ) !void {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
-        openvpn_log.timeMilliseconds(.debug, "Schedule ping check after ", delay);
+        log.logTimeMs(.debug, "Schedule ping check after ", delay);
         try self.ping_timer.init(delay, onPingTimer, self);
     }
 
@@ -875,20 +875,20 @@ pub const Session = struct {
     ) ?u64 {
         if (context.push_reply) |reply| {
             if (reply.options.keep_alive_interval) |seconds|
-                if (seconds > 0) return secondsToMilliseconds(seconds);
+                if (seconds > 0) return secondsToMs(seconds);
         }
         if (self.configuration.keep_alive_interval) |seconds|
-            if (seconds > 0) return secondsToMilliseconds(seconds);
+            if (seconds > 0) return secondsToMs(seconds);
         return null;
     }
 
     fn keepAliveTimeoutMs(self: *const Session, context: *ActiveContext) u64 {
         if (context.push_reply) |reply| {
             if (reply.options.keep_alive_timeout) |seconds|
-                if (seconds > 0) return secondsToMilliseconds(seconds);
+                if (seconds > 0) return secondsToMs(seconds);
         }
         if (self.configuration.keep_alive_timeout) |seconds|
-            if (seconds > 0) return secondsToMilliseconds(seconds);
+            if (seconds > 0) return secondsToMs(seconds);
         return self.options.ping_timeout_ms;
     }
 
@@ -949,7 +949,7 @@ pub const Session = struct {
         };
     }
 
-    fn secondsToMilliseconds(seconds: f64) u64 {
+    fn secondsToMs(seconds: f64) u64 {
         if (!(seconds > 0)) return 0;
         const milliseconds = seconds * 1000.0;
         if (milliseconds >= @as(f64, @floatFromInt(std.math.maxInt(u64))))

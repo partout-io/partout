@@ -345,3 +345,16 @@ test "NetworkSettingsBuilder builds endpoint, PAC, and merged proxy bypass setti
     try std.testing.expect(masked.pac_url == null);
     try std.testing.expectEqual(@as(usize, 2), masked.bypass_domains.len);
 }
+
+test "NetworkSettingsBuilder accepts an empty PAC URL" {
+    const allocator = std.testing.allocator;
+    const local = api.OpenVPNConfiguration{
+        .proxy_auto_configuration_url = "",
+    };
+    const remote = api.OpenVPNConfiguration{};
+    const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
+    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+
+    try std.testing.expectEqual(@as(usize, 1), result.len);
+    try std.testing.expectEqualStrings("", result[0].HTTPProxy.pac_url.?);
+}

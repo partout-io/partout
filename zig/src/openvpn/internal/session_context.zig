@@ -35,6 +35,15 @@ pub const IdleContext = struct {
 
 /// Mutable state owned by an active session and touched only on its looper.
 pub const ActiveContext = struct {
+    pub const KeyList = struct {
+        values: [ControlConstants.number_of_keys]u8 = undefined,
+        len: usize = 0,
+
+        pub fn slice(self: *const KeyList) []const u8 {
+            return self.values[0..self.len];
+        }
+    };
+
     allocator: std.mem.Allocator,
     data_link: DataLink,
     with_local_options: bool,
@@ -101,7 +110,8 @@ pub const ActiveContext = struct {
             if (old != negotiator) old.destroy();
         }
         self.negotiators[negotiator.key] = negotiator;
-        self.logNegotiatorKeys();
+        const keys = self.negotiatorKeys();
+        log.writef(.info, "Negotiators: {any}", .{keys.slice()});
         self.current_negotiator_key = negotiator.key;
         log.writef(.info, "Negotiator: Current key is {d}", .{negotiator.key});
     }
@@ -160,28 +170,26 @@ pub const ActiveContext = struct {
         self.data_count.reset();
     }
 
-    pub fn logNegotiatorKeys(self: *const ActiveContext) void {
-        var keys: [ControlConstants.number_of_keys]u8 = undefined;
-        var count: usize = 0;
+    pub fn negotiatorKeys(self: *const ActiveContext) KeyList {
+        var result: KeyList = .{};
         for (self.negotiators, 0..) |negotiator, key| {
             if (negotiator != null) {
-                keys[count] = @intCast(key);
-                count += 1;
+                result.values[result.len] = @intCast(key);
+                result.len += 1;
             }
         }
-        log.writef(.info, "Negotiators: {any}", .{keys[0..count]});
+        return result;
     }
 
-    pub fn logDataKeys(self: *const ActiveContext) void {
-        var keys: [ControlConstants.number_of_keys]u8 = undefined;
-        var count: usize = 0;
+    pub fn dataKeys(self: *const ActiveContext) KeyList {
+        var result: KeyList = .{};
         for (self.data_channels, 0..) |channel, key| {
             if (channel != null) {
-                keys[count] = @intCast(key);
-                count += 1;
+                result.values[result.len] = @intCast(key);
+                result.len += 1;
             }
         }
-        log.writef(.info, "Data channels: {any}", .{keys[0..count]});
+        return result;
     }
 };
 

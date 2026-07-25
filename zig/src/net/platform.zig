@@ -400,7 +400,9 @@ fn socketFactoryCreate(
         allocator,
         self.socketOptions(endpoint, effective_reachability, timeout),
     ) orelse return error.LinkNotActive;
-    log.writef(.debug, "PlatformSocketFactory: Created socket for {s}", .{endpoint.address});
+    log.writef(.debug, "PlatformSocketFactory: Created socket for {s}", .{
+        log.sensitive(endpoint.address),
+    });
     const fd = wrapper.muxDescriptor() orelse {
         wrapper.nativeIO().cleanup();
         return error.LinkNotActive;

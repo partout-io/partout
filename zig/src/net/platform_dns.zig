@@ -131,7 +131,9 @@ pub const PlatformDNS = struct {
         query_pool.mutex.unlock();
         if (timed_out) {
             thread.detach();
-            log.writef(.err, "DNS resolution timed out for {s}", .{hostname});
+            log.writef(.err, "DNS resolution timed out for {s}", .{
+                log.sensitive(hostname),
+            });
             return error.Timeout;
         }
         thread.join();
@@ -159,7 +161,7 @@ pub const PlatformDNS = struct {
             if (addr == null) continue;
             const numeric = numericHostAlloc(allocator, addr, current.ai_addrlen) catch |err| {
                 log.writef(.err, "getnameinfo() failed for {s}: {s}", .{
-                    hostname,
+                    log.sensitive(hostname),
                     @errorName(err),
                 });
                 continue;
@@ -172,7 +174,10 @@ pub const PlatformDNS = struct {
                 return err;
             };
         }
-        log.writef(.debug, "DNS resolved {s}: {} record(s)", .{ hostname, records.items.len });
+        log.writef(.debug, "DNS resolved {s}: {} record(s)", .{
+            log.sensitive(hostname),
+            records.items.len,
+        });
         return records.toOwnedSlice(allocator);
     }
 };
