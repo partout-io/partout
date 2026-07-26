@@ -21,6 +21,8 @@ const c_common = c_mod.common;
 const log = core.logging;
 const util = core.util;
 
+pub const panic = std.debug.FullPanic(panicHandler);
+
 const allocator = std.heap.c_allocator;
 const identifier = "io.partout";
 const version = "0.152.2";
@@ -29,6 +31,15 @@ const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ ide
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
 // var daemon_runtime = DaemonRuntime{};
 var daemon_runtime: ?*abi.DaemonRuntime = null;
+
+fn panicHandler(message: []const u8, _: ?usize) noreturn {
+    var buffer: [4097]u8 = undefined;
+    const message_length = @min(message.len, buffer.len - 1);
+    @memcpy(buffer[0..message_length], message[0..message_length]);
+    buffer[message_length] = 0;
+    c_common.pp_panic(buffer[0..message_length :0].ptr);
+    @trap();
+}
 
 pub export fn partout_version() callconv(.c) [*:0]const u8 {
     return version_identifier.ptr;

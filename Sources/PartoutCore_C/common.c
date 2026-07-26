@@ -168,6 +168,14 @@ uint32_t pp_time_unix_seconds(void) {
     return (uint32_t)(uint64_t)seconds;
 }
 
+void pp_panic(const char *message) {
+    fputs("partout panic: ", stderr);
+    fputs(message, stderr);
+    fputc('\n', stderr);
+    fflush(stderr);
+    abort();
+}
+
 #if PARTOUT_ANDROID
 JNIEnv *pp_jni_attach_thread(bool *did_attach) {
     JNIEnv *env;

@@ -112,6 +112,9 @@ bool pp_file_is_directory(const char *path);
 /* Return seconds since the Unix epoch, or zero if unavailable. */
 uint32_t pp_time_unix_seconds(void);
 
+/* Report a fatal Zig error without pulling in Zig's default I/O backend. */
+void pp_panic(const char *message);
+
 #pragma clang assume_nonnull end
 
 /* Syscalls. */
