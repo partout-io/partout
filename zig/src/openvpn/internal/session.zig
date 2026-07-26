@@ -390,7 +390,6 @@ pub const Session = struct {
         const self: *Session = @ptrCast(@alignCast(raw));
         self.shutdown_request_lock.lock();
         const cause = self.requested_shutdown_cause;
-        self.requested_shutdown_cause = null;
         self.shutdown_request_lock.unlock();
         self.shutdown(cause orelse return, null) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
