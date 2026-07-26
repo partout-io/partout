@@ -14,6 +14,18 @@ fn waitUntil(value: *const AtomicBool) void {
     }
 }
 
+fn waitUntilWithin(value: *const AtomicBool, timeout_ms: u64) bool {
+    const deadline_ns = core.concurrency.testing.deadlineAfterMilliseconds(
+        core.concurrency.monotonicNs(),
+        timeout_ms,
+    );
+    while (!value.load(.acquire)) {
+        if (core.concurrency.monotonicNs() >= deadline_ns) return false;
+        std.Thread.yield() catch {};
+    }
+    return true;
+}
+
 fn settleScheduler() void {
     for (0..1000) |_| {
         std.Thread.yield() catch {};
@@ -103,6 +115,23 @@ const ScheduledProbe = struct {
     }
 };
 
+const BlockingScheduledProbe = struct {
+    started: AtomicBool = AtomicBool.init(false),
+    release: AtomicBool = AtomicBool.init(false),
+
+    fn record(
+        scheduled: *core.RunAfter.Scheduled,
+        outcome: core.RunAfter.Scheduled.Outcome,
+    ) void {
+        const self: *BlockingScheduledProbe = @ptrCast(
+            @alignCast(scheduled.context.?),
+        );
+        if (outcome != .elapsed) return;
+        self.started.store(true, .release);
+        waitUntil(&self.release);
+    }
+};
+
 test "drainer waits until in-flight work completes" {
     const Worker = struct {
         mutex: *core.Mutex,
@@ -189,6 +218,46 @@ test "RunAfter runs callback after delay" {
     waitUntil(&did_run);
 }
 
+test "RunAfter deadlines account for continuous clock jumps" {
+    const start_ns = 5 * std.time.ns_per_s;
+    const deadline_ns = core.concurrency.testing.deadlineAfterMilliseconds(
+        start_ns,
+        100,
+    );
+
+    try std.testing.expectEqual(
+        @as(u64, 100),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            start_ns,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 1),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns - 1,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 0),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns + 10 * std.time.ns_per_s,
+        ),
+    );
+}
+
+test "RunAfter deadlines saturate without wrapping" {
+    try std.testing.expectEqual(
+        std.math.maxInt(u64),
+        core.concurrency.testing.deadlineAfterMilliseconds(
+            std.math.maxInt(u64) - 1,
+            1,
+        ),
+    );
+}
+
 test "RunAfter cancel prevents callback" {
     var did_run = AtomicBool.init(false);
     var run_after = core.RunAfter{};
@@ -265,6 +334,33 @@ test "RunAfter schedules independent one-shot callbacks" {
 
     waitUntil(&later_probe.elapsed);
     try std.testing.expect(!later_probe.cancelled.load(.acquire));
+}
+
+test "RunAfter rearms an earlier deadline while notifying callbacks" {
+    var blocking_probe = BlockingScheduledProbe{};
+    var earlier_probe = ScheduledProbe{};
+    var later_probe = ScheduledProbe{};
+    var blocking = core.RunAfter.Scheduled{};
+    var earlier = core.RunAfter.Scheduled{};
+    var later = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+    defer blocking_probe.release.store(true, .release);
+
+    try run_after.scheduleAppending(&later, 2_000, ScheduledProbe.record, &later_probe);
+    try run_after.scheduleAppending(
+        &blocking,
+        1,
+        BlockingScheduledProbe.record,
+        &blocking_probe,
+    );
+    waitUntil(&blocking_probe.started);
+
+    try run_after.scheduleAppending(&earlier, 1, ScheduledProbe.record, &earlier_probe);
+    blocking_probe.release.store(true, .release);
+
+    try std.testing.expect(waitUntilWithin(&earlier_probe.elapsed, 500));
+    try std.testing.expect(!later_probe.elapsed.load(.acquire));
 }
 
 test "RunAfter cancel releases scheduled callbacks" {
