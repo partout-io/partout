@@ -840,9 +840,8 @@ pub const Daemon = struct {
         // Keep the borrowed looper object alive until the connection has
         // released every Session that refers to it, but first join its worker
         // so the terminal callback cannot race connection deinitialization.
-        runtime.looper.stop() catch |err| switch (err) {
-            error.TerminalFailure => {},
-            else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
+        runtime.looper.stop() catch |err| {
+            log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)});
         };
         runtime.connection.destroy();
         runtime.looper.deinit();

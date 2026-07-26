@@ -380,9 +380,9 @@ pub const Session = struct {
             &prepare,
             prepareShutdownOnQueue,
         ) catch |err| {
-            // A terminal looper has already serialized final state; its owner
+            // A stopped looper has already serialized final state; its owner
             // routes `OnFinish` through `looperDidTerminate` while Session lives.
-            if (err == error.Cancelled or err == error.TerminalFailure) return;
+            if (err == error.Cancelled) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });

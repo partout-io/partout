@@ -131,7 +131,6 @@ pub const Errors = struct {
     pub const OperationCancelled = error{OperationCancelled};
     pub const ReentrantCall = error{ReentrantCall};
     pub const TaskFailure = error{TaskFailure};
-    pub const TerminalFailure = error{TerminalFailure};
     pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
@@ -139,8 +138,7 @@ pub const Errors = struct {
 pub const CompletionError = std.mem.Allocator.Error ||
     Errors.Cancelled ||
     Errors.MuxFailure ||
-    Errors.OperationCancelled ||
-    Errors.TerminalFailure;
+    Errors.OperationCancelled;
 
 pub const Completion = struct {
     // Completion state.

@@ -102,8 +102,7 @@ pub const Looper = struct {
     pub const ScheduleError = SubmissionError || Errors.TaskFailure;
     pub const StopError = SubmissionError ||
         Errors.InvalidState ||
-        Errors.ReentrantCall ||
-        Errors.TerminalFailure;
+        Errors.ReentrantCall;
     pub const WriteError = SubmissionError ||
         io.Error ||
         Errors.TransformFailure ||
@@ -117,7 +116,6 @@ pub const Looper = struct {
     lock: core.Mutex = .{},
     condition: core.Condition = .{},
     state: State = .idle,
-    terminal_failure: ?Failure = null,
 
     // Command submission and synchronous completion.
     commands: CommandQueue = .{},
@@ -375,10 +373,8 @@ pub const Looper = struct {
                 while (self.state == .stopping) {
                     self.condition.wait(&self.lock);
                 }
-                const failed = self.terminal_failure != null;
                 self.lock.unlock();
                 self.joinWorker();
-                if (failed) return error.TerminalFailure;
                 return;
             },
         }
@@ -407,7 +403,6 @@ pub const Looper = struct {
         if (completion_failure) |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.Cancelled => return error.Cancelled,
-            error.TerminalFailure => return error.TerminalFailure,
             else => log.writefAndFailDebug("Ignoring unexpected Looper stop completion error: {s}", .{
                 @errorName(err),
             }),
@@ -548,7 +543,7 @@ pub const Looper = struct {
             error.OutOfMemory => error.OutOfMemory,
             error.Cancelled => error.Cancelled,
             error.OperationCancelled => error.OperationCancelled,
-            else => error.MuxFailure,
+            error.MuxFailure => error.MuxFailure,
         };
     }
 
@@ -597,12 +592,6 @@ pub const Looper = struct {
         self.lock.lock();
         defer self.lock.unlock();
         return self.tun != null;
-    }
-
-    pub fn terminalFailure(self: *Looper) ?Failure {
-        self.lock.lock();
-        defer self.lock.unlock();
-        return self.terminal_failure;
     }
 
     pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
@@ -1098,12 +1087,11 @@ pub const Looper = struct {
             else => {},
         }
         self.state = .stopped;
-        self.terminal_failure = failure;
         self.cancelPendingLocked(self.commands.takeReady());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
-            completeNow(completion, if (failure != null) error.TerminalFailure else null);
+            completeNow(completion, null);
             self.stop_completion = null;
         }
         self.releaseCompletionsLocked();

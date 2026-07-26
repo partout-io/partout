@@ -33,10 +33,10 @@ test "completion queue releases completions in FIFO order" {
     try std.testing.expect(second.next == null);
 
     var third = Completion{};
-    queue.append(&third, error.TerminalFailure);
+    queue.append(&third, error.OperationCancelled);
     queue.releaseAll();
     try std.testing.expect(third.done);
-    try std.testing.expect(third.failure.? == error.TerminalFailure);
+    try std.testing.expect(third.failure.? == error.OperationCancelled);
 }
 
 test "command queue detaches ready commands in FIFO order" {
