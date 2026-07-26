@@ -26,6 +26,8 @@ pub const Mutex = switch (builtin.os.tag) {
 ///
 /// Waiters must always check their predicate in a loop because a broadcast
 /// does not imply that the predicate remains true after the mutex is reacquired.
+/// `waitUntil` additionally accepts a suspend-inclusive deadline and may return
+/// either because it was signalled or because that deadline may have elapsed.
 pub const Condition = switch (builtin.os.tag) {
     .windows => WindowsCondition,
     else => PosixCondition,
@@ -254,11 +256,10 @@ pub const RunAfter = struct {
 
     /// Appends an independent one-shot callback without replacing earlier ones.
     ///
-    /// Delays are best-effort and quantized to `scheduler_resolution_ms`; a
-    /// callback may run late but is given a full extra tick so it does not run
-    /// early at a tick boundary. This mode must not be started while a callback
-    /// submitted with `scheduleReplacing` is pending. The function starts the
-    /// worker lazily and reports failure to spawn it.
+    /// The worker waits directly for the earliest pending deadline and is
+    /// interrupted when an earlier callback is appended. This mode must not be
+    /// started while a callback submitted with `scheduleReplacing` is pending.
+    /// The function starts the worker lazily and reports failure to spawn it.
     pub fn scheduleAppending(
         self: *RunAfter,
         scheduled: *Scheduled,
@@ -314,12 +315,7 @@ pub const RunAfter = struct {
         scheduled.* = .{
             .context = context,
             .callback = callback,
-            // A full extra tick prevents a newly appended job from expiring
-            // early when it lands immediately before the current tick.
-            .deadline_ns = deadlineAfterMs(
-                monotonicNs(),
-                delay_ms +| scheduler_resolution_ms,
-            ),
+            .deadline_ns = deadlineAfterMs(monotonicNs(), delay_ms),
         };
         if (self.scheduled_tail) |tail| {
             tail.next = scheduled;
@@ -330,7 +326,12 @@ pub const RunAfter = struct {
 
         if (!self.scheduling) {
             self.scheduling = true;
-            self.replaceLocked(scheduler_resolution_ms, runScheduled, self);
+            self.replaceAtLocked(scheduled.deadline_ns, runScheduled, self);
+        } else if ((self.state == .scheduled or
+            self.state == .running_scheduled) and
+            scheduled.deadline_ns < self.deadline_ns.?)
+        {
+            self.replaceAtLocked(scheduled.deadline_ns, runScheduled, self);
         }
     }
 
@@ -376,9 +377,10 @@ pub const RunAfter = struct {
 
     /// Blocks until no replaceable callback is pending or running.
     ///
-    /// In independent scheduling mode, the internal tick callback keeps the
-    /// executor non-idle until every scheduled handle has been notified. This
-    /// function must not race with `deinit` or run from an executor callback.
+    /// In independent scheduling mode, the internal scheduler callback keeps
+    /// the executor non-idle until every scheduled handle has been notified.
+    /// This function must not race with `deinit` or run from an executor
+    /// callback.
     pub fn wait(self: *RunAfter) void {
         self.mutex.lock();
         defer self.mutex.unlock();
@@ -390,7 +392,7 @@ pub const RunAfter = struct {
 
     /// Worker entry point for the replaceable callback slot.
     ///
-    /// The worker sleeps while idle, evaluates delays without holding `mutex`,
+    /// The worker sleeps while idle, waits interruptibly for absolute deadlines,
     /// and serializes callback execution. It exits only after entering
     /// `.stopping`.
     fn run(self: *RunAfter) void {
@@ -410,11 +412,14 @@ pub const RunAfter = struct {
                 self.deadline_ns = value;
                 break :deadline value;
             };
-            self.mutex.unlock();
 
-            if (self.sleepUntilChangedOrElapsed(generation, deadline_ns)) continue;
+            while (self.state == .scheduled and
+                self.generation == generation and
+                monotonicNs() < deadline_ns)
+            {
+                self.cond.waitUntil(&self.mutex, deadline_ns);
+            }
 
-            self.mutex.lock();
             if (self.state == .stopping) {
                 self.mutex.unlock();
                 return;
@@ -451,10 +456,10 @@ pub const RunAfter = struct {
         }
     }
 
-    /// Processes one scheduler tick for the independent callback list.
+    /// Processes callbacks at the earliest independent deadline.
     ///
-    /// Due handles are detached while holding `mutex`, the next tick is armed
-    /// if necessary, and notifications are delivered after unlocking.
+    /// Due handles are detached while holding `mutex`, the next exact deadline
+    /// is armed if necessary, and notifications are delivered after unlocking.
     fn runScheduled(context: ?*anyopaque) void {
         const self: *RunAfter = @ptrCast(@alignCast(context.?));
 
@@ -468,6 +473,7 @@ pub const RunAfter = struct {
         var due_tail: ?*Scheduled = null;
         var previous: ?*Scheduled = null;
         var current = self.scheduled_head;
+        var next_deadline_ns: ?u64 = null;
         const now_ns = monotonicNs();
         while (current) |scheduled| {
             const next = scheduled.next;
@@ -488,12 +494,17 @@ pub const RunAfter = struct {
                 due_tail = scheduled;
             } else {
                 previous = scheduled;
+                if (next_deadline_ns == null or
+                    scheduled.deadline_ns < next_deadline_ns.?)
+                {
+                    next_deadline_ns = scheduled.deadline_ns;
+                }
             }
             current = next;
         }
 
-        if (self.scheduled_head != null) {
-            self.replaceLocked(scheduler_resolution_ms, runScheduled, self);
+        if (next_deadline_ns) |deadline_ns| {
+            self.replaceAtLocked(deadline_ns, runScheduled, self);
         } else {
             self.scheduling = false;
         }
@@ -529,6 +540,29 @@ pub const RunAfter = struct {
             .idle, .scheduled => .scheduled,
             .running, .running_scheduled => .running_scheduled,
             .stopping => unreachable,
+        };
+        self.cond.broadcast();
+    }
+
+    /// Arms an absolute deadline while `mutex` is held.
+    ///
+    /// This variant is used by independent callbacks, whose deadlines begin at
+    /// submission time even when the scheduler callback is currently running.
+    fn replaceAtLocked(
+        self: *RunAfter,
+        deadline_ns: u64,
+        callback: Callback,
+        callback_ctx: ?*anyopaque,
+    ) void {
+        self.generation +%= 1;
+        self.delay_ms = 0;
+        self.deadline_ns = deadline_ns;
+        self.callback = callback;
+        self.callback_ctx = callback_ctx;
+        self.state = switch (self.state) {
+            .idle, .scheduled => .scheduled,
+            .running, .running_scheduled => .running_scheduled,
+            .stopping => @panic("cannot schedule a stopping RunAfter"),
         };
         self.cond.broadcast();
     }
@@ -581,35 +615,6 @@ pub const RunAfter = struct {
             current = next;
         }
     }
-
-    /// Sleeps until `deadline_ns` unless the observed callback slot changes.
-    ///
-    /// Returns `true` when the generation or state changed and the caller must
-    /// discard the elapsed-deadline result. The deadline uses a clock that
-    /// includes system suspend. Polling only bounds rescheduling latency; it
-    /// does not measure elapsed time.
-    fn sleepUntilChangedOrElapsed(self: *RunAfter, generation: u64, deadline_ns: u64) bool {
-        // Maximum sleep interval between generation checks.
-        const sleep_step_ms = 10;
-        while (true) {
-            if (self.hasChanged(generation)) return true;
-
-            const remaining_ms = millisecondsUntil(deadline_ns, monotonicNs());
-            if (remaining_ms == 0) return self.hasChanged(generation);
-            sleepMs(@min(remaining_ms, sleep_step_ms));
-        }
-    }
-
-    /// Reports whether `generation` still identifies the scheduled slot.
-    fn hasChanged(self: *RunAfter, generation: u64) bool {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        return self.state != .scheduled or self.generation != generation;
-    }
-
-    /// Tick resolution used for independent scheduled callbacks.
-    const scheduler_resolution_ms = 10;
 };
 
 /// POSIX implementation of `Mutex` using `pthread_mutex_t`.
@@ -661,6 +666,31 @@ const PosixCondition = struct {
         switch (std.c.pthread_cond_wait(&self.raw, &mutex.raw)) {
             .SUCCESS => {},
             else => @panic("pthread_cond_wait failed"),
+        }
+    }
+
+    /// Atomically releases `mutex` and waits for a signal or an absolute
+    /// suspend-inclusive deadline.
+    ///
+    /// POSIX condition variables use a real-time absolute timeout so the
+    /// kernel accounts for system suspend. The caller must recheck both its
+    /// predicate and the continuous clock after this function returns.
+    pub fn waitUntil(
+        self: *PosixCondition,
+        mutex: *Mutex,
+        deadline_ns: u64,
+    ) void {
+        const remaining_ns = nanosecondsUntil(deadline_ns, monotonicNs());
+        if (remaining_ns == 0) return;
+
+        var realtime: std.c.timespec = undefined;
+        if (std.c.clock_gettime(.REALTIME, &realtime) != 0) {
+            @panic("clock_gettime failed");
+        }
+        const timeout = timespecAfterNs(realtime, remaining_ns);
+        switch (std.c.pthread_cond_timedwait(&self.raw, &mutex.raw, &timeout)) {
+            .SUCCESS, .TIMEDOUT => {},
+            else => @panic("pthread_cond_timedwait failed"),
         }
     }
 
@@ -737,6 +767,38 @@ const WindowsCondition = struct {
     pub fn wait(self: *WindowsCondition, mutex: *Mutex) void {
         switch (RtlSleepConditionVariableSRW(&self.raw, &mutex.raw, null, 0)) {
             .SUCCESS => {},
+            else => @panic("RtlSleepConditionVariableSRW failed"),
+        }
+    }
+
+    /// Atomically releases `mutex` and waits for a signal or an absolute
+    /// suspend-inclusive deadline.
+    ///
+    /// A positive NT timeout is an absolute system-time deadline and therefore
+    /// expires across system suspend. The caller validates the corresponding
+    /// continuous deadline after this function returns.
+    pub fn waitUntil(
+        self: *WindowsCondition,
+        mutex: *Mutex,
+        deadline_ns: u64,
+    ) void {
+        const remaining_ns = nanosecondsUntil(deadline_ns, monotonicNs());
+        if (remaining_ns == 0) return;
+
+        const now_100ns: u64 = @intCast(windows.ntdll.RtlGetSystemTimePrecise());
+        const remaining_100ns = (remaining_ns - 1) / 100 + 1;
+        const absolute_100ns = now_100ns +| remaining_100ns;
+        var timeout: windows.LARGE_INTEGER = @intCast(@min(
+            absolute_100ns,
+            @as(u64, std.math.maxInt(windows.LARGE_INTEGER)),
+        ));
+        switch (RtlSleepConditionVariableSRW(
+            &self.raw,
+            &mutex.raw,
+            &timeout,
+            0,
+        )) {
+            .SUCCESS, .TIMEOUT => {},
             else => @panic("RtlSleepConditionVariableSRW failed"),
         }
     }
@@ -826,14 +888,44 @@ fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
     return now_ns +| delay_ms *| @as(u64, std.time.ns_per_ms);
 }
 
+/// Returns the nanoseconds remaining before an absolute deadline.
+fn nanosecondsUntil(deadline_ns: u64, now_ns: u64) u64 {
+    if (now_ns >= deadline_ns) return 0;
+    return deadline_ns - now_ns;
+}
+
 /// Returns the positive whole-millisecond sleep needed to reach `deadline_ns`.
 ///
 /// Rounding up prevents the scheduler from firing before a sub-millisecond
 /// remainder elapses. A clock jump past the deadline returns zero immediately.
 fn millisecondsUntil(deadline_ns: u64, now_ns: u64) u64 {
-    if (now_ns >= deadline_ns) return 0;
-    const remaining_ns = deadline_ns - now_ns;
+    const remaining_ns = nanosecondsUntil(deadline_ns, now_ns);
+    if (remaining_ns == 0) return 0;
     return (remaining_ns - 1) / std.time.ns_per_ms + 1;
+}
+
+/// Adds a relative nanosecond duration to a POSIX timestamp with saturation.
+fn timespecAfterNs(now: std.c.timespec, duration_ns: u64) std.c.timespec {
+    const Seconds = @TypeOf(now.sec);
+    const max_seconds: u64 = @intCast(std.math.maxInt(Seconds));
+    const now_seconds: u64 = @intCast(now.sec);
+    var extra_seconds = duration_ns / std.time.ns_per_s;
+    var nanoseconds: u64 = @intCast(now.nsec);
+    nanoseconds += duration_ns % std.time.ns_per_s;
+    if (nanoseconds >= std.time.ns_per_s) {
+        nanoseconds -= std.time.ns_per_s;
+        extra_seconds +|= 1;
+    }
+    if (extra_seconds > max_seconds - now_seconds) {
+        return .{
+            .sec = std.math.maxInt(Seconds),
+            .nsec = std.time.ns_per_s - 1,
+        };
+    }
+    return .{
+        .sec = @intCast(now_seconds + extra_seconds),
+        .nsec = @intCast(nanoseconds),
+    };
 }
 
 pub const testing = struct {
