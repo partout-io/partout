@@ -185,7 +185,7 @@ pub const Daemon = struct {
         };
         errdefer {
             daemon.is_deinitializing = true;
-            actor.deinit();
+            actor.destroy();
         }
 
         if (activeConnectionModule(&profile) != null) {
@@ -194,7 +194,7 @@ pub const Daemon = struct {
         return daemon;
     }
 
-    pub fn deinit(self: *Daemon) void {
+    pub fn destroy(self: *Daemon) void {
         // This is crucial to guarantee that there will not be in-flight
         // handlers (reachability, better path, connection events) still calling
         // into the daemon.
@@ -209,7 +209,7 @@ pub const Daemon = struct {
         // Suppress the actor's unexpected-termination path: stop() already
         // dismantled the connection runtime.
         self.is_deinitializing = true;
-        self.actor.deinit();
+        self.actor.destroy();
 
         self.monitor.setEventHandler(null);
         self.monitor.stopObserving();
@@ -797,7 +797,7 @@ pub const Daemon = struct {
             module,
             sb,
         );
-        errdefer connection.deinit();
+        errdefer connection.destroy();
 
         // Publish a complete runtime before the looper can invoke its
         // terminal callback.
@@ -844,7 +844,7 @@ pub const Daemon = struct {
             error.TerminalFailure => {},
             else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
         };
-        runtime.connection.deinit();
+        runtime.connection.destroy();
         runtime.looper.deinit();
         self.allocator.destroy(runtime.looper);
         self.connection_runtime = null;

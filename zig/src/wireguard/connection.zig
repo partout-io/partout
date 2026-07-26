@@ -107,7 +107,7 @@ const WireGuardConnection = struct {
         return created.asConnection();
     }
 
-    fn deinit(self: *WireGuardConnection) void {
+    fn destroy(self: *WireGuardConnection) void {
         const allocator = self.allocator;
         log.write(.debug, "Deinit _WireGuardConnectionV2");
         self.stopDataCountTimer();
@@ -450,7 +450,7 @@ const wireguard_connection_vtable = net.Connection.VTable{
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
-    .deinit = deinit,
+    .destroy = destroy,
 };
 
 fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
@@ -481,9 +481,9 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(events);
 }
 
-fn deinit(ptr: *anyopaque) void {
+fn destroy(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.deinit();
+    self.destroy();
 }
 
 pub const testing = struct {

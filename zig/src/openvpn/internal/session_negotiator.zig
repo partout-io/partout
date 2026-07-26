@@ -167,7 +167,6 @@ pub const Negotiator = struct {
         if (self.tls) |tls| tls.destroy();
         self.pending_packets.deinit();
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 

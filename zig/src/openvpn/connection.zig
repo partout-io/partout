@@ -151,7 +151,7 @@ const OpenVPNConnection = struct {
         return created.asConnection();
     }
 
-    fn deinit(self: *OpenVPNConnection) void {
+    fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit _OpenVPNConnectionV3");
         if (self.current_session) |session| {
             session.setDelegate(null);
@@ -168,7 +168,6 @@ const OpenVPNConnection = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.cache_dir);
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 
@@ -957,7 +956,7 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
-    .deinit = deinit,
+    .destroy = destroy,
     .looper_terminated = looperDidTerminate,
 };
 
@@ -1000,9 +999,9 @@ fn looperDidTerminate(
     self.looperDidTerminate(failure);
 }
 
-fn deinit(ptr: *anyopaque) void {
+fn destroy(ptr: *anyopaque) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.deinit();
+    self.destroy();
 }
 
 pub const testing = struct {

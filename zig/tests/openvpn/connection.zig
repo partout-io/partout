@@ -54,7 +54,7 @@ test "OpenVPN connection borrows the daemon looper" {
     };
     var controller = mock.MockTunnelController{};
     const executor = try mock.MockSerializedExecutor.create(allocator);
-    defer executor.deinit();
+    defer executor.destroy();
     const created = try connection.createConnection(
         &context,
         allocator,
@@ -69,7 +69,7 @@ test "OpenVPN connection borrows the daemon looper" {
             .serialized_executor = executor.interface(),
         },
     );
-    created.deinit();
+    created.destroy();
 
     try looper.perform(void, null, Callbacks.barrier);
     try looper.stop();

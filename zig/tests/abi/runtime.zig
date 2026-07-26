@@ -135,7 +135,7 @@ test "daemon runtime owns options during lifecycle" {
 
     try runtime.start();
     runtime.stop();
-    runtime.deinit(allocator);
+    runtime.destroy(allocator);
 }
 
 test "starts DNS-only profile through tunnel controller" {
@@ -148,7 +148,7 @@ test "starts DNS-only profile through tunnel controller" {
         mock.dnsOnlyProfileJson(),
         runtime.context(&registry),
     );
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try daemon.start();
 
@@ -181,7 +181,7 @@ test "starts profile without active modules without tunnel settings" {
         empty_profile_json,
         runtime.context(&registry),
     );
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try daemon.start();
     defer daemon.stop();
@@ -201,7 +201,7 @@ test "requires a connection implementation for active connection profiles" {
         mock.connectionProfileJson(),
         runtime.context(&registry),
     );
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try std.testing.expectError(
         error.MissingConnectionImplementation,
@@ -215,7 +215,7 @@ test "starts and stops connection profile through injected dependencies" {
     var registry = try mockConnectionRegistry(allocator);
     defer registry.deinit(allocator);
     var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try std.testing.expect(daemon.isConnectionProfile());
 
@@ -259,7 +259,7 @@ test "stop blocks until connection teardown finishes" {
         mock.connectionProfileJson(),
         runtime.context(&registry),
     );
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try daemon.start();
 
@@ -276,7 +276,7 @@ test "network monitor gates immediate connection evaluation" {
     var registry = try mockConnectionRegistry(allocator);
     defer registry.deinit(allocator);
     var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.deinit();
+    defer daemon.destroy();
 
     try daemon.start();
     defer daemon.stop();

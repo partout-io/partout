@@ -99,7 +99,7 @@ pub export fn partout_daemon_start(
         options.deinit(allocator);
         return mapErrorToCode(err);
     };
-    errdefer runtime.deinit(allocator);
+    errdefer runtime.destroy(allocator);
 
     runtime.start() catch |err| return mapErrorToCode(err);
     daemon_runtime = runtime;
@@ -114,7 +114,7 @@ pub export fn partout_daemon_hold() callconv(.c) void {
 pub export fn partout_daemon_stop() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     runtime.stop();
-    runtime.deinit(allocator);
+    runtime.destroy(allocator);
     daemon_runtime = null;
 }
 

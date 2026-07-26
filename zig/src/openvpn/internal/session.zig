@@ -213,7 +213,7 @@ pub const Session = struct {
         errdefer self.lifecycle_lock.deinit();
         self.shutdown_actor = try ShutdownActor.create(allocator, self);
         errdefer {
-            self.shutdown_actor.?.deinit();
+            self.shutdown_actor.?.destroy();
             self.shutdown_actor = null;
         }
         return self;
@@ -239,7 +239,7 @@ pub const Session = struct {
 
         if (self.shutdown_actor) |actor| {
             self.shutdown_actor = null;
-            actor.deinit();
+            actor.destroy();
         }
         switch (self.state) {
             .stopped => {},
@@ -254,7 +254,6 @@ pub const Session = struct {
         self.allocator.free(self.ca_filename);
         self.lifecycle_lock.deinit();
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 

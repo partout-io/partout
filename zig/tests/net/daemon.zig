@@ -159,7 +159,7 @@ test "connection daemon starts settings-only profile" {
         &monitor,
         .{},
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     try std.testing.expect(sut.isSettingsOnly());
@@ -188,7 +188,7 @@ test "connection daemon starts connection and publishes lifecycle status" {
         &monitor,
         .{ .stop_delay_ms = 100 },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     try std.testing.expect(sut.isConnectionProfile());
@@ -239,7 +239,7 @@ test "connection daemon hold preserves published environment" {
         &monitor,
         .{ .stop_delay_ms = 100 },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     const remove_count_before_hold = events.remove_count;
@@ -276,7 +276,7 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
         &monitor,
         .{ .starts_immediately = true },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     try std.testing.expectEqual(@as(usize, 1), failing_connection.start_count);
@@ -315,7 +315,7 @@ test "connection daemon passes connection options into sandbox" {
             .cache_dir = "/tmp/openvpn-cache",
         },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     defer sut.stop();
@@ -357,7 +357,7 @@ test "connection daemon resets data count when connection disconnects" {
             .reconnection_delay_ms = 60_000,
         },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     defer sut.stop();
@@ -389,7 +389,7 @@ test "connection daemon honors disabled cancellation for connection requests" {
             .cancels_unrecoverable = false,
         },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     defer sut.stop();
@@ -424,7 +424,7 @@ test "connection daemon replaces a terminal looper and reconnects" {
             .reconnection_delay_ms = 60_000,
         },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     defer sut.stop();
@@ -473,7 +473,7 @@ test "connection daemon terminates when its actor finishes" {
         &monitor,
         .{ .cancels_unrecoverable = false },
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     sut.actor.shutdown();
@@ -509,7 +509,7 @@ test "connection daemon connects when previously unreachable network becomes rea
         &monitor,
         .{},
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     defer sut.stop();
@@ -546,7 +546,7 @@ test "connection daemon forwards better path events to current connection" {
         &monitor,
         .{},
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     monitor.onBetterPath();
     try std.testing.expectEqual(@as(usize, 0), blocking_connection.better_path_count);
@@ -581,7 +581,7 @@ test "connection daemon runs delayed connection work on its actor" {
         &monitor,
         .{},
     );
-    defer sut.deinit();
+    defer sut.destroy();
 
     try sut.start();
     while (!delayed_connection.did_run.load(.acquire)) {
@@ -613,7 +613,7 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
         &monitor,
         .{},
     );
-    defer sut.deinit();
+    defer sut.destroy();
     defer sut.stop();
     defer delayed_connection.allow_timer_enqueue.store(true, .release);
 
@@ -719,7 +719,7 @@ const DelayedConnection = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(ptr: *anyopaque) void {
+    fn destroy(ptr: *anyopaque) void {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
         self.timer.deinit();
     }
@@ -729,7 +729,7 @@ const DelayedConnection = struct {
         .stop = stop,
         .network_change = networkChange,
         .better_path = betterPath,
-        .deinit = deinit,
+        .destroy = destroy,
     };
 
     const implementation_vtable = net.ConnectionImplementation.VTable{
@@ -779,14 +779,14 @@ const FailingStartConnection = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn deinit(_: *anyopaque) void {}
+    fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
         .start = start,
         .stop = stop,
         .network_change = networkChange,
         .better_path = betterPath,
-        .deinit = deinit,
+        .destroy = destroy,
     };
 
     const implementation_vtable = net.ConnectionImplementation.VTable{
@@ -895,7 +895,7 @@ const SandboxCapture = struct {
         }
     }
 
-    fn deinit(ptr: *anyopaque) void {
+    fn destroy(ptr: *anyopaque) void {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.deinit_count += 1;
     }
@@ -905,7 +905,7 @@ const SandboxCapture = struct {
         .stop = stop,
         .network_change = networkChange,
         .better_path = betterPath,
-        .deinit = deinit,
+        .destroy = destroy,
         .looper_terminated = looperTerminated,
     };
 

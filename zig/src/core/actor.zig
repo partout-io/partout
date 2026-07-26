@@ -84,7 +84,7 @@ pub fn ActorWithFinish(
             return self;
         }
 
-        pub fn deinit(self: *Self) void {
+        pub fn destroy(self: *Self) void {
             self.shutdown();
             self.cond.deinit();
             self.mutex.deinit();
