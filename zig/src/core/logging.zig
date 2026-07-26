@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const api = @import("api.zig");
 const concurrency = @import("concurrency.zig");
@@ -135,6 +136,20 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
     };
     mutex.unlock();
     dispatchCString(logger, @intFromEnum(level), message);
+}
+
+pub fn writeAndFailDebug(message: [:0]const u8) void {
+    write(.err, message);
+    if (builtin.mode == .Debug) {
+        @panic(message);
+    }
+}
+
+pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
+    writef(.err, fmt, args);
+    if (builtin.mode == .Debug) {
+        std.debug.panic(fmt, args);
+    }
 }
 
 fn dispatchSlice(
