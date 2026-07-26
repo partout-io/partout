@@ -371,17 +371,10 @@ pub const Looper = struct {
                 self.lock.unlock();
                 return error.Cancelled;
             },
-            .stopping => {
+            .stopping, .stopped => {
                 while (self.state == .stopping) {
                     self.condition.wait(&self.lock);
                 }
-                const failed = self.terminal_failure != null;
-                self.lock.unlock();
-                self.joinWorker();
-                if (failed) return error.TerminalFailure;
-                return;
-            },
-            .stopped => {
                 const failed = self.terminal_failure != null;
                 self.lock.unlock();
                 self.joinWorker();
