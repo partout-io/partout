@@ -4,7 +4,7 @@
 
 const std = @import("std");
 
-const concurrency = @import("../core/concurrency.zig");
+const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 
 /// Single binary data packet.
@@ -216,7 +216,7 @@ pub const Command = union(enum) {
 /// an optional one-shot timer for deferred scheduling.
 pub const CommandNode = struct {
     command: Command,
-    timer: concurrency.RunAfter.Scheduled = .{},
+    timer: core.RunAfter.Scheduled = .{},
 
     // Intrusive command queue linkage.
     next: ?*CommandNode = null,
