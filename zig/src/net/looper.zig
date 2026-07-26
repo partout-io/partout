@@ -89,6 +89,7 @@ pub const Looper = struct {
     const Errors = queue_mod.Errors;
     const SubmissionError = std.mem.Allocator.Error || Errors.Cancelled;
     const CompletionError = queue_mod.CompletionError;
+    const RetryScheduleError = std.mem.Allocator.Error || std.Thread.SpawnError;
     pub const InitError = std.mem.Allocator.Error || Errors.MuxFailure;
     pub const StartError = std.mem.Allocator.Error ||
         std.Thread.SpawnError ||
@@ -761,7 +762,12 @@ pub const Looper = struct {
                 },
                 .perform => |command| {
                     self.lock.unlock();
-                    command.task.call() catch unreachable;
+                    command.task.call() catch |err| {
+                        log.writef(.fault, "Unexpected perform task failure: {s}", .{
+                            @errorName(err),
+                        });
+                        @panic("Looper perform task failed unexpectedly");
+                    };
                     self.lock.lock();
                     completeNow(command.completion, null);
                     self.condition.broadcast();
@@ -928,11 +934,21 @@ pub const Looper = struct {
                                 return .{ .fatal = .{ .system = suspend_err } };
                             };
                             self.scheduleReadRetry(other) catch |schedule_err| {
-                                return .{ .fatal = .{ .system = schedule_err } };
+                                if (schedule_err == error.OutOfMemory)
+                                    return .{ .fatal = .{ .system = error.OutOfMemory } };
+                                log.writef(.fault, "Unable to schedule read retry: {s}", .{
+                                    @errorName(schedule_err),
+                                });
+                                @panic("Looper read-retry scheduling failed after start");
                             };
                         }
                         self.scheduleWriteRetry(side_io) catch |schedule_err| {
-                            return .{ .fatal = .{ .system = schedule_err } };
+                            if (schedule_err == error.OutOfMemory)
+                                return .{ .fatal = .{ .system = error.OutOfMemory } };
+                            log.writef(.fault, "Unable to schedule write retry: {s}", .{
+                                @errorName(schedule_err),
+                            });
+                            @panic("Looper write-retry scheduling failed after start");
                         };
                         watch_writes = false;
                         break;
@@ -1017,7 +1033,7 @@ pub const Looper = struct {
     fn scheduleReadRetry(
         self: *Looper,
         side_io: *const SideIO,
-    ) std.mem.Allocator.Error!void {
+    ) RetryScheduleError!void {
         self.lock.lock();
         defer self.lock.unlock();
         const index = sideIndex(side_io.side);
@@ -1026,19 +1042,21 @@ pub const Looper = struct {
             .side = side_io.side,
             .id = side_io.id,
         } });
+        errdefer self.allocator.destroy(node);
         self.read_retries[index] = true;
-        self.scheduler.scheduleAppending(
+        errdefer self.read_retries[index] = false;
+        try self.scheduler.scheduleAppending(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        );
     }
 
     fn scheduleWriteRetry(
         self: *Looper,
         side_io: *const SideIO,
-    ) std.mem.Allocator.Error!void {
+    ) RetryScheduleError!void {
         self.lock.lock();
         defer self.lock.unlock();
         const index = sideIndex(side_io.side);
@@ -1047,13 +1065,15 @@ pub const Looper = struct {
             .side = side_io.side,
             .id = side_io.id,
         } });
+        errdefer self.allocator.destroy(node);
         self.write_retries[index] = true;
-        self.scheduler.scheduleAppending(
+        errdefer self.write_retries[index] = false;
+        try self.scheduler.scheduleAppending(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        );
     }
 
     fn detachImmediately(self: *Looper, side: io.Side, failure: Failure) void {
