@@ -75,27 +75,28 @@ public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     /// Keychain item not found.
     case keychainItemNotFound = "keychainItemNotFound"
     /// Compression settings mismatch.
-    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
+    case passphraseRequired = "passphraseRequired"
     /// Connection failure.
-    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
+    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
     /// No routing configuration.
-    case openVPNNoRouting = "OpenVPN.noRouting"
+    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
     /// One-time password is required.
-    case openVPNOTPRequired = "OpenVPN.otpRequired"
+    case openVPNNoRouting = "OpenVPN.noRouting"
     /// Passphrase is required.
-    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
+    case openVPNOTPRequired = "OpenVPN.otpRequired"
     /// Authentication can be retried.
-    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
+    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
     /// Server requested shutdown.
-    case openVPNServerShutdown = "OpenVPN.serverShutdown"
+    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
     /// TLS failure.
-    case openVPNTLSFailure = "OpenVPN.tlsFailure"
+    case openVPNServerShutdown = "OpenVPN.serverShutdown"
     /// Algorithm is unsupported.
-    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
+    case openVPNTLSFailure = "OpenVPN.tlsFailure"
     /// Compression setting is unsupported.
-    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
+    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
     /// Option is unsupported.
-    case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
+    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
     /// Configuration has no peers.
+    case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }

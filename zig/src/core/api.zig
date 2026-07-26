@@ -99,6 +99,9 @@ pub const parseModule = extensions.parseModule;
 pub const typeBuildsConnection = extensions.typeBuildsConnection;
 
 // ZIGME: Map errors to code enum (LLM: don't touch this)
-pub fn codeForError(_: anyerror) PartoutErrorCode {
-    return .unhandled;
+pub fn codeForError(err: anyerror) PartoutErrorCode {
+    return switch (err) {
+        error.PassphraseRequired => .passphraseRequired,
+        else => .unhandled,
+    };
 }

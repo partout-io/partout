@@ -791,6 +791,7 @@ components:
         - parsing
         - keychainAddItem
         - keychainItemNotFound
+        - passphraseRequired
         - OpenVPN.compressionMismatch
         - OpenVPN.connectionFailure
         - OpenVPN.noRouting
@@ -839,6 +840,7 @@ components:
         - parsing
         - keychainAddItem
         - keychainItemNotFound
+        - passphraseRequired
         - openVPNCompressionMismatch
         - openVPNConnectionFailure
         - openVPNNoRouting

@@ -2346,6 +2346,7 @@ pub const PartoutErrorCode = enum {
     parsing,
     keychainAddItem,
     keychainItemNotFound,
+    passphraseRequired,
     openVPNCompressionMismatch,
     openVPNConnectionFailure,
     openVPNNoRouting,
@@ -2399,6 +2400,7 @@ pub const PartoutErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "parsing")) return .parsing;
         if (std.mem.eql(u8, raw_value, "keychainAddItem")) return .keychainAddItem;
         if (std.mem.eql(u8, raw_value, "keychainItemNotFound")) return .keychainItemNotFound;
+        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
         if (std.mem.eql(u8, raw_value, "OpenVPN.compressionMismatch")) return .openVPNCompressionMismatch;
         if (std.mem.eql(u8, raw_value, "OpenVPN.connectionFailure")) return .openVPNConnectionFailure;
         if (std.mem.eql(u8, raw_value, "OpenVPN.noRouting")) return .openVPNNoRouting;
@@ -2450,6 +2452,7 @@ pub const PartoutErrorCode = enum {
             .parsing => "parsing",
             .keychainAddItem => "keychainAddItem",
             .keychainItemNotFound => "keychainItemNotFound",
+            .passphraseRequired => "passphraseRequired",
             .openVPNCompressionMismatch => "OpenVPN.compressionMismatch",
             .openVPNConnectionFailure => "OpenVPN.connectionFailure",
             .openVPNNoRouting => "OpenVPN.noRouting",

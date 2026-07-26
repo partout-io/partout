@@ -147,11 +147,10 @@ test "OpenVPN module importer reports passphrase requirement" {
     );
 
     try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
-    // ZIGME: Restore after mapping code
-    // try std.testing.expectEqual(
-    //     api.PartoutErrorCode.openVPNPassphraseRequired,
-    //     api.codeForError(error.PassphraseRequired),
-    // );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.passphraseRequired,
+        api.codeForError(error.PassphraseRequired),
+    );
 }
 
 test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {

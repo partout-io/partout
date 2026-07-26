@@ -31,7 +31,7 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * Values: cached,notFound,operationCancelled,releasedObject,scriptException,timeout,unhandled,incompatibleModules,incompleteModule,noActiveModules,nonFinalModules,requiredImplementation,unexpectedModuleType,unknownImportedModule,unknownModuleHandler,authentication,crypto,dnsFailure,exhaustedEndpoints,fdUnavailable,ioFailure,linkNotActive,networkChanged,networkUnreachable,socketConfiguration,tunNotActive,tunNotAvailable,decoding,encoding,invalidField,invalidValue,parsing,keychainAddItem,keychainItemNotFound,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,wireGuardEmptyPeers
+ * Values: cached,notFound,operationCancelled,releasedObject,scriptException,timeout,unhandled,incompatibleModules,incompleteModule,noActiveModules,nonFinalModules,requiredImplementation,unexpectedModuleType,unknownImportedModule,unknownModuleHandler,authentication,crypto,dnsFailure,exhaustedEndpoints,fdUnavailable,ioFailure,linkNotActive,networkChanged,networkUnreachable,socketConfiguration,tunNotActive,tunNotAvailable,decoding,encoding,invalidField,invalidValue,parsing,keychainAddItem,keychainItemNotFound,passphraseRequired,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,wireGuardEmptyPeers
  */
 @Serializable
 enum class PartoutErrorCode(val value: kotlin.String) {
@@ -137,6 +137,9 @@ enum class PartoutErrorCode(val value: kotlin.String) {
 
     @SerialName(value = "keychainItemNotFound")
     keychainItemNotFound("keychainItemNotFound"),
+
+    @SerialName(value = "passphraseRequired")
+    passphraseRequired("passphraseRequired"),
 
     @SerialName(value = "OpenVPN.compressionMismatch")
     openVPNCompressionMismatch("OpenVPN.compressionMismatch"),
