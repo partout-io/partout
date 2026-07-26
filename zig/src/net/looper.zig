@@ -99,7 +99,6 @@ pub const Looper = struct {
         Errors.ReentrantCall;
     pub const DetachError = SubmissionError || Errors.ReentrantCall;
     pub const ResumeReadingError = SubmissionError;
-    pub const ScheduleError = SubmissionError || Errors.TaskFailure;
     pub const StopError = SubmissionError ||
         Errors.InvalidState ||
         Errors.ReentrantCall;
@@ -446,38 +445,6 @@ pub const Looper = struct {
         return thread_id == std.Thread.getCurrentId();
     }
 
-    /// With no delay, runs inline on the looper thread or enqueues on it.
-    /// Delayed work is always enqueued asynchronously after `delay_ms`.
-    pub fn schedule(self: *Looper, delay_ms: ?u64, task: Task) ScheduleError!void {
-        if (delay_ms == null and self.isOnQueue()) {
-            task.call() catch |err| {
-                log.writef(.err, "Scheduled task failed: {s}", .{@errorName(err)});
-                return error.TaskFailure;
-            };
-            return;
-        }
-
-        self.lock.lock();
-        defer self.lock.unlock();
-        if (self.state != .started) {
-            log.writef(.debug, "Ignoring schedule before start() or after finish", .{});
-            return error.Cancelled;
-        }
-        if (delay_ms) |delay| {
-            const node = try self.createCommandNode(.{ .perform = task });
-            self.scheduler.schedule(
-                &node.timer,
-                delay,
-                onScheduledCommand,
-                self,
-            ) catch @panic("Looper scheduler failed after start");
-            return;
-        }
-        const node = try self.createCommandNode(.{ .perform = task });
-        self.commands.append(node);
-        self.wakeLocked();
-    }
-
     /// Performs a task synchronously with the worker. Runs inline
     /// if on the same queue to prevent deadlock.
     pub fn perform(
@@ -516,7 +483,7 @@ pub const Looper = struct {
             log.writef(.debug, "Ignoring perform before start() or after finish", .{});
             return error.Cancelled;
         }
-        const node = self.createCommandNode(.{ .schedule = .{
+        const node = self.createCommandNode(.{ .perform = .{
             .task = .{ .context = &holder, .callback = Holder.run },
             .completion = &completion,
         } }) catch |err| {
@@ -792,7 +759,7 @@ pub const Looper = struct {
                         };
                     }
                 },
-                .schedule => |command| {
+                .perform => |command| {
                     self.lock.unlock();
                     command.task.call() catch unreachable;
                     self.lock.lock();
@@ -801,15 +768,6 @@ pub const Looper = struct {
                     // Give the synchronous caller a chance to return before
                     // processing the rest of this detached command batch.
                     self.lock.unlock();
-                    self.lock.lock();
-                },
-                .perform => |task| {
-                    self.lock.unlock();
-                    task.call() catch |err| {
-                        self.lock.lock();
-                        outcome.failure = .{ .user = err };
-                        self.lock.unlock();
-                    };
                     self.lock.lock();
                 },
                 .stop => {
@@ -966,13 +924,16 @@ pub const Looper = struct {
                     },
                     error.Backpressure => {
                         if (opposite) |other| {
-                            if (self.suspendReadAndScheduleRetry(other, fd_set)) |failure| {
-                                return .{ .fatal = failure };
-                            }
+                            self.suspendRead(other, fd_set) catch |suspend_err| {
+                                return .{ .fatal = .{ .system = suspend_err } };
+                            };
+                            self.scheduleReadRetry(other) catch |schedule_err| {
+                                return .{ .fatal = .{ .system = schedule_err } };
+                            };
                         }
-                        if (self.scheduleWriteRetry(side_io)) |failure| {
-                            return .{ .fatal = failure };
-                        }
+                        self.scheduleWriteRetry(side_io) catch |schedule_err| {
+                            return .{ .fatal = .{ .system = schedule_err } };
+                        };
                         watch_writes = false;
                         break;
                     },
@@ -1044,49 +1005,55 @@ pub const Looper = struct {
         return .ok;
     }
 
-    fn suspendReadAndScheduleRetry(
+    fn suspendRead(
         self: *Looper,
         side_io: *SideIO,
         fd_set: *DescriptorSet,
-    ) ?Failure {
-        side_io.setRead(self.mux, false) catch |err| return .{ .system = err };
+    ) io.Error!void {
+        try side_io.setRead(self.mux, false);
         fd_set.removeReadable(side_io.fd);
+    }
 
+    fn scheduleReadRetry(
+        self: *Looper,
+        side_io: *const SideIO,
+    ) std.mem.Allocator.Error!void {
         self.lock.lock();
         defer self.lock.unlock();
         const index = sideIndex(side_io.side);
-        if (self.state != .started or self.read_retries[index]) return null;
-        const node = self.createCommandNode(.{ .enable_read = .{
+        if (self.state != .started or self.read_retries[index]) return;
+        const node = try self.createCommandNode(.{ .enable_read = .{
             .side = side_io.side,
             .id = side_io.id,
-        } }) catch |err| return .{ .system = err };
+        } });
         self.read_retries[index] = true;
         self.scheduler.schedule(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch @panic("Looper read-retry scheduling failed after start");
-        return null;
+        ) catch unreachable;
     }
 
-    fn scheduleWriteRetry(self: *Looper, side_io: *SideIO) ?Failure {
+    fn scheduleWriteRetry(
+        self: *Looper,
+        side_io: *const SideIO,
+    ) std.mem.Allocator.Error!void {
         self.lock.lock();
         defer self.lock.unlock();
         const index = sideIndex(side_io.side);
-        if (self.state != .started or self.write_retries[index]) return null;
-        const node = self.createCommandNode(.{ .enable_write = .{
+        if (self.state != .started or self.write_retries[index]) return;
+        const node = try self.createCommandNode(.{ .enable_write = .{
             .side = side_io.side,
             .id = side_io.id,
-        } }) catch |err| return .{ .system = err };
+        } });
         self.write_retries[index] = true;
         self.scheduler.schedule(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch @panic("Looper write-retry scheduling failed after start");
-        return null;
+        ) catch unreachable;
     }
 
     fn detachImmediately(self: *Looper, side: io.Side, failure: Failure) void {
@@ -1335,7 +1302,7 @@ pub const Looper = struct {
             switch (node.command) {
                 .attach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 .detach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
-                .schedule => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
+                .perform => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
                 else => {},
             }
             self.allocator.destroy(node);

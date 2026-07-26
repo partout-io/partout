@@ -27,14 +27,6 @@ fn yieldRepeatedly() void {
     }
 }
 
-fn waitUntilWithin(value: *const AtomicBool, timeout_ms: u64) bool {
-    var remaining_ms = timeout_ms;
-    while (!value.load(.acquire) and remaining_ms > 0) : (remaining_ms -= 1) {
-        source.core.sleepMs(1);
-    }
-    return value.load(.acquire);
-}
-
 const Pipe = struct {
     fds: [2]std.c.fd_t,
 
@@ -120,27 +112,6 @@ fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
     };
 }
 
-const DelayedTaskProbe = struct {
-    looper: *Looper,
-    fired: AtomicBool = AtomicBool.init(false),
-    ran_on_queue: AtomicBool = AtomicBool.init(false),
-
-    fn run(raw: ?*anyopaque) anyerror!void {
-        const self: *DelayedTaskProbe = @ptrCast(@alignCast(raw.?));
-        self.ran_on_queue.store(self.looper.isOnQueue(), .release);
-        self.fired.store(true, .release);
-    }
-};
-
-const CancellationProbe = struct {
-    fired: AtomicBool = AtomicBool.init(false),
-
-    fn run(raw: ?*anyopaque) anyerror!void {
-        const self: *CancellationProbe = @ptrCast(@alignCast(raw.?));
-        self.fired.store(true, .release);
-    }
-};
-
 const FinishCallProbe = struct {
     called: AtomicBool = AtomicBool.init(false),
 
@@ -160,84 +131,6 @@ test "perform completes synchronously with its result" {
         try looper.perform(u8, null, returnFortyTwo),
     );
     try looper.stop();
-}
-
-test "delayed task waits before running on the looper" {
-    const delay_ms = 100;
-    var looper = try initLooper(.{ .callback = noopFinish });
-    defer looper.deinit();
-    try looper.start();
-    var probe = DelayedTaskProbe{ .looper = &looper };
-
-    try looper.schedule(delay_ms, .{
-        .context = &probe,
-        .callback = DelayedTaskProbe.run,
-    });
-
-    source.core.sleepMs(15);
-    try std.testing.expect(!probe.fired.load(.acquire));
-    try std.testing.expect(waitUntilWithin(&probe.fired, 750));
-
-    try std.testing.expect(probe.ran_on_queue.load(.acquire));
-    try looper.stop();
-}
-
-test "independent delayed tasks run in delay order" {
-    const later_delay_ms = 500;
-    const earlier_delay_ms = 40;
-    var looper = try initLooper(.{ .callback = noopFinish });
-    defer looper.deinit();
-    try looper.start();
-    var later = DelayedTaskProbe{ .looper = &looper };
-    var earlier = DelayedTaskProbe{ .looper = &looper };
-
-    try looper.schedule(later_delay_ms, .{
-        .context = &later,
-        .callback = DelayedTaskProbe.run,
-    });
-    // A synchronous barrier proves that the loop has observed the later task.
-    try looper.performTask(.{ .callback = noopTask });
-    source.core.sleepMs(10);
-
-    try looper.schedule(earlier_delay_ms, .{
-        .context = &earlier,
-        .callback = DelayedTaskProbe.run,
-    });
-
-    try std.testing.expect(waitUntilWithin(&earlier.fired, 250));
-    try std.testing.expect(!later.fired.load(.acquire));
-    try std.testing.expect(earlier.ran_on_queue.load(.acquire));
-    try looper.stop();
-}
-
-test "stop and deinit cancel delayed tasks" {
-    const delay_ms = 300;
-
-    var stopped_looper = try initLooper(.{ .callback = noopFinish });
-    defer stopped_looper.deinit();
-    try stopped_looper.start();
-    var stopped_probe = CancellationProbe{};
-    try stopped_looper.schedule(delay_ms, .{
-        .context = &stopped_probe,
-        .callback = CancellationProbe.run,
-    });
-    try stopped_looper.stop();
-
-    var deinitialized_looper = try initLooper(.{ .callback = noopFinish });
-    var needs_deinit = true;
-    defer if (needs_deinit) deinitialized_looper.deinit();
-    try deinitialized_looper.start();
-    var deinitialized_probe = CancellationProbe{};
-    try deinitialized_looper.schedule(delay_ms, .{
-        .context = &deinitialized_probe,
-        .callback = CancellationProbe.run,
-    });
-    deinitialized_looper.deinit();
-    needs_deinit = false;
-
-    source.core.sleepMs(delay_ms + 50);
-    try std.testing.expect(!stopped_probe.fired.load(.acquire));
-    try std.testing.expect(!deinitialized_probe.fired.load(.acquire));
 }
 
 test "deinit does not invoke the finish callback" {
@@ -265,12 +158,16 @@ test "perform completion is released before later commands finish" {
     defer looper.deinit();
     try looper.start();
 
-    // Hold the loop so perform and the second task land in the same detached
-    // command batch, in that order.
-    try looper.schedule(null, .{
-        .context = &first_task,
-        .callback = BlockingTask.run,
-    });
+    var first_worker = PerformWorker{
+        .looper = &looper,
+        .task = .{ .context = &first_task, .callback = BlockingTask.run },
+    };
+    var first_thread = try std.Thread.spawn(.{}, PerformWorker.run, .{&first_worker});
+    var first_joined = false;
+    defer if (!first_joined) {
+        first_task.release.store(true, .release);
+        first_thread.join();
+    };
     waitUntil(&first_task.entered);
 
     var worker = PerformWorker{ .looper = &looper };
@@ -284,21 +181,36 @@ test "perform completion is released before later commands finish" {
     waitUntil(&worker.started);
     yieldRepeatedly();
 
-    try looper.schedule(null, .{
-        .context = &second_task,
-        .callback = BlockingTask.run,
-    });
+    var second_worker = PerformWorker{
+        .looper = &looper,
+        .task = .{ .context = &second_task, .callback = BlockingTask.run },
+    };
+    var second_thread = try std.Thread.spawn(.{}, PerformWorker.run, .{&second_worker});
+    var second_joined = false;
+    defer if (!second_joined) {
+        second_task.release.store(true, .release);
+        second_thread.join();
+    };
+    waitUntil(&second_worker.started);
+    yieldRepeatedly();
+
     first_task.release.store(true, .release);
     waitUntil(&second_task.entered);
     yieldRepeatedly();
     const completed_before_second_task = worker.done.load(.acquire);
 
     second_task.release.store(true, .release);
+    first_thread.join();
+    first_joined = true;
     worker_thread.join();
     worker_joined = true;
+    second_thread.join();
+    second_joined = true;
 
     try std.testing.expect(completed_before_second_task);
+    try std.testing.expect(first_worker.failure == null);
     try std.testing.expect(worker.failure == null);
+    try std.testing.expect(second_worker.failure == null);
     try looper.stop();
 }
 
@@ -311,19 +223,11 @@ test "work is rejected before start and after terminal cleanup" {
     finish_probe.looper = &looper;
     defer looper.deinit();
 
-    try std.testing.expectError(
-        error.Cancelled,
-        looper.schedule(1, .{ .callback = noopTask }),
-    );
     try looper.start();
     try looper.stop();
 
     try std.testing.expect(finish_probe.oob_was_cancelled.load(.acquire));
     try std.testing.expectError(error.Cancelled, looper.resumeReading(.link));
-    try std.testing.expectError(
-        error.Cancelled,
-        looper.schedule(null, .{ .callback = noopTask }),
-    );
     try std.testing.expectError(
         error.Cancelled,
         looper.performTask(.{ .callback = noopTask }),
@@ -572,10 +476,16 @@ test "deinit cancels a detach queued during a running command" {
         .pair = .{ .link = descriptor(pipe, &mock) },
     });
 
-    try looper.schedule(null, .{
-        .context = &blocking_task,
-        .callback = BlockingTask.run,
-    });
+    var blocking_worker = PerformWorker{
+        .looper = &looper,
+        .task = .{ .context = &blocking_task, .callback = BlockingTask.run },
+    };
+    var blocking_thread = try std.Thread.spawn(.{}, PerformWorker.run, .{&blocking_worker});
+    var blocking_joined = false;
+    defer if (!blocking_joined) {
+        blocking_task.release.store(true, .release);
+        blocking_thread.join();
+    };
     waitUntil(&blocking_task.entered);
 
     var detacher = DetachWorker{ .looper = &looper };
@@ -603,9 +513,12 @@ test "deinit cancels a detach queued during a running command" {
     try std.testing.expect(detacher.failure.? == error.Cancelled);
 
     blocking_task.release.store(true, .release);
+    blocking_thread.join();
+    blocking_joined = true;
     deinit_thread.join();
     deinit_joined = true;
 
+    try std.testing.expect(blocking_worker.failure == null);
     try std.testing.expect(deinit_worker.done.load(.acquire));
     try std.testing.expect(mock.cleaned.load(.acquire));
 }
@@ -617,10 +530,16 @@ test "deinit cancels a perform queued during a running command" {
     defer if (needs_deinit) looper.deinit();
     try looper.start();
 
-    try looper.schedule(null, .{
-        .context = &blocking_task,
-        .callback = BlockingTask.run,
-    });
+    var blocking_worker = PerformWorker{
+        .looper = &looper,
+        .task = .{ .context = &blocking_task, .callback = BlockingTask.run },
+    };
+    var blocking_thread = try std.Thread.spawn(.{}, PerformWorker.run, .{&blocking_worker});
+    var blocking_joined = false;
+    defer if (!blocking_joined) {
+        blocking_task.release.store(true, .release);
+        blocking_thread.join();
+    };
     waitUntil(&blocking_task.entered);
 
     var worker = PerformWorker{ .looper = &looper };
@@ -645,10 +564,13 @@ test "deinit cancels a perform queued during a running command" {
     worker_thread.join();
     worker_joined = true;
     blocking_task.release.store(true, .release);
+    blocking_thread.join();
+    blocking_joined = true;
     deinit_thread.join();
     deinit_joined = true;
     needs_deinit = false;
 
+    try std.testing.expect(blocking_worker.failure == null);
     try std.testing.expect(worker.was_cancelled.load(.acquire));
     try std.testing.expect(deinit_worker.done.load(.acquire));
 }
@@ -666,6 +588,7 @@ const BlockingTask = struct {
 
 const PerformWorker = struct {
     looper: *Looper,
+    task: Looper.Task = .{ .callback = noopTask },
     started: AtomicBool = AtomicBool.init(false),
     done: AtomicBool = AtomicBool.init(false),
     was_cancelled: AtomicBool = AtomicBool.init(false),
@@ -673,7 +596,7 @@ const PerformWorker = struct {
 
     fn run(self: *PerformWorker) void {
         self.started.store(true, .release);
-        self.looper.performTask(.{ .callback = noopTask }) catch |err| {
+        self.looper.performTask(self.task) catch |err| {
             self.failure = err;
             self.was_cancelled.store(err == error.Cancelled, .release);
         };
