@@ -11,6 +11,7 @@ const c_flags = &.{
     "-pedantic",
     "-Werror",
     "-Wno-nullability-extension",
+    "-fvisibility=hidden",
 };
 
 const CryptoLibraries = struct {
@@ -589,9 +590,12 @@ fn addAppleSDKPaths(
 }
 
 fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool) void {
-    module.addCSourceFiles(.{ .files = &.{
-        "src/partout.c",
-    } });
+    module.addCSourceFiles(.{
+        .files = &.{
+            "src/partout.c",
+        },
+        .flags = c_flags,
+    });
     module.addCSourceFiles(.{
         .files = &.{
             "src/c/portable/common.c",
