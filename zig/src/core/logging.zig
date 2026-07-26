@@ -358,7 +358,8 @@ fn forLog(
     value: anytype,
 ) ![]const u8 {
     const T = @TypeOf(value);
-    const format = comptime logFormat(T) orelse unreachable;
+    const format = comptime logFormat(T) orelse
+        @compileError("unsupported type passed to forLog()");
     return switch (format) {
         .declared => T.logging_formatter(allocator, value),
         .model => |adapter| formatWithAdapter(allocator, value, adapter),
@@ -369,7 +370,7 @@ fn forLog(
         .array => switch (@typeInfo(T)) {
             .array => formatArray(allocator, &value),
             .pointer => formatArray(allocator, value),
-            else => unreachable,
+            else => @compileError("array log format requires an array or pointer type"),
         },
         .dictionary => formatDictionary(allocator, &value),
         .dereference => forLog(allocator, value.*),

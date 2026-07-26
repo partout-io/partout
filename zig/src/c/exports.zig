@@ -35,7 +35,7 @@ pub const CryptoBackend = enum {
         if (@hasDecl(crypto, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
         if (@hasDecl(crypto, "PARTOUT_CRYPTO_MBEDTLS")) return .native;
         if (builtin.is_test) return .mock;
-        unreachable;
+        @compileError("no default crypto backend is available");
     }
 };
 
