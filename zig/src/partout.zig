@@ -32,6 +32,7 @@ const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ ide
 // var daemon_runtime = DaemonRuntime{};
 var daemon_runtime: ?*abi.DaemonRuntime = null;
 
+/// Prints at most a 4096-char message (0-terminated).
 fn panicHandler(message: []const u8, _: ?usize) noreturn {
     var buffer: [4097]u8 = undefined;
     const message_length = @min(message.len, buffer.len - 1);
