@@ -499,13 +499,13 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const command_result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
 
-        if (command_result) |err| return err;
+        if (completion_failure) |err| return err;
         if (holder.failure) |err| return err;
         return holder.value.?;
     }
@@ -539,12 +539,12 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
+        if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.Cancelled => error.Cancelled,
             error.OperationCancelled => error.OperationCancelled,
@@ -576,12 +576,12 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
+        if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             else => error.Cancelled,
         };
@@ -1323,17 +1323,17 @@ pub const Looper = struct {
     fn queueCompletionLocked(
         self: *Looper,
         completion: *Completion,
-        result: ?CompletionError,
+        failure: ?CompletionError,
     ) void {
-        self.completions.append(completion, result);
+        self.completions.append(completion, failure);
     }
 
     fn releaseCompletionsLocked(self: *Looper) void {
         self.completions.releaseAll();
     }
 
-    fn completeNow(completion: *Completion, result: ?CompletionError) void {
-        completion.result = result;
+    fn completeNow(completion: *Completion, failure: ?CompletionError) void {
+        completion.failure = failure;
         completion.done = true;
     }
 

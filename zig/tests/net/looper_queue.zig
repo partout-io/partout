@@ -23,7 +23,7 @@ test "completion queue releases completions in FIFO order" {
     try std.testing.expect(second.next == null);
     try std.testing.expect(!first.done);
     try std.testing.expect(!second.done);
-    try std.testing.expect(second.result.? == error.Cancelled);
+    try std.testing.expect(second.failure.? == error.Cancelled);
 
     queue.releaseAll();
 
@@ -36,7 +36,7 @@ test "completion queue releases completions in FIFO order" {
     queue.append(&third, error.TerminalFailure);
     queue.releaseAll();
     try std.testing.expect(third.done);
-    try std.testing.expect(third.result.? == error.TerminalFailure);
+    try std.testing.expect(third.failure.? == error.TerminalFailure);
 }
 
 test "command queue detaches ready commands in FIFO order" {

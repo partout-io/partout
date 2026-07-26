@@ -145,8 +145,8 @@ pub const CompletionError = std.mem.Allocator.Error ||
 pub const Completion = struct {
     // Completion state.
     done: bool = false,
-    // Completion error or null on success.
-    result: ?CompletionError = null,
+    // Completion failure or null on success.
+    failure: ?CompletionError = null,
     // Intrusive completion queue linkage.
     next: ?*Completion = null,
 };
@@ -160,9 +160,9 @@ pub const CompletionQueue = struct {
     pub fn append(
         self: *CompletionQueue,
         completion: *Completion,
-        result: ?CompletionError,
+        failure: ?CompletionError,
     ) void {
-        completion.result = result;
+        completion.failure = failure;
         completion.next = null;
         if (self.tail) |tail| {
             tail.next = completion;
