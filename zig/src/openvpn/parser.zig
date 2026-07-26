@@ -188,7 +188,8 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
                 c_passphrase.deinit();
             }
 
-            const function_table = c_mod.cryptoFunctionTable(backend);
+            const function_table = c_mod.cryptoFunctionTable(backend) catch
+                return error.DecryptionFailed;
             const decrypt_function = function_table.key_decrypted_from_pem orelse
                 return error.DecryptionFailed;
             const c_decrypted = decrypt_function(c_pem.ptr(), c_passphrase.ptr()) orelse

@@ -456,7 +456,7 @@ pub const Subnet = struct {
         else switch (parsed_address.family) {
             .v4 => 32,
             .v6 => 128,
-            .hostname => unreachable,
+            .hostname => return null,
         };
         if (!parsed_address.family.isValidPrefixLength(prefix)) return null;
         return .{

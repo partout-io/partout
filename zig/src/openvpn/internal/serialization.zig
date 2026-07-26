@@ -189,7 +189,7 @@ const AuthSerializer = struct {
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) !AuthSerializer {
-        const functions = c_exports_mod.cryptoFunctionTable(backend).enc;
+        const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
@@ -308,7 +308,7 @@ const CryptSerializer = struct {
         backend: CryptoBackend,
         key: api.OpenVPNStaticKey,
     ) !CryptSerializer {
-        const functions = c_exports_mod.cryptoFunctionTable(backend).enc;
+        const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);

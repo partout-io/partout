@@ -39,23 +39,25 @@ pub const CryptoBackend = enum {
     }
 };
 
-pub fn cryptoFunctionTable(backend: CryptoBackend) crypto.pp_crypto_fnt {
+pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
+
+pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!crypto.pp_crypto_fnt {
     return switch (backend) {
         .openssl => if (@hasDecl(crypto, "PARTOUT_CRYPTO_OPENSSL"))
             crypto.pp_crypto_fnt_openssl()
         else
-            unreachable,
+            error.UnsupportedCryptoBackend,
         .mbedtls => if (@hasDecl(crypto, "PARTOUT_CRYPTO_MBEDTLS"))
             crypto.pp_crypto_fnt_mbedtls()
         else
-            unreachable,
+            error.UnsupportedCryptoBackend,
         .native => if (@hasDecl(crypto, "PARTOUT_CRYPTO_MBEDTLS"))
             crypto.pp_crypto_fnt_native()
         else
-            unreachable,
+            error.UnsupportedCryptoBackend,
         .mock => if (builtin.is_test)
             crypto.pp_crypto_fnt_mock()
         else
-            unreachable,
+            error.UnsupportedCryptoBackend,
     };
 }

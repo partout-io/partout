@@ -81,7 +81,7 @@ const OpenVPNConnection = struct {
     ) net.ConnectionCreateError!net.Connection {
         const openvpn = switch (module.module.*) {
             .OpenVPN => |*value| value,
-            else => unreachable,
+            else => return error.MissingConnectionImplementation,
         };
         const source_configuration = if (openvpn.configuration) |*value|
             value
@@ -89,11 +89,11 @@ const OpenVPNConnection = struct {
             return error.IncompleteModule;
         const looper = sandbox.looper;
 
-        var configuration = configurationApplyingActiveModules(
+        var configuration = try configurationApplyingActiveModules(
             allocator,
             source_configuration,
             sandbox.profile,
-        ) catch return error.OutOfMemory;
+        );
         errdefer configuration.deinit(allocator);
 
         const prng = PRNG.system();
@@ -115,7 +115,7 @@ const OpenVPNConnection = struct {
                 error.InvalidJson,
                 error.InvalidModel,
                 error.UnsupportedModel,
-                => unreachable,
+                => return error.IncompleteModule,
             }
         else
             null;
@@ -469,24 +469,22 @@ const OpenVPNConnection = struct {
             .requires_virtual_device = true,
             .modules = modules,
         };
-        const tunnel = self.controller.setTunnelSettings(info) catch |err| {
+        self.tunnel = self.controller.setTunnelSettings(info) catch |err| {
             self.failTunnelSetup(session, tunnelErrorCode(err));
             return;
         };
-        self.tunnel = tunnel orelse {
+        const active_tunnel = if (self.tunnel) |*value| value else {
             self.failTunnelSetup(session, .tunNotAvailable);
             return;
         };
-        const descriptor = if (self.tunnel) |*active_tunnel| blk: {
-            const fd = active_tunnel.muxDescriptor() orelse {
-                self.failTunnelSetup(session, .fdUnavailable);
-                return;
-            };
-            break :blk net.Looper.Descriptor{
-                .fd = fd,
-                .io = active_tunnel.nativeIO(),
-            };
-        } else unreachable;
+        const fd = active_tunnel.muxDescriptor() orelse {
+            self.failTunnelSetup(session, .fdUnavailable);
+            return;
+        };
+        const descriptor = net.Looper.Descriptor{
+            .fd = fd,
+            .io = active_tunnel.nativeIO(),
+        };
         session.setTunnel(descriptor) catch |err| {
             self.failTunnelSetup(session, tunnelErrorCode(err));
             return;
@@ -832,10 +830,10 @@ fn configurationApplyingActiveModules(
     allocator: std.mem.Allocator,
     source: *const api.OpenVPNConfiguration,
     profile: *const api.Profile,
-) std.mem.Allocator.Error!api.OpenVPNConfiguration {
+) net.ConnectionCreateError!api.OpenVPNConfiguration {
     var configuration = source.clone(allocator) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => unreachable,
+        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.IncompleteModule,
     };
     errdefer configuration.deinit(allocator);
 
@@ -1012,7 +1010,7 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         source: *const api.OpenVPNConfiguration,
         profile: *const api.Profile,
-    ) std.mem.Allocator.Error!api.OpenVPNConfiguration {
+    ) net.ConnectionCreateError!api.OpenVPNConfiguration {
         return configurationApplyingActiveModules(allocator, source, profile);
     }
 };

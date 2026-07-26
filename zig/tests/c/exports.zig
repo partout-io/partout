@@ -20,17 +20,31 @@ test "default crypto backend follows compiled backends" {
 }
 
 test "crypto function table follows the selected backend" {
-    const mock = c_exports.cryptoFunctionTable(.mock);
+    const mock = try c_exports.cryptoFunctionTable(.mock);
     try std.testing.expectEqualStrings("mock", std.mem.span(mock.name));
 
     if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL")) {
-        const openssl = c_exports.cryptoFunctionTable(.openssl);
+        const openssl = try c_exports.cryptoFunctionTable(.openssl);
         try std.testing.expectEqualStrings("openssl", std.mem.span(openssl.name));
+    } else {
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            c_exports.cryptoFunctionTable(.openssl),
+        );
     }
     if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
-        const mbedtls = c_exports.cryptoFunctionTable(.mbedtls);
+        const mbedtls = try c_exports.cryptoFunctionTable(.mbedtls);
         try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
-        const native = c_exports.cryptoFunctionTable(.native);
+        const native = try c_exports.cryptoFunctionTable(.native);
         try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+    } else {
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            c_exports.cryptoFunctionTable(.mbedtls),
+        );
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            c_exports.cryptoFunctionTable(.native),
+        );
     }
 }

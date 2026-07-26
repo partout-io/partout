@@ -134,7 +134,7 @@ pub const PeerEndpointResolver = struct {
         // DNS64 networks this can replace an obsolete NAT64 prefix without a
         // new hostname lookup; other resolvers simply preserve the address.
         try self.refreshTargets(allocator);
-        return self.cache.value().?;
+        return self.cache.value() orelse error.DNSResolutionFailure;
     }
 
     fn populate(
@@ -187,9 +187,9 @@ pub const PeerEndpointResolver = struct {
     fn refreshTargets(
         self: *const PeerEndpointResolver,
         allocator: std.mem.Allocator,
-    ) std.mem.Allocator.Error!void {
+    ) ResolutionError!void {
         const reachability = if (self.factory) |factory| factory.currentReachability() else null;
-        const entries = self.cache.mutableValue().?;
+        const entries = self.cache.mutableValue() orelse return error.DNSResolutionFailure;
         for (entries) |*entry| {
             var mapped = self.resolver.resolveAddress(
                 allocator,
@@ -204,8 +204,11 @@ pub const PeerEndpointResolver = struct {
                 },
             };
 
-            const parsed = api.Address.parseRaw(mapped);
-            if (parsed == null or !parsed.?.isIPAddress()) {
+            const mapped_is_ip_address = if (api.Address.parseRaw(mapped)) |parsed|
+                parsed.isIPAddress()
+            else
+                false;
+            if (!mapped_is_ip_address) {
                 log.writef(.err, "Unable to re-resolve endpoint: {s}", .{
                     @errorName(error.InvalidEndpoint),
                 });
@@ -222,10 +225,10 @@ pub const PeerEndpointResolver = struct {
             previous.deinit(allocator);
             const source_address = api.Address.parseRaw(
                 entry.base.address,
-            ) orelse unreachable;
+            ) orelse return error.InvalidEndpoint;
             const target_address = api.Address.parseRaw(
                 entry.target.address,
-            ) orelse unreachable;
+            ) orelse return error.InvalidEndpoint;
             if (std.mem.eql(u8, source_address.raw, target_address.raw)) {
                 log.writef(
                     .debug,
@@ -271,7 +274,7 @@ pub const PeerEndpointResolver = struct {
         defer util.freeSlice(net.DNSRecord, allocator, records);
 
         const target_address = preferredAddress(records) orelse return error.DNSResolutionFailure;
-        const target = api.Address.parseRaw(target_address) orelse unreachable;
+        const target = api.Address.parseRaw(target_address) orelse return error.InvalidEndpoint;
         log.writef(.debug, "DNS64: mapped {s} to {s}", .{ address, target });
         return (api.Endpoint{
             .address = target_address,
