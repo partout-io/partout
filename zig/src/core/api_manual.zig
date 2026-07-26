@@ -31,8 +31,8 @@ pub const Address = struct {
             };
         }
 
-        fn ofZ(c_address: [*:0]const u8) Family {
-            return ofRaw(std.mem.span(c_address));
+        fn ofZ(c_address: [:0]const u8) Family {
+            return ofRaw(c_address);
         }
 
         fn isValidPrefixLength(self: Family, prefix_length: u8) bool {

@@ -211,7 +211,7 @@ pub const WireGuardAdapter = struct {
     fn startBackend(
         self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
-        wg_config: []const u8,
+        wg_config: [:0]const u8,
     ) StartBackendError!i32 {
         log.write(.debug, "Start wg-go backend");
         const handle = self.backend.turnOn(allocator, wg_config, .{
@@ -408,7 +408,7 @@ fn buildConfiguration(
     configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: *PeerEndpointResolver,
     scope: WireGuardAdapter.ConfigurationScope,
-) WireGuardAdapter.BuildConfigurationError![]u8 {
+) WireGuardAdapter.BuildConfigurationError![:0]u8 {
     const resolved_endpoints = try endpoint_resolver.resolve(
         allocator,
         std.EnumSet(net.DNSResolver.Flag).initEmpty(),
@@ -431,7 +431,7 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         configuration: *const api.WireGuardConfiguration,
         dns_resolver: net.DNSResolver,
-    ) WireGuardAdapter.BuildConfigurationError![]u8 {
+    ) WireGuardAdapter.BuildConfigurationError![:0]u8 {
         var endpoint_resolver = PeerEndpointResolver.init(
             configuration.peers,
             dns_resolver,

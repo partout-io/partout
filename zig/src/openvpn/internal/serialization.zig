@@ -194,10 +194,7 @@ const AuthSerializer = struct {
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();
-        var digest_name: core_mod.util.TemporaryCString = .{};
-        try digest_name.init(allocator, digest.raw());
-        defer digest_name.deinit();
-        const cbc = functions.cbc_create.?(null, digest_name.ptr(), bridge.native()) orelse return error.UnsupportedAlgorithm;
+        const cbc = functions.cbc_create.?(null, digest.raw().ptr, bridge.native()) orelse return error.UnsupportedAlgorithm;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
         const hmac_length = c_crypto.pp_crypto_meta_of(cbc).digest_len;
         const auth_length = hmac_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength;
@@ -316,15 +313,11 @@ const CryptSerializer = struct {
         defer keys.deinit(allocator);
         var bridge = try CryptoKeysBridge.init(allocator, &keys);
         defer bridge.deinit();
-        var cipher_name: core_mod.util.TemporaryCString = .{};
-        try cipher_name.init(allocator, "AES-256-CTR");
-        defer cipher_name.deinit();
-        var digest_name: core_mod.util.TemporaryCString = .{};
-        try digest_name.init(allocator, "SHA256");
-        defer digest_name.deinit();
+        const cipher_name: [:0]const u8 = "AES-256-CTR";
+        const digest_name: [:0]const u8 = "SHA256";
         const ctr = functions.ctr_create.?(
-            cipher_name.ptr(),
-            digest_name.ptr(),
+            cipher_name.ptr,
+            digest_name.ptr,
             ControlConstants.ctr_tag_length,
             ControlConstants.ctr_payload_length,
             bridge.native(),

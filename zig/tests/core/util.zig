@@ -90,6 +90,29 @@ test "temporary C string reports fallback allocator failure" {
     try std.testing.expect(failing.has_induced_failure);
 }
 
+test "passes sentinel slices to C callbacks without copying" {
+    const Callback = struct {
+        fn call(ctx: ?*anyopaque, value: [*c]const u8) callconv(.c) void {
+            const seen: *?[*c]const u8 = @ptrCast(@alignCast(ctx.?));
+            seen.* = value;
+        }
+    };
+
+    const value: [:0]const u8 = "alpha";
+    var seen: ?[*c]const u8 = null;
+    util.withCString(value, Callback.call, &seen);
+
+    try std.testing.expectEqual(@intFromPtr(value.ptr), @intFromPtr(seen.?));
+}
+
+test "borrows C strings without dropping sentinel metadata" {
+    const value: [:0]const u8 = "alpha";
+    const borrowed = util.borrowedCString(value.ptr);
+
+    try std.testing.expectEqual(@intFromPtr(value.ptr), @intFromPtr(borrowed.ptr));
+    try std.testing.expectEqual(@as(u8, 0), borrowed[borrowed.len]);
+}
+
 test "trims common ASCII whitespace" {
     try std.testing.expectEqualStrings("hello", util.trim(" \r\t\nhello \n\t"));
     try std.testing.expectEqualStrings("", util.trim(" \r\t\n"));

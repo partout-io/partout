@@ -379,7 +379,7 @@ pub const ConnectionStatus = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .disconnected => "disconnected",
             .connecting => "connecting",
@@ -498,7 +498,7 @@ pub const DNSModuleDomainPolicy = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .match => "match",
             .matchAndSearch => "matchAndSearch",
@@ -736,7 +736,7 @@ pub const DNSProtocol = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .cleartext => "cleartext",
             .https => "https",
@@ -1014,7 +1014,7 @@ pub const IPSocketType = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .udp => "UDP",
             .tcp => "TCP",
@@ -1061,7 +1061,7 @@ pub const ModuleType = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .Custom => "Custom",
             .DNS => "DNS",
@@ -1155,7 +1155,7 @@ pub const OnDemandModuleOtherNetwork = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .mobile => "mobile",
             .ethernet => "ethernet",
@@ -1184,7 +1184,7 @@ pub const OnDemandModulePolicy = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .any => "any",
             .including => "including",
@@ -1220,7 +1220,7 @@ pub const OpenVPNCipher = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .aes128cbc => "AES-128-CBC",
             .aes192cbc => "AES-192-CBC",
@@ -1709,7 +1709,7 @@ pub const OpenVPNCredentialsOTPMethod = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .none => "none",
             .append => "append",
@@ -1743,7 +1743,7 @@ pub const OpenVPNDigest = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .sha1 => "SHA1",
             .sha224 => "SHA224",
@@ -2034,7 +2034,7 @@ pub const OpenVPNPullMask = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .routes => "routes",
             .dns => "dns",
@@ -2064,7 +2064,7 @@ pub const OpenVPNRoutingPolicy = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .IPv4 => "IPv4",
             .IPv6 => "IPv6",
@@ -2232,7 +2232,7 @@ pub const OpenVPNTLSWrapStrategy = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .auth => "auth",
             .crypt => "crypt",
@@ -2416,7 +2416,7 @@ pub const PartoutErrorCode = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .cached => "cached",
             .notFound => "notFound",
@@ -2675,7 +2675,7 @@ pub const SocketType = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .udp => "UDP",
             .tcp => "TCP",
@@ -3071,7 +3071,7 @@ pub const TunnelStatus = enum {
         return null;
     }
 
-    pub fn raw(self: @This()) []const u8 {
+    pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
             .inactive => "inactive",
             .activating => "activating",

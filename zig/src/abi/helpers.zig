@@ -105,7 +105,7 @@ fn boundEventsBinding(ptr: *anyopaque) ?c.partout_daemon_events {
     return self.binding;
 }
 
-fn eventKeyString(key: net.DaemonEventKey) []const u8 {
+fn eventKeyString(key: net.DaemonEventKey) [:0]const u8 {
     return switch (key) {
         .connection_status => "connectionStatus",
         .data_count => "dataCount",

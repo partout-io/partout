@@ -727,7 +727,7 @@ fn renderEnum(w: *std.Io.Writer, schema_item: Schema) WriterError!void {
             \\        return null;
             \\    }
             \\
-            \\    pub fn raw(self: @This()) []const u8 {
+            \\    pub fn raw(self: @This()) [:0]const u8 {
             \\        return switch (self) {
             \\
         );

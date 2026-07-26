@@ -341,15 +341,13 @@ pub const DataPathWrapper = struct {
 
         const framing = nativeFraming(parameters.compression_framing);
         const cipher_name = if (parameters.cipher) |cipher|
-            try allocator.dupeZ(u8, cipher.raw())
+            cipher.raw()
         else
             null;
-        defer if (cipher_name) |value| allocator.free(value);
         const digest_name = if (parameters.digest) |digest|
-            try allocator.dupeZ(u8, digest.raw())
+            digest.raw()
         else
             null;
-        defer if (digest_name) |value| allocator.free(value);
 
         const mode: *c.openvpn_dp_mode = if (isAEAD(parameters.cipher)) blk: {
             const name = cipher_name orelse return error.UnsupportedAlgorithm;

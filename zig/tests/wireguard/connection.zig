@@ -41,6 +41,7 @@ test "WireGuard connection builds UAPI configuration" {
     );
     defer allocator.free(configuration_text);
 
+    try std.testing.expectEqual(@as(u8, 0), configuration_text[configuration_text.len]);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "private_key=48ccbdcd1d0a520a98a99d297322f7b0998992636453c3c0e669ebf67877cd4b\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "listen_port=51820\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "replace_peers=true\n") != null);
@@ -583,7 +584,7 @@ const fake_backend_vtable = backend_mod.Backend.VTable{
 fn fakeTurnOn(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
-    settings: []const u8,
+    settings: [:0]const u8,
     _: backend_mod.StartTunnel,
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
@@ -607,7 +608,7 @@ fn fakeGetConfig(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_m
     );
 }
 
-fn fakeSetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32, settings: []const u8) backend_mod.Error!i64 {
+fn fakeSetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.set_config_count += 1;
     if (self.last_set_config) |value| allocator.free(value);
