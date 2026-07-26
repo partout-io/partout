@@ -349,6 +349,22 @@ pub const Looper = struct {
         return true;
     }
 
+    /// Requests an orderly stop and waits for the worker thread to terminate.
+    ///
+    /// The stop command runs after work that the looper has already accepted.
+    /// Entering `.stopping` rejects new work, and delayed commands that have not
+    /// become ready are cancelled when the worker finishes. Calling `stop`
+    /// before `start`, or after the worker has already stopped, is a no-op.
+    ///
+    /// This function must run outside the looper thread and outside callbacks
+    /// that borrow looper-owned state. It waits for an in-progress `start` or
+    /// `stop` transition, but returns `error.Cancelled` if `deinit` takes
+    /// ownership of shutdown. Failure to allocate the stop command is returned
+    /// to the caller.
+    ///
+    /// A failure that independently terminates the worker is logged by
+    /// `finish` and delivered to `on_finish`; it is not returned by `stop`.
+    /// `deinit` is still required to release the looper's resources.
     pub fn stop(self: *Looper) StopError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
@@ -360,19 +376,33 @@ pub const Looper = struct {
         }
         switch (self.state) {
             .idle => {
+                // No worker was started, so there is nothing to stop or join.
                 self.lock.unlock();
                 return;
             },
-            .started => {},
-            .starting => @panic("Looper remained starting after wait"),
+            .started => {
+                // This caller owns the transition to `.stopping` below.
+            },
+            .starting => {
+                // The condition loop above must consume this transient state.
+                @panic("Looper remained starting after wait");
+            },
             .deinitializing => {
+                // `deinit` owns shutdown and will cancel pending work and join.
                 self.lock.unlock();
                 return error.Cancelled;
             },
-            .stopping, .stopped => {
+            .stopping => {
+                // Another caller initiated shutdown; wait for it to finish.
                 while (self.state == .stopping) {
                     self.condition.wait(&self.lock);
                 }
+                self.lock.unlock();
+                self.joinWorker();
+                return;
+            },
+            .stopped => {
+                // The worker already finished, but may still need to be joined.
                 self.lock.unlock();
                 self.joinWorker();
                 return;
