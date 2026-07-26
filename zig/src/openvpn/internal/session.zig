@@ -382,7 +382,7 @@ pub const Session = struct {
             prepareShutdownOnQueue,
         ) catch |err| {
             // A terminal looper has already serialized final state; its owner
-            // routes `OnFinish` through `looperDidFinish` while Session lives.
+            // routes `OnFinish` through `looperDidTerminate` while Session lives.
             if (err == error.Cancelled or err == error.TerminalFailure) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
@@ -521,7 +521,7 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperDidFinish(self: *Session, failure: ?net_mod.Looper.Failure) void {
+    pub fn looperDidTerminate(self: *Session, failure: ?net_mod.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{

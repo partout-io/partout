@@ -170,9 +170,9 @@ pub const Connection = struct {
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
         deinit: *const fn (*anyopaque) void,
-        /// Called synchronously from the daemon-owned looper's terminal
-        /// callback. Most protocols can leave this unset.
-        looper_finish: ?*const fn (*anyopaque, ?looper.Looper.Failure) void = null,
+        /// Called synchronously when the shared daemon-owned looper
+        /// terminates, before runtime recovery or connection destruction.
+        looper_terminated: ?*const fn (*anyopaque, ?looper.Looper.Failure) void = null,
     };
 
     pub fn start(self: Connection, events: Events) StartError!bool {
@@ -200,11 +200,11 @@ pub const Connection = struct {
         self.vtable.better_path(self.ptr, events);
     }
 
-    pub fn looperDidFinish(
+    pub fn looperDidTerminate(
         self: Connection,
         failure: ?looper.Looper.Failure,
     ) void {
-        const block = self.vtable.looper_finish orelse return;
+        const block = self.vtable.looper_terminated orelse return;
         block(self.ptr, failure);
     }
 

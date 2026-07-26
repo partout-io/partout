@@ -401,7 +401,10 @@ test "connection daemon replaces a terminal looper and reconnects" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
-    var capture = SandboxCapture{ .queue_work_on_stop = true };
+    var capture = SandboxCapture{
+        .queue_work_on_stop = true,
+        .queue_work_on_looper_termination = true,
+    };
     var implementations = [_]net.ConnectionImplementation{capture.implementation()};
     var registry = try net.ConnectionRegistry.init(allocator, &implementations);
     defer registry.deinit(allocator);
@@ -431,14 +434,16 @@ test "connection daemon replaces a terminal looper and reconnects" {
     const terminal_looper = capture.looper orelse return error.TestUnexpectedResult;
     try terminal_looper.stop();
 
-    // Flush onLooperFinish and its queued FIFO recovery barrier.
+    // Flush onLooperTerminated and its queued FIFO recovery barrier.
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqual(@as(usize, 2), capture.create_count);
     try std.testing.expectEqual(@as(usize, 1), capture.deinit_count);
     try std.testing.expectEqual(@as(usize, 2), capture.start_count);
     try std.testing.expectEqual(@as(usize, 1), capture.stop_count);
-    try std.testing.expectEqual(@as(usize, 1), capture.serialized_count);
+    try std.testing.expectEqual(@as(usize, 1), capture.looper_termination_count);
+    try std.testing.expect(capture.looper_termination_before_deinit);
+    try std.testing.expectEqual(@as(usize, 2), capture.serialized_count);
     try std.testing.expect(capture.serialized_before_deinit);
     const recovered_looper = capture.looper orelse return error.TestUnexpectedResult;
     try std.testing.expect(try recovered_looper.perform(
@@ -798,13 +803,16 @@ const SandboxCapture = struct {
     disconnect_on_start: bool = false,
     cancel_on_start: ?api.PartoutErrorCode = null,
     queue_work_on_stop: bool = false,
+    queue_work_on_looper_termination: bool = false,
     cache_dir: []const u8 = "",
     create_count: usize = 0,
     start_count: usize = 0,
     stop_count: usize = 0,
+    looper_termination_count: usize = 0,
     deinit_count: usize = 0,
     serialized_count: usize = 0,
     serialized_before_deinit: bool = false,
+    looper_termination_before_deinit: bool = false,
 
     fn implementation(self: *SandboxCapture) net.ConnectionImplementation {
         return .{
@@ -878,6 +886,15 @@ const SandboxCapture = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
+    fn looperTerminated(ptr: *anyopaque, _: ?net.Looper.Failure) void {
+        const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
+        self.looper_termination_count += 1;
+        self.looper_termination_before_deinit = self.deinit_count == 0;
+        if (self.queue_work_on_looper_termination) {
+            self.serialized_executor.?.run(self, onSerialized);
+        }
+    }
+
     fn deinit(ptr: *anyopaque) void {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.deinit_count += 1;
@@ -889,6 +906,7 @@ const SandboxCapture = struct {
         .network_change = networkChange,
         .better_path = betterPath,
         .deinit = deinit,
+        .looper_terminated = looperTerminated,
     };
 
     const implementation_vtable = net.ConnectionImplementation.VTable{

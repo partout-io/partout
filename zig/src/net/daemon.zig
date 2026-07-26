@@ -254,7 +254,7 @@ pub const Daemon = struct {
         onConnectionLastError: api.PartoutErrorCode,
         onConnectionDataCount: api.DataCount,
         onConnectionCancel: ?api.PartoutErrorCode,
-        onLooperFinish: ?Looper.Failure,
+        onLooperTerminated: ?Looper.Failure,
         recoverConnection,
         onConnectionBlock: struct {
             ptr: *anyopaque,
@@ -275,7 +275,7 @@ pub const Daemon = struct {
             .onConnectionLastError => |code| self.handleLastError(code),
             .onConnectionDataCount => |count| self.handleDataCount(count),
             .onConnectionCancel => |code| self.handleConnectionCancel(code),
-            .onLooperFinish => |failure| self.handleLooperFinish(failure),
+            .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnectionRuntime(),
             .onConnectionBlock => |payload| self.handleConnectionBlock(payload.ptr, payload.block),
         }
@@ -406,7 +406,7 @@ pub const Daemon = struct {
         self.state = .started;
 
         log.write(.notice, "Start daemon");
-        self.clearEvents();
+        self.clearEnvironment();
 
         // Establish settings-only tunnel if no connection
         if (self.isSettingsOnly()) {
@@ -522,7 +522,7 @@ pub const Daemon = struct {
 
     fn finishStop(self: *Daemon) void {
         self.state = .stopped;
-        if (self.stop_mode == .clear_environment) self.clearEvents();
+        if (self.stop_mode == .clear_environment) self.clearEnvironment();
         log.write(.notice, "Daemon stopped successfully");
     }
 
@@ -664,7 +664,7 @@ pub const Daemon = struct {
         self.emitRemove(.data_count);
     }
 
-    fn handleLooperFinish(
+    fn handleLooperTermination(
         self: *Daemon,
         failure: ?Looper.Failure,
     ) void {
@@ -743,7 +743,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.remove_key(e.ctx, key);
     }
 
-    fn clearEvents(self: *Daemon) void {
+    fn clearEnvironment(self: *Daemon) void {
         log.write(.notice, "Clear connection events");
         self.snapshot_publisher.clearEnvironment();
         self.emitRemove(.connection_status);
@@ -774,7 +774,7 @@ pub const Daemon = struct {
         looper.* = Looper.init(self.allocator, .{
             .on_finish = .{
                 .context = self,
-                .callback = onLooperFinish,
+                .callback = onLooperTerminate,
             },
         }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
@@ -799,7 +799,8 @@ pub const Daemon = struct {
         );
         errdefer connection.deinit();
 
-        // Publish a complete runtime before the looper can invoke onFinish.
+        // Publish a complete runtime before the looper can invoke its
+        // terminal callback.
         self.connection_runtime = .{
             .connection = connection,
             .looper = looper,
@@ -838,7 +839,7 @@ pub const Daemon = struct {
 
         // Keep the borrowed looper object alive until the connection has
         // released every Session that refers to it, but first join its worker
-        // so onFinish cannot race connection deinitialization.
+        // so the terminal callback cannot race connection deinitialization.
         runtime.looper.stop() catch |err| switch (err) {
             error.TerminalFailure => {},
             else => log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)}),
@@ -849,7 +850,7 @@ pub const Daemon = struct {
         self.connection_runtime = null;
     }
 
-    fn onLooperFinish(
+    fn onLooperTerminate(
         ctx: ?*anyopaque,
         failure: ?Looper.Failure,
     ) void {
@@ -857,9 +858,9 @@ pub const Daemon = struct {
         if (self.connection_runtime) |runtime| {
             // Session teardown must stay on the looper queue. It may enqueue
             // connection work first; actor FIFO preserves that ordering.
-            runtime.connection.looperDidFinish(failure);
+            runtime.connection.looperDidTerminate(failure);
         }
-        self.actor.schedule(.{ .onLooperFinish = failure }) catch |err| {
+        self.actor.schedule(.{ .onLooperTerminated = failure }) catch |err| {
             log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});
         };
     }

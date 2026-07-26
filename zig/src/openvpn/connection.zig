@@ -300,12 +300,12 @@ const OpenVPNConnection = struct {
         };
     }
 
-    fn looperDidFinish(
+    fn looperDidTerminate(
         self: *OpenVPNConnection,
         failure: ?net.Looper.Failure,
     ) void {
         const session = self.current_session orelse return;
-        session.looperDidFinish(failure);
+        session.looperDidTerminate(failure);
     }
 
     fn setupLink(
@@ -958,7 +958,7 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .network_change = networkChange,
     .better_path = betterPath,
     .deinit = deinit,
-    .looper_finish = looperDidFinish,
+    .looper_terminated = looperDidTerminate,
 };
 
 fn start(
@@ -992,12 +992,12 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(events);
 }
 
-fn looperDidFinish(
+fn looperDidTerminate(
     ptr: *anyopaque,
     failure: ?net.Looper.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.looperDidFinish(failure);
+    self.looperDidTerminate(failure);
 }
 
 fn deinit(ptr: *anyopaque) void {
