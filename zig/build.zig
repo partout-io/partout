@@ -52,6 +52,11 @@ pub fn build(b: *std.Build) void {
         "embed-c",
         "Embed the C implementations instead of resolving them at the final link.",
     ) orelse false;
+    const shared = b.option(
+        bool,
+        "shared",
+        "Build Partout as a shared library.",
+    ) orelse false;
     const use_openvpn = b.option(
         bool,
         "openvpn",
@@ -126,9 +131,21 @@ pub fn build(b: *std.Build) void {
         use_wireguard,
         build_options,
     );
+    if (shared) {
+        linkVendorLibraries(
+            module,
+            b,
+            target,
+            crypto_libraries,
+            use_wireguard and has_wireguard_backend,
+            vendor_libraries,
+            false,
+        );
+        addRuntimeOrigin(module, target);
+    }
 
     const lib = b.addLibrary(.{
-        .linkage = .static,
+        .linkage = if (shared) .dynamic else .static,
         .name = "partout",
         .root_module = module,
     });
@@ -177,13 +194,14 @@ pub fn build(b: *std.Build) void {
         use_wireguard,
         build_options,
     );
-    linkTestVendorLibraries(
+    linkVendorLibraries(
         test_module,
         b,
         target,
         crypto_libraries,
         use_wireguard and has_wireguard_backend,
         vendor_libraries,
+        true,
     );
     test_module.addImport("source", test_source_module);
 
@@ -199,7 +217,7 @@ pub fn build(b: *std.Build) void {
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 
-    if (target.result.os.tag.isDarwin()) {
+    if (!shared and target.result.os.tag.isDarwin()) {
         const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
@@ -411,13 +429,14 @@ fn addVendorIncludePaths(
     }
 }
 
-fn linkTestVendorLibraries(
+fn linkVendorLibraries(
     module: *std.Build.Module,
     b: *std.Build,
     target: std.Build.ResolvedTarget,
     libraries: CryptoLibraries,
     has_wireguard_backend: bool,
     library_paths: VendorLibraryPaths,
+    add_library_rpath: bool,
 ) void {
     const Entry = struct {
         enabled: bool,
@@ -447,29 +466,34 @@ fn linkTestVendorLibraries(
         if (target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, entry.name });
             std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-                linkTestSystemLibraries(module, library_path, entry.name);
+                linkSystemLibraries(module, library_path, entry.name, add_library_rpath);
                 continue;
             };
             module.addSystemFrameworkPath(.{ .cwd_relative = library_path });
             module.linkFramework(entry.name, .{});
-            module.addRPath(.{ .cwd_relative = library_path });
+            if (add_library_rpath) {
+                module.addRPath(.{ .cwd_relative = library_path });
+            }
         } else {
-            linkTestSystemLibraries(module, library_path, entry.name);
+            linkSystemLibraries(module, library_path, entry.name, add_library_rpath);
         }
     }
 }
 
-fn linkTestSystemLibraries(
+fn linkSystemLibraries(
     module: *std.Build.Module,
     library_path: []const u8,
     name: []const u8,
+    add_library_rpath: bool,
 ) void {
     module.addLibraryPath(.{ .cwd_relative = library_path });
-    module.addRPath(.{ .cwd_relative = library_path });
-    linkTestSystemLibraryNames(module, name);
+    if (add_library_rpath) {
+        module.addRPath(.{ .cwd_relative = library_path });
+    }
+    linkSystemLibraryNames(module, name);
 }
 
-fn linkTestSystemLibraryNames(module: *std.Build.Module, name: []const u8) void {
+fn linkSystemLibraryNames(module: *std.Build.Module, name: []const u8) void {
     const options: std.Build.Module.LinkSystemLibraryOptions = .{
         .use_pkg_config = .no,
     };
@@ -484,6 +508,17 @@ fn linkTestSystemLibraryNames(module: *std.Build.Module, name: []const u8) void 
         module.linkSystemLibrary("wg-go", options);
     } else {
         unreachable;
+    }
+}
+
+fn addRuntimeOrigin(
+    module: *std.Build.Module,
+    target: std.Build.ResolvedTarget,
+) void {
+    if (target.result.os.tag.isDarwin()) {
+        module.addRPath(.{ .cwd_relative = "@loader_path" });
+    } else if (target.result.os.tag != .windows) {
+        module.addRPath(.{ .cwd_relative = "$ORIGIN" });
     }
 }
 

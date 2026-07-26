@@ -32,20 +32,19 @@ var mutex: concurrency.Mutex = .{};
 var logs_private_data: bool = false;
 var external_logger: Callback = null;
 
-// FIXME: #527, Suppress until only Zig ABI
 /// C ABI entry point used by foreign callers to forward a log message.
-// pub export fn partout_log(
-//     level: c_int,
-//     message: [*:0]const u8,
-// ) callconv(.c) void {
-//     mutex.lock();
-//     const logger = external_logger orelse {
-//         mutex.unlock();
-//         return;
-//     };
-//     mutex.unlock();
-//     dispatchCString(logger, level, message);
-// }
+pub export fn partout_log(
+    level: c_int,
+    message: [*:0]const u8,
+) callconv(.c) void {
+    mutex.lock();
+    const logger = external_logger orelse {
+        mutex.unlock();
+        return;
+    };
+    mutex.unlock();
+    dispatchCString(logger, level, message);
+}
 
 /// Configures global logging state.
 ///
