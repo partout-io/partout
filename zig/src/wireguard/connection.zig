@@ -238,7 +238,11 @@ const WireGuardConnection = struct {
 
     fn startDataCountTimer(self: *WireGuardConnection) std.Thread.SpawnError!void {
         self.data_count_timer_active = true;
-        self.data_count_timer.init(self.data_count_interval_ms, onDataCountTimer, self) catch |err| {
+        self.data_count_timer.scheduleReplacing(
+            self.data_count_interval_ms,
+            onDataCountTimer,
+            self,
+        ) catch |err| {
             self.data_count_timer_active = false;
             return err;
         };
@@ -269,7 +273,11 @@ const WireGuardConnection = struct {
 
         self.reportDataCount(events);
         if (!self.data_count_timer_active) return;
-        self.data_count_timer.init(self.data_count_interval_ms, onDataCountTimer, self) catch |err| {
+        self.data_count_timer.scheduleReplacing(
+            self.data_count_interval_ms,
+            onDataCountTimer,
+            self,
+        ) catch |err| {
             log.writef(.err, "Unable to reschedule data count timer: {s}", .{@errorName(err)});
             self.data_count_timer_active = false;
         };
@@ -281,7 +289,7 @@ const WireGuardConnection = struct {
         log.writef(.debug, "Retry backend restart in {} milliseconds", .{
             self.temporary_shutdown_retry_delay_ms,
         });
-        self.temporary_shutdown_retry_timer.init(
+        self.temporary_shutdown_retry_timer.scheduleReplacing(
             self.temporary_shutdown_retry_delay_ms,
             onTemporaryShutdownRetry,
             self,

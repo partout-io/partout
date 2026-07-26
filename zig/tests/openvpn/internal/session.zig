@@ -23,6 +23,8 @@ test "Session borrows an externally managed Looper" {
     };
 
     const allocator = std.testing.allocator;
+    const executor = try source.mock.MockSerializedExecutor.create(allocator);
+    defer executor.destroy();
     var looper = try net.Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
@@ -33,6 +35,7 @@ test "Session borrows an externally managed Looper" {
 
     const session = try Session.create(
         allocator,
+        executor.interface(),
         &looper,
         .{},
         null,

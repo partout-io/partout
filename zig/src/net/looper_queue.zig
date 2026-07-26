@@ -54,7 +54,7 @@ pub const OnRead = struct {
 ///
 /// - .wait and .system are fatal syscall failures
 /// - .io causes a side to be detached, but lets the loop continue
-/// - .user comes from `OnRead` and `Task` callback invocations
+/// - .user comes from `OnRead` callback invocations
 ///
 /// Swift MuxError is resolved to error.MuxFailure and is not
 /// mapped here because it's always returned synchronously.
@@ -130,7 +130,6 @@ pub const Errors = struct {
     pub const MuxFailure = error{MuxFailure};
     pub const OperationCancelled = error{OperationCancelled};
     pub const ReentrantCall = error{ReentrantCall};
-    pub const TaskFailure = error{TaskFailure};
     pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
@@ -203,11 +202,10 @@ pub const Command = union(enum) {
     },
     enable_read: SideIdentity,
     enable_write: SideIdentity,
-    schedule: struct {
+    perform: struct {
         task: Task,
         completion: *Completion,
     },
-    perform: Task,
     stop,
 };
 

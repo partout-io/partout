@@ -104,9 +104,9 @@ pub const SessionDelegate = struct {
 
 /// Default V3 OpenVPN session implementation.
 ///
-/// `Session` is heap-only: callbacks, the shutdown actor, and timer contexts
-/// borrow this stable address until `destroy` joins them. Its `Looper` is
-/// borrowed and dedicated to this session for the same lifetime.
+/// `Session` is heap-only: callbacks and timer contexts borrow this stable
+/// address until `destroy` joins them. Its `Looper` is borrowed and dedicated
+/// to this session for the same lifetime.
 pub const Session = struct {
     pub const Error = errors_mod.SessionError;
 
@@ -118,9 +118,9 @@ pub const Session = struct {
     ca_filename: []u8,
     options: SessionOptions,
 
+    executor: net.SerializedExecutor,
     looper: *net.Looper,
     control_channel: *ControlChannel,
-    shutdown_actor: ?*ShutdownActor,
     lifecycle_lock: core.Mutex = .{},
     negotiation_timer: core.RunAfter = .{},
     ping_timer: core.RunAfter = .{},
@@ -129,24 +129,13 @@ pub const Session = struct {
     state: SessionState = .{ .stopped = .{ .with_local_options = true } },
     link_processor: ?*LinkProcessor = null,
 
-    const ShutdownRequest = struct {
-        cause: ?SessionError,
-        timeout_ms: ?u64 = null,
-    };
-
-    const ShutdownActorError = error{
-        ShutdownFailure,
-    };
-
-    const ShutdownActor = core.Actor(
-        Session,
-        ShutdownRequest,
-        ShutdownActorError,
-        handleShutdownRequest,
-    );
+    shutdown_request_lock: core.Mutex = .{},
+    shutdown_pending: bool = false,
+    shutdown_request_cause: ?SessionError = null,
 
     pub fn create(
         allocator: std.mem.Allocator,
+        executor: net.SerializedExecutor,
         looper: *net.Looper,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
@@ -157,6 +146,7 @@ pub const Session = struct {
     ) Error!*Session {
         return createUnwrapped(
             allocator,
+            executor,
             looper,
             configuration,
             credentials,
@@ -169,6 +159,7 @@ pub const Session = struct {
 
     fn createUnwrapped(
         allocator: std.mem.Allocator,
+        executor: net.SerializedExecutor,
         looper: *net.Looper,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
@@ -206,16 +197,12 @@ pub const Session = struct {
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
             .options = options,
+            .executor = executor,
             .looper = looper,
             .control_channel = control_channel,
-            .shutdown_actor = null,
         };
+        errdefer self.shutdown_request_lock.deinit();
         errdefer self.lifecycle_lock.deinit();
-        self.shutdown_actor = try ShutdownActor.create(allocator, self);
-        errdefer {
-            self.shutdown_actor.?.destroy();
-            self.shutdown_actor = null;
-        }
         return self;
     }
 
@@ -230,17 +217,10 @@ pub const Session = struct {
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
 
-        // Keep timer synchronization and the shutdown actor alive while the
-        // regular lifecycle path finishes: prepare/finish both cancel timers,
-        // and an already-running timer callback may still queue shutdown.
         self.shutdown(null, 0) catch {};
         self.negotiation_timer.deinit();
         self.ping_timer.deinit();
 
-        if (self.shutdown_actor) |actor| {
-            self.shutdown_actor = null;
-            actor.destroy();
-        }
         switch (self.state) {
             .stopped => {},
             .active => |active| active.context.destroy(),
@@ -252,6 +232,7 @@ pub const Session = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
         self.allocator.free(self.ca_filename);
+        self.shutdown_request_lock.deinit();
         self.lifecycle_lock.deinit();
         const allocator = self.allocator;
         allocator.destroy(self);
@@ -351,13 +332,13 @@ pub const Session = struct {
     }
 
     /// Prepares state on the looper, detaches from this external thread, then
-    /// finishes state on the looper. Calling it from a callback is rejected;
-    /// callback failures go through `ShutdownActor` instead.
+    /// finishes state on the looper.
     pub fn shutdown(
         self: *Session,
         cause: ?SessionError,
         timeout_ms: ?u64,
     ) Error!void {
+        if (!self.claimShutdown()) return;
         return self.shutdownUnwrapped(cause, timeout_ms) catch |err|
             errors_mod.sessionError(err);
     }
@@ -397,21 +378,34 @@ pub const Session = struct {
         try self.looper.perform(void, &finish, finishShutdownOnQueue);
     }
 
-    fn requestShutdown(self: *const Session, cause: ?SessionError) void {
-        const actor = self.shutdown_actor orelse return;
-        actor.schedule(.{ .cause = cause }) catch {};
+    fn requestShutdown(self: *Session, cause: SessionError) void {
+        self.shutdown_request_lock.lock();
+        defer self.shutdown_request_lock.unlock();
+        if (self.shutdown_pending) return;
+        self.shutdown_pending = true;
+
+        self.shutdown_request_cause = cause;
+        self.executor.run(self, shutdownOnExecutor);
     }
 
-    fn handleShutdownRequest(
-        self: *Session,
-        request: ShutdownRequest,
-    ) ShutdownActorError!void {
-        self.shutdown(request.cause, request.timeout_ms) catch |err| {
+    fn shutdownOnExecutor(raw: *anyopaque) void {
+        const self: *Session = @ptrCast(@alignCast(raw));
+        self.shutdown_request_lock.lock();
+        const cause = self.shutdown_request_cause;
+        self.shutdown_request_lock.unlock();
+        self.shutdownUnwrapped(cause orelse return, null) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
-            return error.ShutdownFailure;
         };
+    }
+
+    fn claimShutdown(self: *Session) bool {
+        self.shutdown_request_lock.lock();
+        defer self.shutdown_request_lock.unlock();
+        if (self.shutdown_pending) return false;
+        self.shutdown_pending = true;
+        return true;
     }
 
     fn setLinkOnQueue(raw: ?*anyopaque) !void {
@@ -522,6 +516,7 @@ pub const Session = struct {
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
+        _ = self.claimShutdown();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -793,7 +788,7 @@ pub const Session = struct {
     }
 
     fn scheduleNegotiationTick(self: *Session) !void {
-        try self.negotiation_timer.init(
+        try self.negotiation_timer.scheduleReplacing(
             self.options.tick_interval_ms,
             onNegotiationTimer,
             self,
@@ -824,7 +819,7 @@ pub const Session = struct {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay);
-        try self.ping_timer.init(delay, onPingTimer, self);
+        try self.ping_timer.scheduleReplacing(delay, onPingTimer, self);
     }
 
     fn onPingTimer(raw: ?*anyopaque) void {

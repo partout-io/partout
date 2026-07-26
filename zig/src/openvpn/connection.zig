@@ -55,8 +55,8 @@ const OpenVPNConnection = struct {
     factory: net.SocketFactory,
     looper: *net.Looper,
     serialized_executor: net.SerializedExecutor,
-    session_options: SessionOptions,
     connection_options: net.ConnectionOptions,
+    session_options: SessionOptions,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
     endpoints: []api.ExtendedEndpoint,
@@ -139,8 +139,8 @@ const OpenVPNConnection = struct {
             .factory = sandbox.factory,
             .looper = looper,
             .serialized_executor = sandbox.serialized_executor,
-            .session_options = session_options,
             .connection_options = sandbox.options,
+            .session_options = session_options,
             .configuration = configuration,
             .credentials = credentials,
             .endpoints = endpoints,
@@ -208,6 +208,7 @@ const OpenVPNConnection = struct {
         defer self.allocator.free(ca_filename);
         const session = Session.create(
             self.allocator,
+            self.serialized_executor,
             self.looper,
             self.configuration,
             self.credentials,
