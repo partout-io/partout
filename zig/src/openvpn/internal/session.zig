@@ -122,14 +122,16 @@ pub const Session = struct {
     looper: *net.Looper,
     control_channel: *ControlChannel,
     lifecycle_lock: core.Mutex = .{},
-    shutdown_request_lock: core.Mutex = .{},
     negotiation_timer: core.RunAfter = .{},
     ping_timer: core.RunAfter = .{},
 
     delegate: ?SessionDelegate = null,
     state: SessionState = .{ .stopped = .{ .with_local_options = true } },
     link_processor: ?*LinkProcessor = null,
-    requested_shutdown_cause: ?SessionError = null,
+
+    shutdown_request_lock: core.Mutex = .{},
+    shutdown_pending: bool = false,
+    shutdown_request_cause: ?SessionError = null,
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -336,6 +338,7 @@ pub const Session = struct {
         cause: ?SessionError,
         timeout_ms: ?u64,
     ) Error!void {
+        if (!self.claimShutdown()) return;
         return self.shutdownUnwrapped(cause, timeout_ms) catch |err|
             errors_mod.sessionError(err);
     }
@@ -376,26 +379,29 @@ pub const Session = struct {
     }
 
     fn requestShutdown(self: *Session, cause: SessionError) void {
-        self.shutdown_request_lock.lock();
-        if (self.requested_shutdown_cause != null) {
-            self.shutdown_request_lock.unlock();
-            return;
-        }
-        self.requested_shutdown_cause = cause;
-        self.shutdown_request_lock.unlock();
+        if (!self.claimShutdown()) return;
+        self.shutdown_request_cause = cause;
         self.executor.run(self, shutdownOnExecutor);
     }
 
     fn shutdownOnExecutor(raw: *anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw));
         self.shutdown_request_lock.lock();
-        const cause = self.requested_shutdown_cause;
+        const cause = self.shutdown_request_cause;
         self.shutdown_request_lock.unlock();
-        self.shutdown(cause orelse return, null) catch |err| {
+        self.shutdownUnwrapped(cause orelse return, null) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
         };
+    }
+
+    fn claimShutdown(self: *Session) bool {
+        self.shutdown_request_lock.lock();
+        defer self.shutdown_request_lock.unlock();
+        if (self.shutdown_pending) return false;
+        self.shutdown_pending = true;
+        return true;
     }
 
     fn setLinkOnQueue(raw: ?*anyopaque) !void {
@@ -506,6 +512,7 @@ pub const Session = struct {
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
+        _ = self.claimShutdown();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
