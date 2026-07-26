@@ -14,6 +14,7 @@ const packet_mod = @import("packet.zig");
 
 const api = core_mod.api;
 const c = helpers_mod.c;
+const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
@@ -524,10 +525,7 @@ fn staticKeyQuadrant(bytes: []const u8, index: usize) []const u8 {
 }
 
 fn unixSeconds() u32 {
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const seconds = std.Io.Clock.real.now(io).toSeconds();
-    if (seconds <= 0) return 0;
-    return @truncate(@as(u64, @intCast(seconds)));
+    return c_common.pp_time_unix_seconds();
 }
 
 pub const testing = struct {

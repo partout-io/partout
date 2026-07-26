@@ -5,6 +5,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 
+const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("helpers.zig");
 const net = @import("../net/exports.zig");
@@ -13,6 +14,7 @@ const wireguard = @import("../wireguard/exports.zig");
 
 const api = core.api;
 const c = helpers.c;
+const c_common = c_mod.common;
 const util = core.util;
 
 pub const RuntimeError = net.DaemonError || error{
@@ -23,7 +25,7 @@ pub const RuntimeError = net.DaemonError || error{
 
 pub const DaemonOptions = struct {
     profile: api.Profile,
-    cache_dir: []const u8,
+    cache_dir: [:0]const u8,
     is_daemon: bool,
     starts_immediately: bool,
     min_data_count_delta: u64,
@@ -65,7 +67,7 @@ pub const DaemonOptions = struct {
             .{profile.id[0..]},
         );
         defer allocator.free(cache_directory_name);
-        const cache_dir = try std.fs.path.join(
+        const cache_dir = try std.fs.path.joinZ(
             allocator,
             &.{ cache_root, cache_directory_name },
         );
@@ -110,8 +112,7 @@ pub const DaemonRuntime = struct {
         options: DaemonOptions,
         bindings: ?*const c.partout_daemon_bindings,
     ) RuntimeError!*DaemonRuntime {
-        const io = std.Io.Threaded.global_single_threaded.io();
-        std.Io.Dir.cwd().createDirPath(io, options.cache_dir) catch
+        if (!c_common.pp_file_create_directory(options.cache_dir.ptr))
             return error.CacheDirectory;
 
         const self = try allocator.create(DaemonRuntime);

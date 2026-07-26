@@ -9,6 +9,7 @@
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -101,6 +102,18 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
 
 /* Read a whole file into a string. */
 char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent);
+
+/* Create a directory and any missing parents. */
+bool pp_file_create_directory(const char *path);
+
+/* Return whether a path identifies a directory. */
+bool pp_file_is_directory(const char *path);
+
+/* Return seconds since the Unix epoch, or zero if unavailable. */
+uint32_t pp_time_unix_seconds(void);
+
+/* Report a fatal Zig error without pulling in Zig's default I/O backend. */
+void pp_panic(const char *message);
 
 #pragma clang assume_nonnull end
 
