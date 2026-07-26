@@ -437,8 +437,11 @@ const OpenVPNConnection = struct {
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         log.write(.notice, "Session did start");
-        const remote_address = api.Address.parseRaw(remote_endpoint.address) orelse unreachable;
-        log.writef(.info, "\tEndpoint: {s}", .{remote_address});
+        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
+            self.failTunnelSetup(session, .invalidValue);
+            return;
+        };
+        log.writef(.info, "\tEndpoint: {s}", .{address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
             remote_endpoint.proto.socket_type.raw(),
             remote_endpoint.proto.port,
@@ -459,10 +462,6 @@ const OpenVPNConnection = struct {
         };
         defer NetworkSettingsBuilder.deinitModules(self.allocator, modules);
 
-        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
-            self.failTunnelSetup(session, .invalidValue);
-            return;
-        };
         const info = api.TunnelRemoteInfoWrapper{
             .profile = self.profile.*,
             .original_module_id = self.module_id,
