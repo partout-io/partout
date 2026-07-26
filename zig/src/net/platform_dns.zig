@@ -15,7 +15,7 @@ const log = core.logging;
 const DNSRecord = sandbox.DNSRecord;
 const DNSResolver = sandbox.DNSResolver;
 const ReachabilityInfo = io.ReachabilityInfo;
-const ResolveFn = *const fn ([*:0]const u8, *const c.addrinfo, ?*const ReachabilityInfo, *[*c]c.addrinfo) c_int;
+const ResolveFn = *const fn ([:0]const u8, *const c.addrinfo, ?*const ReachabilityInfo, *[*c]c.addrinfo) c_int;
 
 // Timed-out slots remain occupied until their uncancellable query returns.
 const max_pending_queries = 3;
@@ -310,12 +310,12 @@ const Query = struct {
 };
 
 fn resolveNative(
-    hostname: [*:0]const u8,
+    hostname: [:0]const u8,
     hints: *const c.addrinfo,
     reachability: ?*const ReachabilityInfo,
     result: *[*c]c.addrinfo,
 ) c_int {
-    return c.pp_dns_resolve(hostname, null, hints, reachability, result);
+    return c.pp_dns_resolve(hostname.ptr, null, hints, reachability, result);
 }
 
 fn resolveBlock(

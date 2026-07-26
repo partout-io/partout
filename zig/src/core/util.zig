@@ -62,8 +62,8 @@ pub fn appendOwned(
     try list.append(allocator, copy);
 }
 
-/// Returns a slice from a C string.
-pub fn borrowedCString(ptr: [*:0]const u8) []const u8 {
+/// Returns a borrowed sentinel-terminated slice from a C string.
+pub fn borrowedCString(ptr: [*:0]const u8) [:0]const u8 {
     return std.mem.span(ptr);
 }
 
@@ -94,9 +94,9 @@ pub fn containsOnly(value: []const u8, allowed: []const u8) bool {
 
 /// Returns an allocator-owned path to the system temporary directory.
 pub fn defaultCacheDir(allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
-    const env_names = [_][*:0]const u8{ "TMPDIR", "TMP", "TEMP" };
+    const env_names = [_][:0]const u8{ "TMPDIR", "TMP", "TEMP" };
     for (env_names) |name| {
-        const value = std.c.getenv(name) orelse continue;
+        const value = std.c.getenv(name.ptr) orelse continue;
         const path = std.mem.span(value);
         if (path.len > 0) return allocator.dupe(u8, path);
     }
@@ -249,14 +249,13 @@ pub fn trim(value: []const u8) []const u8 {
     return std.mem.trim(u8, value, " \r\t\n");
 }
 
-/// Runs a callback with a slice temporarily remapped to a C string.
+/// Runs a callback with a borrowed, null-terminated slice.
+///
+/// The callback must not retain the pointer after it returns.
 pub fn withCString(
-    value: []const u8,
+    value: [:0]const u8,
     callback: *const fn (?*anyopaque, [*c]const u8) callconv(.c) void,
     callback_ctx: ?*anyopaque,
 ) void {
-    var c_value: TemporaryCString = .{};
-    c_value.init(std.heap.c_allocator, value) catch return;
-    defer c_value.deinit();
-    callback(callback_ctx, c_value.ptr());
+    callback(callback_ctx, value.ptr);
 }

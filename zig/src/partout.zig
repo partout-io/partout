@@ -24,14 +24,14 @@ const util = core.util;
 const allocator = std.heap.c_allocator;
 const identifier = "io.partout";
 const version = "0.152.2";
-const version_identifier: [*:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version });
+const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version });
 
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
 // var daemon_runtime = DaemonRuntime{};
 var daemon_runtime: ?*abi.DaemonRuntime = null;
 
 pub export fn partout_version() callconv(.c) [*:0]const u8 {
-    return version_identifier;
+    return version_identifier.ptr;
 }
 
 pub export fn partout_init(args_pointer: ?*const c.partout_init_args) callconv(.c) void {

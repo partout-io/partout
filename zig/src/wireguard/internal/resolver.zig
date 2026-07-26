@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-const core = @import("../core/exports.zig");
-const net = @import("../net/exports.zig");
+const core = @import("../../core/exports.zig");
+const net = @import("../../net/exports.zig");
 
 const api = core.api;
 const log = core.logging;
@@ -149,7 +149,7 @@ pub const PeerEndpointResolver = struct {
         const reachability = if (self.factory) |factory| factory.currentReachability() else null;
         var failures: usize = 0;
 
-        // ZIGME: Swift resolves peer hostnames concurrently with a task group.
+        // FIXME: #526, Swift resolves peer hostnames concurrently with a task group.
         // This simpler loop makes DNS timeouts additive when several peers are
         // unreachable; use bounded concurrent resolution if that becomes a
         // measurable startup problem.

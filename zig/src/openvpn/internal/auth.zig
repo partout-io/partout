@@ -199,7 +199,7 @@ pub const PRF = struct {
     fn keysHash(
         allocator: std.mem.Allocator,
         functions: c_crypto.pp_crypto_fnt,
-        digest_name: [*:0]const u8,
+        digest_name: [:0]const u8,
         secret: []const u8,
         seed: []const u8,
         size: usize,
@@ -231,7 +231,7 @@ pub const PRF = struct {
     fn hmac(
         allocator: std.mem.Allocator,
         functions: c_crypto.pp_crypto_fnt,
-        digest_name: [*:0]const u8,
+        digest_name: [:0]const u8,
         secret: []const u8,
         data: []const u8,
     ) !ZeroingData {
@@ -241,7 +241,7 @@ pub const PRF = struct {
         var context = c_crypto.pp_hmac_ctx{
             .dst = buffer.bytes.ptr,
             .dst_len = buffer.bytes.len,
-            .digest_name = digest_name,
+            .digest_name = digest_name.ptr,
             .secret = secret.ptr,
             .secret_len = secret.len,
             .data = data.ptr,

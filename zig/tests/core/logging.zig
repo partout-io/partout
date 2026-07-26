@@ -84,6 +84,42 @@ test "external logger callback receives log messages" {
     try std.testing.expect(TestLogger.saw_message);
 }
 
+test "sentinel log messages cross the C callback without copying" {
+    const TestLogger = struct {
+        var message_address: usize = 0;
+
+        fn log(_: c_int, message: [*:0]const u8) callconv(.c) void {
+            message_address = @intFromPtr(message);
+        }
+    };
+
+    const message: [:0]const u8 = "borrowed";
+    logging.init(false, TestLogger.log);
+    defer logging.deinit();
+
+    logging.write(.notice, message);
+
+    try std.testing.expectEqual(@intFromPtr(message.ptr), TestLogger.message_address);
+}
+
+test "C log messages are forwarded without scanning or copying" {
+    const TestLogger = struct {
+        var message_address: usize = 0;
+
+        fn log(_: c_int, message: [*:0]const u8) callconv(.c) void {
+            message_address = @intFromPtr(message);
+        }
+    };
+
+    const message: [:0]const u8 = "borrowed";
+    logging.init(false, TestLogger.log);
+    defer logging.deinit();
+
+    logging.writeCString(.notice, message.ptr);
+
+    try std.testing.expectEqual(@intFromPtr(message.ptr), TestLogger.message_address);
+}
+
 test "duration helpers log compact time representations" {
     CapturingLogger.reset();
     logging.init(false, CapturingLogger.log);

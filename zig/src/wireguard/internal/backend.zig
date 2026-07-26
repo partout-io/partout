@@ -4,9 +4,9 @@
 
 const std = @import("std");
 
-const c_common = @import("../c/exports.zig").common;
-const core = @import("../core/exports.zig");
-const net = @import("../net/exports.zig");
+const c_common = @import("../../c/exports.zig").common;
+const core = @import("../../core/exports.zig");
+const net = @import("../../net/exports.zig");
 const log = core.logging;
 const util = core.util;
 
@@ -34,10 +34,10 @@ pub const Backend = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        turn_on: *const fn (?*anyopaque, std.mem.Allocator, []const u8, StartTunnel) Error!i32,
+        turn_on: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnel) Error!i32,
         turn_off: *const fn (?*anyopaque, i32) void,
         get_config: *const fn (?*anyopaque, std.mem.Allocator, i32) Error!?[]u8,
-        set_config: *const fn (?*anyopaque, std.mem.Allocator, i32, []const u8) Error!i64,
+        set_config: *const fn (?*anyopaque, std.mem.Allocator, i32, [:0]const u8) Error!i64,
         socket_descriptors: *const fn (?*anyopaque, std.mem.Allocator, i32) Error![]net.SocketDescriptor,
         bump_sockets: *const fn (?*anyopaque, i32, bool) void,
         disable_roaming: *const fn (?*anyopaque, i32) void,
@@ -46,7 +46,7 @@ pub const Backend = struct {
     pub fn turnOn(
         self: Backend,
         allocator: std.mem.Allocator,
-        settings: []const u8,
+        settings: [:0]const u8,
         tunnel: StartTunnel,
     ) Error!i32 {
         return self.vtable.turn_on(self.ptr, allocator, settings, tunnel);
@@ -68,7 +68,7 @@ pub const Backend = struct {
         self: Backend,
         allocator: std.mem.Allocator,
         handle: i32,
-        settings: []const u8,
+        settings: [:0]const u8,
     ) Error!i64 {
         return self.vtable.set_config(self.ptr, allocator, handle, settings);
     }
@@ -107,15 +107,11 @@ const go_backend_vtable = Backend.VTable{
 fn cTurnOn(
     _: ?*anyopaque,
     allocator: std.mem.Allocator,
-    settings: []const u8,
+    settings: [:0]const u8,
     tunnel: StartTunnel,
 ) Error!i32 {
     if (c.pp_wg_init() != 0) return error.BackendUnavailable;
     c.pp_wg_set_logger(cLog, null);
-
-    var c_settings: util.TemporaryCString = .{};
-    try c_settings.init(allocator, settings);
-    defer c_settings.deinit();
 
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
@@ -124,11 +120,11 @@ fn cTurnOn(
         var c_ifname: util.TemporaryCString = .{};
         try c_ifname.init(allocator, ifname);
         defer c_ifname.deinit();
-        return c.pp_wg_turn_on(c_settings.ptr(), c_ifname.ptr());
+        return c.pp_wg_turn_on(settings.ptr, c_ifname.ptr());
     }
 
     const fd = tunnel.descriptor() orelse return error.CannotLocateTunnelFileDescriptor;
-    return c.pp_wg_turn_on(c_settings.ptr(), fd);
+    return c.pp_wg_turn_on(settings.ptr, fd);
 }
 
 fn cLog(
@@ -137,8 +133,8 @@ fn cLog(
     message: [*c]const u8,
 ) callconv(.c) void {
     if (message == null) return;
-    const text = std.mem.trimEnd(u8, std.mem.span(message), "\r\n");
-    log.write(if (level == 1) .err else .debug, text);
+    const message_z: [*:0]const u8 = @ptrCast(message);
+    log.writeCString(if (level == 1) .err else .debug, message_z);
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {
@@ -157,14 +153,11 @@ fn cGetConfig(
 
 fn cSetConfig(
     _: ?*anyopaque,
-    allocator: std.mem.Allocator,
+    _: std.mem.Allocator,
     handle: i32,
-    settings: []const u8,
+    settings: [:0]const u8,
 ) Error!i64 {
-    var c_settings: util.TemporaryCString = .{};
-    try c_settings.init(allocator, settings);
-    defer c_settings.deinit();
-    return c.pp_wg_set_config(handle, c_settings.ptr());
+    return c.pp_wg_set_config(handle, settings.ptr);
 }
 
 fn cSocketDescriptors(

@@ -4,7 +4,7 @@
 
 const std = @import("std");
 
-const core = @import("../core/exports.zig");
+const core = @import("../../core/exports.zig");
 const api = core.api;
 
 const resolver = @import("resolver.zig");
@@ -15,7 +15,7 @@ pub fn buildConfiguration(
     allocator: std.mem.Allocator,
     configuration: *const api.WireGuardConfiguration,
     resolved_endpoints: []const resolver.ResolvedEndpoint,
-) BuildConfigurationError![]u8 {
+) BuildConfigurationError![:0]u8 {
     var aw: std.Io.Writer.Allocating = .init(allocator);
     errdefer aw.deinit();
     const writer = &aw.writer;
@@ -62,14 +62,14 @@ pub fn buildConfiguration(
         }
     }
 
-    return aw.toOwnedSlice();
+    return aw.toOwnedSliceSentinel(0);
 }
 
 pub fn buildEndpointConfiguration(
     allocator: std.mem.Allocator,
     configuration: *const api.WireGuardConfiguration,
     resolved_endpoints: []const resolver.ResolvedEndpoint,
-) BuildConfigurationError![]u8 {
+) BuildConfigurationError![:0]u8 {
     var aw: std.Io.Writer.Allocating = .init(allocator);
     errdefer aw.deinit();
     const writer = &aw.writer;
@@ -86,7 +86,7 @@ pub fn buildEndpointConfiguration(
         try writer.print("endpoint={s}\n", .{endpoint_text});
     }
 
-    return aw.toOwnedSlice();
+    return aw.toOwnedSliceSentinel(0);
 }
 
 pub fn parseRuntimeDataCount(text: []const u8) ?api.DataCount {

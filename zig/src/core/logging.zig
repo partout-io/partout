@@ -31,7 +31,7 @@ var mutex: concurrency.Mutex = .{};
 var logs_private_data: bool = false;
 var external_logger: Callback = null;
 
-// ZIGME: Suppress until only Zig ABI
+// FIXME: #527, Suppress until only Zig ABI
 /// C ABI entry point used by foreign callers to forward a log message.
 // pub export fn partout_log(
 //     level: c_int,
@@ -43,16 +43,8 @@ var external_logger: Callback = null;
 //         return;
 //     };
 //     mutex.unlock();
-//     dispatch(logger, level, message);
+//     dispatchCString(logger, level, message);
 // }
-
-fn dispatch(
-    logger: Logger,
-    level: c_int,
-    message: [*:0]const u8,
-) void {
-    logger(level, message);
-}
 
 /// Configures global logging state.
 ///
@@ -97,24 +89,15 @@ pub fn sensitive(value: anytype) SensitiveValue(@TypeOf(value)) {
 
 /// Writes a core log message.
 ///
-/// Messages are dropped when no logger is installed or when allocating the
-/// zero-terminated copy fails.
-pub fn write(level: Level, message: []const u8) void {
+/// The borrowed message remains valid for the duration of the callback.
+pub fn write(level: Level, message: [:0]const u8) void {
     mutex.lock();
     const logger = external_logger orelse {
         mutex.unlock();
         return;
     };
     mutex.unlock();
-    writeTo(logger, level, message);
-}
-
-fn writeTo(logger: Logger, level: Level, message: []const u8) void {
-    const allocator = std.heap.c_allocator;
-    var c_message: util.TemporaryCString = .{};
-    c_message.init(allocator, message) catch return;
-    defer c_message.deinit();
-    dispatch(logger, @intFromEnum(level), c_message.ptr());
+    dispatchSlice(logger, @intFromEnum(level), message);
 }
 
 /// Formats and writes a core log message.
@@ -139,8 +122,35 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
         args,
         private_data,
     ) catch return;
-    const message = std.fmt.allocPrint(allocator, fmt, prepared) catch return;
-    writeTo(logger, level, message);
+    const message = std.fmt.allocPrintSentinel(allocator, fmt, prepared, 0) catch return;
+    dispatchSlice(logger, @intFromEnum(level), message);
+}
+
+/// Forwards a borrowed C string directly to the configured C logger.
+pub fn writeCString(level: Level, message: [*:0]const u8) void {
+    mutex.lock();
+    const logger = external_logger orelse {
+        mutex.unlock();
+        return;
+    };
+    mutex.unlock();
+    dispatchCString(logger, @intFromEnum(level), message);
+}
+
+fn dispatchSlice(
+    logger: Logger,
+    level: c_int,
+    message: [:0]const u8,
+) void {
+    dispatchCString(logger, level, message.ptr);
+}
+
+fn dispatchCString(
+    logger: Logger,
+    level: c_int,
+    message: [*:0]const u8,
+) void {
+    logger(level, message);
 }
 
 /// Writes a duration in seconds using a compact `h`, `m`, and `s`

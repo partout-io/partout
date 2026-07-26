@@ -5,15 +5,16 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const adapter = @import("source").wireguard_adapter;
-const backend_mod = @import("source").wireguard_backend;
+const wireguard_internal = @import("source").wireguard_internal;
+const adapter = wireguard_internal.adapter;
+const backend_mod = wireguard_internal.backend;
 const connection = @import("source").wireguard_connection;
 const conn = @import("source").net_connection;
 const core = @import("source").core;
 const io = @import("source").net_io;
 const sandbox = @import("source").net_sandbox;
-const tunnel_info = @import("source").wireguard_tunnel_info;
-const uapi = @import("source").wireguard_uapi;
+const tunnel_info = wireguard_internal.tunnel_info;
+const uapi = wireguard_internal.uapi;
 
 const api = core.api;
 const AtomicBool = std.atomic.Value(bool);
@@ -40,6 +41,7 @@ test "WireGuard connection builds UAPI configuration" {
     );
     defer allocator.free(configuration_text);
 
+    try std.testing.expectEqual(@as(u8, 0), configuration_text[configuration_text.len]);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "private_key=48ccbdcd1d0a520a98a99d297322f7b0998992636453c3c0e669ebf67877cd4b\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "listen_port=51820\n") != null);
     try std.testing.expect(std.mem.indexOf(u8, configuration_text, "replace_peers=true\n") != null);
@@ -63,7 +65,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
         else => unreachable,
     };
 
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var info = try tunnel_info.TunnelRemoteInfoBuilder.init(
         allocator,
         &profile,
@@ -88,7 +90,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
         else => return error.TestUnexpectedResult,
     };
     try std.testing.expect(core.isGeneratedId(ip.id[0..]));
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     try std.testing.expectEqual(configuration.?.interface.dns.?.id, dns.id);
     try std.testing.expectEqual(@as(?i32, 1420), ip.mtu);
     try std.testing.expectEqualStrings("1.1.1.1", dns.servers[0].raw);
@@ -130,7 +132,7 @@ test "WireGuard connection folds active IP and VPN DNS routes into every peer" {
         else => unreachable,
     };
 
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var merged = try connection.testing.configurationWithActiveModules(
         allocator,
         &source_configuration.?,
@@ -582,7 +584,7 @@ const fake_backend_vtable = backend_mod.Backend.VTable{
 fn fakeTurnOn(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
-    settings: []const u8,
+    settings: [:0]const u8,
     _: backend_mod.StartTunnel,
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
@@ -606,7 +608,7 @@ fn fakeGetConfig(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_m
     );
 }
 
-fn fakeSetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32, settings: []const u8) backend_mod.Error!i64 {
+fn fakeSetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.set_config_count += 1;
     if (self.last_set_config) |value| allocator.free(value);

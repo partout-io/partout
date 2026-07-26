@@ -71,7 +71,7 @@ pub const TLSWrapper = struct {
         const create_tls = functions.create orelse return error.TLSFailure;
         const free_tls = functions.free orelse return error.TLSFailure;
 
-        const ca_path_plain = try std.fmt.allocPrint(
+        const ca_path = try std.fmt.allocPrintSentinel(
             allocator,
             "{s}{s}{s}",
             .{
@@ -79,9 +79,8 @@ pub const TLSWrapper = struct {
                 if (std.mem.endsWith(u8, parameters.caches_directory, "/")) "" else "/",
                 parameters.ca_filename,
             },
+            0,
         );
-        defer allocator.free(ca_path_plain);
-        const ca_path = try allocator.dupeZ(u8, ca_path_plain);
         errdefer allocator.free(ca_path);
         try writeCA(ca_path, ca.pem);
         errdefer _ = c_common.remove(ca_path.ptr);

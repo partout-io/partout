@@ -31,7 +31,7 @@ test "DNS resolver times out and caps abandoned queries" {
         var release = std.atomic.Value(bool).init(false);
 
         fn resolve(
-            _: [*:0]const u8,
+            _: [:0]const u8,
             _: *const c.addrinfo,
             _: ?*const ReachabilityInfo,
             _: *[*c]c.addrinfo,

@@ -9,8 +9,8 @@ const net = @import("../net/exports.zig");
 const api = core.api;
 const log = core.logging;
 
-const adapter_mod = @import("adapter.zig");
-const impl = @import("backend.zig");
+const adapter_mod = @import("internal/adapter.zig");
+const impl = @import("internal/backend.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
 
@@ -63,7 +63,7 @@ const WireGuardConnection = struct {
         module: net.ConnectionModule,
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
-        // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+        // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
         const base_configuration = switch (module.module.*) {
             .WireGuard => |*wireguard| blk: {
                 const configuration = if (wireguard.configuration) |*value|
@@ -128,7 +128,6 @@ const WireGuardConnection = struct {
 
     fn start(
         self: *WireGuardConnection,
-        allocator: std.mem.Allocator,
         events: net.Connection.Events,
     ) net.ConnectionStartError!bool {
         if (!self.adapter.isStopped()) {
@@ -141,7 +140,7 @@ const WireGuardConnection = struct {
         events.status(events.ctx, .connecting);
         errdefer events.status(events.ctx, .disconnected);
 
-        self.adapter.start(allocator) catch |err| {
+        self.adapter.start(self.allocator) catch |err| {
             switch (err) {
                 error.CannotLocateTunnelFileDescriptor => {
                     log.write(
@@ -175,7 +174,7 @@ const WireGuardConnection = struct {
             self.adapter.interfaceName() orelse "unknown",
         });
         events.status(events.ctx, .connected);
-        self.reportDataCount(allocator, events);
+        self.reportDataCount(events);
         self.startDataCountTimer() catch |err| {
             log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
         };
@@ -184,7 +183,6 @@ const WireGuardConnection = struct {
 
     fn stop(
         self: *WireGuardConnection,
-        allocator: std.mem.Allocator,
         timeout_ms: u32,
         events: net.Connection.Events,
     ) void {
@@ -200,18 +198,17 @@ const WireGuardConnection = struct {
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         events.status(events.ctx, .disconnecting);
-        self.adapter.stop(allocator);
+        self.adapter.stop(self.allocator);
         events.status(events.ctx, .disconnected);
     }
 
     fn networkChange(
         self: *WireGuardConnection,
-        allocator: std.mem.Allocator,
         reachability: net.ReachabilityInfo,
         events: net.Connection.Events,
     ) void {
         self.cancelTemporaryShutdownRetry();
-        switch (self.adapter.didUpdateReachable(allocator, reachability.reachable)) {
+        switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
             .resumed => events.status(events.ctx, .connected),
             .retry => self.scheduleTemporaryShutdownRetry(),
@@ -220,7 +217,6 @@ const WireGuardConnection = struct {
 
     fn betterPath(
         _: *WireGuardConnection,
-        _: std.mem.Allocator,
         _: net.Connection.Events,
     ) void {
         log.write(.debug, "Better path notification ignored");
@@ -228,17 +224,13 @@ const WireGuardConnection = struct {
 
     fn reportDataCount(
         self: *const WireGuardConnection,
-        allocator: std.mem.Allocator,
         events: net.Connection.Events,
     ) void {
-        events.data_count(events.ctx, self.readDataCount(allocator) orelse return);
+        events.data_count(events.ctx, self.readDataCount() orelse return);
     }
 
-    fn readDataCount(
-        self: *const WireGuardConnection,
-        allocator: std.mem.Allocator,
-    ) ?api.DataCount {
-        return self.adapter.dataCountFromRuntimeConfig(allocator) catch |err| {
+    fn readDataCount(self: *const WireGuardConnection) ?api.DataCount {
+        return self.adapter.dataCountFromRuntimeConfig(self.allocator) catch |err| {
             log.writef(.debug, "Unable to fetch runtime configuration: {s}", .{@errorName(err)});
             return null;
         };
@@ -275,7 +267,7 @@ const WireGuardConnection = struct {
         if (!self.data_count_timer_active) return;
         const events = self.events orelse return;
 
-        self.reportDataCount(self.allocator, events);
+        self.reportDataCount(events);
         if (!self.data_count_timer_active) return;
         self.data_count_timer.init(self.data_count_interval_ms, onDataCountTimer, self) catch |err| {
             log.writef(.err, "Unable to reschedule data count timer: {s}", .{@errorName(err)});
@@ -463,7 +455,7 @@ const wireguard_connection_vtable = net.Connection.VTable{
 
 fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.start(self.allocator, events);
+    return self.start(events);
 }
 
 fn stop(
@@ -472,7 +464,7 @@ fn stop(
     events: net.Connection.Events,
 ) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.stop(self.allocator, timeout_ms, events);
+    self.stop(timeout_ms, events);
 }
 
 fn networkChange(
@@ -481,12 +473,12 @@ fn networkChange(
     events: net.Connection.Events,
 ) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.networkChange(self.allocator, reachability, events);
+    self.networkChange(reachability, events);
 }
 
 fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.betterPath(self.allocator, events);
+    self.betterPath(events);
 }
 
 fn deinit(ptr: *anyopaque) void {
