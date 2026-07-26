@@ -92,9 +92,10 @@ pub const Drainer = struct {
 
 /// Reusable single-threaded executor for delayed, one-shot callbacks.
 ///
-/// `init` manages one replaceable callback, whereas `schedule` manages several
-/// independent callbacks through caller-owned `Scheduled` handles. The two
-/// scheduling modes must not be mixed while either mode has pending work.
+/// `scheduleReplacing` manages one replaceable callback, whereas
+/// `scheduleAppending` manages several independent callbacks through
+/// caller-owned `Scheduled` handles. The two scheduling modes must not be mixed
+/// while either mode has pending work.
 /// Callbacks run serially on the same worker thread and never under the
 /// executor mutex.
 ///
@@ -102,7 +103,7 @@ pub const Drainer = struct {
 /// until the corresponding callback completes or is cancelled. `deinit` joins
 /// the worker and therefore must not be called from one of its callbacks.
 pub const RunAfter = struct {
-    /// Callback used by the replaceable `init` scheduling mode.
+    /// Callback used by `scheduleReplacing`.
     pub const Callback = *const fn (?*anyopaque) void;
 
     /// Caller-owned handle for an independent one-shot callback.
@@ -128,7 +129,7 @@ pub const RunAfter = struct {
         /// after the callback returns.
         pub const Callback = *const fn (*Scheduled, Outcome) void;
 
-        /// Borrowed application context supplied to `schedule`.
+        /// Borrowed application context supplied to `scheduleAppending`.
         context: ?*anyopaque = null,
 
         /// Callback to notify when this handle reaches a terminal outcome.
@@ -139,6 +140,24 @@ pub const RunAfter = struct {
 
         /// Private intrusive linkage used by the executor's pending list.
         next: ?*Scheduled = null,
+    };
+
+    /// Internal scheduling operation.
+    const Schedule = union(enum) {
+        /// Replaces a pending callback in the executor's single callback slot.
+        replace: struct {
+            delay_ms: u64,
+            callback: Callback,
+            context: ?*anyopaque,
+        },
+
+        /// Appends an independent callback through a caller-owned handle.
+        append: struct {
+            scheduled: *Scheduled,
+            delay_ms: u64,
+            callback: Scheduled.Callback,
+            context: ?*anyopaque,
+        },
     };
 
     /// Lifecycle of the replaceable callback slot and worker thread.
@@ -207,50 +226,84 @@ pub const RunAfter = struct {
         try self.startLocked();
     }
 
-    /// Schedules the replaceable one-shot callback.
+    /// Schedules a one-shot callback, replacing a pending callback.
     ///
-    /// A pending callback previously submitted with `init` is silently
-    /// replaced. If a callback is already running, the new callback waits for
-    /// it to return before its own delay begins being serviced. This mode must
-    /// not be used while independent callbacks from `schedule` are pending.
-    /// The function starts the worker lazily and reports failure to spawn it.
-    pub fn init(
+    /// If a callback is already running, the replacement waits for it to return
+    /// before its own delay begins being serviced. This mode must not be used
+    /// while callbacks submitted with `scheduleAppending` are pending. The
+    /// function starts the worker lazily and reports failure to spawn it.
+    pub fn scheduleReplacing(
         self: *RunAfter,
         delay_ms: u64,
         callback: Callback,
-        callback_ctx: ?*anyopaque,
+        context: ?*anyopaque,
     ) std.Thread.SpawnError!void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-
-        std.debug.assert(self.state != .stopping);
-        std.debug.assert(!self.scheduling);
-        try self.startLocked();
-
-        self.initLocked(delay_ms, callback, callback_ctx);
+        return self.schedule(.{ .replace = .{
+            .delay_ms = delay_ms,
+            .callback = callback,
+            .context = context,
+        } });
     }
 
-    /// Adds an independent one-shot callback without replacing earlier ones.
+    /// Appends an independent one-shot callback without replacing earlier ones.
     ///
     /// Delays are best-effort and quantized to `scheduler_resolution_ms`; a
     /// callback may run late but is given a full extra tick so it does not run
     /// early at a tick boundary. This mode must not be started while a callback
-    /// submitted with `init` is pending. The function starts the worker lazily
-    /// and reports failure to spawn it.
-    pub fn schedule(
+    /// submitted with `scheduleReplacing` is pending. The function starts the
+    /// worker lazily and reports failure to spawn it.
+    pub fn scheduleAppending(
         self: *RunAfter,
         scheduled: *Scheduled,
         delay_ms: u64,
         callback: Scheduled.Callback,
         context: ?*anyopaque,
     ) std.Thread.SpawnError!void {
+        return self.schedule(.{ .append = .{
+            .scheduled = scheduled,
+            .delay_ms = delay_ms,
+            .callback = callback,
+            .context = context,
+        } });
+    }
+
+    /// Dispatches a scheduling operation.
+    fn schedule(self: *RunAfter, request: Schedule) std.Thread.SpawnError!void {
         self.mutex.lock();
         defer self.mutex.unlock();
 
         std.debug.assert(self.state != .stopping);
-        std.debug.assert(self.scheduling or self.state != .scheduled);
-        try self.startLocked();
+        switch (request) {
+            .replace => |options| {
+                std.debug.assert(!self.scheduling);
+                try self.startLocked();
+                self.replaceLocked(
+                    options.delay_ms,
+                    options.callback,
+                    options.context,
+                );
+            },
+            .append => |options| {
+                std.debug.assert(self.scheduling or self.state != .scheduled);
+                try self.startLocked();
+                self.appendLocked(
+                    options.scheduled,
+                    options.delay_ms,
+                    options.callback,
+                    options.context,
+                );
+            },
+        }
+    }
 
+    /// Appends an independent callback while `mutex` is held.
+    fn appendLocked(
+        self: *RunAfter,
+        scheduled: *Scheduled,
+        delay_ms: u64,
+        callback: Scheduled.Callback,
+        context: ?*anyopaque,
+    ) void {
         scheduled.* = .{
             .context = context,
             .callback = callback,
@@ -267,16 +320,16 @@ pub const RunAfter = struct {
 
         if (!self.scheduling) {
             self.scheduling = true;
-            self.initLocked(scheduler_resolution_ms, runScheduled, self);
+            self.replaceLocked(scheduler_resolution_ms, runScheduled, self);
         }
     }
 
     /// Cancels pending callbacks without stopping the worker thread.
     ///
     /// A callback that is already running is allowed to finish. Any queued
-    /// successor from `init` is discarded, and every independent callback that
-    /// is still pending is synchronously notified with `.cancelled` after the
-    /// executor mutex is released.
+    /// successor from `scheduleReplacing` is discarded, and every independent
+    /// callback that is still pending is synchronously notified with
+    /// `.cancelled` after the executor mutex is released.
     pub fn cancel(self: *RunAfter) void {
         self.mutex.lock();
         const cancelled = self.cancelLocked();
@@ -424,7 +477,7 @@ pub const RunAfter = struct {
         }
 
         if (self.scheduled_head != null) {
-            self.initLocked(scheduler_resolution_ms, runScheduled, self);
+            self.replaceLocked(scheduler_resolution_ms, runScheduled, self);
         } else {
             self.scheduling = false;
         }
@@ -437,7 +490,7 @@ pub const RunAfter = struct {
     ///
     /// Incrementing `generation` interrupts any delay currently being observed
     /// by the worker.
-    fn initLocked(
+    fn replaceLocked(
         self: *RunAfter,
         delay_ms: u64,
         callback: Callback,

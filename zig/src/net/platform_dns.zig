@@ -97,7 +97,7 @@ pub const PlatformDNS = struct {
         }, reachability, resolve_fn) catch |err| return err;
 
         var timer: core.RunAfter = .{};
-        timer.init(timeout_ms, Query.timeout, query) catch |err| {
+        timer.scheduleReplacing(timeout_ms, Query.timeout, query) catch |err| {
             timer.deinit();
             query_pool.releaseUnstarted(query);
             log.writef(.err, "Unable to start DNS timeout: {s}", .{@errorName(err)});

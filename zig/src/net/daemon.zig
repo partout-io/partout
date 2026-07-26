@@ -585,7 +585,7 @@ pub const Daemon = struct {
         log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
 
         // Contextually cancels the previous attempt
-        self.resume_gate_timer.init(delay_ms, onResumeGate, self) catch |err| {
+        self.resume_gate_timer.scheduleReplacing(delay_ms, onResumeGate, self) catch |err| {
             log.writef(.err, "Unable to schedule resume connection gate, resume now: {s}", .{@errorName(err)});
             self.doResumeGate();
         };

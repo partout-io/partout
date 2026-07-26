@@ -183,7 +183,7 @@ test "drainer waits until in-flight work completes" {
 test "RunAfter runs callback after delay" {
     var did_run = AtomicBool.init(false);
     var run_after = core.RunAfter{};
-    try run_after.init(1, storeTrue, &did_run);
+    try run_after.scheduleReplacing(1, storeTrue, &did_run);
     defer run_after.deinit();
 
     waitUntil(&did_run);
@@ -192,7 +192,7 @@ test "RunAfter runs callback after delay" {
 test "RunAfter cancel prevents callback" {
     var did_run = AtomicBool.init(false);
     var run_after = core.RunAfter{};
-    try run_after.init(100, storeTrue, &did_run);
+    try run_after.scheduleReplacing(100, storeTrue, &did_run);
 
     run_after.cancel();
     run_after.deinit();
@@ -200,12 +200,12 @@ test "RunAfter cancel prevents callback" {
     try std.testing.expect(!did_run.load(.acquire));
 }
 
-test "RunAfter init cancels previous callback" {
+test "RunAfter replace cancels previous callback" {
     var first_did_run = AtomicBool.init(false);
     var second_did_run = AtomicBool.init(false);
     var run_after = core.RunAfter{};
-    try run_after.init(100, storeTrue, &first_did_run);
-    try run_after.init(1, storeTrue, &second_did_run);
+    try run_after.scheduleReplacing(100, storeTrue, &first_did_run);
+    try run_after.scheduleReplacing(1, storeTrue, &second_did_run);
     defer run_after.deinit();
 
     waitUntil(&second_did_run);
@@ -218,10 +218,10 @@ test "RunAfter reuses worker thread" {
     var run_after = core.RunAfter{};
     defer run_after.deinit();
 
-    try run_after.init(1, ThreadRecorder.record, &recorder);
+    try run_after.scheduleReplacing(1, ThreadRecorder.record, &recorder);
     waitUntil(&recorder.first_did_run);
 
-    try run_after.init(1, ThreadRecorder.record, &recorder);
+    try run_after.scheduleReplacing(1, ThreadRecorder.record, &recorder);
     waitUntil(&recorder.second_did_run);
 
     recorder.mutex.lock();
@@ -237,10 +237,10 @@ test "RunAfter can reschedule while callback is running" {
     defer run_after.deinit();
     defer recorder.first_can_finish.store(true, .release);
 
-    try run_after.init(1, BlockingRecorder.record, &recorder);
+    try run_after.scheduleReplacing(1, BlockingRecorder.record, &recorder);
     waitUntil(&recorder.first_did_start);
 
-    try run_after.init(1, BlockingRecorder.record, &recorder);
+    try run_after.scheduleReplacing(1, BlockingRecorder.record, &recorder);
     settleScheduler();
     try std.testing.expect(!recorder.second_did_run.load(.acquire));
 
@@ -256,8 +256,8 @@ test "RunAfter schedules independent one-shot callbacks" {
     var run_after = core.RunAfter{};
     defer run_after.deinit();
 
-    try run_after.schedule(&later, 100, ScheduledProbe.record, &later_probe);
-    try run_after.schedule(&earlier, 1, ScheduledProbe.record, &earlier_probe);
+    try run_after.scheduleAppending(&later, 100, ScheduledProbe.record, &later_probe);
+    try run_after.scheduleAppending(&earlier, 1, ScheduledProbe.record, &earlier_probe);
 
     waitUntil(&earlier_probe.elapsed);
     try std.testing.expect(!later_probe.elapsed.load(.acquire));
@@ -273,7 +273,7 @@ test "RunAfter cancel releases scheduled callbacks" {
     var run_after = core.RunAfter{};
     defer run_after.deinit();
 
-    try run_after.schedule(&scheduled, 100, ScheduledProbe.record, &probe);
+    try run_after.scheduleAppending(&scheduled, 100, ScheduledProbe.record, &probe);
     run_after.cancel();
 
     try std.testing.expect(probe.cancelled.load(.acquire));

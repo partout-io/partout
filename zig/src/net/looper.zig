@@ -1027,7 +1027,7 @@ pub const Looper = struct {
             .id = side_io.id,
         } });
         self.read_retries[index] = true;
-        self.scheduler.schedule(
+        self.scheduler.scheduleAppending(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,
@@ -1048,7 +1048,7 @@ pub const Looper = struct {
             .id = side_io.id,
         } });
         self.write_retries[index] = true;
-        self.scheduler.schedule(
+        self.scheduler.scheduleAppending(
             &node.timer,
             no_buf_retry_delay_ms,
             onScheduledCommand,

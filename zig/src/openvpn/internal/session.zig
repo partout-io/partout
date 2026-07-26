@@ -793,7 +793,7 @@ pub const Session = struct {
     }
 
     fn scheduleNegotiationTick(self: *Session) !void {
-        try self.negotiation_timer.init(
+        try self.negotiation_timer.scheduleReplacing(
             self.options.tick_interval_ms,
             onNegotiationTimer,
             self,
@@ -824,7 +824,7 @@ pub const Session = struct {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay);
-        try self.ping_timer.init(delay, onPingTimer, self);
+        try self.ping_timer.scheduleReplacing(delay, onPingTimer, self);
     }
 
     fn onPingTimer(raw: ?*anyopaque) void {

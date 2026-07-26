@@ -682,7 +682,7 @@ const DelayedConnection = struct {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
         self.start_thread = std.Thread.getCurrentId();
         events.status(events.ctx, .connecting);
-        self.timer.init(1, onTimer, self) catch return error.UnableToStart;
+        self.timer.scheduleReplacing(1, onTimer, self) catch return error.UnableToStart;
         events.status(events.ctx, .connected);
         return true;
     }
