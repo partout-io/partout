@@ -36,10 +36,9 @@ pub const MockSerializedExecutor = struct {
         return self;
     }
 
-    pub fn deinit(self: *MockSerializedExecutor) void {
-        self.actor.deinit();
+    pub fn destroy(self: *MockSerializedExecutor) void {
+        self.actor.destroy();
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 
@@ -85,7 +84,7 @@ pub const MockConnectionEnvironment = struct {
         allocator: std.mem.Allocator,
     ) !void {
         const executor = try MockSerializedExecutor.create(allocator);
-        errdefer executor.deinit();
+        errdefer executor.destroy();
         self.* = .{
             .looper = try net.Looper.init(allocator, .{
                 .on_finish = .{ .callback = onLooperFinish },
@@ -96,7 +95,7 @@ pub const MockConnectionEnvironment = struct {
 
     pub fn deinit(self: *MockConnectionEnvironment) void {
         self.looper.deinit();
-        self.executor.deinit();
+        self.executor.destroy();
     }
 
     pub fn serializedExecutor(
@@ -127,8 +126,8 @@ pub const MockRuntime = struct {
         runtime: *MockDaemonRuntime,
 
         fn finishTeardown(self: *const Instance, allocator: std.mem.Allocator) void {
-            self.daemon.deinit();
-            self.runtime.deinit(allocator);
+            self.daemon.destroy();
+            self.runtime.destroy(allocator);
             if (self.bindings) |*bindings| {
                 if (bindings.release) |release| {
                     release(bindings);
@@ -145,7 +144,7 @@ pub const MockRuntime = struct {
         const profile_json = util.cString(c_profile);
 
         const runtime = try MockDaemonRuntime.create(allocator, args);
-        errdefer runtime.deinit(allocator);
+        errdefer runtime.destroy(allocator);
 
         var profile = api.Profile.parse(allocator, profile_json) catch |profile_err| {
             return switch (profile_err) {
@@ -181,7 +180,7 @@ pub const MockRuntime = struct {
                 error.OutOfMemory => error.OutOfMemory,
             };
         };
-        errdefer new_daemon.deinit();
+        errdefer new_daemon.destroy();
 
         new_daemon.start() catch {
             return error.InvalidProfile;
@@ -258,7 +257,7 @@ pub const MockDaemonRuntime = struct {
         return self;
     }
 
-    pub fn deinit(self: *const MockDaemonRuntime, allocator: std.mem.Allocator) void {
+    pub fn destroy(self: *MockDaemonRuntime, allocator: std.mem.Allocator) void {
         self.registry.deinit(allocator);
         allocator.destroy(self);
     }
@@ -571,7 +570,7 @@ const mock_connection_vtable = net_conn.Connection.VTable{
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
-    .deinit = deinit,
+    .destroy = destroy,
 };
 
 fn mockTunnelConnectionCreate(
@@ -606,7 +605,7 @@ fn networkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connecti
 
 fn betterPath(_: *anyopaque, _: net_conn.Connection.Events) void {}
 
-fn deinit(ptr: *anyopaque) void {
+fn destroy(ptr: *anyopaque) void {
     const self: *MockConnection = @ptrCast(@alignCast(ptr));
     self.tunnel_info.deinit(self.allocator);
     self.allocator.destroy(self);
@@ -821,7 +820,7 @@ const daemon_mock_connection_vtable = net_conn.Connection.VTable{
     .stop = daemonMockStop,
     .network_change = daemonMockNetworkChange,
     .better_path = daemonMockBetterPath,
-    .deinit = daemonMockDeinit,
+    .destroy = daemonMockDestroy,
 };
 
 fn daemonMockStart(_: *anyopaque, events: net_conn.Connection.Events) net_conn.StartError!bool {
@@ -854,7 +853,7 @@ fn daemonMockNetworkChange(
     _: net_conn.Connection.Events,
 ) void {}
 
-fn daemonMockDeinit(ptr: *anyopaque) void {
+fn daemonMockDestroy(ptr: *anyopaque) void {
     const self: *DaemonMockConnection = @ptrCast(@alignCast(ptr));
     self.allocator.destroy(self);
 }
@@ -903,7 +902,7 @@ const blocking_connection_vtable = net_conn.Connection.VTable{
     .stop = blockingStop,
     .network_change = blockingNetworkChange,
     .better_path = blockingBetterPath,
-    .deinit = blockingDeinit,
+    .destroy = blockingDestroy,
 };
 
 fn blockingStart(_: *anyopaque, events: net_conn.Connection.Events) net_conn.StartError!bool {
@@ -930,7 +929,7 @@ fn blockingBetterPath(ptr: *anyopaque, _: net_conn.Connection.Events) void {
 
 fn blockingNetworkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connection.Events) void {}
 
-fn blockingDeinit(_: *anyopaque) void {}
+fn blockingDestroy(_: *anyopaque) void {}
 
 pub fn blockingConnectionImplementation(blocking_connection: *BlockingStopConnection) net_conn.ConnectionImplementation {
     return .{

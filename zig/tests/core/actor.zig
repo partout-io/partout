@@ -41,7 +41,7 @@ test "actor serializes sync and async messages" {
 
     var state = CounterState{};
     const actor = try CounterActor.create(allocator, &state);
-    defer actor.deinit();
+    defer actor.destroy();
 
     try actor.schedule(.{ .add = 2 });
     try actor.perform(.{ .add = 4 });
@@ -56,7 +56,7 @@ test "actor propagates errors and rejects messages after shutdown" {
 
     var state = CounterState{};
     const actor = try CounterActor.create(allocator, &state);
-    defer actor.deinit();
+    defer actor.destroy();
 
     try std.testing.expectError(error.Rejected, actor.perform(.fail));
 

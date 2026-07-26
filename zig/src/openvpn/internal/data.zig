@@ -321,11 +321,12 @@ pub const DataPathWrapper = struct {
         parameters: DataPathParameters,
         prf: *const PRF,
         seed: ZeroingData,
-    ) !DataPathWrapper {
-        const functions = c_exports_mod.cryptoFunctionTable(parameters.backend).enc;
+    ) Error!DataPathWrapper {
+        const functions = (c_exports_mod.cryptoFunctionTable(parameters.backend) catch
+            return error.UnsupportedAlgorithm).enc;
         const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
         _ = init_seed(seed.bytes.ptr, seed.bytes.len);
-        var keys = try prf.derive(allocator);
+        var keys = prf.derive(allocator) catch return error.CryptoFailure;
         defer keys.deinit(allocator);
         return createWithKeys(allocator, parameters, functions, &keys);
     }

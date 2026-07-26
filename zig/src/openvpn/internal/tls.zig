@@ -54,10 +54,11 @@ pub const TLSWrapper = struct {
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
     ) !*TLSWrapper {
+        const functions = (try c_exports_mod.cryptoFunctionTable(parameters.backend)).tls;
         return createWithFunctions(
             allocator,
             parameters,
-            c_exports_mod.cryptoFunctionTable(parameters.backend).tls,
+            functions,
         );
     }
 

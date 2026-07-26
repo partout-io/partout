@@ -15,7 +15,10 @@ pub const TunnelRemoteInfoBuilder = struct {
     module_id: api.UUID,
     configuration: *const api.WireGuardConfiguration,
 
-    pub const Error = std.mem.Allocator.Error || error{IdGeneration};
+    pub const Error = std.mem.Allocator.Error || error{
+        IdGeneration,
+        InvalidConfiguration,
+    };
 
     const Self = @This();
 
@@ -39,7 +42,7 @@ pub const TunnelRemoteInfoBuilder = struct {
 
         var profile = self.profile.clone(self.allocator) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidJson, error.InvalidModel, error.UnsupportedModel => unreachable,
+            error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.InvalidConfiguration,
         };
         errdefer profile.deinit(self.allocator);
 
@@ -50,7 +53,10 @@ pub const TunnelRemoteInfoBuilder = struct {
             // legitimately have zero endpoints or a different endpoint per
             // peer. Loopback is only a harmless settings placeholder; it is
             // never given to wg-go and cannot route onto the Internet.
-            .address = api.Address.parseRaw("127.0.0.1").?,
+            .address = .{
+                .raw = "127.0.0.1",
+                .family = .v4,
+            },
             .requires_virtual_device = builtin.os.tag != .windows,
             .modules = modules,
         };
@@ -62,7 +68,7 @@ pub const TunnelRemoteInfoBuilder = struct {
         // as Swift does so controller/reporting code can correlate it.
         return source.clone(self.allocator) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidJson, error.InvalidModel, error.UnsupportedModel => unreachable,
+            error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.InvalidConfiguration,
         };
     }
 
@@ -122,13 +128,19 @@ pub const TunnelRemoteInfoBuilder = struct {
     fn buildInterfaceRoute(self: Self, subnet: api.Subnet) Error!api.Route {
         const destination_text = subnet.networkRawAlloc(self.allocator) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidModel, error.Stringify => unreachable,
+            error.InvalidModel, error.Stringify => return error.InvalidConfiguration,
         };
         defer self.allocator.free(destination_text);
 
-        var destination = (try api.Subnet.parseRawAlloc(self.allocator, destination_text)) orelse unreachable;
+        var destination = (try api.Subnet.parseRawAlloc(
+            self.allocator,
+            destination_text,
+        )) orelse return error.InvalidConfiguration;
         errdefer destination.deinit(self.allocator);
-        const gateway = (try api.Address.parseRawAlloc(self.allocator, subnet.address.raw)) orelse unreachable;
+        const gateway = (try api.Address.parseRawAlloc(
+            self.allocator,
+            subnet.address.raw,
+        )) orelse return error.InvalidConfiguration;
         return .{
             .destination = destination,
             .gateway = gateway,
@@ -175,7 +187,10 @@ pub const TunnelRemoteInfoBuilder = struct {
 
     fn cloneSubnet(self: Self, subnet: api.Subnet, prefix: u8) Error!api.Subnet {
         return .{
-            .address = (try api.Address.parseRawAlloc(self.allocator, subnet.address.raw)) orelse unreachable,
+            .address = (try api.Address.parseRawAlloc(
+                self.allocator,
+                subnet.address.raw,
+            )) orelse return error.InvalidConfiguration,
             .prefix_length = prefix,
         };
     }

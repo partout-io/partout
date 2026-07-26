@@ -77,9 +77,10 @@ pub const PRF = struct {
         session_id: []const u8,
         remote_session_id: []const u8,
     ) !PRF {
+        const functions = try c_exports_mod.cryptoFunctionTable(backend);
         return initWithFunctions(
             allocator,
-            c_exports_mod.cryptoFunctionTable(backend),
+            functions,
             handshake,
             session_id,
             remote_session_id,
@@ -148,11 +149,11 @@ pub const PRF = struct {
         var initialized: usize = 0;
         errdefer for (parts[0..initialized]) |*part| part.deinit(allocator);
         for (&parts, 0..) |*part, index| {
-            part.* = keys_data.sliceCopy(
+            part.* = try keys_data.sliceCopy(
                 allocator,
                 index * KeysConstants.key_length,
                 KeysConstants.key_length,
-            ) catch unreachable;
+            );
             initialized += 1;
         }
 
@@ -223,7 +224,7 @@ pub const PRF = struct {
             chain = next_chain.move();
         }
 
-        const truncated = output.sliceCopy(allocator, 0, size) catch unreachable;
+        const truncated = try output.sliceCopy(allocator, 0, size);
         output.deinit(allocator);
         return truncated;
     }
@@ -250,7 +251,7 @@ pub const PRF = struct {
         const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.bytes.len) return error.UnsupportedAlgorithm;
-        const result = buffer.sliceCopy(allocator, 0, length) catch unreachable;
+        const result = try buffer.sliceCopy(allocator, 0, length);
         buffer.deinit(allocator);
         return result;
     }
@@ -443,27 +444,27 @@ pub const Authenticator = struct {
         offset += KeysConstants.random_length;
         const random2_offset = offset;
         offset += KeysConstants.random_length;
-        const options_length = self.control_buffer.networkU16(offset) catch unreachable;
+        const options_length = try self.control_buffer.networkU16(offset);
         offset += 2;
         if (self.control_buffer.bytes.len - offset < options_length) return false;
 
-        var server_random1 = self.control_buffer.sliceCopy(
+        var server_random1 = try self.control_buffer.sliceCopy(
             self.allocator,
             random1_offset,
             KeysConstants.random_length,
-        ) catch unreachable;
+        );
         errdefer server_random1.deinit(self.allocator);
-        var server_random2 = self.control_buffer.sliceCopy(
+        var server_random2 = try self.control_buffer.sliceCopy(
             self.allocator,
             random2_offset,
             KeysConstants.random_length,
-        ) catch unreachable;
+        );
         errdefer server_random2.deinit(self.allocator);
-        var server_options_data = self.control_buffer.sliceCopy(
+        var server_options_data = try self.control_buffer.sliceCopy(
             self.allocator,
             offset,
             options_length,
-        ) catch unreachable;
+        );
         defer server_options_data.deinit(self.allocator);
         offset += options_length;
 
@@ -508,7 +509,7 @@ pub const Authenticator = struct {
             try messages.append(allocator, try allocator.dupe(u8, message));
             offset += length + 1;
         }
-        self.control_buffer.removePrefix(self.allocator, offset) catch unreachable;
+        try self.control_buffer.removePrefix(self.allocator, offset);
         return messages.toOwnedSlice(allocator);
     }
 

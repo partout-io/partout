@@ -88,7 +88,6 @@ pub const ActiveContext = struct {
         self.old_keys.deinit(self.allocator);
         self.remote_endpoint.deinit(self.allocator);
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 

@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const log = core.logging;
 
 /// Single binary data packet.
 pub const Packet = []const u8;
@@ -130,7 +131,6 @@ pub const Errors = struct {
     pub const OperationCancelled = error{OperationCancelled};
     pub const ReentrantCall = error{ReentrantCall};
     pub const TaskFailure = error{TaskFailure};
-    pub const TerminalFailure = error{TerminalFailure};
     pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
@@ -138,14 +138,13 @@ pub const Errors = struct {
 pub const CompletionError = std.mem.Allocator.Error ||
     Errors.Cancelled ||
     Errors.MuxFailure ||
-    Errors.OperationCancelled ||
-    Errors.TerminalFailure;
+    Errors.OperationCancelled;
 
 pub const Completion = struct {
     // Completion state.
     done: bool = false,
-    // Completion error or null on success.
-    result: ?CompletionError = null,
+    // Completion failure or null on success.
+    failure: ?CompletionError = null,
     // Intrusive completion queue linkage.
     next: ?*Completion = null,
 };
@@ -159,9 +158,9 @@ pub const CompletionQueue = struct {
     pub fn append(
         self: *CompletionQueue,
         completion: *Completion,
-        result: ?CompletionError,
+        failure: ?CompletionError,
     ) void {
-        completion.result = result;
+        completion.failure = failure;
         completion.next = null;
         if (self.tail) |tail| {
             tail.next = completion;
@@ -319,7 +318,10 @@ pub const WriteQueue = struct {
 
     /// Advances the head packet and returns whether it was fully consumed.
     pub fn advance(self: *WriteQueue, written: usize) bool {
-        const first = self.head orelse unreachable;
+        const first = self.head orelse {
+            log.writeAndFailDebug("Ignoring advance on an empty WriteQueue");
+            return true;
+        };
         const remaining = first.data.len - self.offset;
         std.debug.assert(written <= remaining);
         if (written < remaining) {

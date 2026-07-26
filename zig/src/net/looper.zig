@@ -102,8 +102,7 @@ pub const Looper = struct {
     pub const ScheduleError = SubmissionError || Errors.TaskFailure;
     pub const StopError = SubmissionError ||
         Errors.InvalidState ||
-        Errors.ReentrantCall ||
-        Errors.TerminalFailure;
+        Errors.ReentrantCall;
     pub const WriteError = SubmissionError ||
         io.Error ||
         Errors.TransformFailure ||
@@ -117,7 +116,6 @@ pub const Looper = struct {
     lock: core.Mutex = .{},
     condition: core.Condition = .{},
     state: State = .idle,
-    terminal_failure: ?Failure = null,
 
     // Command submission and synchronous completion.
     commands: CommandQueue = .{},
@@ -351,6 +349,22 @@ pub const Looper = struct {
         return true;
     }
 
+    /// Requests an orderly stop and waits for the worker thread to terminate.
+    ///
+    /// The stop command runs after work that the looper has already accepted.
+    /// Entering `.stopping` rejects new work, and delayed commands that have not
+    /// become ready are cancelled when the worker finishes. Calling `stop`
+    /// before `start`, or after the worker has already stopped, is a no-op.
+    ///
+    /// This function must run outside the looper thread and outside callbacks
+    /// that borrow looper-owned state. It waits for an in-progress `start` or
+    /// `stop` transition, but returns `error.Cancelled` if `deinit` takes
+    /// ownership of shutdown. Failure to allocate the stop command is returned
+    /// to the caller.
+    ///
+    /// A failure that independently terminates the worker is logged by
+    /// `finish` and delivered to `on_finish`; it is not returned by `stop`.
+    /// `deinit` is still required to release the looper's resources.
     pub fn stop(self: *Looper) StopError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
@@ -362,23 +376,35 @@ pub const Looper = struct {
         }
         switch (self.state) {
             .idle => {
+                // No worker was started, so there is nothing to stop or join.
                 self.lock.unlock();
                 return;
             },
-            .started => {},
-            .starting => unreachable,
+            .started => {
+                // This caller owns the transition to `.stopping` below.
+            },
+            .starting => {
+                // The condition loop above must consume this transient state.
+                @panic("Looper remained starting after wait");
+            },
             .deinitializing => {
+                // `deinit` owns shutdown and will cancel pending work and join.
                 self.lock.unlock();
                 return error.Cancelled;
             },
-            .stopping, .stopped => {
+            .stopping => {
+                // Another caller initiated shutdown; wait for it to finish.
                 while (self.state == .stopping) {
                     self.condition.wait(&self.lock);
                 }
-                const failed = self.terminal_failure != null;
                 self.lock.unlock();
                 self.joinWorker();
-                if (failed) return error.TerminalFailure;
+                return;
+            },
+            .stopped => {
+                // The worker already finished, but may still need to be joined.
+                self.lock.unlock();
+                self.joinWorker();
                 return;
             },
         }
@@ -394,7 +420,7 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         self.lock.unlock();
 
         self.joinWorker();
@@ -404,11 +430,12 @@ pub const Looper = struct {
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.Cancelled => error.Cancelled,
-            error.TerminalFailure => error.TerminalFailure,
-            else => unreachable,
+        if (completion_failure) |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.Cancelled => return error.Cancelled,
+            else => log.writefAndFailDebug("Ignoring unexpected Looper stop completion error: {s}", .{
+                @errorName(err),
+            }),
         };
     }
 
@@ -438,7 +465,12 @@ pub const Looper = struct {
         }
         if (delay_ms) |delay| {
             const node = try self.createCommandNode(.{ .perform = task });
-            self.scheduler.schedule(&node.timer, delay, onScheduledCommand, self) catch unreachable;
+            self.scheduler.schedule(
+                &node.timer,
+                delay,
+                onScheduledCommand,
+                self,
+            ) catch @panic("Looper scheduler failed after start");
             return;
         }
         const node = try self.createCommandNode(.{ .perform = task });
@@ -497,13 +529,13 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const command_result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
 
-        if (command_result) |err| return err;
+        if (completion_failure) |err| return err;
         if (holder.failure) |err| return err;
         return holder.value.?;
     }
@@ -537,16 +569,16 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
+        if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.Cancelled => error.Cancelled,
             error.OperationCancelled => error.OperationCancelled,
-            else => error.MuxFailure,
+            error.MuxFailure => error.MuxFailure,
         };
     }
 
@@ -574,12 +606,12 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         std.debug.assert(self.waiter_count > 0);
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
+        if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             else => error.Cancelled,
         };
@@ -595,12 +627,6 @@ pub const Looper = struct {
         self.lock.lock();
         defer self.lock.unlock();
         return self.tun != null;
-    }
-
-    pub fn terminalFailure(self: *Looper) ?Failure {
-        self.lock.lock();
-        defer self.lock.unlock();
-        return self.terminal_failure;
     }
 
     pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
@@ -1040,7 +1066,7 @@ pub const Looper = struct {
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        ) catch @panic("Looper read-retry scheduling failed after start");
         return null;
     }
 
@@ -1059,7 +1085,7 @@ pub const Looper = struct {
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        ) catch @panic("Looper write-retry scheduling failed after start");
         return null;
     }
 
@@ -1096,12 +1122,11 @@ pub const Looper = struct {
             else => {},
         }
         self.state = .stopped;
-        self.terminal_failure = failure;
         self.cancelPendingLocked(self.commands.takeReady());
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
-            completeNow(completion, if (failure != null) error.TerminalFailure else null);
+            completeNow(completion, null);
             self.stop_completion = null;
         }
         self.releaseCompletionsLocked();
@@ -1321,17 +1346,17 @@ pub const Looper = struct {
     fn queueCompletionLocked(
         self: *Looper,
         completion: *Completion,
-        result: ?CompletionError,
+        failure: ?CompletionError,
     ) void {
-        self.completions.append(completion, result);
+        self.completions.append(completion, failure);
     }
 
     fn releaseCompletionsLocked(self: *Looper) void {
         self.completions.releaseAll();
     }
 
-    fn completeNow(completion: *Completion, result: ?CompletionError) void {
-        completion.result = result;
+    fn completeNow(completion: *Completion, failure: ?CompletionError) void {
+        completion.failure = failure;
         completion.done = true;
     }
 

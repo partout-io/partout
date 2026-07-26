@@ -81,7 +81,7 @@ const OpenVPNConnection = struct {
     ) net.ConnectionCreateError!net.Connection {
         const openvpn = switch (module.module.*) {
             .OpenVPN => |*value| value,
-            else => unreachable,
+            else => return error.MissingConnectionImplementation,
         };
         const source_configuration = if (openvpn.configuration) |*value|
             value
@@ -89,11 +89,11 @@ const OpenVPNConnection = struct {
             return error.IncompleteModule;
         const looper = sandbox.looper;
 
-        var configuration = configurationApplyingActiveModules(
+        var configuration = try configurationApplyingActiveModules(
             allocator,
             source_configuration,
             sandbox.profile,
-        ) catch return error.OutOfMemory;
+        );
         errdefer configuration.deinit(allocator);
 
         const prng = PRNG.system();
@@ -115,7 +115,7 @@ const OpenVPNConnection = struct {
                 error.InvalidJson,
                 error.InvalidModel,
                 error.UnsupportedModel,
-                => unreachable,
+                => return error.IncompleteModule,
             }
         else
             null;
@@ -151,7 +151,7 @@ const OpenVPNConnection = struct {
         return created.asConnection();
     }
 
-    fn deinit(self: *OpenVPNConnection) void {
+    fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit _OpenVPNConnectionV3");
         if (self.current_session) |session| {
             session.setDelegate(null);
@@ -168,7 +168,6 @@ const OpenVPNConnection = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.cache_dir);
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 
@@ -438,8 +437,11 @@ const OpenVPNConnection = struct {
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         log.write(.notice, "Session did start");
-        const remote_address = api.Address.parseRaw(remote_endpoint.address) orelse unreachable;
-        log.writef(.info, "\tEndpoint: {s}", .{remote_address});
+        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
+            self.failTunnelSetup(session, .invalidValue);
+            return;
+        };
+        log.writef(.info, "\tEndpoint: {s}", .{address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
             remote_endpoint.proto.socket_type.raw(),
             remote_endpoint.proto.port,
@@ -460,10 +462,6 @@ const OpenVPNConnection = struct {
         };
         defer NetworkSettingsBuilder.deinitModules(self.allocator, modules);
 
-        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
-            self.failTunnelSetup(session, .invalidValue);
-            return;
-        };
         const info = api.TunnelRemoteInfoWrapper{
             .profile = self.profile.*,
             .original_module_id = self.module_id,
@@ -471,24 +469,22 @@ const OpenVPNConnection = struct {
             .requires_virtual_device = true,
             .modules = modules,
         };
-        const tunnel = self.controller.setTunnelSettings(info) catch |err| {
+        self.tunnel = self.controller.setTunnelSettings(info) catch |err| {
             self.failTunnelSetup(session, tunnelErrorCode(err));
             return;
         };
-        self.tunnel = tunnel orelse {
+        const active_tunnel = if (self.tunnel) |*value| value else {
             self.failTunnelSetup(session, .tunNotAvailable);
             return;
         };
-        const descriptor = if (self.tunnel) |*active_tunnel| blk: {
-            const fd = active_tunnel.muxDescriptor() orelse {
-                self.failTunnelSetup(session, .fdUnavailable);
-                return;
-            };
-            break :blk net.Looper.Descriptor{
-                .fd = fd,
-                .io = active_tunnel.nativeIO(),
-            };
-        } else unreachable;
+        const fd = active_tunnel.muxDescriptor() orelse {
+            self.failTunnelSetup(session, .fdUnavailable);
+            return;
+        };
+        const descriptor = net.Looper.Descriptor{
+            .fd = fd,
+            .io = active_tunnel.nativeIO(),
+        };
         session.setTunnel(descriptor) catch |err| {
             self.failTunnelSetup(session, tunnelErrorCode(err));
             return;
@@ -834,10 +830,10 @@ fn configurationApplyingActiveModules(
     allocator: std.mem.Allocator,
     source: *const api.OpenVPNConfiguration,
     profile: *const api.Profile,
-) std.mem.Allocator.Error!api.OpenVPNConfiguration {
+) net.ConnectionCreateError!api.OpenVPNConfiguration {
     var configuration = source.clone(allocator) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => unreachable,
+        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.IncompleteModule,
     };
     errdefer configuration.deinit(allocator);
 
@@ -957,7 +953,7 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
-    .deinit = deinit,
+    .destroy = destroy,
     .looper_terminated = looperDidTerminate,
 };
 
@@ -1000,9 +996,9 @@ fn looperDidTerminate(
     self.looperDidTerminate(failure);
 }
 
-fn deinit(ptr: *anyopaque) void {
+fn destroy(ptr: *anyopaque) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.deinit();
+    self.destroy();
 }
 
 pub const testing = struct {
@@ -1014,7 +1010,7 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         source: *const api.OpenVPNConfiguration,
         profile: *const api.Profile,
-    ) std.mem.Allocator.Error!api.OpenVPNConfiguration {
+    ) net.ConnectionCreateError!api.OpenVPNConfiguration {
         return configurationApplyingActiveModules(allocator, source, profile);
     }
 };

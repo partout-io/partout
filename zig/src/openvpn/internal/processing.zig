@@ -188,7 +188,6 @@ pub const LinkProcessor = struct {
         self.tcp_read_buffer.deinit(self.allocator);
         self.processor.deinit();
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 

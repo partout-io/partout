@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-const core_mod = @import("../../core/exports.zig");
-const net_mod = @import("../../net/exports.zig");
+const core = @import("../../core/exports.zig");
+const net = @import("../../net/exports.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
@@ -22,9 +22,9 @@ const session_negotiator_mod = @import("session_negotiator.zig");
 const tls_mod = @import("tls.zig");
 
 const session_mod = @This();
-const api = core_mod.api;
+const api = core.api;
 const c = helpers_mod.c;
-const log = core_mod.logging;
+const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
 const ActivePhase = session_context_mod.ActivePhase;
@@ -118,12 +118,12 @@ pub const Session = struct {
     ca_filename: []u8,
     options: SessionOptions,
 
-    looper: *net_mod.Looper,
+    looper: *net.Looper,
     control_channel: *ControlChannel,
     shutdown_actor: ?*ShutdownActor,
-    lifecycle_lock: core_mod.Mutex = .{},
-    negotiation_timer: core_mod.RunAfter = .{},
-    ping_timer: core_mod.RunAfter = .{},
+    lifecycle_lock: core.Mutex = .{},
+    negotiation_timer: core.RunAfter = .{},
+    ping_timer: core.RunAfter = .{},
 
     delegate: ?SessionDelegate = null,
     state: SessionState = .{ .stopped = .{ .with_local_options = true } },
@@ -138,7 +138,7 @@ pub const Session = struct {
         ShutdownFailure,
     };
 
-    const ShutdownActor = core_mod.Actor(
+    const ShutdownActor = core.Actor(
         Session,
         ShutdownRequest,
         ShutdownActorError,
@@ -147,7 +147,7 @@ pub const Session = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
-        looper: *net_mod.Looper,
+        looper: *net.Looper,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
@@ -169,7 +169,7 @@ pub const Session = struct {
 
     fn createUnwrapped(
         allocator: std.mem.Allocator,
-        looper: *net_mod.Looper,
+        looper: *net.Looper,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
@@ -213,7 +213,7 @@ pub const Session = struct {
         errdefer self.lifecycle_lock.deinit();
         self.shutdown_actor = try ShutdownActor.create(allocator, self);
         errdefer {
-            self.shutdown_actor.?.deinit();
+            self.shutdown_actor.?.destroy();
             self.shutdown_actor = null;
         }
         return self;
@@ -239,7 +239,7 @@ pub const Session = struct {
 
         if (self.shutdown_actor) |actor| {
             self.shutdown_actor = null;
-            actor.deinit();
+            actor.destroy();
         }
         switch (self.state) {
             .stopped => {},
@@ -254,7 +254,6 @@ pub const Session = struct {
         self.allocator.free(self.ca_filename);
         self.lifecycle_lock.deinit();
         const allocator = self.allocator;
-        self.* = undefined;
         allocator.destroy(self);
     }
 
@@ -269,7 +268,7 @@ pub const Session = struct {
 
     pub fn setLink(
         self: *Session,
-        descriptor: net_mod.Looper.Descriptor,
+        descriptor: net.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) Error!void {
         return self.setLinkUnwrapped(descriptor, remote_endpoint) catch |err|
@@ -278,7 +277,7 @@ pub const Session = struct {
 
     fn setLinkUnwrapped(
         self: *Session,
-        descriptor: net_mod.Looper.Descriptor,
+        descriptor: net.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) !void {
         var descriptor_transferred = false;
@@ -322,12 +321,12 @@ pub const Session = struct {
         try self.looper.perform(void, &request, setLinkOnQueue);
     }
 
-    pub fn setTunnel(self: *Session, descriptor: net_mod.Looper.Descriptor) Error!void {
+    pub fn setTunnel(self: *Session, descriptor: net.Looper.Descriptor) Error!void {
         return self.setTunnelUnwrapped(descriptor) catch |err|
             errors_mod.sessionError(err);
     }
 
-    fn setTunnelUnwrapped(self: *Session, descriptor: net_mod.Looper.Descriptor) !void {
+    fn setTunnelUnwrapped(self: *Session, descriptor: net.Looper.Descriptor) !void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
 
@@ -381,9 +380,9 @@ pub const Session = struct {
             &prepare,
             prepareShutdownOnQueue,
         ) catch |err| {
-            // A terminal looper has already serialized final state; its owner
+            // A stopped looper has already serialized final state; its owner
             // routes `OnFinish` through `looperDidTerminate` while Session lives.
-            if (err == error.Cancelled or err == error.TerminalFailure) return;
+            if (err == error.Cancelled) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
@@ -521,7 +520,7 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperDidTerminate(self: *Session, failure: ?net_mod.Looper.Failure) void {
+    pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
         std.debug.assert(self.looper.isOnQueue());
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
@@ -540,12 +539,12 @@ pub const Session = struct {
         self.finishShutdown(if (failure) |value| failureError(value) else null);
     }
 
-    fn onSideFailure(raw: ?*anyopaque, failure: net_mod.Looper.Failure) void {
+    fn onSideFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         self.requestShutdown(failureError(failure));
     }
 
-    fn onLinkFailure(raw: ?*anyopaque, failure: net_mod.Looper.Failure) void {
+    fn onLinkFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const cause = failureError(failure);
         self.requestShutdown(if (cause == error.CryptoFailure) error.Reconnect else cause);
@@ -553,8 +552,8 @@ pub const Session = struct {
 
     fn onLinkRead(
         raw: ?*anyopaque,
-        packets: net_mod.Looper.Packets,
-    ) !net_mod.Looper.ReadAction {
+        packets: net.Looper.Packets,
+    ) !net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const processor = self.link_processor orelse return .keep;
         var processed = try processor.processInbound(packets);
@@ -565,8 +564,8 @@ pub const Session = struct {
 
     fn onTunnelRead(
         raw: ?*anyopaque,
-        packets: net_mod.Looper.Packets,
-    ) !net_mod.Looper.ReadAction {
+        packets: net.Looper.Packets,
+    ) !net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.receiveTunnel(packets);
         return .keep;
@@ -575,7 +574,7 @@ pub const Session = struct {
     fn receiveLink(self: *Session, packets: []const []const u8) !void {
         std.debug.assert(self.looper.isOnQueue());
         const context = self.state.activeContext() orelse return;
-        context.last_received_ns = core_mod.concurrency.monotonicNs();
+        context.last_received_ns = core.concurrency.monotonicNs();
         var negotiator = context.currentNegotiator() orelse {
             log.write(.fault, "No negotiator");
             return error.Assertion;
@@ -865,7 +864,7 @@ pub const Session = struct {
         const last_received = context.last_received_ns orelse return;
         const timeout_ns = self.keepAliveTimeoutMs(context) *|
             @as(u64, std.time.ns_per_ms);
-        if (core_mod.concurrency.monotonicNs() -| last_received > timeout_ns)
+        if (core.concurrency.monotonicNs() -| last_received > timeout_ns)
             return error.Timeout;
     }
 
@@ -924,7 +923,7 @@ pub const Session = struct {
     }
 
     fn delegateCurrentDataCount(self: *Session, context: *ActiveContext) void {
-        const now = core_mod.concurrency.monotonicNs();
+        const now = core.concurrency.monotonicNs();
         if (context.last_data_count_ns) |last| {
             const minimum = self.options.min_data_count_interval_ms *|
                 @as(u64, std.time.ns_per_ms);
@@ -937,7 +936,7 @@ pub const Session = struct {
         });
     }
 
-    fn failureError(failure: net_mod.Looper.Failure) SessionError {
+    fn failureError(failure: net.Looper.Failure) SessionError {
         return switch (failure) {
             .user => |cause| errors_mod.sessionError(cause),
             .io => |details| errors_mod.sessionError(details.cause),

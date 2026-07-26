@@ -72,7 +72,7 @@ const WireGuardConnection = struct {
                     return error.IncompleteModule;
                 break :blk configuration;
             },
-            else => unreachable,
+            else => return error.MissingConnectionImplementation,
         };
 
         const created = try allocator.create(WireGuardConnection);
@@ -107,7 +107,7 @@ const WireGuardConnection = struct {
         return created.asConnection();
     }
 
-    fn deinit(self: *WireGuardConnection) void {
+    fn destroy(self: *WireGuardConnection) void {
         const allocator = self.allocator;
         log.write(.debug, "Deinit _WireGuardConnectionV2");
         self.stopDataCountTimer();
@@ -321,10 +321,10 @@ fn configurationApplyingActiveModules(
     allocator: std.mem.Allocator,
     source: *const api.WireGuardConfiguration,
     profile: *const api.Profile,
-) std.mem.Allocator.Error!api.WireGuardConfiguration {
+) net.ConnectionCreateError!api.WireGuardConfiguration {
     var configuration = source.clone(allocator) catch |err| switch (err) {
         error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => unreachable,
+        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.IncompleteModule,
     };
     errdefer configuration.deinit(allocator);
 
@@ -337,7 +337,7 @@ fn appendActiveModuleAllowedIPs(
     allocator: std.mem.Allocator,
     peer: *api.WireGuardRemoteInterface,
     profile: *const api.Profile,
-) std.mem.Allocator.Error!void {
+) net.ConnectionCreateError!void {
     var extra_count: usize = 0;
     for (profile.modules) |*module| {
         if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
@@ -412,25 +412,28 @@ fn cloneRouteDestination(
     allocator: std.mem.Allocator,
     route: *const api.Route,
     family: api.Address.Family,
-) std.mem.Allocator.Error!api.Subnet {
+) net.ConnectionCreateError!api.Subnet {
     if (route.destination) |*destination| return cloneSubnet(allocator, destination);
     return switch (family) {
-        .v4 => (try api.Subnet.parseRawAlloc(allocator, "0.0.0.0/0")).?,
-        .v6 => (try api.Subnet.parseRawAlloc(allocator, "::/0")).?,
-        .hostname => unreachable,
+        .v4 => (try api.Subnet.parseRawAlloc(allocator, "0.0.0.0/0")) orelse
+            error.IncompleteModule,
+        .v6 => (try api.Subnet.parseRawAlloc(allocator, "::/0")) orelse
+            error.IncompleteModule,
+        .hostname => error.IncompleteModule,
     };
 }
 
 fn cloneAddressAsHostSubnet(
     allocator: std.mem.Allocator,
     address: *const api.Address,
-) std.mem.Allocator.Error!api.Subnet {
+) net.ConnectionCreateError!api.Subnet {
     return .{
-        .address = (try api.Address.parseRawAlloc(allocator, address.raw)).?,
+        .address = (try api.Address.parseRawAlloc(allocator, address.raw)) orelse
+            return error.IncompleteModule,
         .prefix_length = switch (address.family) {
             .v4 => 32,
             .v6 => 128,
-            .hostname => unreachable,
+            .hostname => return error.IncompleteModule,
         },
     };
 }
@@ -438,9 +441,10 @@ fn cloneAddressAsHostSubnet(
 fn cloneSubnet(
     allocator: std.mem.Allocator,
     subnet: *const api.Subnet,
-) std.mem.Allocator.Error!api.Subnet {
+) net.ConnectionCreateError!api.Subnet {
     return .{
-        .address = (try api.Address.parseRawAlloc(allocator, subnet.address.raw)).?,
+        .address = (try api.Address.parseRawAlloc(allocator, subnet.address.raw)) orelse
+            return error.IncompleteModule,
         .prefix_length = subnet.prefix_length,
     };
 }
@@ -450,7 +454,7 @@ const wireguard_connection_vtable = net.Connection.VTable{
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
-    .deinit = deinit,
+    .destroy = destroy,
 };
 
 fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
@@ -481,9 +485,9 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(events);
 }
 
-fn deinit(ptr: *anyopaque) void {
+fn destroy(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.deinit();
+    self.destroy();
 }
 
 pub const testing = struct {
@@ -496,7 +500,7 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         source: *const api.WireGuardConfiguration,
         profile: *const api.Profile,
-    ) std.mem.Allocator.Error!api.WireGuardConfiguration {
+    ) net.ConnectionCreateError!api.WireGuardConfiguration {
         return configurationApplyingActiveModules(allocator, source, profile);
     }
 

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const api = @import("api.zig");
 const concurrency = @import("concurrency.zig");
@@ -135,6 +136,20 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
     };
     mutex.unlock();
     dispatchCString(logger, @intFromEnum(level), message);
+}
+
+pub fn writeAndFailDebug(message: [:0]const u8) void {
+    write(.err, message);
+    if (builtin.mode == .Debug) {
+        @panic(message);
+    }
+}
+
+pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
+    writef(.err, fmt, args);
+    if (builtin.mode == .Debug) {
+        std.debug.panic(fmt, args);
+    }
 }
 
 fn dispatchSlice(
@@ -343,7 +358,8 @@ fn forLog(
     value: anytype,
 ) ![]const u8 {
     const T = @TypeOf(value);
-    const format = comptime logFormat(T) orelse unreachable;
+    const format = comptime logFormat(T) orelse
+        @compileError("unsupported type passed to forLog()");
     return switch (format) {
         .declared => T.logging_formatter(allocator, value),
         .model => |adapter| formatWithAdapter(allocator, value, adapter),
@@ -354,7 +370,7 @@ fn forLog(
         .array => switch (@typeInfo(T)) {
             .array => formatArray(allocator, &value),
             .pointer => formatArray(allocator, value),
-            else => unreachable,
+            else => @compileError("array log format requires an array or pointer type"),
         },
         .dictionary => formatDictionary(allocator, &value),
         .dereference => forLog(allocator, value.*),

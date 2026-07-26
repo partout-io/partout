@@ -58,7 +58,6 @@ pub fn ControlChannel(comptime Serializer: type) type {
             self.sent_dates_ms.deinit();
             self.serializer.deinit(self.allocator);
             const allocator = self.allocator;
-            self.* = undefined;
             allocator.destroy(self);
         }
 

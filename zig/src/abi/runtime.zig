@@ -159,7 +159,7 @@ pub const DaemonRuntime = struct {
                 },
             },
         );
-        errdefer self.daemon.deinit();
+        errdefer self.daemon.destroy();
 
         // Bind the platform to the underlying OS callbacks
         self.platform.attach();
@@ -169,8 +169,8 @@ pub const DaemonRuntime = struct {
         return self;
     }
 
-    pub fn deinit(self: *DaemonRuntime, allocator: std.mem.Allocator) void {
-        self.daemon.deinit();
+    pub fn destroy(self: *DaemonRuntime, allocator: std.mem.Allocator) void {
+        self.daemon.destroy();
         self.platform.deinit();
         self.registry.deinit(allocator);
         self.options.deinit(allocator);

@@ -375,7 +375,7 @@ pub const RunAfter = struct {
                     self.mutex.unlock();
                     return;
                 },
-                .idle, .scheduled => unreachable,
+                .idle, .scheduled => @panic("invalid RunAfter state after callback"),
             }
             self.cond.broadcast();
             self.mutex.unlock();
@@ -450,7 +450,7 @@ pub const RunAfter = struct {
         self.state = switch (self.state) {
             .idle, .scheduled => .scheduled,
             .running, .running_scheduled => .running_scheduled,
-            .stopping => unreachable,
+            .stopping => @panic("cannot schedule a stopping RunAfter"),
         };
         self.cond.broadcast();
     }
@@ -545,7 +545,7 @@ const PosixMutex = struct {
     pub fn lock(self: *PosixMutex) void {
         switch (std.c.pthread_mutex_lock(&self.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_mutex_lock failed"),
         }
     }
 
@@ -555,7 +555,7 @@ const PosixMutex = struct {
     pub fn unlock(self: *PosixMutex) void {
         switch (std.c.pthread_mutex_unlock(&self.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_mutex_unlock failed"),
         }
     }
 
@@ -565,7 +565,7 @@ const PosixMutex = struct {
     pub fn deinit(self: *PosixMutex) void {
         switch (std.c.pthread_mutex_destroy(&self.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_mutex_destroy failed"),
         }
     }
 };
@@ -582,7 +582,7 @@ const PosixCondition = struct {
     pub fn wait(self: *PosixCondition, mutex: *Mutex) void {
         switch (std.c.pthread_cond_wait(&self.raw, &mutex.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_cond_wait failed"),
         }
     }
 
@@ -592,7 +592,7 @@ const PosixCondition = struct {
     pub fn broadcast(self: *PosixCondition) void {
         switch (std.c.pthread_cond_broadcast(&self.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_cond_broadcast failed"),
         }
     }
 
@@ -602,7 +602,7 @@ const PosixCondition = struct {
     pub fn deinit(self: *PosixCondition) void {
         switch (std.c.pthread_cond_destroy(&self.raw)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("pthread_cond_destroy failed"),
         }
     }
 };
@@ -659,7 +659,7 @@ const WindowsCondition = struct {
     pub fn wait(self: *WindowsCondition, mutex: *Mutex) void {
         switch (RtlSleepConditionVariableSRW(&self.raw, &mutex.raw, null, 0)) {
             .SUCCESS => {},
-            else => unreachable,
+            else => @panic("RtlSleepConditionVariableSRW failed"),
         }
     }
 
