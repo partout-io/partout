@@ -364,7 +364,7 @@ pub const Looper = struct {
                 return;
             },
             .started => {},
-            .starting => unreachable,
+            .starting => @panic("Looper remained starting after wait"),
             .deinitializing => {
                 self.lock.unlock();
                 return error.Cancelled;
@@ -435,7 +435,12 @@ pub const Looper = struct {
         }
         if (delay_ms) |delay| {
             const node = try self.createCommandNode(.{ .perform = task });
-            self.scheduler.schedule(&node.timer, delay, onScheduledCommand, self) catch unreachable;
+            self.scheduler.schedule(
+                &node.timer,
+                delay,
+                onScheduledCommand,
+                self,
+            ) catch @panic("Looper scheduler failed after start");
             return;
         }
         const node = try self.createCommandNode(.{ .perform = task });
@@ -1031,7 +1036,7 @@ pub const Looper = struct {
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        ) catch @panic("Looper read-retry scheduling failed after start");
         return null;
     }
 
@@ -1050,7 +1055,7 @@ pub const Looper = struct {
             no_buf_retry_delay_ms,
             onScheduledCommand,
             self,
-        ) catch unreachable;
+        ) catch @panic("Looper write-retry scheduling failed after start");
         return null;
     }
 
