@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const log = core.logging;
 
 /// Single binary data packet.
 pub const Packet = []const u8;
@@ -319,7 +320,10 @@ pub const WriteQueue = struct {
 
     /// Advances the head packet and returns whether it was fully consumed.
     pub fn advance(self: *WriteQueue, written: usize) bool {
-        const first = self.head orelse unreachable;
+        const first = self.head orelse {
+            log.writeAndFailDebug("Ignoring advance on an empty WriteQueue");
+            return true;
+        };
         const remaining = first.data.len - self.offset;
         std.debug.assert(written <= remaining);
         if (written < remaining) {

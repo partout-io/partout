@@ -394,7 +394,7 @@ pub const Looper = struct {
         while (!completion.done) {
             self.condition.wait(&self.lock);
         }
-        const result = completion.result;
+        const completion_failure = completion.failure;
         self.lock.unlock();
 
         self.joinWorker();
@@ -404,11 +404,13 @@ pub const Looper = struct {
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
-        if (result) |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.Cancelled => error.Cancelled,
-            error.TerminalFailure => error.TerminalFailure,
-            else => unreachable,
+        if (completion_failure) |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.Cancelled => return error.Cancelled,
+            error.TerminalFailure => return error.TerminalFailure,
+            else => log.writefAndFailDebug("Ignoring unexpected Looper stop completion error: {s}", .{
+                @errorName(err),
+            }),
         };
     }
 
