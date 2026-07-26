@@ -379,7 +379,11 @@ pub const Session = struct {
     }
 
     fn requestShutdown(self: *Session, cause: SessionError) void {
-        if (!self.claimShutdown()) return;
+        self.shutdown_request_lock.lock();
+        defer self.shutdown_request_lock.unlock();
+        if (self.shutdown_pending) return;
+        self.shutdown_pending = true;
+
         self.shutdown_request_cause = cause;
         self.executor.run(self, shutdownOnExecutor);
     }
