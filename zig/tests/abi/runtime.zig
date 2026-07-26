@@ -6,6 +6,7 @@ const std = @import("std");
 const source = @import("source");
 
 const core = source.core;
+const c_common = source.c_common;
 const conn = source.net_connection;
 const net_daemon = source.net_daemon;
 const helpers = source.abi_helpers;
@@ -129,9 +130,7 @@ test "daemon runtime owns options during lifecycle" {
         std.fs.path.basename(options.cache_dir),
     );
     const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
-    const io = std.Io.Threaded.global_single_threaded.io();
-    const stat = try std.Io.Dir.cwd().statFile(io, runtime.options.cache_dir, .{});
-    try std.testing.expectEqual(.directory, stat.kind);
+    try std.testing.expect(c_common.pp_file_is_directory(runtime.options.cache_dir.ptr));
 
     try runtime.start();
     runtime.stop();

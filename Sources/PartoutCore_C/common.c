@@ -10,6 +10,11 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <errno.h>
+#include <time.h>
+
+#if !PARTOUT_WINDOWS
+#include <sys/stat.h>
+#endif
 
 const int PPIOErrorWouldBlock   = -11;
 const int PPIOErrorNoBufs       = -12;
@@ -97,6 +102,70 @@ failure:
     if (file) fclose(file);
     if (abs_path) free(abs_path);
     return NULL;
+}
+
+bool pp_file_is_directory(const char *path) {
+    if (!path || path[0] == '\0') return false;
+#if PARTOUT_WINDOWS
+    const DWORD attributes = GetFileAttributesA(path);
+    return attributes != INVALID_FILE_ATTRIBUTES &&
+           (attributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+#else
+    struct stat status;
+    return stat(path, &status) == 0 && S_ISDIR(status.st_mode);
+#endif
+}
+
+static bool pp_file_create_single_directory(const char *path) {
+#if PARTOUT_WINDOWS
+    if (CreateDirectoryA(path, NULL)) return true;
+#else
+    if (mkdir(path, 0755) == 0) return true;
+#endif
+    return pp_file_is_directory(path);
+}
+
+static bool pp_file_is_separator(char value) {
+#if PARTOUT_WINDOWS
+    return value == '/' || value == '\\';
+#else
+    return value == '/';
+#endif
+}
+
+bool pp_file_create_directory(const char *path) {
+    if (!path || path[0] == '\0') return false;
+
+    const size_t path_length = strlen(path);
+    char *mutable_path = malloc(path_length + 1);
+    if (!mutable_path) return false;
+    memcpy(mutable_path, path, path_length + 1);
+
+    for (char *cursor = mutable_path; *cursor; ++cursor) {
+        if (!pp_file_is_separator(*cursor)) continue;
+        if (cursor == mutable_path || pp_file_is_separator(cursor[-1])) continue;
+#if PARTOUT_WINDOWS
+        /* Do not attempt to create the "C:" part of a drive path. */
+        if (cursor == mutable_path + 2 && mutable_path[1] == ':') continue;
+#endif
+        const char separator = *cursor;
+        *cursor = '\0';
+        if (!pp_file_create_single_directory(mutable_path)) {
+            free(mutable_path);
+            return false;
+        }
+        *cursor = separator;
+    }
+
+    const bool created = pp_file_create_single_directory(mutable_path);
+    free(mutable_path);
+    return created;
+}
+
+uint32_t pp_time_unix_seconds(void) {
+    const time_t seconds = time(NULL);
+    if (seconds == (time_t)-1 || seconds <= 0) return 0;
+    return (uint32_t)(uint64_t)seconds;
 }
 
 #if PARTOUT_ANDROID
