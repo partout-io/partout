@@ -135,8 +135,8 @@ pub const RunAfter = struct {
         /// Callback to notify when this handle reaches a terminal outcome.
         callback: ?Scheduled.Callback = null,
 
-        /// Approximate delay remaining in scheduler ticks.
-        remaining_ms: u64 = 0,
+        /// Absolute suspend-inclusive deadline for this callback.
+        deadline_ns: u64 = 0,
 
         /// Private intrusive linkage used by the executor's pending list.
         next: ?*Scheduled = null,
@@ -190,6 +190,13 @@ pub const RunAfter = struct {
 
     /// Delay associated with the replaceable callback slot.
     delay_ms: u64 = 0,
+
+    /// Absolute suspend-inclusive deadline for the replaceable callback.
+    ///
+    /// A successor scheduled from a running callback leaves this unset until
+    /// that callback returns, so its delay begins when the worker can service
+    /// it.
+    deadline_ns: ?u64 = null,
 
     /// Replaceable callback waiting in, or executing from, the callback slot.
     callback: ?Callback = null,
@@ -309,7 +316,10 @@ pub const RunAfter = struct {
             .callback = callback,
             // A full extra tick prevents a newly appended job from expiring
             // early when it lands immediately before the current tick.
-            .remaining_ms = delay_ms +| scheduler_resolution_ms,
+            .deadline_ns = deadlineAfterMs(
+                monotonicNs(),
+                delay_ms +| scheduler_resolution_ms,
+            ),
         };
         if (self.scheduled_tail) |tail| {
             tail.next = scheduled;
@@ -349,6 +359,7 @@ pub const RunAfter = struct {
         const cancelled = self.takeScheduledLocked();
         self.scheduling = false;
         self.generation +%= 1;
+        self.deadline_ns = null;
         self.callback = null;
         self.callback_ctx = null;
         self.state = .stopping;
@@ -394,10 +405,14 @@ pub const RunAfter = struct {
             }
             std.debug.assert(self.state == .scheduled);
             const generation = self.generation;
-            const delay_ms = self.delay_ms;
+            const deadline_ns = self.deadline_ns orelse deadline: {
+                const value = deadlineAfterMs(monotonicNs(), self.delay_ms);
+                self.deadline_ns = value;
+                break :deadline value;
+            };
             self.mutex.unlock();
 
-            if (self.sleepUntilChangedOrElapsed(generation, delay_ms)) continue;
+            if (self.sleepUntilChangedOrElapsed(generation, deadline_ns)) continue;
 
             self.mutex.lock();
             if (self.state == .stopping) {
@@ -419,6 +434,7 @@ pub const RunAfter = struct {
             self.mutex.lock();
             switch (self.state) {
                 .running => {
+                    self.deadline_ns = null;
                     self.callback = null;
                     self.callback_ctx = null;
                     self.state = .idle;
@@ -452,10 +468,10 @@ pub const RunAfter = struct {
         var due_tail: ?*Scheduled = null;
         var previous: ?*Scheduled = null;
         var current = self.scheduled_head;
+        const now_ns = monotonicNs();
         while (current) |scheduled| {
             const next = scheduled.next;
-            scheduled.remaining_ms -|= scheduler_resolution_ms;
-            if (scheduled.remaining_ms == 0) {
+            if (now_ns >= scheduled.deadline_ns) {
                 if (previous) |before| {
                     before.next = next;
                 } else {
@@ -496,14 +512,23 @@ pub const RunAfter = struct {
         callback: Callback,
         callback_ctx: ?*anyopaque,
     ) void {
+        const was_running = switch (self.state) {
+            .running, .running_scheduled => true,
+            .idle, .scheduled => false,
+            .stopping => @panic("cannot schedule a stopping RunAfter"),
+        };
         self.generation +%= 1;
         self.delay_ms = delay_ms;
+        self.deadline_ns = if (was_running)
+            null
+        else
+            deadlineAfterMs(monotonicNs(), delay_ms);
         self.callback = callback;
         self.callback_ctx = callback_ctx;
         self.state = switch (self.state) {
             .idle, .scheduled => .scheduled,
             .running, .running_scheduled => .running_scheduled,
-            .stopping => @panic("cannot schedule a stopping RunAfter"),
+            .stopping => unreachable,
         };
         self.cond.broadcast();
     }
@@ -523,6 +548,7 @@ pub const RunAfter = struct {
         const cancelled = self.takeScheduledLocked();
         self.scheduling = false;
         self.generation +%= 1;
+        self.deadline_ns = null;
         self.callback = null;
         self.callback_ctx = null;
         self.state = switch (self.state) {
@@ -556,23 +582,22 @@ pub const RunAfter = struct {
         }
     }
 
-    /// Sleeps for `delay_ms` unless the observed callback slot changes.
+    /// Sleeps until `deadline_ns` unless the observed callback slot changes.
     ///
     /// Returns `true` when the generation or state changed and the caller must
-    /// discard the elapsed-delay result. Polling bounds rescheduling latency to
-    /// roughly `sleep_step_ms` without requiring timed condition waits.
-    fn sleepUntilChangedOrElapsed(self: *RunAfter, generation: u64, delay_ms: u64) bool {
+    /// discard the elapsed-deadline result. The deadline uses a clock that
+    /// includes system suspend. Polling only bounds rescheduling latency; it
+    /// does not measure elapsed time.
+    fn sleepUntilChangedOrElapsed(self: *RunAfter, generation: u64, deadline_ns: u64) bool {
         // Maximum sleep interval between generation checks.
         const sleep_step_ms = 10;
-        var remaining_ms = delay_ms;
-        while (remaining_ms > 0) {
+        while (true) {
             if (self.hasChanged(generation)) return true;
 
-            const current_sleep_ms = @min(remaining_ms, sleep_step_ms);
-            sleepMs(current_sleep_ms);
-            remaining_ms -= current_sleep_ms;
+            const remaining_ms = millisecondsUntil(deadline_ns, monotonicNs());
+            if (remaining_ms == 0) return self.hasChanged(generation);
+            sleepMs(@min(remaining_ms, sleep_step_ms));
         }
-        return self.hasChanged(generation);
     }
 
     /// Reports whether `generation` still identifies the scheduled slot.
@@ -753,6 +778,11 @@ pub fn sleepMs(value: u64) void {
 }
 
 /// Returns nanoseconds from a process-independent monotonic clock.
+///
+/// The clock includes time spent in system suspend wherever the host exposes
+/// that distinction. Network deadlines therefore remain wall-time deadlines
+/// across device sleep without being affected by changes to the real-time
+/// clock.
 pub fn monotonicNs() u64 {
     if (builtin.os.tag == .windows) {
         const windows = std.os.windows;
@@ -765,9 +795,48 @@ pub fn monotonicNs() u64 {
         return @intCast((@as(u128, ticks) * std.time.ns_per_s) / ticks_per_second);
     }
 
+    const clock_id = switch (builtin.os.tag) {
+        // CLOCK_BOOTTIME is monotonic and includes system suspend.
+        .linux => std.c.CLOCK.BOOTTIME,
+
+        // Darwin's MONOTONIC_RAW is the continuous counterpart to
+        // UPTIME_RAW and includes time spent asleep.
+        .driverkit,
+        .ios,
+        .maccatalyst,
+        .macos,
+        .tvos,
+        .visionos,
+        .watchos,
+        => std.c.CLOCK.MONOTONIC_RAW,
+
+        // These are the closest boot-relative clocks exposed by the hosts.
+        .dragonfly, .freebsd => std.c.CLOCK.MONOTONIC_FAST,
+        else => std.c.CLOCK.MONOTONIC,
+    };
     var timestamp: std.c.timespec = undefined;
-    if (std.c.clock_gettime(.MONOTONIC, &timestamp) != 0) return 0;
+    if (std.c.clock_gettime(clock_id, &timestamp) != 0) return 0;
     const seconds: u64 = @intCast(timestamp.sec);
     const nanoseconds: u64 = @intCast(timestamp.nsec);
     return seconds *| @as(u64, std.time.ns_per_s) +| nanoseconds;
 }
+
+/// Computes a saturating absolute deadline from an integer millisecond delay.
+fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
+    return now_ns +| delay_ms *| @as(u64, std.time.ns_per_ms);
+}
+
+/// Returns the positive whole-millisecond sleep needed to reach `deadline_ns`.
+///
+/// Rounding up prevents the scheduler from firing before a sub-millisecond
+/// remainder elapses. A clock jump past the deadline returns zero immediately.
+fn millisecondsUntil(deadline_ns: u64, now_ns: u64) u64 {
+    if (now_ns >= deadline_ns) return 0;
+    const remaining_ns = deadline_ns - now_ns;
+    return (remaining_ns - 1) / std.time.ns_per_ms + 1;
+}
+
+pub const testing = struct {
+    pub const deadlineAfterMilliseconds = deadlineAfterMs;
+    pub const millisecondsUntilDeadline = millisecondsUntil;
+};

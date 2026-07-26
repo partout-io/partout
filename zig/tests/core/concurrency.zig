@@ -189,6 +189,46 @@ test "RunAfter runs callback after delay" {
     waitUntil(&did_run);
 }
 
+test "RunAfter deadlines account for continuous clock jumps" {
+    const start_ns = 5 * std.time.ns_per_s;
+    const deadline_ns = core.concurrency.testing.deadlineAfterMilliseconds(
+        start_ns,
+        100,
+    );
+
+    try std.testing.expectEqual(
+        @as(u64, 100),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            start_ns,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 1),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns - 1,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 0),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns + 10 * std.time.ns_per_s,
+        ),
+    );
+}
+
+test "RunAfter deadlines saturate without wrapping" {
+    try std.testing.expectEqual(
+        std.math.maxInt(u64),
+        core.concurrency.testing.deadlineAfterMilliseconds(
+            std.math.maxInt(u64) - 1,
+            1,
+        ),
+    );
+}
+
 test "RunAfter cancel prevents callback" {
     var did_run = AtomicBool.init(false);
     var run_after = core.RunAfter{};
