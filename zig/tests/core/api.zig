@@ -64,7 +64,7 @@ test "reports generated JSON error keys" {
     );
     try std.testing.expectEqualStrings("privateKey", info.key orelse return error.TestUnexpectedResult);
 
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     // info.key = "stale";
     // try std.testing.expectError(
     //     error.InvalidModel,

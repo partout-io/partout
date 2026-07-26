@@ -31,7 +31,7 @@ var mutex: concurrency.Mutex = .{};
 var logs_private_data: bool = false;
 var external_logger: Callback = null;
 
-// ZIGME: Suppress until only Zig ABI
+// FIXME: #527, Suppress until only Zig ABI
 /// C ABI entry point used by foreign callers to forward a log message.
 // pub export fn partout_log(
 //     level: c_int,

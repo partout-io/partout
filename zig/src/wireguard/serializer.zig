@@ -13,7 +13,7 @@ pub fn serializeModule(
     module: *const api.TaggedModule,
     _: ?*anyopaque,
 ) core.SerializeError![]u8 {
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     const configuration = switch (module.*) {
         .WireGuard => |*wireguard| blk: {
             const value = if (wireguard.configuration) |*configuration|

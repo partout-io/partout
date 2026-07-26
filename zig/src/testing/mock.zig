@@ -108,7 +108,7 @@ pub const MockConnectionEnvironment = struct {
     fn onLooperFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
 };
 
-// ZIGME: Hardcode until only Zig ABI
+// FIXME: #527, Hardcode until only Zig ABI
 pub export fn partout_log(_: i32, message: [*:0]const u8) void {
     std.debug.print("{s}\n", .{message});
 }

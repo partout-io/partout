@@ -64,7 +64,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
         else => unreachable,
     };
 
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var info = try tunnel_info.TunnelRemoteInfoBuilder.init(
         allocator,
         &profile,
@@ -89,7 +89,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
         else => return error.TestUnexpectedResult,
     };
     try std.testing.expect(core.isGeneratedId(ip.id[0..]));
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     try std.testing.expectEqual(configuration.?.interface.dns.?.id, dns.id);
     try std.testing.expectEqual(@as(?i32, 1420), ip.mtu);
     try std.testing.expectEqualStrings("1.1.1.1", dns.servers[0].raw);
@@ -131,7 +131,7 @@ test "WireGuard connection folds active IP and VPN DNS routes into every peer" {
         else => unreachable,
     };
 
-    // ZIGME: Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+    // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     var merged = try connection.testing.configurationWithActiveModules(
         allocator,
         &source_configuration.?,
