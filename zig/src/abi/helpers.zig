@@ -14,6 +14,7 @@ const util = core.util;
 const ImportAndEncodeError = core.ImportError || api.EncodeError;
 
 pub const c = @cImport({
+    @cInclude("c/android_import_compat.h");
     @cInclude("partout.h");
 });
 

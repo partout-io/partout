@@ -27,6 +27,11 @@ else # Apple
 BUILDEXT := dylib
 endif
 
+GO_LDFLAGS := -w
+ifneq ($(filter android linux,$(HOST_GOOS)),)
+GO_LDFLAGS += -extldflags=-Wl,-soname,libwg-go.so
+endif
+
 # Build output
 MODROOT=src
 BUILDDIR ?= $(CURDIR)/build
@@ -58,7 +63,7 @@ version-header: $(BUILDDIR)/wireguard-go-version.h
 
 $(BUILDDIR)/libwg-go: export CGO_ENABLED := 1
 $(BUILDDIR)/libwg-go: $(GOROOT)/.prepared go.mod
-	go build -C $(MODROOT) -ldflags=-w -trimpath -v \
+	go build -C $(MODROOT) -ldflags="$(GO_LDFLAGS)" -trimpath -v \
 		-o "$(BUILDDIR)/libwg-go.$(BUILDEXT)" \
 		-buildmode=$(BUILDMODE)
 	rm -f "$(BUILDDIR)/libwg-go.h"

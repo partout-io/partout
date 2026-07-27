@@ -105,7 +105,40 @@ elseif(PARTOUT_ZIG_ARCH MATCHES "^(x64|amd64|x86_64)$")
     set(PARTOUT_ZIG_ARCH x86_64)
 endif()
 if(ANDROID)
-    set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-linux-android")
+    foreach(required_var IN ITEMS
+            CMAKE_ANDROID_NDK
+            CMAKE_SYSROOT
+            CMAKE_LIBRARY_ARCHITECTURE
+            ANDROID_PLATFORM
+            ANDROID_ABI)
+        if(NOT DEFINED ${required_var} OR "${${required_var}}" STREQUAL "")
+            message(FATAL_ERROR "${required_var} is required to configure Zig for Android")
+        endif()
+    endforeach()
+    unset(required_var)
+    if(NOT ANDROID_PLATFORM MATCHES "^android-([0-9]+)$")
+        message(FATAL_ERROR "Unsupported ANDROID_PLATFORM value: ${ANDROID_PLATFORM}")
+    endif()
+    set(PARTOUT_ANDROID_API "${CMAKE_MATCH_1}")
+
+    set(PARTOUT_ZIG_TARGET
+        "${PARTOUT_ZIG_ARCH}-linux-android.${PARTOUT_ANDROID_API}"
+    )
+    set(PARTOUT_ZIG_LIBC_FILE
+        "${CMAKE_CURRENT_BINARY_DIR}/android-${ANDROID_ABI}-${PARTOUT_ANDROID_API}.libc"
+    )
+    file(WRITE "${PARTOUT_ZIG_LIBC_FILE}"
+"include_dir=${CMAKE_SYSROOT}/usr/include
+sys_include_dir=${CMAKE_SYSROOT}/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
+crt_dir=${CMAKE_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/${PARTOUT_ANDROID_API}
+msvc_lib_dir=
+kernel32_lib_dir=
+gcc_dir=
+"
+    )
+    list(APPEND PARTOUT_ZIG_ARGS
+        --libc "${PARTOUT_ZIG_LIBC_FILE}"
+    )
 elseif(APPLE)
     set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-macos")
 elseif(WIN32)

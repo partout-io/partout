@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pub const c = @cImport({
+    @cInclude("c/android_import_compat.h");
     @cInclude("openvpn/openvpn.h");
 });
 
