@@ -234,6 +234,7 @@ build_slice() {
             --global-cache-dir "$global_cache_dir" \
             --release=small \
             -Dtarget="$target" \
+            -Dlegacy-build=true \
             -Dapple-sdk-path="$sdk" \
             -Dopenssl-include="$openssl_include" \
             -Dopenssl-lib="$openssl_lib" \

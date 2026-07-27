@@ -84,7 +84,6 @@ set(PARTOUT_ZIG_ARGS
     --prefix "${PARTOUT_ZIG_INSTALL_DIR}"
     --cache-dir "${PARTOUT_ZIG_BUILD_DIR}/cache"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
-    -Dembed-c=true
 )
 if(PP_BUILD_STATIC)
     list(APPEND PARTOUT_ZIG_ARGS -Dshared=false)

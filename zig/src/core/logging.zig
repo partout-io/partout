@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 const api = @import("api.zig");
 const concurrency = @import("concurrency.zig");
@@ -33,7 +34,7 @@ var logs_private_data: bool = false;
 var external_logger: Callback = null;
 
 /// C ABI entry point used by foreign callers to forward a log message.
-pub export fn partout_log(
+fn partoutLog(
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void {
@@ -44,6 +45,12 @@ pub export fn partout_log(
     };
     mutex.unlock();
     dispatchCString(logger, level, message);
+}
+
+comptime {
+    if (!build_options.legacy_build) {
+        @export(&partoutLog, .{ .name = "partout_log" });
+    }
 }
 
 /// Configures global logging state.

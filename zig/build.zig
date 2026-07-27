@@ -49,11 +49,12 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
     const api_codegen_step = addAPICodegenStep(b);
-    const embed_c = b.option(
+    const legacy_build = b.option(
         bool,
-        "embed-c",
-        "Embed the C implementations instead of resolving them at the final link.",
+        "legacy-build",
+        "Build for the legacy Swift integration that provides C implementations.",
     ) orelse false;
+    const embed_c = !legacy_build;
     const shared = b.option(
         bool,
         "shared",
@@ -110,7 +111,7 @@ pub fn build(b: *std.Build) void {
         null;
 
     const build_options = b.addOptions();
-    build_options.addOption(bool, "embed_c", embed_c);
+    build_options.addOption(bool, "legacy_build", legacy_build);
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
 
