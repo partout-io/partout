@@ -4,6 +4,3 @@
 [submodule "vendors/openssl"]
 	path = vendors/openssl
 	url = https://github.com/openssl/openssl
-[submodule "swift-cmake-toolchains"]
-	path = cmake/swift
-	url = https://github.com/keeshux/swift-cmake-toolchains
