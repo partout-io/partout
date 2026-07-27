@@ -79,7 +79,7 @@ pp_dns_result pp_dns_result_next(pp_dns_result result) {
 }
 
 size_t pp_dns_address_string_max(void) {
-    return 128;
+    return NI_MAXHOST;
 }
 
 bool pp_dns_address_string(pp_dns_result result,
