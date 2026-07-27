@@ -269,7 +269,7 @@ pub const Daemon = struct {
             .stop => self.doStop(.clear_environment),
             .evaluateConnection => self.doEvaluateConnection(),
             .resumeGate => self.doResumeGate(),
-            .onReachability => |reachability| self.handleReachabilitySignal(reachability),
+            .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionStatus => |status| self.handleConnectionStatus(status),
             .onConnectionLastError => |code| self.handleLastError(code),
@@ -313,23 +313,22 @@ pub const Daemon = struct {
         };
     }
 
-    // Network callbacks may originate while the platform owns a lock that is
-    // also needed by tunnel-controller callbacks. Never wait for the actor
-    // here: starting a connection can synchronously report a snapshot back to
-    // the platform and would otherwise deadlock with that lock held.
+    // This is external and is gated through ConnectionGate
     fn onReachability(ctx: ?*anyopaque, reachability: io.ReachabilityInfo) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.schedule(.{ .onReachability = reachability }) catch |err| {
-            log.writef(.err, "Unable to enqueue reachability: {s}", .{@errorName(err)});
+        if (self.gate) |*gate| {
+            _ = gate.updateReachability(reachability.reachable);
+        }
+        self.actor.perform(.{ .onReachability = reachability }) catch |err| {
+            log.writef(.err, "Unable to handle reachability: {s}", .{@errorName(err)});
         };
     }
 
-    // Like reachability, better-path notifications come from platform code
-    // whose locks must be released before calling back into the controller.
+    // This is external and is invoked by ConnectionGate
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.schedule(.onBetterPath) catch |err| {
-            log.writef(.err, "Unable to enqueue better path: {s}", .{@errorName(err)});
+        self.actor.perform(.onBetterPath) catch |err| {
+            log.writef(.err, "Unable to handle better path: {s}", .{@errorName(err)});
         };
     }
 
@@ -601,16 +600,6 @@ pub const Daemon = struct {
         if (self.gate) |*gate| {
             _ = gate.setEnabled(true);
         }
-    }
-
-    // Updates the gate on the actor so that a ready transition and the
-    // resulting connection start are serialized with the corresponding
-    // network-change event.
-    fn handleReachabilitySignal(self: *Daemon, reachability: io.ReachabilityInfo) void {
-        if (self.gate) |*gate| {
-            _ = gate.updateReachability(reachability.reachable);
-        }
-        self.handleReachability(reachability);
     }
 
     // Forwards the event to the underlying connection
