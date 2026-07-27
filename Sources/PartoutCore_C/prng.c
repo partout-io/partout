@@ -15,11 +15,11 @@
 #include "portable/prng.h"
 
 uint32_t pp_prng_rand(void) {
-#if PARTOUT_WINDOWS
-    return rand();
-#else
-    return arc4random();
-#endif
+    uint32_t value;
+    if (!pp_prng_do((uint8_t *)&value, sizeof(value))) {
+        abort();
+    }
+    return value;
 }
 
 #if PARTOUT_APPLE
