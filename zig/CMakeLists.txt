@@ -341,8 +341,9 @@ target_sources(partout
     PUBLIC
         FILE_SET api_headers
         TYPE HEADERS
-        BASE_DIRS "${CMAKE_CURRENT_SOURCE_DIR}/src"
-        FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
+        # FIXME: Change this after dropping Swift symlinks
+        BASE_DIRS "${ROOT_DIR}/Sources/Partout_C/include"
+        FILES "${ROOT_DIR}/Sources/Partout_C/include/partout.h"
 )
 target_include_directories(partout PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>
