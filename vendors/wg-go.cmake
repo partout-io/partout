@@ -71,7 +71,7 @@ if(NOT PP_USE_PREBUILT_VENDORS)
         )
         if(ANDROID)
             set(CLANG ${SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang)
-            set(WGGO_CMD ${WGGO_CMD} ANDROID=1 CC=${CLANG})
+            list(APPEND WGGO_CMD ANDROID=1 CC=${CLANG})
         endif()
     endif()
 
@@ -117,4 +117,10 @@ target_link_libraries(WireGuardGoInterface INTERFACE WireGuardGo::wg-go)
 if(NOT PP_USE_PREBUILT_VENDORS)
     add_dependencies(WireGuardGo::wg-go WireGuardGoProject)
     add_dependencies(WireGuardGoInterface WireGuardGoProject)
+endif()
+
+if(PP_BUILD_LIBRARY)
+    install(FILES "${WGGO_DIR}/include/wg_go/wg_go.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wg_go"
+    )
 endif()

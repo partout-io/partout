@@ -29,7 +29,6 @@ try {
     $bin_dir = "bin"
     $configuration = "Release"
     $generator = "Ninja Multi-Config"
-    $swift_version = "6.3.1"
     $vendor_source = $null
     $vendor_prebuilt_url = $null
     $crypto_selected = $false
@@ -117,18 +116,14 @@ try {
             }
             "-l" {
                 $cmake_opts += "-DPP_BUILD_LIBRARY=ON"
-                $cmake_opts += "-DCMAKE_C_COMPILER=clang"
-                $cmake_opts += "-DCMAKE_CXX_COMPILER=clang"
                 $do_build = $true
                 $index += 1
             }
             "-android" {
                 $build_dir = ".cmake-android"
-                $cmake_opts += "-DCMAKE_ANDROID_NDK=$env:ANDROID_NDK_HOME"
+                $cmake_opts += "-DCMAKE_TOOLCHAIN_FILE=${env:ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake"
+                $cmake_opts += "-DANDROID_PLATFORM=android-24"
                 $cmake_opts += "-DANDROID_ABI=arm64-v8a"
-                $cmake_opts += "-DANDROID_STL=c++_shared"
-                $cmake_opts += "-DSWIFT_VERSION=$swift_version"
-                $cmake_opts += "-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake"
                 $index += 1
             }
             "-vendors" {

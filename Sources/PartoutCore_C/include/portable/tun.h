@@ -44,24 +44,6 @@ pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);
 
-#if !PARTOUT_WINDOWS
-/* Reusable with POSIX-like tun device. */
-static inline int pp_tun_handle_result(int ret) {
-    if (ret < 0) {
-        if (pp_io_wouldblock()) {
-            return PPIOErrorWouldBlock;
-        }
-        if (pp_io_nobufs()) {
-            return PPIOErrorNoBufs;
-        }
-        if (pp_io_nospace()) {
-            return PPIOErrorNoSpace;
-        }
-    }
-    return ret;
-}
-#endif
-
 /* Tunnel controller. */
 typedef struct {
     void *_Nullable ctx;

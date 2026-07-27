@@ -10,12 +10,6 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#if !PARTOUT_WINDOWS
-#include <netdb.h>
-#endif
-#if PARTOUT_ANDROID
-#include <android/multinetwork.h>
-#endif
 #include "portable/common.h"
 
 #pragma clang assume_nonnull begin
@@ -39,26 +33,6 @@ static inline pp_reachability pp_reachability_none(void) {
     };
 #endif
     return none;
-}
-
-static inline int pp_dns_resolve(const char *hostname,
-                                 const char *_Nullable service,
-                                 const struct addrinfo *_Nullable hints,
-                                 const pp_reachability *_Nullable reachability,
-                                 struct addrinfo *_Nullable *_Nonnull infoptr) {
-#if PARTOUT_ANDROID
-    if (!reachability || reachability->network_handle == 0) {
-        return EAI_FAIL;
-    }
-    return android_getaddrinfofornetwork(reachability->network_handle,
-                                         hostname,
-                                         service,
-                                         hints,
-                                         infoptr);
-#else
-    (void)reachability;
-    return getaddrinfo(hostname, service, hints, infoptr);
-#endif
 }
 
 /* The available protocols. */
@@ -114,14 +88,6 @@ int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
 bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write);
 bool pp_socket_reset_events(pp_socket sock);
 
-#if PARTOUT_WINDOWS
-static inline int pp_socket_last_error(void) {
-    return WSAGetLastError();
-}
-#else
-static inline int pp_socket_last_error(void) {
-    return errno;
-}
-#endif
+int pp_socket_last_error_binding(void);
 
 #pragma clang assume_nonnull end

@@ -58,4 +58,4 @@ jobs:
         if: matrix.suite == 'zig'
         working-directory: zig
         run: |
-          zig build test -Dembed-c=true -Dopenvpn=true -Dwireguard=true
+          zig build test -Dopenvpn=true -Dwireguard=true

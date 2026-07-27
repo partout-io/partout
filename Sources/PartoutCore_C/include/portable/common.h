@@ -70,35 +70,8 @@ void pp_zero(void *ptr, size_t count) {
 #endif
 }
 
-static inline
-char *pp_dup(const char *str) {
-#if PARTOUT_WINDOWS
-    char *ptr = _strdup(str);
-#else
-    char *ptr = strdup(str);
-#endif
-    if (!ptr) {
-        pp_clog(PPLogLevelFault, "pp_dup: strdup() call failed");
-        abort();
-    }
-    return ptr;
-}
-
-#if PARTOUT_WINDOWS
-static inline
-FILE *_Nullable pp_fopen(const char *filename, const char *mode) {
-    FILE *file_ret = NULL;
-    errno_t file_err = fopen_s(&file_ret, filename, mode);
-    if (file_err == 0) {
-        return NULL;
-    }
-    return file_ret;
-}
-#define pp_sscanf sscanf_s
-#else
-#define pp_fopen fopen
-#define pp_sscanf sscanf
-#endif
+char *pp_dup(const char *str);
+FILE *_Nullable pp_fopen(const char *filename, const char *mode);
 
 /* Read a whole file into a string. */
 char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent);
@@ -127,28 +100,19 @@ extern const int PPIOErrorNoSpace;
 
 #pragma clang assume_nonnull begin
 
-typedef _Nonnull HANDLE pp_fd;
-typedef SOCKET pp_socket_fd;
+/* ABI-compatible with the Windows SDK HANDLE and SOCKET definitions. */
+typedef void *_Nonnull pp_fd;
+typedef uintptr_t pp_socket_fd;
 
 static inline bool pp_fd_is_valid(pp_fd fd) {
-    return fd != INVALID_HANDLE_VALUE;
+    return (intptr_t)fd != -1;
 }
 
-#define PP_IO_RETRY(result, fn) \
-    do { \
-        do { \
-            (result) = (fn); \
-        } while ((result) < 0 && WSAGetLastError() == WSAEINTR); \
-    } while (0)
-
-static inline int pp_io_last_error(void) {
-    return (int)GetLastError();
-}
+int pp_io_last_error_binding(void);
 #pragma clang assume_nonnull end
 
 #else
 
-#include <errno.h>
 #pragma clang assume_nonnull begin
 
 typedef int pp_fd;
@@ -160,29 +124,8 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
 
 int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 int pp_fd_restore_blocking(pp_fd fd, int original_flags);
+int pp_io_last_error_binding(void);
 
-#define PP_IO_RETRY(result, fn) \
-    do { \
-        do { \
-            (result) = (fn); \
-        } while ((result) < 0 && errno == EINTR); \
-    } while (0)
-
-static inline int pp_io_last_error(void) {
-    return errno;
-}
-
-static inline bool pp_io_wouldblock(void) {
-    return errno == EAGAIN || errno == EWOULDBLOCK;
-}
-
-static inline bool pp_io_nobufs(void) {
-    return errno == ENOBUFS;
-}
-
-static inline bool pp_io_nospace(void) {
-    return errno == ENOSPC;
-}
 #pragma clang assume_nonnull end
 
 #endif

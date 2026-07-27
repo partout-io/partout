@@ -12,21 +12,6 @@ include(GNUInstallDirs)
 include(CMakePackageConfigHelpers)
 include("cmake/prebuilt.cmake")
 
-# Be quite strict
-set(CMAKE_C_FLAGS "
-    -Wall -Wextra \
-    -Wno-nullability-extension \
-    -Wno-language-extension-token"
-)
-if(NOT WIN32)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -pedantic")
-endif()
-set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
-set(CMAKE_CXX_STANDARD 11)
-if(MSVC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /EHsc")
-endif()
-
 # Command line options
 option(PP_BUILD_LIBRARY "Include main library" 0)
 option(PP_BUILD_STATIC "Build as static library" 0)
@@ -179,18 +164,7 @@ endif()
 
 # Build Partout library (opt-in), after vendored dependencies
 if(PP_BUILD_LIBRARY)
-    enable_language(Swift)
-    if(WIN32)
-        # CMake passes raw MSVC defaults such as /machine and /INCREMENTAL
-        # through <LINK_FLAGS>, but swiftc expects linker flags via -Xlinker.
-        foreach(rule IN ITEMS
-                CMAKE_Swift_CREATE_SHARED_LIBRARY
-                CMAKE_Swift_CREATE_SHARED_MODULE
-                CMAKE_Swift_CREATE_STATIC_LIBRARY)
-            string(REPLACE " <LINK_FLAGS>" "" ${rule} "${${rule}}")
-        endforeach()
-    endif()
-    add_subdirectory(Sources)
+    add_subdirectory(zig)
     if(PP_BUILD_USE_OPENSSL)
         target_link_libraries(partout_c PRIVATE "$<BUILD_LOCAL_INTERFACE:OpenSSLInterface>")
         target_link_libraries(partout PRIVATE "$<BUILD_LOCAL_INTERFACE:OpenSSLInterface>")

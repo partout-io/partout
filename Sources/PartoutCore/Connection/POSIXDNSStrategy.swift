@@ -56,24 +56,21 @@ private extension POSIXDNSStrategy {
         }
         pp_log_g(.core, .info, "resolveAndBlock() with Android network handle: \(networkHandle)")
 #endif
-        var hints = addrinfo()
-#if canImport(Darwin)
-        // Beware that DNS breaks on Android when AI_ALL + AF_UNSPEC is set
-        hints.ai_flags = flags.contains(.allAddresses) ? AI_ALL : 0
-#endif
-        hints.ai_family = AF_UNSPEC // IPv4/IPv6
-        // XXX: Choosing either would dedup results
-//        hints.ai_socktype = SOCK_STREAM SOCK_DGRAM
-        var infoPointer: UnsafeMutablePointer<addrinfo>?
+        var infoPointer: pp_dns_result?
         var cReachability = reachability?.toCReachability ?? pp_reachability_none()
         let result = hostname.withCString {
-            pp_dns_resolve($0, nil, &hints, &cReachability, &infoPointer)
+            pp_dns_resolve(
+                $0,
+                nil,
+                flags.contains(.allAddresses),
+                &cReachability,
+                &infoPointer
+            )
         }
         guard result == 0 else {
-            switch result {
-            case EAI_BADFLAGS:
+            if pp_dns_error_is_bad_flags(result) {
                 pp_log_g(.core, .fault, "pp_dns_resolve() failed with EAI_BADFLAGS")
-            default:
+            } else {
                 pp_log_g(.core, .fault, "pp_dns_resolve() failed with result \(result)")
             }
             throw PartoutError(.dnsFailure)
@@ -81,38 +78,30 @@ private extension POSIXDNSStrategy {
 
         defer {
             if let infoPointer {
-                freeaddrinfo(infoPointer)
+                pp_dns_result_free(infoPointer)
             }
         }
 
         var records: [DNSRecord] = []
-        var currentPointer = infoPointer
-        while let pointer = currentPointer {
-            let info = pointer.pointee
-            currentPointer = info.ai_next
+        var current = infoPointer
+        while let result = current {
+            current = pp_dns_result_next(result)
             guard !Task.isCancelled else { return nil }
-            guard let addr = info.ai_addr else { continue }
-            let addrLength = socklen_t(info.ai_addrlen)
-            var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-#if os(Windows)
-            let hostBufLength = DWORD(hostBuffer.count)
-#elseif os(Android)
-            let hostBufLength = Int(hostBuffer.count)
-#else
-            let hostBufLength = socklen_t(hostBuffer.count)
-#endif
-            let result = getnameinfo(
-                addr,
-                addrLength,
-                &hostBuffer,
-                hostBufLength,
-                nil,
-                0,
-                NI_NUMERICHOST
-            )
-            if result == 0 {
+            var hostBuffer = [CChar](repeating: 0, count: Int(pp_dns_address_string_max()))
+            var isIPv6 = false
+            let isResolved = hostBuffer.withUnsafeMutableBufferPointer {
+                guard let baseAddress = $0.baseAddress else {
+                    return false
+                }
+                return pp_dns_address_string(
+                    result,
+                    baseAddress,
+                    $0.count,
+                    &isIPv6
+                )
+            }
+            if isResolved {
                 let address = hostBuffer.string
-                let isIPv6 = info.ai_family == AF_INET6
                 records.append(DNSRecord(address: address, isIPv6: isIPv6))
             }
         }

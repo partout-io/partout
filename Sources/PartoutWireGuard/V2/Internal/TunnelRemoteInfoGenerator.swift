@@ -310,30 +310,29 @@ private extension Endpoint {
 #if os(iOS) || os(tvOS)
         let hostname = address.rawValue
 
-        var hints = addrinfo()
-        hints.ai_family = AF_UNSPEC
-        hints.ai_socktype = SOCK_DGRAM
-        hints.ai_protocol = IPPROTO_UDP
-        hints.ai_flags = 0
-
-        var resultPointer: UnsafeMutablePointer<addrinfo>?
+        var resultPointer: pp_dns_result?
         defer {
-            resultPointer.flatMap {
-                freeaddrinfo($0)
+            if let resultPointer {
+                pp_dns_result_free(resultPointer)
             }
         }
 
-        let errorCode = pp_dns_resolve(hostname, "\(port)", &hints, nil, &resultPointer)
+        let service = "\(port)"
+        let errorCode = hostname.withCString { hostname in
+            service.withCString { service in
+                pp_dns_resolve(hostname, service, false, nil, &resultPointer)
+            }
+        }
         if errorCode != 0 {
             throw PartoutError(.dnsFailure)
         }
 
         var next = resultPointer
-        while let addrInfo = next?.pointee {
-            if let endpoint = Self.endpoint(from: addrInfo, port: port) {
+        while let result = next {
+            next = pp_dns_result_next(result)
+            if let endpoint = Self.endpoint(from: result, port: port) {
                 return endpoint
             }
-            next = addrInfo.ai_next
         }
         throw PartoutError(.dnsFailure)
 #else
@@ -341,28 +340,18 @@ private extension Endpoint {
 #endif
     }
 
-    static func endpoint(from addrInfo: addrinfo, port: UInt16) -> Endpoint? {
-        guard let addr = addrInfo.ai_addr else {
-            return nil
+    static func endpoint(from result: pp_dns_result, port: UInt16) -> Endpoint? {
+        var hostBuffer = [CChar](repeating: 0, count: Int(pp_dns_address_string_max()))
+        var isIPv6 = false
+        let isResolved = hostBuffer.withUnsafeMutableBufferPointer {
+            pp_dns_address_string(
+                result,
+                $0.baseAddress!,
+                $0.count,
+                &isIPv6
+            )
         }
-        var hostBuffer = [CChar](repeating: 0, count: Int(NI_MAXHOST))
-#if os(Windows)
-        let hostBufferLength = DWORD(hostBuffer.count)
-#elseif os(Android)
-        let hostBufferLength = Int(hostBuffer.count)
-#else
-        let hostBufferLength = socklen_t(hostBuffer.count)
-#endif
-        let result = getnameinfo(
-            addr,
-            socklen_t(addrInfo.ai_addrlen),
-            &hostBuffer,
-            hostBufferLength,
-            nil,
-            0,
-            NI_NUMERICHOST
-        )
-        guard result == 0 else {
+        guard isResolved else {
             return nil
         }
         return try? Endpoint(hostBuffer.string, port)

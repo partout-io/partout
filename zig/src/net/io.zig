@@ -215,7 +215,7 @@ pub const SocketWrapper = struct {
     }
 
     pub fn lastErrorCode(_: SocketWrapper) c_int {
-        return c.pp_socket_last_error();
+        return c.pp_socket_last_error_binding();
     }
 };
 
@@ -282,7 +282,7 @@ pub const TunWrapper = struct {
     }
 
     pub fn lastErrorCode(_: TunWrapper) c_int {
-        return c.pp_io_last_error();
+        return c.pp_io_last_error_binding();
     }
 };
 

@@ -32,9 +32,9 @@ test "DNS resolver times out and caps abandoned queries" {
 
         fn resolve(
             _: [:0]const u8,
-            _: *const c.addrinfo,
+            _: bool,
             _: ?*const ReachabilityInfo,
-            _: *[*c]c.addrinfo,
+            _: *c.pp_dns_result,
         ) c_int {
             while (!release.load(.acquire)) std.Thread.yield() catch {};
             return -1;

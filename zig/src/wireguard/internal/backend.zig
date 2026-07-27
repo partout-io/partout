@@ -11,6 +11,7 @@ const log = core.logging;
 const util = core.util;
 
 const c = @cImport({
+    @cInclude("c/android_import_compat.h");
     @cInclude("wireguard/wireguard.h");
 });
 

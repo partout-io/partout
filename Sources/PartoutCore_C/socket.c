@@ -4,10 +4,20 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <WinSock2.h>
+#include <WS2tcpip.h>
+#include <Windows.h>
+#elif PARTOUT_ANDROID
+#include <android/multinetwork.h>
+#endif
+
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <fcntl.h>
 #include "portable/common.h"
 #include "portable/socket.h"
 
@@ -38,6 +48,11 @@ static void local_cleanup_socket(pp_socket sock);
 static pp_fd local_invalid_watch_fd(void);
 static pp_fd local_socket_watch_fd(const pp_socket sock);
 
+static int local_getaddrinfo(const char *hostname,
+                             const char *service,
+                             const struct addrinfo *hints,
+                             const pp_reachability *reachability,
+                             struct addrinfo **result);
 static int local_connect_with_timeout(pp_socket_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
@@ -57,6 +72,30 @@ static bool local_is_valid_socket(pp_socket sock) {
     return sock &&
            !local_is_invalid_fd(sock->fd) &&
            pp_fd_is_valid(local_socket_watch_fd(sock));
+}
+
+static int local_getaddrinfo(const char *hostname,
+                             const char *service,
+                             const struct addrinfo *hints,
+                             const pp_reachability *reachability,
+                             struct addrinfo **result) {
+#if PARTOUT_ANDROID
+    if (!reachability || reachability->network_handle == 0) {
+        return EAI_FAIL;
+    }
+    return android_getaddrinfofornetwork(reachability->network_handle,
+                                         hostname,
+                                         service,
+                                         hints,
+                                         result);
+#else
+    (void)reachability;
+    return getaddrinfo(hostname, service, hints, result);
+#endif
+}
+
+int pp_socket_last_error_binding(void) {
+    return pp_socket_last_error();
 }
 
 /* Create a socket from a formerly opened file descriptor. */
@@ -144,7 +183,11 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
     snprintf(port_str, sizeof(port_str), "%u", port);
-    const int ret = pp_dns_resolve(ip_addr, port_str, &hints, reachability, &resolved);
+    const int ret = local_getaddrinfo(ip_addr,
+                                      port_str,
+                                      &hints,
+                                      reachability,
+                                      &resolved);
     if (ret != 0) {
         local_print_error("pp_dns_resolve()");
         goto failure;
