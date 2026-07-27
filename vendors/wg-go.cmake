@@ -118,3 +118,9 @@ if(NOT PP_USE_PREBUILT_VENDORS)
     add_dependencies(WireGuardGo::wg-go WireGuardGoProject)
     add_dependencies(WireGuardGoInterface WireGuardGoProject)
 endif()
+
+if(PP_BUILD_LIBRARY)
+    install(FILES "${WGGO_DIR}/include/wg_go/wg_go.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/wg_go"
+    )
+endif()
