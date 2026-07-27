@@ -90,9 +90,12 @@ private extension POSIXDNSStrategy {
             var hostBuffer = [CChar](repeating: 0, count: Int(pp_dns_address_string_max()))
             var isIPv6 = false
             let isResolved = hostBuffer.withUnsafeMutableBufferPointer {
-                pp_dns_address_string(
+                guard let baseAddress = $0.baseAddress else {
+                    return false
+                }
+                return pp_dns_address_string(
                     result,
-                    $0.baseAddress!,
+                    baseAddress,
                     $0.count,
                     &isIPv6
                 )
