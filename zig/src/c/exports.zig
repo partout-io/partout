@@ -14,6 +14,7 @@ pub const common = @cImport({
 
 pub const io = @cImport({
     @cInclude("c/android_import_compat.h");
+    @cInclude("portable/dns.h");
     @cInclude("portable/mux.h");
     @cInclude("portable/socket.h");
     @cInclude("portable/tun.h");

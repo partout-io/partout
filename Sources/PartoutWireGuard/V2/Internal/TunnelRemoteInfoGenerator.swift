@@ -313,7 +313,7 @@ private extension Endpoint {
         var resultPointer: pp_dns_result?
         defer {
             if let resultPointer {
-                pp_dns_free(resultPointer)
+                pp_dns_result_free(resultPointer)
             }
         }
 
@@ -329,7 +329,7 @@ private extension Endpoint {
 
         var next = resultPointer
         while let result = next {
-            next = pp_dns_next(result)
+            next = pp_dns_result_next(result)
             if let endpoint = Self.endpoint(from: result, port: port) {
                 return endpoint
             }
@@ -341,7 +341,7 @@ private extension Endpoint {
     }
 
     static func endpoint(from result: pp_dns_result, port: UInt16) -> Endpoint? {
-        var hostBuffer = [CChar](repeating: 0, count: Int(PPDNSAddressStringMax))
+        var hostBuffer = [CChar](repeating: 0, count: Int(pp_dns_address_string_max()))
         var isIPv6 = false
         let isResolved = hostBuffer.withUnsafeMutableBufferPointer {
             pp_dns_address_string(

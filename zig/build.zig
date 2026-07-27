@@ -599,6 +599,7 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     module.addCSourceFiles(.{
         .files = &.{
             "src/c/portable/common.c",
+            "src/c/portable/dns.c",
             "src/c/portable/lib.c",
             "src/c/portable/mux.c",
             "src/c/portable/network.c",

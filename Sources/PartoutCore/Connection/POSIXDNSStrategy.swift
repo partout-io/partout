@@ -78,16 +78,16 @@ private extension POSIXDNSStrategy {
 
         defer {
             if let infoPointer {
-                pp_dns_free(infoPointer)
+                pp_dns_result_free(infoPointer)
             }
         }
 
         var records: [DNSRecord] = []
         var current = infoPointer
         while let result = current {
-            current = pp_dns_next(result)
+            current = pp_dns_result_next(result)
             guard !Task.isCancelled else { return nil }
-            var hostBuffer = [CChar](repeating: 0, count: Int(PPDNSAddressStringMax))
+            var hostBuffer = [CChar](repeating: 0, count: Int(pp_dns_address_string_max()))
             var isIPv6 = false
             let isResolved = hostBuffer.withUnsafeMutableBufferPointer {
                 pp_dns_address_string(

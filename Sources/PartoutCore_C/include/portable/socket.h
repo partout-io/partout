@@ -35,26 +35,6 @@ static inline pp_reachability pp_reachability_none(void) {
     return none;
 }
 
-/* Opaque wrapper around the platform-native addrinfo list. */
-typedef struct __pp_dns_result *pp_dns_result;
-
-enum {
-    PPDNSAddressStringMax = 128
-};
-
-int pp_dns_resolve(const char *hostname,
-                   const char *_Nullable service,
-                   bool all_addresses,
-                   const pp_reachability *_Nullable reachability,
-                   pp_dns_result _Nullable *_Nonnull result);
-void pp_dns_free(pp_dns_result result);
-pp_dns_result _Nullable pp_dns_next(pp_dns_result result);
-bool pp_dns_address_string(pp_dns_result result,
-                           char *dst,
-                           size_t dst_len,
-                           bool *is_ipv6);
-bool pp_dns_error_is_bad_flags(int error_code);
-
 /* The available protocols. */
 typedef enum {
     PPSocketProtoTCP,

@@ -140,7 +140,7 @@ pub const PlatformDNS = struct {
         }
         thread.join();
 
-        defer if (result) |info| c.pp_dns_free(info);
+        defer if (result) |info| c.pp_dns_result_free(info);
         if (status != 0) {
             if (c.pp_dns_error_is_bad_flags(status)) {
                 log.write(.fault, "getaddrinfo() failed with EAI_BADFLAGS");
@@ -156,14 +156,15 @@ pub const PlatformDNS = struct {
             for (records.items) |record| record.deinit(allocator);
             records.deinit(allocator);
         }
+        const address_buffer = try allocator.alloc(u8, c.pp_dns_address_string_max());
+        defer allocator.free(address_buffer);
         var item = result;
-        while (item) |info| : (item = c.pp_dns_next(info)) {
-            var address_buffer: [c.PPDNSAddressStringMax]u8 =
-                [_]u8{0} ** c.PPDNSAddressStringMax;
+        while (item) |info| : (item = c.pp_dns_result_next(info)) {
+            @memset(address_buffer, 0);
             var is_ipv6 = false;
             if (!c.pp_dns_address_string(
                 info,
-                &address_buffer,
+                address_buffer.ptr,
                 address_buffer.len,
                 &is_ipv6,
             )) {
@@ -172,7 +173,7 @@ pub const PlatformDNS = struct {
                 });
                 continue;
             }
-            const numeric = try allocator.dupe(u8, std.mem.sliceTo(&address_buffer, 0));
+            const numeric = try allocator.dupe(u8, std.mem.sliceTo(address_buffer, 0));
             records.append(allocator, .{
                 .address = numeric,
                 .is_ipv6 = is_ipv6,
@@ -310,7 +311,7 @@ const Query = struct {
 
     fn recycleLocked(self: *Query) void {
         if (!self.caller_done or !self.worker_done) return;
-        if (self.result) |result| c.pp_dns_free(result);
+        if (self.result) |result| c.pp_dns_result_free(result);
         std.heap.c_allocator.free(self.hostname.?);
         self.* = .{};
     }

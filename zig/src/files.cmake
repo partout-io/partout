@@ -125,6 +125,7 @@ src/c/crypto/crypto_openssl.c
 src/c/crypto/crypto_windows.c
 src/c/crypto/tls_options.c
 src/c/portable/common.c
+src/c/portable/dns.c
 src/c/portable/lib.c
 src/c/portable/mux.c
 src/c/portable/network.c

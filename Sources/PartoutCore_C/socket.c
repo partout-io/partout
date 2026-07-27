@@ -15,7 +15,6 @@
 #endif
 
 #include <fcntl.h>
-#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -92,81 +91,6 @@ static int local_getaddrinfo(const char *hostname,
 #else
     (void)reachability;
     return getaddrinfo(hostname, service, hints, result);
-#endif
-}
-
-int pp_dns_resolve(const char *hostname,
-                   const char *service,
-                   bool all_addresses,
-                   const pp_reachability *reachability,
-                   pp_dns_result *result) {
-    struct addrinfo hints;
-    struct addrinfo *native_result = NULL;
-    pp_zero(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;
-#if PARTOUT_APPLE && defined(AI_ALL)
-    if (all_addresses) {
-        hints.ai_flags |= AI_ALL;
-    }
-#else
-    (void)all_addresses;
-#endif
-    const int status = local_getaddrinfo(hostname,
-                                         service,
-                                         &hints,
-                                         reachability,
-                                         &native_result);
-    *result = (pp_dns_result)native_result;
-    return status;
-}
-
-void pp_dns_free(pp_dns_result result) {
-    if (!result) return;
-    freeaddrinfo((struct addrinfo *)result);
-}
-
-pp_dns_result pp_dns_next(pp_dns_result result) {
-    if (!result) return NULL;
-    const struct addrinfo *native_result = (const struct addrinfo *)result;
-    return (pp_dns_result)native_result->ai_next;
-}
-
-bool pp_dns_address_string(pp_dns_result result,
-                           char *dst,
-                           size_t dst_len,
-                           bool *is_ipv6) {
-    if (!result || !dst || dst_len == 0 || !is_ipv6) return false;
-    const struct addrinfo *native_result = (const struct addrinfo *)result;
-    if (!native_result->ai_addr) return false;
-#if PARTOUT_WINDOWS
-    if (native_result->ai_addrlen > INT_MAX || dst_len > UINT32_MAX) return false;
-    const int status = getnameinfo(native_result->ai_addr,
-                                   (int)native_result->ai_addrlen,
-                                   dst,
-                                   (DWORD)dst_len,
-                                   NULL,
-                                   0,
-                                   NI_NUMERICHOST);
-#else
-    const int status = getnameinfo(native_result->ai_addr,
-                                   native_result->ai_addrlen,
-                                   dst,
-                                   (socklen_t)dst_len,
-                                   NULL,
-                                   0,
-                                   NI_NUMERICHOST);
-#endif
-    if (status != 0) return false;
-    *is_ipv6 = native_result->ai_family == AF_INET6;
-    return true;
-}
-
-bool pp_dns_error_is_bad_flags(int error_code) {
-#ifdef EAI_BADFLAGS
-    return error_code == EAI_BADFLAGS;
-#else
-    (void)error_code;
-    return false;
 #endif
 }
 

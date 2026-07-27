@@ -7,6 +7,7 @@
 #pragma once
 
 #include "common.h"
+#include "dns.h"
 #include "endian.h"
 #include "lib.h"
 #include "mux.h"
