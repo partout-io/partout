@@ -176,7 +176,8 @@ while [[ $# -gt 0 ]]; do
         -android)
             is_android=1
             build_dir=.cmake-android
-            cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
+            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=${ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake")
+            cmake_opts+=("-DANDROID_PLATFORM=android-24")
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
             shift
             ;;
