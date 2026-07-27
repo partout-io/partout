@@ -658,6 +658,11 @@ fn copyFixedString(buffer: *[64]u8, len: *usize, value: []const u8) void {
 }
 
 pub const MockTunnelController = struct {
+    pub const SnapshotBlock = struct {
+        entered: std.atomic.Value(bool) = .init(false),
+        release: std.atomic.Value(bool) = .init(false),
+    };
+
     pub const LastTunnelSettings = struct {
         requires_virtual_device: bool,
         original_module_id: api.UUID,
@@ -676,6 +681,7 @@ pub const MockTunnelController = struct {
     clear_tunnel_settings_count: usize = 0,
     configure_sockets_count: usize = 0,
     report_snapshot_count: usize = 0,
+    snapshot_block: ?*SnapshotBlock = null,
     last_settings_info: ?api.TunnelRemoteInfoWrapper = null,
     last_settings: ?LastTunnelSettings = null,
     reasserting: bool = false,
@@ -716,6 +722,12 @@ fn mockConfigureSockets(ptr: ?*anyopaque, descriptors: []const net_io.SocketDesc
 fn mockReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
     const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
     self.report_snapshot_count += 1;
+    if (self.snapshot_block) |block| {
+        block.entered.store(true, .release);
+        while (!block.release.load(.acquire)) {
+            std.Thread.yield() catch {};
+        }
+    }
     _ = snapshot;
 }
 
