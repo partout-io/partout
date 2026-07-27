@@ -518,12 +518,66 @@ test "connection daemon connects when previously unreachable network becomes rea
     }, sut.testStatuses());
 
     monitor.setReachable(true);
+    // External network callbacks enqueue work so platform locks can be
+    // released before the actor calls back into the tunnel controller.
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
         .connecting,
         .connected,
     }, sut.testStatuses());
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
+}
+
+test "connection daemon does not block the external reachability callback on snapshots" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{ .reachable = false };
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{},
+    );
+    defer sut.destroy();
+
+    try sut.start();
+    defer sut.stop();
+
+    var snapshot_block = mock.MockTunnelController.SnapshotBlock{};
+    controller.snapshot_block = &snapshot_block;
+    var callback_returned = std.atomic.Value(bool).init(false);
+    const Emitter = struct {
+        fn run(target: *mock.MockNetworkMonitor, returned: *std.atomic.Value(bool)) void {
+            target.setReachable(true);
+            returned.store(true, .release);
+        }
+    };
+    const emitter = try std.Thread.spawn(.{}, Emitter.run, .{ &monitor, &callback_returned });
+    defer {
+        snapshot_block.release.store(true, .release);
+        emitter.join();
+    }
+
+    var attempts: usize = 0;
+    while (!snapshot_block.entered.load(.acquire) and attempts < 100_000) : (attempts += 1) {
+        std.Thread.yield() catch {};
+    }
+    try std.testing.expect(snapshot_block.entered.load(.acquire));
+    attempts = 0;
+    while (!callback_returned.load(.acquire) and attempts < 100_000) : (attempts += 1) {
+        std.Thread.yield() catch {};
+    }
+    try std.testing.expect(callback_returned.load(.acquire));
 }
 
 test "connection daemon forwards better path events to current connection" {
@@ -553,6 +607,7 @@ test "connection daemon forwards better path events to current connection" {
 
     try sut.start();
     monitor.onBetterPath();
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqual(@as(usize, 1), blocking_connection.better_path_count);
 
     sut.stop();
