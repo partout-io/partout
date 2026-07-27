@@ -117,8 +117,6 @@ try {
             }
             "-l" {
                 $cmake_opts += "-DPP_BUILD_LIBRARY=ON"
-                $cmake_opts += "-DCMAKE_C_COMPILER=clang"
-                $cmake_opts += "-DCMAKE_CXX_COMPILER=clang"
                 $do_build = $true
                 $index += 1
             }

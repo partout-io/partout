@@ -13,13 +13,9 @@ include(CMakePackageConfigHelpers)
 include("cmake/prebuilt.cmake")
 
 # Be quite strict
-set(CMAKE_C_FLAGS "
-    -Wall -Wextra \
-    -Wno-nullability-extension \
-    -Wno-language-extension-token"
-)
+set(CMAKE_C_FLAGS "-Wall")
 if(NOT WIN32)
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -pedantic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Werror -pedantic -Wextra -Wno-nullability-extension -Wno-language-extension-token")
 endif()
 set(CMAKE_CXX_FLAGS ${CMAKE_C_FLAGS})
 set(CMAKE_CXX_STANDARD 11)
