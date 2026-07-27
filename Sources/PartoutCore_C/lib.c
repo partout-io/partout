@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include "portable/common.h"
@@ -14,7 +22,6 @@ struct __pp_lib_struct {
     HMODULE handle;
 };
 #else
-#include <dlfcn.h>
 struct __pp_lib_struct {
     void *handle;
 };

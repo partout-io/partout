@@ -20,6 +20,10 @@ struct __pp_socket_struct {
 
 typedef socklen_t os_socklen_t;
 
+static inline int pp_socket_last_error(void) {
+    return errno;
+}
+
 static inline void local_print_error(const char *msg) {
     pp_clog_v(PPLogLevelFault, "%s failed: %s", msg, strerror(errno));
 }

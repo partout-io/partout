@@ -4,15 +4,20 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#include <objbase.h>
+#include <wintun.h>
+#endif
+
 #include "portable/common.h"
 #include "portable/tun.h"
 
 // FIXME: #188, Implement Windows tun_ctrl
 
 #if PARTOUT_WINDOWS
-
-#include <wintun.h>
-#include <objbase.h>
 
 // FIXME: #188, convert debug messages to logs
 

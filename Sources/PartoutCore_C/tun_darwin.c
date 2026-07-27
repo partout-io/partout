@@ -11,6 +11,7 @@
 
 #if PARTOUT_APPLE
 
+#include "portable/io_posix.h"
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/uio.h>
@@ -189,7 +190,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     int read_len;
     PP_IO_RETRY(read_len, (int)readv(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (read_len < 0) {
-        return pp_tun_handle_result(read_len);
+        return pp_io_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
         pp_clog(PPLogLevelError, "tun_darwin: Missing 4-byte utun packet header");
@@ -215,7 +216,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     int written_len;
     PP_IO_RETRY(written_len, (int)writev(tun->fd, iov, sizeof(iov) / sizeof(struct iovec)));
     if (written_len < 0) {
-        return pp_tun_handle_result(written_len);
+        return pp_io_handle_result(written_len);
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
     return (int)src_len;

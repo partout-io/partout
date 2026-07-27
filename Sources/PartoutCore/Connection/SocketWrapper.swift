@@ -99,7 +99,7 @@ final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     }
 
     var lastErrorCode: Int32 {
-        pp_socket_last_error()
+        pp_socket_last_error_binding()
     }
 }
 

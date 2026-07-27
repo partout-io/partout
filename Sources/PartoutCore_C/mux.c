@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#endif
+
 #include "portable/common.h"
 
 const int PPMuxErrorNull = -2;
@@ -11,5 +17,6 @@ const int PPMuxErrorNull = -2;
 #if PARTOUT_WINDOWS
 #include "portable/mux_windows.h"
 #else
+#include "portable/io_posix.h"
 #include "portable/mux_posix.h"
 #endif

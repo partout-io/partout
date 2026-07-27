@@ -4,6 +4,13 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#include <bcrypt.h>
+#endif
+
 #include <stdlib.h>
 #include "portable/prng.h"
 
@@ -24,8 +31,6 @@ bool pp_prng_do(uint8_t *dst, size_t len) {
 }
 
 #elif PARTOUT_WINDOWS
-
-#include <bcrypt.h>
 
 bool pp_prng_do(uint8_t *dst, size_t len) {
     NTSTATUS status = BCryptGenRandom(

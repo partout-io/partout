@@ -15,7 +15,7 @@ const log = core.logging;
 const DNSRecord = sandbox.DNSRecord;
 const DNSResolver = sandbox.DNSResolver;
 const ReachabilityInfo = io.ReachabilityInfo;
-const ResolveFn = *const fn ([:0]const u8, *const c.addrinfo, ?*const ReachabilityInfo, *[*c]c.addrinfo) c_int;
+const ResolveFn = *const fn ([:0]const u8, bool, ?*const ReachabilityInfo, *c.pp_dns_result) c_int;
 
 // Timed-out slots remain occupied until their uncancellable query returns.
 const max_pending_queries = 3;
@@ -91,10 +91,12 @@ pub const PlatformDNS = struct {
             log.writef(.info, "resolveAndBlock() with Android network handle: {}", .{info.network_handle});
         }
 
-        const query = query_pool.acquire(hostname, .{
-            .ai_family = c.AF_UNSPEC,
-            .ai_flags = dnsFlags(flags),
-        }, reachability, resolve_fn) catch |err| return err;
+        const query = query_pool.acquire(
+            hostname,
+            flags.contains(.allAddresses) and builtin.os.tag.isDarwin(),
+            reachability,
+            resolve_fn,
+        ) catch |err| return err;
 
         var timer: core.RunAfter = .{};
         timer.scheduleReplacing(timeout_ms, Query.timeout, query) catch |err| {
@@ -116,7 +118,7 @@ pub const PlatformDNS = struct {
         while (!query.worker_done and !query.timed_out) query_pool.cond.wait(&query_pool.mutex);
         const timed_out = query.timed_out;
         const status = query.status;
-        var result: [*c]c.addrinfo = null;
+        var result: c.pp_dns_result = null;
         if (!timed_out) {
             result = query.result;
             query.result = null;
@@ -138,9 +140,9 @@ pub const PlatformDNS = struct {
         }
         thread.join();
 
-        defer if (result) |info| c.freeaddrinfo(info);
+        defer if (result) |info| c.pp_dns_free(info);
         if (status != 0) {
-            if (@hasDecl(c, "EAI_BADFLAGS") and status == c.EAI_BADFLAGS) {
+            if (c.pp_dns_error_is_bad_flags(status)) {
                 log.write(.fault, "getaddrinfo() failed with EAI_BADFLAGS");
             } else {
                 log.writef(.fault, "getaddrinfo() failed with result {}", .{status});
@@ -155,20 +157,25 @@ pub const PlatformDNS = struct {
             records.deinit(allocator);
         }
         var item = result;
-        while (item) |info| : (item = info.*.ai_next) {
-            const current = info.*;
-            const addr = current.ai_addr;
-            if (addr == null) continue;
-            const numeric = numericHostAlloc(allocator, addr, current.ai_addrlen) catch |err| {
-                log.writef(.err, "getnameinfo() failed for {s}: {s}", .{
+        while (item) |info| : (item = c.pp_dns_next(info)) {
+            var address_buffer: [c.PPDNSAddressStringMax]u8 =
+                [_]u8{0} ** c.PPDNSAddressStringMax;
+            var is_ipv6 = false;
+            if (!c.pp_dns_address_string(
+                info,
+                &address_buffer,
+                address_buffer.len,
+                &is_ipv6,
+            )) {
+                log.writef(.err, "getnameinfo() failed for {s}", .{
                     log.sensitive(hostname),
-                    @errorName(err),
                 });
                 continue;
-            };
+            }
+            const numeric = try allocator.dupe(u8, std.mem.sliceTo(&address_buffer, 0));
             records.append(allocator, .{
                 .address = numeric,
-                .is_ipv6 = current.ai_family == c.AF_INET6,
+                .is_ipv6 = is_ipv6,
             }) catch |err| {
                 allocator.free(numeric);
                 return err;
@@ -218,7 +225,7 @@ const QueryPool = struct {
     fn acquire(
         self: *QueryPool,
         hostname: []const u8,
-        hints: c.addrinfo,
+        all_addresses: bool,
         reachability: ?ReachabilityInfo,
         resolve_fn: ResolveFn,
     ) DNSResolver.Error!*Query {
@@ -232,7 +239,7 @@ const QueryPool = struct {
             query.* = .{
                 .in_use = true,
                 .hostname = hostname_copy,
-                .hints = hints,
+                .all_addresses = all_addresses,
                 .reachability = reachability,
                 .resolve_fn = resolve_fn,
             };
@@ -267,11 +274,11 @@ const Query = struct {
     worker_done: bool = false,
     caller_done: bool = false,
     hostname: ?[:0]u8 = null,
-    hints: c.addrinfo = .{},
+    all_addresses: bool = false,
     reachability: ?ReachabilityInfo = null,
     resolve_fn: ResolveFn = resolveNative,
     status: c_int = 0,
-    result: [*c]c.addrinfo = null,
+    result: c.pp_dns_result = null,
 
     fn timeout(ctx: ?*anyopaque) void {
         const self: *Query = @ptrCast(@alignCast(ctx.?));
@@ -283,11 +290,11 @@ const Query = struct {
     }
 
     fn run(self: *Query) void {
-        var result: [*c]c.addrinfo = null;
+        var result: c.pp_dns_result = null;
         var reachability = self.reachability;
         const status = self.resolve_fn(
             self.hostname.?,
-            &self.hints,
+            self.all_addresses,
             if (reachability) |*info| info else null,
             &result,
         );
@@ -303,7 +310,7 @@ const Query = struct {
 
     fn recycleLocked(self: *Query) void {
         if (!self.caller_done or !self.worker_done) return;
-        if (self.result) |result| c.freeaddrinfo(result);
+        if (self.result) |result| c.pp_dns_free(result);
         std.heap.c_allocator.free(self.hostname.?);
         self.* = .{};
     }
@@ -311,11 +318,11 @@ const Query = struct {
 
 fn resolveNative(
     hostname: [:0]const u8,
-    hints: *const c.addrinfo,
+    all_addresses: bool,
     reachability: ?*const ReachabilityInfo,
-    result: *[*c]c.addrinfo,
+    result: *c.pp_dns_result,
 ) c_int {
-    return c.pp_dns_resolve(hostname.ptr, null, hints, reachability, result);
+    return c.pp_dns_resolve(hostname.ptr, null, all_addresses, reachability, result);
 }
 
 fn resolveBlock(
@@ -339,36 +346,4 @@ fn resolveAddressBlock(
 ) DNSResolver.Error![]u8 {
     const self: *PlatformDNS = @ptrCast(@alignCast(ptr.?));
     return self.resolveAddress(allocator, address, reachability, timeout_ms);
-}
-
-fn dnsFlags(flags: std.EnumSet(DNSResolver.Flag)) c_int {
-    var result: c_int = 0;
-    // Beware that DNS breaks on Android when AI_ALL + AF_UNSPEC is set
-    if (builtin.os.tag.isDarwin()) {
-        if (flags.contains(.allAddresses) and @hasDecl(c, "AI_ALL")) {
-            result |= c.AI_ALL;
-        }
-    }
-    return result;
-}
-
-fn numericHostAlloc(
-    allocator: std.mem.Allocator,
-    addr: [*c]const c.struct_sockaddr,
-    addr_len: c.socklen_t,
-) DNSResolver.Error![]u8 {
-    var buffer: [c.NI_MAXHOST]u8 = [_]u8{0} ** c.NI_MAXHOST;
-    switch (c.getnameinfo(
-        addr,
-        addr_len,
-        buffer[0..].ptr,
-        @intCast(buffer.len),
-        null,
-        0,
-        c.NI_NUMERICHOST,
-    )) {
-        0 => {},
-        else => return error.ResolutionFailure,
-    }
-    return try allocator.dupe(u8, std.mem.sliceTo(&buffer, 0));
 }

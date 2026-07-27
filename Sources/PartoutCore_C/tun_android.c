@@ -9,6 +9,7 @@
 
 #if PARTOUT_ANDROID
 
+#include "portable/io_posix.h"
 #include <jni.h>
 #include <assert.h>
 #include <stdio.h>
@@ -34,7 +35,7 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!dst || dst_len == 0) return -1;
     int ret;
     PP_IO_RETRY(ret, read(tun->fd, dst, dst_len));
-    return pp_tun_handle_result(ret);
+    return pp_io_handle_result(ret);
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
@@ -42,7 +43,7 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!src || src_len == 0) return -1;
     int ret;
     PP_IO_RETRY(ret, write(tun->fd, src, src_len));
-    return pp_tun_handle_result(ret);
+    return pp_io_handle_result(ret);
 }
 
 void pp_tun_close(const pp_tun tun) {

@@ -4,6 +4,12 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#endif
+
 #include "crypto/crypto.h"
 #include "crypto_windows.h"
 

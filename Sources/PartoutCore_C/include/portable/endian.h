@@ -9,7 +9,7 @@
 
 #include <stdint.h>
 
-#if PARTOUT_APPLE
+#if PARTOUT_APPLE || PARTOUT_WINDOWS
 
 static inline
 uint16_t pp_endian_ntohs(uint16_t num) {

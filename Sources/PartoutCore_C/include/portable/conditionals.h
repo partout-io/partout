@@ -42,9 +42,6 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <WinSock2.h>
-#include <WS2tcpip.h>
-#include <Windows.h>
 #endif
 
 #if defined(PARTOUT_CRYPTO_OPENSSL) || defined(PARTOUT_CRYPTO_MBEDTLS)

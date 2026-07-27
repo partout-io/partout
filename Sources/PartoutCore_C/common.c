@@ -4,7 +4,18 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#endif
+
 #include "portable/common.h"
+#if PARTOUT_WINDOWS
+#include "portable/io_windows.h"
+#else
+#include "portable/io_posix.h"
+#endif
 
 #include <stdarg.h>
 #include <stdio.h>
@@ -19,6 +30,28 @@
 const int PPIOErrorWouldBlock   = -11;
 const int PPIOErrorNoBufs       = -12;
 const int PPIOErrorNoSpace      = -13;
+
+char *pp_dup(const char *str) {
+#if PARTOUT_WINDOWS
+    char *ptr = _strdup(str);
+#else
+    char *ptr = strdup(str);
+#endif
+    if (!ptr) {
+        pp_clog(PPLogLevelFault, "pp_dup: strdup() call failed");
+        abort();
+    }
+    return ptr;
+}
+
+FILE *pp_fopen(const char *filename, const char *mode) {
+#if PARTOUT_WINDOWS
+    FILE *file = NULL;
+    return fopen_s(&file, filename, mode) == 0 ? file : NULL;
+#else
+    return fopen(filename, mode);
+#endif
+}
 
 void pp_clog_v(pp_log_level level, const char *fmt, ...) {
 #if !PARTOUT_WINDOWS
@@ -46,15 +79,6 @@ void pp_clog_v(pp_log_level level, const char *fmt, ...) {
 #endif
 }
 
-static FILE *pp_file_open_read(const char *path) {
-#if PARTOUT_WINDOWS
-    FILE *file = NULL;
-    return (fopen_s(&file, path, "rb") == 0) ? file : NULL;
-#else
-    return fopen(path, "rb");
-#endif
-}
-
 char *pp_file_read(const char *rel_path, const char *parent) {
     char *abs_path = NULL;
     FILE *file = NULL;
@@ -73,7 +97,7 @@ char *pp_file_read(const char *rel_path, const char *parent) {
     }
 
     /* Open file at absolute path. */
-    file = pp_file_open_read(abs_path);
+    file = pp_fopen(abs_path, "rb");
     if (!file) goto failure;
     free(abs_path);
     abs_path = NULL;
@@ -253,3 +277,7 @@ int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
     return 0;
 }
 #endif
+
+int pp_io_last_error_binding(void) {
+    return pp_io_last_error();
+}

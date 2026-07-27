@@ -68,7 +68,7 @@ final class TunWrapper: NativeIOInterface, @unchecked Sendable {
     }
 
     var lastErrorCode: Int32 {
-        pp_io_last_error()
+        pp_io_last_error_binding()
     }
 }
 
