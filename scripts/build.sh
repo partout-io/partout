@@ -2,7 +2,6 @@
 set -e
 build_dir=.cmake
 bin_dir=bin
-swift_version=6.3.1
 vendor_source=
 vendor_prebuilt_url=
 crypto_selected=
@@ -179,9 +178,6 @@ while [[ $# -gt 0 ]]; do
             build_dir=.cmake-android
             cmake_opts+=("-DCMAKE_ANDROID_NDK=$ANDROID_NDK_HOME")
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
-            cmake_opts+=("-DANDROID_STL=c++_shared")
-            cmake_opts+=("-DSWIFT_VERSION=$swift_version")
-            cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-android.toolchain.cmake")
             shift
             ;;
         -vendors)
@@ -235,12 +231,6 @@ if [[ -n $vendor_source ]]; then
 fi
 if [[ -n $vendor_prebuilt_url ]]; then
     cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
-fi
-
-# On Linux, use custom toolchain
-if [[ $is_android != 1 && `uname -s` == "Linux" ]]; then
-    cmake_opts+=("-DSWIFT_VERSION=$swift_version")
-    cmake_opts+=("-DCMAKE_TOOLCHAIN_FILE=cmake/swift/swift-linux.toolchain.cmake")
 fi
 
 # Generate models
