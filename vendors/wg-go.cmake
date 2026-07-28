@@ -70,8 +70,10 @@ if(NOT PP_USE_PREBUILT_VENDORS)
             DESTDIR=${WGGO_DIR}
         )
         if(ANDROID)
-            set(CLANG ${SWIFT_ANDROID_ARCH}-linux-android${ANDROID_NATIVE_API_LEVEL}-clang)
-            list(APPEND WGGO_CMD ANDROID=1 CC=${CLANG})
+            list(APPEND WGGO_CMD
+                ANDROID=1
+                CC=${CMAKE_LIBRARY_ARCHITECTURE}${ANDROID_NATIVE_API_LEVEL}-clang
+            )
         endif()
     endif()
 

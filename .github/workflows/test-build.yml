@@ -5,8 +5,6 @@ on:
 
 env:
   INSTALL_DIR: dist
-  SWIFT_VERSION: swift-6.3.2-release
-  SWIFT_BUILD: 6.3.2-RELEASE
 
 jobs:
   build:
@@ -30,12 +28,8 @@ jobs:
         uses: egor-tensin/vs-shell@v2
         with:
           arch: ${{ matrix.arch }}
-      - name: Set up Swift
-        uses: compnerd/gha-setup-swift@main
-        with:
-          swift-version: ${{ env.SWIFT_VERSION }}
-          swift-build: ${{ env.SWIFT_BUILD }}
-          cache: true
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
       - name: Build with CMake (no vendors)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -44,11 +38,6 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          # Swift action sets a wrong path, maybe the toolchain
-          # has changed its layout since the action was last updated
-          SWIFT_PATHS=("$HOME"/swift-*/usr/bin)
-          PATH="${SWIFT_PATHS[0]}:$PATH"
-          git submodule update --init cmake/swift
           ./scripts/build.sh -gen -l -install "$INSTALL_DIR"
       - name: Verify output
         if: runner.os == 'Windows'

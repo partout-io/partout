@@ -10,6 +10,9 @@
 #include <mbedtls/pem.h>
 #include <mbedtls/pk.h>
 #include <mbedtls/version.h>
+#if MBEDTLS_VERSION_MAJOR < 4
+#include <mbedtls/psa_util.h>
+#endif
 #include <psa/crypto.h>
 #include "portable/common.h"
 #include "crypto/keys.h"
@@ -24,6 +27,33 @@
 static
 bool pp_key_init_psa(void) {
     return psa_crypto_init() == PSA_SUCCESS;
+}
+
+static
+int pp_key_parse(mbedtls_pk_context *key,
+                 const unsigned char *pem,
+                 size_t pem_len,
+                 const unsigned char *passphrase,
+                 size_t passphrase_len) {
+#if MBEDTLS_VERSION_MAJOR >= 4
+    return mbedtls_pk_parse_key(
+        key,
+        pem,
+        pem_len,
+        passphrase,
+        passphrase_len
+    );
+#else
+    return mbedtls_pk_parse_key(
+        key,
+        pem,
+        pem_len,
+        passphrase,
+        passphrase_len,
+        mbedtls_psa_get_random,
+        MBEDTLS_PSA_RANDOM_STATE
+    );
+#endif
 }
 
 static
@@ -214,7 +244,7 @@ char *pp_key_decrypted_from_buffer(const char *pem, const char *passphrase) {
     mbedtls_pk_init(&key);
 
     const size_t passphrase_len = strlen(passphrase);
-    const int ret = mbedtls_pk_parse_key(
+    const int ret = pp_key_parse(
         &key,
         (const unsigned char *)pem,
         strlen(pem) + 1,
@@ -629,11 +659,11 @@ pp_tls pp_mbedtls_create(const pp_tls_options *opt, pp_tls_error_code *error) {
         }
 
         if (opt->key_pem) {
-            ret = mbedtls_pk_parse_key(&tls->key,
-                                       (const unsigned char *)opt->key_pem,
-                                       strlen(opt->key_pem) + 1,
-                                       NULL,
-                                       0);
+            ret = pp_key_parse(&tls->key,
+                               (const unsigned char *)opt->key_pem,
+                               strlen(opt->key_pem) + 1,
+                               NULL,
+                               0);
             if (ret != 0) {
                 pp_tls_log_mbed_error("mbedtls_pk_parse_key", ret);
                 pp_tls_set_error(error, PPTLSErrorClientKeyRead);

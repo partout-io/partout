@@ -195,6 +195,28 @@ if(PP_BUILD_USE_OPENSSL)
             ${OPENSSL_PKG_LIBRARY_DIRS}
             ${PARTOUT_OPENSSL_TARGET_LIBRARY}
         )
+
+        # Debian-family distributions install architecture-independent OpenSSL
+        # headers in /usr/include/openssl and generated headers such as
+        # opensslconf.h in /usr/include/<multiarch>/openssl. Native compilers
+        # search both implicitly, but Zig needs the multiarch path explicitly.
+        set(PARTOUT_OPENSSL_CONFIG_INCLUDE "")
+        set(PARTOUT_OPENSSL_CONFIG_INCLUDE_CANDIDATES
+            ${PARTOUT_OPENSSL_INCLUDE}
+            ${CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES}
+        )
+        if(CMAKE_LIBRARY_ARCHITECTURE)
+            list(APPEND PARTOUT_OPENSSL_CONFIG_INCLUDE_CANDIDATES
+                "${PARTOUT_OPENSSL_INCLUDE}/${CMAKE_LIBRARY_ARCHITECTURE}"
+                "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}"
+            )
+        endif()
+        foreach(candidate IN LISTS PARTOUT_OPENSSL_CONFIG_INCLUDE_CANDIDATES)
+            if(EXISTS "${candidate}/openssl/opensslconf.h")
+                set(PARTOUT_OPENSSL_CONFIG_INCLUDE "${candidate}")
+                break()
+            endif()
+        endforeach()
     else()
         set(PARTOUT_OPENSSL_INCLUDE "${OPENSSL_DIR}/include")
         set(PARTOUT_OPENSSL_LIBRARY "${OPENSSL_DIR}/${OPENSSL_LIBDIR}")
@@ -206,6 +228,12 @@ if(PP_BUILD_USE_OPENSSL)
         "-Dopenssl-include=${PARTOUT_OPENSSL_INCLUDE}"
         "-Dopenssl-lib=${PARTOUT_OPENSSL_LIBRARY}"
     )
+    if(PARTOUT_OPENSSL_CONFIG_INCLUDE AND
+       NOT PARTOUT_OPENSSL_CONFIG_INCLUDE STREQUAL PARTOUT_OPENSSL_INCLUDE)
+        list(APPEND PARTOUT_ZIG_ARGS
+            "-Dopenssl-config-include=${PARTOUT_OPENSSL_CONFIG_INCLUDE}"
+        )
+    endif()
     if(TARGET OpenSSLInterface)
         list(APPEND PARTOUT_ZIG_DEPENDENCIES OpenSSLInterface)
     endif()

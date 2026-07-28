@@ -21,6 +21,7 @@ const CryptoLibraries = struct {
 
 const VendorIncludePaths = struct {
     openssl: ?[]const u8,
+    openssl_config: ?[]const u8,
     mbedtls: ?[]const u8,
     wg_go: ?[]const u8,
     wintun: ?[]const u8,
@@ -72,6 +73,12 @@ pub fn build(b: *std.Build) void {
     ) orelse false;
     const vendor_includes = VendorIncludePaths{
         .openssl = pathOption(b, "openssl-include", "OpenSSL headers search path.", false),
+        .openssl_config = pathOption(
+            b,
+            "openssl-config-include",
+            "OpenSSL platform-specific headers search path.",
+            false,
+        ),
         .mbedtls = pathOption(b, "mbedtls-include", "MbedTLS headers search path.", false),
         .wg_go = pathOption(b, "wg-go-include", "wg-go headers search path.", false),
         .wintun = pathOption(b, "wintun-include", "Wintun headers search path.", false),
@@ -420,6 +427,7 @@ fn addVendorIncludePaths(
     };
     const entries = [_]Entry{
         .{ .path = paths.openssl, .framework_name = "openssl" },
+        .{ .path = paths.openssl_config, .framework_name = null },
         .{ .path = paths.mbedtls, .framework_name = "mbedtls" },
         .{ .path = paths.wg_go, .framework_name = "wg_go" },
         .{ .path = paths.wintun, .framework_name = null },

@@ -212,6 +212,11 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
+if [[ -n $vendor_prebuilt_url && $is_android != 1 ]]; then
+    echo "-vendors <url> is only supported for Android builds by build.sh"
+    exit 1
+fi
+
 # Crypto
 if [[ $crypto_selected == 1 ]]; then
     if [[ $crypto_openssl == 1 ]]; then
