@@ -6,4 +6,4 @@
   -wireguard                     Enable WireGuard support
   -l                             Build the Partout library
   -android                       Configure an Android build
-  -vendors [auto|bundled|<url>]  Select vendor source or prebuilt vendor URL
+  -vendors [auto|bundled|<url>]  Select source (prebuilt URL: Android/Windows only)
