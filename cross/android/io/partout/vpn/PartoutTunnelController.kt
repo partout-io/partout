@@ -177,7 +177,7 @@ internal class PartoutTunnelController(
     }
 
     override fun configureSockets(fds: IntArray) = synchronized(lock) {
-        if (isNativeCancelled) { return }
+        if (isNativeCancelled) { return@synchronized }
         Log.d(logTag, "configureSockets(${fds.toList()})")
         fds.forEach {
             require(it >= 0) {
@@ -192,7 +192,7 @@ internal class PartoutTunnelController(
     }
 
     override fun onSnapshot(snapshotJSON: String) = synchronized(lock) {
-        if (isNativeCancelled) { return }
+        if (isNativeCancelled) { return@synchronized }
         if (options.logsSnapshots) {
             Log.d(logTag, "onSnapshot(${snapshotJSON})")
         }
@@ -202,7 +202,7 @@ internal class PartoutTunnelController(
     }
 
     override fun clearTunnel(killSwitch: Boolean) = synchronized(lock) {
-        if (isNativeCancelled) { return }
+        if (isNativeCancelled) { return@synchronized }
 
         // Optionally replace with catch-all fake tun
         if (killSwitch) {
@@ -229,7 +229,7 @@ internal class PartoutTunnelController(
     }
 
     override fun cancelTunnel(errorCode: String?) = synchronized(lock) {
-        if (isNativeCancelled) { return }
+        if (isNativeCancelled) { return@synchronized }
         Log.d(logTag, "cancelTunnel()")
 
         // Prevent further calls
