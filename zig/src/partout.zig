@@ -99,10 +99,10 @@ pub export fn partout_daemon_start(
     const args = args_pointer orelse return c.PartoutCompletionCodeArgs;
     var error_info: api.JsonErrorInfo = .{};
     var options = abi.DaemonOptions.init(allocator, args.*, &error_info) catch |err| {
-        if (err == error.InvalidProfile) {
-            if (error_info.key) |key| {
-                log.writef(.fault, "Unable to parse profile: {s}", .{key});
-            }
+        if (error_info.key) |key| {
+            log.writef(.fault, "Unable to parse profile: {s}, {s}", .{ @errorName(err), key });
+        } else {
+            log.writef(.fault, "Unable to parse profile: {s}", .{@errorName(err)});
         }
         return c.PartoutCompletionCodeArgs;
     };
