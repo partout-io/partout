@@ -116,7 +116,7 @@ class PartoutVpnServiceRuntime(
         stopTunnel()
 
         val startOptions = runCatching {
-            engine.prepareStart(intent, profileJSON)
+            engine.prepareStart(wrapper.partoutVersion(), intent, profileJSON)
         }.getOrElse {
             it.throwIfCancellation()
             Log.e(logTag, "Unable to prepare VPN daemon", it)
@@ -423,7 +423,11 @@ class PartoutVpnServiceRuntime(
     )
 
     interface Engine {
-        suspend fun prepareStart(intent: Intent?, profileJSON: String): StartOptions
+        suspend fun prepareStart(
+            version: String,
+            intent: Intent?,
+            profileJSON: String
+        ): StartOptions
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
         suspend fun deleteLastProfile(id: String)
