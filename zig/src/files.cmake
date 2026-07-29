@@ -146,6 +146,7 @@ src/openvpn/c/mss_fix.c
 src/openvpn/c/pkt_proc.c
 src/openvpn/c/test/openvpn_crypto_mock.c
 src/partout.c
+src/partout_jni.c
 src/wireguard/c/backend.c
 src/wireguard/c/key.c
 src/wireguard/c/x25519.c
