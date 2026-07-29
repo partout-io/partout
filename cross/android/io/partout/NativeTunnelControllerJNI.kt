@@ -11,8 +11,8 @@ Three layers are involved in this:
 - NativeTunnelController.swift (+ tun_android.c)
 
 Where:
-- PartoutVpnServiceRuntime owns PartoutTunnelController and forwards its JNI ref to Engine.start()
-- The engine sets up the Swift/C NativeTunnelController with the JNI ref
+- PartoutVpnServiceRuntime owns PartoutTunnelController and forwards its JNI ref to PartoutWrapper
+- PartoutWrapper sets up the Swift/C NativeTunnelController with the JNI ref
 - On setup, NativeTunnelController sets itself (via C) as the PartoutTunnelController delegate
 - When needed, NativeTunnelController calls PartoutTunnelController methods via JNI
 - When needed, PartoutTunnelController calls NativeTunnelController methods via the JNI delegate

@@ -33,7 +33,6 @@ import kotlinx.serialization.Contextual
  *
  * @param dnsFallbackServers 
  * @param logsSnapshots 
- * @param minDataCountDelta 
  */
 @Serializable
 
@@ -43,10 +42,7 @@ data class TunnelControllerOptions (
     val dnsFallbackServers: kotlin.collections.List<kotlin.String>,
 
     @SerialName(value = "logsSnapshots")
-    val logsSnapshots: kotlin.Boolean,
-
-    @SerialName(value = "minDataCountDelta")
-    val minDataCountDelta: kotlin.Long
+    val logsSnapshots: kotlin.Boolean
 
 ) {
 

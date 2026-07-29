@@ -15,6 +15,7 @@ public final class PartoutProviderRuntime: Sendable {
     private let messageHandler: DefaultMessageHandler
     private let options: TunnelControllerOptions
     private let logsPrivateData: Bool
+    private let minDataCountDelta: Int64?
     private let logger: partout_logger_cb?
 
     public init(
@@ -23,6 +24,7 @@ public final class PartoutProviderRuntime: Sendable {
         options: TunnelControllerOptions,
         defaults: UserDefaults,
         logsPrivateData: Bool,
+        minDataCountDelta: Int64? = nil,
         logger: partout_logger_cb?
     ) throws {
         profile = try Profile(withNEProvider: provider, decoder: decoder)
@@ -32,6 +34,7 @@ public final class PartoutProviderRuntime: Sendable {
         messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
         self.logsPrivateData = logsPrivateData
+        self.minDataCountDelta = minDataCountDelta
         self.logger = logger
     }
 
@@ -77,7 +80,7 @@ public final class PartoutProviderRuntime: Sendable {
             is_daemon: false,
             starts_immediately: false,
             cache_dir: nil,
-            min_data_count_delta: options.minDataCountDelta
+            min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
         )
         let result = profileJSON.withCString { profile in
             withUnsafePointer(to: &bindings) { bindingsPtr in

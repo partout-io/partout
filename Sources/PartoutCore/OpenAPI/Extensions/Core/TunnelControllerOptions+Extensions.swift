@@ -4,6 +4,6 @@
 
 extension TunnelControllerOptions {
     public init() {
-        self.init(dnsFallbackServers: [], logsSnapshots: false, minDataCountDelta: .zero)
+        self.init(dnsFallbackServers: [], logsSnapshots: false)
     }
 }

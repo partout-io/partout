@@ -602,6 +602,7 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
     module.addCSourceFiles(.{
         .files = &.{
             "src/partout.c",
+            "src/partout_jni.c",
         },
         .flags = c_flags,
     });
