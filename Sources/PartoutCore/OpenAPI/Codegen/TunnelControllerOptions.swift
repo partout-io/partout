@@ -10,12 +10,10 @@ public struct TunnelControllerOptions: Sendable, Codable, Hashable {
 
     public var dnsFallbackServers: [String]
     public var logsSnapshots: Bool
-    public var minDataCountDelta: ModelUInt64
 
-    public init(dnsFallbackServers: [String], logsSnapshots: Bool, minDataCountDelta: ModelUInt64) {
+    public init(dnsFallbackServers: [String], logsSnapshots: Bool) {
         self.dnsFallbackServers = dnsFallbackServers
         self.logsSnapshots = logsSnapshots
-        self.minDataCountDelta = minDataCountDelta
     }
 }
 

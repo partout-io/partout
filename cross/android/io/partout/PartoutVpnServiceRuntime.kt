@@ -14,6 +14,7 @@ import android.os.Looper
 import android.os.Message
 import android.os.Messenger
 import android.util.Log
+import io.partout.abi.PartoutException
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelControllerOptions
 import io.partout.models.TunnelSnapshot
@@ -28,14 +29,15 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.onFailure
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 
 class PartoutVpnServiceRuntime(
     private val logTag: String,
     private val jniLogTag: String,
     val service: VpnService,
-    private val engine: Engine,
-    private val options: TunnelControllerOptions
+    private val wrapper: PartoutWrapperProtocol,
+    private val engine: Engine
 ): TunnelControllerDelegate {
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
@@ -47,10 +49,7 @@ class PartoutVpnServiceRuntime(
     private var controller: PartoutTunnelController? = null
 
     // Deliver snapshots with mutex
-    private val snapshotEmitter = SnapshotEmitter(
-        if (options.logsSnapshots) logTag else null,
-        service
-    )
+    private val snapshotEmitter = SnapshotEmitter(logTag, service)
 
     init {
         serviceScope.launch {
@@ -116,8 +115,20 @@ class PartoutVpnServiceRuntime(
         // Stop current tunnel if running
         stopTunnel()
 
+        val startOptions = runCatching {
+            engine.prepareStart(intent, profileJSON)
+        }.getOrElse {
+            it.throwIfCancellation()
+            Log.e(logTag, "Unable to prepare VPN daemon", it)
+            stopService()
+            return@launchCommand
+        }
+
         // Observe snapshots during start attempt
-        snapshotEmitter.accept(profileId)
+        snapshotEmitter.accept(
+            profileId,
+            startOptions.controllerOptions.logsSnapshots
+        )
 
         isRunning = true
         activeProfileId = profileId
@@ -128,9 +139,20 @@ class PartoutVpnServiceRuntime(
                 service,
                 serviceScope,
                 this,
-                options
+                startOptions.controllerOptions
             )
-            engine.start(intent, newController, profileJSON)
+            val code = withContext(Dispatchers.IO) {
+                wrapper.partoutInit(logTag, startOptions.logsPrivateData)
+                wrapper.partoutDaemonStart(
+                    profileJSON,
+                    service.cacheDir.absolutePath,
+                    newController,
+                    startOptions.minDataCountDelta
+                )
+            }
+            if (code != 0) {
+                throw PartoutException(code, null)
+            }
             // Does not throw from now
             Log.i(logTag, "Started VPN daemon")
             controller = newController
@@ -188,7 +210,9 @@ class PartoutVpnServiceRuntime(
         }
         Log.i(logTag, "Stopping VPN daemon")
         runCatching {
-            engine.stop()
+            withContext(Dispatchers.IO) {
+                wrapper.partoutDaemonStop()
+            }
         }.onFailure {
             Log.e(logTag, "Unable to stop VPN daemon", it)
         }
@@ -230,17 +254,19 @@ class PartoutVpnServiceRuntime(
 
     //region Snapshots
     private class SnapshotEmitter(
-        private val logTag: String?,
+        private val logTag: String,
         private val service: Service
     ) {
         private val lock = Any()
         private var isAccepting = false
+        private var logsSnapshots = false
         private var activeProfileId: String? = null
         @Volatile private var latestSnapshot: TunnelSnapshot? = null
 
-        fun accept(profileId: String) {
+        fun accept(profileId: String, logsSnapshots: Boolean) {
             synchronized(lock) {
                 isAccepting = true
+                this.logsSnapshots = logsSnapshots
                 activeProfileId = profileId
                 latestSnapshot = null
             }
@@ -249,6 +275,7 @@ class PartoutVpnServiceRuntime(
         fun shutdown() {
             synchronized(lock) {
                 isAccepting = false
+                logsSnapshots = false
                 activeProfileId = null
             }
         }
@@ -270,6 +297,7 @@ class PartoutVpnServiceRuntime(
                 broadcast(finalSnapshot)
             }
             isAccepting = false
+            logsSnapshots = false
             activeProfileId = null
         }
 
@@ -300,8 +328,8 @@ class PartoutVpnServiceRuntime(
         }
 
         private fun logIfNeeded(message: String) {
-            logTag?.let {
-                Log.d(it, message)
+            if (logsSnapshots) {
+                Log.d(logTag, message)
             }
         }
 
@@ -388,9 +416,14 @@ class PartoutVpnServiceRuntime(
     //endregion
 
     //region Engine
+    data class StartOptions(
+        val logsPrivateData: Boolean,
+        val minDataCountDelta: Long,
+        val controllerOptions: TunnelControllerOptions
+    )
+
     interface Engine {
-        suspend fun start(intent: Intent?, controller: NativeTunnelControllerJNI, profileJSON: String)
-        suspend fun stop()
+        suspend fun prepareStart(intent: Intent?, profileJSON: String): StartOptions
         suspend fun readLastProfile(): String
         suspend fun writeLastProfile(json: String)
         suspend fun deleteLastProfile(id: String)

@@ -127,4 +127,6 @@ void daemon_bindings_free(partout_daemon_bindings *b) {
     }
     PP_JNI_DETACH(env);
 }
+#else
+typedef int partout_jni_disabled;
 #endif
