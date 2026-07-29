@@ -53,13 +53,11 @@ struct SerializationTests {
 
         let options = TunnelControllerOptions(
             dnsFallbackServers: ["1.1.1.1", "2606:4700:4700::1111"],
-            logsSnapshots: true,
-            minDataCountDelta: 4_096
+            logsSnapshots: true
         )
         let decodedOptions = try decodeEncoded(options, as: TunnelControllerOptions.self)
         #expect(decodedOptions.dnsFallbackServers == options.dnsFallbackServers)
         #expect(decodedOptions.logsSnapshots == options.logsSnapshots)
-        #expect(decodedOptions.minDataCountDelta == options.minDataCountDelta)
     }
 
     // MARK: - Custom codable
