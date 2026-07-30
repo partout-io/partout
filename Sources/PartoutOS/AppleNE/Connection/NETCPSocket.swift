@@ -9,7 +9,6 @@ public final class NETCPObserver: LinkObserver {
     public struct Options: Sendable {
         public let minLength: Int
         public let maxLength: Int
-        public let withSafeValueObserver: Bool
     }
 
     protocol StateObserver {
@@ -34,11 +33,7 @@ public final class NETCPObserver: LinkObserver {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        if options.withSafeValueObserver {
-            observer = SafeObserver(nwConnection)
-        } else {
-            observer = LegacyObserver(nwConnection)
-        }
+        observer = SafeObserver(nwConnection)
         defer {
             observer = nil
         }
@@ -170,20 +165,6 @@ private struct SafeObserver: NETCPObserver.StateObserver {
 
     init(_ connection: NWTCPConnection) {
         backend = SafeValueObserver(connection)
-    }
-
-    func waitForState(timeout: Int, onState: @escaping (NWTCPConnectionState) throws -> Bool) async throws {
-        try await backend.waitForValue(on: \.state, timeout: timeout) { state in
-            try onState(state)
-        }
-    }
-}
-
-private struct LegacyObserver: NETCPObserver.StateObserver {
-    let backend: ValueObserver<NWTCPConnection>
-
-    init(_ connection: NWTCPConnection) {
-        backend = ValueObserver(connection)
     }
 
     func waitForState(timeout: Int, onState: @escaping (NWTCPConnectionState) throws -> Bool) async throws {
