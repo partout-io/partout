@@ -7,10 +7,10 @@ import PartoutCore
 import Testing
 
 struct TaggedModuleTests {
-    @Test(arguments: [true, false])
-    func givenTaggedModules_whenEncode_thenTypeDiscriminatorsAreIncluded(withLegacyEncoding: Bool) throws {
+    @Test
+    func givenTaggedModules_whenEncode_thenTypeDiscriminatorsAreIncluded() throws {
         let taggedModules = try makeTaggedModules()
-        let data = try encoder(withLegacyEncoding: withLegacyEncoding)
+        let data = try encoder()
             .encode(taggedModules)
         let json = String(decoding: data, as: UTF8.self)
         print(json)
@@ -39,10 +39,9 @@ private extension TaggedModuleTests {
         ]
     }
 
-    func encoder(withLegacyEncoding: Bool) -> JSONEncoder {
+    func encoder() -> JSONEncoder {
         let encoder = JSONEncoder.shared()
         encoder.outputFormatting = [.sortedKeys, .prettyPrinted]
-        encoder.userInfo = [.legacySwiftEncoding: withLegacyEncoding]
         return encoder
     }
 }

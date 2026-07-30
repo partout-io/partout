@@ -15,7 +15,7 @@ struct CodingRegistryLegacyTests {
         let fixture = try newLegacyV2ProfileFixture(encoder)
         let encoded = try encoder.encode(fixture.profile.asCodableProfileV2)
 
-        let sut = registry.withLegacyEncoding(false)
+        let sut = CodingRegistry(registry: registry)
         let decoded = try sut.profile(fromString: encoded)
         #expect(decoded == fixture.profile)
     }

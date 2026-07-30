@@ -10,10 +10,10 @@ import Testing
 struct NEProtocolCoderTests {
     let registry = Registry(withKnown: true)
 
-    @Test(arguments: [true, false])
-    func givenProfile_whenEncodeToProvider_thenDecodes(legacy: Bool) throws {
+    @Test
+    func givenProfile_whenEncodeToProvider_thenDecodes() throws {
         let profile = try newProfile()
-        let coder = registry.withLegacyEncoding(legacy)
+        let coder = CodingRegistry(registry: registry)
         let sut = ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
@@ -28,10 +28,10 @@ struct NEProtocolCoderTests {
         #expect(decodedProfile == profile)
     }
 
-    @Test(arguments: [true, false])
-    func givenProfile_whenEncodeToKeychain_thenDecodes(legacy: Bool) throws {
+    @Test
+    func givenProfile_whenEncodeToKeychain_thenDecodes() throws {
         let profile = try newProfile()
-        let coder = registry.withLegacyEncoding(legacy)
+        let coder = CodingRegistry(registry: registry)
         let sut = KeychainNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
@@ -99,12 +99,6 @@ private final class MockKeychain: Keychain {
             throw PartoutError(.decoding)
         }
         return string
-    }
-}
-
-private extension Registry {
-    func withLegacyEncoding(_ legacy: Bool) -> CodingRegistry {
-        CodingRegistry(registry: self, withLegacyEncoding: { legacy })
     }
 }
 #endif
