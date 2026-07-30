@@ -5,7 +5,7 @@
 import NetworkExtension
 
 /// ``NEProtocolCoder`` encoding to and from a keychain.
-public struct KeychainNEProtocolCoder: NEProtocolCoder {
+public struct KeychainNEProtocolCoderV2: NEProtocolCoder {
     private let ctx: PartoutLoggerContext
 
     private let tunnelBundleIdentifier: String
@@ -54,45 +54,38 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
     }
 
     public func purge(managers: [NETunnelProviderManager]) async {
+    }
 
-        // remove those managers (plus their keychain entry) we cannot decode a profile from
-        var managersToRemove: [NETunnelProviderManager] = []
-        var keychainToRetain: [Data] = []
-        managers.forEach {
-            do {
-                guard let proto = $0.protocolConfiguration as? NETunnelProviderProtocol else {
-                    throw PartoutError(.decoding)
-                }
-                _ = try profile(from: proto)
-                if let item = $0.protocolConfiguration?.passwordReference {
-                    keychainToRetain.append(item)
-                }
-            } catch {
-                pp_log(ctx, .os, .error, "Unable to decode profile, will delete NE manager '\($0.localizedDescription ?? "")': \(error)")
-                managersToRemove.append($0)
+    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
+        // Retain the keychain entries referenced by valid managers.
+        let keychainToRetain: Set<Data> = managers.reduce(into: []) {
+            if let item = $1.protocolConfiguration?.passwordReference {
+                $0.insert(item)
             }
         }
-        for manager in managersToRemove {
-            if let ref = manager.protocolConfiguration?.passwordReference {
-                keychain.removePassword(forReference: ref)
-            }
-            try? await manager.removeFromPreferences()
-        }
 
-        // remove keychain entries that do not belong to any active manager
+        // Return complete profiles from unreferenced keychain entries. Undecodable
+        // entries are retained because this keychain may contain unrelated or
+        // temporarily inaccessible data.
+        var staleProfiles: [Profile] = []
+        var staleProfileIds: Set<Profile.ID> = []
         do {
             let entries = try keychain.allPasswordReferences()
-            entries.forEach {
-                if !keychainToRetain.contains($0) {
-                    keychain.removePassword(forReference: $0)
+            entries.forEach { ref in
+                guard !keychainToRetain.contains(ref) else { return }
+                do {
+                    let pwd = try keychain.password(forReference: ref)
+                    let profile = try coder.profile(fromString: pwd)
+                    if staleProfileIds.insert(profile.id).inserted {
+                        staleProfiles.append(profile)
+                    }
+                } catch {
+                    pp_log(ctx, .os, .error, "Unable to recover keychain reference, retain: \(error)")
                 }
             }
         } catch {
             pp_log(ctx, .os, .error, "Unable to fetch keychain items: \(error)")
         }
-    }
-
-    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
-        []
+        return staleProfiles
     }
 }
