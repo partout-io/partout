@@ -44,7 +44,7 @@ public actor NETunnelStrategyV2 {
 
     private let coder: NEProtocolCoder
 
-    private let managerStore: NETunnelManagerStore
+    private let store: NETunnelManagerStore
 
     private let options: Set<Option>
 
@@ -79,7 +79,7 @@ public actor NETunnelStrategyV2 {
             ctx,
             bundleIdentifier: bundleIdentifier,
             coder: coder,
-            managerStore: SystemNETunnelManagerStore(),
+            store: SystemNETunnelManagerStore(),
             title: title
         )
     }
@@ -88,13 +88,13 @@ public actor NETunnelStrategyV2 {
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
         coder: NEProtocolCoder,
-        managerStore: NETunnelManagerStore,
+        store: NETunnelManagerStore,
         title: @escaping @Sendable (Profile) -> String
     ) {
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
-        self.managerStore = managerStore
+        self.store = store
 //        self.options = options
         self.title = title
         options = []
@@ -233,9 +233,9 @@ extension NETunnelStrategyV2: NETunnelManagerRepository {
         guard let manager = allManagers[profileId] else {
             return
         }
-        let managerStore = managerStore
+        let store = store
         try await mutatePreferences {
-            try await managerStore.remove(manager)
+            try await store.remove(manager)
         }
         allManagers.removeValue(forKey: profileId)
         try? coder.removeProfile(withId: profileId)
@@ -364,13 +364,13 @@ private extension NETunnelStrategyV2 {
         block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
         let manager = managerBlock()
-        let managerStore = managerStore
+        let store = store
         try await mutatePreferences {
-            try await managerStore.load(manager)
+            try await store.load(manager)
             try Task.checkCancellation()
             block(manager)
             try Task.checkCancellation()
-            try await managerStore.save(manager)
+            try await store.save(manager)
         }
         return manager
     }
@@ -536,7 +536,7 @@ private extension NETunnelStrategyV2 {
     func loadManagedManagers(
         removeInvalidProfiles: Bool
     ) async throws -> [Profile.ID: NETunnelProviderManager] {
-        let loadedManagers = try await managerStore.loadAll()
+        let loadedManagers = try await store.loadAll()
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
 
         for manager in loadedManagers {
@@ -582,7 +582,7 @@ private extension NETunnelStrategyV2 {
     ) async {
         pp_log(ctx, .os, .error, "Remove NE manager '\(manager.localizedDescription ?? "")': \(reason)")
         do {
-            try await managerStore.remove(manager)
+            try await store.remove(manager)
         } catch {
             pp_log(ctx, .os, .error, "Unable to remove NE manager '\(manager.localizedDescription ?? "")': \(error)")
         }
