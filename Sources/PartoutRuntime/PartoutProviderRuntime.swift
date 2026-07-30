@@ -79,14 +79,20 @@ public final class PartoutProviderRuntime: Sendable {
                 }
             }
         )
-        let daemonOptions = partout_daemon_options(
-            is_daemon: false,
-            starts_immediately: false,
-            cache_dir: cacheDir,
-            min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
-        )
         let result = profileJSON.withCString { profile in
-            withUnsafePointer(to: &bindings) { bindingsPtr in
+            let cCacheDir = cacheDir?.withCString {
+                strdup($0)
+            }
+            defer {
+                free(cCacheDir)
+            }
+            let daemonOptions = partout_daemon_options(
+                is_daemon: false,
+                starts_immediately: false,
+                cache_dir: cCacheDir,
+                min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
+            )
+            return withUnsafePointer(to: &bindings) { bindingsPtr in
                 var start_args = partout_daemon_start_args(
                     profile: profile,
                     options: daemonOptions,
