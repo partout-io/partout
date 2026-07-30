@@ -91,4 +91,8 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
             pp_log(ctx, .os, .error, "Unable to fetch keychain items: \(error)")
         }
     }
+
+    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
+        []
+    }
 }

@@ -40,10 +40,4 @@ public protocol NEProtocolDecoder: Sendable {
     func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile]
 }
 
-extension NEProtocolDecoder {
-    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
-        []
-    }
-}
-
 let NEProtocolCoderServerAddress = "127.0.0.1"
