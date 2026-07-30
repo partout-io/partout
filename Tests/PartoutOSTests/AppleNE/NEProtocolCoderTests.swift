@@ -189,7 +189,7 @@ private extension NEProtocolCoderTests {
     }
 
     func newStrategy(
-        coder: NEProtocolCoderV2,
+        coder: NEProtocolCoder,
         store: NETunnelManagerStore
     ) -> NETunnelStrategyV2 {
         NETunnelStrategyV2(
@@ -203,7 +203,7 @@ private extension NEProtocolCoderTests {
 
     func newManager(
         for profile: Profile,
-        coder: NEProtocolCoderV2
+        coder: NEProtocolCoder
     ) throws -> NETunnelProviderManager {
         let proto = try coder.protocolConfiguration(from: profile, title: \.name)
         var providerConfiguration = proto.providerConfiguration ?? [:]
