@@ -46,8 +46,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
     public func removeProfile(withId profileId: Profile.ID) throws {
     }
 
-    public func purge(managers: [NETunnelProviderManager]) -> [Profile] {
-        []
+    public func purge(managers: [NETunnelProviderManager]) {
     }
 }
 

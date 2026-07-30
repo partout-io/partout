@@ -4,8 +4,36 @@
 
 @preconcurrency import NetworkExtension
 
+protocol NETunnelManagerStore: Sendable {
+    func loadAll() async throws -> [NETunnelProviderManager]
+
+    func load(_ manager: NETunnelProviderManager) async throws
+
+    func save(_ manager: NETunnelProviderManager) async throws
+
+    func remove(_ manager: NETunnelProviderManager) async throws
+}
+
+private struct SystemNETunnelManagerStore: NETunnelManagerStore {
+    func loadAll() async throws -> [NETunnelProviderManager] {
+        try await NETunnelProviderManager.loadAllFromPreferences()
+    }
+
+    func load(_ manager: NETunnelProviderManager) async throws {
+        try await manager.loadFromPreferences()
+    }
+
+    func save(_ manager: NETunnelProviderManager) async throws {
+        try await manager.saveToPreferences()
+    }
+
+    func remove(_ manager: NETunnelProviderManager) async throws {
+        try await manager.removeFromPreferences()
+    }
+}
+
 /// A tunnel strategy based on `NETunnelProviderManager`.
-public actor NETunnelStrategy {
+public actor NETunnelStrategyV2 {
     public enum Option: Sendable {
         case multiple
     }
@@ -14,7 +42,9 @@ public actor NETunnelStrategy {
 
     private let bundleIdentifier: String
 
-    private let coder: NEProtocolCoder
+    private let coder: NEProtocolCoderV2
+
+    private let managerStore: NETunnelManagerStore
 
     private let options: Set<Option>
 
@@ -28,19 +58,43 @@ public actor NETunnelStrategy {
         }
     }
 
-    private var pendingSaveTask: PendingSaveTask?
+    private var lastManagerMutation: Task<Void, Error>?
+
+    private var pendingReload: (
+        task: Task<[NETunnelProviderManager], Error>,
+        recoversProfiles: Bool
+    )?
+
+    private var shouldReloadAgain = false
 
     // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
-        coder: NEProtocolCoder,
+        coder: NEProtocolCoderV2,
 //        options: Set<Option> = []
+        title: @escaping @Sendable (Profile) -> String
+    ) {
+        self.init(
+            ctx,
+            bundleIdentifier: bundleIdentifier,
+            coder: coder,
+            managerStore: SystemNETunnelManagerStore(),
+            title: title
+        )
+    }
+
+    init(
+        _ ctx: PartoutLoggerContext,
+        bundleIdentifier: String,
+        coder: NEProtocolCoderV2,
+        managerStore: NETunnelManagerStore,
         title: @escaping @Sendable (Profile) -> String
     ) {
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
+        self.managerStore = managerStore
 //        self.options = options
         self.title = title
         options = []
@@ -68,12 +122,9 @@ public actor NETunnelStrategy {
 
 // MARK: - TunnelObservableStrategy
 
-extension NETunnelStrategy: TunnelObservableStrategy {
+extension NETunnelStrategyV2: TunnelObservableStrategy {
     public func prepare(purge: Bool) async throws {
-        try await reloadAllManagers()
-        if purge {
-            await coder.purge(managers: Array(allManagers.values))
-        }
+        _ = try await reloadManagers(recoverProfiles: purge)
     }
 
     public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
@@ -89,6 +140,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
+        await waitForPendingReload()
         guard let manager = allManagers[profileId] else {
             return
         }
@@ -132,10 +184,10 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                         return
                     }
                     guard !Task.isCancelled else {
-                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategyV2.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    pp_log(ctx, .os, .debug, "NETunnelStrategyV2.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
@@ -149,68 +201,42 @@ extension NETunnelStrategy: TunnelObservableStrategy {
 
 // MARK: - NETunnelManagerRepository
 
-extension NETunnelStrategy: NETunnelManagerRepository {
+extension NETunnelStrategyV2: NETunnelManagerRepository {
     public func fetch() async throws -> [NETunnelProviderManager] {
-        try await reloadAllManagers()
-        let managers = Array(allManagers.values)
-        await coder.purge(managers: managers)
-        return managers
+        try await reloadManagers(recoverProfiles: true)
     }
 
     public func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws {
-        profile.log(.os, .notice, withPreamble: "Encoded profile:")
-
-        let proto = try coder.protocolConfiguration(from: profile, title: title)
-
-        // store custom data on the side
-        proto.profileId = profile.id
-
+        await waitForPendingReload()
+        let existingManager = allManagers[profile.id]
         let manager: NETunnelProviderManager
         do {
-            manager = try await saveAtomically(profile.id) {
-                $0.localizedDescription = profile.name
-                $0.protocolConfiguration = proto
-
-                let shouldEnableOnDemand: Bool
-                if profile.isInteractive {
-                    shouldEnableOnDemand = false
-                } else if let onDemandModule = profile.firstModule(ofType: OnDemandModule.self, ifActive: true) {
-                    let rules = onDemandModule.neRules(self.ctx)
-                    if !rules.isEmpty {
-                        $0.onDemandRules = rules
-                    } else {
-                        $0.onDemandRules = [NEOnDemandRuleConnect()]
-                    }
-                    shouldEnableOnDemand = true
-                } else {
-                    shouldEnableOnDemand = false
-                }
-
-                // do not alter these two flags unless connecting explicitly
-                $0.isEnabled = forConnecting || $0.isEnabled
-                $0.isOnDemandEnabled = (forConnecting || $0.isOnDemandEnabled) && shouldEnableOnDemand
-            }
+            manager = try await saveProfile(
+                profile,
+                manager: existingManager,
+                forConnecting: forConnecting,
+                options: options
+            )
         } catch {
-
-            // revert adds, retain updates
-            if allManagers[profile.id] == nil {
+            // A regular save creates the keychain entry first. Roll it back if
+            // the corresponding manager could not be created.
+            if existingManager == nil {
                 try? coder.removeProfile(withId: profile.id)
             }
-
             throw error
         }
-
-        if forConnecting {
-            let options = options as? [String: NSObject]
-            try manager.connection.startVPNTunnel(options: options)
-        }
+        allManagers[profile.id] = manager
     }
 
     public func remove(profileId: Profile.ID) async throws {
+        await waitForPendingReload()
         guard let manager = allManagers[profileId] else {
             return
         }
-        try await manager.removeFromPreferences()
+        let managerStore = managerStore
+        try await mutatePreferences {
+            try await managerStore.remove(manager)
+        }
         allManagers.removeValue(forKey: profileId)
         try? coder.removeProfile(withId: profileId)
     }
@@ -232,7 +258,7 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                         return
                     }
                     guard !Task.isCancelled else {
-                        pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.managersStream")
+                        pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategyV2.managersStream")
                         break
                     }
                     continuation.yield(value)
@@ -246,25 +272,69 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     }
 }
 
+private extension NETunnelStrategyV2 {
+    @discardableResult
+    func saveProfile<O>(
+        _ profile: Profile,
+        manager existingManager: NETunnelProviderManager?,
+        forConnecting: Bool,
+        options: O?
+    ) async throws -> NETunnelProviderManager {
+        profile.log(.os, .notice, withPreamble: "Encoded profile:")
+
+        let proto = try coder.protocolConfiguration(from: profile, title: title)
+
+        // store custom data on the side
+        proto.profileId = profile.id
+
+        let manager = try await saveAtomically(existingManager ?? NETunnelProviderManager()) {
+            $0.localizedDescription = profile.name
+            $0.protocolConfiguration = proto
+
+            let shouldEnableOnDemand: Bool
+            if profile.isInteractive {
+                shouldEnableOnDemand = false
+            } else if let onDemandModule = profile.firstModule(ofType: OnDemandModule.self, ifActive: true) {
+                let rules = onDemandModule.neRules(self.ctx)
+                if !rules.isEmpty {
+                    $0.onDemandRules = rules
+                } else {
+                    $0.onDemandRules = [NEOnDemandRuleConnect()]
+                }
+                shouldEnableOnDemand = true
+            } else {
+                shouldEnableOnDemand = false
+            }
+
+            // do not alter these two flags unless connecting explicitly
+            $0.isEnabled = forConnecting || $0.isEnabled
+            $0.isOnDemandEnabled = (forConnecting || $0.isOnDemandEnabled) && shouldEnableOnDemand
+        }
+
+        if forConnecting {
+            let options = options as? [String: NSObject]
+            try manager.connection.startVPNTunnel(options: options)
+        }
+        return manager
+    }
+}
+
 // MARK: - Notifications
 
-private extension NETunnelStrategy {
+private extension NETunnelStrategyV2 {
 
     @objc
     nonisolated func onVPNConfigurationChange(_ notification: Notification) {
-        guard let manager = notification.object as? NETunnelProviderManager,
-              manager.tunnelBundleIdentifier == bundleIdentifier,
-              let profileId = manager.tunnelProtocol?.profileId else {
+        if let manager = notification.object as? NETunnelProviderManager,
+           let managerBundleIdentifier = manager.tunnelBundleIdentifier,
+           managerBundleIdentifier != bundleIdentifier {
             return
         }
 
-        pp_log(ctx, .os, .debug, "NEVPNConfigurationChange(\(profileId)): \(notification)")
+        let profileId = (notification.object as? NETunnelProviderManager)?.tunnelProtocol?.profileId
+        pp_log(ctx, .os, .debug, "NEVPNConfigurationChange(\(profileId?.description ?? "unknown")): \(notification)")
         Task {
-            do {
-                try await reloadAllManagers()
-            } catch {
-                pp_log(ctx, .os, .error, "Unable to reload managers: \(error)")
-            }
+            await reloadAfterConfigurationChange()
         }
     }
 
@@ -287,57 +357,41 @@ private extension NETunnelStrategy {
 
 // MARK: - Concurrency
 
-private extension NETunnelStrategy {
-    func saveAtomically(
-        _ profileId: Profile.ID,
-        block: @escaping @Sendable (NETunnelProviderManager) -> Void
-    ) async throws -> NETunnelProviderManager {
-        try await saveAtomically(
-            self.allManagers[profileId] ?? NETunnelProviderManager(),
-            block: block
-        )
-    }
-
+private extension NETunnelStrategyV2 {
     @discardableResult
     func saveAtomically(
         _ managerBlock: @escaping @autoclosure () -> NETunnelProviderManager,
         block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
-        while let pendingSaveTask {
-            do {
-                try await pendingSaveTask.task.value
-                clearPendingSaveTask(pendingSaveTask)
-            } catch {
-                clearPendingSaveTask(pendingSaveTask)
-                throw error
-            }
-        }
-
         let manager = managerBlock()
-        let pendingSaveTask = PendingSaveTask(task: Task { @Sendable in
-            try await manager.loadFromPreferences()
+        let managerStore = managerStore
+        try await mutatePreferences {
+            try await managerStore.load(manager)
             try Task.checkCancellation()
             block(manager)
             try Task.checkCancellation()
-            try await manager.saveToPreferences()
-        })
-        self.pendingSaveTask = pendingSaveTask
-
-        do {
-            try await pendingSaveTask.task.value
-            clearPendingSaveTask(pendingSaveTask)
-        } catch {
-            clearPendingSaveTask(pendingSaveTask)
-            throw error
+            try await managerStore.save(manager)
         }
         return manager
     }
 
-    func clearPendingSaveTask(_ pendingSaveTask: PendingSaveTask) {
-        guard self.pendingSaveTask?.id == pendingSaveTask.id else {
-            return
+    func mutatePreferences(
+        _ block: @escaping @Sendable () async throws -> Void
+    ) async throws {
+        let previousMutation = lastManagerMutation
+        let mutation = Task {
+            // The previous caller already receives its own error. A failed write
+            // must not prevent later writes from being attempted.
+            _ = try? await previousMutation?.value
+            try Task.checkCancellation()
+            try await block()
         }
-        self.pendingSaveTask = nil
+        lastManagerMutation = mutation
+        try await mutation.value
+    }
+
+    func waitForManagerMutation() async {
+        _ = try? await lastManagerMutation?.value
     }
 
     func disconnectCurrentManagers() async {
@@ -364,15 +418,9 @@ private extension NETunnelStrategy {
     }
 }
 
-private struct PendingSaveTask: Sendable {
-    let id = UniqueID()
-
-    let task: Task<Void, Error>
-}
-
 // MARK: - Active managers
 
-private extension NETunnelStrategy {
+private extension NETunnelStrategyV2 {
     nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
         let stream = managersSubject.subscribe()
         let mappedStream: AsyncStream<[Profile.ID: TunnelSnapshot]>
@@ -414,29 +462,152 @@ private extension NETunnelStrategy {
         return mappedStream.removeDuplicates()
     }
 
-    func reloadAllManagers() async throws {
-        var removedManagers = allManagers
-
-        let managers = try await NETunnelProviderManager.loadAllFromPreferences()
-        allManagers = managers.reduce(into: [:]) {
-            guard $1.tunnelBundleIdentifier == bundleIdentifier else {
-                $1.removeFromPreferences()
-                return
+    func reloadManagers(recoverProfiles: Bool) async throws -> [NETunnelProviderManager] {
+        if let pendingReload {
+            let managers = try await pendingReload.task.value
+            if recoverProfiles && !pendingReload.recoversProfiles {
+                return try await reloadManagers(recoverProfiles: true)
             }
-            guard let profileId = $1.tunnelProtocol?.profileId else {
-                $1.removeFromPreferences()
-                return
-            }
-            $0[profileId] = $1
-            removedManagers.removeValue(forKey: profileId)
+            return managers
         }
 
-        // clean up coder data of removed managers
-        removedManagers.forEach {
-            try? coder.removeProfile(withId: $0.key)
+        let task = Task {
+            try await reloadManagersUntilCurrent(recoverProfiles: recoverProfiles)
+        }
+        pendingReload = (task, recoverProfiles)
+        return try await task.value
+    }
+
+    func reloadManagersUntilCurrent(
+        recoverProfiles: Bool
+    ) async throws -> [NETunnelProviderManager] {
+        defer {
+            pendingReload = nil
         }
 
+        var recoverProfiles = recoverProfiles
+        var managers: [Profile.ID: NETunnelProviderManager] = [:]
+        repeat {
+            shouldReloadAgain = false
+            managers = try await loadManagers(recoverProfiles: recoverProfiles)
+            recoverProfiles = false
+
+            if shouldReloadAgain {
+                pp_log(ctx, .os, .debug, "Reload managers again after configuration changes")
+            }
+        } while shouldReloadAgain
+
+        allManagers = managers
         logManagers()
+        return Array(managers.values)
+    }
+
+    func loadManagers(
+        recoverProfiles: Bool
+    ) async throws -> [Profile.ID: NETunnelProviderManager] {
+        await waitForManagerMutation()
+
+        var managers = try await loadManagedManagers(removeInvalidProfiles: recoverProfiles)
+        guard recoverProfiles else {
+            return managers
+        }
+
+        let profiles = await coder.recoverProfiles(notReferencedBy: Array(managers.values))
+        for profile in profiles where managers[profile.id] == nil {
+            do {
+                pp_log(ctx, .os, .notice, "Restore stale profile: \(profile.id)")
+                managers[profile.id] = try await saveProfile(
+                    profile,
+                    manager: nil,
+                    forConnecting: false,
+                    options: nil as Void?
+                )
+            } catch {
+                // This is a recovery, so keep the keychain profile for the next attempt.
+                pp_log(ctx, .os, .error, "Unable to restore stale profile \(profile.id): \(error)")
+            }
+        }
+
+        // Preference writes emit configuration notifications. Verify what the
+        // system persisted before publishing the new state.
+        return try await loadManagedManagers(removeInvalidProfiles: true)
+    }
+
+    func loadManagedManagers(
+        removeInvalidProfiles: Bool
+    ) async throws -> [Profile.ID: NETunnelProviderManager] {
+        let loadedManagers = try await managerStore.loadAll()
+        var managers: [Profile.ID: NETunnelProviderManager] = [:]
+
+        for manager in loadedManagers {
+            guard manager.tunnelBundleIdentifier == bundleIdentifier else {
+                await removeManager(manager, reason: "unexpected tunnel bundle identifier")
+                continue
+            }
+            guard let profileId = manager.tunnelProtocol?.profileId else {
+                await removeManager(manager, reason: "missing profile identifier")
+                continue
+            }
+            if removeInvalidProfiles {
+                do {
+                    _ = try coder.profile(from: manager.tunnelProtocol!)
+                } catch {
+                    await removeManager(manager, reason: "unable to decode profile: \(error)")
+                    continue
+                }
+            }
+            guard let existingManager = managers[profileId] else {
+                managers[profileId] = manager
+                continue
+            }
+
+            let managerToKeep: NETunnelProviderManager
+            let duplicateManager: NETunnelProviderManager
+            if manager.rank > existingManager.rank {
+                managerToKeep = manager
+                duplicateManager = existingManager
+            } else {
+                managerToKeep = existingManager
+                duplicateManager = manager
+            }
+            managers[profileId] = managerToKeep
+            await removeManager(duplicateManager, reason: "duplicate for profile \(profileId)")
+        }
+        return managers
+    }
+
+    func removeManager(
+        _ manager: NETunnelProviderManager,
+        reason: String
+    ) async {
+        pp_log(ctx, .os, .error, "Remove NE manager '\(manager.localizedDescription ?? "")': \(reason)")
+        do {
+            try await managerStore.remove(manager)
+        } catch {
+            pp_log(ctx, .os, .error, "Unable to remove NE manager '\(manager.localizedDescription ?? "")': \(error)")
+        }
+    }
+
+    func waitForPendingReload() async {
+        while let pendingReload {
+            do {
+                _ = try await pendingReload.task.value
+            } catch {
+                pp_log(ctx, .os, .error, "Pending manager reload failed: \(error)")
+            }
+        }
+    }
+
+    func reloadAfterConfigurationChange() async {
+        guard pendingReload == nil else {
+            shouldReloadAgain = true
+            return
+        }
+        do {
+            _ = try await reloadManagers(recoverProfiles: false)
+        } catch {
+            pp_log(ctx, .os, .error, "Unable to reload managers: \(error)")
+        }
     }
 
     func updateCurrentManagersIfNeeded(with manager: NETunnelProviderManager, profileId: Profile.ID) {
@@ -453,9 +624,9 @@ private extension NETunnelStrategy {
 
     func logManagers() {
         if !allManagers.isEmpty {
-            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers:")
+            pp_log(ctx, .os, .debug, "NETunnelStrategyV2.allManagers:")
         } else {
-            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers: none")
+            pp_log(ctx, .os, .debug, "NETunnelStrategyV2.allManagers: none")
         }
         allManagers.values.forEach {
             guard let profileId = $0.tunnelProtocol?.profileId else {
@@ -543,9 +714,6 @@ private extension NEVPNConnection {
             }
         }
     }
-}
-
-extension NETunnelProviderManager: @retroactive @unchecked Sendable {
 }
 
 private extension NETunnelProviderManager {
