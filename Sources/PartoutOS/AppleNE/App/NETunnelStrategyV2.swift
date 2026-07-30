@@ -4,34 +4,6 @@
 
 @preconcurrency import NetworkExtension
 
-protocol NETunnelManagerStore: Sendable {
-    func loadAll() async throws -> [NETunnelProviderManager]
-
-    func load(_ manager: NETunnelProviderManager) async throws
-
-    func save(_ manager: NETunnelProviderManager) async throws
-
-    func remove(_ manager: NETunnelProviderManager) async throws
-}
-
-private struct SystemNETunnelManagerStore: NETunnelManagerStore {
-    func loadAll() async throws -> [NETunnelProviderManager] {
-        try await NETunnelProviderManager.loadAllFromPreferences()
-    }
-
-    func load(_ manager: NETunnelProviderManager) async throws {
-        try await manager.loadFromPreferences()
-    }
-
-    func save(_ manager: NETunnelProviderManager) async throws {
-        try await manager.saveToPreferences()
-    }
-
-    func remove(_ manager: NETunnelProviderManager) async throws {
-        try await manager.removeFromPreferences()
-    }
-}
-
 /// A tunnel strategy based on `NETunnelProviderManager`.
 public actor NETunnelStrategyV2 {
     public enum Option: Sendable {
@@ -750,5 +722,30 @@ private extension NEVPNStatus {
         @unknown default:
             return .inactive
         }
+    }
+}
+
+protocol NETunnelManagerStore: Sendable {
+    func loadAll() async throws -> [NETunnelProviderManager]
+    func load(_ manager: NETunnelProviderManager) async throws
+    func save(_ manager: NETunnelProviderManager) async throws
+    func remove(_ manager: NETunnelProviderManager) async throws
+}
+
+private struct SystemNETunnelManagerStore: NETunnelManagerStore {
+    func loadAll() async throws -> [NETunnelProviderManager] {
+        try await NETunnelProviderManager.loadAllFromPreferences()
+    }
+
+    func load(_ manager: NETunnelProviderManager) async throws {
+        try await manager.loadFromPreferences()
+    }
+
+    func save(_ manager: NETunnelProviderManager) async throws {
+        try await manager.saveToPreferences()
+    }
+
+    func remove(_ manager: NETunnelProviderManager) async throws {
+        try await manager.removeFromPreferences()
     }
 }
