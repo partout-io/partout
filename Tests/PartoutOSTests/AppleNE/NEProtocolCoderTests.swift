@@ -196,7 +196,7 @@ private extension NEProtocolCoderTests {
             .global,
             bundleIdentifier: bundleIdentifier,
             coder: coder,
-            managerStore: store,
+            store: store,
             title: \.name
         )
     }
