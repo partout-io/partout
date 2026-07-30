@@ -1,0 +1,377 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+const std = @import("std");
+
+const core = @import("source").core;
+
+const AtomicBool = std.atomic.Value(bool);
+
+fn waitUntil(value: *const AtomicBool) void {
+    while (!value.load(.acquire)) {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn waitUntilWithin(value: *const AtomicBool, timeout_ms: u64) bool {
+    const deadline_ns = core.concurrency.testing.deadlineAfterMilliseconds(
+        core.concurrency.monotonicNs(),
+        timeout_ms,
+    );
+    while (!value.load(.acquire)) {
+        if (core.concurrency.monotonicNs() >= deadline_ns) return false;
+        std.Thread.yield() catch {};
+    }
+    return true;
+}
+
+fn settleScheduler() void {
+    for (0..1000) |_| {
+        std.Thread.yield() catch {};
+    }
+}
+
+fn storeTrue(ctx: ?*anyopaque) void {
+    const value: *AtomicBool = @ptrCast(@alignCast(ctx.?));
+    value.store(true, .release);
+}
+
+const ThreadRecorder = struct {
+    mutex: core.Mutex = .{},
+    count: usize = 0,
+    first: ?std.Thread.Id = null,
+    second: ?std.Thread.Id = null,
+    first_did_run: AtomicBool = AtomicBool.init(false),
+    second_did_run: AtomicBool = AtomicBool.init(false),
+
+    fn deinit(self: *ThreadRecorder) void {
+        self.mutex.deinit();
+    }
+
+    fn record(ctx: ?*anyopaque) void {
+        const self: *ThreadRecorder = @ptrCast(@alignCast(ctx.?));
+
+        self.mutex.lock();
+        self.count += 1;
+        switch (self.count) {
+            1 => {
+                self.first = std.Thread.getCurrentId();
+                self.first_did_run.store(true, .release);
+            },
+            2 => {
+                self.second = std.Thread.getCurrentId();
+                self.second_did_run.store(true, .release);
+            },
+            else => {},
+        }
+        self.mutex.unlock();
+    }
+};
+
+const BlockingRecorder = struct {
+    mutex: core.Mutex = .{},
+    count: usize = 0,
+    first_did_start: AtomicBool = AtomicBool.init(false),
+    first_can_finish: AtomicBool = AtomicBool.init(false),
+    second_did_run: AtomicBool = AtomicBool.init(false),
+
+    fn deinit(self: *BlockingRecorder) void {
+        self.mutex.deinit();
+    }
+
+    fn record(ctx: ?*anyopaque) void {
+        const self: *BlockingRecorder = @ptrCast(@alignCast(ctx.?));
+
+        self.mutex.lock();
+        self.count += 1;
+        const count = self.count;
+        self.mutex.unlock();
+
+        switch (count) {
+            1 => {
+                self.first_did_start.store(true, .release);
+                waitUntil(&self.first_can_finish);
+            },
+            2 => self.second_did_run.store(true, .release),
+            else => {},
+        }
+    }
+};
+
+const ScheduledProbe = struct {
+    elapsed: AtomicBool = AtomicBool.init(false),
+    cancelled: AtomicBool = AtomicBool.init(false),
+
+    fn record(
+        scheduled: *core.RunAfter.Scheduled,
+        outcome: core.RunAfter.Scheduled.Outcome,
+    ) void {
+        const self: *ScheduledProbe = @ptrCast(@alignCast(scheduled.context.?));
+        switch (outcome) {
+            .elapsed => self.elapsed.store(true, .release),
+            .cancelled => self.cancelled.store(true, .release),
+        }
+    }
+};
+
+const BlockingScheduledProbe = struct {
+    started: AtomicBool = AtomicBool.init(false),
+    release: AtomicBool = AtomicBool.init(false),
+
+    fn record(
+        scheduled: *core.RunAfter.Scheduled,
+        outcome: core.RunAfter.Scheduled.Outcome,
+    ) void {
+        const self: *BlockingScheduledProbe = @ptrCast(
+            @alignCast(scheduled.context.?),
+        );
+        if (outcome != .elapsed) return;
+        self.started.store(true, .release);
+        waitUntil(&self.release);
+    }
+};
+
+test "drainer waits until in-flight work completes" {
+    const Worker = struct {
+        mutex: *core.Mutex,
+        drainer: *core.Drainer,
+        started: *AtomicBool,
+        release: *AtomicBool,
+        completed: *AtomicBool,
+
+        fn run(self: @This()) void {
+            self.mutex.lock();
+            self.drainer.enter();
+            self.mutex.unlock();
+
+            self.started.store(true, .release);
+            waitUntil(self.release);
+            self.drainer.leave(self.mutex);
+            self.completed.store(true, .release);
+        }
+    };
+    const Drain = struct {
+        mutex: *core.Mutex,
+        drainer: *core.Drainer,
+        started: *AtomicBool,
+        completed: *AtomicBool,
+
+        fn run(self: @This()) void {
+            self.mutex.lock();
+            self.started.store(true, .release);
+            self.drainer.drain(self.mutex);
+            self.mutex.unlock();
+            self.completed.store(true, .release);
+        }
+    };
+
+    var mutex = core.Mutex{};
+    defer mutex.deinit();
+    var drainer = core.Drainer{};
+    defer drainer.deinit();
+    var worker_started = AtomicBool.init(false);
+    var worker_release = AtomicBool.init(false);
+    var worker_completed = AtomicBool.init(false);
+    var drain_started = AtomicBool.init(false);
+    var drain_completed = AtomicBool.init(false);
+
+    var worker_thread = try std.Thread.spawn(.{}, Worker.run, .{Worker{
+        .mutex = &mutex,
+        .drainer = &drainer,
+        .started = &worker_started,
+        .release = &worker_release,
+        .completed = &worker_completed,
+    }});
+    waitUntil(&worker_started);
+
+    var drain_thread = try std.Thread.spawn(.{}, Drain.run, .{Drain{
+        .mutex = &mutex,
+        .drainer = &drainer,
+        .started = &drain_started,
+        .completed = &drain_completed,
+    }});
+    waitUntil(&drain_started);
+    settleScheduler();
+
+    if (drain_completed.load(.acquire)) {
+        worker_release.store(true, .release);
+        worker_thread.join();
+        drain_thread.join();
+        return error.TestUnexpectedResult;
+    }
+
+    worker_release.store(true, .release);
+    worker_thread.join();
+    drain_thread.join();
+
+    try std.testing.expect(worker_completed.load(.acquire));
+    try std.testing.expect(drain_completed.load(.acquire));
+}
+
+test "RunAfter runs callback after delay" {
+    var did_run = AtomicBool.init(false);
+    var run_after = core.RunAfter{};
+    try run_after.scheduleReplacing(1, storeTrue, &did_run);
+    defer run_after.deinit();
+
+    waitUntil(&did_run);
+}
+
+test "RunAfter deadlines account for continuous clock jumps" {
+    const start_ns = 5 * std.time.ns_per_s;
+    const deadline_ns = core.concurrency.testing.deadlineAfterMilliseconds(
+        start_ns,
+        100,
+    );
+
+    try std.testing.expectEqual(
+        @as(u64, 100),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            start_ns,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 1),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns - 1,
+        ),
+    );
+    try std.testing.expectEqual(
+        @as(u64, 0),
+        core.concurrency.testing.millisecondsUntilDeadline(
+            deadline_ns,
+            deadline_ns + 10 * std.time.ns_per_s,
+        ),
+    );
+}
+
+test "RunAfter deadlines saturate without wrapping" {
+    try std.testing.expectEqual(
+        std.math.maxInt(u64),
+        core.concurrency.testing.deadlineAfterMilliseconds(
+            std.math.maxInt(u64) - 1,
+            1,
+        ),
+    );
+}
+
+test "RunAfter cancel prevents callback" {
+    var did_run = AtomicBool.init(false);
+    var run_after = core.RunAfter{};
+    try run_after.scheduleReplacing(100, storeTrue, &did_run);
+
+    run_after.cancel();
+    run_after.deinit();
+
+    try std.testing.expect(!did_run.load(.acquire));
+}
+
+test "RunAfter replace cancels previous callback" {
+    var first_did_run = AtomicBool.init(false);
+    var second_did_run = AtomicBool.init(false);
+    var run_after = core.RunAfter{};
+    try run_after.scheduleReplacing(100, storeTrue, &first_did_run);
+    try run_after.scheduleReplacing(1, storeTrue, &second_did_run);
+    defer run_after.deinit();
+
+    waitUntil(&second_did_run);
+    try std.testing.expect(!first_did_run.load(.acquire));
+}
+
+test "RunAfter reuses worker thread" {
+    var recorder = ThreadRecorder{};
+    defer recorder.deinit();
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+
+    try run_after.scheduleReplacing(1, ThreadRecorder.record, &recorder);
+    waitUntil(&recorder.first_did_run);
+
+    try run_after.scheduleReplacing(1, ThreadRecorder.record, &recorder);
+    waitUntil(&recorder.second_did_run);
+
+    recorder.mutex.lock();
+    defer recorder.mutex.unlock();
+
+    try std.testing.expectEqual(recorder.first.?, recorder.second.?);
+}
+
+test "RunAfter can reschedule while callback is running" {
+    var recorder = BlockingRecorder{};
+    defer recorder.deinit();
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+    defer recorder.first_can_finish.store(true, .release);
+
+    try run_after.scheduleReplacing(1, BlockingRecorder.record, &recorder);
+    waitUntil(&recorder.first_did_start);
+
+    try run_after.scheduleReplacing(1, BlockingRecorder.record, &recorder);
+    settleScheduler();
+    try std.testing.expect(!recorder.second_did_run.load(.acquire));
+
+    recorder.first_can_finish.store(true, .release);
+    waitUntil(&recorder.second_did_run);
+}
+
+test "RunAfter schedules independent one-shot callbacks" {
+    var later_probe = ScheduledProbe{};
+    var earlier_probe = ScheduledProbe{};
+    var later = core.RunAfter.Scheduled{};
+    var earlier = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+
+    try run_after.scheduleAppending(&later, 100, ScheduledProbe.record, &later_probe);
+    try run_after.scheduleAppending(&earlier, 1, ScheduledProbe.record, &earlier_probe);
+
+    waitUntil(&earlier_probe.elapsed);
+    try std.testing.expect(!later_probe.elapsed.load(.acquire));
+    try std.testing.expect(!earlier_probe.cancelled.load(.acquire));
+
+    waitUntil(&later_probe.elapsed);
+    try std.testing.expect(!later_probe.cancelled.load(.acquire));
+}
+
+test "RunAfter rearms an earlier deadline while notifying callbacks" {
+    var blocking_probe = BlockingScheduledProbe{};
+    var earlier_probe = ScheduledProbe{};
+    var later_probe = ScheduledProbe{};
+    var blocking = core.RunAfter.Scheduled{};
+    var earlier = core.RunAfter.Scheduled{};
+    var later = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+    defer blocking_probe.release.store(true, .release);
+
+    try run_after.scheduleAppending(&later, 2_000, ScheduledProbe.record, &later_probe);
+    try run_after.scheduleAppending(
+        &blocking,
+        1,
+        BlockingScheduledProbe.record,
+        &blocking_probe,
+    );
+    waitUntil(&blocking_probe.started);
+
+    try run_after.scheduleAppending(&earlier, 1, ScheduledProbe.record, &earlier_probe);
+    blocking_probe.release.store(true, .release);
+
+    try std.testing.expect(waitUntilWithin(&earlier_probe.elapsed, 500));
+    try std.testing.expect(!later_probe.elapsed.load(.acquire));
+}
+
+test "RunAfter cancel releases scheduled callbacks" {
+    var probe = ScheduledProbe{};
+    var scheduled = core.RunAfter.Scheduled{};
+    var run_after = core.RunAfter{};
+    defer run_after.deinit();
+
+    try run_after.scheduleAppending(&scheduled, 100, ScheduledProbe.record, &probe);
+    run_after.cancel();
+
+    try std.testing.expect(probe.cancelled.load(.acquire));
+    try std.testing.expect(!probe.elapsed.load(.acquire));
+}

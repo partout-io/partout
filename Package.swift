@@ -15,13 +15,17 @@ let envDocs = env["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
-let areas = Area.allCases
-let cryptoMode: CryptoMode? = .openSSL
+let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let openSSLVersion: Version = "3.6.300" // 3.6.2
-let wgGoVersion: Version = "0.0.2025063103"
-let cmakeOutput = envCMakeOutput ?? "bin/windows-arm64"
+let wgGoVersion: Version = "0.0.20260725"
+// Local CMake output is only required for generated wg-go and wintun artifacts.
+let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
 // let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
+
+let areas = Area.allCases.filter {
+    $0 != .openVPN || !cryptoLibraries.isEmpty
+}
 
 // MARK: - Package
 
@@ -40,7 +44,8 @@ default:
 // The global settings for C targets
 let globalCSettings: [CSetting] = [
     .unsafeFlags([
-        "-Wall", "-Wextra"//, "-pedantic", "-Werror"
+        "-W", "-Wall", "-Wextra", "-pedantic", "-Werror",
+        "-Wno-nullability-extension"
     ])
 ]
 
@@ -56,6 +61,14 @@ let package = Package(
             name: "partout",
             type: libraryType,
             targets: ["Partout"]
+        ),
+        .library(
+            name: "Partout_C",
+            targets: ["Partout_C"]
+        ),
+        .library(
+            name: "PartoutRuntime",
+            targets: ["PartoutRuntime"]
         )
     ],
     targets: [
@@ -64,35 +77,50 @@ let package = Package(
             dependencies: {
                 // These are always included
                 var list: [Target.Dependency] = [
+                    "Partout_C",
+                    "PartoutCrypto_C",
                     "PartoutCore",
                     "PartoutOS"
                 ]
-                if cryptoMode != nil {
-                    list.append("_PartoutCryptoImpl_C")
-                    if areas.contains(.openVPN) {
-                        list.append("PartoutOpenVPNConnection")
-                    } else {
-                        list.append("PartoutOpenVPN")
-                    }
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN")
                 }
                 if areas.contains(.wireGuard) {
-                    list.append("PartoutWireGuardConnection")
-                } else {
                     list.append("PartoutWireGuard")
                 }
                 return list
             }(),
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
+            swiftSettings: areas.swiftSettings + useFoundationCompatibility.swiftSettings
         ),
-        .testTarget(
-            name: "PartoutTests",
-            dependencies: ["Partout"],
-            exclude: useFoundationCompatibility.partoutTestsExclude,
-            swiftSettings: areas.compactMap(\.define).map {
-                .define($0)
-            } + useFoundationCompatibility.swiftSettings
+        .target(
+            name: "Partout_C",
+            dependencies: {
+                var list: [Target.Dependency] = [
+                    "PartoutCrypto_C",
+                    "PartoutCore_C"
+                ]
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN_C")
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("PartoutWireGuard_C")
+                }
+                return list
+            }(),
+            cSettings: globalCSettings + cryptoLibraries.cSettings + {
+                var list: [CSetting] = []
+                if areas.contains(.openVPN) {
+                    list.append(.define("PARTOUT_OPENVPN"))
+                }
+                if areas.contains(.wireGuard) {
+                    list.append(.define("PARTOUT_WIREGUARD"))
+                }
+                return list
+            }()
+        ),
+        .target(
+            name: "PartoutRuntime",
+            dependencies: ["Partout"]
         )
     ]
 )
@@ -185,37 +213,31 @@ package.targets.append(contentsOf: [
 
 // MARK: OpenVPN
 
-package.products.append(
-    .library(
-        name: "PartoutOpenVPN",
-        targets: ["PartoutOpenVPN"]
-    )
-)
-package.targets.append(
-    .target(
-        name: "PartoutOpenVPN",
-        dependencies: ["PartoutOS"]
-    )
-)
-
 // OpenVPN requires Crypto/TLS wrappers
-if areas.contains(.openVPN), cryptoMode != nil {
+if areas.contains(.openVPN) {
+    package.products.append(
+        .library(
+            name: "PartoutOpenVPN",
+            targets: ["PartoutOpenVPN"]
+        )
+    )
     package.targets.append(contentsOf: [
         .target(
-            name: "PartoutOpenVPNConnection_C",
-            dependencies: ["_PartoutCryptoImpl_C"],
+            name: "PartoutOpenVPN_C",
+            dependencies: ["PartoutCrypto_C"],
             cSettings: globalCSettings
         ),
         .target(
-            name: "PartoutOpenVPNConnection",
+            name: "PartoutOpenVPN",
             dependencies: [
-                "PartoutOpenVPN",
-                "PartoutOpenVPNConnection_C"
-            ]
+                "PartoutCore",
+                "PartoutOpenVPN_C"
+            ],
+            swiftSettings: cryptoLibraries.swiftSettings
         ),
         .testTarget(
             name: "PartoutOpenVPNTests",
-            dependencies: ["PartoutOpenVPNConnection"],
+            dependencies: ["PartoutOpenVPN"],
             exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
             resources: [
                 .process("Resources")
@@ -227,38 +249,30 @@ if areas.contains(.openVPN), cryptoMode != nil {
 
 // MARK: WireGuard
 
-package.products.append(
-    .library(
-        name: "PartoutWireGuard",
-        targets: ["PartoutWireGuard"]
-    )
-)
-package.targets.append(contentsOf: [
-    .target(
-        name: "PartoutWireGuard",
-        dependencies: [
-            "PartoutOS",
-            "PartoutWireGuard_C"
-        ]
-    ),
-    .target(
-        name: "PartoutWireGuard_C",
-        dependencies: ["PartoutCore_C"]
-    )
-])
-
 if areas.contains(.wireGuard) {
+    package.products.append(
+        .library(
+            name: "PartoutWireGuard",
+            targets: ["PartoutWireGuard"]
+        )
+    )
     switch OS.current {
     case .apple:
         // Require static wg-go backend
         package.dependencies.append(
-            .package(url: "https://github.com/partout-io/wg-go-apple", from: wgGoVersion)
+            .package(url: "https://github.com/partout-io/wg-go-apple", exact: wgGoVersion)
         )
+//        package.targets.append(
+//            .binaryTarget(
+//                name: "wg-go-apple",
+//                path: "../../wg-go-apple/build/wg-go.xcframework"
+//            )
+//        )
         package.targets.append(
             .target(
-                name: "PartoutWireGuardConnection_C",
+                name: "PartoutWireGuard_C",
                 dependencies: [
-                    "PartoutWireGuard_C",
+                    "PartoutCore_C",
                     "wg-go-apple"
                 ]
             )
@@ -267,8 +281,8 @@ if areas.contains(.wireGuard) {
         // Load wg-go backend dynamically
         package.targets.append(
             .target(
-                name: "PartoutWireGuardConnection_C",
-                dependencies: ["PartoutWireGuard_C"],
+                name: "PartoutWireGuard_C",
+                dependencies: ["PartoutCore_C"],
                 cSettings: globalCSettings + [
                     .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
                 ],
@@ -281,15 +295,15 @@ if areas.contains(.wireGuard) {
     }
     package.targets.append(contentsOf: [
         .target(
-            name: "PartoutWireGuardConnection",
+            name: "PartoutWireGuard",
             dependencies: [
-                "PartoutWireGuard",
-                "PartoutWireGuardConnection_C"
+                "PartoutCore",
+                "PartoutWireGuard_C"
             ]
         ),
         .testTarget(
             name: "PartoutWireGuardTests",
-            dependencies: ["PartoutWireGuardConnection"],
+            dependencies: ["PartoutWireGuard"],
             exclude: useFoundationCompatibility.wireGuardTestsExclude
         )
     ])
@@ -297,89 +311,99 @@ if areas.contains(.wireGuard) {
 
 // MARK: - Crypto
 
-switch cryptoMode {
-case .openSSL:
-    // OpenSSL-based crypto/TLS implementations
-    switch OS.current {
-    case .apple:
-        package.dependencies.append(
-            .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
-        )
-        package.targets.append(contentsOf: [
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: [
-                    "openssl-apple",
-                    "PartoutCore_C"
-                ],
-                path: "Sources/PartoutCrypto/OpenSSL_C"
+var cryptoDependencies: [Target.Dependency] = ["PartoutCore_C"]
+
+for mode in cryptoLibraries {
+    switch mode {
+    case .openSSL:
+        // OpenSSL-based crypto/TLS implementations
+        switch OS.current {
+        case .apple:
+            package.dependencies.append(
+                .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
             )
-        ])
-    default:
+            cryptoDependencies.append("openssl-apple")
+        default:
+            package.targets.append(
+                .systemLibrary(
+                    name: "COpenSSL",
+                    path: "Sources/SystemLibraries/COpenSSL",
+                    pkgConfig: "openssl",
+                    providers: [
+                        .brew(["openssl@3"]),
+                        .apt(["libssl-dev"])
+                    ]
+                )
+            )
+            cryptoDependencies.append("COpenSSL")
+        }
+    case .mbedTLS:
+        // Crypto with OS routines, TLS with MbedTLS
         package.targets.append(
-            .target(
-                name: "_PartoutCryptoImpl_C",
-                dependencies: ["PartoutCore_C"],
-                path: "Sources/PartoutCrypto/OpenSSL_C",
-                cSettings: globalCSettings + [
-                    .unsafeFlags(["-I\(cmakeOutput)/openssl/include"])
-                ],
-                linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/openssl/lib"]),
-                    // WARNING: order matters, ssl then crypto
-                    .linkedLibrary("\(staticLibPrefix)ssl"),
-                    .linkedLibrary("\(staticLibPrefix)crypto")
+            .systemLibrary(
+                name: "CMbedTLS",
+                path: "Sources/SystemLibraries/CMbedTLS",
+                pkgConfig: "mbedtls",
+                providers: [
+                    .brew(["mbedtls"]),
+                    .apt(["libmbedtls-dev"])
                 ]
             )
         )
+        cryptoDependencies.append("CMbedTLS")
     }
-case .native:
-    // Crypto with OS routines, TLS with MbedTLS
-    package.targets.append(
-        .target(
-            name: "_PartoutCryptoImpl_C",
-            dependencies: ["PartoutCore_C"],
-            path: "Sources/PartoutCrypto/Native_C",
-            exclude: {
-                // Pick current OS by removing it from exclusions
-                var list = Set(OS.allCases)
-                list.remove(.current)
-                return list.map { "src/\($0.rawValue)" }
-            }(),
-            cSettings: globalCSettings + [
-                .unsafeFlags(["-I\(cmakeOutput)/mbedtls/include"])
-            ],
-            linkerSettings: [
-                .unsafeFlags(["-L\(cmakeOutput)/mbedtls/lib"]),
-                 // WARNING: order matters
-                .linkedLibrary("mbedtls"),
-                .linkedLibrary("mbedx509"),
-                .linkedLibrary("mbedcrypto")
-            ]
-        )
-    )
-default:
-    break
 }
 
 // Include concrete crypto targets if supported
-if cryptoMode != nil {
-    package.products.append(
-        .library(
-            name: "PartoutCrypto",
-            targets: ["_PartoutCryptoImpl_C"]
-        )
+package.targets.append(
+    .target(
+        name: "PartoutCrypto_C",
+        dependencies: cryptoDependencies,
+        exclude: {
+            // Pick current OS by removing it from exclusions
+            var list: [String] = []
+            if !cryptoLibraries.contains(.openSSL) {
+                list.append("crypto_openssl.c")
+            }
+            var native = Set(OS.nativeCryptoSources)
+            if !cryptoLibraries.contains(.mbedTLS) {
+                list.append("crypto_mbedtls.c")
+            } else {
+                native.remove(OS.current.nativeCryptoSource)
+            }
+            let nativeSrc = native.map { "crypto_\($0.rawValue).c" }
+            list.append(contentsOf: nativeSrc)
+            return list
+        }(),
+        cSettings: globalCSettings,
+        linkerSettings: {
+            var list: [LinkerSetting] = []
+            if cryptoLibraries.contains(.mbedTLS) {
+                list.append(.linkedLibrary("mbedx509"))
+                list.append(.linkedLibrary("mbedcrypto"))
+            }
+            return list
+        }()
     )
+)
+package.products.append(
+    .library(
+        name: "PartoutCrypto",
+        targets: ["PartoutCrypto_C"]
+    )
+)
+if !cryptoLibraries.isEmpty {
     package.targets.append(contentsOf: [
         .testTarget(
             name: "PartoutCryptoTests",
             dependencies: [
-                "_PartoutCryptoImpl_C",
+                "PartoutCrypto_C",
                 "PartoutOS"
             ],
             exclude: [
                 "CryptoPerformanceTests.swift"
-            ]
+            ],
+            swiftSettings: cryptoLibraries.swiftSettings
         )
     ])
 }
@@ -414,11 +438,15 @@ package.targets.append(contentsOf: [
 
 // MARK: - Configuration structures
 
-enum Area: CaseIterable {
+protocol Definable {
+    var define: String { get }
+}
+
+enum Area: Definable, CaseIterable {
     case openVPN
     case wireGuard
 
-    var define: String? {
+    var define: String {
         switch self {
         case .openVPN: "PARTOUT_OPENVPN"
         case .wireGuard: "PARTOUT_WIREGUARD"
@@ -428,9 +456,11 @@ enum Area: CaseIterable {
 
 enum OS: String, CaseIterable {
     case android
-    case apple
+    case apple = "darwin"
     case linux
     case windows
+
+    static let nativeCryptoSources: Set<OS> = [.apple, .linux, .windows]
 
     // Unfortunately, SwiftPM has no "when" conditionals on package
     // dependencies. We resort on some raw #if, which are reliable
@@ -461,11 +491,39 @@ enum OS: String, CaseIterable {
         case .windows: [.windows]
         }
     }
+
+    var nativeCryptoSource: OS {
+        switch self {
+        case .android: .linux
+        default: self
+        }
+    }
 }
 
-enum CryptoMode {
+enum CryptoLibrary: Definable {
     case openSSL
-    case native
+    case mbedTLS
+
+    var define: String {
+        switch self {
+        case .openSSL: "PARTOUT_CRYPTO_OPENSSL"
+        case .mbedTLS: "PARTOUT_CRYPTO_MBEDTLS"
+        }
+    }
+}
+
+extension Collection where Element: Definable {
+    var cSettings: [CSetting] {
+        map {
+            .define($0.define)
+        }
+    }
+
+    var swiftSettings: [SwiftSetting] {
+        map {
+            .define($0.define)
+        }
+    }
 }
 
 enum FoundationCompatibility {
@@ -519,10 +577,3 @@ enum FoundationCompatibility {
         }
     }
 }
-
-// MARK: - Codegen
-
-package.dependencies.append(
-    .package(url: "https://github.com/partout-io/codegen", branch: "master")
-    // .package(path: "../../../codegen")
-)

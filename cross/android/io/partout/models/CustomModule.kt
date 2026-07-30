@@ -8,20 +8,29 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
 
+import io.partout.models.ModuleType
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * A type-erased ``Module`` for encoding external implementations.
  *
  * @param innerType 
  * @param json 
@@ -30,11 +39,11 @@ import kotlinx.serialization.Contextual
 
 data class CustomModule (
 
-    @SerialName(value = "innerType")
-    val innerType: kotlin.String,
+    @Contextual @SerialName(value = "innerType")
+    val innerType: ModuleType,
 
     @Contextual @SerialName(value = "json")
-    val json: kotlinx.serialization.json.JsonElement?
+    val json: kotlinx.serialization.json.JsonElement
 
 ) {
 

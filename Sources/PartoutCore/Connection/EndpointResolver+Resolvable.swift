@@ -40,8 +40,12 @@ extension EndpointResolver {
             self.isResolved = isResolved
         }
 
-        func resolved(with dns: DNSResolver, timeout: Int) async throws -> Self {
-            let records = try await dns.resolve(originalEndpoint.address.rawValue, timeout: timeout)
+        func resolved(with dns: DNSResolver, reachability: ReachabilityInfo?, timeout: Int) async throws -> Self {
+            let records = try await dns.resolve(
+                originalEndpoint.address.rawValue,
+                reachability: reachability,
+                timeout: timeout
+            )
             pp_log(ctx, .core, .notice, "DNS resolved addresses: \(records.map { $0.address.asSensitiveAddress(ctx) })")
             return with(newResolvedEndpoints: originalEndpoint.unrolledEndpoints(ctx, records: records))
         }

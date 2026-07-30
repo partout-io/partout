@@ -15,7 +15,7 @@ extension Registry {
                 },
                 connectionBlock: {
                     let ctx = PartoutLoggerContext($0.profile.id)
-                    return try OpenVPNConnection(
+                    return try _OpenVPNConnectionV3(
                         ctx,
                         parameters: $0,
                         module: $1,
@@ -33,7 +33,7 @@ extension Registry {
                 },
                 connectionBlock: {
                     let ctx = PartoutLoggerContext($0.profile.id)
-                    return try WireGuardConnection(
+                    return try _WireGuardConnectionV2(
                         ctx,
                         parameters: $0,
                         module: $1

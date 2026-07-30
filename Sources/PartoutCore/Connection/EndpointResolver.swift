@@ -32,6 +32,7 @@ public struct EndpointResolver: Sendable {
 
     public func withNextEndpoint(
         dns: DNSResolver,
+        reachability: ReachabilityInfo?,
         timeout: Int
     ) async throws -> (nextResolver: Self, endpoint: ExtendedEndpoint) {
         var copy = self
@@ -52,7 +53,11 @@ public struct EndpointResolver: Sendable {
                 pp_log(ctx, .core, .info, "Try DNS resolution: \(currentResolvable.asSensitiveAddress(ctx))")
                 let newResolvable: EndpointResolver.Resolvable
                 do {
-                    newResolvable = try await currentResolvable.resolved(with: dns, timeout: timeout)
+                    newResolvable = try await currentResolvable.resolved(
+                        with: dns,
+                        reachability: reachability,
+                        timeout: timeout
+                    )
                 } catch {
                     pp_log(ctx, .core, .fault, "DNS resolution failed: \(error)")
                     newResolvable = currentResolvable.with(newResolvedEndpoints: [])

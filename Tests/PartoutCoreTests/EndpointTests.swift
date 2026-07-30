@@ -23,6 +23,15 @@ struct EndpointTests {
         try assertEndpoint(with: "4::", 1194, .v6)
         assertEndpointFailure(with: "::4::", 1194, .v6)
     }
+
+    @Test
+    func givenBracketedIPv6_whenParse_thenSucceeds() throws {
+        let sut = try #require(Endpoint(rawValue: "[2607:f0d0:1002:51::4]:1194"))
+
+        #expect(sut.address.rawValue == "2607:f0d0:1002:51::4")
+        #expect(sut.address.family == .v6)
+        #expect(sut.port == 1194)
+    }
 }
 
 private extension EndpointTests {

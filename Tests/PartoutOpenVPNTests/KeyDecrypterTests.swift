@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 struct KeyDecrypterTests {
@@ -46,7 +46,7 @@ struct KeyDecrypterTests {
 
 private extension KeyDecrypterTests {
     func newDecrypter() -> SimpleKeyDecrypter {
-        SimpleKeyDecrypter()
+        SimpleKeyDecrypter(backend: .forTesting)
     }
 
     func path(withName name: String) throws -> String {

@@ -118,7 +118,7 @@ bool key_eq(const uint8_t key1[static WG_KEY_LEN], const uint8_t key2[static WG_
 	volatile uint8_t acc = 0;
 	for (unsigned int i = 0; i < WG_KEY_LEN; ++i) {
 		acc |= key1[i] ^ key2[i];
-		asm volatile("" : "=r"(acc) : "0"(acc));
+		__asm__ __volatile__("" : "=r"(acc) : "0"(acc));
 	}
 	return 1 & ((acc - 1) >> 8);
 }

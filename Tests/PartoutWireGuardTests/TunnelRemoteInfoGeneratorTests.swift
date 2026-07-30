@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import PartoutCore
-@testable import PartoutWireGuardConnection
+@testable import PartoutWireGuard
 import Testing
 
 struct TunnelRemoteInfoGeneratorTests {
@@ -57,11 +57,35 @@ struct TunnelRemoteInfoGeneratorTests {
 
         let map = try await configuration.resolvePeers(
             resolver: dns,
+            flags: [],
             timeout: 1000,
             logHandler: { _, _ in }
         )
 
         #expect(map[sourceEndpoint] == sourceEndpoint)
+        let requestedHostnames = await dns.requestedHostnames
+        #expect(requestedHostnames.isEmpty)
+    }
+
+    @Test
+    func givenBracketedIPv6Endpoint_whenGeneratingUAPIConfiguration_thenBypassesDNS64Cache() async throws {
+        let sourceEndpoint = try #require(Endpoint(rawValue: "[2001:db8::1]:51830"))
+        #expect(sourceEndpoint.address.family == .v6)
+        let configuration = try makeConfiguration(endpoint: "[2001:db8::1]:51830")
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: "64:ff9b::c000:201", isIPv6: true)
+        ], for: sourceEndpoint.address.rawValue)
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: dns,
+            dnsTimeout: 1000
+        )
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+
+        #expect(uapiConfiguration.contains("endpoint=[2001:db8::1]:51830"))
         let requestedHostnames = await dns.requestedHostnames
         #expect(requestedHostnames.isEmpty)
     }
@@ -79,6 +103,7 @@ struct TunnelRemoteInfoGeneratorTests {
 
         let map = try await configuration.resolvePeers(
             resolver: dns,
+            flags: [],
             timeout: 1000,
             logHandler: { _, _ in }
         )
@@ -86,6 +111,74 @@ struct TunnelRemoteInfoGeneratorTests {
         #expect(map[sourceEndpoint] == ipv4Endpoint)
         let requestedHostnames = await dns.requestedHostnames
         #expect(requestedHostnames == [sourceEndpoint.address.rawValue])
+    }
+
+    @Test
+    func givenPreResolvedEndpoint_whenGeneratingUAPIConfiguration_thenUsesCachedDNS() async throws {
+        let sourceEndpoint = try Endpoint("foobar.com", 51830)
+        let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let dns = RecordingDNSResolver()
+        await dns.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let sut = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: dns,
+            dnsTimeout: 1000
+        )
+
+        _ = try await sut.cacheResolvedPeerEndpoints(logHandler: { _, _ in })
+        let requestedHostnamesAfterResolve = await dns.requestedHostnames
+
+        let uapiConfiguration = try await sut.uapiConfiguration(logHandler: { _, _ in })
+        let requestedHostnamesAfterUAPI = await dns.requestedHostnames
+
+        #expect(requestedHostnamesAfterResolve == [sourceEndpoint.address.rawValue])
+        #expect(await dns.requestedFlags == [[.allAddresses]])
+        #expect(requestedHostnamesAfterUAPI == requestedHostnamesAfterResolve)
+        #expect(uapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
+    }
+
+    @Test
+    func givenUncachedEndpoint_whenGeneratingUAPIConfigurations_thenResolveWithoutAllAddresses() async throws {
+        let sourceEndpoint = try Endpoint("foobar.com", 51830)
+        let ipv4Endpoint = try Endpoint("77.160.28.16", sourceEndpoint.port)
+        let configuration = try makeConfiguration(endpoint: sourceEndpoint.rawValue)
+        let fullConfigurationDNS = RecordingDNSResolver()
+        await fullConfigurationDNS.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+        let endpointUpdateDNS = RecordingDNSResolver()
+        await endpointUpdateDNS.setResolvedRecords([
+            DNSRecord(address: ipv4Endpoint.address.rawValue, isIPv6: false)
+        ], for: sourceEndpoint.address.rawValue)
+
+        let fullConfigurationGenerator = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: fullConfigurationDNS,
+            dnsTimeout: 1000
+        )
+        let endpointUpdateGenerator = TunnelRemoteInfoGenerator(
+            .global,
+            tunnelConfiguration: configuration,
+            dns: endpointUpdateDNS,
+            dnsTimeout: 1000
+        )
+
+        let uapiConfiguration = try await fullConfigurationGenerator.uapiConfiguration(logHandler: { _, _ in })
+        let endpointUapiConfiguration = await endpointUpdateGenerator.endpointUapiConfiguration(logHandler: { _, _ in })
+
+        #expect(await fullConfigurationDNS.requestedHostnames == [sourceEndpoint.address.rawValue])
+        #expect(await fullConfigurationDNS.requestedFlags == [[]])
+        #expect(uapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
+
+        #expect(await endpointUpdateDNS.requestedHostnames == [sourceEndpoint.address.rawValue])
+        #expect(await endpointUpdateDNS.requestedFlags == [[]])
+        #expect(endpointUapiConfiguration.contains("endpoint=\(ipv4Endpoint.wgRepresentation)"))
     }
 
     @Test
@@ -103,6 +196,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1000
         )
         let logs = LogCollector()
@@ -141,6 +235,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1
         )
 
@@ -168,6 +263,7 @@ struct TunnelRemoteInfoGeneratorTests {
         let sut = TunnelRemoteInfoGenerator(
             .global,
             tunnelConfiguration: configuration,
+            dns: nil,
             dnsTimeout: 1
         )
         let info = sut.generateRemoteInfo(moduleId: UniqueID())
@@ -197,17 +293,24 @@ private actor RecordingDNSResolver: DNSResolver {
 
     private var hostnames: [String] = []
 
+    private var flags: [Set<DNSResolverFlag>] = []
+
     func setResolvedRecords(_ records: [DNSRecord], for hostname: String) {
         resolvedRecords[hostname] = records
     }
 
-    func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord] {
+    func resolve(_ hostname: String, flags: Set<DNSResolverFlag>, reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
         hostnames.append(hostname)
+        self.flags.append(flags)
         return resolvedRecords[hostname] ?? []
     }
 
     var requestedHostnames: [String] {
         hostnames
+    }
+
+    var requestedFlags: [Set<DNSResolverFlag>] {
+        flags
     }
 }
 

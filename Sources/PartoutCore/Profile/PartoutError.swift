@@ -1,0 +1,83 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+/// Mappable to ``PartoutError``.
+public protocol PartoutErrorMappable {
+    var asPartoutError: PartoutError { get }
+}
+
+/// Extensible error type thrown by the library.
+public struct PartoutError: Error {
+    public let code: Code
+
+    public let reason: Error?
+
+    public let userInfo: Sendable?
+
+    public init(_ code: Code) {
+        self.code = code
+        reason = nil
+        userInfo = nil
+    }
+
+    public init(_ code: Code, _ reason: Error) {
+        self.code = code
+        self.reason = reason
+        userInfo = nil
+    }
+
+    public init(_ code: Code, _ userInfo: Sendable, _ reason: Error? = nil) {
+        self.code = code
+        self.reason = reason
+        self.userInfo = userInfo
+    }
+
+    public init(_ error: Error) {
+        do {
+            throw error
+        } catch let error as Self {
+            self = error
+        } catch let error as PartoutErrorMappable {
+            self = error.asPartoutError
+        }
+        // anything else
+        catch {
+            self = Self.unhandled(reason: error)
+        }
+    }
+}
+
+extension PartoutError: Equatable {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.code == rhs.code
+    }
+}
+
+extension Error {
+    public var partoutErrorCode: PartoutError.Code {
+        switch self {
+        case let pe as PartoutError:
+            return pe.code
+        case let me as PartoutErrorMappable:
+            return me.asPartoutError.code
+        default:
+            return .unhandled
+        }
+    }
+}
+
+// MARK: - Description
+
+extension PartoutError: CustomDebugStringConvertible {
+    public var debugDescription: String {
+        var desc: [String] = ["PartoutError.\(code.rawValue)"]
+        if let userInfo {
+            desc.append("userInfo=\(String(describing: userInfo))")
+        }
+        if let reason {
+            desc.append("reason=\(reason) (\(reason.localizedDescription))")
+        }
+        return "{\(desc.joined(separator: ", "))}"
+    }
+}

@@ -4,7 +4,7 @@
 
 import PartoutCore
 @testable import PartoutOpenVPN
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 struct OpenVPNParserTests {
@@ -319,6 +319,6 @@ private extension OpenVPNParserTests {
     }
 
     static func allParsers() -> [StandardOpenVPNParser] {
-        [StandardOpenVPNParser(decrypter: SimpleKeyDecrypter())]
+        [StandardOpenVPNParser(decrypter: SimpleKeyDecrypter(backend: .forTesting))]
     }
 }

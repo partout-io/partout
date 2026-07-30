@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-private let undefinedModuleType = ModuleType("Undefined")
+private let undefinedModuleType: ModuleType = .Undefined
 
 extension Module {
     public static var moduleType: ModuleType {

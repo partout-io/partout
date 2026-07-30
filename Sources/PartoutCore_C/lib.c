@@ -4,18 +4,24 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#else
+#include <dlfcn.h>
+#endif
+
 #include <stdio.h>
 #include <string.h>
 #include "portable/common.h"
 #include "portable/lib.h"
 
 #if PARTOUT_WINDOWS
-#include <windows.h>
 struct __pp_lib_struct {
     HMODULE handle;
 };
 #else
-#include <dlfcn.h>
 struct __pp_lib_struct {
     void *handle;
 };
@@ -30,7 +36,7 @@ pp_lib pp_lib_create(const char *path) {
     snprintf(path_ext, path_len, "%s.dll", path);
     HMODULE handle = LoadLibraryExA(path_ext, NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!handle) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "LoadLibraryExA(): %lu", GetLastError());
         goto failure;
     }
 #else
@@ -41,7 +47,7 @@ pp_lib pp_lib_create(const char *path) {
 #endif
     void *handle = dlopen(path_ext, RTLD_NOW);
     if (!handle) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "dlopen(): %s", dlerror());
+        pp_clog_v(PPLogLevelFault, "dlopen(): %s", dlerror());
         goto failure;
     }
 #endif
@@ -67,12 +73,12 @@ void pp_lib_free(pp_lib lib) {
 
 void *pp_lib_load(const pp_lib lib, const char *symbol) {
 #if PARTOUT_WINDOWS
-    void *ptr = GetProcAddress(lib->handle, symbol);
+    void *ptr = (void *)GetProcAddress(lib->handle, symbol);
 #else
     void *ptr = dlsym(lib->handle, symbol);
 #endif
     if (!ptr) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "%s not found in library", symbol);
+        pp_clog_v(PPLogLevelFault, "%s not found in library", symbol);
         return NULL;
     }
     return ptr;

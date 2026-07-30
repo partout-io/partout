@@ -76,7 +76,7 @@ struct ProfileTests {
         var pb = Profile.Builder()
         pb.behavior = ProfileBehavior()
         #expect(!(try pb.build().disconnectsOnSleep))
-        pb.behavior?.disconnectsOnSleep = true
+        pb.behavior = ProfileBehavior(disconnectsOnSleep: true, includesAllNetworks: false)
         #expect(try pb.build().disconnectsOnSleep)
     }
 }

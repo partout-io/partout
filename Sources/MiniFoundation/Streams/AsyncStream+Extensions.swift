@@ -21,7 +21,7 @@ extension AsyncThrowingStream {
 extension AsyncStream where Element: Equatable & Sendable {
     public func removeDuplicates() -> AsyncStream<Element> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 var previous: Element?
                 for await value in self {
                     guard !Task.isCancelled else {
@@ -35,6 +35,9 @@ extension AsyncStream where Element: Equatable & Sendable {
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 }
@@ -42,7 +45,7 @@ extension AsyncStream where Element: Equatable & Sendable {
 extension AsyncThrowingStream where Element: Equatable & Sendable {
     public func removeDuplicates() -> AsyncThrowingStream<Element, Error> where Error == Failure {
         AsyncThrowingStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     var previous: Element?
                     for try await value in self {
@@ -60,6 +63,9 @@ extension AsyncThrowingStream where Element: Equatable & Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 }
@@ -67,7 +73,7 @@ extension AsyncThrowingStream where Element: Equatable & Sendable {
 extension AsyncStream where Element: Sendable {
     public func map<Other>(_ block: @escaping @Sendable (Element) -> Other) -> AsyncStream<Other> where Other: Sendable {
         AsyncStream<Other> { continuation in
-            Task {
+            let task = Task {
                 for await value in self {
                     guard !Task.isCancelled else {
                         break
@@ -76,12 +82,15 @@ extension AsyncStream where Element: Sendable {
                 }
                 continuation.finish()
             }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
         }
     }
 
     public func compactMap<Other>(_ block: @escaping @Sendable (Element) -> Other?) -> AsyncStream<Other> where Other: Sendable {
         AsyncStream<Other> { continuation in
-            Task {
+            let task = Task {
                 for await value in self {
                     guard !Task.isCancelled else {
                         break
@@ -91,6 +100,9 @@ extension AsyncStream where Element: Sendable {
                     }
                 }
                 continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
     }
@@ -103,7 +115,7 @@ extension AsyncThrowingStream where Element: Sendable {
 
     public func replaceError(with element: @autoclosure @escaping @Sendable () -> Element?) -> AsyncStream<Element> {
         AsyncStream { continuation in
-            Task {
+            let task = Task {
                 do {
                     for try await value in self {
                         guard !Task.isCancelled else {
@@ -118,6 +130,9 @@ extension AsyncThrowingStream where Element: Sendable {
                     }
                     continuation.finish()
                 }
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
     }

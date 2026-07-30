@@ -21,7 +21,7 @@ struct EndpointResolverResolvableTests {
         dns.resolvedRecords = [hostname: resolvedRecords]
         var sut = EndpointResolver.Resolvable(.global, endpoint)
 
-        sut = try await sut.resolved(with: dns, timeout: 1000)
+        sut = try await sut.resolved(with: dns, reachability: nil,timeout: 1000)
         #expect(sut.isResolved)
 
         for (i, record) in resolvedRecords.enumerated() {
@@ -45,7 +45,7 @@ struct EndpointResolverResolvableTests {
         var sut = EndpointResolver.Resolvable(.global, endpoint)
 
         do {
-            sut = try await sut.resolved(with: dns, timeout: 1000)
+            sut = try await sut.resolved(with: dns, reachability: nil,timeout: 1000)
         } catch {
             sut = sut.with(newResolvedEndpoints: [])
         }

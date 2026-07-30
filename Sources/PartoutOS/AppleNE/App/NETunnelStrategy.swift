@@ -28,7 +28,7 @@ public actor NETunnelStrategy {
         }
     }
 
-    private var pendingSaveTask: Task<Void, Error>?
+    private var pendingSaveTask: PendingSaveTask?
 
     // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
@@ -125,12 +125,9 @@ extension NETunnelStrategy: TunnelObservableStrategy {
     }
 
     public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
-        AsyncStream { [weak self] continuation in
-            Task { [weak self] in
-                guard let stream = self?.activeProfilesStream.dropFirst() else {
-                    continuation.finish()
-                    return
-                }
+        let stream = activeProfilesStream
+        return AsyncStream { [weak self] continuation in
+            let task = Task { [weak self] in
                 for await activeProfiles in stream {
                     guard let self else {
                         continuation.finish()
@@ -144,6 +141,9 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
     }
@@ -228,12 +228,9 @@ extension NETunnelStrategy: NETunnelManagerRepository {
     }
 
     public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
-        AsyncStream { [weak self] continuation in
-            Task { [weak self] in
-                guard let stream = self?.managersSubject.subscribe().dropFirst() else {
-                    continuation.finish()
-                    return
-                }
+        let stream = managersSubject.subscribe().dropFirst()
+        return AsyncStream { [weak self] continuation in
+            let task = Task { [weak self] in
                 for await value in stream {
                     guard let self else {
                         continuation.finish()
@@ -246,6 +243,9 @@ extension NETunnelStrategy: NETunnelManagerRepository {
                     continuation.yield(value)
                 }
                 continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
             }
         }
     }
@@ -322,20 +322,41 @@ private extension NETunnelStrategy {
         _ managerBlock: @escaping @autoclosure () -> NETunnelProviderManager,
         block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
-        if let pendingSaveTask {
-            try await pendingSaveTask.value
+        while let pendingSaveTask {
+            do {
+                try await pendingSaveTask.task.value
+                clearPendingSaveTask(pendingSaveTask)
+            } catch {
+                clearPendingSaveTask(pendingSaveTask)
+                throw error
+            }
         }
+
         let manager = managerBlock()
-        pendingSaveTask = Task { @Sendable in
+        let pendingSaveTask = PendingSaveTask(task: Task { @Sendable in
             try await manager.loadFromPreferences()
             try Task.checkCancellation()
             block(manager)
             try Task.checkCancellation()
             try await manager.saveToPreferences()
+        })
+        self.pendingSaveTask = pendingSaveTask
+
+        do {
+            try await pendingSaveTask.task.value
+            clearPendingSaveTask(pendingSaveTask)
+        } catch {
+            clearPendingSaveTask(pendingSaveTask)
+            throw error
         }
-        try await pendingSaveTask?.value
-        pendingSaveTask = nil
         return manager
+    }
+
+    func clearPendingSaveTask(_ pendingSaveTask: PendingSaveTask) {
+        guard self.pendingSaveTask?.id == pendingSaveTask.id else {
+            return
+        }
+        self.pendingSaveTask = nil
     }
 
     func disconnectCurrentManagers() async {
@@ -360,6 +381,12 @@ private extension NETunnelStrategy {
             }
         }
     }
+}
+
+private struct PendingSaveTask: Sendable {
+    let id = UniqueID()
+
+    let task: Task<Void, Error>
 }
 
 // MARK: - Active managers

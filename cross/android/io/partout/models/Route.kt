@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
@@ -21,18 +29,20 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Represents a route in the routing table.
  *
- * @param destination 
- * @param gateway 
+ * @param destination The destination subnet or `nil` if default.
+ * @param gateway The address of the gateway (falls back to global gateway).
  */
 @Serializable
 
 data class Route (
 
+    /* The destination subnet or `nil` if default. */
     @SerialName(value = "destination")
     val destination: kotlin.String? = null,
 
+    /* The address of the gateway (falls back to global gateway). */
     @SerialName(value = "gateway")
     val gateway: kotlin.String? = null
 

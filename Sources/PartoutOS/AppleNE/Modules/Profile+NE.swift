@@ -5,9 +5,10 @@
 import NetworkExtension
 
 extension Profile {
-    func networkSettings(
+    // TODO: #518, Make internal after migrating to Zig
+    public func networkSettings(
         with info: TunnelRemoteInfo?,
-        options: NETunnelController.Options? = nil
+        options: TunnelControllerOptions = .init()
     ) -> NEPacketTunnelNetworkSettings {
         let ctx = PartoutLoggerContext(id)
         let tunnelRemoteAddress = info?.address?.rawValue ?? NEPacketTunnelNetworkSettings.fakeRemoteAddress
@@ -72,8 +73,8 @@ extension Profile {
         if isGateway, neSettings.dnsSettings == nil {
             pp_log(ctx, .os, .info, "\tVPN is default gateway but has no DNS settings")
 
-            if let dnsFallbackServers = options?.dnsFallbackServers,
-               !dnsFallbackServers.isEmpty {
+            let dnsFallbackServers = options.dnsFallbackServers
+            if !dnsFallbackServers.isEmpty {
                 pp_log(ctx, .os, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
                 neSettings.dnsSettings = NEDNSSettings(servers: dnsFallbackServers)
             }

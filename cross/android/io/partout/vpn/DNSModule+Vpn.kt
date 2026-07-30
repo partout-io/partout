@@ -6,120 +6,93 @@ package io.partout.vpn
 
 import android.net.VpnService
 import android.util.Log
+import io.partout.extensions.VpnSubnet
+import io.partout.extensions.unsupportedProtocolName
 import io.partout.models.DNSModule
-import io.partout.models.DNSModuleProtocolTypehttps
-import io.partout.models.DNSModuleProtocolTypetls
 
-class DNSModuleApplying(
+internal class DNSModuleApplying(
     private val module: DNSModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
-        var applied = when (module.protocolType) {
-            is DNSModuleProtocolTypehttps, is DNSModuleProtocolTypetls -> true
-            else -> module.servers.isNotEmpty()
-        }
-
-        when (module.protocolType) {
-            is DNSModuleProtocolTypehttps -> {
-                Log.i(
-                    logTag,
-                    "DNS: DoH is not supported by VpnService.Builder, using numeric servers only"
-                )
-                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-            }
-
-            is DNSModuleProtocolTypetls -> {
-                Log.i(
-                    logTag,
-                    "DNS: DoT is not supported by VpnService.Builder, using numeric servers only"
-                )
-                module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-            }
-
-            else -> {
-                if (module.servers.isNotEmpty()) {
-                    module.addServers(logTag, builder, routed = module.routesThroughVPN == true)
-                } else {
-                    Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
-                }
-            }
-        }
-
-        if (!applied) {
+        if (!module.applyServers(logTag, builder)) {
             return false
         }
-
-        module.domainName?.takeIf { it.isNotBlank() }?.let {
-            Log.i(logTag, "DNS: Search domain (domainName): $it")
-            builder.addSearchDomain(it)
-        }
-
-        module.searchDomains.orEmpty().forEach { domain ->
-            if (domain.isNotBlank()) {
-                Log.i(logTag, "DNS: Search domain: $domain")
-                builder.addSearchDomain(domain)
-            }
-        }
-
-        return applied
+        module.addSearchDomains(logTag, builder)
+        return true
     }
 }
 
-fun DNSModule.addServers(
+private fun DNSModule.applyServers(
+    logTag: String,
+    builder: VpnService.Builder
+): Boolean {
+    val protocolName = unsupportedProtocolName
+    if (protocolName != null) {
+        Log.i(
+            logTag,
+            "DNS: $protocolName is not supported by VpnService.Builder, using numeric servers only"
+        )
+        return addServers(logTag, builder, routed = routesThroughVPN == true)
+    }
+    if (servers.isEmpty()) {
+        Log.i(logTag, "DNS: cleartext DNS without servers is ignored")
+        return false
+    }
+    return addServers(logTag, builder, routed = routesThroughVPN == true)
+}
+
+private fun DNSModule.addSearchDomains(
+    logTag: String,
+    builder: VpnService.Builder
+) {
+    domainName?.takeIf { it.isNotBlank() }?.let {
+        Log.i(logTag, "DNS: Search domain (domainName): $it")
+        builder.addSearchDomain(it)
+    }
+    searchDomains.orEmpty().forEach { domain ->
+        if (domain.isNotBlank()) {
+            Log.i(logTag, "DNS: Search domain: $domain")
+            builder.addSearchDomain(domain)
+        }
+    }
+}
+
+internal fun DNSModule.addServers(
     logTag: String,
     builder: VpnService.Builder,
     routed: Boolean
-) {
+): Boolean {
+    var addedServers = false
     servers.forEach { server ->
-        val route = subnetFrom(server)
+        val route = VpnSubnet.parse(server)
         if (route == null) {
             Log.w(logTag, "DNS: Ignoring invalid server '$server'")
             return@forEach
         }
-
-        Log.i(logTag, "DNS: Server: ${route.address}/${route.prefixLength}")
-        builder.addDnsServer(route.address)
-
+        Log.i(logTag, "DNS: Server: ${route.cidr}")
+        builder.addDnsServer(route)
+        addedServers = true
         when {
             routed -> {
-                Log.i(logTag, "DNS: Route server through VPN: ${route.address}/${route.prefixLength}")
-                builder.addRoute(route.address, route.prefixLength)
+                Log.i(logTag, "DNS: Route server through VPN: ${route.cidr}")
+                builder.addRoute(route)
             }
         }
     }
+    return addedServers
 }
 
-private data class DnsNumericSubnet(
-    val address: String,
-    val prefixLength: Int
-)
-
-private fun subnetFrom(raw: String): DnsNumericSubnet? {
-    val trimmed = raw.trim()
-    if (trimmed.isEmpty()) {
-        return null
+internal fun List<String>.addDNSServers(
+    logTag: String,
+    builder: VpnService.Builder
+) {
+    forEach { server ->
+        val route = VpnSubnet.parse(server)
+        if (route == null) {
+            Log.w(logTag, "DNS: Ignoring invalid fallback server '$server'")
+            return@forEach
+        }
+        Log.i(logTag, "DNS: Fallback server: ${route.cidr}")
+        builder.addDnsServer(route)
     }
-
-    val parts = trimmed.split("/", limit = 2)
-    val address = parts[0].trim()
-    val prefixLength = parts.getOrNull(1)?.toIntOrNull() ?: defaultPrefixLength(address)
-    if (prefixLength == null) {
-        return null
-    }
-    if (!isNumericAddress(address)) {
-        return null
-    }
-    return DnsNumericSubnet(address, prefixLength)
-}
-
-private fun defaultPrefixLength(address: String): Int? {
-    return when {
-        address.contains(":") -> 128
-        address.contains(".") -> 32
-        else -> null
-    }
-}
-
-private fun isNumericAddress(address: String): Boolean {
-    return address.contains(":") || address.matches(Regex("""\d{1,3}(\.\d{1,3}){3}"""))
 }

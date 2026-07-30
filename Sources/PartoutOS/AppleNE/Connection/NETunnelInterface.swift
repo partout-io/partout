@@ -5,7 +5,7 @@
 import NetworkExtension
 
 /// A tunnel interface based on `NEPacketTunnelFlow`.
-public final class NETunnelInterface: IOInterface {
+public final class NETunnelInterface: TunInterface {
     private let ctx: PartoutLoggerContext
 
     nonisolated(unsafe)
@@ -16,10 +16,19 @@ public final class NETunnelInterface: IOInterface {
         self.impl = impl
     }
 
-    // MARK: TunnelInterface
+    // MARK: TunInterface
 
-    public var fileDescriptor: UInt64? {
-        nil
+    public var muxDescriptor: FileDescriptor? {
+        NEPacketTunnelFlow.nativeFileDescriptor
+    }
+
+    public var nativeIO: NativeIOInterface? {
+        do {
+            return try NEPacketTunnelFlow.forNativeIO(ctx)
+        } catch {
+            pp_log(ctx, .os, .fault, "Unable to create or look up tun I/O interface: \(error)")
+            return nil
+        }
     }
 
     public func readPackets() async throws -> [Data] {

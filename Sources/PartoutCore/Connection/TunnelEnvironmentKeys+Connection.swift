@@ -7,5 +7,5 @@ extension TunnelEnvironmentKeys {
 
     public static let dataCount = TunnelEnvironmentKey<DataCount>("dataCount")
 
-    public static let lastErrorCode = TunnelEnvironmentKey<PartoutError.Code>("lastErrorCode")
+    public static let lastErrorCode = TunnelEnvironmentKey<String>("lastErrorCode")
 }

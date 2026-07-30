@@ -13,6 +13,13 @@ let package = Package(
         .executableTarget(
             name: "test-posix-socket",
             dependencies: ["partout"]
+        ),
+        .executableTarget(
+            name: "test-daemon",
+            dependencies: ["partout"],
+            resources: [
+                .copy("profiles")
+            ]
         )
     ]
 )

@@ -30,4 +30,5 @@ Use these entities to track and troubleshoot the internal library activities.
 ### Errors
 
 - ``PartoutError``
+- ``PartoutErrorCode``
 - ``PartoutErrorMappable``

@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
@@ -22,15 +30,16 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * Represents an OpenVPN static key file (as generated with --genkey)
  *
- * @param `data` 
+ * @param `data` Wrapper of a byte array with safe encoding capabilities.
  * @param dir 
  */
 @Serializable
 
 data class OpenVPNStaticKey (
 
+    /* Wrapper of a byte array with safe encoding capabilities. */
     @SerialName(value = "data")
     val `data`: kotlin.String,
 

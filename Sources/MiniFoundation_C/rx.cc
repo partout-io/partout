@@ -79,7 +79,7 @@ minif_rx_result *minif_rx_matches(const char *pattern, const char *input) {
         minif_rx_result *out = new minif_rx_result;
         out->count = collected.size();
         out->matches = new _minif_rx_match[out->count];
-        for (int i = 0; i < out->count; ++i) {
+        for (size_t i = 0; i < out->count; ++i) {
             const std::string &s = collected[i];
             char* cstr = new char[s.size() + 1];
             memcpy(cstr, s.c_str(), s.size() + 1);
@@ -97,7 +97,7 @@ minif_rx_result *minif_rx_matches(const char *pattern, const char *input) {
 void minif_rx_result_free(minif_rx_result *result) {
     if (!result) return;
     if (result->matches) {
-        for (int i = 0; i < result->count; ++i) {
+        for (size_t i = 0; i < result->count; ++i) {
             delete[] result->matches[i].token;
         }
         delete[] result->matches;
@@ -110,7 +110,7 @@ size_t minif_rx_result_get_items_count(const minif_rx_result *result) {
 }
 
 const minif_rx_match *minif_rx_result_get_item(const minif_rx_result *result, int index) {
-    assert(index < result->count);
+    assert((size_t)index < result->count);
     return &result->matches[index];
 }
 

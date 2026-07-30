@@ -79,7 +79,7 @@ public final class ConnectionReporter: Sendable {
     }
 
     public func reportLastErrorCode(_ code: PartoutError.Code) {
-        reportEnvironmentValue(code, forKey: TunnelEnvironmentKeys.lastErrorCode)
+        reportEnvironmentValue(code.rawValue, forKey: TunnelEnvironmentKeys.lastErrorCode)
     }
 }
 

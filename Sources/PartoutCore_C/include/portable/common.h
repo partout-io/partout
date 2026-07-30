@@ -5,13 +5,16 @@
  */
 
 #pragma once
-#include "portable/conditionals.h"
+#include "conditionals.h"
 
 #include <assert.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#pragma clang assume_nonnull begin
 
 /* Logging counterpart of Swift pp_log. */
 
@@ -23,33 +26,30 @@ typedef enum {
     PPLogLevelDebug
 } pp_log_level;
 
-typedef const char *_Nonnull pp_log_category;
-extern pp_log_category PPLogCategoryCore;
+/* This callback forwards to the logger from partout_init(). */
+// extern bool partout_log_enabled(void);
+extern void partout_log(pp_log_level level, const char *message);
 
-extern void pp_clog(pp_log_category category,
-                    pp_log_level level,
-                    const char *_Nonnull message);
+static inline
+void pp_clog(pp_log_level level, const char *message) {
+    partout_log(level, message);
+}
 
-void pp_clog_v(pp_log_category category,
-               pp_log_level level,
-               const char *_Nonnull fmt, ...);
-
-void pp_log_simple_append(const char *_Nullable tag,
-                          pp_log_level level,
-                          const char *_Nonnull message);
+void pp_clog_v(pp_log_level level, const char *fmt, ...);
 
 /* Use inline rather than #define to make available to Swift. */
 
 static inline
 void pp_assert(bool condition) {
     assert(condition);
+    (void)condition;
 }
 
 static inline
-void *_Nonnull pp_alloc(size_t size) {
+void *pp_alloc(size_t size) {
     void *memory = calloc(1, size);
     if (!memory) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_alloc: malloc() call failed");
+        pp_clog(PPLogLevelFault, "pp_alloc: malloc() call failed");
         abort();
     }
     return memory;
@@ -62,7 +62,7 @@ void pp_free(void *_Nullable ptr) {
 }
 
 static inline
-void pp_zero(void *_Nonnull ptr, size_t count) {
+void pp_zero(void *ptr, size_t count) {
 #ifdef bzero
     bzero(ptr, count);
 #else
@@ -70,41 +70,76 @@ void pp_zero(void *_Nonnull ptr, size_t count) {
 #endif
 }
 
-static inline
-char *_Nonnull pp_dup(const char *_Nonnull str) {
-#if PARTOUT_WINDOWS
-    char *ptr = _strdup(str);
-#else
-    char *ptr = strdup(str);
-#endif
-    if (!ptr) {
-        pp_clog(PPLogCategoryCore, PPLogLevelFault, "pp_dup: strdup() call failed");
-        abort();
-    }
-    return ptr;
-}
+char *pp_dup(const char *str);
+FILE *_Nullable pp_fopen(const char *filename, const char *mode);
+
+/* Read a whole file into a string. */
+char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent);
+
+/* Create a directory and any missing parents. */
+bool pp_file_create_directory(const char *path);
+
+/* Return whether a path identifies a directory. */
+bool pp_file_is_directory(const char *path);
+
+/* Return seconds since the Unix epoch, or zero if unavailable. */
+uint32_t pp_time_unix_seconds(void);
+
+/* Report a fatal Zig error without pulling in Zig's default I/O backend. */
+void pp_panic(const char *message);
+
+#pragma clang assume_nonnull end
+
+/* Syscalls. */
+
+extern const int PPIOErrorWouldBlock;
+extern const int PPIOErrorNoBufs;
+extern const int PPIOErrorNoSpace;
 
 #if PARTOUT_WINDOWS
-static inline
-FILE *_Nullable pp_fopen(const char *_Nonnull filename, const char *_Nonnull mode) {
-    FILE *file_ret = NULL;
-    errno_t file_err = fopen_s(&file_ret, filename, mode);
-    if (file_err == 0) {
-        return NULL;
-    }
-    return file_ret;
+
+#pragma clang assume_nonnull begin
+
+/* ABI-compatible with the Windows SDK HANDLE and SOCKET definitions. */
+typedef void *_Nonnull pp_fd;
+typedef uintptr_t pp_socket_fd;
+
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return (intptr_t)fd != -1;
 }
-#define pp_sscanf sscanf_s
+
+int pp_io_last_error_binding(void);
+#pragma clang assume_nonnull end
+
 #else
-#define pp_fopen fopen
-#define pp_sscanf sscanf
+
+#pragma clang assume_nonnull begin
+
+typedef int pp_fd;
+typedef pp_fd pp_socket_fd;
+
+static inline bool pp_fd_is_valid(pp_fd fd) {
+    return fd != -1;
+}
+
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
+int pp_fd_restore_blocking(pp_fd fd, int original_flags);
+int pp_io_last_error_binding(void);
+
+#pragma clang assume_nonnull end
+
 #endif
+
+/* Android only. */
 
 #if PARTOUT_ANDROID
+#include <android/multinetwork.h>
 #include <jni.h>
-#include <stdbool.h>
+
+#pragma clang assume_nonnull begin
+
 extern _Nullable JavaVM *_Nullable jvm;
-_Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *_Nonnull did_attach);
+_Nullable JNIEnv *_Nullable pp_jni_attach_thread(bool *did_attach);
 void *_Nullable pp_jni_new_global_ref(void *_Nullable ref);
 void pp_jni_delete_global_ref(void *_Nullable ref);
 
@@ -130,6 +165,7 @@ void pp_jni_delete_global_ref(void *_Nullable ref);
     do { \
         if (env_name##_did_attach) (*jvm)->DetachCurrentThread(jvm); \
     } while (0)
-#endif
 
-typedef void (*pp_completion)(void *_Nullable ctx, const int error_code);
+#pragma clang assume_nonnull end
+
+#endif

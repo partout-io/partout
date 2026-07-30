@@ -68,7 +68,11 @@ pp_zd *pp_zd_create_from_hex(const char *hex) {
     const size_t bytes_len = len / 2;
     uint8_t *bytes = pp_alloc(bytes_len);
     for (size_t i = 0; i < bytes_len; i++) {
-        pp_sscanf(hex + 2 * i, "%2hhx", bytes + i);
+#if PARTOUT_WINDOWS
+        sscanf_s(hex + 2 * i, "%2hhx", bytes + i);
+#else
+        sscanf(hex + 2 * i, "%2hhx", bytes + i);
+#endif
     }
     return pp_zd_create_copy(bytes, bytes_len);
 }

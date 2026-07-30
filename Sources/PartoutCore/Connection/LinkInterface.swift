@@ -16,19 +16,12 @@ public protocol LinkInterface: IOInterface {
     /// Publishes when a better path is available.
     nonisolated var hasBetterPath: AsyncStream<Void> { get }
 
-    /**
-     Sets the handler for incoming packets. This only needs to be set once.
-
-     - Parameter handler: The handler invoked whenever an array of `Data` packets is received, with an optional `Error` in case a network failure occurs.
-     */
-    @available(*, deprecated)
-    func setReadHandler(_ handler: @escaping @Sendable ([Data]?, Error?) -> Void)
-
     /// Returns an upgraded link if available (e.g. when a better path exists).
+    @available(*, deprecated, message: "Reconnect manually to an endpoint")
     nonisolated func upgraded() async throws -> LinkInterface
 
     /// Shuts down the link.
-    nonisolated func shutdown()
+    nonisolated func close()
 }
 
 extension LinkInterface {
@@ -40,6 +33,10 @@ extension LinkInterface {
     /// When `true`, packets delivery is guaranteed.
     public var isReliable: Bool {
         linkType.plainType == .tcp
+    }
+
+    public func remoteEndpoint() throws -> ExtendedEndpoint {
+        try ExtendedEndpoint(remoteAddress, remoteProtocol)
     }
 }
 

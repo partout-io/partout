@@ -4,7 +4,7 @@
 
 import PartoutCore
 import PartoutOpenVPN
-@testable import PartoutOpenVPNConnection
+@testable import PartoutOpenVPN
 import Testing
 
 struct NetworkSettingsBuilderTests {

@@ -27,21 +27,27 @@ Given the main app and the daemon:
 
 ### Setting up a connection
 
-- ``BetterPathBlock``
-- ``BSDSocketFactory``
+- ``BetterPathStreamFactory``
 - ``Connection``
 - ``ConnectionParameters``
 - ``ConnectionStatus``
-- ``CyclingConnection``
 - ``DataCount``
 - ``EndpointResolver``
+- ``NativeSocketFactory``
 - ``NetworkInterfaceFactory``
+
+### Event loop
+
+- ``FdLooper``
+- ``Side``
 
 ### DNS resolution
 
 - ``DNSRecord``
 - ``DNSResolver``
+- ``DNSResolverFlag``
 - ``POSIXDNSStrategy``
+- ``ReachabilityInfo``
 - ``SimpleDNSResolver``
 - ``SimpleDNSStrategy``
 
@@ -50,11 +56,13 @@ Given the main app and the daemon:
 - ``IOInterface``
 - ``LinkInterface``
 - ``LinkObserver``
-- ``BSDSocket``
-- ``BSDSocketObserver``
-- ``SocketIOInterface``
+- ``NativeIOError``
+- ``NativeIOInterface``
+- ``TunInterface``
 
 ### Applying network settings
 
+- ``NativeTunnelController``
 - ``TunnelController``
+- ``TunnelControllerOptions``
 - ``TunnelRemoteInfo``

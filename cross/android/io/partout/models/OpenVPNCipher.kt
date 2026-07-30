@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
@@ -21,7 +29,7 @@ import kotlinx.serialization.Serializable
 
 
 /**
- * 
+ * Encryption algorithm.
  *
  * Values: aes128cbc,aes192cbc,aes256cbc,aes128gcm,aes192gcm,aes256gcm
  */

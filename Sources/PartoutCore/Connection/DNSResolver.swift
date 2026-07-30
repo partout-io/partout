@@ -2,9 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// Result of ``DNSResolver/resolve(_:timeout:)``.
+/// Result of ``DNSResolver/resolve(_:flags:reachability:timeout:)``
 public struct DNSRecord: Hashable, Codable, Sendable {
-
     /// Address string.
     public let address: String
 
@@ -17,14 +16,31 @@ public struct DNSRecord: Hashable, Codable, Sendable {
     }
 }
 
+/// Flags for ``DNSResolver``.
+public enum DNSResolverFlag: Sendable {
+    case allAddresses
+}
+
 /// Performs DNS resolution.
 public protocol DNSResolver: AnyObject, Sendable {
-
     /**
      Resolves a hostname asynchronously.
 
      - Parameter hostname: The hostname to resolve.
+     - Parameter flags: Additional set of ``DNSResolverFlag``.
+     - Parameter reachability: The optional ``ReachabilityInfo``.
      - Parameter timeout: The timeout in milliseconds.
      */
-    func resolve(_ hostname: String, timeout: Int) async throws -> [DNSRecord]
+    func resolve(
+        _ hostname: String,
+        flags: Set<DNSResolverFlag>,
+        reachability: ReachabilityInfo?,
+        timeout: Int
+    ) async throws -> [DNSRecord]
+}
+
+extension DNSResolver {
+    public func resolve(_ hostname: String, flags: Set<DNSResolverFlag> = [], reachability: ReachabilityInfo?, timeout: Int) async throws -> [DNSRecord] {
+        try await resolve(hostname, flags: flags, reachability: reachability, timeout: timeout)
+    }
 }

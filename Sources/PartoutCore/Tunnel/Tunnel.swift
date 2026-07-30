@@ -42,9 +42,13 @@ public actor Tunnel {
         snapshotsSubject = CurrentValueStream([:])
         environments = [:]
         subscriptions = []
-#if swift(<6.0)
-        observeObjects()
-#endif
+    }
+
+    deinit {
+        pendingInstall?.cancel()
+        subscriptions.forEach {
+            $0.cancel()
+        }
     }
 }
 
@@ -52,14 +56,13 @@ public actor Tunnel {
 
 extension Tunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
-#if swift(>=6.0)
         observeObjects()
-#endif
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
 
     public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
+        observeObjects()
         guard !profile.activeModulesIds.isEmpty else {
             throw PartoutError(.noActiveModules)
         }
@@ -92,12 +95,14 @@ extension Tunnel: TunnelStrategy {
     }
 
     public func uninstall(profileId: Profile.ID) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Uninstall profile \(profileId)...")
         try await strategy.uninstall(profileId: profileId)
         environments.removeValue(forKey: profileId)
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
+        observeObjects()
         pp_log(ctx, .core, .info, "Disconnect profile \(profileId)...")
         try await strategy.disconnect(from: profileId)
     }
@@ -162,18 +167,15 @@ extension Tunnel {
 
 private extension Tunnel {
     func observeObjects() {
-#if swift(>=6.0)
         // Subscribe once
         guard subscriptions.isEmpty else { return }
-#endif
+        let ctx = self.ctx
+        let strategyStream = strategy.didUpdateActiveProfiles
         var subscriptions: [Task<Void, Never>] = []
-        subscriptions.append(Task { [weak self] in
-            guard let ctx = self?.ctx else { return }
-            guard let stream = self?.strategy.didUpdateActiveProfiles else { return }
-            for await snapshots in stream {
-                guard let self else { break }
+        subscriptions.append(Task { [weak self, ctx] in
+            for await snapshots in strategyStream {
                 guard !Task.isCancelled else { break }
-                await handleStrategySnapshots(snapshots)
+                await self?.handleStrategySnapshots(snapshots)
             }
             pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
         })
@@ -181,9 +183,8 @@ private extension Tunnel {
             subscriptions.append(Task { [weak self] in
                 guard let ctx = self?.ctx else { return }
                 while true {
-                    guard let self else { break }
                     guard !Task.isCancelled else { break }
-                    await refreshSnapshotEnvironments()
+                    await self?.refreshSnapshotEnvironments()
                     try? await Task.sleep(milliseconds: refreshInterval)
                 }
                 pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")

@@ -10,7 +10,14 @@ public final class MockNetworkInterfaceFactory: NetworkInterfaceFactory, @unchec
     public init() {
     }
 
-    public func linkObserver(to endpoint: ExtendedEndpoint) -> LinkObserver {
+    public func currentReachability() -> ReachabilityInfo? {
+        nil
+    }
+
+    public func linkObserver(
+        to endpoint: ExtendedEndpoint,
+        reachability: ReachabilityInfo?,
+    ) -> LinkObserver {
         let newObserver = MockLinkObserver(to: endpoint, linkBlock: linkBlock)
         observerBlock(newObserver)
         return newObserver

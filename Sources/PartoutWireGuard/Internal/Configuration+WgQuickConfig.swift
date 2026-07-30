@@ -121,7 +121,7 @@ extension WireGuard.Configuration {
         for peer in peers {
             output.append("\n[Peer]\n")
             output.append("PublicKey = \(peer.publicKey.rawValue)\n")
-            if let preSharedKey = peer.preSharedKey?.rawValue {
+            if let preSharedKey = peer.preSharedKey?.rawValue, !preSharedKey.isEmpty {
                 output.append("PresharedKey = \(preSharedKey)\n")
             }
             if !peer.allowedIPs.isEmpty {

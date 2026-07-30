@@ -4,15 +4,29 @@
 
 /// Represents an I/O interface able to read and write data.
 public protocol IOInterface: AnyObject, Sendable {
-
     /// The file descriptor, if available.
-    var fileDescriptor: UInt64? { get }
+    var muxDescriptor: FileDescriptor? { get }
+
+    /// A ``NativeIOInterface`` object to perform native I/O.
+    var nativeIO: NativeIOInterface? { get }
 
     /// Reads packets from the interface.
+    @available(*, deprecated, message: "Use FdLooper")
     func readPackets() async throws -> [Data]
 
     /// Writes packets to the interface.
     ///
     /// - Parameter packets: The packets to write.
+    @available(*, deprecated, message: "Use FdLooper")
     func writePackets(_ packets: [Data]) async throws
+}
+
+extension IOInterface {
+    public var muxDescriptor: FileDescriptor? {
+        nil
+    }
+
+    public var nativeIO: NativeIOInterface? {
+        nil
+    }
 }

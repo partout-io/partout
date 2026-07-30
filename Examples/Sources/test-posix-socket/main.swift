@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import _PartoutPortable_C
 import Partout
 import Testing
 
@@ -14,41 +15,54 @@ final class MyDest: LoggerDestination {
     }
 }
 
+final class DummyFactory: BetterPathStreamFactory {
+    func newStream() -> PassthroughStream<Void> {
+        PassthroughStream()
+    }
+}
+
 func tryTCPConnection() async throws {
     var log = PartoutLogger.Builder()
     log.setDestination(MyDest(), for: [.core])
     PartoutLogger.register(log.build())
 
     pp_log(.global, .core, .fault, ">>> CONNECTING")
-    let endpoint = try ExtendedEndpoint("vps", .init(.tcp, 80))
-    let observer = BSDSocketObserver(
-        .global,
-        endpoint: endpoint,
-        betterPathBlock: {
-            PassthroughStream()
-        }
-    )
+    let endpoint = try ExtendedEndpoint("google.com", .init(.tcp, 80))
+    let betterPathFactory = DummyFactory()
+    let factory = NativeSocketFactory(.global, betterPathFactory: betterPathFactory)
+    let observer = factory.linkObserver(to: endpoint, reachability: nil)
     let sut = try await observer.waitForActivity(timeout: 5000)
+    guard let io = sut.nativeIO else {
+        fatalError("Missing .nativeIO")
+    }
 
     let req = "GET / HTTP/1.0\r\n\r\n"
     let reqData = req.data(using: .utf8)!
     pp_log(.global, .core, .fault, ">>> WRITING")
-    try await sut.writePackets([reqData])
+    var offset = 0
+    while offset < reqData.count {
+        guard let written = try? io.write(reqData, offset: offset) else {
+            continue
+        }
+        offset += Int(written)
+        print("total=\(reqData.count), written=\(written)")
+    }
     pp_log(.global, .core, .fault, ">>> WRITTEN")
 
-    do {
-        let packets = try await sut.readPackets()
-        packets.forEach {
-            guard let string = String(data: $0, encoding: .utf8) else {
-                pp_log(.global, .core, .info, ">>> (hex) \($0.toHex())")
-                return
-            }
-            pp_log(.global, .core, .info, ">>> (utf) \(string)")
+    var data = Data()
+    let expected = 256
+    var buf: [UInt8] = Array(repeating: 0, count: expected)
+    while data.count < expected {
+        guard let count = try? io.read(&buf) else {
+            continue
         }
-    } catch {
-        pp_log(.global, .core, .info, ">>> (error) \(error)")
+        data.append(Data(buf[0..<Int(count)]))
+    }
+    guard let string = String(data: data, encoding: .utf8) else {
+        pp_log(.global, .core, .info, ">>> (hex) \(data.toHex())")
         return
     }
+    pp_log(.global, .core, .info, ">>> (utf) \(string)")
 
     try await Task.sleep(interval: 10)
 }

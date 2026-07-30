@@ -6,10 +6,15 @@ package io.partout.vpn
 
 import android.net.VpnService
 import android.os.Build
+import io.partout.extensions.VpnSubnet
 import java.lang.reflect.InvocationTargetException
 import java.net.InetAddress
 
 private const val IP_PREFIX_CLASS_NAME = "android.net.IpPrefix"
+
+internal fun VpnService.Builder.tryExcludeRoute(subnet: VpnSubnet): Throwable? {
+    return tryExcludeRoute(subnet.address, subnet.prefixLength)
+}
 
 internal fun VpnService.Builder.tryExcludeRoute(
     address: InetAddress,

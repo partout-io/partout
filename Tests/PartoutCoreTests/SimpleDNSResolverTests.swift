@@ -9,21 +9,36 @@ struct SimpleDNSResolverTests {
     @Test
     func givenResolver_whenResolveBeforeTimeout_thenReturnsResolvedRecords() async throws {
         let records = [DNSRecord(address: "1.2.3.4", isIPv6: false)]
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             MockStrategy(records: records, delay: 100)
         }
-        let result = try await sut.resolve("foobar.com", timeout: 500)
+        let result = try await sut.resolve("foobar.com", reachability: nil, timeout: 500)
         #expect(result == records)
     }
 
     @Test
     func givenResolver_whenResolveAfterTimeout_thenFailsWithTimeout() async throws {
         let records = [DNSRecord(address: "1.2.3.4", isIPv6: false)]
-        let sut = SimpleDNSResolver { _ in
+        let sut = SimpleDNSResolver { _, _ in
             MockStrategy(records: records, delay: 500)
         }
         do {
-            _ = try await sut.resolve("foobar.com", timeout: 100)
+            _ = try await sut.resolve("foobar.com", reachability: nil,timeout: 100)
+            #expect(Bool(false), ".resolve must fail")
+        } catch let error as PartoutError {
+            #expect(error.code == .timeout)
+        } catch {
+            #expect(Bool(false), "Unexpected error: \(error)")
+        }
+    }
+
+    @Test
+    func givenResolverIgnoringCancellation_whenTimeout_thenStillReturns() async throws {
+        let sut = SimpleDNSResolver { _, _ in
+            CancellationIgnoringStrategy()
+        }
+        do {
+            _ = try await sut.resolve("foobar.com", reachability: nil,timeout: 100)
             #expect(Bool(false), ".resolve must fail")
         } catch let error as PartoutError {
             #expect(error.code == .timeout)
@@ -59,7 +74,7 @@ private actor MockStrategy: SimpleDNSStrategy {
         }
     }
 
-    func waitForResolution() async throws -> [DNSRecord] {
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord] {
         print("waitForResolution")
         let result = try await resolutionTask?.value
         print("endResolution")
@@ -69,5 +84,18 @@ private actor MockStrategy: SimpleDNSStrategy {
     func cancelResolution() {
         print("cancelResolution")
         resolutionTask?.cancel()
+    }
+}
+
+private actor CancellationIgnoringStrategy: SimpleDNSStrategy {
+    func startResolution() {
+    }
+
+    func waitForResolution(reachability: ReachabilityInfo?) async throws -> [DNSRecord] {
+        try await Task.sleep(milliseconds: 10_000)
+        return []
+    }
+
+    func cancelResolution() {
     }
 }

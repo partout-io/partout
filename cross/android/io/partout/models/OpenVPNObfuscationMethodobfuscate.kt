@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
@@ -24,13 +32,14 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param mask 
+ * @param mask Wrapper of a byte array with safe encoding capabilities.
  */
 @Serializable
 
 @SerialName(value = "obfuscate")
 data class OpenVPNObfuscationMethodobfuscate (
 
+    /* Wrapper of a byte array with safe encoding capabilities. */
     @SerialName(value = "mask")
     val mask: kotlin.String
 

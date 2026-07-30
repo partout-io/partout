@@ -6,15 +6,10 @@
 
 #pragma once
 #include "portable/conditionals.h"
+#include "portable/endian.h"
 
 #include <stdint.h>
 #include <stdlib.h>
-
-#if PARTOUT_WINDOWS
-#include <WinSock2.h>
-#else
-#include <arpa/inet.h>
-#endif
 
 typedef enum {
     PPAddrFamilyUnknown,
@@ -39,5 +34,5 @@ int pp_addr_network_v6(void *dst, const size_t dst_len,
                        const char *addr, const int prefix);
 
 static inline uint32_t pp_swap_big32_to_host(uint32_t x) {
-    return ntohl(x);
+    return pp_endian_ntohl(x);
 }

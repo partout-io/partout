@@ -4,6 +4,14 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
+#include "portable/conditionals.h"
+
+#if PARTOUT_WINDOWS
+#include <Windows.h>
+#include <objbase.h>
+#include <wintun.h>
+#endif
+
 #include "portable/common.h"
 #include "portable/tun.h"
 
@@ -11,13 +19,11 @@
 
 #if PARTOUT_WINDOWS
 
-#include <wintun.h>
-#include <objbase.h>
-
 // FIXME: #188, convert debug messages to logs
 
 struct __pp_tun_struct {
-    LPWSTR name;
+    const char *name;
+    LPWSTR wname;
     WINTUN_ADAPTER_HANDLE adapter;
     WINTUN_SESSION_HANDLE session;
 };
@@ -63,18 +69,18 @@ GUID guid_from_wstring(const wchar_t *wstr) {
     return guid;
 }
 
-static
-pp_tun pp_tun_create(const char *_Nonnull uuid) {
+pp_tun pp_tun_open(const char *uuid) {
+    if (!uuid) return NULL;
     WINTUN_ADAPTER_HANDLE adapter = NULL;
     WINTUN_SESSION_HANDLE session = NULL;
     LPCWSTR tun_type = NULL;
-    LPCWSTR dev_name = NULL;
+    LPWSTR dev_name = NULL;
 
     // Load DLL before anything (do it once)
     if (!wintun) {
         wintun = LoadLibraryExA("wintun.dll", NULL, LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
         if (!wintun) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), LoadLibraryExA(): %lu", GetLastError());
+            pp_clog_v(PPLogLevelFault, "tun_windows: create(), LoadLibraryExA(): %lu", GetLastError());
             goto failure;
         }
         // Required DLL functions
@@ -94,31 +100,32 @@ pp_tun pp_tun_create(const char *_Nonnull uuid) {
     tun_type = L"Partout";
     dev_name = wstring_from_string(uuid);
     if (!dev_name) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
+        pp_clog_v(PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
         goto failure;
     }
     GUID dev_guid = guid_from_wstring(dev_name);
     adapter = WintunCreateAdapter(dev_name, tun_type, &dev_guid);
     if (!adapter) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
         goto failure;
     }
 
     DWORD version = WintunGetRunningDriverVersion();
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo,
+    pp_clog_v(PPLogLevelInfo,
               "tun_windows: Wintun v%lu.%lu loaded", (version >> 16) & 0xff, (version >> 0) & 0xff);
 
     // Create a session with a 4MB ring buffer
     session = WintunStartSession(adapter, WINTUN_MAX_RING_CAPACITY);
     if (!session) {
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: create(), WintunStartSession(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "tun_windows: create(), WintunStartSession(): %lu", GetLastError());
         goto failure;
     }
     // printf("tun_windows: adapter is %p, session is %p\n", adapter, session);
 
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: Created wintun device %ls", dev_name);
+    pp_clog_v(PPLogLevelInfo, "tun_windows: Created wintun device %ls", dev_name);
     pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->name = _wcsdup(dev_name);
+    tun->name = pp_dup(uuid);
+    tun->wname = dev_name;
     tun->adapter = adapter;
     tun->session = session;
     return tun;
@@ -127,22 +134,17 @@ failure:
     if (session) WintunEndSession(session);
     if (adapter) WintunCloseAdapter(adapter);
     if (dev_name) pp_free((LPWSTR)dev_name);
-    if (wintun) FreeLibrary(wintun);
     return NULL;
 }
 
-static
-void pp_tun_free(pp_tun tun) {
+void pp_tun_free_and_close(pp_tun tun, bool and_close) {
     if (!tun) return;
-    pp_tun_shutdown(tun);
-    if (tun->adapter) {
-        WintunCloseAdapter(tun->adapter);
+    if (and_close) {
+        pp_tun_close(tun);
     }
-    pp_free(tun->name);
+    pp_free((char *)tun->name);
+    pp_free(tun->wname);
     pp_free(tun);
-
-    // XXX: Static library allocations are retained
-    // FreeLibrary(wintun);
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
@@ -150,30 +152,25 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         SetLastError(ERROR_INVALID_HANDLE);
         return -1;
     }
+    if (!dst || dst_len == 0) return -1;
     DWORD packet_len;
-    BYTE *packet = NULL;
-    while (!packet) {
-        // printf(">>> tun_read looping, packet is %p, session is %p", packet, tun->session);
-        packet = WintunReceivePacket(tun->session, &packet_len);
-        // printf(">>> tun_read received: %p\n", packet);
-        if (packet) break;
+    BYTE *packet = WintunReceivePacket(tun->session, &packet_len);
+    if (!packet) {
         const DWORD err = GetLastError();
-        if (err != ERROR_NO_MORE_ITEMS) {
-            pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: read(), %lu", err);
-            return -1;
+        if (err == ERROR_NO_MORE_ITEMS) {
+            return PPIOErrorWouldBlock;
         }
-        WaitForSingleObject(WintunGetReadWaitEvent(tun->session), INFINITE);
+        pp_clog_v(PPLogLevelFault, "tun_windows: read(), %lu", err);
+        return -1;
     }
-    // FIXME: #188, dst_len must accomodate max packet_len (can we know the MTU beforehand?)
-    // WINTUN_MAX_IP_PACKET_SIZE
-    // printf(">>> tun_read read %lu bytes\n", packet_len);
-    pp_assert(dst_len >= packet_len);
-    if (dst_len >= packet_len) {
-        memcpy(dst, packet, packet_len);
+    if (dst_len < packet_len) {
+        WintunReleaseReceivePacket(tun->session, packet);
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return -1;
     }
+    memcpy(dst, packet, packet_len);
     WintunReleaseReceivePacket(tun->session, packet);
-    // printf(">>> tun_read released\n");
-    return packet_len;
+    return (int)packet_len;
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
@@ -181,75 +178,90 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
         SetLastError(ERROR_INVALID_HANDLE);
         return -1;
     }
-    // printf(">>> tun_write write %llu bytes\n", src_len);
+    if (!src || src_len == 0) return -1;
     BYTE *packet = WintunAllocateSendPacket(tun->session, src_len);
     if (!packet) {
         const DWORD err = GetLastError();
-        // Silently drop packets if the ring is full
-        if (err == ERROR_BUFFER_OVERFLOW) return 0;
-        pp_clog_v(PPLogCategoryCore, PPLogLevelFault, "tun_windows: write(), %lu", err);
+        if (err == ERROR_BUFFER_OVERFLOW) {
+            return PPIOErrorNoBufs;
+        }
+        pp_clog_v(PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
     }
-    // printf(">>> tun_write allocated\n");
     memcpy(packet, src, src_len);
     WintunSendPacket(tun->session, packet);
-    // printf(">>> tun_write written\n");
-    return src_len;
+    return (int)src_len;
 }
 
-void pp_tun_shutdown(const pp_tun tun) {
+void pp_tun_close(const pp_tun tun) {
     if (!tun || !tun->session) return;
     WintunEndSession(tun->session);
     tun->session = NULL;
+    WintunCloseAdapter(tun->adapter);
+    tun->adapter = NULL;
 }
 
-int pp_tun_fd(const pp_tun tun) {
-    (void)tun;
-    return -1;
+pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
+    if (!tun || !tun->session) return INVALID_HANDLE_VALUE;
+    return WintunGetReadWaitEvent(tun->session);
 }
 
 const char *pp_tun_name(const pp_tun tun) {
-    (void)tun;
-    return NULL;
+    if (!tun) return NULL;
+    return tun->name;
 }
 
-void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     (void)ref;
     (void)delegate;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelDebug, "tun_windows: ctrl_set_delegate(%p, %p)", ref, delegate);
+    pp_clog_v(PPLogLevelDebug, "tun_windows: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
-pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
     (void)uuid;
     (void)info_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_set_tunnel(%p)", ref);
-    return NULL;
+    pp_clog_v(PPLogLevelInfo, "tun_windows: ctrl_set_tunnel(%p)", ref);
+    return pp_tun_open(uuid);
 }
 
-void pp_tun_ctrl_configure_sockets(void *ref, const int *fds, const size_t fds_len) {
+static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+                                          const pp_socket_fd *fds, const size_t fds_len) {
     (void)ref;
+    (void)info;
     (void)fds;
     (void)fds_len;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_configure_sockets(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_windows: ctrl_configure_sockets(%p)", ref);
+    return true;
 }
 
-void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
+static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     (void)ref;
     (void)snapshot_json;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_report_snapshot(%p)", ref);
 }
 
-void pp_tun_ctrl_clear_tunnel(void *ref, pp_tun tun_impl) {
+static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
-    (void)tun_impl;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_clear_tunnel(%p)", ref);
+    (void)kill_switch;
+    pp_clog_v(PPLogLevelInfo, "tun_windows: ctrl_clear_tunnel(%p)", ref);
 }
 
-void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
+static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
     (void)ref;
     (void)error_code;
-    pp_clog_v(PPLogCategoryCore, PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
+    pp_clog_v(PPLogLevelInfo, "tun_windows: ctrl_cancel_tunnel(%p)", ref);
+}
+
+pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
+    pp_tun_ctrl_fnt fnt = {
+        .set_delegate = pp_tun_ctrl_set_delegate,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
+        .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .clear_tunnel = pp_tun_ctrl_clear_tunnel,
+        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
+    };
+    return fnt;
 }
 
 #endif

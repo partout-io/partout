@@ -38,7 +38,7 @@ extension StandardOpenVPNParserError: PartoutErrorMappable {
         case .malformed(let option):
             return PartoutError(.parsing, option, self)
         case .unsupportedCompression(let option):
-            return PartoutError(.OpenVPN.unsupportedCompression, option, self)
+            return PartoutError(.openVPNUnsupportedCompression, option, self)
         case .unsupportedConfiguration(let option):
             return PartoutError(.parsing, option, self)
         case .encryptionPassphrase, .unableToDecrypt:

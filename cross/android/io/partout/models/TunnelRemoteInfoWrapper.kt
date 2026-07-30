@@ -8,14 +8,23 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
 
 import io.partout.models.TaggedModule
+import io.partout.models.TaggedProfile
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -24,14 +33,18 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
+ * @param profile 
  * @param originalModuleId 
  * @param requiresVirtualDevice 
- * @param address 
+ * @param address A hostname or IP address.
  * @param modules 
  */
 @Serializable
 
 data class TunnelRemoteInfoWrapper (
+
+    @SerialName(value = "profile")
+    val profile: TaggedProfile,
 
     @SerialName(value = "originalModuleId")
     val originalModuleId: kotlin.String,
@@ -39,6 +52,7 @@ data class TunnelRemoteInfoWrapper (
     @SerialName(value = "requiresVirtualDevice")
     val requiresVirtualDevice: kotlin.Boolean,
 
+    /* A hostname or IP address. */
     @SerialName(value = "address")
     val address: kotlin.String? = null,
 

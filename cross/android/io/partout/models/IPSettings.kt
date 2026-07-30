@@ -8,9 +8,17 @@
 
 @file:Suppress(
     "ArrayInDataClass",
+    "DuplicatedCode",
     "EnumEntryName",
     "RemoveRedundantQualifierName",
-    "UnusedImport"
+    "RemoveRedundantCallsOfConversionMethods",
+    "REDUNDANT_CALL_OF_CONVERSION_METHOD",
+    "RedundantUnitReturnType",
+    "RemoveEmptyClassBody",
+    "UnnecessaryVariable",
+    "UnusedImport",
+    "UnnecessaryVariable",
+    "unused"
 )
 
 package io.partout.models
@@ -22,28 +30,27 @@ import kotlinx.serialization.SerialName
 import kotlinx.serialization.Contextual
 
 /**
- * 
+ * IP settings and routes.
  *
- * @param excludedRoutes 
- * @param includedRoutes 
- * @param subnets 
- * @param legacySingleSubnet 
+ * @param subnets The subnets.
+ * @param includedRoutes The included routes.
+ * @param excludedRoutes The excluded routes.
  */
 @Serializable
 
 data class IPSettings (
 
-    @SerialName(value = "excludedRoutes")
-    val excludedRoutes: kotlin.collections.List<Route>,
-
-    @SerialName(value = "includedRoutes")
-    val includedRoutes: kotlin.collections.List<Route>,
-
+    /* The subnets. */
     @SerialName(value = "subnets")
     val subnets: kotlin.collections.List<kotlin.String>,
 
-    @SerialName(value = "legacySingleSubnet")
-    val legacySingleSubnet: kotlin.String? = null
+    /* The included routes. */
+    @SerialName(value = "includedRoutes")
+    val includedRoutes: kotlin.collections.List<Route>,
+
+    /* The excluded routes. */
+    @SerialName(value = "excludedRoutes")
+    val excludedRoutes: kotlin.collections.List<Route>
 
 ) {
 
