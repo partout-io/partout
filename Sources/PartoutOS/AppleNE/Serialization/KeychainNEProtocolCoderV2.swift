@@ -4,13 +4,8 @@
 
 import NetworkExtension
 
-/// An ``NEProtocolCoder`` that can recover profiles no longer referenced by a manager.
-public protocol NEProtocolCoderV2: NEProtocolEncoder, NEProtocolDecoder {
-    func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile]
-}
-
 /// ``NEProtocolCoder`` encoding to and from a keychain.
-public struct KeychainNEProtocolCoderV2: NEProtocolCoderV2 {
+public struct KeychainNEProtocolCoderV2: NEProtocolCoder {
     private let ctx: PartoutLoggerContext
 
     private let tunnelBundleIdentifier: String
@@ -92,11 +87,5 @@ public struct KeychainNEProtocolCoderV2: NEProtocolCoderV2 {
             pp_log(ctx, .os, .error, "Unable to fetch keychain items: \(error)")
         }
         return staleProfiles
-    }
-}
-
-extension ProviderNEProtocolCoder: NEProtocolCoderV2 {
-    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
-        []
     }
 }

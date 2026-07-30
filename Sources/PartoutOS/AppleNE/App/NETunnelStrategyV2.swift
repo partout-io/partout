@@ -42,7 +42,7 @@ public actor NETunnelStrategyV2 {
 
     private let bundleIdentifier: String
 
-    private let coder: NEProtocolCoderV2
+    private let coder: NEProtocolCoder
 
     private let managerStore: NETunnelManagerStore
 
@@ -71,7 +71,7 @@ public actor NETunnelStrategyV2 {
     public init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
-        coder: NEProtocolCoderV2,
+        coder: NEProtocolCoder,
 //        options: Set<Option> = []
         title: @escaping @Sendable (Profile) -> String
     ) {
@@ -87,7 +87,7 @@ public actor NETunnelStrategyV2 {
     init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
-        coder: NEProtocolCoderV2,
+        coder: NEProtocolCoder,
         managerStore: NETunnelManagerStore,
         title: @escaping @Sendable (Profile) -> String
     ) {

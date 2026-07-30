@@ -36,6 +36,14 @@ public protocol NEProtocolDecoder: Sendable {
     ///   - protocolConfiguration: The `NETunnelProviderProtocol` to decode.
     /// - Returns: The decoded profile.
     func profile(from protocolConfiguration: NETunnelProviderProtocol) throws -> Profile
+
+    func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile]
+}
+
+extension NEProtocolDecoder {
+    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
+        []
+    }
 }
 
 let NEProtocolCoderServerAddress = "127.0.0.1"

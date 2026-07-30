@@ -48,6 +48,10 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 
     public func purge(managers: [NETunnelProviderManager]) {
     }
+
+    public func recoverProfiles(notReferencedBy managers: [NETunnelProviderManager]) async -> [Profile] {
+        []
+    }
 }
 
 extension ProviderNEProtocolCoder {
