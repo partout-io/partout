@@ -33,7 +33,7 @@ public actor NETunnelStrategyV2 {
     private var lastManagerMutation: Task<Void, Error>?
 
     private var pendingReload: (
-        task: Task<[NETunnelProviderManager], Error>,
+        task: Task<Void, Error>,
         recoversProfiles: Bool
     )?
 
@@ -187,7 +187,7 @@ extension NETunnelStrategyV2: NETunnelManagerRepository {
                 profile,
                 manager: existingManager,
                 forConnecting: forConnecting,
-                options: options
+                options: options as? [String: NSObject]
             )
         } catch {
             // A regular save creates the keychain entry first. Roll it back if
@@ -245,12 +245,11 @@ extension NETunnelStrategyV2: NETunnelManagerRepository {
 }
 
 private extension NETunnelStrategyV2 {
-    @discardableResult
-    func saveProfile<O>(
+    func saveProfile(
         _ profile: Profile,
         manager existingManager: NETunnelProviderManager?,
         forConnecting: Bool,
-        options: O?
+        options: [String: NSObject]?
     ) async throws -> NETunnelProviderManager {
         profile.log(.os, .notice, withPreamble: "Encoded profile:")
 
@@ -284,7 +283,6 @@ private extension NETunnelStrategyV2 {
         }
 
         if forConnecting {
-            let options = options as? [String: NSObject]
             try manager.connection.startVPNTunnel(options: options)
         }
         return manager
@@ -362,10 +360,6 @@ private extension NETunnelStrategyV2 {
         try await mutation.value
     }
 
-    func waitForManagerMutation() async {
-        _ = try? await lastManagerMutation?.value
-    }
-
     func disconnectCurrentManagers() async {
         await withTaskGroup(of: Void.self) { group in
             allManagers.forEach { pair in
@@ -436,48 +430,46 @@ private extension NETunnelStrategyV2 {
 
     func reloadManagers(recoverProfiles: Bool) async throws -> [NETunnelProviderManager] {
         if let pendingReload {
-            let managers = try await pendingReload.task.value
+            try await pendingReload.task.value
             if recoverProfiles && !pendingReload.recoversProfiles {
                 return try await reloadManagers(recoverProfiles: true)
             }
-            return managers
+            return Array(allManagers.values)
         }
 
         let task = Task {
-            try await reloadManagersUntilCurrent(recoverProfiles: recoverProfiles)
+            try await performReload(recoverProfiles: recoverProfiles)
         }
         pendingReload = (task, recoverProfiles)
-        return try await task.value
+        try await task.value
+        return Array(allManagers.values)
     }
 
-    func reloadManagersUntilCurrent(
-        recoverProfiles: Bool
-    ) async throws -> [NETunnelProviderManager] {
+    func performReload(recoverProfiles: Bool) async throws {
         defer {
             pendingReload = nil
         }
 
         var recoverProfiles = recoverProfiles
-        var managers: [Profile.ID: NETunnelProviderManager] = [:]
-        repeat {
+        while true {
             shouldReloadAgain = false
-            managers = try await loadManagers(recoverProfiles: recoverProfiles)
+            let managers = try await loadManagers(recoverProfiles: recoverProfiles)
             recoverProfiles = false
 
-            if shouldReloadAgain {
-                pp_log(ctx, .os, .debug, "Reload managers again after configuration changes")
+            guard shouldReloadAgain else {
+                allManagers = managers
+                logManagers()
+                return
             }
-        } while shouldReloadAgain
 
-        allManagers = managers
-        logManagers()
-        return Array(managers.values)
+            pp_log(ctx, .os, .debug, "Reload managers again after configuration changes")
+        }
     }
 
     func loadManagers(
         recoverProfiles: Bool
     ) async throws -> [Profile.ID: NETunnelProviderManager] {
-        await waitForManagerMutation()
+        _ = try? await lastManagerMutation?.value
 
         var managers = try await loadManagedManagers(removeInvalidProfiles: recoverProfiles)
         guard recoverProfiles else {
@@ -492,7 +484,7 @@ private extension NETunnelStrategyV2 {
                     profile,
                     manager: nil,
                     forConnecting: false,
-                    options: nil as Void?
+                    options: nil
                 )
             } catch {
                 // This is a recovery, so keep the keychain profile for the next attempt.
@@ -512,17 +504,21 @@ private extension NETunnelStrategyV2 {
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
 
         for manager in loadedManagers {
-            guard manager.tunnelBundleIdentifier == bundleIdentifier else {
+            guard let proto = manager.tunnelProtocol else {
+                await removeManager(manager, reason: "missing tunnel protocol")
+                continue
+            }
+            guard proto.providerBundleIdentifier == bundleIdentifier else {
                 await removeManager(manager, reason: "unexpected tunnel bundle identifier")
                 continue
             }
-            guard let profileId = manager.tunnelProtocol?.profileId else {
+            guard let profileId = proto.profileId else {
                 await removeManager(manager, reason: "missing profile identifier")
                 continue
             }
             if removeInvalidProfiles {
                 do {
-                    _ = try coder.profile(from: manager.tunnelProtocol!)
+                    _ = try coder.profile(from: proto)
                 } catch {
                     await removeManager(manager, reason: "unable to decode profile: \(error)")
                     continue
@@ -533,17 +529,12 @@ private extension NETunnelStrategyV2 {
                 continue
             }
 
-            let managerToKeep: NETunnelProviderManager
-            let duplicateManager: NETunnelProviderManager
             if manager.rank > existingManager.rank {
-                managerToKeep = manager
-                duplicateManager = existingManager
+                managers[profileId] = manager
+                await removeManager(existingManager, reason: "duplicate for profile \(profileId)")
             } else {
-                managerToKeep = existingManager
-                duplicateManager = manager
+                await removeManager(manager, reason: "duplicate for profile \(profileId)")
             }
-            managers[profileId] = managerToKeep
-            await removeManager(duplicateManager, reason: "duplicate for profile \(profileId)")
         }
         return managers
     }
@@ -563,7 +554,7 @@ private extension NETunnelStrategyV2 {
     func waitForPendingReload() async {
         while let pendingReload {
             do {
-                _ = try await pendingReload.task.value
+                try await pendingReload.task.value
             } catch {
                 pp_log(ctx, .os, .error, "Pending manager reload failed: \(error)")
             }
