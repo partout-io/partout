@@ -15,6 +15,7 @@ public final class PartoutProviderRuntime: Sendable {
     private let messageHandler: DefaultMessageHandler
     private let options: TunnelControllerOptions
     private let logsPrivateData: Bool
+    private let cacheDir: String?
     private let minDataCountDelta: Int64?
     private let logger: partout_logger_cb?
 
@@ -24,6 +25,7 @@ public final class PartoutProviderRuntime: Sendable {
         options: TunnelControllerOptions,
         defaults: UserDefaults,
         logsPrivateData: Bool,
+        cacheDir: String? = nil,
         minDataCountDelta: Int64? = nil,
         logger: partout_logger_cb?
     ) throws {
@@ -34,6 +36,7 @@ public final class PartoutProviderRuntime: Sendable {
         messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
         self.logsPrivateData = logsPrivateData
+        self.cacheDir = cacheDir
         self.minDataCountDelta = minDataCountDelta
         self.logger = logger
     }
@@ -79,7 +82,7 @@ public final class PartoutProviderRuntime: Sendable {
         let daemonOptions = partout_daemon_options(
             is_daemon: false,
             starts_immediately: false,
-            cache_dir: nil,
+            cache_dir: cacheDir,
             min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
         )
         let result = profileJSON.withCString { profile in
@@ -92,11 +95,13 @@ public final class PartoutProviderRuntime: Sendable {
                 return partout_daemon_start(&start_args)
             }
         }
-        guard result == 0 else {
-            retainedController.release()
-            retainedEnvironment.release()
-            pp_log(ctx, .os, .fault, "Unable to start runtime: result=\(result)")
-            return
+        let cResult = partout_completion_code(result)
+        switch cResult {
+        case PartoutCompletionCodeOK:
+            break
+        default:
+            pp_log(ctx, .os, .fault, "Unable to start runtime: result=\(cResult)")
+            throw PartoutError(.invalidValue)
         }
         pp_log(ctx, .os, .notice, "Runtime started")
     }
@@ -106,8 +111,8 @@ public final class PartoutProviderRuntime: Sendable {
         partout_daemon_hold()
     }
 
-    public func stopTunnel(with reason: NEProviderStopReason) async {
-        pp_log(ctx, .os, .notice, "Stop runtime, reason: \(String(describing: reason))")
+    public func stopTunnel() async {
+        pp_log(ctx, .os, .notice, "Stop runtime")
         partout_daemon_stop()
     }
 
