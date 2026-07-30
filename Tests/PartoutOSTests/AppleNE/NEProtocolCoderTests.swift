@@ -4,9 +4,8 @@
 
 #if canImport(NetworkExtension)
 
-@testable import PartoutOS
-import Foundation
 import NetworkExtension
+@testable import PartoutOS
 import Testing
 
 @Suite(.serialized)
