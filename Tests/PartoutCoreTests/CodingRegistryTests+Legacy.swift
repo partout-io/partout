@@ -5,8 +5,8 @@
 @testable import PartoutCore
 import Testing
 
-// `withLegacyEncoding` only changes `string(fromProfile:)`; decode always probes
-// V3, then V2, then V1, so these legacy decode checks stay unparameterized.
+// Decode always probes V3, then V2, then V1, so these legacy decode checks
+// stay unparameterized.
 struct CodingRegistryLegacyTests {
     @Test
     func givenCoder_whenDecodeProfileEncodedWithLegacyV2_thenIsDecoded() throws {
@@ -15,7 +15,7 @@ struct CodingRegistryLegacyTests {
         let fixture = try newLegacyV2ProfileFixture(encoder)
         let encoded = try encoder.encode(fixture.profile.asCodableProfileV2)
 
-        let sut = registry.withLegacyEncoding(false)
+        let sut = CodingRegistry(registry: registry)
         let decoded = try sut.profile(fromString: encoded)
         #expect(decoded == fixture.profile)
     }

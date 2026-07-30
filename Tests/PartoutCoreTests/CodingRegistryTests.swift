@@ -6,10 +6,10 @@
 import Testing
 
 struct CodingRegistryTests {
-    @Test(arguments: [true, false])
-    func givenCoder_whenEncodeProfileWithKnownHandlers_thenIsDecoded(legacy: Bool) throws {
+    @Test
+    func givenCoder_whenEncodeProfileWithKnownHandlers_thenIsDecoded() throws {
         let registry = Registry(withKnown: true)
-        let sut = registry.withLegacyEncoding(legacy)
+        let sut = CodingRegistry(registry: registry)
 
         var ovpnBuilder = OpenVPN.Configuration.Builder()
         ovpnBuilder.ca = OpenVPN.CryptoContainer(pem: "ca is required")
@@ -40,7 +40,7 @@ struct CodingRegistryTests {
     @Test
     func givenCoder_whenDecodeV3ProfileWithLegacyOTPMethod_thenIsDecoded() throws {
         let registry = Registry(withKnown: true)
-        let sut = registry.withLegacyEncoding(false)
+        let sut = CodingRegistry(registry: registry)
 
         var ovpnBuilder = OpenVPN.Configuration.Builder()
         ovpnBuilder.ca = OpenVPN.CryptoContainer(pem: "ca is required")
@@ -71,12 +71,12 @@ struct CodingRegistryTests {
         #expect(decoded == profile)
     }
 
-    @Test(arguments: [true, false])
-    func givenCoder_whenEncodeProfileWithRegisteredModule_thenIsDecoded(legacy: Bool) throws {
+    @Test
+    func givenCoder_whenEncodeProfileWithRegisteredModule_thenIsDecoded() throws {
         let registry = Registry(allHandlers: [
             DNSModule.moduleHandler
         ])
-        let sut = registry.withLegacyEncoding(legacy)
+        let sut = CodingRegistry(registry: registry)
         let module = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
         let profile = try Profile.Builder(modules: [module]).build()
 
@@ -85,12 +85,12 @@ struct CodingRegistryTests {
         #expect(decoded == profile)
     }
 
-    @Test(arguments: [true, false])
-    func givenCoder_whenEncodeProfile_thenIsDecoded(legacy: Bool) throws {
+    @Test
+    func givenCoder_whenEncodeProfile_thenIsDecoded() throws {
         let registry = Registry(allHandlers: [
             DNSModule.moduleHandler
         ])
-        let sut = registry.withLegacyEncoding(legacy)
+        let sut = CodingRegistry(registry: registry)
         let module = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
         let profile = try Profile.Builder(modules: [module]).build()
 
@@ -99,13 +99,13 @@ struct CodingRegistryTests {
         #expect(decoded == profile)
     }
 
-    @Test(arguments: [true, false])
-    func givenCoder_whenEncodeProfile_thenDecodesToEqual(legacy: Bool) throws {
+    @Test
+    func givenCoder_whenEncodeProfile_thenDecodesToEqual() throws {
         let registry = Registry(allHandlers: [
             DNSModule.moduleHandler,
             IPModule.moduleHandler
         ])
-        let sut = registry.withLegacyEncoding(legacy)
+        let sut = CodingRegistry(registry: registry)
         let dnsModule = try DNSModule.Builder(
             protocolType: .tls,
             servers: ["1.1.1.1", "4.4.4.4"],
@@ -124,11 +124,5 @@ struct CodingRegistryTests {
         #expect(decodedProfile.modules[0] as? DNSModule == dnsModule)
         #expect(decodedProfile.modules[1] as? IPModule == ipModule)
         #expect(decodedProfile == profile)
-    }
-}
-
-extension Registry {
-    func withLegacyEncoding(_ legacy: Bool) -> CodingRegistry {
-        CodingRegistry(registry: self, withLegacyEncoding: { legacy })
     }
 }

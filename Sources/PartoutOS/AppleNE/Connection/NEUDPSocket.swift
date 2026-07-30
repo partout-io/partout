@@ -8,7 +8,6 @@ import NetworkExtension
 public final class NEUDPObserver: LinkObserver {
     public struct Options: Sendable {
         public let maxDatagrams: Int
-        public let withSafeValueObserver: Bool
     }
 
     protocol StateObserver {
@@ -33,11 +32,7 @@ public final class NEUDPObserver: LinkObserver {
     }
 
     public func waitForActivity(timeout: Int) async throws -> LinkInterface {
-        if options.withSafeValueObserver {
-            observer = SafeObserver(nwSession)
-        } else {
-            observer = LegacyObserver(nwSession)
-        }
+        observer = SafeObserver(nwSession)
         defer {
             observer = nil
         }
@@ -171,20 +166,6 @@ private struct SafeObserver: NEUDPObserver.StateObserver {
 
     init(_ session: NWUDPSession) {
         backend = SafeValueObserver(session)
-    }
-
-    func waitForState(timeout: Int, onState: @escaping (NWUDPSessionState) throws -> Bool) async throws {
-        try await backend.waitForValue(on: \.state, timeout: timeout) { state in
-            try onState(state)
-        }
-    }
-}
-
-private struct LegacyObserver: NEUDPObserver.StateObserver {
-    let backend: ValueObserver<NWUDPSession>
-
-    init(_ session: NWUDPSession) {
-        backend = ValueObserver(session)
     }
 
     func waitForState(timeout: Int, onState: @escaping (NWUDPSessionState) throws -> Bool) async throws {

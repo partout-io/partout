@@ -7,17 +7,14 @@ public final class CodingRegistry {
     public typealias PostDecodeBlock = @Sendable (Profile) -> Profile?
 
     private let registry: Registry
-    private let withLegacyEncoding: @Sendable () -> Bool
     private let customModuleHandler: TaggedProfile.CustomModuleHandler?
     private let postDecodeBlock: PostDecodeBlock?
 
     public init(
         registry: Registry,
-        withLegacyEncoding: @escaping @Sendable () -> Bool,
         customModuleHandler: TaggedProfile.CustomModuleHandler? = nil
     ) {
         self.registry = registry
-        self.withLegacyEncoding = withLegacyEncoding
         self.customModuleHandler = customModuleHandler
         postDecodeBlock = Self.migratedProfile
     }
@@ -27,10 +24,7 @@ public final class CodingRegistry {
 
 extension CodingRegistry: ProfileCoder {
     public func string(fromProfile profile: Profile) throws -> String {
-        if withLegacyEncoding() {
-            return try rawStringLegacyV2(fromProfile: profile)
-        }
-        return try rawStringV3(fromProfile: profile)
+        try rawStringV3(fromProfile: profile)
     }
 
     public func profile(fromString string: String) throws -> Profile {
