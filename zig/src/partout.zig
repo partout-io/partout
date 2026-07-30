@@ -94,9 +94,11 @@ pub export fn partout_import_module(
 pub export fn partout_daemon_start(
     args_pointer: ?*const c.partout_daemon_start_args,
 ) callconv(.c) c_int {
+    const args = args_pointer orelse return c.PartoutCompletionCodeArgs;
+    var releases_bindings = true;
+    defer if (releases_bindings) releaseDaemonBindings(args.bindings);
     if (daemon_runtime != null) return mapErrorToCode(error.AlreadyStarted);
 
-    const args = args_pointer orelse return c.PartoutCompletionCodeArgs;
     var error_info: api.JsonErrorInfo = .{};
     var options = abi.DaemonOptions.init(allocator, args.*, &error_info) catch |err| {
         if (error_info.key) |key| {
@@ -111,11 +113,23 @@ pub export fn partout_daemon_start(
         options.deinit(allocator);
         return mapErrorToCode(err);
     };
-    errdefer runtime.destroy(allocator);
 
-    runtime.start() catch |err| return mapErrorToCode(err);
+    // Take ownership of the bindings now that the runtime exists
+    releases_bindings = false;
+
+    runtime.start() catch |err| {
+        runtime.stop();
+        runtime.destroy(allocator);
+        return mapErrorToCode(err);
+    };
     daemon_runtime = runtime;
     return c.PartoutCompletionCodeOK;
+}
+
+fn releaseDaemonBindings(bindings: ?*const c.partout_daemon_bindings) void {
+    const value = bindings orelse return;
+    const release = value.release orelse return;
+    release(@constCast(value));
 }
 
 pub export fn partout_daemon_hold() callconv(.c) void {

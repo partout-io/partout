@@ -2807,7 +2807,6 @@ pub const TaggedModule = union(enum) {
 pub const TunnelControllerOptions = struct {
     dns_fallback_servers: []const []const u8 = &.{},
     logs_snapshots: bool = false,
-    min_data_count_delta: u64 = 0,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!TunnelControllerOptions {
         return parseWithErrorInfo(allocator, text, null);
@@ -2831,7 +2830,6 @@ pub const TunnelControllerOptions = struct {
         errdefer result.deinit(allocator);
         result.dns_fallback_servers = try parseJsonField([]const []const u8, allocator, object, "dnsFallbackServers", error_info);
         result.logs_snapshots = try parseJsonField(bool, allocator, object, "logsSnapshots", error_info);
-        result.min_data_count_delta = try parseJsonField(u64, allocator, object, "minDataCountDelta", error_info);
         return result;
     }
 
@@ -2844,7 +2842,6 @@ pub const TunnelControllerOptions = struct {
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson([]const []const u8, allocator, &self.dns_fallback_servers);
         deinitJson(bool, allocator, &self.logs_snapshots);
-        deinitJson(u64, allocator, &self.min_data_count_delta);
     }
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
@@ -2853,8 +2850,6 @@ pub const TunnelControllerOptions = struct {
         try writeJson(jw, self.dns_fallback_servers);
         try jw.objectField("logsSnapshots");
         try writeJson(jw, self.logs_snapshots);
-        try jw.objectField("minDataCountDelta");
-        try writeJson(jw, self.min_data_count_delta);
         try jw.endObject();
     }
 };
