@@ -252,7 +252,7 @@ private extension AppleKeychain {
 
 private extension Dictionary where Key == String, Value == Any {
     mutating func apply(_ metadata: [KeychainMetadata]) {
-        for entry in metadata ?? [] {
+        for entry in metadata {
             switch entry {
             case .label(let label):
                 self[kSecAttrLabel as String] = label

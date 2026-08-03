@@ -20,7 +20,7 @@ struct NEProtocolCoderTests {
             coder: coder
         )
 
-        let proto = try sut.protocolConfiguration(from: profile, title: \.name)
+        let proto = try sut.protocolConfiguration(from: profile)
         #expect(proto.providerBundleIdentifier == bundleIdentifier)
         #expect(proto.providerConfiguration?[ProviderNEProtocolCoder.providerKey] as? String != nil)
 
@@ -39,7 +39,7 @@ struct NEProtocolCoderTests {
             keychain: MockKeychain()
         )
 
-        let proto = try sut.protocolConfiguration(from: profile, title: \.name)
+        let proto = try sut.protocolConfiguration(from: profile)
         #expect(proto.providerBundleIdentifier == bundleIdentifier)
         #expect(proto.providerConfiguration == nil)
 
@@ -67,7 +67,7 @@ private extension NEProtocolCoderTests {
 }
 
 private final class MockKeychain: Keychain {
-    func set(password: String, for username: String, label: String?) throws -> Data {
+    func set(password: String, for username: String, metadata: [KeychainMetadata]?) throws -> Data {
         guard let reference = password.data(using: .utf8) else {
             throw PartoutError(.encoding)
         }

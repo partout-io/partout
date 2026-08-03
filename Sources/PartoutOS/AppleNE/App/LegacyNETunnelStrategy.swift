@@ -543,9 +543,6 @@ private extension NEVPNConnection {
     }
 }
 
-extension NETunnelProviderManager: @retroactive @unchecked Sendable {
-}
-
 private extension NETunnelProviderManager {
     var asSnapshot: TunnelSnapshot? {
         guard let profileId else {
