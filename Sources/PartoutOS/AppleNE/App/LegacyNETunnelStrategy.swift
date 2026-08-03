@@ -36,6 +36,7 @@ public actor LegacyNETunnelStrategy {
         coder: NEProtocolCoder,
 //        options: Set<Option> = []
     ) {
+        pp_log(ctx, .os, .info, "LegacyNETunnelStrategy.init()")
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
