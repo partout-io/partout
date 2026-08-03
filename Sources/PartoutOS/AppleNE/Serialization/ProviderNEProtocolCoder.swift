@@ -22,7 +22,7 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         self.coder = coder
     }
 
-    public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
+    public func protocolConfiguration(from profile: Profile) throws -> NETunnelProviderProtocol {
         let encoded = try coder.string(fromProfile: profile)
 
         let proto = NETunnelProviderProtocol()
@@ -41,12 +41,6 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
             throw PartoutError(.decoding)
         }
         return try coder.profile(fromString: encoded)
-    }
-
-    public func removeProfile(withId profileId: Profile.ID) throws {
-    }
-
-    public func purge(managers: [NETunnelProviderManager]) {
     }
 }
 
