@@ -27,14 +27,10 @@ public final class AppleKeychain: Keychain {
         metadata: [KeychainMetadata]? = nil
     ) throws -> Data {
         var existingReference: Data?
+        let currentPassword: String?
         do {
             let reference = try passwordReference(for: username)
-            let currentPassword = try self.password(forReference: reference)
-
-            // return existing reference if content has not changed
-            guard password != currentPassword else {
-                return reference
-            }
+            currentPassword = try self.password(forReference: reference)
 
             // keep going
             existingReference = reference
@@ -48,6 +44,7 @@ public final class AppleKeychain: Keychain {
             }
 
             // otherwise, no pre-existing password
+            currentPassword = nil
         } catch {
 
             // IMPORTANT: rethrow any other unknown error (leave this code explicit)
@@ -60,7 +57,9 @@ public final class AppleKeychain: Keychain {
             query[kSecValuePersistentRef as String] = existingReference
 
             var attributes: [String: Any] = [:]
-            attributes[kSecValueData as String] = password.data(using: .utf8)
+            if password != currentPassword {
+                attributes[kSecValueData as String] = password.data(using: .utf8)
+            }
             metadata.map { attributes.apply($0) }
 
             let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
