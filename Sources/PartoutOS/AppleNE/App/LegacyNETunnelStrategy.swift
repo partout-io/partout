@@ -17,6 +17,8 @@ public actor LegacyNETunnelStrategy {
 
     private let coder: NEProtocolCoder
 
+    private let preferences: NETunnelPreferences
+
     private let options: Set<Option>
 
     private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
@@ -36,10 +38,25 @@ public actor LegacyNETunnelStrategy {
         coder: NEProtocolCoder,
 //        options: Set<Option> = []
     ) {
+        self.init(
+            ctx,
+            bundleIdentifier: bundleIdentifier,
+            coder: coder,
+            preferences: .live
+        )
+    }
+
+    init(
+        _ ctx: PartoutLoggerContext,
+        bundleIdentifier: String,
+        coder: NEProtocolCoder,
+        preferences: NETunnelPreferences
+    ) {
         pp_log(ctx, .os, .info, "LegacyNETunnelStrategy.init()")
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.coder = coder
+        self.preferences = preferences
 //        self.options = options
         options = []
         managersSubject = CurrentValueStream([:])
@@ -105,7 +122,7 @@ extension LegacyNETunnelStrategy: TunnelObservableStrategy {
               manager.connection.status.asTunnelStatus != .inactive else {
             return nil
         }
-        try await manager.loadFromPreferences()
+        try await preferences.load(manager)
         guard let session = manager.connection as? NETunnelProviderSession else {
             return nil
         }
@@ -208,7 +225,7 @@ extension LegacyNETunnelStrategy: NETunnelManagerRepository {
         guard let manager = allManagers[profileId] else {
             return
         }
-        try await manager.removeFromPreferences()
+        try await preferences.remove(manager)
         allManagers.removeValue(forKey: profileId)
         try? coder.removeProfile(withId: profileId)
     }
@@ -313,11 +330,11 @@ private extension LegacyNETunnelStrategy {
 
         let manager = managerBlock()
         let pendingSaveTask = PendingSaveTask(task: Task { @Sendable in
-            try await manager.loadFromPreferences()
+            try await preferences.load(manager)
             try Task.checkCancellation()
             block(manager)
             try Task.checkCancellation()
-            try await manager.saveToPreferences()
+            try await preferences.save(manager)
         })
         self.pendingSaveTask = pendingSaveTask
 
@@ -415,19 +432,21 @@ private extension LegacyNETunnelStrategy {
     func reloadAllManagers() async throws {
         var removedManagers = allManagers
 
-        let managers = try await NETunnelProviderManager.loadAllFromPreferences()
-        allManagers = managers.reduce(into: [:]) {
-            guard $1.tunnelBundleIdentifier == bundleIdentifier else {
-                $1.removeFromPreferences()
-                return
+        let loadedManagers = try await preferences.loadAll()
+        var managers: [Profile.ID: NETunnelProviderManager] = [:]
+        for manager in loadedManagers {
+            guard manager.tunnelBundleIdentifier == bundleIdentifier else {
+                try? await preferences.remove(manager)
+                continue
             }
-            guard let profileId = $1.tunnelProtocol?.profileId else {
-                $1.removeFromPreferences()
-                return
+            guard let profileId = manager.tunnelProtocol?.profileId else {
+                try? await preferences.remove(manager)
+                continue
             }
-            $0[profileId] = $1
+            managers[profileId] = manager
             removedManagers.removeValue(forKey: profileId)
         }
+        allManagers = managers
 
         // clean up coder data of removed managers
         removedManagers.forEach {

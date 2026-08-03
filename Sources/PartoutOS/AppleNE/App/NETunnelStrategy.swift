@@ -19,6 +19,8 @@ public actor NETunnelStrategy {
 
     private let coder: NEProtocolCoder
 
+    private let preferences: NETunnelPreferences
+
     private let options: Set<Option>
 
     private let fingerprint: @Sendable (Profile) -> String?
@@ -44,11 +46,30 @@ public actor NETunnelStrategy {
 //        options: Set<Option> = []
         fingerprint: @escaping @Sendable (Profile) -> String?
     ) {
+        self.init(
+            ctx,
+            bundleIdentifier: bundleIdentifier,
+            source: source,
+            coder: coder,
+            preferences: .live,
+            fingerprint: fingerprint
+        )
+    }
+
+    init(
+        _ ctx: PartoutLoggerContext,
+        bundleIdentifier: String,
+        source: AsyncStream<ProfilesEvent>,
+        coder: NEProtocolCoder,
+        preferences: NETunnelPreferences,
+        fingerprint: @escaping @Sendable (Profile) -> String?
+    ) {
         pp_log(ctx, .os, .info, "NETunnelStrategy.init()")
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.source = source
         self.coder = coder
+        self.preferences = preferences
 //        self.options = options
         self.fingerprint = fingerprint
         options = []
@@ -113,7 +134,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                   manager.connection.status.asTunnelStatus != .inactive else {
                 return SendableProviderSession(nil)
             }
-            try await manager.loadFromPreferences()
+            try await strategy.preferences.load(manager)
             return SendableProviderSession(manager.connection as? NETunnelProviderSession)
         }
         guard let session = session.value else {
@@ -223,7 +244,7 @@ private extension NETunnelStrategy {
         guard let manager = allManagers[profileId] else {
             return
         }
-        try await manager.removeFromPreferences()
+        try await preferences.remove(manager)
         allManagers.removeValue(forKey: profileId)
     }
 }
@@ -270,7 +291,7 @@ private extension NETunnelStrategy {
         for (profileId, manager) in staleManagers {
             do {
                 pp_log(ctx, .os, .info, "Removing externally deleted manager (\(profileId))...")
-                try await manager.removeFromPreferences()
+                try await preferences.remove(manager)
                 managers.removeValue(forKey: profileId)
             } catch {
                 pp_log(ctx, .os, .error, "Unable to remove manager \(profileId): \(error)")
@@ -390,11 +411,11 @@ private extension NETunnelStrategy {
         _ manager: NETunnelProviderManager,
         block: @escaping @Sendable (NETunnelProviderManager) -> Void
     ) async throws -> NETunnelProviderManager {
-        try await manager.loadFromPreferences()
+        try await preferences.load(manager)
         try Task.checkCancellation()
         block(manager)
         try Task.checkCancellation()
-        try await manager.saveToPreferences()
+        try await preferences.save(manager)
         return manager
     }
 
@@ -490,12 +511,12 @@ private extension NETunnelStrategy {
     }
 
     func reloadAllManagers() async throws -> [Profile.ID: NETunnelProviderManager] {
-        let loadedManagers = try await NETunnelProviderManager.loadAllFromPreferences()
+        let loadedManagers = try await preferences.loadAll()
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
         for manager in loadedManagers {
             guard manager.tunnelBundleIdentifier == bundleIdentifier,
                   let profileId = manager.tunnelProtocol?.profileId else {
-                try? await manager.removeFromPreferences()
+                try? await preferences.remove(manager)
                 continue
             }
             managers[profileId] = manager
