@@ -21,7 +21,11 @@ public final class AppleKeychain: Keychain {
     }
 
     @discardableResult
-    public func set(password: String, for username: String, label: String? = nil) throws -> Data {
+    public func set(
+        password: String,
+        for username: String,
+        metadata: [KeychainMetadata]? = nil
+    ) throws -> Data {
         var existingReference: Data?
         do {
             let reference = try passwordReference(for: username)
@@ -57,9 +61,7 @@ public final class AppleKeychain: Keychain {
 
             var attributes: [String: Any] = [:]
             attributes[kSecValueData as String] = password.data(using: .utf8)
-            if let label {
-                attributes[kSecAttrLabel as String] = label
-            }
+            metadata.map { attributes.apply($0) }
 
             let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
             guard status == errSecSuccess else {
@@ -73,11 +75,11 @@ public final class AppleKeychain: Keychain {
             var query: [String: Any] = [:]
             setScope(query: &query)
             query[kSecClass as String] = kSecClassGenericPassword
-            query[kSecAttrLabel as String] = label
             query[kSecAttrAccount as String] = username
             query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             query[kSecValueData as String] = password.data(using: .utf8)
             query[kSecReturnPersistentRef as String] = true
+            metadata.map { query.apply($0) }
 
             var ref: CFTypeRef?
             let status = SecItemAdd(query as CFDictionary, &ref)
@@ -245,6 +247,19 @@ private extension AppleKeychain {
             #if os(macOS)
             query[kSecUseDataProtectionKeychain as String] = true
             #endif
+        }
+    }
+}
+
+private extension Dictionary where Key == String, Value == Any {
+    mutating func apply(_ metadata: [KeychainMetadata]) {
+        for entry in metadata ?? [] {
+            switch entry {
+            case .label(let label):
+                self[kSecAttrLabel as String] = label
+            case .comment(let comment):
+                self[kSecAttrComment as String] = comment
+            }
         }
     }
 }
