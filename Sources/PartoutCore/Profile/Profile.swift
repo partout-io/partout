@@ -189,6 +189,19 @@ extension Profile {
     }
 }
 
+// MARK: - Events
+
+/// Represents events emitted from a profile source.
+public enum ProfilesEvent: Sendable {
+    public enum Change: Sendable {
+        case upsert(Profile)
+        case remove(Profile.ID)
+    }
+
+    case snapshot([Profile])
+    case changes([Change])
+}
+
 // MARK: - Logging
 
 extension Profile {
