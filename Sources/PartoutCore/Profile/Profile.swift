@@ -192,6 +192,8 @@ extension Profile {
 // MARK: - Events
 
 /// Represents events emitted from a profile source.
+///
+/// A source must emit a ``snapshot(_:)`` before emitting incremental ``changes(_:)``.
 public enum ProfilesEvent: Sendable {
     public enum Change: Sendable {
         case upsert(Profile)
