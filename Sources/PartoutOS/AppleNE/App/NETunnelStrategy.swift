@@ -290,8 +290,7 @@ private extension NETunnelStrategy {
         let staleManagers = managers.filter { !profileIds.contains($0.key) }
         for (profileId, manager) in staleManagers {
             do {
-                pp_log(ctx, .os, .info, "Removing externally deleted manager (\(profileId))...")
-                try await preferences.remove(manager)
+                pp_log(ctx, .os, .info, "Ignore manager (unowned id: \(profileId))")
                 managers.removeValue(forKey: profileId)
             } catch {
                 pp_log(ctx, .os, .error, "Unable to remove manager \(profileId): \(error)")
@@ -514,9 +513,12 @@ private extension NETunnelStrategy {
         let loadedManagers = try await preferences.loadAll()
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
         for manager in loadedManagers {
-            guard manager.tunnelBundleIdentifier == bundleIdentifier,
-                  let profileId = manager.tunnelProtocol?.profileId else {
-                try? await preferences.remove(manager)
+            guard manager.tunnelBundleIdentifier == bundleIdentifier else {
+                pp_log(ctx, .os, .info, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
+                continue
+            }
+            guard let profileId = manager.tunnelProtocol?.profileId else {
+                pp_log(ctx, .os, .info, "Ignore manager (missing id)")
                 continue
             }
             managers[profileId] = manager
