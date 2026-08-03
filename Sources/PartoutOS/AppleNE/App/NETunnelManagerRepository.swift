@@ -5,6 +5,7 @@
 import NetworkExtension
 
 /// Offers an API to manage the installed set of NETunnelProviderManager.
+@available(*, deprecated, message: "Used by LegacyNETunnelStrategy")
 public protocol NETunnelManagerRepository: Sendable {
     func fetch() async throws -> [NETunnelProviderManager]
 
