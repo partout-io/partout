@@ -518,7 +518,8 @@ private extension NETunnelStrategy {
                 continue
             }
             guard let profileId = manager.tunnelProtocol?.profileId else {
-                pp_log(ctx, .os, .info, "Ignore manager (missing id)")
+                pp_log(ctx, .os, .info, "Discard manager (missing id)")
+                manager.removeFromPreferences(completionHandler: nil)
                 continue
             }
             managers[profileId] = manager
