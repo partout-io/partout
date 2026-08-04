@@ -4,23 +4,29 @@
 
 /// A tunnel environment reader that updates via Network Extension messaging.
 public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Sendable {
-    private let queue: DispatchQueue
+    public typealias FetchBlock = @Sendable (Profile.ID) async throws -> StaticTunnelEnvironment
 
-    private weak var strategy: NETunnelStrategy?
+    private let queue: DispatchQueue
 
     private let profileId: Profile.ID
 
     private let interval: TimeInterval
 
+    private let fetchEnvironment: FetchBlock
+
     private var latestEnvironment: TunnelEnvironmentReader?
 
     private var timerSubscription: Task<Void, Never>?
 
-    public init(strategy: NETunnelStrategy, profileId: Profile.ID, interval: TimeInterval = 1.0) {
+    public init(
+        profileId: Profile.ID,
+        interval: TimeInterval = 1.0,
+        fetchEnvironment: @escaping FetchBlock
+    ) {
         queue = DispatchQueue(label: "NETunnelEnvironment[\(profileId)]")
-        self.strategy = strategy
         self.profileId = profileId
         self.interval = interval
+        self.fetchEnvironment = fetchEnvironment
         observeObjects()
     }
 
@@ -47,20 +53,10 @@ private extension NETunnelEnvironment {
     func observeObjects() {
         timerSubscription = Task { [weak self] in
             while true {
-                guard let self, let strategy else {
-                    return
-                }
-                guard !Task.isCancelled else {
-                    return
-                }
+                guard let self else { return }
+                guard !Task.isCancelled else { return }
                 do {
-                    let output = try await strategy.sendMessage(.environment(), to: profileId)
-                    switch output {
-                    case .environment(let env):
-                        latestEnvironment = env
-                    default:
-                        break
-                    }
+                    latestEnvironment = try await fetchEnvironment(profileId)
                     try await Task.sleep(interval: interval)
                 } catch {
                     pp_log_id(profileId, .os, .error, "Unable to fetch NE environment for \(profileId): \(error)")
