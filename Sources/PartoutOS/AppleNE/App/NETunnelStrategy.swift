@@ -543,6 +543,9 @@ private extension NETunnelStrategy {
     }
 
     func updateCurrentManagersIfNeeded(with manager: NETunnelProviderManager, profileId: Profile.ID) {
+        // IMPORTANT: It must be a tracked manager. We might receive notifications
+        // from a manager with the same profile ID but owned by a different user.
+        guard manager === allManagers[profileId] else { return }
         // Deletion
         if manager.connection.status == .invalid {
             allManagers.removeValue(forKey: profileId)
