@@ -516,6 +516,7 @@ private extension NETunnelStrategy {
 
     func reloadAllManagers() async throws -> [Profile.ID: NETunnelProviderManager] {
         let loadedManagers = try await preferences.loadAll()
+        pp_log(ctx, .os, .debug, "All managers (\(loadedManagers.count)): \(loadedManagers.compactMap(\.localizedDescription))")
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
         for manager in loadedManagers {
             guard manager.tunnelBundleIdentifier == bundleIdentifier else {
