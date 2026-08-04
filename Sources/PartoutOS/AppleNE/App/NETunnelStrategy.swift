@@ -534,7 +534,7 @@ private extension NETunnelStrategy {
             allManagers.removeValue(forKey: profileId)
         }
         // Update
-        else {
+        else if allManagers.keys.contains(profileId) {
             allManagers[profileId] = manager
         }
     }
