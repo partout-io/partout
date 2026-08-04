@@ -22,6 +22,11 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
         self.coder = coder
     }
 
+    public func owns(_ protocolConfiguration: NETunnelProviderProtocol, for profileId: Profile.ID) -> Bool {
+        // FIXME: ###
+        true
+    }
+
     public func protocolConfiguration(from profile: Profile) throws -> NETunnelProviderProtocol {
         let encoded = try coder.string(fromProfile: profile)
 

@@ -38,6 +38,20 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
         self.legacyOptions = legacyOptions
     }
 
+    public func owns(_ protocolConfiguration: NETunnelProviderProtocol, for profileId: Profile.ID) -> Bool {
+        guard let managerReference = protocolConfiguration.passwordReference else {
+            return false
+        }
+        do {
+            let currentReference = try keychain.passwordReference(
+                for: profileId.uuidString
+            )
+            return managerReference == currentReference
+        } catch {
+            return false
+        }
+    }
+
     public func protocolConfiguration(from profile: Profile) throws -> NETunnelProviderProtocol {
         let passwordReference: Data
 

@@ -9,6 +9,9 @@ public typealias NEProtocolCoder = NEProtocolEncoder & NEProtocolDecoder
 
 /// Encodes a `Profile` for use in Network Extension.
 public protocol NEProtocolEncoder: Sendable {
+    /// Checks ownership of a `NETunnelProviderProtocol` for a given profile.
+    func owns(_ protocolConfiguration: NETunnelProviderProtocol, for profileId: Profile.ID) -> Bool
+
     /// Encodes a `Profile` into a `NETunnelProviderProtocol`.
     /// - Parameters:
     ///   - profile: The profile to encode.

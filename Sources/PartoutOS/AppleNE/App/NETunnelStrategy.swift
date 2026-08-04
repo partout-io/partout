@@ -523,9 +523,17 @@ private extension NETunnelStrategy {
                 pp_log(ctx, .os, .info, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
                 continue
             }
-            guard let profileId = manager.tunnelProtocol?.profileId else {
+            guard let proto = manager.tunnelProtocol as? NETunnelProviderProtocol else {
+                pp_log(ctx, .os, .info, "Ignore manager (wrong protocol type)")
+                continue
+            }
+            guard let profileId = proto.profileId else {
                 pp_log(ctx, .os, .info, "Discard manager (missing id)")
                 manager.removeFromPreferences(completionHandler: nil)
+                continue
+            }
+            guard coder.owns(proto, for: profileId) else {
+                pp_log(ctx, .os, .info, "Ignore manager (different owner)")
                 continue
             }
             managers[profileId] = manager
