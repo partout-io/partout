@@ -45,7 +45,7 @@ struct NEProtocolCoderTests {
 
         let proto = try sut.protocolConfiguration(from: profile)
 
-        #expect(proto.providerConfiguration?[ProviderNEProtocolCoder.providerKey] as? String != nil)
+        #expect(proto.providerConfiguration?[ProviderNEProtocolCoder.profileKey] as? String != nil)
         #expect(proto.passwordReference == nil)
     }
 
@@ -124,7 +124,8 @@ private extension NEProtocolCoderTests {
                 ProviderNEProtocolCoder(
                     .global,
                     tunnelBundleIdentifier: bundleIdentifier,
-                    coder: coder
+                    coder: coder,
+                    uid: 100
                 ),
                 keychain
             )

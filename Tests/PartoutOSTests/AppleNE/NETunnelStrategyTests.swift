@@ -170,7 +170,8 @@ private var protocolCoder: ProviderNEProtocolCoder {
     ProviderNEProtocolCoder(
         .global,
         tunnelBundleIdentifier: bundleIdentifier,
-        coder: CodingRegistry(registry: Registry(withKnown: true))
+        coder: CodingRegistry(registry: Registry(withKnown: true)),
+        uid: 100
     )
 }
 
