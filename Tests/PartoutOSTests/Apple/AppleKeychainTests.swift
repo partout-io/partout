@@ -22,4 +22,32 @@ struct AppleKeychainTests {
         #expect(updatedReference == originalReference)
         #expect(try sut.password(forReference: originalReference) == "updated")
     }
+
+    @Test
+    func givenServices_whenUsingSameUsername_thenKeepsEntriesIsolated() throws {
+        let username = "AppleKeychainTests.\(UUID().uuidString)"
+        let first = AppleKeychain(
+            .global,
+            group: nil,
+            service: "AppleKeychainTests.first.\(UUID().uuidString)"
+        )
+        let second = AppleKeychain(
+            .global,
+            group: nil,
+            service: "AppleKeychainTests.second.\(UUID().uuidString)"
+        )
+        defer {
+            first.removePassword(for: username)
+            second.removePassword(for: username)
+        }
+
+        let firstReference = try first.set(password: "first", for: username)
+        let secondReference = try second.set(password: "second", for: username)
+
+        #expect(firstReference != secondReference)
+        #expect(try first.password(for: username) == "first")
+        #expect(try second.password(for: username) == "second")
+        #expect(try first.allPasswordReferences() == [firstReference])
+        #expect(try second.allPasswordReferences() == [secondReference])
+    }
 }

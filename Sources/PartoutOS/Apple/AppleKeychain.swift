@@ -6,18 +6,36 @@
 public final class AppleKeychain: Keychain {
     private let ctx: PartoutLoggerContext
 
-    private let accessGroup: String?
+    private let group: String?
+
+    private let service: String?
 
     /**
      Creates a keychain.
 
      - Parameter ctx: The context.
      - Parameter group: An optional App Group.
+     - Parameter service: An optional service used to scope username-based queries.
      - Precondition: Proper App Group entitlements (if group is non-nil).
      **/
-    public init(_ ctx: PartoutLoggerContext, group: String?) {
+    init(
+        _ ctx: PartoutLoggerContext,
+        group: String?,
+        service: String? = nil
+    ) {
         self.ctx = ctx
-        accessGroup = group
+        self.group = group
+        self.service = service
+    }
+
+    public convenience init(_ ctx: PartoutLoggerContext, group: String) {
+        precondition(!group.isEmpty, "Group must not be empty")
+        self.init(ctx, group: group, service: nil)
+    }
+
+    public convenience init(_ ctx: PartoutLoggerContext, service: String) {
+        precondition(!service.isEmpty, "Service must not be empty")
+        self.init(ctx, group: nil, service: service)
     }
 
     @discardableResult
@@ -75,7 +93,9 @@ public final class AppleKeychain: Keychain {
             setScope(query: &query)
             query[kSecClass as String] = kSecClassGenericPassword
             query[kSecAttrAccount as String] = username
-            query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            if group != nil {
+                query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
+            }
             query[kSecValueData as String] = password.data(using: .utf8)
             query[kSecReturnPersistentRef as String] = true
             metadata.map { query.apply($0) }
@@ -238,8 +258,11 @@ public final class AppleKeychain: Keychain {
 
 private extension AppleKeychain {
     func setScope(query: inout [String: Any]) {
-        if let accessGroup {
-            query[kSecAttrAccessGroup as String] = accessGroup
+        if let service {
+            query[kSecAttrService as String] = service
+        }
+        if let group {
+            query[kSecAttrAccessGroup as String] = group
             #if os(macOS)
             query[kSecUseDataProtectionKeychain as String] = true
             #endif
