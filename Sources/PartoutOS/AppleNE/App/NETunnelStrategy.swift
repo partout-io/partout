@@ -377,7 +377,12 @@ private extension NETunnelStrategy {
     func withMutation<T: Sendable>(
         _ operation: @escaping @Sendable (isolated NETunnelStrategy) async throws -> T
     ) async throws -> T {
-        try await mutationTask(operation).value
+        let task = mutationTask(operation)
+        return try await withTaskCancellationHandler {
+            try await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     func mutationTask<T: Sendable>(
