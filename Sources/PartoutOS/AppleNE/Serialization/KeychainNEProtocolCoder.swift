@@ -6,6 +6,14 @@ import NetworkExtension
 
 /// ``NEProtocolCoder`` encoding to and from a keychain.
 public struct KeychainNEProtocolCoder: NEProtocolCoder {
+    public struct LegacyOptions: Sendable {
+        public let title: @Sendable (Profile) -> String
+
+        public init(title: @escaping @Sendable (Profile) -> String) {
+            self.title = title
+        }
+    }
+
     private let ctx: PartoutLoggerContext
 
     private let tunnelBundleIdentifier: String
@@ -14,21 +22,53 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
 
     private let keychain: Keychain
 
-    public init(_ ctx: PartoutLoggerContext, tunnelBundleIdentifier: String, coder: ProfileCoder, keychain: Keychain) {
+    private let legacyOptions: LegacyOptions?
+
+    public init(
+        _ ctx: PartoutLoggerContext,
+        tunnelBundleIdentifier: String,
+        coder: ProfileCoder,
+        keychain: Keychain,
+        legacyOptions: LegacyOptions? = nil
+    ) {
         self.ctx = ctx
         self.tunnelBundleIdentifier = tunnelBundleIdentifier
         self.coder = coder
         self.keychain = keychain
+        self.legacyOptions = legacyOptions
     }
 
-    public func protocolConfiguration(from profile: Profile, title: (Profile) -> String) throws -> NETunnelProviderProtocol {
-        let encoded = try coder.string(fromProfile: profile)
+    public func owns(_ protocolConfiguration: NETunnelProviderProtocol, for profileId: Profile.ID) -> Bool {
+        guard let managerReference = protocolConfiguration.passwordReference else {
+            return false
+        }
+        do {
+            let currentReference = try keychain.passwordReference(
+                for: profileId.uuidString
+            )
+            return managerReference == currentReference
+        } catch {
+            return false
+        }
+    }
 
-        let passwordReference = try keychain.set(
-            password: encoded,
-            for: profile.id.uuidString,
-            label: title(profile)
-        )
+    public func protocolConfiguration(from profile: Profile) throws -> NETunnelProviderProtocol {
+        let passwordReference: Data
+
+        // Legacy had side-effect, actively writes to keychain
+        if let legacyOptions {
+            let encoded = try coder.string(fromProfile: profile)
+            passwordReference = try keychain.set(
+                password: encoded,
+                for: profile.id.uuidString,
+                metadata: [
+                    .label(legacyOptions.title(profile))
+                ]
+            )
+        } else {
+            // Going forward, rely on external reference
+            passwordReference = try keychain.passwordReference(for: profile.id.uuidString)
+        }
 
         let proto = NETunnelProviderProtocol()
         proto.providerBundleIdentifier = tunnelBundleIdentifier
@@ -47,48 +87,5 @@ public struct KeychainNEProtocolCoder: NEProtocolCoder {
         }
         let encoded = try keychain.password(forReference: passwordReference)
         return try coder.profile(fromString: encoded)
-    }
-
-    public func removeProfile(withId profileId: Profile.ID) throws {
-        keychain.removePassword(for: profileId.uuidString)
-    }
-
-    public func purge(managers: [NETunnelProviderManager]) async {
-
-        // remove those managers (plus their keychain entry) we cannot decode a profile from
-        var managersToRemove: [NETunnelProviderManager] = []
-        var keychainToRetain: [Data] = []
-        managers.forEach {
-            do {
-                guard let proto = $0.protocolConfiguration as? NETunnelProviderProtocol else {
-                    throw PartoutError(.decoding)
-                }
-                _ = try profile(from: proto)
-                if let item = $0.protocolConfiguration?.passwordReference {
-                    keychainToRetain.append(item)
-                }
-            } catch {
-                pp_log(ctx, .os, .error, "Unable to decode profile, will delete NE manager '\($0.localizedDescription ?? "")': \(error)")
-                managersToRemove.append($0)
-            }
-        }
-        for manager in managersToRemove {
-            if let ref = manager.protocolConfiguration?.passwordReference {
-                keychain.removePassword(forReference: ref)
-            }
-            try? await manager.removeFromPreferences()
-        }
-
-        // remove keychain entries that do not belong to any active manager
-        do {
-            let entries = try keychain.allPasswordReferences()
-            entries.forEach {
-                if !keychainToRetain.contains($0) {
-                    keychain.removePassword(forReference: $0)
-                }
-            }
-        } catch {
-            pp_log(ctx, .os, .error, "Unable to fetch keychain items: \(error)")
-        }
     }
 }

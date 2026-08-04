@@ -21,16 +21,16 @@ public final class AppleKeychain: Keychain {
     }
 
     @discardableResult
-    public func set(password: String, for username: String, label: String? = nil) throws -> Data {
+    public func set(
+        password: String,
+        for username: String,
+        metadata: [KeychainMetadata]? = nil
+    ) throws -> Data {
         var existingReference: Data?
+        let currentPassword: String?
         do {
             let reference = try passwordReference(for: username)
-            let currentPassword = try self.password(forReference: reference)
-
-            // return existing reference if content has not changed
-            guard password != currentPassword else {
-                return reference
-            }
+            currentPassword = try self.password(forReference: reference)
 
             // keep going
             existingReference = reference
@@ -44,6 +44,7 @@ public final class AppleKeychain: Keychain {
             }
 
             // otherwise, no pre-existing password
+            currentPassword = nil
         } catch {
 
             // IMPORTANT: rethrow any other unknown error (leave this code explicit)
@@ -56,10 +57,10 @@ public final class AppleKeychain: Keychain {
             query[kSecValuePersistentRef as String] = existingReference
 
             var attributes: [String: Any] = [:]
-            attributes[kSecValueData as String] = password.data(using: .utf8)
-            if let label {
-                attributes[kSecAttrLabel as String] = label
+            if password != currentPassword {
+                attributes[kSecValueData as String] = password.data(using: .utf8)
             }
+            metadata.map { attributes.apply($0) }
 
             let status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
             guard status == errSecSuccess else {
@@ -73,11 +74,11 @@ public final class AppleKeychain: Keychain {
             var query: [String: Any] = [:]
             setScope(query: &query)
             query[kSecClass as String] = kSecClassGenericPassword
-            query[kSecAttrLabel as String] = label
             query[kSecAttrAccount as String] = username
             query[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlock
             query[kSecValueData as String] = password.data(using: .utf8)
             query[kSecReturnPersistentRef as String] = true
+            metadata.map { query.apply($0) }
 
             var ref: CFTypeRef?
             let status = SecItemAdd(query as CFDictionary, &ref)
@@ -179,13 +180,10 @@ public final class AppleKeychain: Keychain {
         switch status {
         case errSecSuccess:
             break
-
         case errSecUserCanceled:
             throw PartoutError(.operationCancelled)
-
         case errSecItemNotFound:
-            throw PartoutError(.keychainItemNotFound)
-
+            return []
         default:
             pp_log(ctx, .core, .error, "allPasswordReferences(), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
@@ -245,6 +243,19 @@ private extension AppleKeychain {
             #if os(macOS)
             query[kSecUseDataProtectionKeychain as String] = true
             #endif
+        }
+    }
+}
+
+private extension Dictionary where Key == String, Value == Any {
+    mutating func apply(_ metadata: [KeychainMetadata]) {
+        for entry in metadata {
+            switch entry {
+            case .label(let label):
+                self[kSecAttrLabel as String] = label
+            case .comment(let comment):
+                self[kSecAttrComment as String] = comment
+            }
         }
     }
 }

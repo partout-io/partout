@@ -1,0 +1,600 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+@preconcurrency import NetworkExtension
+
+/// A tunnel strategy based on `NETunnelProviderManager`.
+@available(*, deprecated, renamed: "NETunnelStrategy")
+public actor LegacyNETunnelStrategy {
+    public enum Option: Sendable {
+        case multiple
+    }
+
+    private let ctx: PartoutLoggerContext
+
+    private let bundleIdentifier: String
+
+    private let coder: NEProtocolCoder
+
+    private let preferences: NETunnelPreferences
+
+    private let options: Set<Option>
+
+    private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
+
+    private var allManagers: [Profile.ID: NETunnelProviderManager] {
+        didSet {
+            managersSubject.send(allManagers)
+        }
+    }
+
+    private var pendingSaveTask: PendingSaveTask?
+
+    // TODO: #218/passepartout, support .multiple option after implementing in PTP
+    public init(
+        _ ctx: PartoutLoggerContext,
+        bundleIdentifier: String,
+        coder: NEProtocolCoder,
+//        options: Set<Option> = []
+    ) {
+        self.init(
+            ctx,
+            bundleIdentifier: bundleIdentifier,
+            coder: coder,
+            preferences: .live
+        )
+    }
+
+    init(
+        _ ctx: PartoutLoggerContext,
+        bundleIdentifier: String,
+        coder: NEProtocolCoder,
+        preferences: NETunnelPreferences
+    ) {
+        pp_log(ctx, .os, .info, "LegacyNETunnelStrategy.init()")
+        self.ctx = ctx
+        self.bundleIdentifier = bundleIdentifier
+        self.coder = coder
+        self.preferences = preferences
+//        self.options = options
+        options = []
+        managersSubject = CurrentValueStream([:])
+        allManagers = [:]
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onVPNConfigurationChange),
+            name: .NEVPNConfigurationChange,
+            object: nil
+        )
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(onVPNStatus),
+            name: .NEVPNStatusDidChange,
+            object: nil
+        )
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+}
+
+// MARK: - TunnelObservableStrategy
+
+extension LegacyNETunnelStrategy: TunnelObservableStrategy {
+    public func prepare(purge: Bool) async throws {
+        try await reloadAllManagers()
+        if purge {
+            await coder.purge(managers: Array(allManagers.values))
+        }
+    }
+
+    public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
+        if connect, !self.options.contains(.multiple) {
+            await disconnectCurrentManagers()
+        }
+        let nsOptions = options as? [String: NSObject]
+        try await save(profile, forConnecting: connect, options: nsOptions)
+    }
+
+    public func uninstall(profileId: Profile.ID) async throws {
+        try await remove(profileId: profileId)
+    }
+
+    public func disconnect(from profileId: Profile.ID) async throws {
+        guard let manager = allManagers[profileId] else {
+            return
+        }
+        try await saveAtomically(manager) {
+            $0.isOnDemandEnabled = false
+        }
+        // XXX: Mitigate races where the on-demand flag, despite saveToPreferences(),
+        // is not disabled yet, thus causing the tunnel to reconnect
+        try await Task.sleep(for: .milliseconds(200))
+        manager.connection.stopVPNTunnel()
+        await manager.connection.waitForDisconnection()
+    }
+
+    public func sendMessage(_ message: Data, to profileId: Profile.ID) async throws -> Data? {
+        guard let manager = allManagers[profileId],
+              manager.connection.status.asTunnelStatus != .inactive else {
+            return nil
+        }
+        try await preferences.load(manager)
+        guard let session = manager.connection as? NETunnelProviderSession else {
+            return nil
+        }
+        return try await withCheckedThrowingContinuation { continuation in
+            do {
+                try session.sendProviderMessage(message) { response in
+                    continuation.resume(returning: response)
+                }
+            } catch {
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+
+    public nonisolated var didUpdateActiveProfiles: AsyncStream<[Profile.ID: TunnelSnapshot]> {
+        let stream = activeProfilesStream
+        return AsyncStream { [weak self] continuation in
+            let task = Task { [weak self] in
+                for await activeProfiles in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
+                    guard !Task.isCancelled else {
+                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        break
+                    }
+                    pp_log(ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
+                    continuation.yield(activeProfiles)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+
+// MARK: - NETunnelManagerRepository
+
+extension LegacyNETunnelStrategy: NETunnelManagerRepository {
+    public func fetch() async throws -> [NETunnelProviderManager] {
+        try await reloadAllManagers()
+        let managers = Array(allManagers.values)
+        await coder.purge(managers: managers)
+        return managers
+    }
+
+    public func save<O>(_ profile: Profile, forConnecting: Bool, options: O?) async throws {
+        profile.log(.os, .notice, withPreamble: "Encoded profile:")
+
+        let proto = try coder.protocolConfiguration(from: profile)
+
+        // store custom data on the side
+        proto.profileId = profile.id
+
+        let manager: NETunnelProviderManager
+        do {
+            manager = try await saveAtomically(profile.id) {
+                $0.localizedDescription = profile.name
+                $0.protocolConfiguration = proto
+
+                let shouldEnableOnDemand: Bool
+                if profile.isInteractive {
+                    shouldEnableOnDemand = false
+                } else if let onDemandModule = profile.firstModule(ofType: OnDemandModule.self, ifActive: true) {
+                    let rules = onDemandModule.neRules(self.ctx)
+                    if !rules.isEmpty {
+                        $0.onDemandRules = rules
+                    } else {
+                        $0.onDemandRules = [NEOnDemandRuleConnect()]
+                    }
+                    shouldEnableOnDemand = true
+                } else {
+                    shouldEnableOnDemand = false
+                }
+
+                // do not alter these two flags unless connecting explicitly
+                $0.isEnabled = forConnecting || $0.isEnabled
+                $0.isOnDemandEnabled = (forConnecting || $0.isOnDemandEnabled) && shouldEnableOnDemand
+            }
+        } catch {
+
+            // revert adds, retain updates
+            if allManagers[profile.id] == nil {
+                try? coder.removeProfile(withId: profile.id)
+            }
+
+            throw error
+        }
+
+        if forConnecting {
+            let options = options as? [String: NSObject]
+            try manager.connection.startVPNTunnel(options: options)
+        }
+    }
+
+    public func remove(profileId: Profile.ID) async throws {
+        guard let manager = allManagers[profileId] else {
+            return
+        }
+        try await preferences.remove(manager)
+        allManagers.removeValue(forKey: profileId)
+        try? coder.removeProfile(withId: profileId)
+    }
+
+    public nonisolated func profile(from manager: NETunnelProviderManager) throws -> Profile {
+        guard let proto = manager.tunnelProtocol else {
+            throw PartoutError(.decoding)
+        }
+        return try coder.profile(from: proto)
+    }
+
+    public nonisolated var managersStream: AsyncStream<[Profile.ID: NETunnelProviderManager]> {
+        let stream = managersSubject.subscribe().dropFirst()
+        return AsyncStream { [weak self] continuation in
+            let task = Task { [weak self] in
+                for await value in stream {
+                    guard let self else {
+                        continuation.finish()
+                        return
+                    }
+                    guard !Task.isCancelled else {
+                        pp_log(self.ctx, .os, .debug, "Cancelled NETunnelStrategy.managersStream")
+                        break
+                    }
+                    continuation.yield(value)
+                }
+                continuation.finish()
+            }
+            continuation.onTermination = { _ in
+                task.cancel()
+            }
+        }
+    }
+}
+
+// MARK: - Notifications
+
+private extension LegacyNETunnelStrategy {
+
+    @objc
+    nonisolated func onVPNConfigurationChange(_ notification: Notification) {
+        guard let manager = notification.object as? NETunnelProviderManager,
+              manager.tunnelBundleIdentifier == bundleIdentifier,
+              let profileId = manager.tunnelProtocol?.profileId else {
+            return
+        }
+
+        pp_log(ctx, .os, .debug, "NEVPNConfigurationChange(\(profileId)): \(notification)")
+        Task {
+            do {
+                try await reloadAllManagers()
+            } catch {
+                pp_log(ctx, .os, .error, "Unable to reload managers: \(error)")
+            }
+        }
+    }
+
+    @objc
+    nonisolated func onVPNStatus(_ notification: Notification) {
+        guard let connection = notification.object as? NETunnelProviderSession,
+              let manager = connection.manager as? NETunnelProviderManager,
+              manager.tunnelBundleIdentifier == bundleIdentifier,
+              let profileId = manager.tunnelProtocol?.profileId else {
+            return
+        }
+
+//        pp_log(ctx, .os, .debug, "NEVPNStatusDidChange: \(notification)")
+        pp_log(ctx, .os, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
+        Task {
+            await updateCurrentManagersIfNeeded(with: manager, profileId: profileId)
+        }
+    }
+}
+
+// MARK: - Concurrency
+
+private extension LegacyNETunnelStrategy {
+    func saveAtomically(
+        _ profileId: Profile.ID,
+        block: @escaping @Sendable (NETunnelProviderManager) -> Void
+    ) async throws -> NETunnelProviderManager {
+        try await saveAtomically(
+            self.allManagers[profileId] ?? NETunnelProviderManager(),
+            block: block
+        )
+    }
+
+    @discardableResult
+    func saveAtomically(
+        _ managerBlock: @escaping @autoclosure () -> NETunnelProviderManager,
+        block: @escaping @Sendable (NETunnelProviderManager) -> Void
+    ) async throws -> NETunnelProviderManager {
+        while let pendingSaveTask {
+            do {
+                try await pendingSaveTask.task.value
+                clearPendingSaveTask(pendingSaveTask)
+            } catch {
+                clearPendingSaveTask(pendingSaveTask)
+                throw error
+            }
+        }
+
+        let manager = managerBlock()
+        let pendingSaveTask = PendingSaveTask(task: Task { @Sendable in
+            try await preferences.load(manager)
+            try Task.checkCancellation()
+            block(manager)
+            try Task.checkCancellation()
+            try await preferences.save(manager)
+        })
+        self.pendingSaveTask = pendingSaveTask
+
+        do {
+            try await pendingSaveTask.task.value
+            clearPendingSaveTask(pendingSaveTask)
+        } catch {
+            clearPendingSaveTask(pendingSaveTask)
+            throw error
+        }
+        return manager
+    }
+
+    func clearPendingSaveTask(_ pendingSaveTask: PendingSaveTask) {
+        guard self.pendingSaveTask?.id == pendingSaveTask.id else {
+            return
+        }
+        self.pendingSaveTask = nil
+    }
+
+    func disconnectCurrentManagers() async {
+        await withTaskGroup(of: Void.self) { group in
+            allManagers.forEach { pair in
+                let status = pair.value.connection.status.asTunnelStatus
+                guard status != .inactive || pair.value.isOnDemandEnabled == true else {
+                    return
+                }
+                group.addTask { [weak self] in
+                    guard let self else {
+                        return
+                    }
+                    pp_log(ctx, .os, .notice, "Disconnect from \(pair.key)...")
+                    do {
+                        try await disconnect(from: pair.key)
+                    } catch {
+                        pp_log(ctx, .os, .error, "Unable to disconnect from \(pair.key): \(error)")
+                    }
+                    pp_log(ctx, .os, .notice, "Disconnection of \(pair.key) complete!")
+                }
+            }
+        }
+    }
+}
+
+private struct PendingSaveTask: Sendable {
+    let id = UniqueID()
+
+    let task: Task<Void, Error>
+}
+
+// MARK: - Active managers
+
+private extension LegacyNETunnelStrategy {
+    nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
+        let stream = managersSubject.subscribe()
+        let mappedStream: AsyncStream<[Profile.ID: TunnelSnapshot]>
+
+        if options.contains(.multiple) {
+            mappedStream = stream
+                .map {
+                    // active managers are those ranked > 0
+                    $0.filter {
+                        $0.value.rank > 0
+                    }
+                    .compactMapValues(\.asSnapshot)
+                }
+        } else {
+            mappedStream = stream
+                .map {
+                    // active manager is the max ranked
+                    let maxRank = $0.max {
+                        $0.value.rank < $1.value.rank
+                    }?.value.rank ?? 0
+
+                    // if max rank is 0, no manager is active
+                    guard maxRank > 0 else {
+                        return [:]
+                    }
+
+                    // return the max ranked manager
+                    let filtered = $0.filter {
+                        $0.value.rank == maxRank
+                    }
+                    // There might be a moment where 2 managers may be enabled at the same
+                    // time, e.g., while switching from one to another one. We should
+                    // tolerate this scenario.
+                    assert(filtered.count <= 2, "Max ranked manager must be at most two")
+                    return filtered.compactMapValues(\.asSnapshot)
+                }
+        }
+
+        return mappedStream.removeDuplicates()
+    }
+
+    func reloadAllManagers() async throws {
+        var removedManagers = allManagers
+
+        let loadedManagers = try await preferences.loadAll()
+        var managers: [Profile.ID: NETunnelProviderManager] = [:]
+        for manager in loadedManagers {
+            guard manager.tunnelBundleIdentifier == bundleIdentifier else {
+                try? await preferences.remove(manager)
+                continue
+            }
+            guard let profileId = manager.tunnelProtocol?.profileId else {
+                try? await preferences.remove(manager)
+                continue
+            }
+            managers[profileId] = manager
+            removedManagers.removeValue(forKey: profileId)
+        }
+        allManagers = managers
+
+        // clean up coder data of removed managers
+        removedManagers.forEach {
+            try? coder.removeProfile(withId: $0.key)
+        }
+
+        logManagers()
+    }
+
+    func updateCurrentManagersIfNeeded(with manager: NETunnelProviderManager, profileId: Profile.ID) {
+
+        // deletion
+        if allManagers.keys.contains(profileId), manager.connection.status == .invalid {
+            allManagers.removeValue(forKey: profileId)
+        }
+        // update
+        else {
+            allManagers[profileId] = manager
+        }
+    }
+
+    func logManagers() {
+        if !allManagers.isEmpty {
+            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers:")
+        } else {
+            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers: none")
+        }
+        allManagers.values.forEach {
+            guard let profileId = $0.tunnelProtocol?.profileId else {
+                return
+            }
+            pp_log(ctx, .os, .debug, "\t\($0.localizedDescription ?? "")(\(profileId)): isEnabled=\($0.isEnabled), isOnDemandEnabled=\($0.isOnDemandEnabled), status=\($0.connection.status), rank=\($0.rank)")
+        }
+    }
+}
+
+private extension NETunnelProviderManager {
+    var rank: Int {
+#if os(iOS) || os(tvOS)
+        // only one profile at a time is enabled on iOS/tvOS
+        if isEnabled {
+            return isOnDemandEnabled ? .max : .max - 1
+        }
+#endif
+        if ![.disconnected, .invalid].contains(connection.status) {
+            return 2
+        }
+        if isOnDemandEnabled {
+            return 1
+        }
+        return 0
+    }
+}
+
+// MARK: - Profile ID
+
+private enum CustomProviderKey: String {
+    case profileId
+
+    var key: String {
+        "CustomProviderKey.\(rawValue)"
+    }
+}
+
+private extension NETunnelProviderManager {
+    var profileId: Profile.ID? {
+        tunnelProtocol?.profileId
+    }
+}
+
+private extension NETunnelProviderProtocol {
+    var profileId: UniqueID? {
+        get {
+            guard let uuidString = providerConfiguration?[CustomProviderKey.profileId.key] as? String else {
+                return nil
+            }
+            return UniqueID(uuidString: uuidString)
+        }
+        set {
+            var cfg = providerConfiguration ?? [:]
+            cfg[CustomProviderKey.profileId.key] = newValue?.uuidString
+            providerConfiguration = cfg
+        }
+    }
+}
+
+private extension NETunnelProviderManager {
+    var tunnelProtocol: NETunnelProviderProtocol? {
+        protocolConfiguration as? NETunnelProviderProtocol
+    }
+
+    var tunnelBundleIdentifier: String? {
+        tunnelProtocol?.providerBundleIdentifier
+    }
+}
+
+// MARK: - Helpers
+
+private extension NEVPNConnection {
+    func waitForDisconnection() async {
+        if status == .disconnected {
+            return
+        }
+        for await notification in NotificationCenter.default.notifications(named: .NEVPNStatusDidChange) {
+            guard let connection = notification.object as? NETunnelProviderSession,
+                  connection === self else {
+                continue
+            }
+            if [.disconnected, .invalid].contains(connection.status) {
+                return
+            }
+        }
+    }
+}
+
+private extension NETunnelProviderManager {
+    var asSnapshot: TunnelSnapshot? {
+        guard let profileId else {
+            return nil
+        }
+        let status = connection.status.asTunnelStatus
+        let isEnabled = isEnabled && (isOnDemandEnabled || status != .inactive)
+        return TunnelSnapshot(
+            id: profileId,
+            isEnabled: isEnabled,
+            status: status,
+            onDemand: isEnabled && isOnDemandEnabled
+        )
+    }
+}
+
+private extension NEVPNStatus {
+    var asTunnelStatus: TunnelStatus {
+        switch self {
+        case .connecting, .reasserting:
+            return .activating
+
+        case .connected:
+            return .active
+
+        case .disconnecting:
+            return .deactivating
+
+        case .disconnected, .invalid:
+            return .inactive
+
+        @unknown default:
+            return .inactive
+        }
+    }
+}

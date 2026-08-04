@@ -7,6 +7,12 @@
 // Service -> Where
 // Account -> Account
 
+/// Extra fields of keychain entries.
+public enum KeychainMetadata {
+    case label(String)
+    case comment(String)
+}
+
 /// Defines keychain access and modification.
 public protocol Keychain: Sendable {
 
@@ -17,11 +23,11 @@ public protocol Keychain: Sendable {
 
      - Parameter password: The password to set.
      - Parameter username: The username to set the password for.
-     - Parameter label: An optional label.
+     - Parameter metadata: Optional metadata.
      - Returns: The reference to the password.
      **/
     @discardableResult
-    func set(password: String, for username: String, label: String?) throws -> Data
+    func set(password: String, for username: String, metadata: [KeychainMetadata]?) throws -> Data
 
     /**
      Removes a password.
