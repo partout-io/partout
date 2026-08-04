@@ -180,13 +180,10 @@ public final class AppleKeychain: Keychain {
         switch status {
         case errSecSuccess:
             break
-
         case errSecUserCanceled:
             throw PartoutError(.operationCancelled)
-
         case errSecItemNotFound:
-            throw PartoutError(.keychainItemNotFound)
-
+            return []
         default:
             pp_log(ctx, .core, .error, "allPasswordReferences(), keychain status is \(status)")
             throw PartoutError(.keychainItemNotFound, status)
