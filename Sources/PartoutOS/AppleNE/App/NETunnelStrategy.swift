@@ -287,14 +287,13 @@ private extension NETunnelStrategy {
 
         // Remove managers that are no longer backed by the source.
         let profileIds = Set(profiles.map(\.id))
-        let staleManagers = managers.filter { !profileIds.contains($0.key) }
-        for (profileId, manager) in staleManagers {
-            do {
-                pp_log(ctx, .os, .info, "Ignore manager (unowned id: \(profileId))")
-                managers.removeValue(forKey: profileId)
-            } catch {
-                pp_log(ctx, .os, .error, "Unable to remove manager \(profileId): \(error)")
+        managers = managers.filter {
+            let profileId = $0.key
+            guard profileIds.contains(profileId) else {
+                pp_log(ctx, .os, .debug, "Ignore manager (unowned id: \(profileId))")
+                return false
             }
+            return true
         }
 
         // Publish retained managers before saving so updates reuse them.
@@ -520,20 +519,20 @@ private extension NETunnelStrategy {
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
         for manager in loadedManagers {
             guard manager.tunnelBundleIdentifier == bundleIdentifier else {
-                pp_log(ctx, .os, .info, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
+                pp_log(ctx, .os, .debug, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
                 continue
             }
-            guard let proto = manager.tunnelProtocol as? NETunnelProviderProtocol else {
-                pp_log(ctx, .os, .info, "Ignore manager (wrong protocol type)")
+            guard let proto = manager.tunnelProtocol else {
+                pp_log(ctx, .os, .debug, "Ignore manager (wrong protocol type)")
                 continue
             }
             guard let profileId = proto.profileId else {
-                pp_log(ctx, .os, .info, "Discard manager (missing id)")
+                pp_log(ctx, .os, .debug, "Discard manager (missing id)")
                 manager.removeFromPreferences(completionHandler: nil)
                 continue
             }
             guard coder.owns(proto, for: profileId) else {
-                pp_log(ctx, .os, .info, "Ignore manager (different owner)")
+                pp_log(ctx, .os, .debug, "Ignore manager (different owner)")
                 continue
             }
             managers[profileId] = manager
