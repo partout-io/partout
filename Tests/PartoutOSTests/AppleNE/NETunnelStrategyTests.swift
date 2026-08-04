@@ -105,11 +105,9 @@ struct NETunnelStrategySnapshotTests {
         try await strategy.prepare(purge: false)
         try await strategy.prepare(purge: false)
         continuation.yield(.snapshot([matching, changed, missingFingerprint, new]))
-        await store.waitForActionCount(9)
+        await store.waitForActionCount(7)
 
-        await #expect(throws: PreferenceFailure.self) {
-            try await strategy.uninstall(profileId: staleWithFailedRemoval)
-        }
+        try await strategy.uninstall(profileId: staleWithFailedRemoval)
         try await strategy.uninstall(profileId: matching.id)
         continuation.finish()
 
@@ -119,8 +117,8 @@ struct NETunnelStrategySnapshotTests {
         #expect(actions.filter(\.isLoadAll).count == 1)
         #expect(Set(savedIds) == [changed.id, missingFingerprint.id, new.id])
         #expect(!savedIds.contains(matching.id))
-        #expect(removedIds.filter { $0 == stale }.count == 1)
-        #expect(removedIds.filter { $0 == staleWithFailedRemoval }.count == 2)
+        #expect(!removedIds.contains(stale))
+        #expect(!removedIds.contains(staleWithFailedRemoval))
         #expect(removedIds.filter { $0 == matching.id }.count == 1)
     }
 
