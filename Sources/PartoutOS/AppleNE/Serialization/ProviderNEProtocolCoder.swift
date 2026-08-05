@@ -59,6 +59,6 @@ public struct ProviderNEProtocolCoder: NEProtocolCoder {
 }
 
 extension ProviderNEProtocolCoder {
-    static let profileKey = "Profile"
-    static let uidKey = "UID"
+    public static let profileKey = "Profile"
+    public static let uidKey = "UID"
 }
