@@ -4,7 +4,7 @@
 
 /// A tunnel environment reader that updates via Network Extension messaging.
 public final class NETunnelEnvironment: TunnelEnvironmentReader, @unchecked Sendable {
-    public typealias FetchBlock = @Sendable (Profile.ID) async throws -> StaticTunnelEnvironment
+    public typealias FetchBlock = @Sendable (Profile.ID) async throws -> StaticTunnelEnvironment?
 
     private let queue: DispatchQueue
 
@@ -57,11 +57,10 @@ private extension NETunnelEnvironment {
                 guard !Task.isCancelled else { return }
                 do {
                     latestEnvironment = try await fetchEnvironment(profileId)
-                    try await Task.sleep(interval: interval)
                 } catch {
                     pp_log_id(profileId, .os, .error, "Unable to fetch NE environment for \(profileId): \(error)")
-                    return
                 }
+                try? await Task.sleep(interval: interval)
             }
         }
     }
