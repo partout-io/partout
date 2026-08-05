@@ -28,12 +28,10 @@ struct AppleKeychainTests {
         let username = "AppleKeychainTests.\(UUID().uuidString)"
         let first = AppleKeychain(
             .global,
-            group: nil,
             service: "AppleKeychainTests.first.\(UUID().uuidString)"
         )
         let second = AppleKeychain(
             .global,
-            group: nil,
             service: "AppleKeychainTests.second.\(UUID().uuidString)"
         )
         defer {

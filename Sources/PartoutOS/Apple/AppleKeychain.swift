@@ -28,8 +28,10 @@ public final class AppleKeychain: Keychain {
         self.service = service
     }
 
-    public convenience init(_ ctx: PartoutLoggerContext, group: String) {
-        precondition(!group.isEmpty, "Group must not be empty")
+    public convenience init(_ ctx: PartoutLoggerContext, group: String?) {
+        if let group {
+            precondition(!group.isEmpty, "Group must not be empty")
+        }
         self.init(ctx, group: group, service: nil)
     }
 
