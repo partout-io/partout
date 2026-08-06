@@ -2,14 +2,20 @@ set(PARTOUT_WGGO_DEPENDENCY "")
 set(WGGO_DIR "${PP_BUILD_OUTPUT}/wg-go")
 set(WGGO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go")
 
+if(WIN32)
+    set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
+    set(WGGO_IMPORT_LIBRARY "${WGGO_DIR}/lib/wg-go${CMAKE_IMPORT_LIBRARY_SUFFIX}")
+else()
+    set(WGGO_RUNTIME_LIBRARY
+        "${WGGO_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wg-go${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
+
 if(PP_USE_PREBUILT_VENDORS)
     partout_use_prebuilt_vendor(wg-go WGGO_DIR)
     return()
 endif()
 
 if(WIN32)
-    set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
-    set(WGGO_IMPORT_LIBRARY "${WGGO_DIR}/lib/wg-go${CMAKE_IMPORT_LIBRARY_SUFFIX}")
     set(WGGO_OUTPUTS "${WGGO_RUNTIME_LIBRARY}" "${WGGO_IMPORT_LIBRARY}")
 
     if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
@@ -62,8 +68,6 @@ if(WIN32)
         )
     endif()
 else()
-    set(WGGO_RUNTIME_LIBRARY
-        "${WGGO_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wg-go${CMAKE_SHARED_LIBRARY_SUFFIX}")
     set(WGGO_OUTPUTS "${WGGO_RUNTIME_LIBRARY}")
     set(WGGO_BUILD_COMMANDS
         COMMAND ${VENDOR_ENV} make -C "${WGGO_SOURCE_DIR}" install "DESTDIR=${WGGO_DIR}"
