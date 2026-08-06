@@ -30,38 +30,66 @@ function(partout_install_runtime_directory directory)
     )
 endfunction()
 
+function(partout_install_link_file file)
+    install(FILES "${file}"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        OPTIONAL
+    )
+endfunction()
+
+function(partout_install_link_directory directory)
+    install(DIRECTORY "${directory}/"
+        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        OPTIONAL
+        USE_SOURCE_PERMISSIONS
+        FILES_MATCHING
+        PATTERN "*.a"
+        PATTERN "*.lib"
+    )
+endfunction()
+
 install(DIRECTORY "${PP_BUILD_OUTPUT}/partout/include/"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     OPTIONAL
     USE_SOURCE_PERMISSIONS
 )
-install(DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/"
-    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-    OPTIONAL
-    USE_SOURCE_PERMISSIONS
-    FILES_MATCHING
-    PATTERN "*.a"
-    PATTERN "*.lib"
-)
 
-if(WIN32)
-    set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_OUTPUT}/partout/bin/partout.dll")
-    if(WINTUN_DIR)
-        partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
-    endif()
-else()
-    set(PARTOUT_RUNTIME_LIBRARY
-        "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
+if(WIN32 AND WINTUN_DIR)
+    partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
 endif()
-partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
+
+if(PP_BUILD_STATIC)
+    partout_install_link_file(
+        "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}"
+    )
+else()
+    if(WIN32)
+        set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_OUTPUT}/partout/bin/partout.dll")
+    else()
+        set(PARTOUT_RUNTIME_LIBRARY
+            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    endif()
+    partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
+endif()
 if(PP_BUILD_USE_WIREGUARD)
-    partout_install_runtime_file("${WGGO_RUNTIME_LIBRARY}")
+    if(NOT WGGO_RUNTIME_LIBRARY MATCHES "\\.(a|lib)$")
+        partout_install_runtime_file("${WGGO_RUNTIME_LIBRARY}")
+    endif()
+    if(PP_BUILD_STATIC AND WGGO_DIR)
+        partout_install_link_directory("${WGGO_DIR}/lib")
+    endif()
 endif()
 if(PARTOUT_OPENSSL_IS_PREBUILT)
     partout_install_runtime_directory("${OPENSSL_DIR}/bin")
     partout_install_runtime_directory("${OPENSSL_DIR}/lib")
+    if(PP_BUILD_STATIC)
+        partout_install_link_directory("${OPENSSL_DIR}/lib")
+    endif()
 endif()
 if(PARTOUT_MBEDTLS_IS_PREBUILT)
     partout_install_runtime_directory("${MBEDTLS_DIR}/bin")
     partout_install_runtime_directory("${MBEDTLS_DIR}/lib")
+    if(PP_BUILD_STATIC)
+        partout_install_link_directory("${MBEDTLS_DIR}/lib")
+    endif()
 endif()
