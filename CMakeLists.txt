@@ -3,6 +3,7 @@ project(Partout LANGUAGES C)
 
 include(ExternalProject)
 include(FetchContent)
+include(GNUInstallDirs)
 include("cmake/prebuilt.cmake")
 
 option(PP_BUILD_STATIC "Build Partout as a static library" OFF)
@@ -203,3 +204,55 @@ add_custom_target(partout ALL
     COMMAND_EXPAND_LISTS
     VERBATIM
 )
+
+if(WIN32)
+    set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_BINDIR}")
+else()
+    set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+function(partout_install_runtime_file file)
+    install(FILES "${file}"
+        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+        OPTIONAL
+    )
+endfunction()
+
+function(partout_install_runtime_directory directory)
+    if(WIN32)
+        set(runtime_patterns PATTERN "*.dll")
+    elseif(APPLE)
+        set(runtime_patterns PATTERN "*.dylib")
+    else()
+        set(runtime_patterns PATTERN "*.so" PATTERN "*.so.*")
+    endif()
+    install(DIRECTORY "${directory}/"
+        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+        OPTIONAL
+        USE_SOURCE_PERMISSIONS
+        FILES_MATCHING
+        ${runtime_patterns}
+    )
+endfunction()
+
+if(WIN32)
+    set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_PREFIX}/bin/partout.dll")
+    partout_install_runtime_file("${PP_BUILD_PREFIX}/bin/wintun.dll")
+else()
+    set(PARTOUT_RUNTIME_LIBRARY
+        "${PP_BUILD_PREFIX}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
+endif()
+partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
+if(PP_BUILD_USE_WIREGUARD)
+    partout_install_runtime_file("${WGGO_RUNTIME_LIBRARY}")
+endif()
+if(NOT PP_USE_SYSTEM_VENDORS)
+    if(PP_BUILD_USE_OPENSSL)
+        partout_install_runtime_directory("${OPENSSL_DIR}/bin")
+        partout_install_runtime_directory("${OPENSSL_DIR}/lib")
+    endif()
+    if(PP_BUILD_USE_MBEDTLS)
+        partout_install_runtime_directory("${MBEDTLS_DIR}/bin")
+        partout_install_runtime_directory("${MBEDTLS_DIR}/lib")
+    endif()
+endif()
