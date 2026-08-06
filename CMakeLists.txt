@@ -119,7 +119,7 @@ if(PP_BUILD_USE_OPENSSL)
             "-Dopenssl-config-include=${PARTOUT_OPENSSL_CONFIG_INCLUDE_DIR}"
         )
     endif()
-    list(APPEND PARTOUT_ZIG_DEPENDS OpenSSLInterface)
+    list(APPEND PARTOUT_ZIG_DEPENDS ${PARTOUT_OPENSSL_DEPENDENCY})
 endif()
 
 if(PP_BUILD_USE_MBEDTLS)
@@ -128,7 +128,7 @@ if(PP_BUILD_USE_MBEDTLS)
         "-Dmbedtls-include=${PARTOUT_MBEDTLS_INCLUDE_DIR}"
         "-Dmbedtls-lib=${PARTOUT_MBEDTLS_LIBRARY_DIR}"
     )
-    list(APPEND PARTOUT_ZIG_DEPENDS MbedTLSInterface)
+    list(APPEND PARTOUT_ZIG_DEPENDS ${PARTOUT_MBEDTLS_DEPENDENCY})
 endif()
 
 if(PP_BUILD_USE_OPENVPN)
@@ -142,11 +142,10 @@ if(PP_BUILD_USE_WIREGUARD)
         "-Dwg-go-include=${WGGO_DIR}/include"
         "-Dwg-go-lib=${WGGO_DIR}/lib"
     )
-    list(APPEND PARTOUT_ZIG_DEPENDS WireGuardGoInterface)
+    list(APPEND PARTOUT_ZIG_DEPENDS ${PARTOUT_WGGO_DEPENDENCY})
 endif()
 
 if(WIN32)
-    set(WINTUN_VERSION 0.14.1)
     include("vendors/wintun.cmake")
     list(APPEND PARTOUT_ZIG_ARGS "-Dwintun-include=${WINTUN_DIR}")
 endif()
