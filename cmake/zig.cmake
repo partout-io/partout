@@ -5,7 +5,27 @@ set(PARTOUT_ZIG_ARGS build install
 )
 
 if(PP_BUILD_USE_OPENSSL)
-    include("${CMAKE_CURRENT_LIST_DIR}/dependencies/openssl.cmake")
+    set(PARTOUT_OPENSSL_IS_PREBUILT OFF)
+    if(PP_SYSTEM_VENDORS_AVAILABLE)
+        partout_use_homebrew_formula(openssl@3.5)
+        find_package(OpenSSL 3 QUIET COMPONENTS SSL Crypto)
+    endif()
+    if(PP_SYSTEM_VENDORS_AVAILABLE AND OpenSSL_FOUND)
+        set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_INCLUDE_DIR}")
+        get_filename_component(PARTOUT_OPENSSL_LIBRARY_DIR
+            "${OPENSSL_SSL_LIBRARY}" DIRECTORY)
+        if(CMAKE_LIBRARY_ARCHITECTURE AND
+           EXISTS "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/openssl/opensslconf.h")
+            set(PARTOUT_OPENSSL_CONFIG_INCLUDE_DIR
+                "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}")
+        endif()
+        message(STATUS "Using system OpenSSL")
+    else()
+        partout_use_prebuilt_vendor(openssl OPENSSL_DIR)
+        set(PARTOUT_OPENSSL_IS_PREBUILT ON)
+        set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_DIR}/include")
+        set(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_DIR}/lib")
+    endif()
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dopenssl-include=${PARTOUT_OPENSSL_INCLUDE_DIR}"
         "-Dopenssl-lib=${PARTOUT_OPENSSL_LIBRARY_DIR}"
@@ -18,7 +38,26 @@ if(PP_BUILD_USE_OPENSSL)
 endif()
 
 if(PP_BUILD_USE_MBEDTLS)
-    include("${CMAKE_CURRENT_LIST_DIR}/dependencies/mbedtls.cmake")
+    set(PARTOUT_MBEDTLS_IS_PREBUILT OFF)
+    if(PP_SYSTEM_VENDORS_AVAILABLE)
+        partout_use_homebrew_formula(mbedtls)
+        find_path(PARTOUT_MBEDTLS_INCLUDE_DIR mbedtls/ssl.h)
+        find_library(PARTOUT_MBEDTLS_TLS_LIBRARY mbedtls)
+        find_library(PARTOUT_MBEDTLS_X509_LIBRARY mbedx509)
+        find_library(PARTOUT_MBEDTLS_CRYPTO_LIBRARY mbedcrypto)
+    endif()
+    if(PP_SYSTEM_VENDORS_AVAILABLE AND PARTOUT_MBEDTLS_INCLUDE_DIR AND
+       PARTOUT_MBEDTLS_TLS_LIBRARY AND PARTOUT_MBEDTLS_X509_LIBRARY AND
+       PARTOUT_MBEDTLS_CRYPTO_LIBRARY)
+        get_filename_component(PARTOUT_MBEDTLS_LIBRARY_DIR
+            "${PARTOUT_MBEDTLS_TLS_LIBRARY}" DIRECTORY)
+        message(STATUS "Using system MbedTLS")
+    else()
+        partout_use_prebuilt_vendor(mbedtls MBEDTLS_DIR)
+        set(PARTOUT_MBEDTLS_IS_PREBUILT ON)
+        set(PARTOUT_MBEDTLS_INCLUDE_DIR "${MBEDTLS_DIR}/include")
+        set(PARTOUT_MBEDTLS_LIBRARY_DIR "${MBEDTLS_DIR}/lib")
+    endif()
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dmbedtls-include=${PARTOUT_MBEDTLS_INCLUDE_DIR}"
         "-Dmbedtls-lib=${PARTOUT_MBEDTLS_LIBRARY_DIR}"
@@ -30,7 +69,28 @@ if(PP_BUILD_USE_OPENVPN)
 endif()
 
 if(PP_BUILD_USE_WIREGUARD)
-    include("${CMAKE_CURRENT_LIST_DIR}/dependencies/wg-go.cmake")
+    if(PP_SYSTEM_VENDORS_AVAILABLE)
+        find_path(PARTOUT_WGGO_INCLUDE_DIR wg_go/wg_go.h)
+        find_library(PARTOUT_WGGO_LIBRARY wg-go)
+    endif()
+    if(PP_SYSTEM_VENDORS_AVAILABLE AND PARTOUT_WGGO_INCLUDE_DIR AND
+       PARTOUT_WGGO_LIBRARY)
+        get_filename_component(PARTOUT_WGGO_LIBRARY_DIR
+            "${PARTOUT_WGGO_LIBRARY}" DIRECTORY)
+        set(WGGO_RUNTIME_LIBRARY "${PARTOUT_WGGO_LIBRARY}")
+        message(STATUS "Using system wg-go")
+    else()
+        partout_use_prebuilt_vendor(wg-go WGGO_DIR)
+        set(PARTOUT_WGGO_INCLUDE_DIR "${WGGO_DIR}/include")
+        set(PARTOUT_WGGO_LIBRARY_DIR "${WGGO_DIR}/lib")
+        if(WIN32)
+            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
+        elseif(APPLE)
+            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/libwg-go.a")
+        else()
+            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/libwg-go.so")
+        endif()
+    endif()
     list(APPEND PARTOUT_ZIG_ARGS
         -Dwireguard=true
         "-Dwg-go-include=${PARTOUT_WGGO_INCLUDE_DIR}"
@@ -39,7 +99,11 @@ if(PP_BUILD_USE_WIREGUARD)
 endif()
 
 if(WIN32 AND PP_BUILD_LIBRARY AND PP_BUILD_WINTUN_PREBUILT_URL)
-    include("${CMAKE_CURRENT_LIST_DIR}/dependencies/wintun.cmake")
+    partout_use_prebuilt_vendor(wintun WINTUN_DIR)
+    if(NOT EXISTS "${WINTUN_DIR}/wintun.dll" OR
+       NOT EXISTS "${WINTUN_DIR}/wintun.h")
+        message(FATAL_ERROR "Prebuilt Wintun is incomplete in ${WINTUN_DIR}")
+    endif()
     list(APPEND PARTOUT_ZIG_ARGS "-Dwintun-include=${WINTUN_DIR}")
 endif()
 
