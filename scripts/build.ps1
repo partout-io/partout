@@ -31,6 +31,7 @@ try {
     $generator = "Ninja Multi-Config"
     $vendor_source = $null
     $vendor_prebuilt_url = $null
+    $vendor_root = $null
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
@@ -124,14 +125,22 @@ try {
                         "auto" {
                             $vendor_source = $null
                             $vendor_prebuilt_url = $null
+                            $vendor_root = $null
                         }
-                        "bundled" {
-                            $vendor_source = "bundled"
+                        "system" {
+                            $vendor_source = "system"
                             $vendor_prebuilt_url = $null
+                            $vendor_root = $null
                         }
                         default {
-                            $vendor_source = $null
-                            $vendor_prebuilt_url = $args[$index + 1]
+                            $vendor_source = "prebuilt"
+                            if (Test-Path -Path $args[$index + 1] -PathType Container) {
+                                $vendor_root = (Resolve-Path $args[$index + 1]).Path
+                                $vendor_prebuilt_url = $null
+                            } else {
+                                $vendor_prebuilt_url = $args[$index + 1]
+                                $vendor_root = $null
+                            }
                         }
                     }
                     $index += 2
@@ -170,6 +179,9 @@ try {
     }
     if ($vendor_prebuilt_url) {
         $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
+    }
+    if ($vendor_root) {
+        $cmake_opts += "-DPP_BUILD_VENDOR_ROOT=$vendor_root"
     }
 
     if ($gen_build) {

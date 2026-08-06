@@ -1,0 +1,22 @@
+set(PARTOUT_WGGO_DEPENDENCY "")
+
+if(PP_USE_SYSTEM_VENDORS)
+    find_path(PARTOUT_WGGO_INCLUDE_DIR wg_go/wg_go.h REQUIRED)
+    find_library(PARTOUT_WGGO_LIBRARY NAMES wg-go REQUIRED)
+    get_filename_component(PARTOUT_WGGO_LIBRARY_DIR "${PARTOUT_WGGO_LIBRARY}" DIRECTORY)
+    set(WGGO_RUNTIME_LIBRARY "${PARTOUT_WGGO_LIBRARY}")
+    message(STATUS "Using system wg-go")
+else()
+    partout_use_prebuilt_vendor(wg-go WGGO_DIR)
+    set(PARTOUT_WGGO_INCLUDE_DIR "${WGGO_DIR}/include")
+    set(PARTOUT_WGGO_LIBRARY_DIR "${WGGO_DIR}/lib")
+    if(WIN32)
+        set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
+    elseif(APPLE)
+        set(WGGO_RUNTIME_LIBRARY
+            "${WGGO_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}wg-go${CMAKE_STATIC_LIBRARY_SUFFIX}")
+    else()
+        set(WGGO_RUNTIME_LIBRARY
+            "${WGGO_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wg-go${CMAKE_SHARED_LIBRARY_SUFFIX}")
+    endif()
+endif()

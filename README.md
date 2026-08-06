@@ -47,7 +47,7 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-These are the requirements for Partout, but additional build tools may be required depending on the vendors build system.
+Partout consumes system libraries or artifacts published by the `prebuilts` project; it does not build vendor sources.
 
 #### Build
 
@@ -56,7 +56,7 @@ Use one of the `scripts/build.*` variants based on the host platform:
 - `scripts/build.sh` (bash)
 - `scripts/build.ps1` (Windows PowerShell)
 
-The script builds the selected vendors and accepts a few options:
+The script resolves the selected dependencies and accepts a few options:
 
 - `-h`, `--help`: Show the build help
 - `-gen`: Configure CMake
@@ -64,7 +64,7 @@ The script builds the selected vendors and accepts a few options:
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable support for WireGuard (requires Go)
 - `-android`: Build for Android
-- `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
+- `-vendors [auto|system|<path-or-url>]`: Use system dependencies, a local prebuilts root, or a prebuilt release URL
 
 After the initial `-gen`, invoke the script without arguments to rebuild the
 existing configuration.

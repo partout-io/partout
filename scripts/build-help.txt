@@ -6,4 +6,5 @@
   -openvpn                       Enable OpenVPN support
   -wireguard                     Enable WireGuard support
   -android                       Configure an Android build
-  -vendors [auto|bundled|<url>]  Select source (prebuilt URL: Android/Windows only)
+  -vendors [auto|system|<path-or-url>]
+                                 Select system or prebuilt dependencies

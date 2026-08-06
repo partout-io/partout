@@ -1,0 +1,17 @@
+set(PARTOUT_OPENSSL_DEPENDENCY "")
+
+if(PP_USE_SYSTEM_VENDORS)
+    partout_use_homebrew_formula(openssl@3.5)
+    find_package(OpenSSL 3 REQUIRED COMPONENTS SSL Crypto)
+    set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_INCLUDE_DIR}")
+    get_filename_component(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_SSL_LIBRARY}" DIRECTORY)
+    if(CMAKE_LIBRARY_ARCHITECTURE AND
+       EXISTS "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/openssl/opensslconf.h")
+        set(PARTOUT_OPENSSL_CONFIG_INCLUDE_DIR "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}")
+    endif()
+    message(STATUS "Using system OpenSSL")
+else()
+    partout_use_prebuilt_vendor(openssl OPENSSL_DIR)
+    set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_DIR}/include")
+    set(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_DIR}/lib")
+endif()

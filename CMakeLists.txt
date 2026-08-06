@@ -1,8 +1,6 @@
 cmake_minimum_required(VERSION 3.28)
 project(Partout LANGUAGES C)
 
-include(ExternalProject)
-include(FetchContent)
 include(GNUInstallDirs)
 include("cmake/prebuilt.cmake")
 
@@ -12,9 +10,10 @@ option(PP_BUILD_USE_OPENSSL "Enable the OpenSSL backend" OFF)
 option(PP_BUILD_USE_MBEDTLS "Enable the MbedTLS backend" OFF)
 option(PP_BUILD_USE_OPENVPN "Enable OpenVPN" OFF)
 option(PP_BUILD_USE_WIREGUARD "Enable WireGuard" OFF)
-set(PP_BUILD_VENDOR_SOURCE "auto" CACHE STRING "Vendor source: auto or bundled")
-set_property(CACHE PP_BUILD_VENDOR_SOURCE PROPERTY STRINGS auto bundled)
+set(PP_BUILD_VENDOR_SOURCE "auto" CACHE STRING "Vendor source: auto, system, or prebuilt")
+set_property(CACHE PP_BUILD_VENDOR_SOURCE PROPERTY STRINGS auto system prebuilt)
 set(PP_BUILD_VENDOR_PREBUILT_URL "" CACHE STRING "Base URL for prebuilt vendor archives")
+set(PP_BUILD_VENDOR_ROOT "" CACHE PATH "Local root containing prebuilt vendor directories")
 
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" PLATFORM_NAME)
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_NAME)
@@ -37,20 +36,27 @@ file(TO_CMAKE_PATH "${PP_BUILD_OUTPUT}" PP_BUILD_OUTPUT)
 set(PP_BUILD_PREFIX "${PP_BUILD_OUTPUT}/partout" CACHE PATH "Partout install prefix")
 file(TO_CMAKE_PATH "${PP_BUILD_PREFIX}" PP_BUILD_PREFIX)
 
-if(NOT PP_BUILD_VENDOR_SOURCE MATCHES "^(auto|bundled)$")
-    message(FATAL_ERROR "PP_BUILD_VENDOR_SOURCE must be auto or bundled")
+if(NOT PP_BUILD_VENDOR_SOURCE MATCHES "^(auto|system|prebuilt)$")
+    message(FATAL_ERROR "PP_BUILD_VENDOR_SOURCE must be auto, system, or prebuilt")
 endif()
 
 set(PP_USE_SYSTEM_VENDORS OFF)
 set(PP_USE_PREBUILT_VENDORS OFF)
-if(PP_BUILD_USE_OPENSSL OR PP_BUILD_USE_MBEDTLS OR PP_BUILD_USE_WIREGUARD)
+if(PP_BUILD_USE_OPENSSL OR PP_BUILD_USE_MBEDTLS OR PP_BUILD_USE_WIREGUARD OR
+   (WIN32 AND PP_BUILD_LIBRARY))
     set(PP_BUILD_USES_VENDORS ON)
 endif()
-if(PP_BUILD_USES_VENDORS AND PP_BUILD_VENDOR_SOURCE STREQUAL "auto")
-    if(ANDROID OR WIN32)
+if(PP_BUILD_USES_VENDORS)
+    if(PP_BUILD_VENDOR_SOURCE STREQUAL "system")
+        set(PP_USE_SYSTEM_VENDORS ON)
+    elseif(PP_BUILD_VENDOR_SOURCE STREQUAL "prebuilt")
         set(PP_USE_PREBUILT_VENDORS ON)
     else()
-        set(PP_USE_SYSTEM_VENDORS ON)
+        if(PP_BUILD_VENDOR_ROOT OR ANDROID OR WIN32)
+            set(PP_USE_PREBUILT_VENDORS ON)
+        else()
+            set(PP_USE_SYSTEM_VENDORS ON)
+        endif()
     endif()
 endif()
 
@@ -109,7 +115,7 @@ set(PARTOUT_ZIG_ARGS build install
 set(PARTOUT_ZIG_DEPENDS)
 
 if(PP_BUILD_USE_OPENSSL)
-    include("vendors/openssl.cmake")
+    include("cmake/dependencies/openssl.cmake")
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dopenssl-include=${PARTOUT_OPENSSL_INCLUDE_DIR}"
         "-Dopenssl-lib=${PARTOUT_OPENSSL_LIBRARY_DIR}"
@@ -123,7 +129,7 @@ if(PP_BUILD_USE_OPENSSL)
 endif()
 
 if(PP_BUILD_USE_MBEDTLS)
-    include("vendors/mbedtls.cmake")
+    include("cmake/dependencies/mbedtls.cmake")
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dmbedtls-include=${PARTOUT_MBEDTLS_INCLUDE_DIR}"
         "-Dmbedtls-lib=${PARTOUT_MBEDTLS_LIBRARY_DIR}"
@@ -136,17 +142,17 @@ if(PP_BUILD_USE_OPENVPN)
 endif()
 
 if(PP_BUILD_USE_WIREGUARD)
-    include("vendors/wg-go.cmake")
+    include("cmake/dependencies/wg-go.cmake")
     list(APPEND PARTOUT_ZIG_ARGS
         -Dwireguard=true
-        "-Dwg-go-include=${WGGO_DIR}/include"
-        "-Dwg-go-lib=${WGGO_DIR}/lib"
+        "-Dwg-go-include=${PARTOUT_WGGO_INCLUDE_DIR}"
+        "-Dwg-go-lib=${PARTOUT_WGGO_LIBRARY_DIR}"
     )
     list(APPEND PARTOUT_ZIG_DEPENDS ${PARTOUT_WGGO_DEPENDENCY})
 endif()
 
-if(WIN32)
-    include("vendors/wintun.cmake")
+if(WIN32 AND PP_BUILD_LIBRARY)
+    include("cmake/dependencies/wintun.cmake")
     list(APPEND PARTOUT_ZIG_ARGS "-Dwintun-include=${WINTUN_DIR}")
 endif()
 
@@ -247,7 +253,7 @@ partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
 if(PP_BUILD_USE_WIREGUARD)
     partout_install_runtime_file("${WGGO_RUNTIME_LIBRARY}")
 endif()
-if(NOT PP_USE_SYSTEM_VENDORS)
+if(PP_USE_PREBUILT_VENDORS)
     if(PP_BUILD_USE_OPENSSL)
         partout_install_runtime_directory("${OPENSSL_DIR}/bin")
         partout_install_runtime_directory("${OPENSSL_DIR}/lib")
