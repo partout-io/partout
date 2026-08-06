@@ -14,23 +14,71 @@ const c_flags = &.{
     "-fvisibility=hidden",
 };
 
-const CryptoLibraries = struct {
-    openssl: bool = false,
-    mbedtls: bool = false,
+const Vendor = enum {
+    openssl,
+    mbedtls,
+    wg_go,
+
+    fn optionName(vendor: Vendor) []const u8 {
+        return switch (vendor) {
+            .openssl => "openssl",
+            .mbedtls => "mbedtls",
+            .wg_go => "wg-go",
+        };
+    }
+
+    fn displayName(vendor: Vendor) []const u8 {
+        return switch (vendor) {
+            .openssl => "OpenSSL",
+            .mbedtls => "MbedTLS",
+            .wg_go => "wg-go",
+        };
+    }
+
+    fn frameworkName(vendor: Vendor) []const u8 {
+        return switch (vendor) {
+            .openssl => "openssl",
+            .mbedtls => "mbedtls",
+            .wg_go => "wg_go",
+        };
+    }
 };
 
-const VendorIncludePaths = struct {
-    openssl: ?[]const u8,
-    openssl_config: ?[]const u8,
-    mbedtls: ?[]const u8,
-    wg_go: ?[]const u8,
-    wintun: ?[]const u8,
+const VendorPaths = struct {
+    vendor: Vendor,
+    include: ?[]const u8,
+    library: ?[]const u8,
+
+    fn enabled(paths: VendorPaths) bool {
+        return paths.include != null;
+    }
 };
 
-const VendorLibraryPaths = struct {
-    openssl: ?[]const u8,
-    mbedtls: ?[]const u8,
-    wg_go: ?[]const u8,
+const Vendors = struct {
+    openssl: VendorPaths,
+    mbedtls: VendorPaths,
+    wg_go: VendorPaths,
+    openssl_config_include: ?[]const u8,
+    wintun_include: ?[]const u8,
+
+    fn all(vendors: Vendors) [3]VendorPaths {
+        return .{ vendors.openssl, vendors.mbedtls, vendors.wg_go };
+    }
+
+    fn hasWireGuardBackend(vendors: Vendors) bool {
+        return vendors.wg_go.enabled();
+    }
+};
+
+const BuildConfig = struct {
+    target: std.Build.ResolvedTarget,
+    optimize: std.builtin.OptimizeMode,
+    apple_sdk_path: ?[]const u8,
+    vendors: Vendors,
+    embed_c: bool,
+    openvpn: bool,
+    wireguard: bool,
+    options: *std.Build.Step.Options,
 };
 
 const default_api_excluded_schemas =
@@ -71,47 +119,18 @@ pub fn build(b: *std.Build) void {
         "wireguard",
         "Compile the WireGuard library.",
     ) orelse false;
-    const vendor_includes = VendorIncludePaths{
-        .openssl = pathOption(b, "openssl-include", "OpenSSL headers search path.", false),
-        .openssl_config = pathOption(
+    const vendors = Vendors{
+        .openssl = vendorPathsOption(b, .openssl),
+        .mbedtls = vendorPathsOption(b, .mbedtls),
+        .wg_go = vendorPathsOption(b, .wg_go),
+        .openssl_config_include = pathOption(
             b,
             "openssl-config-include",
             "OpenSSL platform-specific headers search path.",
             false,
         ),
-        .mbedtls = pathOption(b, "mbedtls-include", "MbedTLS headers search path.", false),
-        .wg_go = pathOption(b, "wg-go-include", "wg-go headers search path.", false),
-        .wintun = pathOption(b, "wintun-include", "Wintun headers search path.", false),
+        .wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false),
     };
-    const crypto_libraries = CryptoLibraries{
-        .openssl = vendor_includes.openssl != null,
-        .mbedtls = vendor_includes.mbedtls != null,
-    };
-    const vendor_libraries = VendorLibraryPaths{
-        .openssl = pathOption(
-            b,
-            "openssl-lib",
-            "OpenSSL library search path.",
-            crypto_libraries.openssl,
-        ),
-        .mbedtls = pathOption(
-            b,
-            "mbedtls-lib",
-            "MbedTLS library search path.",
-            crypto_libraries.mbedtls,
-        ),
-        .wg_go = pathOption(
-            b,
-            "wg-go-lib",
-            "wg-go library search path.",
-            vendor_includes.wg_go != null,
-        ),
-    };
-    validatePathPair("openssl", vendor_includes.openssl, vendor_libraries.openssl);
-    validatePathPair("mbedtls", vendor_includes.mbedtls, vendor_libraries.mbedtls);
-    validatePathPair("wg-go", vendor_includes.wg_go, vendor_libraries.wg_go);
-    const has_wireguard_backend =
-        vendor_includes.wg_go != null and vendor_libraries.wg_go != null;
     const apple_sdk_path = if (target.result.os.tag.isDarwin())
         b.option([]const u8, "apple-sdk-path", "Path to the Apple platform SDK.")
     else
@@ -122,36 +141,20 @@ pub fn build(b: *std.Build) void {
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
 
-    const module = b.createModule(.{
-        .root_source_file = b.path("src/partout.zig"),
+    const config = BuildConfig{
         .target = target,
         .optimize = optimize,
-        .link_libc = true,
-        .sanitize_c = .off,
-    });
-    configurePartoutModule(
-        module,
-        b,
-        target,
-        apple_sdk_path,
-        crypto_libraries,
-        vendor_includes,
-        has_wireguard_backend,
-        embed_c,
-        use_openvpn,
-        use_wireguard,
-        build_options,
-    );
+        .apple_sdk_path = apple_sdk_path,
+        .vendors = vendors,
+        .embed_c = embed_c,
+        .openvpn = use_openvpn,
+        .wireguard = use_wireguard,
+        .options = build_options,
+    };
+
+    const module = createPartoutModule(b, config, "src/partout.zig", true);
     if (shared) {
-        linkVendorLibraries(
-            module,
-            b,
-            target,
-            crypto_libraries,
-            use_wireguard and has_wireguard_backend,
-            vendor_libraries,
-            false,
-        );
+        linkVendorLibraries(module, b, config, false);
         addRuntimeOrigin(module, target);
     }
 
@@ -165,55 +168,9 @@ pub fn build(b: *std.Build) void {
     check.dependOn(&lib.step);
     b.default_step = check;
 
-    const test_source_module = b.createModule(.{
-        .root_source_file = b.path("src/testing.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-        .sanitize_c = .off,
-    });
-    configurePartoutModuleSettings(
-        test_source_module,
-        b,
-        target,
-        apple_sdk_path,
-        crypto_libraries,
-        vendor_includes,
-        has_wireguard_backend,
-        use_openvpn,
-        use_wireguard,
-        build_options,
-    );
-
-    const test_module = b.createModule(.{
-        .root_source_file = b.path("tests/all.zig"),
-        .target = target,
-        .optimize = optimize,
-        .link_libc = true,
-        .sanitize_c = .off,
-    });
-    configurePartoutModule(
-        test_module,
-        b,
-        target,
-        apple_sdk_path,
-        crypto_libraries,
-        vendor_includes,
-        has_wireguard_backend,
-        embed_c,
-        use_openvpn,
-        use_wireguard,
-        build_options,
-    );
-    linkVendorLibraries(
-        test_module,
-        b,
-        target,
-        crypto_libraries,
-        use_wireguard and has_wireguard_backend,
-        vendor_libraries,
-        true,
-    );
+    const test_source_module = createPartoutModule(b, config, "src/testing.zig", false);
+    const test_module = createPartoutModule(b, config, "tests/all.zig", true);
+    linkVendorLibraries(test_module, b, config, true);
     test_module.addImport("source", test_source_module);
 
     const unit_tests = b.addTest(.{
@@ -237,7 +194,7 @@ pub fn build(b: *std.Build) void {
         b.installArtifact(lib);
     }
     if (target.result.os.tag == .windows) {
-        if (vendor_includes.wintun) |include_path| {
+        if (vendors.wintun_include) |include_path| {
             const dll = b.fmt("{s}/wintun.dll", .{include_path});
             b.getInstallStep().dependOn(&b.addInstallBinFile(
                 .{ .cwd_relative = dll },
@@ -273,14 +230,25 @@ fn pathOption(
     return b.dupe(path);
 }
 
-fn validatePathPair(
-    name: []const u8,
-    include_path: ?[]const u8,
-    library_path: ?[]const u8,
-) void {
-    if (include_path == null and library_path != null) {
+fn vendorPathsOption(b: *std.Build, vendor: Vendor) VendorPaths {
+    const name = vendor.optionName();
+    const display_name = vendor.displayName();
+    const include = pathOption(
+        b,
+        b.fmt("{s}-include", .{name}),
+        b.fmt("{s} headers search path.", .{display_name}),
+        false,
+    );
+    const library = pathOption(
+        b,
+        b.fmt("{s}-lib", .{name}),
+        b.fmt("{s} library search path.", .{display_name}),
+        include != null,
+    );
+    if (include == null and library != null) {
         std.debug.panic("-{s}-include is required with -{s}-lib", .{ name, name });
     }
+    return .{ .vendor = vendor, .include = include, .library = library };
 }
 
 fn addAPICodegenStep(b: *std.Build) *std.Build.Step {
@@ -346,78 +314,61 @@ fn addCoverageRunStep(
     return run;
 }
 
+fn createPartoutModule(
+    b: *std.Build,
+    config: BuildConfig,
+    root_source_file: []const u8,
+    add_c_sources: bool,
+) *std.Build.Module {
+    const module = b.createModule(.{
+        .root_source_file = b.path(root_source_file),
+        .target = config.target,
+        .optimize = config.optimize,
+        .link_libc = true,
+        .sanitize_c = .off,
+    });
+    configurePartoutModule(module, b, config);
+
+    if (add_c_sources and config.embed_c) {
+        addCSources(module, config.openvpn, config.wireguard);
+        addCryptoCSources(module, config);
+    }
+    return module;
+}
+
 fn configurePartoutModule(
     module: *std.Build.Module,
     b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    apple_sdk_path: ?[]const u8,
-    crypto_libraries: CryptoLibraries,
-    vendor_includes: VendorIncludePaths,
-    has_wireguard_backend: bool,
-    embed_c: bool,
-    use_openvpn: bool,
-    use_wireguard: bool,
-    build_options: *std.Build.Step.Options,
+    config: BuildConfig,
 ) void {
-    configurePartoutModuleSettings(
-        module,
-        b,
-        target,
-        apple_sdk_path,
-        crypto_libraries,
-        vendor_includes,
-        has_wireguard_backend,
-        use_openvpn,
-        use_wireguard,
-        build_options,
-    );
-
-    if (embed_c) {
-        addCSources(module, use_openvpn, use_wireguard);
-        addCryptoCSources(module, target, crypto_libraries);
-    }
-}
-
-fn configurePartoutModuleSettings(
-    module: *std.Build.Module,
-    b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    apple_sdk_path: ?[]const u8,
-    crypto_libraries: CryptoLibraries,
-    vendor_includes: VendorIncludePaths,
-    has_wireguard_backend: bool,
-    use_openvpn: bool,
-    use_wireguard: bool,
-    build_options: *std.Build.Step.Options,
-) void {
-    module.addOptions("build_options", build_options);
+    module.addOptions("build_options", config.options);
     module.addIncludePath(b.path("src"));
     module.addIncludePath(b.path("src/c/portable/include"));
     module.addIncludePath(b.path("src/c/crypto/include"));
-    if (use_openvpn) {
+    if (config.openvpn) {
         module.addIncludePath(b.path("src/openvpn/c/include"));
     }
-    if (use_wireguard) {
+    if (config.wireguard) {
         module.addIncludePath(b.path("src/wireguard/c/include"));
     }
-    addVendorIncludePaths(module, b, target, vendor_includes);
-    addAppleSDKPaths(module, b, apple_sdk_path);
-    if (crypto_libraries.openssl) {
+    addVendorIncludePaths(module, b, config);
+    addAppleSDKPaths(module, b, config.apple_sdk_path);
+    if (config.vendors.openssl.enabled()) {
         module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
     }
-    if (crypto_libraries.mbedtls) {
+    if (config.vendors.mbedtls.enabled()) {
         module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
     }
-    module.addCMacro("PARTOUT_OPENVPN", if (use_openvpn) "1" else "0");
-    module.addCMacro("PARTOUT_WIREGUARD", if (use_wireguard) "1" else "0");
+    module.addCMacro("PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
+    module.addCMacro("PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     module.addCMacro(
         "PARTOUT_HAS_WIREGUARD_BACKEND",
-        if (has_wireguard_backend) "1" else "0",
+        if (config.vendors.hasWireGuardBackend()) "1" else "0",
     );
-    if (target.result.os.tag.isDarwin()) {
+    if (config.target.result.os.tag.isDarwin()) {
         module.linkFramework("Security", .{});
     }
-    if (target.result.os.tag == .windows) {
+    if (config.target.result.os.tag == .windows) {
         module.linkSystemLibrary("bcrypt", .{});
         module.linkSystemLibrary("ole32", .{});
         module.linkSystemLibrary("ws2_32", .{});
@@ -427,86 +378,54 @@ fn configurePartoutModuleSettings(
 fn addVendorIncludePaths(
     module: *std.Build.Module,
     b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    paths: VendorIncludePaths,
+    config: BuildConfig,
 ) void {
-    const Entry = struct {
-        path: ?[]const u8,
-        framework_name: ?[]const u8,
-    };
-    const entries = [_]Entry{
-        .{ .path = paths.openssl, .framework_name = "openssl" },
-        .{ .path = paths.openssl_config, .framework_name = null },
-        .{ .path = paths.mbedtls, .framework_name = "mbedtls" },
-        .{ .path = paths.wg_go, .framework_name = "wg_go" },
-        .{ .path = paths.wintun, .framework_name = null },
-    };
-    for (entries) |entry| {
-        const path = entry.path orelse continue;
-        const fwname = entry.framework_name orelse {
-            module.addSystemIncludePath(.{ .cwd_relative = path });
-            continue;
-        };
-        if (target.result.os.tag.isDarwin()) {
-            const framework = b.fmt("{s}/{s}.framework", .{ path, fwname });
+    for (config.vendors.all()) |paths| {
+        const include_path = paths.include orelse continue;
+        const framework_name = paths.vendor.frameworkName();
+        if (config.target.result.os.tag.isDarwin()) {
+            const framework = b.fmt("{s}/{s}.framework", .{ include_path, framework_name });
             std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-                module.addSystemIncludePath(.{ .cwd_relative = path });
+                module.addSystemIncludePath(.{ .cwd_relative = include_path });
                 continue;
             };
-            module.addSystemFrameworkPath(.{ .cwd_relative = path });
+            module.addSystemFrameworkPath(.{ .cwd_relative = include_path });
         } else {
-            module.addSystemIncludePath(.{ .cwd_relative = path });
+            module.addSystemIncludePath(.{ .cwd_relative = include_path });
         }
+    }
+    for ([_]?[]const u8{
+        config.vendors.openssl_config_include,
+        config.vendors.wintun_include,
+    }) |include_path| {
+        module.addSystemIncludePath(.{ .cwd_relative = include_path orelse continue });
     }
 }
 
 fn linkVendorLibraries(
     module: *std.Build.Module,
     b: *std.Build,
-    target: std.Build.ResolvedTarget,
-    libraries: CryptoLibraries,
-    has_wireguard_backend: bool,
-    library_paths: VendorLibraryPaths,
+    config: BuildConfig,
     add_library_rpath: bool,
 ) void {
-    const Entry = struct {
-        enabled: bool,
-        library_path: ?[]const u8,
-        name: []const u8,
-    };
-    const entries = [_]Entry{
-        .{
-            .enabled = libraries.openssl,
-            .library_path = library_paths.openssl,
-            .name = "openssl",
-        },
-        .{
-            .enabled = libraries.mbedtls,
-            .library_path = library_paths.mbedtls,
-            .name = "mbedtls",
-        },
-        .{
-            .enabled = has_wireguard_backend,
-            .library_path = library_paths.wg_go,
-            .name = "wg_go",
-        },
-    };
-    for (entries) |entry| {
-        if (!entry.enabled) continue;
-        const library_path = entry.library_path orelse unreachable;
-        if (target.result.os.tag.isDarwin()) {
-            const framework = b.fmt("{s}/{s}.framework", .{ library_path, entry.name });
+    for (config.vendors.all()) |paths| {
+        if (!paths.enabled()) continue;
+        if (paths.vendor == .wg_go and !config.wireguard) continue;
+        const library_path = paths.library orelse unreachable;
+        const framework_name = paths.vendor.frameworkName();
+        if (config.target.result.os.tag.isDarwin()) {
+            const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
             std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-                linkSystemLibraries(module, target, library_path, entry.name, add_library_rpath);
+                linkSystemLibraries(module, config.target, paths, add_library_rpath);
                 continue;
             };
             module.addSystemFrameworkPath(.{ .cwd_relative = library_path });
-            module.linkFramework(entry.name, .{});
+            module.linkFramework(framework_name, .{});
             if (add_library_rpath) {
                 module.addRPath(.{ .cwd_relative = library_path });
             }
         } else {
-            linkSystemLibraries(module, target, library_path, entry.name, add_library_rpath);
+            linkSystemLibraries(module, config.target, paths, add_library_rpath);
         }
     }
 }
@@ -514,45 +433,45 @@ fn linkVendorLibraries(
 fn linkSystemLibraries(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    library_path: []const u8,
-    name: []const u8,
+    paths: VendorPaths,
     add_library_rpath: bool,
 ) void {
+    const library_path = paths.library orelse unreachable;
     module.addLibraryPath(.{ .cwd_relative = library_path });
     if (add_library_rpath) {
         module.addRPath(.{ .cwd_relative = library_path });
     }
-    linkSystemLibraryNames(module, target, name);
+    linkSystemLibraryNames(module, target, paths.vendor);
 }
 
 fn linkSystemLibraryNames(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
-    name: []const u8,
+    vendor: Vendor,
 ) void {
     var options: std.Build.Module.LinkSystemLibraryOptions = .{
         .use_pkg_config = .no,
     };
-    if (std.mem.eql(u8, name, "openssl")) {
-        if (target.result.os.tag == .windows) {
+    switch (vendor) {
+        .openssl => if (target.result.os.tag == .windows) {
             module.linkSystemLibrary("libssl", options);
             module.linkSystemLibrary("libcrypto", options);
         } else {
             module.linkSystemLibrary("ssl", options);
             module.linkSystemLibrary("crypto", options);
-        }
-    } else if (std.mem.eql(u8, name, "mbedtls")) {
-        module.linkSystemLibrary("mbedtls", options);
-        module.linkSystemLibrary("mbedx509", options);
-        module.linkSystemLibrary("mbedcrypto", options);
-    } else if (std.mem.eql(u8, name, "wg_go")) {
-        // Disambiguate import .lib from .dll
-        if (target.result.os.tag == .windows) {
-            options.preferred_link_mode = .static;
-        }
-        module.linkSystemLibrary("wg-go", options);
-    } else {
-        unreachable;
+        },
+        .mbedtls => {
+            module.linkSystemLibrary("mbedtls", options);
+            module.linkSystemLibrary("mbedx509", options);
+            module.linkSystemLibrary("mbedcrypto", options);
+        },
+        .wg_go => {
+            // Disambiguate import .lib from .dll.
+            if (target.result.os.tag == .windows) {
+                options.preferred_link_mode = .static;
+            }
+            module.linkSystemLibrary("wg-go", options);
+        },
     }
 }
 
@@ -608,90 +527,68 @@ fn addAppleSDKPaths(
 }
 
 fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool) void {
-    module.addCSourceFiles(.{
-        .files = &.{
-            "src/partout.c",
-            "src/partout_jni.c",
-        },
-        .flags = c_flags,
+    addCSourceFiles(module, &.{
+        "src/partout.c",
+        "src/partout_jni.c",
     });
-    module.addCSourceFiles(.{
-        .files = &.{
-            "src/c/portable/common.c",
-            "src/c/portable/dns.c",
-            "src/c/portable/lib.c",
-            "src/c/portable/mux.c",
-            "src/c/portable/network.c",
-            "src/c/portable/prng.c",
-            "src/c/portable/socket.c",
-            "src/c/portable/tun_android.c",
-            "src/c/portable/tun_darwin.c",
-            "src/c/portable/tun_linux.c",
-            "src/c/portable/tun_windows.c",
-            "src/c/portable/zd.c",
-        },
-        .flags = c_flags,
+    addCSourceFiles(module, &.{
+        "src/c/portable/common.c",
+        "src/c/portable/dns.c",
+        "src/c/portable/lib.c",
+        "src/c/portable/mux.c",
+        "src/c/portable/network.c",
+        "src/c/portable/prng.c",
+        "src/c/portable/socket.c",
+        "src/c/portable/tun_android.c",
+        "src/c/portable/tun_darwin.c",
+        "src/c/portable/tun_linux.c",
+        "src/c/portable/tun_windows.c",
+        "src/c/portable/zd.c",
     });
 
     if (use_openvpn) {
-        module.addCSourceFiles(.{
-            .files = &.{
-                "src/openvpn/c/control.c",
-                "src/openvpn/c/dp_framing.c",
-                "src/openvpn/c/dp_mode.c",
-                "src/openvpn/c/dp_mode_ad.c",
-                "src/openvpn/c/dp_mode_hmac.c",
-                "src/openvpn/c/mss_fix.c",
-                "src/openvpn/c/pkt_proc.c",
-                "src/openvpn/c/test/openvpn_crypto_mock.c",
-            },
-            .flags = c_flags,
+        addCSourceFiles(module, &.{
+            "src/openvpn/c/control.c",
+            "src/openvpn/c/dp_framing.c",
+            "src/openvpn/c/dp_mode.c",
+            "src/openvpn/c/dp_mode_ad.c",
+            "src/openvpn/c/dp_mode_hmac.c",
+            "src/openvpn/c/mss_fix.c",
+            "src/openvpn/c/pkt_proc.c",
+            "src/openvpn/c/test/openvpn_crypto_mock.c",
         });
     }
 
     if (use_wireguard) {
-        module.addCSourceFiles(.{
-            .files = &.{
-                "src/wireguard/c/backend.c",
-                "src/wireguard/c/key.c",
-                "src/wireguard/c/x25519.c",
-            },
-            .flags = c_flags,
+        addCSourceFiles(module, &.{
+            "src/wireguard/c/backend.c",
+            "src/wireguard/c/key.c",
+            "src/wireguard/c/x25519.c",
         });
     }
 }
 
 fn addCryptoCSources(
     module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-    crypto_libraries: CryptoLibraries,
+    config: BuildConfig,
 ) void {
-    module.addCSourceFiles(.{
-        .files = &.{
-            "src/c/crypto/tls_options.c",
-            "src/c/crypto/crypto_mock.c",
-        },
-        .flags = c_flags,
+    addCSourceFiles(module, &.{
+        "src/c/crypto/tls_options.c",
+        "src/c/crypto/crypto_mock.c",
     });
 
-    if (crypto_libraries.openssl) {
-        module.addCSourceFiles(.{
-            .files = &.{
-                "src/c/crypto/crypto_openssl.c",
-            },
-            .flags = c_flags,
-        });
+    if (config.vendors.openssl.enabled()) {
+        addCSourceFiles(module, &.{"src/c/crypto/crypto_openssl.c"});
     }
 
-    if (crypto_libraries.mbedtls) {
-        module.addCSourceFiles(.{
-            .files = &.{
-                "src/c/crypto/crypto_mbedtls.c",
-            },
-            .flags = c_flags,
-        });
-        addNativeCryptoCSources(module, target);
+    if (config.vendors.mbedtls.enabled()) {
+        addCSourceFiles(module, &.{"src/c/crypto/crypto_mbedtls.c"});
+        addNativeCryptoCSources(module, config.target);
     }
+}
+
+fn addCSourceFiles(module: *std.Build.Module, files: []const []const u8) void {
+    module.addCSourceFiles(.{ .files = files, .flags = c_flags });
 }
 
 fn addNativeCryptoCSources(
@@ -699,24 +596,9 @@ fn addNativeCryptoCSources(
     target: std.Build.ResolvedTarget,
 ) void {
     switch (target.result.os.tag) {
-        .macos, .ios, .tvos, .watchos, .visionos => module.addCSourceFiles(.{
-            .files = &.{
-                "src/c/crypto/crypto_darwin.c",
-            },
-            .flags = c_flags,
-        }),
-        .linux => module.addCSourceFiles(.{
-            .files = &.{
-                "src/c/crypto/crypto_linux.c",
-            },
-            .flags = c_flags,
-        }),
-        .windows => module.addCSourceFiles(.{
-            .files = &.{
-                "src/c/crypto/crypto_windows.c",
-            },
-            .flags = c_flags,
-        }),
+        .macos, .ios, .tvos, .watchos, .visionos => addCSourceFiles(module, &.{"src/c/crypto/crypto_darwin.c"}),
+        .linux => addCSourceFiles(module, &.{"src/c/crypto/crypto_linux.c"}),
+        .windows => addCSourceFiles(module, &.{"src/c/crypto/crypto_windows.c"}),
         else => {},
     }
 }
