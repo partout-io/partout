@@ -133,13 +133,10 @@ fi
 
 find_xcframework() {
     local package=$1
-    local product=$2
-    local package_dir="$artifacts_dir/$package"
     local result
 
-    [[ -d "$package_dir" ]] || fail "missing SwiftPM artifact: $package_dir"
-    result=$(find "$package_dir" -type d -name "$product.xcframework" -print -quit)
-    [[ -n "$result" ]] || fail "unable to find $product.xcframework under $package_dir"
+    result=$(find "$artifacts_dir" -type d -name "$package.xcframework" -print -quit)
+    [[ -n "$result" ]] || fail "unable to find $package.xcframework under $artifacts_dir"
     cd "$(dirname "$result")"
     printf '%s/%s\n' "$(pwd)" "$(basename "$result")"
 }
@@ -180,9 +177,9 @@ resolve_xcframework_paths() {
         fail "$product artifact slice $identifier must contain Headers/$header"
 }
 
-openssl_xcframework=$(find_xcframework openssl-apple openssl)
-mbedtls_xcframework=$(find_xcframework mbedtls-apple mbedtls)
-wg_go_xcframework=$(find_xcframework wg-go-apple wg-go)
+openssl_xcframework=$(find_xcframework openssl)
+mbedtls_xcframework=$(find_xcframework mbedtls)
+wg_go_xcframework=$(find_xcframework wg-go)
 
 work_dir="$zig_dir/zig-out/xcframework-build"
 cache_dir="$zig_dir/zig-out/xcframework-cache"
@@ -242,6 +239,7 @@ build_slice() {
             --cache-dir "$cache_dir" \
             --global-cache-dir "$global_cache_dir" \
             --release=small \
+            -Dshared=true \
             -Dtarget="$target" \
             -Dapple-sdk-path="$sdk" \
             -Dopenvpn=true \
