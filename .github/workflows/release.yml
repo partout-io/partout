@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - master
+      - feature/release-zig
     paths:
       - zig/src/partout.zig
 
