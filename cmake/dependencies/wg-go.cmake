@@ -1,5 +1,3 @@
-set(PARTOUT_WGGO_DEPENDENCY "")
-
 if(PP_SYSTEM_VENDORS_AVAILABLE)
     find_path(PARTOUT_WGGO_INCLUDE_DIR wg_go/wg_go.h)
     find_library(PARTOUT_WGGO_LIBRARY wg-go)
