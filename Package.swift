@@ -7,39 +7,21 @@ import PackageDescription
 
 // MARK: Environment
 
-// Optional overrides from environment
-let env = ProcessInfo.processInfo.environment
-let envOS = env["PP_BUILD_OS"]
-let envCMakeOutput = env["PP_BUILD_CMAKE_OUTPUT"]
-let envDocs = env["PP_BUILD_DOCS"] == "1"
+let envDocs = ProcessInfo.processInfo.environment["PP_BUILD_DOCS"] == "1"
 
 // MARK: Configuration
 
+let prebuiltsVersion = "0.5.2"
+let openSSLChecksum = "dc092eb9950083492bd341834771a996213457119e7427f244dbfbe899cd143f"
+let wgGoChecksum = "5ce6457721b49a0221e2465ca8eb94b9e5ce40c208a53a5192737cb0061d6a0b"
 let cryptoLibraries: [CryptoLibrary] = [.openSSL]
-let openSSLVersion: Version = "3.6.300" // 3.6.2
-let wgGoVersion: Version = "0.0.20260725"
-// Local CMake output is only required for generated wg-go and wintun artifacts.
-let cmakeOutput = envCMakeOutput ?? "bin/darwin-arm64"
 let useFoundationCompatibility: FoundationCompatibility = .off
-// let useFoundationCompatibility: FoundationCompatibility = OS.current != .apple ? .on : .off
 
 let areas = Area.allCases.filter {
     $0 != .openVPN || !cryptoLibraries.isEmpty
 }
 
 // MARK: - Package
-
-// Build dynamic library on Android
-var libraryType: Product.Library.LibraryType? = nil
-var staticLibPrefix = ""
-switch OS.current {
-case .android, .linux:
-    libraryType = .dynamic
-case .windows:
-    staticLibPrefix = "lib"
-default:
-    break
-}
 
 // The global settings for C targets
 let globalCSettings: [CSetting] = [
@@ -59,7 +41,6 @@ let package = Package(
     products: [
         .library(
             name: "partout",
-            type: libraryType,
             targets: ["Partout"]
         ),
         .library(
@@ -154,35 +135,22 @@ package.targets.append(contentsOf: [
     ),
     .target(
         name: "PartoutCore_C",
-        cSettings: globalCSettings + {
-            var list: [CSetting] = []
-            if OS.current == .windows {
-                list.append(.unsafeFlags([
-                    "-I\(cmakeOutput)/wintun"
-                ]))
-            }
-            return list
-        }()
+        cSettings: globalCSettings
     ),
     .target(
         name: "PartoutOS",
         dependencies: ["PartoutCore"],
         exclude: {
             var list: [String] = []
-            switch OS.current {
-            case .apple:
 #if swift(>=6.0)
-                list.append(contentsOf: [
-                    "AppleNE/Connection/NEUDPSocket.swift",
-                    "AppleNE/Connection/NETCPSocket.swift",
-                    "AppleNE/Connection/ValueObserver.swift",
-                    "AppleNE/Extensions/NWUDPSessionState+Description.swift",
-                    "AppleNE/Extensions/NWTCPConnectionState+Description.swift"
-                ])
+            list.append(contentsOf: [
+                "AppleNE/Connection/NEUDPSocket.swift",
+                "AppleNE/Connection/NETCPSocket.swift",
+                "AppleNE/Extensions/NWUDPSessionState+Description.swift",
+                "AppleNE/Extensions/NWTCPConnectionState+Description.swift",
+                "AppleNE/Connection/SafeValueObserver.swift"
+            ])
 #endif
-            default:
-                list.append(contentsOf: ["Apple", "AppleNE"])
-            }
             return list
         }(),
         swiftSettings: useFoundationCompatibility.swiftSettings
@@ -198,14 +166,9 @@ package.targets.append(contentsOf: [
         dependencies: ["PartoutOS"],
         exclude: {
             var list: [String] = []
-            switch OS.current {
-            case .apple:
 #if swift(>=6.0)
-                list.append("AppleNE/ValueObserverTests.swift")
+            list.append("AppleNE/ValueObserverTests.swift")
 #endif
-            default:
-                list.append(contentsOf: ["Apple", "AppleNE"])
-            }
             return list
         }()
     )
@@ -256,43 +219,20 @@ if areas.contains(.wireGuard) {
             targets: ["PartoutWireGuard"]
         )
     )
-    switch OS.current {
-    case .apple:
-        // Require static wg-go backend
-        package.dependencies.append(
-            .package(url: "https://github.com/partout-io/wg-go-apple", exact: wgGoVersion)
+    package.targets.append(contentsOf: [
+        .binaryTarget(
+            name: "wg-go-apple",
+            url: "https://github.com/partout-io/prebuilts/releases/download/\(prebuiltsVersion)/wg-go.xcframework.zip",
+            checksum: wgGoChecksum
+        ),
+        .target(
+            name: "PartoutWireGuard_C",
+            dependencies: [
+                "PartoutCore_C",
+                "wg-go-apple"
+            ]
         )
-//        package.targets.append(
-//            .binaryTarget(
-//                name: "wg-go-apple",
-//                path: "../../wg-go-apple/build/wg-go.xcframework"
-//            )
-//        )
-        package.targets.append(
-            .target(
-                name: "PartoutWireGuard_C",
-                dependencies: [
-                    "PartoutCore_C",
-                    "wg-go-apple"
-                ]
-            )
-        )
-    default:
-        // Load wg-go backend dynamically
-        package.targets.append(
-            .target(
-                name: "PartoutWireGuard_C",
-                dependencies: ["PartoutCore_C"],
-                cSettings: globalCSettings + [
-                    .unsafeFlags(["-I\(cmakeOutput)/wg-go/include"])
-                ],
-                linkerSettings: [
-                    .unsafeFlags(["-L\(cmakeOutput)/wg-go/lib"]),
-                    .linkedLibrary("\(staticLibPrefix)wg-go")
-                ]
-            )
-        )
-    }
+    ])
     package.targets.append(contentsOf: [
         .target(
             name: "PartoutWireGuard",
@@ -317,26 +257,14 @@ for mode in cryptoLibraries {
     switch mode {
     case .openSSL:
         // OpenSSL-based crypto/TLS implementations
-        switch OS.current {
-        case .apple:
-            package.dependencies.append(
-                .package(url: "https://github.com/partout-io/openssl-apple", from: openSSLVersion)
+        package.targets.append(
+            .binaryTarget(
+                name: "openssl-apple",
+                url: "https://github.com/partout-io/prebuilts/releases/download/\(prebuiltsVersion)/openssl.xcframework.zip",
+                checksum: openSSLChecksum
             )
-            cryptoDependencies.append("openssl-apple")
-        default:
-            package.targets.append(
-                .systemLibrary(
-                    name: "COpenSSL",
-                    path: "Sources/SystemLibraries/COpenSSL",
-                    pkgConfig: "openssl",
-                    providers: [
-                        .brew(["openssl@3"]),
-                        .apt(["libssl-dev"])
-                    ]
-                )
-            )
-            cryptoDependencies.append("COpenSSL")
-        }
+        )
+        cryptoDependencies.append("openssl-apple")
     case .mbedTLS:
         // Crypto with OS routines, TLS with MbedTLS
         package.targets.append(
@@ -345,8 +273,7 @@ for mode in cryptoLibraries {
                 path: "Sources/SystemLibraries/CMbedTLS",
                 pkgConfig: "mbedtls",
                 providers: [
-                    .brew(["mbedtls"]),
-                    .apt(["libmbedtls-dev"])
+                    .brew(["mbedtls"])
                 ]
             )
         )
@@ -360,19 +287,19 @@ package.targets.append(
         name: "PartoutCrypto_C",
         dependencies: cryptoDependencies,
         exclude: {
-            // Pick current OS by removing it from exclusions
+            // Only Darwin provides the native crypto implementation.
             var list: [String] = []
             if !cryptoLibraries.contains(.openSSL) {
                 list.append("crypto_openssl.c")
             }
-            var native = Set(OS.nativeCryptoSources)
             if !cryptoLibraries.contains(.mbedTLS) {
                 list.append("crypto_mbedtls.c")
-            } else {
-                native.remove(OS.current.nativeCryptoSource)
+                list.append("crypto_darwin.c")
             }
-            let nativeSrc = native.map { "crypto_\($0.rawValue).c" }
-            list.append(contentsOf: nativeSrc)
+            list.append(contentsOf: [
+                "crypto_linux.c",
+                "crypto_windows.c"
+            ])
             return list
         }(),
         cSettings: globalCSettings,
@@ -450,52 +377,6 @@ enum Area: Definable, CaseIterable {
         switch self {
         case .openVPN: "PARTOUT_OPENVPN"
         case .wireGuard: "PARTOUT_WIREGUARD"
-        }
-    }
-}
-
-enum OS: String, CaseIterable {
-    case android
-    case apple = "darwin"
-    case linux
-    case windows
-
-    static let nativeCryptoSources: Set<OS> = [.apple, .linux, .windows]
-
-    // Unfortunately, SwiftPM has no "when" conditionals on package
-    // dependencies. We resort on some raw #if, which are reliable
-    // as long as we don't cross-compile.
-    static var current: OS {
-        // Android is never compiled natively, therefore #if os(Android)
-        // would be wrong here. Resort to an explicit env variable.
-        if let envOS {
-            guard let os = OS(rawValue: envOS) else {
-                fatalError("Unrecognized OS '\(envOS)'")
-            }
-            return os
-        }
-#if os(Windows)
-        return .windows
-#elseif os(Linux)
-        return .linux
-#else
-        return .apple
-#endif
-    }
-
-    var platforms: [Platform] {
-        switch self {
-        case .android: [.android]
-        case .apple: [.iOS, .macOS, .tvOS]
-        case .linux: [.linux]
-        case .windows: [.windows]
-        }
-    }
-
-    var nativeCryptoSource: OS {
-        switch self {
-        case .android: .linux
-        default: self
         }
     }
 }
