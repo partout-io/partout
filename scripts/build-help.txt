@@ -1,3 +1,4 @@
+  -h, --help                     Show this help
   -clean                         Remove build output directories
   -gen                           Configure CMake
   -install <dir>                 Set the Zig install prefix

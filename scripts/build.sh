@@ -27,10 +27,12 @@ EOF
 EOF
 }
 
-if [[ $# -eq 0 ]]; then
-    print_help
-    exit 0
-fi
+for arg in "$@"; do
+    if [[ $arg == -h || $arg == --help ]]; then
+        print_help
+        exit 0
+    fi
+done
 
 root_dir="$script_dir"/..
 pushd $root_dir
@@ -86,6 +88,9 @@ generate_models() {
 
 positional_args=()
 cmake_opts=()
+if [[ $# -eq 0 ]]; then
+    do_build=1
+fi
 while [[ $# -gt 0 ]]; do
     case $1 in
         -clean)
@@ -240,11 +245,12 @@ if [[ $gen_models == 1 ]]; then
 fi
 
 # Configure CMake
-if [[ ! -d $build_dir ]]; then
-    mkdir $build_dir
-fi
 if [[ $gen_build == 1 ]]; then
+    mkdir -p $build_dir
     cmake -G Ninja -S . -B $build_dir "${cmake_opts[@]}"
+elif [[ $do_build == 1 && ! -f $build_dir/CMakeCache.txt ]]; then
+    echo "Build directory is not configured; run scripts/build.sh -gen first"
+    exit 1
 fi
 
 # Execute

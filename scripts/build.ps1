@@ -18,7 +18,7 @@ Options:
     Show-CommonHelp
 }
 
-if ($args.Count -eq 0) {
+if ($args -contains "-h" -or $args -contains "--help") {
     Show-Help
     exit 0
 }
@@ -34,7 +34,7 @@ try {
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
-    $do_build = $false
+    $do_build = $args.Count -eq 0
     $gen_build = $false
     $install_dir = $null
     $positional_args = @()
@@ -172,13 +172,16 @@ try {
         $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
     }
 
-    if (-not (Test-Path -Path $build_dir)) {
-        New-Item -ItemType Directory -Path $build_dir | Out-Null
-    }
     if ($gen_build) {
+        if (-not (Test-Path -Path $build_dir)) {
+            New-Item -ItemType Directory -Path $build_dir | Out-Null
+        }
         $configure_args = @("-G", $generator, "-S", ".", "-B", $build_dir) + $cmake_opts
         & cmake @configure_args
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } elseif ($do_build -and -not (Test-Path -Path (Join-Path $build_dir "CMakeCache.txt") -PathType Leaf)) {
+        Write-Error "Build directory is not configured; run scripts/build.ps1 -gen first"
+        exit 1
     }
 
     if ($do_build) {
