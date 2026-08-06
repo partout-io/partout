@@ -63,6 +63,17 @@ normalize_platform() {
     esac
 }
 
+framework_binary() {
+    local framework=$1
+    local platform=$2
+
+    if [[ $platform == macos ]]; then
+        printf '%s/Versions/A/%s\n' "$framework" "$framework_name"
+    else
+        printf '%s/%s\n' "$framework" "$framework_name"
+    fi
+}
+
 resolve_active_arch() {
     local candidates=("${CURRENT_ARCH:-}")
     local candidate
@@ -111,7 +122,7 @@ else
     library_extension=a
 fi
 
-for tool in zig xcrun xcodebuild lipo; do
+for tool in zig xcrun xcodebuild lipo plutil; do
     command -v "$tool" >/dev/null 2>&1 || fail "missing required tool: $tool"
 done
 
@@ -142,9 +153,68 @@ output_path="$output_parent/$(basename "$output_path")"
 [[ "$output_path" != / ]] || fail "refusing to replace root directory"
 [[ "$(basename "$output_path")" == *.xcframework ]] ||
     fail "output must have an .xcframework extension: $output_path"
-if [[ $full_build -eq 0 && ! -d "$output_path" ]]; then
-    echo "missing XCFramework to update, falling back to --full build: $output_path"
-    full_build=1
+
+identifier_matches_platform() {
+    local identifier=$1
+
+    case "$active_platform:$identifier" in
+        macos:macos-*) return 0 ;;
+        ios:ios-*-simulator) return 1 ;;
+        ios:ios-*) return 0 ;;
+        ios-simulator:ios-*-simulator) return 0 ;;
+        tvos:tvos-*-simulator) return 1 ;;
+        tvos:tvos-*) return 0 ;;
+        tvos-simulator:tvos-*-simulator) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+find_active_slice_identifier() {
+    local slice
+    local identifier
+    local framework
+    local binary
+    local existing_archs
+
+    [[ -d "$output_path" && -f "$output_path/Info.plist" ]] || return 1
+    plutil -lint "$output_path/Info.plist" >/dev/null 2>&1 || return 1
+    for slice in "$output_path"/*; do
+        [[ -d "$slice" ]] || continue
+        identifier=${slice##*/}
+        identifier_matches_platform "$identifier" || continue
+        framework="$slice/$framework_name.framework"
+        binary=$(framework_binary "$framework" "$active_platform")
+        [[ -f "$binary" ]] || continue
+        existing_archs=$(lipo -archs "$binary" 2>/dev/null) || continue
+        if [[ " $existing_archs " == *" $active_arch "* ]]; then
+            printf '%s\n' "$identifier"
+            return 0
+        fi
+    done
+    return 1
+}
+
+output_has_framework_slices() {
+    local framework
+
+    [[ -d "$output_path" ]] || return 1
+    for framework in "$output_path"/*/"$framework_name.framework"; do
+        [[ -d "$framework" ]] && return 0
+    done
+    return 1
+}
+
+create_active_output=0
+active_output_identifier=
+if [[ $full_build -eq 0 ]]; then
+    if active_output_identifier=$(find_active_slice_identifier); then
+        :
+    elif output_has_framework_slices; then
+        fail "missing $active_platform $active_arch slice in $output_path (rebuild it with --full)"
+    else
+        echo "No existing XCFramework slices; creating $active_platform $active_arch only"
+        create_active_output=1
+    fi
 fi
 
 find_xcframework() {
@@ -203,13 +273,6 @@ global_cache_dir="$zig_dir/zig-out/xcframework-global-cache"
 if [[ $full_build -eq 1 ]]; then
     echo "Removing cached XCFramework build"
     rm -rf "$work_dir" "$cache_dir" "$global_cache_dir"
-    for cache_slice in \
-        macos-arm64 macos-x86_64 \
-        ios-arm64 ios-simulator-arm64 ios-simulator-x86_64 \
-        tvos-arm64 tvos-simulator-arm64 tvos-simulator-x86_64; do
-        rm -rf "$cache_dir-$build_mode-slice-$cache_slice"
-        rm -rf "$global_cache_dir-$build_mode-slice-$cache_slice"
-    done
 fi
 mkdir -p "$work_dir" "$cache_dir" "$global_cache_dir"
 chmod 755 "$work_dir" "$cache_dir" "$global_cache_dir"
@@ -228,10 +291,6 @@ build_slice() {
     local mbedtls_identifier=$5
     local wg_go_identifier=$6
     local install_root="$work_dir/install/$name"
-    # Zig 0.16 fails to reopen manifests when multiple Darwin targets use
-    # shared or nested cache directories, so keep each slice in flat caches.
-    local slice_cache_dir="$cache_dir-$build_mode-slice-$name"
-    local slice_global_cache_dir="$global_cache_dir-$build_mode-slice-$name"
     local openssl_include
     local openssl_lib
     local mbedtls_include
@@ -254,10 +313,9 @@ build_slice() {
         wg_go.h wg_go/wg_go.h libwg-go.a
     wg_go_include=$xcframework_include_path
     wg_go_lib=$xcframework_library_path
-    mkdir -p "$install_root" "$slice_cache_dir" "$slice_global_cache_dir"
-    chmod 755 \
-        "$work_dir/install" "$install_root" \
-        "$slice_cache_dir" "$slice_global_cache_dir"
+    rm -rf "$install_root"
+    mkdir -p "$install_root"
+    chmod 755 "$work_dir/install" "$install_root"
 
     local build_options=(
         -Dtarget="$target"
@@ -286,8 +344,8 @@ build_slice() {
         zig build install \
             -j1 \
             --prefix "$install_root" \
-            --cache-dir "$slice_cache_dir" \
-            --global-cache-dir "$slice_global_cache_dir" \
+            --cache-dir "$cache_dir" \
+            --global-cache-dir "$global_cache_dir" \
             --release=small \
             "${build_options[@]}"
     )
@@ -307,7 +365,6 @@ configure_slice() {
             slice_openssl=macos-arm64_x86_64
             slice_mbedtls=macos-arm64_x86_64
             slice_wg_go=macos-arm64_x86_64
-            slice_identifier=macos-arm64_x86_64
             ;;
         ios:arm64)
             slice_target="aarch64-ios.$ios_min"
@@ -315,7 +372,6 @@ configure_slice() {
             slice_openssl=ios-arm64
             slice_mbedtls=ios-arm64
             slice_wg_go=ios-arm64
-            slice_identifier=ios-arm64
             ;;
         ios-simulator:*)
             slice_target="$zig_arch-ios.$ios_min-simulator"
@@ -323,7 +379,6 @@ configure_slice() {
             slice_openssl=ios-arm64_x86_64-simulator
             slice_mbedtls=ios-arm64_x86_64-simulator
             slice_wg_go=ios-arm64_x86_64-simulator
-            slice_identifier=ios-arm64_x86_64-simulator
             ;;
         tvos:arm64)
             slice_target="aarch64-tvos.$tvos_min"
@@ -331,7 +386,6 @@ configure_slice() {
             slice_openssl=tvos-arm64
             slice_mbedtls=tvos-arm64
             slice_wg_go=tvos-arm64
-            slice_identifier=tvos-arm64
             ;;
         tvos-simulator:*)
             slice_target="$zig_arch-tvos.$tvos_min-simulator"
@@ -339,7 +393,6 @@ configure_slice() {
             slice_openssl=tvos-arm64_x86_64-simulator
             slice_mbedtls=tvos-arm64_x86_64-simulator
             slice_wg_go=tvos-arm64_x86_64-simulator
-            slice_identifier=tvos-arm64_x86_64-simulator
             ;;
         *) fail "$platform does not support architecture $arch" ;;
     esac
@@ -427,17 +480,6 @@ make_framework() {
     printf '%s\n' "$framework"
 }
 
-framework_binary() {
-    local framework=$1
-    local platform=$2
-
-    if [[ $platform == macos ]]; then
-        printf '%s/Versions/A/%s\n' "$framework" "$framework_name"
-    else
-        printf '%s/%s\n' "$framework" "$framework_name"
-    fi
-}
-
 generated_output="$work_dir/$framework_name.xcframework"
 if [[ $full_build -eq 1 ]]; then
     xcframework_arguments=()
@@ -452,13 +494,19 @@ if [[ $full_build -eq 1 ]]; then
     xcodebuild -create-xcframework \
         "${xcframework_arguments[@]}" \
         -output "$generated_output"
+elif [[ $create_active_output -eq 1 ]]; then
+    active_binary="$work_dir/install/$slice_name/lib/$library_name"
+    framework=$(make_framework "$active_platform" "$active_binary")
+    xcodebuild -create-xcframework \
+        -framework "$framework" \
+        -output "$generated_output"
 else
     active_binary="$work_dir/install/$slice_name/lib/$library_name"
 
     # Preserve every other XCFramework slice and replace only the active
     # architecture in the matching platform variant.
     cp -R "$output_path" "$generated_output"
-    existing_framework="$generated_output/$slice_identifier/$framework_name.framework"
+    existing_framework="$generated_output/$active_output_identifier/$framework_name.framework"
     existing_binary=$(framework_binary "$existing_framework" "$active_platform")
     [[ -f $existing_binary ]] ||
         fail "missing $active_platform $active_arch slice in $output_path (rebuild it with --full)"
@@ -476,7 +524,8 @@ else
     cp "$zig_dir/src/module.modulemap" "$existing_framework/Modules/module.modulemap"
 fi
 
-if [[ $full_build -eq 0 ]] && diff -qr --no-dereference "$output_path" "$generated_output" >/dev/null; then
+if [[ $full_build -eq 0 && -d "$output_path" ]] &&
+    diff -qr --no-dereference "$output_path" "$generated_output" >/dev/null; then
     rm -rf "$generated_output"
     echo "Unchanged $output_path"
 else
