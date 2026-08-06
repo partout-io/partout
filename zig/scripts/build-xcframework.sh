@@ -243,14 +243,14 @@ build_slice() {
             --global-cache-dir "$global_cache_dir" \
             --release=small \
             -Dtarget="$target" \
-            -Dlegacy-build=true \
             -Dapple-sdk-path="$sdk" \
+            -Dopenvpn=true \
+            -Dwireguard=true \
+            -Dlegacy-build=true \
             -Dopenssl-include="$openssl_include" \
             -Dopenssl-lib="$openssl_lib" \
             -Dmbedtls-include="$mbedtls_include" \
             -Dmbedtls-lib="$mbedtls_lib" \
-            -Dopenvpn=true \
-            -Dwireguard=true \
             -Dwg-go-include="$wg_go_include" \
             -Dwg-go-lib="$wg_go_lib"
     )
