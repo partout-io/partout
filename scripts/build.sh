@@ -127,7 +127,7 @@ while [[ $# -gt 0 ]]; do
             shift
             ;;
         -crypto)
-            # openssl|native, comma-separated
+            # openssl|mbedtls, comma-separated
             if [[ -z ${2:-} || $2 == -* ]]; then
                 echo "-crypto requires a value"
                 exit 1
@@ -145,7 +145,7 @@ while [[ $# -gt 0 ]]; do
                     openssl)
                         crypto_openssl=1
                         ;;
-                    native)
+                    mbedtls)
                         crypto_mbedtls=1
                         ;;
                     "")

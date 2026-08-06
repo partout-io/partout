@@ -1,9 +1,9 @@
-  -h, --help                     Show this help
-  -clean                         Remove build output directories
-  -gen                           Configure CMake
-  -install <dir>                 Install build artifacts into a directory
-  -crypto <openssl|native>[,...] Enable one or more crypto backends
-  -openvpn                       Enable OpenVPN support
-  -wireguard                     Enable WireGuard support
-  -android                       Configure an Android build
-  -prebuilts <version>           Use a prebuilts release version
+  -h, --help                      Show this help
+  -clean                          Remove build output directories
+  -gen                            Configure CMake
+  -install <dir>                  Install build artifacts into a directory
+  -crypto <openssl|mbedtls>[,...] Enable one or more crypto backends
+  -openvpn                        Enable OpenVPN support
+  -wireguard                      Enable WireGuard support
+  -android                        Configure an Android build
+  -prebuilts <version>            Use a prebuilts release version

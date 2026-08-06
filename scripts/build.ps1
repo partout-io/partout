@@ -59,7 +59,7 @@ try {
                 "openssl" {
                     $script:crypto_openssl = $true
                 }
-                "native" {
+                "mbedtls" {
                     $script:crypto_mbedtls = $true
                 }
                 "" {

@@ -62,7 +62,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-gen`: Configure CMake
 - `-install <dir>`: Install the completed build artifacts into a directory
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
-- `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
+- `-crypto (openssl|mbedtls[,openssl|mbedtls...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
 - `-prebuilts <version>`: Use vendor archives from the matching `partout-io/prebuilts` GitHub release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
