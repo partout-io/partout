@@ -62,9 +62,14 @@ The script resolves the selected dependencies and accepts a few options:
 - `-gen`: Configure CMake
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
-- `-wireguard`: Enable support for WireGuard (requires Go)
+- `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
-- `-vendors <url>`: Set the prebuilts URL used when a system vendor is unavailable. Android, Windows, wg-go, and Wintun always require prebuilts.
+- `-vendors <vendor>=<url>`: Set an exact prebuilt archive URL for `openssl`, `mbedtls`, `wg-go`, or `wintun`. Repeat the option for multiple vendors. On macOS and Linux, CMake tries the system library first and uses this URL only as a fallback.
+
+The equivalent CMake variables are `PP_BUILD_OPENSSL_PREBUILT_URL`,
+`PP_BUILD_MBEDTLS_PREBUILT_URL`, `PP_BUILD_WG_GO_PREBUILT_URL`, and
+`PP_BUILD_WINTUN_PREBUILT_URL`. Optional `*_PREBUILT_HASH` variables accept a
+CMake `URL_HASH` value such as `SHA256=<digest>`.
 
 After the initial `-gen`, invoke the script without arguments to rebuild the
 existing configuration.

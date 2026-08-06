@@ -2,7 +2,6 @@
 set -e
 build_dir=.cmake
 bin_dir=bin
-vendor_prebuilt_url=
 crypto_selected=
 crypto_openssl=
 crypto_mbedtls=
@@ -182,10 +181,27 @@ while [[ $# -gt 0 ]]; do
             ;;
         -vendors)
             if [[ -z ${2:-} || $2 == -* ]]; then
-                echo "-vendors requires a URL"
+                echo "-vendors requires <vendor>=<url>"
                 exit 1
             fi
-            vendor_prebuilt_url=$2
+            vendor_spec=$2
+            vendor_name=${vendor_spec%%=*}
+            vendor_url=${vendor_spec#*=}
+            if [[ $vendor_spec != *=* || -z $vendor_url ]]; then
+                echo "-vendors requires <vendor>=<url>"
+                exit 1
+            fi
+            case $vendor_name in
+                openssl) vendor_id=OPENSSL ;;
+                mbedtls) vendor_id=MBEDTLS ;;
+                wg-go) vendor_id=WG_GO ;;
+                wintun) vendor_id=WINTUN ;;
+                *)
+                    echo "Unknown vendor '$vendor_name'"
+                    exit 1
+                    ;;
+            esac
+            cmake_opts+=("-DPP_BUILD_${vendor_id}_PREBUILT_URL=$vendor_url")
             shift
             shift
             ;;
@@ -213,10 +229,6 @@ if [[ $crypto_selected == 1 ]]; then
     else
         cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=OFF")
     fi
-fi
-
-if [[ -n $vendor_prebuilt_url ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
 fi
 
 # Generate models

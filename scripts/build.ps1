@@ -29,7 +29,6 @@ try {
     $bin_dir = "bin"
     $configuration = "Release"
     $generator = "Ninja Multi-Config"
-    $vendor_prebuilt_url = $null
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
@@ -116,7 +115,25 @@ try {
                 $index += 1
             }
             "-vendors" {
-                $vendor_prebuilt_url = Require-Value "-vendors" $index $args
+                $vendorSpec = Require-Value "-vendors" $index $args
+                $separator = $vendorSpec.IndexOf("=")
+                if ($separator -le 0 -or $separator -eq ($vendorSpec.Length - 1)) {
+                    Write-Error "-vendors requires <vendor>=<url>"
+                    exit 1
+                }
+                $vendorName = $vendorSpec.Substring(0, $separator)
+                $vendorUrl = $vendorSpec.Substring($separator + 1)
+                $vendorId = switch ($vendorName) {
+                    "openssl" { "OPENSSL" }
+                    "mbedtls" { "MBEDTLS" }
+                    "wg-go" { "WG_GO" }
+                    "wintun" { "WINTUN" }
+                    default {
+                        Write-Error "Unknown vendor '$vendorName'"
+                        exit 1
+                    }
+                }
+                $cmake_opts += "-DPP_BUILD_${vendorId}_PREBUILT_URL=$vendorUrl"
                 $index += 2
             }
             "-gen-models" {
@@ -145,10 +162,6 @@ try {
     if ($crypto_selected) {
         $cmake_opts += "-DPP_BUILD_USE_OPENSSL=$(ConvertTo-CMakeBool $crypto_openssl)"
         $cmake_opts += "-DPP_BUILD_USE_MBEDTLS=$(ConvertTo-CMakeBool $crypto_mbedtls)"
-    }
-
-    if ($vendor_prebuilt_url) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
     }
 
     if ($gen_build) {
