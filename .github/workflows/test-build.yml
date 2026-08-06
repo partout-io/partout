@@ -33,12 +33,12 @@ jobs:
       - name: Build with CMake (no vendors)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/build.ps1 -gen -l -install $env:INSTALL_DIR
+        run: ./scripts/build.ps1 -gen -install $env:INSTALL_DIR
       - name: Build with CMake (no vendors)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          ./scripts/build.sh -gen -l -install "$INSTALL_DIR"
+          ./scripts/build.sh -gen -install "$INSTALL_DIR"
       - name: Verify output
         if: runner.os == 'Windows'
         shell: pwsh

@@ -118,7 +118,7 @@ while [[ $# -gt 0 ]]; do
             fi
             install_dir=$2
             mkdir -p "$install_dir"
-            cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
+            cmake_opts+=("-DPP_BUILD_PREFIX=$install_dir")
             do_build=1
             shift
             shift
@@ -166,11 +166,6 @@ while [[ $# -gt 0 ]]; do
         -wireguard)
             do_build=1
             cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
-            shift
-            ;;
-        -l)
-            do_build=1
-            cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             shift
             ;;
         -android)
@@ -244,24 +239,17 @@ if [[ $gen_models == 1 ]]; then
     generate_models $gen_models_language
 fi
 
-# Generate CMake files
+# Configure CMake
 if [[ ! -d $build_dir ]]; then
     mkdir $build_dir
 fi
-if [[ ! -d $bin_dir ]]; then
-    mkdir $bin_dir
-fi
 if [[ $gen_build == 1 ]]; then
-    scripts/gen-cmake-files.sh
     cmake -G Ninja -S . -B $build_dir "${cmake_opts[@]}"
 fi
 
 # Execute
 if [[ $do_build == 1 ]]; then
     cmake --build $build_dir
-    if [[ -n $install_dir ]]; then
-        cmake --install $build_dir
-    fi
 fi
 
 popd

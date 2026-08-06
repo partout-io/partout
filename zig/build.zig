@@ -236,6 +236,15 @@ pub fn build(b: *std.Build) void {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
         b.installArtifact(lib);
     }
+    if (target.result.os.tag == .windows) {
+        if (vendor_includes.wintun) |include_path| {
+            const dll = b.fmt("{s}/wintun.dll", .{include_path});
+            b.getInstallStep().dependOn(&b.addInstallBinFile(
+                .{ .cwd_relative = dll },
+                "wintun.dll",
+            ).step);
+        }
+    }
 
     const install_docs = b.addInstallDirectory(.{
         .source_dir = lib.getEmittedDocs(),
