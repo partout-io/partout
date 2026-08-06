@@ -36,16 +36,16 @@ targets: [
 
 ### CMake
 
-Partout can be imported as a CMake project. The exported target is `partout`.
+CMake is a thin wrapper around the Zig build. It builds the selected vendors,
+then invokes `zig build install` with their include and library paths.
 
 #### Requirements
 
-- Swift
-- C/C++ build tools
+- Zig 0.16+
+- C build tools
 - CMake
 - ninja
 - Android NDK (optional)
-- [Swift Android SDK][swift-android-sdk] (optional)
 
 These are the requirements for Partout, but additional build tools may be required depending on the vendors build system.
 
@@ -56,36 +56,39 @@ Use one of the `scripts/build.*` variants based on the host platform:
 - `scripts/build.sh` (bash)
 - `scripts/build.ps1` (Windows PowerShell)
 
-The script builds the vendors as static libraries and accepts a few options: 
+The script builds the selected vendors and accepts a few options:
 
-- `-gen`: Generate CMake metadata
+- `-h`, `--help`: Show the build help
+- `-gen`: Configure CMake
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
-- `-l`: Build the Partout library (opt-in)
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable support for WireGuard (requires Go)
 - `-android`: Build for Android
 - `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
 
+After the initial `-gen`, invoke the script without arguments to rebuild the
+existing configuration.
+
 For example, this will build Partout for release with a dependency on OpenSSL:
 
 ```shell
-$ scripts/build.sh -gen -config Release -l -crypto openssl
+$ scripts/build.sh -gen -config Release -crypto openssl
 ```
 
 Sample output:
 
 ```
 # macOS
-bin/darwin-arm64/libpartout.dylib	
+bin/darwin-arm64/partout/lib/libpartout.dylib
 # Linux
-bin/linux-aarch64/libpartout.so
+bin/linux-aarch64/partout/lib/libpartout.so
 # Android
-bin/android-aarch64/libpartout.so
+bin/android-aarch64/partout/lib/libpartout.so
 # Windows
-bin/windows-arm64/partout.dll
+bin/windows-arm64/partout/bin/partout.dll
 ```
 
-Partout must be bundled with the shared vendored libraries to work. On Windows, it must also include the Swift runtime DLLs. Building for Android requires access to the Android NDK and the Swift Android SDK.
+Partout must be bundled with the enabled shared vendor libraries to work. Building for Android requires access to the Android NDK.
 
 Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
 
@@ -93,7 +96,7 @@ Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
 
 ### Xcode
 
-There is an Xcode Demo in the `Examples` directory. Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
+There is an Xcode Demo in the `cross/swift` directory. Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
 Put your configuration files into `Demo/App/Files` with these names:
 

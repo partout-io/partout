@@ -1,9 +1,9 @@
+  -h, --help                     Show this help
   -clean                         Remove build output directories
-  -gen                           Generate CMake metadata and configure
-  -install <dir>                 Install after building
+  -gen                           Configure CMake
+  -install <dir>                 Set the Zig install prefix
   -crypto <openssl|native>[,...] Enable one or more crypto backends
   -openvpn                       Enable OpenVPN support
   -wireguard                     Enable WireGuard support
-  -l                             Build the Partout library
   -android                       Configure an Android build
   -vendors [auto|bundled|<url>]  Select source (prebuilt URL: Android/Windows only)

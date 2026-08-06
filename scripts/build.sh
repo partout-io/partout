@@ -27,10 +27,12 @@ EOF
 EOF
 }
 
-if [[ $# -eq 0 ]]; then
-    print_help
-    exit 0
-fi
+for arg in "$@"; do
+    if [[ $arg == -h || $arg == --help ]]; then
+        print_help
+        exit 0
+    fi
+done
 
 root_dir="$script_dir"/..
 pushd $root_dir
@@ -86,6 +88,9 @@ generate_models() {
 
 positional_args=()
 cmake_opts=()
+if [[ $# -eq 0 ]]; then
+    do_build=1
+fi
 while [[ $# -gt 0 ]]; do
     case $1 in
         -clean)
@@ -118,7 +123,7 @@ while [[ $# -gt 0 ]]; do
             fi
             install_dir=$2
             mkdir -p "$install_dir"
-            cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
+            cmake_opts+=("-DPP_BUILD_PREFIX=$install_dir")
             do_build=1
             shift
             shift
@@ -166,11 +171,6 @@ while [[ $# -gt 0 ]]; do
         -wireguard)
             do_build=1
             cmake_opts+=("-DPP_BUILD_USE_WIREGUARD=ON")
-            shift
-            ;;
-        -l)
-            do_build=1
-            cmake_opts+=("-DPP_BUILD_LIBRARY=ON")
             shift
             ;;
         -android)
@@ -244,24 +244,18 @@ if [[ $gen_models == 1 ]]; then
     generate_models $gen_models_language
 fi
 
-# Generate CMake files
-if [[ ! -d $build_dir ]]; then
-    mkdir $build_dir
-fi
-if [[ ! -d $bin_dir ]]; then
-    mkdir $bin_dir
-fi
+# Configure CMake
 if [[ $gen_build == 1 ]]; then
-    scripts/gen-cmake-files.sh
+    mkdir -p $build_dir
     cmake -G Ninja -S . -B $build_dir "${cmake_opts[@]}"
+elif [[ $do_build == 1 && ! -f $build_dir/CMakeCache.txt ]]; then
+    echo "Build directory is not configured; run scripts/build.sh -gen first"
+    exit 1
 fi
 
 # Execute
 if [[ $do_build == 1 ]]; then
     cmake --build $build_dir
-    if [[ -n $install_dir ]]; then
-        cmake --install $build_dir
-    fi
 fi
 
 popd

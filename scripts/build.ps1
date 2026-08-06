@@ -18,7 +18,7 @@ Options:
     Show-CommonHelp
 }
 
-if ($args.Count -eq 0) {
+if ($args -contains "-h" -or $args -contains "--help") {
     Show-Help
     exit 0
 }
@@ -34,7 +34,7 @@ try {
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
-    $do_build = $false
+    $do_build = $args.Count -eq 0
     $gen_build = $false
     $install_dir = $null
     $positional_args = @()
@@ -76,11 +76,6 @@ try {
         }
     }
 
-    function Get-SourceRelativePath($base_dir, $file) {
-        $relative = $file.FullName.Substring($base_dir.Length).TrimStart([char[]]@("\", "/"))
-        "./" + ($relative -replace "\\", "/")
-    }
-
     $index = 0
     while ($index -lt $args.Count) {
         switch ($args[$index]) {
@@ -96,7 +91,7 @@ try {
             "-install" {
                 $install_dir = Require-Value "-install" $index $args
                 New-Item -ItemType Directory -Path $install_dir -Force | Out-Null
-                $cmake_opts += "-DCMAKE_INSTALL_PREFIX=$install_dir"
+                $cmake_opts += "-DPP_BUILD_PREFIX=$install_dir"
                 $do_build = $true
                 $index += 2
             }
@@ -111,11 +106,6 @@ try {
             }
             "-wireguard" {
                 $cmake_opts += "-DPP_BUILD_USE_WIREGUARD=ON"
-                $do_build = $true
-                $index += 1
-            }
-            "-l" {
-                $cmake_opts += "-DPP_BUILD_LIBRARY=ON"
                 $do_build = $true
                 $index += 1
             }
@@ -182,26 +172,21 @@ try {
         $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
     }
 
-    if (-not (Test-Path -Path $build_dir)) {
-        New-Item -ItemType Directory -Path $build_dir | Out-Null
-    }
-    if (-not (Test-Path -Path $bin_dir)) {
-        New-Item -ItemType Directory -Path $bin_dir | Out-Null
-    }
-
     if ($gen_build) {
+        if (-not (Test-Path -Path $build_dir)) {
+            New-Item -ItemType Directory -Path $build_dir | Out-Null
+        }
         $configure_args = @("-G", $generator, "-S", ".", "-B", $build_dir) + $cmake_opts
         & cmake @configure_args
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    } elseif ($do_build -and -not (Test-Path -Path (Join-Path $build_dir "CMakeCache.txt") -PathType Leaf)) {
+        Write-Error "Build directory is not configured; run scripts/build.ps1 -gen first"
+        exit 1
     }
 
     if ($do_build) {
         & cmake --build $build_dir --config $configuration
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        if ($install_dir) {
-            & cmake --install $build_dir --config $configuration
-            if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-        }
     }
 } finally {
     Pop-Location
