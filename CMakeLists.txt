@@ -102,8 +102,6 @@ endif()
 
 set(PARTOUT_ZIG_ARGS build install
     --prefix "${PP_BUILD_PREFIX}"
-    --cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-cache"
-    --global-cache-dir "${CMAKE_CURRENT_BINARY_DIR}/zig-global-cache"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
     "-Dshared=$<IF:$<BOOL:${PP_BUILD_STATIC}>,false,true>"
 )
