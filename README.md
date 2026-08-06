@@ -36,7 +36,7 @@ targets: [
 
 ### CMake
 
-CMake is a thin wrapper around the Zig build. It builds the selected vendors,
+CMake is a thin wrapper around the Zig build. It resolves the selected vendors,
 then invokes `zig build install` with their include and library paths.
 
 #### Requirements
@@ -47,7 +47,7 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-These are the requirements for Partout, but additional build tools may be required depending on the vendors build system.
+Partout consumes system libraries or artifacts published by the `prebuilts` project; it does not build vendor sources.
 
 #### Build
 
@@ -56,15 +56,20 @@ Use one of the `scripts/build.*` variants based on the host platform:
 - `scripts/build.sh` (bash)
 - `scripts/build.ps1` (Windows PowerShell)
 
-The script builds the selected vendors and accepts a few options:
+The script resolves the selected dependencies and accepts a few options:
 
 - `-h`, `--help`: Show the build help
 - `-gen`: Configure CMake
+- `-install <dir>`: Install the completed build artifacts into a directory
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
-- `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
-- `-wireguard`: Enable support for WireGuard (requires Go)
+- `-crypto (openssl|mbedtls[,openssl|mbedtls...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
+- `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
-- `-vendors [bundled|<url>]`: Build bundled vendors (requires submodules), or provide the prebuilt vendor URL for Android/Windows
+- `-prebuilts <version>`: Use vendor archives from the matching `partout-io/prebuilts` GitHub release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
+
+The equivalent CMake variable is `PP_BUILD_VENDOR_PREBUILT_URL`. Optional
+vendor-specific `*_PREBUILT_HASH` variables accept a CMake `URL_HASH` value
+such as `SHA256=<digest>`.
 
 After the initial `-gen`, invoke the script without arguments to rebuild the
 existing configuration.

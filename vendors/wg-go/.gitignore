@@ -1,5 +1,0 @@
-.DS_Store
-build/
-bin/
-.goroot
-wg-go.def

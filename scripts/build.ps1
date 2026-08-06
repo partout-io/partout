@@ -29,8 +29,6 @@ try {
     $bin_dir = "bin"
     $configuration = "Release"
     $generator = "Ninja Multi-Config"
-    $vendor_source = $null
-    $vendor_prebuilt_url = $null
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
@@ -61,7 +59,7 @@ try {
                 "openssl" {
                     $script:crypto_openssl = $true
                 }
-                "native" {
+                "mbedtls" {
                     $script:crypto_mbedtls = $true
                 }
                 "" {
@@ -91,7 +89,7 @@ try {
             "-install" {
                 $install_dir = Require-Value "-install" $index $args
                 New-Item -ItemType Directory -Path $install_dir -Force | Out-Null
-                $cmake_opts += "-DPP_BUILD_PREFIX=$install_dir"
+                $cmake_opts += "-DCMAKE_INSTALL_PREFIX=$install_dir"
                 $do_build = $true
                 $index += 2
             }
@@ -116,26 +114,11 @@ try {
                 $cmake_opts += "-DANDROID_ABI=arm64-v8a"
                 $index += 1
             }
-            "-vendors" {
-                if (($index + 1) -ge $args.Count -or $args[$index + 1].StartsWith("-")) {
-                    $index += 1
-                } else {
-                    switch ($args[$index + 1]) {
-                        "auto" {
-                            $vendor_source = $null
-                            $vendor_prebuilt_url = $null
-                        }
-                        "bundled" {
-                            $vendor_source = "bundled"
-                            $vendor_prebuilt_url = $null
-                        }
-                        default {
-                            $vendor_source = $null
-                            $vendor_prebuilt_url = $args[$index + 1]
-                        }
-                    }
-                    $index += 2
-                }
+            "-prebuilts" {
+                $prebuiltsVersion = Require-Value "-prebuilts" $index $args
+                $prebuiltsUrl = "https://github.com/partout-io/prebuilts/releases/download/$prebuiltsVersion"
+                $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$prebuiltsUrl"
+                $index += 2
             }
             "-gen-models" {
                 Write-Error "-gen-models is not supported by build.ps1"
@@ -165,13 +148,6 @@ try {
         $cmake_opts += "-DPP_BUILD_USE_MBEDTLS=$(ConvertTo-CMakeBool $crypto_mbedtls)"
     }
 
-    if ($vendor_source) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_SOURCE=$vendor_source"
-    }
-    if ($vendor_prebuilt_url) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
-    }
-
     if ($gen_build) {
         if (-not (Test-Path -Path $build_dir)) {
             New-Item -ItemType Directory -Path $build_dir | Out-Null
@@ -186,6 +162,10 @@ try {
 
     if ($do_build) {
         & cmake --build $build_dir --config $configuration
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    if ($install_dir) {
+        & cmake --install $build_dir --config $configuration
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 } finally {

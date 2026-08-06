@@ -2,8 +2,6 @@
 set -e
 build_dir=.cmake
 bin_dir=bin
-vendor_source=
-vendor_prebuilt_url=
 crypto_selected=
 crypto_openssl=
 crypto_mbedtls=
@@ -123,13 +121,13 @@ while [[ $# -gt 0 ]]; do
             fi
             install_dir=$2
             mkdir -p "$install_dir"
-            cmake_opts+=("-DPP_BUILD_PREFIX=$install_dir")
+            cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
             do_build=1
             shift
             shift
             ;;
         -crypto)
-            # openssl|native, comma-separated
+            # openssl|mbedtls, comma-separated
             if [[ -z ${2:-} || $2 == -* ]]; then
                 echo "-crypto requires a value"
                 exit 1
@@ -147,7 +145,7 @@ while [[ $# -gt 0 ]]; do
                     openssl)
                         crypto_openssl=1
                         ;;
-                    native)
+                    mbedtls)
                         crypto_mbedtls=1
                         ;;
                     "")
@@ -181,24 +179,15 @@ while [[ $# -gt 0 ]]; do
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
             shift
             ;;
-        -vendors)
+        -prebuilts)
             if [[ -z ${2:-} || $2 == -* ]]; then
-                shift
-            else
-                case $2 in
-                    auto)
-                        vendor_source=
-                        ;;
-                    bundled)
-                        vendor_source=bundled
-                        ;;
-                    *)
-                        vendor_prebuilt_url=$2
-                        ;;
-                esac
-                shift
-                shift
+                echo "-prebuilts requires a version"
+                exit 1
             fi
+            prebuilts_url="https://github.com/partout-io/prebuilts/releases/download/$2"
+            cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$prebuilts_url")
+            shift
+            shift
             ;;
         -*|--*)
             echo "Unknown option $1"
@@ -212,11 +201,6 @@ while [[ $# -gt 0 ]]; do
 done
 set -- "${positional_args[@]}"
 
-if [[ -n $vendor_prebuilt_url && $is_android != 1 ]]; then
-    echo "-vendors <url> is only supported for Android builds by build.sh"
-    exit 1
-fi
-
 # Crypto
 if [[ $crypto_selected == 1 ]]; then
     if [[ $crypto_openssl == 1 ]]; then
@@ -229,14 +213,6 @@ if [[ $crypto_selected == 1 ]]; then
     else
         cmake_opts+=("-DPP_BUILD_USE_MBEDTLS=OFF")
     fi
-fi
-
-# Vendor overrides
-if [[ -n $vendor_source ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_SOURCE=$vendor_source")
-fi
-if [[ -n $vendor_prebuilt_url ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
 fi
 
 # Generate models
@@ -256,6 +232,9 @@ fi
 # Execute
 if [[ $do_build == 1 ]]; then
     cmake --build $build_dir
+fi
+if [[ -n $install_dir ]]; then
+    cmake --install $build_dir
 fi
 
 popd
