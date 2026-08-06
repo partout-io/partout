@@ -5,6 +5,9 @@ set(WGGO_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vendors/wg-go")
 if(WIN32)
     set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
     set(WGGO_IMPORT_LIBRARY "${WGGO_DIR}/lib/wg-go${CMAKE_IMPORT_LIBRARY_SUFFIX}")
+elseif(APPLE)
+    set(WGGO_RUNTIME_LIBRARY
+        "${WGGO_DIR}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}wg-go${CMAKE_STATIC_LIBRARY_SUFFIX}")
 else()
     set(WGGO_RUNTIME_LIBRARY
         "${WGGO_DIR}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}wg-go${CMAKE_SHARED_LIBRARY_SUFFIX}")
@@ -70,7 +73,10 @@ if(WIN32)
 else()
     set(WGGO_OUTPUTS "${WGGO_RUNTIME_LIBRARY}")
     set(WGGO_BUILD_COMMANDS
-        COMMAND ${VENDOR_ENV} make -C "${WGGO_SOURCE_DIR}" install "DESTDIR=${WGGO_DIR}"
+        COMMAND ${VENDOR_ENV} make -C "${WGGO_SOURCE_DIR}" install
+            "BUILDDIR=${CMAKE_CURRENT_BINARY_DIR}/vendors/wg-go-build"
+            "DESTDIR=${WGGO_DIR}"
+            "TMPROOTDIR=${CMAKE_CURRENT_BINARY_DIR}/vendors/wg-go-goroot"
     )
     if(ANDROID)
         list(APPEND WGGO_BUILD_COMMANDS
@@ -78,8 +84,30 @@ else()
             "CC=${CMAKE_LIBRARY_ARCHITECTURE}${ANDROID_NATIVE_API_LEVEL}-clang"
         )
     elseif(APPLE)
+        if(NOT CMAKE_OSX_SYSROOT OR NOT CMAKE_C_COMPILER_TARGET)
+            message(FATAL_ERROR
+                "Apple wg-go builds require CMAKE_OSX_SYSROOT and CMAKE_C_COMPILER_TARGET")
+        endif()
+        if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
+            set(WGGO_GOARCH arm64)
+        elseif(ARCH_NAME MATCHES "^(x86_64|amd64)$")
+            set(WGGO_GOARCH amd64)
+        else()
+            message(FATAL_ERROR "Unsupported wg-go Apple architecture: ${ARCH_NAME}")
+        endif()
+        if(CMAKE_SYSTEM_NAME STREQUAL "Darwin")
+            set(WGGO_GOOS darwin)
+        elseif(CMAKE_SYSTEM_NAME MATCHES "^(iOS|tvOS)$")
+            set(WGGO_GOOS ios)
+        else()
+            message(FATAL_ERROR "Unsupported wg-go Apple system: ${CMAKE_SYSTEM_NAME}")
+        endif()
         list(APPEND WGGO_BUILD_COMMANDS
-            COMMAND install_name_tool -id @rpath/libwg-go.dylib "${WGGO_RUNTIME_LIBRARY}"
+            APPLE=1
+            "GOARCH=${WGGO_GOARCH}"
+            "GOOS=${WGGO_GOOS}"
+            "SDKROOT=${CMAKE_OSX_SYSROOT}"
+            "TARGET=${CMAKE_C_COMPILER_TARGET}"
         )
     endif()
 endif()

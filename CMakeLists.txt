@@ -7,6 +7,7 @@ include(GNUInstallDirs)
 include("cmake/prebuilt.cmake")
 
 option(PP_BUILD_STATIC "Build Partout as a static library" OFF)
+option(PP_BUILD_LIBRARY "Build the Partout library" ON)
 option(PP_BUILD_USE_OPENSSL "Enable the OpenSSL backend" OFF)
 option(PP_BUILD_USE_MBEDTLS "Enable the MbedTLS backend" OFF)
 option(PP_BUILD_USE_OPENVPN "Enable OpenVPN" OFF)
@@ -193,15 +194,17 @@ if(PARTOUT_ZIG_TARGET)
     list(APPEND PARTOUT_ZIG_ARGS "-Dtarget=${PARTOUT_ZIG_TARGET}")
 endif()
 
-find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
-add_custom_target(partout ALL
-    COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_SOURCE_DIR}/zig"
-        "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
-    DEPENDS ${PARTOUT_ZIG_DEPENDS}
-    USES_TERMINAL
-    COMMAND_EXPAND_LISTS
-    VERBATIM
-)
+if(PP_BUILD_LIBRARY)
+    find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
+    add_custom_target(partout ALL
+        COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_SOURCE_DIR}/zig"
+            "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
+        DEPENDS ${PARTOUT_ZIG_DEPENDS}
+        USES_TERMINAL
+        COMMAND_EXPAND_LISTS
+        VERBATIM
+    )
+endif()
 
 if(WIN32)
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_BINDIR}")

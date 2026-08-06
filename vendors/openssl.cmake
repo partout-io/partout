@@ -24,20 +24,34 @@ if(PP_USE_PREBUILT_VENDORS)
     return()
 endif()
 
-set(OPENSSL_TARGET "")
-if(WIN32)
-    if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
-        set(OPENSSL_TARGET VC-WIN64-ARM)
-    else()
-        set(OPENSSL_TARGET VC-WIN64A)
+set(OPENSSL_TARGET "" CACHE STRING "OpenSSL Configure target")
+set(OPENSSL_PLATFORM_ARGS "" CACHE STRING "Additional OpenSSL Configure arguments")
+set(OPENSSL_ENV ${VENDOR_ENV})
+if(NOT OPENSSL_TARGET)
+    if(WIN32)
+        if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
+            set(OPENSSL_TARGET VC-WIN64-ARM)
+        else()
+            set(OPENSSL_TARGET VC-WIN64A)
+        endif()
+    elseif(ANDROID)
+        set(OPENSSL_TARGET android-arm64)
     endif()
-elseif(ANDROID)
-    set(OPENSSL_TARGET android-arm64)
-    list(APPEND VENDOR_ENV "ANDROID_NDK_ROOT=${CMAKE_ANDROID_NDK}")
+endif()
+
+if(ANDROID)
+    list(APPEND OPENSSL_ENV "ANDROID_NDK_ROOT=${CMAKE_ANDROID_NDK}")
+elseif(APPLE)
+    set(OPENSSL_ENV
+        "${CMAKE_COMMAND}" -E env
+        "CFLAGS=-isysroot ${CMAKE_OSX_SYSROOT} -target ${CMAKE_C_COMPILER_TARGET}"
+        "LDFLAGS=-isysroot ${CMAKE_OSX_SYSROOT} -target ${CMAKE_C_COMPILER_TARGET}"
+    )
 endif()
 
 set(OPENSSL_CONFIGURE_ARGS
     ${OPENSSL_TARGET}
+    ${OPENSSL_PLATFORM_ARGS}
     "--prefix=${OPENSSL_DIR}"
     "--openssldir=${OPENSSL_DIR}"
     --libdir=lib
@@ -53,7 +67,7 @@ set(OPENSSL_CONFIGURE_ARGS
     no-zlib
 )
 
-set(OPENSSL_BUILD_COMMAND ${VENDOR_ENV} ${MAKE_CMD})
+set(OPENSSL_BUILD_COMMAND ${OPENSSL_ENV} ${MAKE_CMD})
 if(NOT WIN32)
     include(ProcessorCount)
     ProcessorCount(OPENSSL_BUILD_JOBS)
@@ -62,7 +76,7 @@ if(NOT WIN32)
     endif()
 endif()
 
-set(OPENSSL_INSTALL_COMMAND ${VENDOR_ENV} ${MAKE_CMD} install_sw)
+set(OPENSSL_INSTALL_COMMAND ${OPENSSL_ENV} ${MAKE_CMD} install_sw)
 if(APPLE)
     list(APPEND OPENSSL_INSTALL_COMMAND
         COMMAND install_name_tool -id @rpath/libcrypto.3.dylib "${OPENSSL_DIR}/lib/libcrypto.3.dylib"
@@ -81,7 +95,7 @@ ExternalProject_Add(OpenSSLProject
     DOWNLOAD_COMMAND
         "${CMAKE_COMMAND}" -E rm -rf "${OPENSSL_BUILD_SOURCE_DIR}"
         COMMAND "${CMAKE_COMMAND}" -E copy_directory "${OPENSSL_SOURCE_DIR}" "${OPENSSL_BUILD_SOURCE_DIR}"
-    CONFIGURE_COMMAND ${VENDOR_ENV} perl "${OPENSSL_BUILD_SOURCE_DIR}/Configure" ${OPENSSL_CONFIGURE_ARGS}
+    CONFIGURE_COMMAND ${OPENSSL_ENV} perl "${OPENSSL_BUILD_SOURCE_DIR}/Configure" ${OPENSSL_CONFIGURE_ARGS}
     BUILD_COMMAND ${OPENSSL_BUILD_COMMAND}
     INSTALL_COMMAND ${OPENSSL_INSTALL_COMMAND}
     BUILD_IN_SOURCE 1
