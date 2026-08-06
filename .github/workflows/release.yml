@@ -53,7 +53,7 @@ jobs:
           archive="$xcframework.zip"
           release_body="$RUNNER_TEMP/release-body.md"
 
-          zig/scripts/build-xcframework.sh "$xcframework" "$ARTIFACTS_DIR" --full
+          zig/scripts/build-xcframework.sh "$xcframework" "$ARTIFACTS_DIR" --full --monolith
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
           checksum=$(swift package compute-checksum "$archive")
 
