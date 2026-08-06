@@ -17,18 +17,23 @@ fail() {
 }
 
 if [[ $# -lt 1 ]]; then
-    fail "usage: $0 <output.xcframework> [artifacts-directory] [--full]"
+    fail "usage: $0 <output.xcframework> [artifacts-directory] [--full] [--monolith]"
 fi
 
 output_argument=$1
 artifacts_argument=
 full_build=0
+monolith_build=0
 shift
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --full)
             [[ $full_build -eq 0 ]] || fail "duplicate option: --full"
             full_build=1
+            ;;
+        --monolith)
+            [[ $monolith_build -eq 0 ]] || fail "duplicate option: --monolith"
+            monolith_build=1
             ;;
         -*) fail "unknown option: $1" ;;
         *)
@@ -56,6 +61,17 @@ normalize_platform() {
         tvos-simulator|appletvsimulator*) printf '%s\n' tvos-simulator ;;
         *) return 1 ;;
     esac
+}
+
+framework_binary() {
+    local framework=$1
+    local platform=$2
+
+    if [[ $platform == macos ]]; then
+        printf '%s/Versions/A/%s\n' "$framework" "$framework_name"
+    else
+        printf '%s/%s\n' "$framework" "$framework_name"
+    fi
 }
 
 resolve_active_arch() {
@@ -94,8 +110,19 @@ if [[ $full_build -eq 0 ]]; then
 else
     echo "Building all platform and architecture slices"
 fi
+if [[ $monolith_build -eq 1 ]]; then
+    echo "Building a dynamic monolith with statically linked vendors"
+    build_mode=monolith
+    library_name=libpartout.dylib
+    library_extension=dylib
+else
+    echo "Building a static library with external vendor implementations"
+    build_mode=legacy
+    library_name=libpartout.a
+    library_extension=a
+fi
 
-for tool in zig xcrun xcodebuild lipo; do
+for tool in zig xcrun xcodebuild lipo plutil; do
     command -v "$tool" >/dev/null 2>&1 || fail "missing required tool: $tool"
 done
 
@@ -126,20 +153,76 @@ output_path="$output_parent/$(basename "$output_path")"
 [[ "$output_path" != / ]] || fail "refusing to replace root directory"
 [[ "$(basename "$output_path")" == *.xcframework ]] ||
     fail "output must have an .xcframework extension: $output_path"
-if [[ $full_build -eq 0 && ! -d "$output_path" ]]; then
-    echo "missing XCFramework to update, falling back to --full build: $output_path"
-    full_build=1
+
+identifier_matches_platform() {
+    local identifier=$1
+
+    case "$active_platform:$identifier" in
+        macos:macos-*) return 0 ;;
+        ios:ios-*-simulator) return 1 ;;
+        ios:ios-*) return 0 ;;
+        ios-simulator:ios-*-simulator) return 0 ;;
+        tvos:tvos-*-simulator) return 1 ;;
+        tvos:tvos-*) return 0 ;;
+        tvos-simulator:tvos-*-simulator) return 0 ;;
+        *) return 1 ;;
+    esac
+}
+
+find_active_slice_identifier() {
+    local slice
+    local identifier
+    local framework
+    local binary
+    local existing_archs
+
+    [[ -d "$output_path" && -f "$output_path/Info.plist" ]] || return 1
+    plutil -lint "$output_path/Info.plist" >/dev/null 2>&1 || return 1
+    for slice in "$output_path"/*; do
+        [[ -d "$slice" ]] || continue
+        identifier=${slice##*/}
+        identifier_matches_platform "$identifier" || continue
+        framework="$slice/$framework_name.framework"
+        binary=$(framework_binary "$framework" "$active_platform")
+        [[ -f "$binary" ]] || continue
+        existing_archs=$(lipo -archs "$binary" 2>/dev/null) || continue
+        if [[ " $existing_archs " == *" $active_arch "* ]]; then
+            printf '%s\n' "$identifier"
+            return 0
+        fi
+    done
+    return 1
+}
+
+output_has_framework_slices() {
+    local framework
+
+    [[ -d "$output_path" ]] || return 1
+    for framework in "$output_path"/*/"$framework_name.framework"; do
+        [[ -d "$framework" ]] && return 0
+    done
+    return 1
+}
+
+create_active_output=0
+active_output_identifier=
+if [[ $full_build -eq 0 ]]; then
+    if active_output_identifier=$(find_active_slice_identifier); then
+        :
+    elif output_has_framework_slices; then
+        fail "missing $active_platform $active_arch slice in $output_path (rebuild it with --full)"
+    else
+        echo "No existing XCFramework slices; creating $active_platform $active_arch only"
+        create_active_output=1
+    fi
 fi
 
 find_xcframework() {
     local package=$1
-    local product=$2
-    local package_dir="$artifacts_dir/$package"
     local result
 
-    [[ -d "$package_dir" ]] || fail "missing SwiftPM artifact: $package_dir"
-    result=$(find "$package_dir" -type d -name "$product.xcframework" -print -quit)
-    [[ -n "$result" ]] || fail "unable to find $product.xcframework under $package_dir"
+    result=$(find "$artifacts_dir" -type d -name "$package.xcframework" -print -quit)
+    [[ -n "$result" ]] || fail "unable to find $package.xcframework under $artifacts_dir"
     cd "$(dirname "$result")"
     printf '%s/%s\n' "$(pwd)" "$(basename "$result")"
 }
@@ -180,9 +263,9 @@ resolve_xcframework_paths() {
         fail "$product artifact slice $identifier must contain Headers/$header"
 }
 
-openssl_xcframework=$(find_xcframework openssl-apple openssl)
-mbedtls_xcframework=$(find_xcframework mbedtls-apple mbedtls)
-wg_go_xcframework=$(find_xcframework wg-go-apple wg-go)
+openssl_xcframework=$(find_xcframework openssl)
+mbedtls_xcframework=$(find_xcframework mbedtls)
+wg_go_xcframework=$(find_xcframework wg-go)
 
 work_dir="$zig_dir/zig-out/xcframework-build"
 cache_dir="$zig_dir/zig-out/xcframework-cache"
@@ -200,13 +283,44 @@ ios_simulator_sdk=$(xcrun --sdk iphonesimulator --show-sdk-path)
 tvos_sdk=$(xcrun --sdk appletvos --show-sdk-path)
 tvos_simulator_sdk=$(xcrun --sdk appletvsimulator --show-sdk-path)
 
+link_monolith() {
+    local install_root=$1
+    local clang_target=$2
+    local sdk=$3
+    local openssl_lib=$4
+    local mbedtls_lib=$5
+    local wg_go_lib=$6
+    local static_library="$install_root/lib/libpartout.a"
+    local dynamic_library="$install_root/lib/libpartout.dylib"
+
+    [[ -f "$static_library" ]] || fail "missing static Partout library: $static_library"
+    xcrun clang \
+        -target "$clang_target" \
+        -isysroot "$sdk" \
+        -dynamiclib \
+        -Wl,-install_name,"@rpath/$framework_name.framework/$framework_name" \
+        -Wl,-compatibility_version,1.0.0 \
+        -Wl,-current_version,1.0.0 \
+        -Wl,-dead_strip \
+        -Wl,-rpath,@loader_path \
+        -Wl,-exported_symbols_list,"$zig_dir/src/partout.exports" \
+        -Wl,-force_load,"$static_library" \
+        "$openssl_lib/libopenssl.a" \
+        "$mbedtls_lib/libmbedtls.a" \
+        "$wg_go_lib/libwg-go.a" \
+        -framework CoreFoundation \
+        -framework Security \
+        -o "$dynamic_library"
+}
+
 build_slice() {
     local name=$1
     local target=$2
-    local sdk=$3
-    local openssl_identifier=$4
-    local mbedtls_identifier=$5
-    local wg_go_identifier=$6
+    local clang_target=$3
+    local sdk=$4
+    local openssl_identifier=$5
+    local mbedtls_identifier=$6
+    local wg_go_identifier=$7
     local install_root="$work_dir/install/$name"
     local openssl_include
     local openssl_lib
@@ -230,8 +344,25 @@ build_slice() {
         wg_go.h wg_go/wg_go.h libwg-go.a
     wg_go_include=$xcframework_include_path
     wg_go_lib=$xcframework_library_path
+    rm -rf "$install_root"
     mkdir -p "$install_root"
     chmod 755 "$work_dir/install" "$install_root"
+
+    local build_options=(
+        -Dtarget="$target"
+        -Dapple-sdk-path="$sdk"
+        -Dopenvpn=true
+        -Dwireguard=true
+        -Dopenssl-include="$openssl_include"
+        -Dopenssl-lib="$openssl_lib"
+        -Dmbedtls-include="$mbedtls_include"
+        -Dmbedtls-lib="$mbedtls_lib"
+        -Dwg-go-include="$wg_go_include"
+        -Dwg-go-lib="$wg_go_lib"
+    )
+    if [[ $monolith_build -eq 0 ]]; then
+        build_options+=(-Dlegacy-build=true)
+    fi
 
     echo "Building $name ($target)"
     (
@@ -242,18 +373,13 @@ build_slice() {
             --cache-dir "$cache_dir" \
             --global-cache-dir "$global_cache_dir" \
             --release=small \
-            -Dtarget="$target" \
-            -Dlegacy-build=true \
-            -Dapple-sdk-path="$sdk" \
-            -Dopenssl-include="$openssl_include" \
-            -Dopenssl-lib="$openssl_lib" \
-            -Dmbedtls-include="$mbedtls_include" \
-            -Dmbedtls-lib="$mbedtls_lib" \
-            -Dopenvpn=true \
-            -Dwireguard=true \
-            -Dwg-go-include="$wg_go_include" \
-            -Dwg-go-lib="$wg_go_lib"
+            "${build_options[@]}"
     )
+    if [[ $monolith_build -eq 1 ]]; then
+        link_monolith \
+            "$install_root" "$clang_target" "$sdk" \
+            "$openssl_lib" "$mbedtls_lib" "$wg_go_lib"
+    fi
 }
 
 configure_slice() {
@@ -262,47 +388,48 @@ configure_slice() {
     local zig_arch=x86_64
 
     [[ $arch == arm64 ]] && zig_arch=aarch64
+    local clang_arch=$arch
     slice_name="$platform-$arch"
     case "$platform:$arch" in
         macos:*)
             slice_target="$zig_arch-macos.$macos_min"
+            slice_clang_target="$clang_arch-apple-macos$macos_min"
             slice_sdk=$macos_sdk
             slice_openssl=macos-arm64_x86_64
             slice_mbedtls=macos-arm64_x86_64
             slice_wg_go=macos-arm64_x86_64
-            slice_identifier=macos-arm64_x86_64
             ;;
         ios:arm64)
             slice_target="aarch64-ios.$ios_min"
+            slice_clang_target="arm64-apple-ios$ios_min"
             slice_sdk=$ios_sdk
             slice_openssl=ios-arm64
             slice_mbedtls=ios-arm64
             slice_wg_go=ios-arm64
-            slice_identifier=ios-arm64
             ;;
         ios-simulator:*)
             slice_target="$zig_arch-ios.$ios_min-simulator"
+            slice_clang_target="$clang_arch-apple-ios$ios_min-simulator"
             slice_sdk=$ios_simulator_sdk
             slice_openssl=ios-arm64_x86_64-simulator
             slice_mbedtls=ios-arm64_x86_64-simulator
             slice_wg_go=ios-arm64_x86_64-simulator
-            slice_identifier=ios-arm64_x86_64-simulator
             ;;
         tvos:arm64)
             slice_target="aarch64-tvos.$tvos_min"
+            slice_clang_target="arm64-apple-tvos$tvos_min"
             slice_sdk=$tvos_sdk
             slice_openssl=tvos-arm64
             slice_mbedtls=tvos-arm64
             slice_wg_go=tvos-arm64
-            slice_identifier=tvos-arm64
             ;;
         tvos-simulator:*)
             slice_target="$zig_arch-tvos.$tvos_min-simulator"
+            slice_clang_target="$clang_arch-apple-tvos$tvos_min-simulator"
             slice_sdk=$tvos_simulator_sdk
             slice_openssl=tvos-arm64_x86_64-simulator
             slice_mbedtls=tvos-arm64_x86_64-simulator
             slice_wg_go=tvos-arm64_x86_64-simulator
-            slice_identifier=tvos-arm64_x86_64-simulator
             ;;
         *) fail "$platform does not support architecture $arch" ;;
     esac
@@ -311,7 +438,7 @@ configure_slice() {
 build_configured_slice() {
     configure_slice "$1" "$2"
     build_slice \
-        "$slice_name" "$slice_target" "$slice_sdk" \
+        "$slice_name" "$slice_target" "$slice_clang_target" "$slice_sdk" \
         "$slice_openssl" "$slice_mbedtls" "$slice_wg_go"
 }
 
@@ -333,9 +460,9 @@ mkdir -p "$work_dir/universal"
 if [[ $full_build -eq 1 ]]; then
     for platform in macos ios-simulator tvos-simulator; do
         lipo -create \
-            "$work_dir/install/$platform-arm64/lib/libpartout.a" \
-            "$work_dir/install/$platform-x86_64/lib/libpartout.a" \
-            -output "$work_dir/universal/$platform.a"
+            "$work_dir/install/$platform-arm64/lib/$library_name" \
+            "$work_dir/install/$platform-x86_64/lib/$library_name" \
+            -output "$work_dir/universal/$platform.$library_extension"
     done
 fi
 
@@ -390,24 +517,13 @@ make_framework() {
     printf '%s\n' "$framework"
 }
 
-framework_binary() {
-    local framework=$1
-    local platform=$2
-
-    if [[ $platform == macos ]]; then
-        printf '%s/Versions/A/%s\n' "$framework" "$framework_name"
-    else
-        printf '%s/%s\n' "$framework" "$framework_name"
-    fi
-}
-
 generated_output="$work_dir/$framework_name.xcframework"
 if [[ $full_build -eq 1 ]]; then
     xcframework_arguments=()
     for platform in macos ios ios-simulator tvos tvos-simulator; do
         case "$platform" in
-            ios|tvos) binary="$work_dir/install/$platform-arm64/lib/libpartout.a" ;;
-            *) binary="$work_dir/universal/$platform.a" ;;
+            ios|tvos) binary="$work_dir/install/$platform-arm64/lib/$library_name" ;;
+            *) binary="$work_dir/universal/$platform.$library_extension" ;;
         esac
         framework=$(make_framework "$platform" "$binary")
         xcframework_arguments+=(-framework "$framework")
@@ -415,13 +531,19 @@ if [[ $full_build -eq 1 ]]; then
     xcodebuild -create-xcframework \
         "${xcframework_arguments[@]}" \
         -output "$generated_output"
+elif [[ $create_active_output -eq 1 ]]; then
+    active_binary="$work_dir/install/$slice_name/lib/$library_name"
+    framework=$(make_framework "$active_platform" "$active_binary")
+    xcodebuild -create-xcframework \
+        -framework "$framework" \
+        -output "$generated_output"
 else
-    active_binary="$work_dir/install/$slice_name/lib/libpartout.a"
+    active_binary="$work_dir/install/$slice_name/lib/$library_name"
 
     # Preserve every other XCFramework slice and replace only the active
     # architecture in the matching platform variant.
     cp -R "$output_path" "$generated_output"
-    existing_framework="$generated_output/$slice_identifier/$framework_name.framework"
+    existing_framework="$generated_output/$active_output_identifier/$framework_name.framework"
     existing_binary=$(framework_binary "$existing_framework" "$active_platform")
     [[ -f $existing_binary ]] ||
         fail "missing $active_platform $active_arch slice in $output_path (rebuild it with --full)"
@@ -431,7 +553,7 @@ else
     if [[ $existing_archs == "$active_arch" ]]; then
         cp "$active_binary" "$existing_binary"
     else
-        replacement_binary="$work_dir/replacement-$active_platform-$active_arch.a"
+        replacement_binary="$work_dir/replacement-$active_platform-$active_arch.$library_extension"
         lipo "$existing_binary" -replace "$active_arch" "$active_binary" -output "$replacement_binary"
         mv "$replacement_binary" "$existing_binary"
     fi
@@ -439,7 +561,8 @@ else
     cp "$zig_dir/src/module.modulemap" "$existing_framework/Modules/module.modulemap"
 fi
 
-if [[ $full_build -eq 0 ]] && diff -qr --no-dereference "$output_path" "$generated_output" >/dev/null; then
+if [[ $full_build -eq 0 && -d "$output_path" ]] &&
+    diff -qr --no-dereference "$output_path" "$generated_output" >/dev/null; then
     rm -rf "$generated_output"
     echo "Unchanged $output_path"
 else

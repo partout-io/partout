@@ -31,14 +31,13 @@ prebuilts_tag=$(gh release view \
 
 for vendor in openssl mbedtls wg-go; do
     archive="$vendor.xcframework.zip"
-    package_dir="$artifacts_dir/$vendor-apple"
     gh release download "$prebuilts_tag" \
         --repo "$prebuilts_repository" \
         --pattern "$archive" \
         --dir "$temp_dir"
-    mkdir -p "$package_dir"
-    ditto -x -k "$temp_dir/$archive" "$package_dir"
-    [[ -d "$package_dir/$vendor.xcframework" ]] ||
+    mkdir -p "$artifacts_dir"
+    ditto -x -k "$temp_dir/$archive" "$artifacts_dir"
+    [[ -d "$artifacts_dir/$vendor.xcframework" ]] ||
         fail "missing $vendor.xcframework in $archive"
 done
 

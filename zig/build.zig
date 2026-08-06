@@ -42,6 +42,14 @@ const Vendor = enum {
             .wg_go => "wg_go",
         };
     }
+
+    fn appleStaticArchiveName(vendor: Vendor) []const u8 {
+        return switch (vendor) {
+            .openssl => "libopenssl.a",
+            .mbedtls => "libmbedtls.a",
+            .wg_go => "libwg-go.a",
+        };
+    }
 };
 
 const VendorPaths = struct {
@@ -109,6 +117,11 @@ pub fn build(b: *std.Build) void {
         "shared",
         "Build Partout as a shared library.",
     ) orelse false;
+    const install_name = b.option(
+        []const u8,
+        "install-name",
+        "Darwin install name for a shared Partout library.",
+    );
     const use_openvpn = b.option(
         bool,
         "openvpn",
@@ -163,6 +176,12 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
+    if (install_name) |value| {
+        if (!shared or !target.result.os.tag.isDarwin()) {
+            std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
+        }
+        lib.install_name = value;
+    }
 
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
@@ -366,6 +385,7 @@ fn configurePartoutModule(
         if (config.vendors.hasWireGuardBackend()) "1" else "0",
     );
     if (config.target.result.os.tag.isDarwin()) {
+        module.linkFramework("CoreFoundation", .{});
         module.linkFramework("Security", .{});
     }
     if (config.target.result.os.tag == .windows) {
@@ -416,7 +436,15 @@ fn linkVendorLibraries(
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
             std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-                linkSystemLibraries(module, config.target, paths, add_library_rpath);
+                const archive = b.fmt(
+                    "{s}/{s}",
+                    .{ library_path, paths.vendor.appleStaticArchiveName() },
+                );
+                std.Io.Dir.accessAbsolute(b.graph.io, archive, .{}) catch {
+                    linkSystemLibraries(module, config.target, paths, add_library_rpath);
+                    continue;
+                };
+                module.addObjectFile(.{ .cwd_relative = archive });
                 continue;
             };
             module.addSystemFrameworkPath(.{ .cwd_relative = library_path });
@@ -523,6 +551,7 @@ fn addAppleSDKPaths(
 ) void {
     const sdk = sdk_path orelse return;
     module.addSystemIncludePath(.{ .cwd_relative = b.fmt("{s}/usr/include", .{sdk}) });
+    module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/usr/lib", .{sdk}) });
     module.addSystemFrameworkPath(.{ .cwd_relative = b.fmt("{s}/System/Library/Frameworks", .{sdk}) });
 }
 
