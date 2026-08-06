@@ -31,6 +31,34 @@ const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ ide
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
 // var daemon_runtime = DaemonRuntime{};
 var daemon_runtime: ?*abi.DaemonRuntime = null;
+var daemon_process_lock: DaemonProcessLock = .{};
+
+const DaemonProcessLock = struct {
+    mutex: core.Mutex = .{},
+    condition: core.Condition = .{},
+    is_locked: bool = false,
+
+    fn prepare(self: *DaemonProcessLock) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.is_locked = true;
+    }
+
+    fn wait(self: *DaemonProcessLock) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        while (self.is_locked) {
+            self.condition.wait(&self.mutex);
+        }
+    }
+
+    fn release(self: *DaemonProcessLock) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.is_locked = false;
+        self.condition.broadcast();
+    }
+};
 
 /// Prints at most a 4096-char message (0-terminated).
 fn panicHandler(message: []const u8, _: ?usize) noreturn {
@@ -122,7 +150,10 @@ pub export fn partout_daemon_start(
         runtime.destroy(allocator);
         return mapErrorToCode(err);
     };
+    const is_daemon = runtime.options.is_daemon;
+    if (is_daemon) daemon_process_lock.prepare();
     daemon_runtime = runtime;
+    if (is_daemon) daemon_process_lock.wait();
     return c.PartoutCompletionCodeOK;
 }
 
@@ -139,9 +170,11 @@ pub export fn partout_daemon_hold() callconv(.c) void {
 
 pub export fn partout_daemon_stop() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
+    const is_daemon = runtime.options.is_daemon;
     runtime.stop();
     runtime.destroy(allocator);
     daemon_runtime = null;
+    if (is_daemon) daemon_process_lock.release();
 }
 
 fn mapErrorToCode(err: abi.RuntimeError) c_int {
