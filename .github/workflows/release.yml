@@ -39,6 +39,10 @@ jobs:
           prebuilts_tag=$(ci/download-prebuilts.sh "$artifacts_dir")
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
           echo "tag=$prebuilts_tag" >> "$GITHUB_OUTPUT"
+      - name: Run Zig tests
+        working-directory: zig
+        run: |
+          zig build test -Dopenvpn=true -Dwireguard=true
       - name: Build XCFramework
         id: build_xcframework
         env:
