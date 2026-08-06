@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - Sources/PartoutCore/PartoutConstants.swift
+      - zig/src/partout.zig
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +25,7 @@ jobs:
       - name: Parse version
         id: parse_version
         env:
-          ABI_SOURCE: Sources/PartoutCore/PartoutConstants.swift
+          ABI_SOURCE: zig/src/partout.zig
         run: |
           version=$(sed -nE 's/^.*version = "(.*)".*$/\1/p' "$ABI_SOURCE")
           test -n "$version"
