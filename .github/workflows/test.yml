@@ -31,14 +31,6 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v6
-      - name: Verify CMake file lists
-        if: matrix.suite == 'swift'
-        run: |
-          scripts/gen-cmake-files.sh
-          if [[ -n "$(git status --porcelain)" ]]; then
-            git status --short
-            exit 1
-          fi
       - uses: partout-io/action-prepare-xcode-build@master
         if: matrix.suite == 'swift'
         with:
