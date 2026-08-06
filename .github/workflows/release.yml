@@ -11,22 +11,62 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: write
+
 jobs:
   publish_release:
     name: Publish Release
-    runs-on: ubuntu-latest
+    runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
       - name: Parse version
         id: parse_version
         env:
           ABI_SOURCE: Sources/PartoutCore/PartoutConstants.swift
         run: |
-          version=`sed -nE "s/^.*version = \"(.*)\".*$/\1/p" $ABI_SOURCE`
+          version=$(sed -nE 's/^.*version = "(.*)".*$/\1/p' "$ABI_SOURCE")
+          test -n "$version"
           echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Download latest prebuilts
+        id: prebuilts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          artifacts_dir="$RUNNER_TEMP/prebuilts-artifacts"
+          prebuilts_tag=$(ci/download-prebuilts.sh "$artifacts_dir")
+          echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
+          echo "tag=$prebuilts_tag" >> "$GITHUB_OUTPUT"
+      - name: Build XCFramework
+        id: build_xcframework
+        env:
+          ARTIFACTS_DIR: ${{ steps.prebuilts.outputs.artifacts_dir }}
+          PREBUILTS_TAG: ${{ steps.prebuilts.outputs.tag }}
+        run: |
+          xcframework="$RUNNER_TEMP/PartoutNative.xcframework"
+          archive="$xcframework.zip"
+          release_body="$RUNNER_TEMP/release-body.md"
+
+          zig/scripts/build-xcframework.sh "$xcframework" "$ARTIFACTS_DIR" --full
+          ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
+          checksum=$(swift package compute-checksum "$archive")
+
+          {
+            echo "Prebuilts tag: \`$PREBUILTS_TAG\`"
+            echo
+            echo "PartoutNative.xcframework.zip checksum: \`$checksum\`"
+          } > "$release_body"
+
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "release_body=$release_body" >> "$GITHUB_OUTPUT"
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ steps.parse_version.outputs.version }}
           tag_name: ${{ steps.parse_version.outputs.version }}
           generate_release_notes: true
+          body_path: ${{ steps.build_xcframework.outputs.release_body }}
+          files: ${{ steps.build_xcframework.outputs.archive }}
+          fail_on_unmatched_files: true
