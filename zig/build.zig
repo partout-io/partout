@@ -176,9 +176,6 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
-    if (shared and target.result.os.tag.isDarwin()) {
-        lib.setVersionScript(b.path("src/partout.exports"));
-    }
     if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
             std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
@@ -210,10 +207,6 @@ pub fn build(b: *std.Build) void {
     if (!shared and target.result.os.tag.isDarwin()) {
         const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
-        b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
-    } else if (shared and target.result.os.tag.isDarwin()) {
-        const verified_lib = addDarwinExportControlStep(b, lib.getEmittedBin());
-        b.getInstallStep().dependOn(&b.addInstallLibFile(verified_lib, "libpartout.dylib").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
@@ -548,59 +541,6 @@ fn addDarwinStaticArchiveRepackStep(
     run.addFileArg(source);
     const output = run.addOutputFileArg("libpartout.a");
     run.setName("repack Darwin static archive");
-    return output;
-}
-
-fn addDarwinExportControlStep(
-    b: *std.Build,
-    source: std.Build.LazyPath,
-) std.Build.LazyPath {
-    // Zig 0.16 does not expose Darwin's -exported_symbols_list linker option.
-    // Apply the same private-extern policy before installation, then assert
-    // that the resulting dynamic symbol table exactly matches the ABI list.
-    const run = b.addSystemCommand(&.{
-        "sh",
-        "-c",
-        \\set -eu
-        \\exports="$1"
-        \\input="$2"
-        \\output="$3"
-        \\diagnostics="${output}.nmedit.log"
-        \\if ! xcrun nmedit -s "$exports" "$input" -o "$output" 2>"$diagnostics"; then
-        \\    cat "$diagnostics" >&2
-        \\    exit 1
-        \\fi
-        \\rm -f "$diagnostics"
-        \\xcrun nm -gU "$output" | awk '
-        \\    NR == FNR {
-        \\        if (NF && $1 !~ /^#/) allowed[$1] = 1
-        \\        next
-        \\    }
-        \\    {
-        \\        symbol = $NF
-        \\        seen[symbol] = 1
-        \\        if (!(symbol in allowed)) {
-        \\            print "unexpected exported symbol: " symbol > "/dev/stderr"
-        \\            failed = 1
-        \\        }
-        \\    }
-        \\    END {
-        \\        for (symbol in allowed) {
-        \\            if (!(symbol in seen)) {
-        \\                print "missing exported symbol: " symbol > "/dev/stderr"
-        \\                failed = 1
-        \\            }
-        \\        }
-        \\        exit failed
-        \\    }
-        \\' "$exports" -
-        ,
-        "control-darwin-exports",
-    });
-    run.addFileArg(b.path("src/partout.exports"));
-    run.addFileArg(source);
-    const output = run.addOutputFileArg("libpartout.dylib");
-    run.setName("control Darwin exports");
     return output;
 }
 

@@ -283,13 +283,44 @@ ios_simulator_sdk=$(xcrun --sdk iphonesimulator --show-sdk-path)
 tvos_sdk=$(xcrun --sdk appletvos --show-sdk-path)
 tvos_simulator_sdk=$(xcrun --sdk appletvsimulator --show-sdk-path)
 
+link_monolith() {
+    local install_root=$1
+    local clang_target=$2
+    local sdk=$3
+    local openssl_lib=$4
+    local mbedtls_lib=$5
+    local wg_go_lib=$6
+    local static_library="$install_root/lib/libpartout.a"
+    local dynamic_library="$install_root/lib/libpartout.dylib"
+
+    [[ -f "$static_library" ]] || fail "missing static Partout library: $static_library"
+    xcrun clang \
+        -target "$clang_target" \
+        -isysroot "$sdk" \
+        -dynamiclib \
+        -Wl,-install_name,"@rpath/$framework_name.framework/$framework_name" \
+        -Wl,-compatibility_version,1.0.0 \
+        -Wl,-current_version,1.0.0 \
+        -Wl,-dead_strip \
+        -Wl,-rpath,@loader_path \
+        -Wl,-exported_symbols_list,"$zig_dir/src/partout.exports" \
+        -Wl,-force_load,"$static_library" \
+        "$openssl_lib/libopenssl.a" \
+        "$mbedtls_lib/libmbedtls.a" \
+        "$wg_go_lib/libwg-go.a" \
+        -framework CoreFoundation \
+        -framework Security \
+        -o "$dynamic_library"
+}
+
 build_slice() {
     local name=$1
     local target=$2
-    local sdk=$3
-    local openssl_identifier=$4
-    local mbedtls_identifier=$5
-    local wg_go_identifier=$6
+    local clang_target=$3
+    local sdk=$4
+    local openssl_identifier=$5
+    local mbedtls_identifier=$6
+    local wg_go_identifier=$7
     local install_root="$work_dir/install/$name"
     local openssl_include
     local openssl_lib
@@ -329,12 +360,7 @@ build_slice() {
         -Dwg-go-include="$wg_go_include"
         -Dwg-go-lib="$wg_go_lib"
     )
-    if [[ $monolith_build -eq 1 ]]; then
-        build_options+=(
-            -Dshared=true
-            -Dinstall-name="@rpath/$framework_name.framework/$framework_name"
-        )
-    else
+    if [[ $monolith_build -eq 0 ]]; then
         build_options+=(-Dlegacy-build=true)
     fi
 
@@ -349,6 +375,11 @@ build_slice() {
             --release=small \
             "${build_options[@]}"
     )
+    if [[ $monolith_build -eq 1 ]]; then
+        link_monolith \
+            "$install_root" "$clang_target" "$sdk" \
+            "$openssl_lib" "$mbedtls_lib" "$wg_go_lib"
+    fi
 }
 
 configure_slice() {
@@ -357,10 +388,12 @@ configure_slice() {
     local zig_arch=x86_64
 
     [[ $arch == arm64 ]] && zig_arch=aarch64
+    local clang_arch=$arch
     slice_name="$platform-$arch"
     case "$platform:$arch" in
         macos:*)
             slice_target="$zig_arch-macos.$macos_min"
+            slice_clang_target="$clang_arch-apple-macos$macos_min"
             slice_sdk=$macos_sdk
             slice_openssl=macos-arm64_x86_64
             slice_mbedtls=macos-arm64_x86_64
@@ -368,6 +401,7 @@ configure_slice() {
             ;;
         ios:arm64)
             slice_target="aarch64-ios.$ios_min"
+            slice_clang_target="arm64-apple-ios$ios_min"
             slice_sdk=$ios_sdk
             slice_openssl=ios-arm64
             slice_mbedtls=ios-arm64
@@ -375,6 +409,7 @@ configure_slice() {
             ;;
         ios-simulator:*)
             slice_target="$zig_arch-ios.$ios_min-simulator"
+            slice_clang_target="$clang_arch-apple-ios$ios_min-simulator"
             slice_sdk=$ios_simulator_sdk
             slice_openssl=ios-arm64_x86_64-simulator
             slice_mbedtls=ios-arm64_x86_64-simulator
@@ -382,6 +417,7 @@ configure_slice() {
             ;;
         tvos:arm64)
             slice_target="aarch64-tvos.$tvos_min"
+            slice_clang_target="arm64-apple-tvos$tvos_min"
             slice_sdk=$tvos_sdk
             slice_openssl=tvos-arm64
             slice_mbedtls=tvos-arm64
@@ -389,6 +425,7 @@ configure_slice() {
             ;;
         tvos-simulator:*)
             slice_target="$zig_arch-tvos.$tvos_min-simulator"
+            slice_clang_target="$clang_arch-apple-tvos$tvos_min-simulator"
             slice_sdk=$tvos_simulator_sdk
             slice_openssl=tvos-arm64_x86_64-simulator
             slice_mbedtls=tvos-arm64_x86_64-simulator
@@ -401,7 +438,7 @@ configure_slice() {
 build_configured_slice() {
     configure_slice "$1" "$2"
     build_slice \
-        "$slice_name" "$slice_target" "$slice_sdk" \
+        "$slice_name" "$slice_target" "$slice_clang_target" "$slice_sdk" \
         "$slice_openssl" "$slice_mbedtls" "$slice_wg_go"
 }
 
