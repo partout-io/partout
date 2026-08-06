@@ -179,12 +179,13 @@ while [[ $# -gt 0 ]]; do
             cmake_opts+=("-DANDROID_ABI=arm64-v8a")
             shift
             ;;
-        -vendors)
+        -prebuilts)
             if [[ -z ${2:-} || $2 == -* ]]; then
-                echo "-vendors requires a URL"
+                echo "-prebuilts requires a version"
                 exit 1
             fi
-            cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$2")
+            prebuilts_url="https://github.com/partout-io/prebuilts/releases/download/$2"
+            cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$prebuilts_url")
             shift
             shift
             ;;

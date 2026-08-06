@@ -65,7 +65,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
-- `-vendors <url>`: Set the root URL containing prebuilt vendor archives. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses this URL only as a fallback.
+- `-prebuilts <version>`: Use vendor archives from the matching `partout-io/prebuilts` GitHub release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
 
 The equivalent CMake variable is `PP_BUILD_VENDOR_PREBUILT_URL`. Optional
 vendor-specific `*_PREBUILT_HASH` variables accept a CMake `URL_HASH` value

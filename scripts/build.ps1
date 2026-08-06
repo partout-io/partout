@@ -114,9 +114,10 @@ try {
                 $cmake_opts += "-DANDROID_ABI=arm64-v8a"
                 $index += 1
             }
-            "-vendors" {
-                $vendorUrl = Require-Value "-vendors" $index $args
-                $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendorUrl"
+            "-prebuilts" {
+                $prebuiltsVersion = Require-Value "-prebuilts" $index $args
+                $prebuiltsUrl = "https://github.com/partout-io/prebuilts/releases/download/$prebuiltsVersion"
+                $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$prebuiltsUrl"
                 $index += 2
             }
             "-gen-models" {
