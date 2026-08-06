@@ -12,11 +12,14 @@ let envDocs = ProcessInfo.processInfo.environment["PP_BUILD_DOCS"] == "1"
 // MARK: Configuration
 
 let prebuiltsVersion = "0.5.2"
+let prebuiltsURL = "https://github.com/partout-io/prebuilts/releases/download/\(prebuiltsVersion)"
 let openSSLChecksum = "dc092eb9950083492bd341834771a996213457119e7427f244dbfbe899cd143f"
+let mbedTLSChecksum = "084d1e16f41bcfa683082ada4601f887cb98608bf4dd91164ba8655634b11013"
 let wgGoChecksum = "5ce6457721b49a0221e2465ca8eb94b9e5ce40c208a53a5192737cb0061d6a0b"
 let cryptoLibraries: [CryptoLibrary] = [.openSSL]
 let useFoundationCompatibility: FoundationCompatibility = .off
 
+// Exclude OpenVPN if no crypto libraries
 let areas = Area.allCases.filter {
     $0 != .openVPN || !cryptoLibraries.isEmpty
 }
@@ -222,7 +225,7 @@ if areas.contains(.wireGuard) {
     package.targets.append(contentsOf: [
         .binaryTarget(
             name: "wg-go-apple",
-            url: "https://github.com/partout-io/prebuilts/releases/download/\(prebuiltsVersion)/wg-go.xcframework.zip",
+            url: "\(prebuiltsURL)/wg-go.xcframework.zip",
             checksum: wgGoChecksum
         ),
         .target(
@@ -260,7 +263,7 @@ for mode in cryptoLibraries {
         package.targets.append(
             .binaryTarget(
                 name: "openssl-apple",
-                url: "https://github.com/partout-io/prebuilts/releases/download/\(prebuiltsVersion)/openssl.xcframework.zip",
+                url: "\(prebuiltsURL)/openssl.xcframework.zip",
                 checksum: openSSLChecksum
             )
         )
@@ -268,16 +271,13 @@ for mode in cryptoLibraries {
     case .mbedTLS:
         // Crypto with OS routines, TLS with MbedTLS
         package.targets.append(
-            .systemLibrary(
-                name: "CMbedTLS",
-                path: "Sources/SystemLibraries/CMbedTLS",
-                pkgConfig: "mbedtls",
-                providers: [
-                    .brew(["mbedtls"])
-                ]
+            .binaryTarget(
+                name: "mbedtls-apple",
+                url: "\(prebuiltsURL)/mbedtls.xcframework.zip",
+                checksum: mbedTLSChecksum
             )
         )
-        cryptoDependencies.append("CMbedTLS")
+        cryptoDependencies.append("mbedtls-apple")
     }
 }
 
@@ -302,15 +302,7 @@ package.targets.append(
             ])
             return list
         }(),
-        cSettings: globalCSettings,
-        linkerSettings: {
-            var list: [LinkerSetting] = []
-            if cryptoLibraries.contains(.mbedTLS) {
-                list.append(.linkedLibrary("mbedx509"))
-                list.append(.linkedLibrary("mbedcrypto"))
-            }
-            return list
-        }()
+        cSettings: globalCSettings
     )
 )
 package.products.append(

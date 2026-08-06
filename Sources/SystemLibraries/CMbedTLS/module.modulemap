@@ -1,7 +1,0 @@
-module CMbedTLS [system] {
-    header "shim.h"
-    link "mbedtls"
-    link "mbedx509"
-    link "mbedcrypto"
-    export *
-}
