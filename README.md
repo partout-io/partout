@@ -96,7 +96,7 @@ Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
 
 ### Xcode
 
-There is an Xcode Demo in the `Examples` directory. Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
+There is an Xcode Demo in the `cross/swift` directory. Edit `Demo/Config.xcconfig` with your developer details. You must comply with all the capabilities and entitlements in the main app and the tunnel extension target.
 
 Put your configuration files into `Demo/App/Files` with these names:
 

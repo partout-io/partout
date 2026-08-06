@@ -23,16 +23,21 @@ extension PartoutTunnelObservable {
             SharedTunnelEnvironment(profileId: $0)
         }
 #else
-        let strategy = NETunnelStrategy(
+        let strategy = LegacyNETunnelStrategy(
             .global,
             bundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: Demo.neProtocolCoder,
-            title: {
-                "PartoutDemo: \($0.name)"
-            }
+            coder: Demo.neProtocolCoder
         )
         let tunnel = Tunnel(.global, strategy: strategy) {
-            NETunnelEnvironment(strategy: strategy, profileId: $0)
+            NETunnelEnvironment(profileId: $0) {
+                let output = try await strategy.sendMessage(.environment(), to: $0)
+                switch output {
+                case .environment(let env):
+                    return env
+                default:
+                    return nil
+                }
+            }
         }
 #endif
         return PartoutTunnelObservable(tunnel: tunnel)

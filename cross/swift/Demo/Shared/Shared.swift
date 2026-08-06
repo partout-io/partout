@@ -81,8 +81,11 @@ extension Demo {
         KeychainNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: CodingRegistry(registry: .shared, withLegacyEncoding: { false }),
-            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)")
+            coder: CodingRegistry(registry: .shared),
+            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)"),
+            legacyOptions: .init {
+                "PartoutDemo: \($0.name)"
+            }
         )
     }
 
