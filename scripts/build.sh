@@ -121,7 +121,7 @@ while [[ $# -gt 0 ]]; do
             fi
             install_dir=$2
             mkdir -p "$install_dir"
-            cmake_opts+=("-DPP_BUILD_PREFIX=$install_dir")
+            cmake_opts+=("-DCMAKE_INSTALL_PREFIX=$install_dir")
             do_build=1
             shift
             shift
@@ -231,6 +231,9 @@ fi
 # Execute
 if [[ $do_build == 1 ]]; then
     cmake --build $build_dir
+fi
+if [[ -n $install_dir ]]; then
+    cmake --install $build_dir
 fi
 
 popd

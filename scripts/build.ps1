@@ -89,7 +89,7 @@ try {
             "-install" {
                 $install_dir = Require-Value "-install" $index $args
                 New-Item -ItemType Directory -Path $install_dir -Force | Out-Null
-                $cmake_opts += "-DPP_BUILD_PREFIX=$install_dir"
+                $cmake_opts += "-DCMAKE_INSTALL_PREFIX=$install_dir"
                 $do_build = $true
                 $index += 2
             }
@@ -161,6 +161,10 @@ try {
 
     if ($do_build) {
         & cmake --build $build_dir --config $configuration
+        if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+    }
+    if ($install_dir) {
+        & cmake --install $build_dir --config $configuration
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     }
 } finally {

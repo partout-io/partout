@@ -60,6 +60,7 @@ The script resolves the selected dependencies and accepts a few options:
 
 - `-h`, `--help`: Show the build help
 - `-gen`: Configure CMake
+- `-install <dir>`: Install the completed build artifacts into a directory
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable WireGuard

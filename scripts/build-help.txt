@@ -1,7 +1,7 @@
   -h, --help                     Show this help
   -clean                         Remove build output directories
   -gen                           Configure CMake
-  -install <dir>                 Set the Zig install prefix
+  -install <dir>                 Install build artifacts into a directory
   -crypto <openssl|native>[,...] Enable one or more crypto backends
   -openvpn                       Enable OpenVPN support
   -wireguard                     Enable WireGuard support

@@ -30,14 +30,28 @@ function(partout_install_runtime_directory directory)
     )
 endfunction()
 
+install(DIRECTORY "${PP_BUILD_OUTPUT}/partout/include/"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    OPTIONAL
+    USE_SOURCE_PERMISSIONS
+)
+install(DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/"
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    OPTIONAL
+    USE_SOURCE_PERMISSIONS
+    FILES_MATCHING
+    PATTERN "*.a"
+    PATTERN "*.lib"
+)
+
 if(WIN32)
-    set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_PREFIX}/bin/partout.dll")
+    set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_OUTPUT}/partout/bin/partout.dll")
     if(WINTUN_DIR)
-        partout_install_runtime_file("${PP_BUILD_PREFIX}/bin/wintun.dll")
+        partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
     endif()
 else()
     set(PARTOUT_RUNTIME_LIBRARY
-        "${PP_BUILD_PREFIX}/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
 endif()
 partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
 if(PP_BUILD_USE_WIREGUARD)
