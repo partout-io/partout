@@ -6,6 +6,7 @@ on:
       - master
     paths:
       - zig/src/partout.zig
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
