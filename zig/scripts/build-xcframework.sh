@@ -17,18 +17,23 @@ fail() {
 }
 
 if [[ $# -lt 1 ]]; then
-    fail "usage: $0 <output.xcframework> [artifacts-directory] [--full]"
+    fail "usage: $0 <output.xcframework> [artifacts-directory] [--full] [--monolith]"
 fi
 
 output_argument=$1
 artifacts_argument=
 full_build=0
+monolith_build=0
 shift
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --full)
             [[ $full_build -eq 0 ]] || fail "duplicate option: --full"
             full_build=1
+            ;;
+        --monolith)
+            [[ $monolith_build -eq 0 ]] || fail "duplicate option: --monolith"
+            monolith_build=1
             ;;
         -*) fail "unknown option: $1" ;;
         *)
@@ -93,6 +98,17 @@ if [[ $full_build -eq 0 ]]; then
     echo "Building active slice only: $active_platform $active_arch (pass --full for all slices)"
 else
     echo "Building all platform and architecture slices"
+fi
+if [[ $monolith_build -eq 1 ]]; then
+    echo "Building a dynamic monolith with statically linked vendors"
+    build_mode=monolith
+    library_name=libpartout.dylib
+    library_extension=dylib
+else
+    echo "Building a static library with external vendor implementations"
+    build_mode=legacy
+    library_name=libpartout.a
+    library_extension=a
 fi
 
 for tool in zig xcrun xcodebuild lipo; do
@@ -187,6 +203,13 @@ global_cache_dir="$zig_dir/zig-out/xcframework-global-cache"
 if [[ $full_build -eq 1 ]]; then
     echo "Removing cached XCFramework build"
     rm -rf "$work_dir" "$cache_dir" "$global_cache_dir"
+    for cache_slice in \
+        macos-arm64 macos-x86_64 \
+        ios-arm64 ios-simulator-arm64 ios-simulator-x86_64 \
+        tvos-arm64 tvos-simulator-arm64 tvos-simulator-x86_64; do
+        rm -rf "$cache_dir-$build_mode-slice-$cache_slice"
+        rm -rf "$global_cache_dir-$build_mode-slice-$cache_slice"
+    done
 fi
 mkdir -p "$work_dir" "$cache_dir" "$global_cache_dir"
 chmod 755 "$work_dir" "$cache_dir" "$global_cache_dir"
@@ -205,6 +228,10 @@ build_slice() {
     local mbedtls_identifier=$5
     local wg_go_identifier=$6
     local install_root="$work_dir/install/$name"
+    # Zig 0.16 fails to reopen manifests when multiple Darwin targets use
+    # shared or nested cache directories, so keep each slice in flat caches.
+    local slice_cache_dir="$cache_dir-$build_mode-slice-$name"
+    local slice_global_cache_dir="$global_cache_dir-$build_mode-slice-$name"
     local openssl_include
     local openssl_lib
     local mbedtls_include
@@ -227,8 +254,31 @@ build_slice() {
         wg_go.h wg_go/wg_go.h libwg-go.a
     wg_go_include=$xcframework_include_path
     wg_go_lib=$xcframework_library_path
-    mkdir -p "$install_root"
-    chmod 755 "$work_dir/install" "$install_root"
+    mkdir -p "$install_root" "$slice_cache_dir" "$slice_global_cache_dir"
+    chmod 755 \
+        "$work_dir/install" "$install_root" \
+        "$slice_cache_dir" "$slice_global_cache_dir"
+
+    local build_options=(
+        -Dtarget="$target"
+        -Dapple-sdk-path="$sdk"
+        -Dopenvpn=true
+        -Dwireguard=true
+        -Dopenssl-include="$openssl_include"
+        -Dopenssl-lib="$openssl_lib"
+        -Dmbedtls-include="$mbedtls_include"
+        -Dmbedtls-lib="$mbedtls_lib"
+        -Dwg-go-include="$wg_go_include"
+        -Dwg-go-lib="$wg_go_lib"
+    )
+    if [[ $monolith_build -eq 1 ]]; then
+        build_options+=(
+            -Dshared=true
+            -Dinstall-name="@rpath/$framework_name.framework/$framework_name"
+        )
+    else
+        build_options+=(-Dlegacy-build=true)
+    fi
 
     echo "Building $name ($target)"
     (
@@ -236,21 +286,10 @@ build_slice() {
         zig build install \
             -j1 \
             --prefix "$install_root" \
-            --cache-dir "$cache_dir" \
-            --global-cache-dir "$global_cache_dir" \
+            --cache-dir "$slice_cache_dir" \
+            --global-cache-dir "$slice_global_cache_dir" \
             --release=small \
-            -Dshared=true \
-            -Dtarget="$target" \
-            -Dapple-sdk-path="$sdk" \
-            -Dopenvpn=true \
-            -Dwireguard=true \
-            -Dlegacy-build=true \
-            -Dopenssl-include="$openssl_include" \
-            -Dopenssl-lib="$openssl_lib" \
-            -Dmbedtls-include="$mbedtls_include" \
-            -Dmbedtls-lib="$mbedtls_lib" \
-            -Dwg-go-include="$wg_go_include" \
-            -Dwg-go-lib="$wg_go_lib"
+            "${build_options[@]}"
     )
 }
 
@@ -331,9 +370,9 @@ mkdir -p "$work_dir/universal"
 if [[ $full_build -eq 1 ]]; then
     for platform in macos ios-simulator tvos-simulator; do
         lipo -create \
-            "$work_dir/install/$platform-arm64/lib/libpartout.a" \
-            "$work_dir/install/$platform-x86_64/lib/libpartout.a" \
-            -output "$work_dir/universal/$platform.a"
+            "$work_dir/install/$platform-arm64/lib/$library_name" \
+            "$work_dir/install/$platform-x86_64/lib/$library_name" \
+            -output "$work_dir/universal/$platform.$library_extension"
     done
 fi
 
@@ -404,8 +443,8 @@ if [[ $full_build -eq 1 ]]; then
     xcframework_arguments=()
     for platform in macos ios ios-simulator tvos tvos-simulator; do
         case "$platform" in
-            ios|tvos) binary="$work_dir/install/$platform-arm64/lib/libpartout.a" ;;
-            *) binary="$work_dir/universal/$platform.a" ;;
+            ios|tvos) binary="$work_dir/install/$platform-arm64/lib/$library_name" ;;
+            *) binary="$work_dir/universal/$platform.$library_extension" ;;
         esac
         framework=$(make_framework "$platform" "$binary")
         xcframework_arguments+=(-framework "$framework")
@@ -414,7 +453,7 @@ if [[ $full_build -eq 1 ]]; then
         "${xcframework_arguments[@]}" \
         -output "$generated_output"
 else
-    active_binary="$work_dir/install/$slice_name/lib/libpartout.a"
+    active_binary="$work_dir/install/$slice_name/lib/$library_name"
 
     # Preserve every other XCFramework slice and replace only the active
     # architecture in the matching platform variant.
@@ -429,7 +468,7 @@ else
     if [[ $existing_archs == "$active_arch" ]]; then
         cp "$active_binary" "$existing_binary"
     else
-        replacement_binary="$work_dir/replacement-$active_platform-$active_arch.a"
+        replacement_binary="$work_dir/replacement-$active_platform-$active_arch.$library_extension"
         lipo "$existing_binary" -replace "$active_arch" "$active_binary" -output "$replacement_binary"
         mv "$replacement_binary" "$existing_binary"
     fi
