@@ -1,0 +1,13 @@
+# SPDX-FileCopyrightText: 2026 Davide De Rosa
+#
+# SPDX-License-Identifier: GPL-3.0
+
+_partout_version
+_partout_init
+_partout_readfile
+_partout_import_profile
+_partout_import_module
+_partout_daemon_start
+_partout_daemon_hold
+_partout_daemon_stop
+_partout_log
