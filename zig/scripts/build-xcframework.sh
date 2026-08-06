@@ -181,6 +181,7 @@ resolve_xcframework_paths() {
 }
 
 openssl_xcframework=$(find_xcframework openssl-apple openssl)
+mbedtls_xcframework=$(find_xcframework mbedtls-apple mbedtls)
 wg_go_xcframework=$(find_xcframework wg-go-apple wg-go)
 
 work_dir="$zig_dir/zig-out/xcframework-build"
@@ -204,18 +205,26 @@ build_slice() {
     local target=$2
     local sdk=$3
     local openssl_identifier=$4
-    local wg_go_identifier=$5
+    local mbedtls_identifier=$5
+    local wg_go_identifier=$6
     local install_root="$work_dir/install/$name"
     local openssl_include
     local openssl_lib
+    local mbedtls_include
+    local mbedtls_lib
     local wg_go_include
     local wg_go_lib
 
     resolve_xcframework_paths \
         "$openssl_xcframework" "$openssl_identifier" openssl \
-        rand.h rand.h libopenssl.a
+        rand.h openssl/rand.h libopenssl.a
     openssl_include=$xcframework_include_path
     openssl_lib=$xcframework_library_path
+    resolve_xcframework_paths \
+        "$mbedtls_xcframework" "$mbedtls_identifier" mbedtls \
+        mbedtls/ssl.h mbedtls/ssl.h libmbedtls.a
+    mbedtls_include=$xcframework_include_path
+    mbedtls_lib=$xcframework_library_path
     resolve_xcframework_paths \
         "$wg_go_xcframework" "$wg_go_identifier" wg_go \
         wg_go.h wg_go/wg_go.h libwg-go.a
@@ -238,6 +247,8 @@ build_slice() {
             -Dapple-sdk-path="$sdk" \
             -Dopenssl-include="$openssl_include" \
             -Dopenssl-lib="$openssl_lib" \
+            -Dmbedtls-include="$mbedtls_include" \
+            -Dmbedtls-lib="$mbedtls_lib" \
             -Dopenvpn=true \
             -Dwireguard=true \
             -Dwg-go-include="$wg_go_include" \
@@ -257,13 +268,15 @@ configure_slice() {
             slice_target="$zig_arch-macos.$macos_min"
             slice_sdk=$macos_sdk
             slice_openssl=macos-arm64_x86_64
+            slice_mbedtls=macos-arm64_x86_64
             slice_wg_go=macos-arm64_x86_64
             slice_identifier=macos-arm64_x86_64
             ;;
         ios:arm64)
             slice_target="aarch64-ios.$ios_min"
             slice_sdk=$ios_sdk
-            slice_openssl=ios-arm64_arm64e
+            slice_openssl=ios-arm64
+            slice_mbedtls=ios-arm64
             slice_wg_go=ios-arm64
             slice_identifier=ios-arm64
             ;;
@@ -271,13 +284,15 @@ configure_slice() {
             slice_target="$zig_arch-ios.$ios_min-simulator"
             slice_sdk=$ios_simulator_sdk
             slice_openssl=ios-arm64_x86_64-simulator
-            slice_wg_go=ios-arm64-simulator
+            slice_mbedtls=ios-arm64_x86_64-simulator
+            slice_wg_go=ios-arm64_x86_64-simulator
             slice_identifier=ios-arm64_x86_64-simulator
             ;;
         tvos:arm64)
             slice_target="aarch64-tvos.$tvos_min"
             slice_sdk=$tvos_sdk
             slice_openssl=tvos-arm64
+            slice_mbedtls=tvos-arm64
             slice_wg_go=tvos-arm64
             slice_identifier=tvos-arm64
             ;;
@@ -285,7 +300,8 @@ configure_slice() {
             slice_target="$zig_arch-tvos.$tvos_min-simulator"
             slice_sdk=$tvos_simulator_sdk
             slice_openssl=tvos-arm64_x86_64-simulator
-            slice_wg_go=tvos-arm64-simulator
+            slice_mbedtls=tvos-arm64_x86_64-simulator
+            slice_wg_go=tvos-arm64_x86_64-simulator
             slice_identifier=tvos-arm64_x86_64-simulator
             ;;
         *) fail "$platform does not support architecture $arch" ;;
@@ -294,7 +310,9 @@ configure_slice() {
 
 build_configured_slice() {
     configure_slice "$1" "$2"
-    build_slice "$slice_name" "$slice_target" "$slice_sdk" "$slice_openssl" "$slice_wg_go"
+    build_slice \
+        "$slice_name" "$slice_target" "$slice_sdk" \
+        "$slice_openssl" "$slice_mbedtls" "$slice_wg_go"
 }
 
 if [[ $full_build -eq 1 ]]; then
