@@ -1,8 +1,12 @@
 set(PARTOUT_OPENSSL_DEPENDENCY "")
+set(PARTOUT_OPENSSL_IS_PREBUILT OFF)
 
-if(PP_USE_SYSTEM_VENDORS)
+if(PP_SYSTEM_VENDORS_AVAILABLE)
     partout_use_homebrew_formula(openssl@3.5)
-    find_package(OpenSSL 3 REQUIRED COMPONENTS SSL Crypto)
+    find_package(OpenSSL 3 QUIET COMPONENTS SSL Crypto)
+endif()
+
+if(PP_SYSTEM_VENDORS_AVAILABLE AND OpenSSL_FOUND)
     set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_INCLUDE_DIR}")
     get_filename_component(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_SSL_LIBRARY}" DIRECTORY)
     if(CMAKE_LIBRARY_ARCHITECTURE AND
@@ -12,6 +16,7 @@ if(PP_USE_SYSTEM_VENDORS)
     message(STATUS "Using system OpenSSL")
 else()
     partout_use_prebuilt_vendor(openssl OPENSSL_DIR)
+    set(PARTOUT_OPENSSL_IS_PREBUILT ON)
     set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_DIR}/include")
     set(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_DIR}/lib")
 endif()

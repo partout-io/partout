@@ -2,9 +2,7 @@
 set -e
 build_dir=.cmake
 bin_dir=bin
-vendor_source=
 vendor_prebuilt_url=
-vendor_root=
 crypto_selected=
 crypto_openssl=
 crypto_mbedtls=
@@ -184,33 +182,12 @@ while [[ $# -gt 0 ]]; do
             ;;
         -vendors)
             if [[ -z ${2:-} || $2 == -* ]]; then
-                shift
-            else
-                case $2 in
-                    auto)
-                        vendor_source=
-                        vendor_prebuilt_url=
-                        vendor_root=
-                        ;;
-                    system)
-                        vendor_source=system
-                        vendor_prebuilt_url=
-                        vendor_root=
-                        ;;
-                    *)
-                        vendor_source=prebuilt
-                        if [[ -d $2 ]]; then
-                            vendor_root=$2
-                            vendor_prebuilt_url=
-                        else
-                            vendor_prebuilt_url=$2
-                            vendor_root=
-                        fi
-                        ;;
-                esac
-                shift
-                shift
+                echo "-vendors requires a URL"
+                exit 1
             fi
+            vendor_prebuilt_url=$2
+            shift
+            shift
             ;;
         -*|--*)
             echo "Unknown option $1"
@@ -223,11 +200,6 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${positional_args[@]}"
-
-if [[ -n $vendor_prebuilt_url && ${is_android:-} != 1 ]]; then
-    echo "-vendors <url> is only supported for Android builds by build.sh"
-    exit 1
-fi
 
 # Crypto
 if [[ $crypto_selected == 1 ]]; then
@@ -243,15 +215,8 @@ if [[ $crypto_selected == 1 ]]; then
     fi
 fi
 
-# Vendor overrides
-if [[ -n $vendor_source ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_SOURCE=$vendor_source")
-fi
 if [[ -n $vendor_prebuilt_url ]]; then
     cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url")
-fi
-if [[ -n $vendor_root ]]; then
-    cmake_opts+=("-DPP_BUILD_VENDOR_ROOT=$vendor_root")
 fi
 
 # Generate models

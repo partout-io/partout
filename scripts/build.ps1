@@ -29,9 +29,7 @@ try {
     $bin_dir = "bin"
     $configuration = "Release"
     $generator = "Ninja Multi-Config"
-    $vendor_source = $null
     $vendor_prebuilt_url = $null
-    $vendor_root = $null
     $crypto_selected = $false
     $crypto_openssl = $false
     $crypto_mbedtls = $false
@@ -118,33 +116,8 @@ try {
                 $index += 1
             }
             "-vendors" {
-                if (($index + 1) -ge $args.Count -or $args[$index + 1].StartsWith("-")) {
-                    $index += 1
-                } else {
-                    switch ($args[$index + 1]) {
-                        "auto" {
-                            $vendor_source = $null
-                            $vendor_prebuilt_url = $null
-                            $vendor_root = $null
-                        }
-                        "system" {
-                            $vendor_source = "system"
-                            $vendor_prebuilt_url = $null
-                            $vendor_root = $null
-                        }
-                        default {
-                            $vendor_source = "prebuilt"
-                            if (Test-Path -Path $args[$index + 1] -PathType Container) {
-                                $vendor_root = (Resolve-Path $args[$index + 1]).Path
-                                $vendor_prebuilt_url = $null
-                            } else {
-                                $vendor_prebuilt_url = $args[$index + 1]
-                                $vendor_root = $null
-                            }
-                        }
-                    }
-                    $index += 2
-                }
+                $vendor_prebuilt_url = Require-Value "-vendors" $index $args
+                $index += 2
             }
             "-gen-models" {
                 Write-Error "-gen-models is not supported by build.ps1"
@@ -174,14 +147,8 @@ try {
         $cmake_opts += "-DPP_BUILD_USE_MBEDTLS=$(ConvertTo-CMakeBool $crypto_mbedtls)"
     }
 
-    if ($vendor_source) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_SOURCE=$vendor_source"
-    }
     if ($vendor_prebuilt_url) {
         $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendor_prebuilt_url"
-    }
-    if ($vendor_root) {
-        $cmake_opts += "-DPP_BUILD_VENDOR_ROOT=$vendor_root"
     }
 
     if ($gen_build) {

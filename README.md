@@ -36,7 +36,7 @@ targets: [
 
 ### CMake
 
-CMake is a thin wrapper around the Zig build. It builds the selected vendors,
+CMake is a thin wrapper around the Zig build. It resolves the selected vendors,
 then invokes `zig build install` with their include and library paths.
 
 #### Requirements
@@ -64,7 +64,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-crypto (openssl|native[,openssl|native...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable support for WireGuard (requires Go)
 - `-android`: Build for Android
-- `-vendors [auto|system|<path-or-url>]`: Use system dependencies, a local prebuilts root, or a prebuilt release URL
+- `-vendors <url>`: Set the prebuilts URL used when a system vendor is unavailable. Android, Windows, wg-go, and Wintun always require prebuilts.
 
 After the initial `-gen`, invoke the script without arguments to rebuild the
 existing configuration.

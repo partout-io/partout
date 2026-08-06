@@ -6,5 +6,4 @@
   -openvpn                       Enable OpenVPN support
   -wireguard                     Enable WireGuard support
   -android                       Configure an Android build
-  -vendors [auto|system|<path-or-url>]
-                                 Select system or prebuilt dependencies
+  -vendors <url>                 Set the fallback/required prebuilts URL

@@ -52,19 +52,9 @@ function(partout_prebuilt_vendor_archive target output_archive)
 endfunction()
 
 function(partout_prepare_prebuilt_vendors)
-    if(PP_BUILD_VENDOR_ROOT)
-        get_filename_component(vendor_root "${PP_BUILD_VENDOR_ROOT}" ABSOLUTE)
-        if(NOT IS_DIRECTORY "${vendor_root}")
-            message(FATAL_ERROR "PP_BUILD_VENDOR_ROOT does not exist: ${vendor_root}")
-        endif()
-        set(PP_VENDOR_ROOT "${vendor_root}" PARENT_SCOPE)
-        message(STATUS "Using local prebuilt vendors from ${vendor_root}")
-        return()
-    endif()
-
     if(NOT PP_BUILD_VENDOR_PREBUILT_URL)
         message(FATAL_ERROR
-            "Set PP_BUILD_VENDOR_ROOT or PP_BUILD_VENDOR_PREBUILT_URL when using prebuilt vendors")
+            "PP_BUILD_VENDOR_PREBUILT_URL is required when system vendors are unavailable")
     endif()
 
     partout_prebuilt_vendor_target(target)
@@ -87,15 +77,28 @@ function(partout_prepare_prebuilt_vendors)
 
     FetchContent_Declare(${content_name} ${fetch_content_args})
     FetchContent_MakeAvailable(${content_name})
-    FetchContent_GetProperties(${content_name} SOURCE_DIR source_dir)
-
-    set(PP_VENDOR_ROOT "${source_dir}" PARENT_SCOPE)
+    FetchContent_GetProperties(${content_name} SOURCE_DIR vendor_root)
     message(STATUS "Using prebuilt vendors (${target})")
+
+    get_filename_component(output_root "${PP_BUILD_OUTPUT}" ABSOLUTE)
+    if(NOT "${vendor_root}" STREQUAL "${output_root}")
+        file(MAKE_DIRECTORY "${output_root}")
+        foreach(prebuilt_entry IN ITEMS openssl mbedtls wg-go wintun manifest.json)
+            file(REMOVE_RECURSE "${output_root}/${prebuilt_entry}")
+        endforeach()
+        file(COPY "${vendor_root}/" DESTINATION "${output_root}" USE_SOURCE_PERMISSIONS)
+    endif()
+    set(PP_VENDOR_ROOT "${output_root}" PARENT_SCOPE)
 endfunction()
 
 function(partout_use_prebuilt_vendor vendor output_dir)
     if(NOT vendor MATCHES "^(mbedtls|openssl|wg-go|wintun)$")
         message(FATAL_ERROR "No prebuilt archive configured for vendor '${vendor}'")
+    endif()
+
+    if(NOT PP_VENDOR_ROOT)
+        partout_prepare_prebuilt_vendors()
+        set(PP_VENDOR_ROOT "${PP_VENDOR_ROOT}" PARENT_SCOPE)
     endif()
 
     set(vendor_dir "${PP_VENDOR_ROOT}/${vendor}")
