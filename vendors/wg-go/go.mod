@@ -4,7 +4,7 @@ go 1.24.0
 
 require (
 	golang.org/x/sys v0.32.0
-	golang.zx2c4.com/wireguard v0.0.0-20250521234502-f333402bd9cb
+	golang.zx2c4.com/wireguard v0.0.0-20260522210424-ecfc5a8d5446
 )
 
 require (

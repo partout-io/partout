@@ -6,29 +6,37 @@
 all: clean build install
 
 # Go configuration
-HOST_GOOS := $(shell go env GOOS)
-HOST_GOARCH := $(shell go env GOARCH)
+GOOS ?= $(shell go env GOOS)
+GOARCH ?= $(shell go env GOARCH)
 HOST_GOROOT := $(shell go env GOROOT)
+export GOOS
+export GOARCH
 
-BUILDMODE := c-shared
+BUILDMODE ?= c-shared
+ifeq ($(APPLE),1)
+override BUILDMODE := c-archive
+endif
 
 # Cross-build for Android
 ifeq ($(ANDROID),1)
-HOST_GOOS := android
-HOST_GOARCH := arm64
-export GOOS := $(HOST_GOOS)
-export GOARCH := $(HOST_GOARCH)
+GOOS := android
+GOARCH := arm64
+endif
+
+ifeq ($(BUILDMODE),c-archive)
+BUILDEXT := a
+else ifeq ($(GOOS),linux)
 BUILDEXT := so
-else ifeq ($(HOST_GOOS),linux)
+else ifeq ($(GOOS),android)
 BUILDEXT := so
-else ifeq ($(HOST_GOOS),windows)
+else ifeq ($(GOOS),windows)
 BUILDEXT := dll
 else # Apple
 BUILDEXT := dylib
 endif
 
 GO_LDFLAGS := -w
-ifneq ($(filter android linux,$(HOST_GOOS)),)
+ifneq ($(filter android linux,$(GOOS)),)
 GO_LDFLAGS += -extldflags=-Wl,-soname,libwg-go.so
 endif
 
@@ -36,13 +44,16 @@ endif
 MODROOT=src
 BUILDDIR ?= $(CURDIR)/build
 TMPROOTDIR ?= $(CURDIR)/.goroot
-DESTDIR ?= $(CURDIR)/bin/$(HOST_GOOS)-$(HOST_GOARCH)
+DESTDIR ?= $(CURDIR)/bin/$(GOOS)-$(GOARCH)
 
-# Some specifics on macOS
-ifeq ($(HOST_GOOS),darwin)
+# Some specifics on Apple platforms
+ifeq ($(APPLE),1)
 # Include sysroot
 SDKROOT ?= $(shell xcrun --sdk macosx --show-sdk-path)
-export CGO_CFLAGS := -isysroot $(SDKROOT)
+TARGET ?= $(GOARCH)-apple-macos
+export CGO_CFLAGS := -isysroot $(SDKROOT) -target $(TARGET)
+export CGO_CXXFLAGS := $(CGO_CFLAGS)
+export CGO_LDFLAGS := -isysroot $(SDKROOT) -target $(TARGET)
 export PATH := $(PATH):/opt/homebrew/bin:/usr/local/bin
 # Patch runtime
 export GOROOT := $(TMPROOTDIR)
