@@ -105,7 +105,7 @@ function(partout_prebuilt_vendor_archive vendor target output_archive)
 endfunction()
 
 function(partout_use_prebuilt_vendor vendor output_dir)
-    if(NOT vendor MATCHES "^(mbedtls|openssl|wg-go|wintun)$")
+    if(NOT vendor MATCHES "^(mbedtls|openssl|wg-go)$")
         message(FATAL_ERROR "No prebuilt archive configured for vendor '${vendor}'")
     endif()
 
