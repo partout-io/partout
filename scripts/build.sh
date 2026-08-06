@@ -181,27 +181,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -vendors)
             if [[ -z ${2:-} || $2 == -* ]]; then
-                echo "-vendors requires <vendor>=<url>"
+                echo "-vendors requires a URL"
                 exit 1
             fi
-            vendor_spec=$2
-            vendor_name=${vendor_spec%%=*}
-            vendor_url=${vendor_spec#*=}
-            if [[ $vendor_spec != *=* || -z $vendor_url ]]; then
-                echo "-vendors requires <vendor>=<url>"
-                exit 1
-            fi
-            case $vendor_name in
-                openssl) vendor_id=OPENSSL ;;
-                mbedtls) vendor_id=MBEDTLS ;;
-                wg-go) vendor_id=WG_GO ;;
-                wintun) vendor_id=WINTUN ;;
-                *)
-                    echo "Unknown vendor '$vendor_name'"
-                    exit 1
-                    ;;
-            esac
-            cmake_opts+=("-DPP_BUILD_${vendor_id}_PREBUILT_URL=$vendor_url")
+            cmake_opts+=("-DPP_BUILD_VENDOR_PREBUILT_URL=$2")
             shift
             shift
             ;;

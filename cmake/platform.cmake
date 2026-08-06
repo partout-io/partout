@@ -1,5 +1,8 @@
 include("${CMAKE_CURRENT_LIST_DIR}/prebuilt.cmake")
 
+set(PP_BUILD_VENDOR_PREBUILT_URL "" CACHE STRING
+    "Root URL containing prebuilt vendor archives")
+
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" PLATFORM_NAME)
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_NAME)
 if(WIN32)

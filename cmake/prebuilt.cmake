@@ -93,23 +93,36 @@ function(partout_prepare_apple_vendor source_dir vendor_dir vendor)
     endforeach()
 endfunction()
 
+function(partout_prebuilt_vendor_archive vendor target output_archive)
+    if(target STREQUAL "apple-xcframework")
+        set(archive "${vendor}.xcframework.zip")
+    elseif(target MATCHES "^windows-")
+        set(archive "${vendor}-${target}.zip")
+    else()
+        set(archive "${vendor}-${target}.tar.gz")
+    endif()
+    set(${output_archive} "${archive}" PARENT_SCOPE)
+endfunction()
+
 function(partout_use_prebuilt_vendor vendor output_dir)
     if(NOT vendor MATCHES "^(mbedtls|openssl|wg-go|wintun)$")
         message(FATAL_ERROR "No prebuilt archive configured for vendor '${vendor}'")
     endif()
 
     partout_prebuilt_vendor_target(target)
+    if(NOT PP_BUILD_VENDOR_PREBUILT_URL)
+        message(FATAL_ERROR
+            "PP_BUILD_VENDOR_PREBUILT_URL is required for prebuilt vendor '${vendor}'")
+    endif()
+    partout_prebuilt_vendor_archive("${vendor}" "${target}" archive)
+    string(REGEX REPLACE "/+$" "" vendor_root "${PP_BUILD_VENDOR_PREBUILT_URL}")
     string(REPLACE "-" "_" vendor_id "${vendor}")
     string(TOUPPER "${vendor_id}" vendor_id)
-    set(url_var "PP_BUILD_${vendor_id}_PREBUILT_URL")
     set(hash_var "PP_BUILD_${vendor_id}_PREBUILT_HASH")
-    if(NOT DEFINED ${url_var} OR "${${url_var}}" STREQUAL "")
-        message(FATAL_ERROR "${url_var} is required for prebuilt vendor '${vendor}'")
-    endif()
-    string(REPLACE "-" "_" content_name "partout_${vendor}_prebuilt")
+    string(REPLACE "-" "_" content_name "partout_${vendor}_${target}_prebuilt")
 
     set(fetch_content_args
-        URL "${${url_var}}"
+        URL "${vendor_root}/${archive}"
         SOURCE_SUBDIR "__partout_no_cmake_subdir"
         DOWNLOAD_EXTRACT_TIMESTAMP FALSE
     )

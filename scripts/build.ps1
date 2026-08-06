@@ -115,25 +115,8 @@ try {
                 $index += 1
             }
             "-vendors" {
-                $vendorSpec = Require-Value "-vendors" $index $args
-                $separator = $vendorSpec.IndexOf("=")
-                if ($separator -le 0 -or $separator -eq ($vendorSpec.Length - 1)) {
-                    Write-Error "-vendors requires <vendor>=<url>"
-                    exit 1
-                }
-                $vendorName = $vendorSpec.Substring(0, $separator)
-                $vendorUrl = $vendorSpec.Substring($separator + 1)
-                $vendorId = switch ($vendorName) {
-                    "openssl" { "OPENSSL" }
-                    "mbedtls" { "MBEDTLS" }
-                    "wg-go" { "WG_GO" }
-                    "wintun" { "WINTUN" }
-                    default {
-                        Write-Error "Unknown vendor '$vendorName'"
-                        exit 1
-                    }
-                }
-                $cmake_opts += "-DPP_BUILD_${vendorId}_PREBUILT_URL=$vendorUrl"
+                $vendorUrl = Require-Value "-vendors" $index $args
+                $cmake_opts += "-DPP_BUILD_VENDOR_PREBUILT_URL=$vendorUrl"
                 $index += 2
             }
             "-gen-models" {
