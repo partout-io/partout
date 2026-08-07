@@ -468,6 +468,26 @@ fi
 
 write_info_plist() {
     local path=$1
+    local platform=$2
+    local minimum_os_key
+    local minimum_os_version
+
+    case "$platform" in
+        macos)
+            minimum_os_key=LSMinimumSystemVersion
+            minimum_os_version=$macos_min
+            ;;
+        ios|ios-simulator)
+            minimum_os_key=MinimumOSVersion
+            minimum_os_version=$ios_min
+            ;;
+        tvos|tvos-simulator)
+            minimum_os_key=MinimumOSVersion
+            minimum_os_version=$tvos_min
+            ;;
+        *) fail "unsupported framework platform: $platform" ;;
+    esac
+
     cat > "$path" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -485,6 +505,8 @@ write_info_plist() {
   <string>1.0</string>
   <key>CFBundleVersion</key>
   <string>1</string>
+  <key>$minimum_os_key</key>
+  <string>$minimum_os_version</string>
 </dict>
 </plist>
 PLIST
@@ -506,7 +528,7 @@ make_framework() {
     cp "$binary" "$content/$framework_name"
     cp "$zig_dir/src/partout.h" "$content/Headers/partout.h"
     cp "$zig_dir/src/module.modulemap" "$content/Modules/module.modulemap"
-    write_info_plist "$plist"
+    write_info_plist "$plist" "$platform"
     if [[ $platform == macos ]]; then
         ln -s A "$framework/Versions/Current"
         ln -s "Versions/Current/$framework_name" "$framework/$framework_name"
@@ -559,6 +581,12 @@ else
     fi
     cp "$zig_dir/src/partout.h" "$existing_framework/Headers/partout.h"
     cp "$zig_dir/src/module.modulemap" "$existing_framework/Modules/module.modulemap"
+    if [[ $active_platform == macos ]]; then
+        existing_plist="$existing_framework/Versions/A/Resources/Info.plist"
+    else
+        existing_plist="$existing_framework/Info.plist"
+    fi
+    write_info_plist "$existing_plist" "$active_platform"
 fi
 
 if [[ $full_build -eq 0 && -d "$output_path" ]] &&
