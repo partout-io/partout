@@ -52,19 +52,17 @@ jobs:
         run: |
           xcframework="$RUNNER_TEMP/PartoutNative.xcframework"
           archive="$xcframework.zip"
+          checksum_file="$archive.checksum"
           release_body="$RUNNER_TEMP/release-body.md"
 
           scripts/build-xcframework.sh "$xcframework" "$ARTIFACTS_DIR" --full --monolith
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
-          checksum=$(swift package compute-checksum "$archive")
+          swift package compute-checksum "$archive" > "$checksum_file"
 
-          {
-            echo "Prebuilts tag: \`$PREBUILTS_TAG\`"
-            echo
-            echo "PartoutNative.xcframework.zip checksum: \`$checksum\`"
-          } > "$release_body"
+          echo "Prebuilts tag: \`$PREBUILTS_TAG\`" > "$release_body"
 
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "checksum_file=$checksum_file" >> "$GITHUB_OUTPUT"
           echo "release_body=$release_body" >> "$GITHUB_OUTPUT"
       - name: Publish release
         uses: softprops/action-gh-release@v3
@@ -73,5 +71,7 @@ jobs:
           tag_name: ${{ steps.parse_version.outputs.version }}
           generate_release_notes: true
           body_path: ${{ steps.build_xcframework.outputs.release_body }}
-          files: ${{ steps.build_xcframework.outputs.archive }}
+          files: |
+            ${{ steps.build_xcframework.outputs.archive }}
+            ${{ steps.build_xcframework.outputs.checksum_file }}
           fail_on_unmatched_files: true
