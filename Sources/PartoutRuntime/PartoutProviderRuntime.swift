@@ -21,7 +21,7 @@ public final class PartoutProviderRuntime: Sendable {
 
     public init(
         provider: NEPacketTunnelProvider,
-        decoder: NEProtocolDecoder,
+        profile: Profile,
         options: TunnelControllerOptions,
         defaults: UserDefaults,
         logsPrivateData: Bool,
@@ -29,11 +29,11 @@ public final class PartoutProviderRuntime: Sendable {
         minDataCountDelta: Int64? = nil,
         logger: partout_logger_cb?
     ) throws {
-        profile = try Profile(withNEProvider: provider, decoder: decoder)
         ctx = PartoutLoggerContext(profile.id)
         controller = PartoutTunnelController(ctx, provider: provider, options: options)
         environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
         messageHandler = DefaultMessageHandler(ctx, environment: environment)
+        self.profile = profile
         self.options = options
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
