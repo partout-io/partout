@@ -128,8 +128,8 @@ done
 
 caller_dir=$(pwd)
 script_dir=$(cd "$(dirname "$0")" && pwd)
-zig_dir=$(cd "$script_dir/.." && pwd)
-repo_dir=$(cd "$zig_dir/.." && pwd)
+zig_dir=$(cd "$script_dir/../zig" && pwd)
+repo_dir=$(cd "$script_dir/.." && pwd)
 
 if [[ -n $artifacts_argument ]]; then
     case "$artifacts_argument" in
