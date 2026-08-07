@@ -10,8 +10,8 @@ import Partout
 public final class PartoutProviderRuntime: Sendable {
     private let ctx: PartoutLoggerContext
     public let profile: Profile
+    public let environment: UserDefaultsEnvironment
     private let controller: PartoutTunnelController
-    private let environment: UserDefaultsEnvironment
     private let messageHandler: DefaultMessageHandler
     private let options: TunnelControllerOptions
     private let logsPrivateData: Bool
@@ -30,10 +30,10 @@ public final class PartoutProviderRuntime: Sendable {
         logger: partout_logger_cb?
     ) throws {
         ctx = PartoutLoggerContext(profile.id)
-        controller = PartoutTunnelController(ctx, provider: provider, options: options)
-        environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
-        messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.profile = profile
+        environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
+        controller = PartoutTunnelController(ctx, provider: provider, options: options)
+        messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
