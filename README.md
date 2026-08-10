@@ -6,17 +6,17 @@
 [![Unit Tests](https://github.com/partout-io/partout/actions/workflows/test.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/test.yml)
 [![Release](https://github.com/partout-io/partout/actions/workflows/release.yml/badge.svg)](https://github.com/partout-io/partout/actions/workflows/release.yml)
 
-# [Partout](https://partout.io)
+# [Partout][partout]
 
 _The easiest way to build cross-platform tunnel apps_.
 
-Partout (French: /paʁtu/) is a _multilanguage_ library using [Swift][swift] and C at its core. It provides VPN functionality through the [Network Extension][network-extension] framework on Apple platforms, but it partially works on Android, Linux, and Windows (with [Wintun][wintun]). I'm documenting the long journey of making Partout fully cross-platform [in a blog series][blog], where I write about the challenges of Swift on non-Apple targets, and how I'm overcoming them.
+Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, plus Swift and Kotlin for the OS bindings. It provides VPN functionality through the [Network Extension][apple-ne] framework on Apple platforms, through [VpnService][android-vpnservice] on Android, and it partially works on Windows (with [Wintun][wintun]) and Linux.
 
-Partout is the backbone of [Passepartout][passepartout]. The footprint is kept in check on non-Apple platforms by reimplementing a small subset of Swift Foundation in the `MiniFoundation` targets.
+Partout is the backbone of [Passepartout][passepartout].
 
 ## Usage
 
-**As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [obtain a proper license][license-website].**
+**As per the GPL, the public license is not suitable for the App Store and other closed-source distributions. If you want to use Partout for proprietary or commercial purposes, please [obtain a proper license][partout-license].**
 
 ### SwiftPM
 
@@ -47,7 +47,7 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-Partout consumes system libraries or artifacts published by the `prebuilts` project; it does not build vendor sources.
+Partout consumes system libraries or artifacts published by the [prebuilts][github-prebuilts] project; it does not build vendor sources.
 
 #### Build
 
@@ -65,7 +65,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-crypto (openssl|mbedtls[,openssl|mbedtls...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
 - `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
-- `-prebuilts <version>`: Use vendor archives from the matching `partout-io/prebuilts` GitHub release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
+- `-prebuilts <version>`: Use vendor archives from the matching [`partout-io/prebuilts`][github-prebuilts] GitHub Release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
 
 The equivalent CMake variable is `PP_BUILD_VENDOR_PREBUILT_URL`. Optional
 vendor-specific `*_PREBUILT_HASH` variables accept a CMake `URL_HASH` value
@@ -115,7 +115,7 @@ Open `Demo.xcodeproj` and run the `PartoutDemo` target.
 
 Copyright (c) 2026 Davide De Rosa. All rights reserved.
 
-The library is licensed under the [GPLv3][license]. The `MiniFoundation` targets and the [CMake toolchains][github-toolchains] are MIT-licensed.
+The library is licensed under the [GPLv3][license].
 
 ### Contributing
 
@@ -153,24 +153,20 @@ This product includes software developed by the OpenSSL Project for use in the O
 
 Twitter: [@keeshux][about-twitter]
 
-Website: [partout.io][about-website]
+Website: [partout.io][partout]
 
-[passepartout]: https://passepartoutvpn.app/
-[swift]: https://swift.org/
-[swift-android-sdk]: https://github.com/swift-android-sdk/swift-android-sdk
-[network-extension]: https://developer.apple.com/documentation/networkextension/
-[protobuf]: https://protobuf.dev/
-[kotlin]: https://kotlinlang.org/
+[partout]: https://partout.io
+[partout-license]: https://partout.io/license/
+[passepartout]: https://partout.io/passepartout/
+[apple-ne]: https://developer.apple.com/documentation/networkextension/
+[android-vpnservice]: https://developer.android.com/reference/android/net/VpnService
 [wintun]: https://git.zx2c4.com/wintun/about/
-[blog]: https://davidederosa.com/cross-platform-swift/
 [license]: LICENSE
-[license-website]: https://partout.io/license
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
-[openapi-generator]: https://openapi-generator.tech/
 
-[github-releases]: https://github.com/partout-io/partout/releases
-[github-toolchains]: https://github.com/partout-io/partout/tree/master/cmake
+[github-prebuilts]: https://github.com/partout-io/prebuilts
+
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
@@ -178,9 +174,7 @@ Website: [partout.io][about-website]
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
 [credits-url.c]: https://github.com/cozis/url.c
-[credits-uuidv4]: https://github.com/rxi/uuid4
 [credits-wintun]: https://github.com/wireguard/wintun
 [credits-wireguard-go]: https://github.com/wireguard/wireguard-go
 
 [about-twitter]: https://twitter.com/keeshux
-[about-website]: https://github.com/partout-io
