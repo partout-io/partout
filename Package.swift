@@ -3,7 +3,10 @@
 
 import PackageDescription
 
-let version = "0.155.2"
+let partoutNative: Target = .partoutNative(
+//    .local
+    .remote("0.155.2", checksum: "f09ddaf15ceda59129e33568c43592f852dae88246500a3d55d5e346199685e1")
+)
 
 let package = Package(
     name: "partout",
@@ -27,11 +30,7 @@ let package = Package(
         )
     ],
     targets: [
-        .binaryTarget(
-            name: "PartoutNative",
-            url: "https://github.com/partout-io/partout/releases/download/\(version)/PartoutNative.xcframework.zip",
-            checksum: "f09ddaf15ceda59129e33568c43592f852dae88246500a3d55d5e346199685e1"
-        ),
+        partoutNative,
         .target(
             name: "PartoutCore",
             dependencies: ["PartoutCore_C"],
@@ -57,3 +56,27 @@ let package = Package(
     ],
     swiftLanguageModes: [.v6]
 )
+
+enum PartoutNativeTarget {
+    case local
+    case remote(_ version: String, checksum: String)
+}
+
+extension Target {
+    static func partoutNative(_ target: PartoutNativeTarget) -> Target {
+        let name = "PartoutNative"
+        switch target {
+        case .local:
+            return .binaryTarget(
+                name: name,
+                path: "\(name).xcframework"
+            )
+        case .remote(let version, let checksum):
+            return .binaryTarget(
+                name: name,
+                url: "https://github.com/partout-io/partout/releases/download/\(version)/\(name).xcframework.zip",
+                checksum: checksum
+            )
+        }
+    }
+}
