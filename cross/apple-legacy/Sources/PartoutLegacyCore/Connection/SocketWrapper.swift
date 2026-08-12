@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutLegacyCore_C
-@testable import PartoutCore
+import PartoutCore
 
 final class SocketWrapper: NativeIOInterface, @unchecked Sendable {
     struct Options: Sendable {

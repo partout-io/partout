@@ -15,7 +15,7 @@ extension TunnelRemoteInfoWrapper {
 }
 
 extension TunnelRemoteInfo {
-    func encodedAsJSON(_ profile: Profile) throws -> String {
+    public func encodedAsJSON(_ profile: Profile) throws -> String {
         let wrapped = TunnelRemoteInfoWrapper(profile, info: self)
         do {
             return try JSONEncoder.shared().encodeJSON(wrapped)

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutLegacyCore_C
-@testable import PartoutCore
+import PartoutCore
 
 /// Implementation of ``SimpleDNSStrategy`` with the POSIX C library.
 public actor POSIXDNSStrategy: SimpleDNSStrategy {

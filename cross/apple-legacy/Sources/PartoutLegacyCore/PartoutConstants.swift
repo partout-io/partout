@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@_exported @testable import PartoutCore
+@_exported import PartoutCore
 @_exported import MiniFoundation
 
 public enum PartoutConstants {

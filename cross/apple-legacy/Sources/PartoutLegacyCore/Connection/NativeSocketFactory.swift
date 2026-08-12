@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import PartoutLegacyCore_C
-@testable import PartoutCore
+import PartoutCore
 
 /// A ``NetworkInterfaceFactory`` that spawns native BSD sockets.
 public final class NativeSocketFactory: NetworkInterfaceFactory {

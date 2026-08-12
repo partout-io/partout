@@ -23,10 +23,7 @@ let package = Package(
     targets: [
         .target(
             name: "PartoutCore",
-            dependencies: ["PartoutCore_C"],
-            swiftSettings: [
-                .unsafeFlags(["-enable-testing"])
-            ]
+            dependencies: ["PartoutCore_C"]
         ),
         .target(
             name: "PartoutCore_C"
