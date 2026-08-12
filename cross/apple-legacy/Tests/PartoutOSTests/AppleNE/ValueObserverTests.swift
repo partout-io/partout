@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore
+import PartoutLegacyCore
 @testable import PartoutOS
 import Testing
 

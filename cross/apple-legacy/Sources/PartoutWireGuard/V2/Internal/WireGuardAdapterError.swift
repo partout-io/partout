@@ -3,7 +3,7 @@
 
 internal import _PartoutWireGuard_C
 #if !USE_CMAKE
-import PartoutCore
+import PartoutLegacyCore
 #endif
 
 enum WireGuardAdapterError: Error, Sendable {

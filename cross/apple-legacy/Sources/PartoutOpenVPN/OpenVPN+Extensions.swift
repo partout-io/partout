@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !USE_CMAKE
-@_exported import PartoutCore
+@_exported import PartoutLegacyCore
 #endif
 
 extension OpenVPNModule: ConnectionModule {

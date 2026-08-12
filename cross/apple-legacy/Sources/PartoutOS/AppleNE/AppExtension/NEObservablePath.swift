@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Network
+import class Network.NWPathMonitor
+import struct Network.NWPath
 
 /// An observer that publishes updates from a `NWPathMonitor`.
 public final class NEObservablePath: ReachabilityObserver {

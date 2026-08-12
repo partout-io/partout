@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCrypto_C
-import PartoutCore
+import PartoutLegacyCore
 
 extension CryptoWrapper {
     func encryptData(_ data: CZeroingData, flags: UnsafePointer<pp_crypto_flags>?) throws -> CZeroingData {

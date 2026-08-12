@@ -207,9 +207,9 @@ pub fn build(b: *std.Build) void {
     if (!shared and target.result.os.tag.isDarwin()) {
         const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
-        b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
+        b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/c/partout/include/partout.h"), "partout.h").step);
     } else {
-        lib.installHeader(b.path("src/partout.h"), "partout.h");
+        lib.installHeader(b.path("src/c/partout/include/partout.h"), "partout.h");
         b.installArtifact(lib);
     }
     if (target.result.os.tag == .windows) {
@@ -362,13 +362,14 @@ fn configurePartoutModule(
 ) void {
     module.addOptions("build_options", config.options);
     module.addIncludePath(b.path("src"));
+    module.addIncludePath(b.path("src/c/partout/include"));
     module.addIncludePath(b.path("src/c/portable/include"));
     module.addIncludePath(b.path("src/c/crypto/include"));
     if (config.openvpn) {
-        module.addIncludePath(b.path("src/openvpn/c/include"));
+        module.addIncludePath(b.path("src/c/openvpn/include"));
     }
     if (config.wireguard) {
-        module.addIncludePath(b.path("src/wireguard/c/include"));
+        module.addIncludePath(b.path("src/c/wireguard/include"));
     }
     addVendorIncludePaths(module, b, config);
     addAppleSDKPaths(module, b, config.apple_sdk_path);
@@ -577,22 +578,22 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
 
     if (use_openvpn) {
         addCSourceFiles(module, &.{
-            "src/openvpn/c/control.c",
-            "src/openvpn/c/dp_framing.c",
-            "src/openvpn/c/dp_mode.c",
-            "src/openvpn/c/dp_mode_ad.c",
-            "src/openvpn/c/dp_mode_hmac.c",
-            "src/openvpn/c/mss_fix.c",
-            "src/openvpn/c/pkt_proc.c",
-            "src/openvpn/c/test/openvpn_crypto_mock.c",
+            "src/c/openvpn/control.c",
+            "src/c/openvpn/dp_framing.c",
+            "src/c/openvpn/dp_mode.c",
+            "src/c/openvpn/dp_mode_ad.c",
+            "src/c/openvpn/dp_mode_hmac.c",
+            "src/c/openvpn/mss_fix.c",
+            "src/c/openvpn/pkt_proc.c",
+            "src/c/openvpn/test/openvpn_crypto_mock.c",
         });
     }
 
     if (use_wireguard) {
         addCSourceFiles(module, &.{
-            "src/wireguard/c/backend.c",
-            "src/wireguard/c/key.c",
-            "src/wireguard/c/x25519.c",
+            "src/c/wireguard/backend.c",
+            "src/c/wireguard/key.c",
+            "src/c/wireguard/x25519.c",
         });
     }
 }

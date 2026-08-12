@@ -15,7 +15,15 @@ let package = Package(
     products: [
         .library(
             name: "partout",
-            targets: ["PartoutRuntime"]
+            targets: ["Partout"]
+        ),
+        .library(
+            name: "PartoutCore",
+            targets: ["PartoutCore"]
+        ),
+        .library(
+            name: "PartoutCore_C",
+            targets: ["PartoutCore_C"]
         )
     ],
     targets: [
@@ -25,13 +33,25 @@ let package = Package(
             checksum: "f09ddaf15ceda59129e33568c43592f852dae88246500a3d55d5e346199685e1"
         ),
         .target(
-            name: "PartoutRuntime",
-            dependencies: ["PartoutNative"],
-            path: "cross/apple/Sources/PartoutRuntime"
+            name: "Partout",
+            dependencies: [
+                "PartoutCore",
+                "PartoutNative"
+            ],
+            path: "cross/apple/Sources/Partout"
+        ),
+        .target(
+            name: "PartoutCore",
+            dependencies: ["PartoutCore_C"],
+            path: "cross/apple/Sources/PartoutCore"
+        ),
+        .target(
+            name: "PartoutCore_C",
+            path: "cross/apple/Sources/PartoutCore_C"
         ),
         .testTarget(
-            name: "PartoutRuntimeTests",
-            path: "cross/apple/Tests/PartoutRuntimeTests"
+            name: "PartoutTests",
+            path: "cross/apple/Tests/PartoutTests"
         )
     ],
     swiftLanguageModes: [.v6]

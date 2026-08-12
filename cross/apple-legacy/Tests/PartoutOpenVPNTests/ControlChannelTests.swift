@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import _PartoutCrypto_C
-import PartoutCore
+import PartoutLegacyCore
 @testable import PartoutOpenVPN
 import Testing
 

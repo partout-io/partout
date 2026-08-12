@@ -42,8 +42,18 @@ let globalCSettings: [CSetting] = [
     ])
 ]
 
+let sharedPartoutCore: Target.Dependency = .product(
+    name: "PartoutCore",
+    package: "partout-shared"
+)
+
+let sharedPartoutCoreC: Target.Dependency = .product(
+    name: "PartoutCore_C",
+    package: "partout-shared"
+)
+
 let package = Package(
-    name: "partout",
+    name: "partout-legacy",
     platforms: [
         .iOS(.v16),
         .macOS(.v13),
@@ -51,13 +61,12 @@ let package = Package(
     ],
     products: [
         .library(
-            name: "partout",
+            name: "partout-legacy",
             targets: ["Partout"]
-        ),
-        .library(
-            name: "Partout_C",
-            targets: ["Partout_C"]
         )
+    ],
+    dependencies: [
+        .package(name: "partout-shared", path: "../apple")
     ],
     targets: [
         .target(
@@ -67,7 +76,7 @@ let package = Package(
                 var list: [Target.Dependency] = [
                     "Partout_C",
                     "PartoutCrypto_C",
-                    "PartoutCore",
+                    "PartoutLegacyCore",
                     "PartoutOS"
                 ]
                 if areas.contains(.openVPN) {
@@ -85,7 +94,8 @@ let package = Package(
             dependencies: {
                 var list: [Target.Dependency] = [
                     "PartoutCrypto_C",
-                    "PartoutCore_C"
+                    "PartoutLegacyCore_C",
+                    sharedPartoutCoreC
                 ]
                 if areas.contains(.openVPN) {
                     list.append("PartoutOpenVPN_C")
@@ -119,8 +129,8 @@ if envDocs {
 // Wrapper = Core + OS
 package.products.append(contentsOf: [
     .library(
-        name: "PartoutCore",
-        targets: ["PartoutCore"]
+        name: "PartoutLegacyCore",
+        targets: ["PartoutLegacyCore"]
     ),
     .library(
         name: "PartoutOS",
@@ -129,20 +139,23 @@ package.products.append(contentsOf: [
 ])
 package.targets.append(contentsOf: [
     .target(
-        name: "PartoutCore",
+        name: "PartoutLegacyCore",
         dependencies: [
             "MiniFoundation",
-            "PartoutCore_C"
+            "PartoutLegacyCore_C",
+            sharedPartoutCore,
+            sharedPartoutCoreC
         ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(
-        name: "PartoutCore_C",
+        name: "PartoutLegacyCore_C",
+        dependencies: [sharedPartoutCoreC],
         cSettings: globalCSettings
     ),
     .target(
         name: "PartoutOS",
-        dependencies: ["PartoutCore"],
+        dependencies: ["PartoutLegacyCore"],
         exclude: {
             var list: [String] = []
 #if swift(>=6.0)
@@ -159,8 +172,8 @@ package.targets.append(contentsOf: [
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .testTarget(
-        name: "PartoutCoreTests",
-        dependencies: ["PartoutCore"],
+        name: "PartoutLegacyCoreTests",
+        dependencies: ["PartoutLegacyCore"],
         exclude: useFoundationCompatibility.coreTestsExclude,
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
@@ -196,7 +209,7 @@ if areas.contains(.openVPN) {
         .target(
             name: "PartoutOpenVPN",
             dependencies: [
-                "PartoutCore",
+                "PartoutLegacyCore",
                 "PartoutOpenVPN_C"
             ],
             swiftSettings: cryptoLibraries.swiftSettings
@@ -227,7 +240,8 @@ if areas.contains(.wireGuard) {
         .target(
             name: "PartoutWireGuard_C",
             dependencies: [
-                "PartoutCore_C",
+                "PartoutLegacyCore_C",
+                sharedPartoutCoreC,
                 "wg-go"
             ]
         )
@@ -236,7 +250,7 @@ if areas.contains(.wireGuard) {
         .target(
             name: "PartoutWireGuard",
             dependencies: [
-                "PartoutCore",
+                "PartoutLegacyCore",
                 "PartoutWireGuard_C"
             ]
         ),
@@ -250,7 +264,10 @@ if areas.contains(.wireGuard) {
 
 // MARK: - Crypto
 
-var cryptoDependencies: [Target.Dependency] = ["PartoutCore_C"]
+var cryptoDependencies: [Target.Dependency] = [
+    "PartoutLegacyCore_C",
+    sharedPartoutCoreC
+]
 
 for mode in cryptoLibraries {
     switch mode {
@@ -327,7 +344,10 @@ package.products.append(
 package.targets.append(contentsOf: [
     .target(
         name: "MiniFoundation",
-        dependencies: ["MiniFoundation_C"],
+        dependencies: [
+            "MiniFoundation_C",
+            sharedPartoutCore
+        ],
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .target(

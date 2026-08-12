@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import JavaScriptCore
+@_exported import PartoutLegacyCore
 
 /// A scripting engine based on the JavaScriptCore framework. This class is not actor-safe.
 public final class AppleJavaScriptEngine: ScriptingEngine, @unchecked Sendable {

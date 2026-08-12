@@ -1,0 +1,38 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+import PartoutLegacyCore
+internal import PartoutLegacyCore_C
+#if canImport(Network)
+import Network
+#endif
+import Testing
+
+struct DataNetworkTests {
+    @Test
+    func givenData_whenParse_thenSucceeds() {
+        let sut = Data(hex: "00000000")
+        #expect(sut.asIPAddress == "0.0.0.0")
+    }
+
+#if canImport(Network)
+    @Test
+    func givenIPv4_whenParse_thenSucceeds() throws {
+        let sut = "1.2.3.4"
+        let addr = Network.IPv4Address(sut)
+        let ipv4 = try #require(addr)
+        let bytes = [UInt8](ipv4.rawValue)
+        #expect(Data(bytes).asIPAddress == sut)
+    }
+
+    @Test
+    func givenIPv6_whenParse_thenSucceeds() throws {
+        let sut = "11:2::3:4"
+        let addr = Network.IPv6Address(sut)
+        let ipv6 = try #require(addr)
+        let bytes = [UInt8](ipv6.rawValue)
+        #expect(Data(bytes).asIPAddress == sut)
+    }
+#endif
+}

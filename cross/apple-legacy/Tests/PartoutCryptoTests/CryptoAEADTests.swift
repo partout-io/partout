@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore
+import PartoutLegacyCore
 import Testing
 
 private let plainHex = "00112233ffddaa"

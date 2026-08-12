@@ -1,0 +1,137 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+public import NetworkExtension
+
+extension Profile {
+    // TODO: #518, Make internal after migrating to Zig
+    public func networkSettings(
+        with info: TunnelRemoteInfo?,
+        options: TunnelControllerOptions = .init()
+    ) -> NEPacketTunnelNetworkSettings {
+        let ctx = PartoutLoggerContext(id)
+        let tunnelRemoteAddress = info?.address?.rawValue ?? NEPacketTunnelNetworkSettings.fakeRemoteAddress
+        var neSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: tunnelRemoteAddress)
+
+        pp_log(ctx, .os, .info, "Build NetworkExtension settings from Profile")
+        pp_log(ctx, .os, .info, "\tTunnel remote address: \(tunnelRemoteAddress.asSensitiveAddress(ctx))")
+
+        // 1. Gather active modules
+
+        var applicableModules = modules.filter {
+            isActiveModule(withId: $0.id)
+        }
+
+        // 2. Inject remote modules right after the originating module
+
+        if let info, let remoteModules = info.modules,
+           let indexOfRemoteModule = applicableModules.firstIndex(where: { $0.id == info.originalModuleId }) {
+            applicableModules.insert(contentsOf: remoteModules, at: indexOfRemoteModule + 1)
+        }
+
+        // 3. Apply modules to NE settings
+
+        applicableModules.forEach {
+            let moduleDescription = LoggableModule(ctx, $0)
+                .debugDescription(withSensitiveData: ctx.logger.logsModules)
+
+            if let applicableModule = $0 as? Module & NESettingsApplying {
+                pp_log(ctx, .os, .info, "\t+ \(type(of: $0)): \(moduleDescription)")
+                applicableModule.apply(ctx, to: &neSettings)
+            } else {
+                pp_log(ctx, .os, .info, "\t- \(type(of: $0)): \(moduleDescription)")
+            }
+        }
+
+        let isGatewayIPv4 = neSettings.ipv4Settings?.includedRoutes?.contains {
+            $0.hasSameDestination(as: .default())
+        } ?? false
+        let isGatewayIPv6 = neSettings.ipv6Settings?.includedRoutes?.contains {
+            $0.hasSameDestination(as: .default())
+        } ?? false
+        let isGateway = isGatewayIPv4 || isGatewayIPv6
+        pp_log(ctx, .os, .info, "\tVPN is default gateway: \(isGateway)")
+
+        // 4. Configure DNS for non-connection profiles
+
+        if firstBuildingConnection(ifActive: true) == nil {
+            // XXX: The tunnel takes several seconds to stop if only DNS settings
+            // are provided. Here we add some fake IP settings to work around
+            // this behavior.
+            if neSettings.ipv4Settings == nil {
+                neSettings.ipv4Settings = .fakeLoopback
+            }
+            if neSettings.ipv6Settings == nil {
+                neSettings.ipv6Settings = .fakeLoopback
+            }
+            pp_log(ctx, .os, .info, "\tRoute DNS-only settings with empty matchDomains")
+        }
+
+        // 5. Optionally enable DNS fallback if default gateway without DNS settings
+
+        if isGateway, neSettings.dnsSettings == nil {
+            pp_log(ctx, .os, .info, "\tVPN is default gateway but has no DNS settings")
+
+            let dnsFallbackServers = options.dnsFallbackServers
+            if !dnsFallbackServers.isEmpty {
+                pp_log(ctx, .os, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
+                neSettings.dnsSettings = NEDNSSettings(servers: dnsFallbackServers)
+            }
+        }
+
+        // 6. Optionally route DNS through the VPN
+
+        applicableModules.forEach {
+            guard let dnsModule = $0 as? DNSModule else {
+                return
+            }
+            guard let routesThroughVPN = dnsModule.routesThroughVPN else {
+                return
+            }
+            if routesThroughVPN {
+                pp_log(ctx, .os, .info, "\tRoute DNS inside the VPN")
+            } else {
+                pp_log(ctx, .os, .info, "\tRoute DNS outside the VPN")
+            }
+            neSettings.dnsSettings?.servers.forEach {
+                guard let addr = Address(rawValue: $0) else { return }
+                switch addr {
+                case .ip(let addr, let family):
+                    switch family {
+                    case .v4:
+                        guard let settings = neSettings.ipv4Settings else {
+                            return
+                        }
+                        let route = NEIPv4Route(destinationAddress: addr, subnetMask: "255.255.255.255")
+                        if routesThroughVPN {
+                            pp_log(ctx, .os, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
+                            settings.includedRoutes = (settings.includedRoutes ?? []) + [route]
+                        } else {
+                            pp_log(ctx, .os, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
+                            settings.excludedRoutes = (settings.excludedRoutes ?? []) + [route]
+                        }
+                        neSettings.ipv4Settings = settings
+                    case .v6:
+                        guard let settings = neSettings.ipv6Settings else {
+                            return
+                        }
+                        let route = NEIPv6Route(destinationAddress: addr, networkPrefixLength: 128)
+                        if routesThroughVPN {
+                            pp_log(ctx, .os, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
+                            settings.includedRoutes = (settings.includedRoutes ?? []) + [route]
+                        } else {
+                            pp_log(ctx, .os, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
+                            settings.excludedRoutes = (settings.excludedRoutes ?? []) + [route]
+                        }
+                        neSettings.ipv6Settings = settings
+                    }
+                case .hostname:
+                    assertionFailure("DNS servers must be IP addresses")
+                }
+            }
+        }
+
+        return neSettings
+    }
+}

@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 internal import _PartoutCrypto_C
-import PartoutCore
+import PartoutLegacyCore
 
 extension Data {
     init(hex: String) {

@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@preconcurrency import Network
+@preconcurrency import class Network.NWPathMonitor
+@preconcurrency import struct Network.NWPath
 
 /// A better path implementation backed by `NWPathMonitor`.
 public struct NEBetterPathStreamFactory: BetterPathStreamFactory {
