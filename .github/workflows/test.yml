@@ -39,6 +39,7 @@ jobs:
         if: matrix.suite == 'swift'
         run: |
           swift test
+          cd cross/apple-legacy && swift test
       - uses: mlugg/setup-zig@v2
         if: matrix.suite == 'zig'
       - name: Run Zig tests
