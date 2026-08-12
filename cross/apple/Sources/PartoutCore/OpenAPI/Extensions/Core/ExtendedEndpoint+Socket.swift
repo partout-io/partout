@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public import _PartoutPortable_C
+import _PartoutPortable_C
 
 extension ExtendedEndpoint {
     var socketProto: pp_socket_proto {

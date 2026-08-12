@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public import NetworkExtension
+import NetworkExtension
 
 extension DNSModule: NESettingsApplying {
     public func apply(_ ctx: PartoutLoggerContext, to settings: inout NEPacketTunnelNetworkSettings) {

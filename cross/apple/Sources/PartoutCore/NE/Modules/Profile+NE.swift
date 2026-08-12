@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public import NetworkExtension
+import NetworkExtension
 
 extension Profile {
     // TODO: #518, Make internal after migrating to Zig

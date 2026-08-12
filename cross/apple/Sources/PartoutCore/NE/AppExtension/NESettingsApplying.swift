@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public import NetworkExtension
+import NetworkExtension
 
 /// Able to apply its own settings to `NEPacketTunnelNetworkSettings`.
 public protocol NESettingsApplying {

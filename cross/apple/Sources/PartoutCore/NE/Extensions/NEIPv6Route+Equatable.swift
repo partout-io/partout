@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-public import NetworkExtension
+import NetworkExtension
 
 extension NEIPv6Route {
     open override func isEqual(_ object: Any?) -> Bool {

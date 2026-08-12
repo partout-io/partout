@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if !USE_CMAKE
-@_exported public import Foundation
-@_exported public import _PartoutPortable_C
+@_exported import Foundation
+@_exported import _PartoutPortable_C
 #endif
 
 extension LoggerCategory {
