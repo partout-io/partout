@@ -38,9 +38,21 @@ extension Module {
         true
     }
 
-    // if isMutuallyExclusive, allow one Module of this type at most
     public func checkCompatible(with otherModule: Module, activeIds: Set<UniqueID>) throws {
         precondition(otherModule.id != id)
+
+        // allow one active connection-building Module at most
+        if buildsConnection {
+            guard activeIds.contains(id), activeIds.contains(otherModule.id) else {
+                return
+            }
+            guard !otherModule.buildsConnection else {
+                throw PartoutError(.incompatibleModules, [self, otherModule])
+            }
+            return
+        }
+
+        // if isMutuallyExclusive, allow one Module of this type at most
         if !isMutuallyExclusive {
             return
         }
