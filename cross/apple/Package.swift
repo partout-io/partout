@@ -30,6 +30,10 @@ let package = Package(
         ),
         .target(
             name: "PartoutCore_C"
+        ),
+        .testTarget(
+            name: "PartoutTests",
+            dependencies: ["PartoutCore"]
         )
     ],
     swiftLanguageModes: [.v6]

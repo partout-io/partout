@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import PartoutLegacyCore
+@testable import PartoutCore
 import Testing
 
 struct ProfileModulesTests {
@@ -63,6 +63,18 @@ struct ProfileModulesTests {
         }
         sut.activeModulesIds = Set(sut.modules.map(\.id))
         #expect(throws: Error.self) {
+            try sut.build()
+        }
+    }
+
+    @Test
+    func givenDifferentTypeConnectionModules_whenActive_thenBuildFails() {
+        let sut = Profile.Builder(
+            modules: [OpenVPNModule(id: UniqueID()), WireGuardModule(id: UniqueID())],
+            activatingModules: true
+        )
+
+        #expect(throws: PartoutError.self) {
             try sut.build()
         }
     }
@@ -152,10 +164,10 @@ private struct IncompatibleModule: Module {
     let id = UniqueID()
 }
 
-private struct SomeConnectionModule: ConnectionModule {
+private struct SomeConnectionModule: Module {
     let id = UniqueID()
 
-    func newConnection(with impl: (any ModuleImplementation)?, parameters: ConnectionParameters) throws -> any Connection {
-        fatalError()
+    var buildsConnection: Bool {
+        true
     }
 }

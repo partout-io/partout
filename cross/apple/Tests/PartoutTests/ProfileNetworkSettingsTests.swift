@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-import PartoutLegacyCore
-@testable import PartoutOS
+@testable import PartoutCore
 import Testing
 
 struct ProfileNetworkSettingsTests {
@@ -191,8 +190,8 @@ struct ProfileNetworkSettingsTests {
     }
 }
 
-private struct BogusConnectionModule: ConnectionModule {
-    func newConnection(with impl: (any ModuleImplementation)?, parameters: ConnectionParameters) throws -> Connection {
-        fatalError()
+private struct BogusConnectionModule: Module {
+    var buildsConnection: Bool {
+        true
     }
 }

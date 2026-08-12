@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@testable import PartoutLegacyCore
 @testable import PartoutCore
 import Foundation
 import Testing

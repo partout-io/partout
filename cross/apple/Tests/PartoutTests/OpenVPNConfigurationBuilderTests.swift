@@ -2,11 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutLegacyCore
-import PartoutOpenVPN
+import PartoutCore
 import Testing
 
-struct ConfigurationBuilderTests {
+struct OpenVPNConfigurationBuilderTests {
     @Test
     func givenBuilder_whenClient_thenHasFallbackValues() throws {
         var sut = OpenVPN.Configuration.Builder()
