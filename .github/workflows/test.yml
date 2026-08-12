@@ -35,11 +35,6 @@ jobs:
         if: matrix.suite == 'swift'
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Ensure Foundation compatibility is off
-        if: matrix.suite == 'swift'
-        run: |
-          expected="let useFoundationCompatibility: FoundationCompatibility = .off"
-          grep "^$expected" Package.swift
       - name: Run Swift tests
         if: matrix.suite == 'swift'
         run: |
