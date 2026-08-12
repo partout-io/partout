@@ -14,13 +14,13 @@ let envDocs = ProcessInfo.processInfo.environment["PP_BUILD_DOCS"] == "1"
 let vendorsConfiguration = VendorsConfiguration(
     location: .remote(
         "https://github.com/partout-io/prebuilts/releases/download",
-        version: "0.5.3"
+        version: "0.6.0"
     ),
 //    location: .local("../../prebuilts/artifacts/"),
     checksums: [
-        .openSSL: "96572378e7d172d47ef7e59c6595a56e2933b55c4cbf33258253109105906253",
-        .mbedTLS: "3b9d01f69801a68380130b2777775d39a7da03d9e95766d227a478487b5ab600",
-        .wgGo: "5045bd510ffa1289235abafa7a121279fe79c37c3e6f1437507ca10ca53ac539"
+        .openSSL: "56c5af93c191fbf0d1b21ed111018e025887fae5da7c573c30850f8082c73821",
+        .mbedTLS: "455fae07a531e13380e6d239d58dce1bc1b5b9b26b914976ae2b2da54bb33073",
+        .wgGo: "036f075b8e23839afc243c00fb4d762226b34d7f1d3a5385c6176c1f84484773"
     ]
 )
 
