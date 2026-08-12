@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/openvpn/include/openvpn/dp_framing_comp.h
+../../../../../../zig/src/openvpn/c/include/openvpn/dp_framing_comp.h

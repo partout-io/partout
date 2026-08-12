@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/openvpn/include/openvpn/dp_error.h
+../../../../../../zig/src/openvpn/c/include/openvpn/dp_error.h

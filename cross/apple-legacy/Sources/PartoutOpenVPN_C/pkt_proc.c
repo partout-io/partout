@@ -1,1 +1,1 @@
-../../../../zig/src/c/openvpn/pkt_proc.c
+../../../../zig/src/openvpn/c/pkt_proc.c

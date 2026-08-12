@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/openvpn/include/openvpn/pkt_proc.h
+../../../../../../zig/src/openvpn/c/include/openvpn/pkt_proc.h

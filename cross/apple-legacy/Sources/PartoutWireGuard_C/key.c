@@ -1,1 +1,1 @@
-../../../../zig/src/c/wireguard/key.c
+../../../../zig/src/wireguard/c/key.c

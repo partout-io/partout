@@ -1,1 +1,1 @@
-../../../../zig/src/c/openvpn/mss_fix.c
+../../../../zig/src/openvpn/c/mss_fix.c

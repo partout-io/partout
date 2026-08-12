@@ -1,1 +1,1 @@
-../../../../../../../zig/src/c/openvpn/include/openvpn/test/dp_mock.h
+../../../../../../../zig/src/openvpn/c/include/openvpn/test/dp_mock.h

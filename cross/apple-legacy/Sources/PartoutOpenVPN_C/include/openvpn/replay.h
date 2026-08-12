@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/openvpn/include/openvpn/replay.h
+../../../../../../zig/src/openvpn/c/include/openvpn/replay.h

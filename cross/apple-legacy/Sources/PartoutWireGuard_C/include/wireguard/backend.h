@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/wireguard/include/wireguard/backend.h
+../../../../../../zig/src/wireguard/c/include/wireguard/backend.h

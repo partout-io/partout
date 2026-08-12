@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/wireguard/include/wireguard/x25519.h
+../../../../../../zig/src/wireguard/c/include/wireguard/x25519.h

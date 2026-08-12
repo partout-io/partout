@@ -1,1 +1,1 @@
-../../../../../zig/src/c/partout/include/partout.h
+../../../../../zig/src/partout.h
