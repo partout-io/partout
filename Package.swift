@@ -15,7 +15,7 @@ let package = Package(
     products: [
         .library(
             name: "partout",
-            targets: ["Partout"]
+            targets: ["PartoutRuntime"]
         ),
         .library(
             name: "PartoutCore",
@@ -33,14 +33,6 @@ let package = Package(
             checksum: "f09ddaf15ceda59129e33568c43592f852dae88246500a3d55d5e346199685e1"
         ),
         .target(
-            name: "Partout",
-            dependencies: [
-                "PartoutCore",
-                "PartoutNative"
-            ],
-            path: "cross/apple/Sources/Partout"
-        ),
-        .target(
             name: "PartoutCore",
             dependencies: ["PartoutCore_C"],
             path: "cross/apple/Sources/PartoutCore"
@@ -48,6 +40,14 @@ let package = Package(
         .target(
             name: "PartoutCore_C",
             path: "cross/apple/Sources/PartoutCore_C"
+        ),
+        .target(
+            name: "PartoutRuntime",
+            dependencies: [
+                "PartoutCore",
+                "PartoutNative"
+            ],
+            path: "cross/apple/Sources/PartoutRuntime"
         ),
         .testTarget(
             name: "PartoutTests",

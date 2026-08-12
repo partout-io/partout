@@ -44,12 +44,12 @@ let globalCSettings: [CSetting] = [
 
 let sharedPartoutCore: Target.Dependency = .product(
     name: "PartoutCore",
-    package: "partout-shared"
+    package: "partout"
 )
 
 let sharedPartoutCoreC: Target.Dependency = .product(
     name: "PartoutCore_C",
-    package: "partout-shared"
+    package: "partout"
 )
 
 let package = Package(
@@ -66,7 +66,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(name: "partout-shared", path: "../apple")
+        .package(path: "../..")
     ],
     targets: [
         .target(
