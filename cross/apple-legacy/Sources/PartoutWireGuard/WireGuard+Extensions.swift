@@ -2,9 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !USE_CMAKE
 @_exported import PartoutLegacyCore
-#endif
 
 extension WireGuardModule: ConnectionModule {
     /// - Throws: If `impl` is not of type ``WireGuardModule/Implementation``.

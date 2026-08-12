@@ -2,9 +2,7 @@
 // Copyright © 2018-2023 WireGuard LLC. All Rights Reserved.
 
 internal import _PartoutWireGuard_C
-#if !USE_CMAKE
 import PartoutLegacyCore
-#endif
 
 enum WireGuardAdapterError: Error, Sendable {
     /// Failure to locate tunnel file descriptor.
