@@ -4,8 +4,6 @@
 
 #if canImport(Darwin)
 import NetworkExtension
-import Partout_C
-import Partout
 
 public final class PartoutProviderRuntime: Sendable {
     private let ctx: PartoutLoggerContext

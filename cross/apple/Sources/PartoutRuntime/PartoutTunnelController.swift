@@ -3,9 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #if canImport(Darwin)
-internal import _PartoutPortable_C
 import NetworkExtension
-import Partout
 
 /// A controller based on `NEPacketTunnelProvider`.
 final class PartoutTunnelController: Sendable {

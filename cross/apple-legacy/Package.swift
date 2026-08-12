@@ -57,10 +57,6 @@ let package = Package(
         .library(
             name: "Partout_C",
             targets: ["Partout_C"]
-        ),
-        .library(
-            name: "PartoutRuntime",
-            targets: ["PartoutRuntime"]
         )
     ],
     targets: [
@@ -109,10 +105,6 @@ let package = Package(
                 }
                 return list
             }()
-        ),
-        .target(
-            name: "PartoutRuntime",
-            dependencies: ["Partout"]
         )
     ]
 )

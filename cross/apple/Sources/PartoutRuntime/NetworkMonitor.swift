@@ -4,7 +4,6 @@
 
 #if canImport(Darwin)
 @preconcurrency import Network
-import Partout
 
 /// A continuous stream of network events.
 final class NetworkMonitor: @unchecked Sendable {
