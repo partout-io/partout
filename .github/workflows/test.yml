@@ -44,6 +44,5 @@ jobs:
         if: matrix.suite == 'zig'
       - name: Run Zig tests
         if: matrix.suite == 'zig'
-        working-directory: .
         run: |
           zig build test -Dopenvpn=true -Dwireguard=true

@@ -41,7 +41,6 @@ jobs:
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
           echo "tag=$prebuilts_tag" >> "$GITHUB_OUTPUT"
       - name: Run Zig tests
-        working-directory: .
         run: |
           zig build test -Dopenvpn=true -Dwireguard=true
       - name: Build XCFramework
