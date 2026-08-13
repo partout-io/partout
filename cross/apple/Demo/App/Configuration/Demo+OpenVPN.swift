@@ -3,23 +3,25 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import Partout
+import PartoutCore
 
 extension OpenVPN {
     static var demoModule: OpenVPNModule? {
-        do {
-            let parser = StandardOpenVPNParser()
-            guard let url = Constants.demoURL else {
-                return nil
-            }
-            let result = try parser.parsed(fromURL: url)
-            let builder = result.configuration.builder()
-            var module = OpenVPNModule.Builder(configurationBuilder: builder)
-            module.credentials = Constants.demoCredentials
-            return try module.build()
-        } catch {
-            fatalError("Unable to build: \(error)")
-        }
+        // FIXME: ###, Import with ABI
+        nil
+//        do {
+//            let parser = StandardOpenVPNParser()
+//            guard let url = Constants.demoURL else {
+//                return nil
+//            }
+//            let result = try parser.parsed(fromURL: url)
+//            let builder = result.configuration.builder()
+//            var module = OpenVPNModule.Builder(configurationBuilder: builder)
+//            module.credentials = Constants.demoCredentials
+//            return try module.build()
+//        } catch {
+//            fatalError("Unable to build: \(error)")
+//        }
     }
 }
 

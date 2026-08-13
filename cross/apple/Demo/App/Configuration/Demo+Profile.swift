@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import Partout
+import PartoutCore
 
 extension Profile {
     static let demo: Profile = {

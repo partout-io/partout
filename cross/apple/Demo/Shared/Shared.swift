@@ -77,22 +77,33 @@ extension Demo {
 // MARK: - Implementations
 
 extension Demo {
-    static var neProtocolCoder: KeychainNEProtocolCoder {
-        KeychainNEProtocolCoder(
+    static var neProtocolCoder: ProviderNEProtocolCoder {
+        ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: CodingRegistry(registry: .shared),
-            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)"),
-            legacyOptions: .init {
-                "PartoutDemo: \($0.name)"
-            }
+            coder: BasicProfileCoder(),
+            uid: 1000
         )
     }
 
-    static let tunnelDefaults: UserDefaults = {
+    static var tunnelDefaults: UserDefaults {
         guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
             fatalError("Not entitled to App Group: \(appGroupIdentifier)")
         }
         return defaults
-    }()
+    }
+}
+
+private final class BasicProfileCoder: ProfileCoder {
+    func string(fromProfile profile: Profile) throws -> String {
+        try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
+    }
+
+    func profile(fromString string: String) throws -> Profile {
+        guard let data = string.data(using: .utf8) else {
+            throw PartoutError(.decoding)
+        }
+        let tagged = try JSONDecoder.shared().decode(TaggedProfile.self, from: data)
+        return try tagged.asProfile()
+    }
 }

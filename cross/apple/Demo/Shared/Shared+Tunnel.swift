@@ -5,7 +5,7 @@
 import Foundation
 import PartoutCore
 
-extension NEProtocolDecoder where Self == KeychainNEProtocolCoder {
+extension NEProtocolDecoder where Self == ProviderNEProtocolCoder {
     static var shared: Self {
         Demo.neProtocolCoder
     }

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Partout
+import PartoutCore
 import SwiftUI
 
 private enum ButtonAction {
@@ -199,10 +199,8 @@ private extension ContentView {
 
     func onTapModule(_ module: Module) {
         var builder = profile.builder()
-        if module is ConnectionModule {
-            builder.toggleExclusiveModule(withId: module.id) {
-                $0 is ConnectionModule
-            }
+        if module.buildsConnection {
+            builder.toggleExclusiveModule(withId: module.id, excluding: \.buildsConnection)
         } else {
             builder.toggleModule(withId: module.id)
         }
