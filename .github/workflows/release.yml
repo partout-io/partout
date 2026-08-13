@@ -21,6 +21,14 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_tag_gpgsign: true
       - name: Set up Zig
         uses: mlugg/setup-zig@v2
       - name: Parse version
@@ -79,7 +87,25 @@ jobs:
             echo "::error::Failed to update Package.swift"
             exit 1
           fi
-          echo "commit=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          commit=$(git rev-parse HEAD)
+          git verify-commit "$commit"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Sign release tag
+        env:
+          VERSION: ${{ steps.parse_version.outputs.version }}
+          COMMIT: ${{ steps.update_package.outputs.commit }}
+        run: |
+          if git ls-remote --exit-code --tags \
+            origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            git fetch --force --no-tags \
+              origin "refs/tags/$VERSION:refs/tags/$VERSION"
+          else
+            git tag -s "$VERSION" "$COMMIT" -m "$VERSION"
+            git push origin "refs/tags/$VERSION"
+          fi
+
+          test "$(git rev-list -n 1 "$VERSION")" = "$COMMIT"
+          git tag --verify "$VERSION"
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
