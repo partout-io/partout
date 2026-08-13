@@ -25,4 +25,3 @@ sed -i '' -E "s/$zig_pattern/const version = \"$version\";/" "$zig_constants"
 
 git -C "$root" add "$zig_constants"
 git -C "$root" commit --allow-empty -m "Bump version"
-git -C "$root" tag -as "$version" -m "$version"
