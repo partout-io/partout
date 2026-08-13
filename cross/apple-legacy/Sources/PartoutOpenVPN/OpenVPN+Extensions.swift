@@ -42,9 +42,3 @@ extension OpenVPN.CryptoContainer {
         return OpenVPN.CryptoContainer(pem: decryptedPEM)
     }
 }
-
-extension TunnelEnvironmentKeys {
-    public enum OpenVPN {
-        public static let serverConfiguration = TunnelEnvironmentKey<OpenVPNConfiguration>("OpenVPN.serverConfiguration")
-    }
-}
