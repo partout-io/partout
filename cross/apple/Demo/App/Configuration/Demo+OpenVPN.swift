@@ -4,24 +4,20 @@
 
 import Foundation
 import PartoutCore
+import PartoutNative
+import PartoutRuntime
 
 extension OpenVPN {
     static var demoModule: OpenVPNModule? {
-        // FIXME: ###, Import with ABI
-        nil
-//        do {
-//            let parser = StandardOpenVPNParser()
-//            guard let url = Constants.demoURL else {
-//                return nil
-//            }
-//            let result = try parser.parsed(fromURL: url)
-//            let builder = result.configuration.builder()
-//            var module = OpenVPNModule.Builder(configurationBuilder: builder)
-//            module.credentials = Constants.demoCredentials
-//            return try module.build()
-//        } catch {
-//            fatalError("Unable to build: \(error)")
-//        }
+        do {
+            guard let url = Constants.demoURL else { return nil }
+            guard let module = try Demo.parseModule(OpenVPNModule.self, url: url) else { return nil }
+            var builder = module.builder()
+            builder.credentials = Constants.demoCredentials
+            return try builder.build()
+        } catch {
+            fatalError("Unable to build: \(error)")
+        }
     }
 }
 

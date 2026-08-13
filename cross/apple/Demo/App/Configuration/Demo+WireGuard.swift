@@ -7,19 +7,12 @@ import PartoutCore
 
 extension WireGuard {
     static var demoModule: WireGuardModule? {
-        // FIXME: ###, Import with ABI
-        nil
-//        do {
-//            guard let url = Constants.demoURL else {
-//                return nil
-//            }
-//            let wg = try String(contentsOf: url)
-//            let builder = try StandardWireGuardParser().configuration(from: wg).builder()
-//            let module = WireGuardModule.Builder(configurationBuilder: builder)
-//            return try module.build()
-//        } catch {
-//            fatalError("Unable to build: \(error)")
-//        }
+        do {
+            guard let url = Constants.demoURL else { return nil }
+            return try Demo.parseModule(WireGuardModule.self, url: url)
+        } catch {
+            fatalError("Unable to build: \(error)")
+        }
     }
 }
 
