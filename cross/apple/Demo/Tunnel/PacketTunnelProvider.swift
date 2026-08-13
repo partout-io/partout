@@ -6,30 +6,32 @@
 import PartoutCore
 import PartoutRuntime
 
+extension NSObject: @retroactive @unchecked Sendable {}
+
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     private var ctx: PartoutLoggerContext?
 
-    private var fwd: NEPTPForwarder?
+    private var runtime: PartoutProviderRuntime?
 
     override func startTunnel(options: [String: NSObject]? = nil) async throws {
         do {
-            // Decode profile
             let profile = try Profile(withNEProvider: self, decoder: .shared)
-
-            // Set IPC environment
-            let environment = Demo.tunnelEnvironment
-
-            // NetworkExtension specifics
-            let controller = NETunnelController(
+            runtime = try PartoutProviderRuntime(
                 provider: self,
                 profile: profile,
-                options: .init()
+                options: .init(
+                    dnsFallbackServers: [],
+                    logsSnapshots: false
+                ),
+                defaults: Demo.tunnelDefaults,
+                logsPrivateData: false,
+                cacheDir: FileManager.default.temporaryDirectory.path(),
+                minDataCountDelta: 0,
+                logger: logger
             )
 
             var loggerBuilder = PartoutLogger.Builder()
             loggerBuilder.setDestination(OSLogDestination(.core), for: [.core])
-            loggerBuilder.setDestination(OSLogDestination(.openvpn), for: [.openvpn])
-            loggerBuilder.setDestination(OSLogDestination(.wireguard), for: [.wireguard])
             loggerBuilder.logsModules = true
             loggerBuilder.setLocalLogger(
                 url: Demo.Log.tunnelURL,
@@ -45,15 +47,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             let ctx = PartoutLoggerContext(profile.id)
             self.ctx = ctx
 
-            fwd = try NEPTPForwarder(
-                ctx,
-                profile: profile,
-                connectionFactory: Registry.shared,
-                controller: controller,
-                environment: environment,
-                cancelsUnrecoverable: false
-            )
-            try await fwd?.startTunnel(options: [:])
+            try await runtime?.startTunnel()
         } catch {
             flushLog()
             throw error
@@ -61,8 +55,8 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     }
 
     override func stopTunnel(with reason: NEProviderStopReason) async {
-        await fwd?.stopTunnel(with: reason)
-        fwd = nil
+        await runtime?.stopTunnel()
+        runtime = nil
         flushLog()
     }
 
@@ -72,15 +66,15 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     }
 
     override func handleAppMessage(_ messageData: Data) async -> Data? {
-        await fwd?.handleAppMessage(messageData)
+        await runtime?.handleAppMessage(messageData)
     }
 
     override func wake() {
-        fwd?.wake()
+        runtime?.wake()
     }
 
     override func sleep() async {
-        await fwd?.sleep()
+        await runtime?.sleep()
     }
 }
 
@@ -92,4 +86,13 @@ private extension PacketTunnelProvider {
             flushLog()
         }
     }
+}
+
+private nonisolated func logger(
+    _ level: Int32,
+    _ message: UnsafePointer<CChar>?
+) {
+    guard let level = DebugLog.Level(rawValue: Int(level)),
+          let message else { return }
+    pp_log(.global, .abi, level, String(cString: message))
 }

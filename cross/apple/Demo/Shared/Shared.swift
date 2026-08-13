@@ -89,10 +89,10 @@ extension Demo {
         )
     }
 
-    static let tunnelEnvironment: UserDefaultsEnvironment = {
+    static let tunnelDefaults: UserDefaults = {
         guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
             fatalError("Not entitled to App Group: \(appGroupIdentifier)")
         }
-        return UserDefaultsEnvironment(profileId: nil, defaults: defaults)
+        return defaults
     }()
 }
