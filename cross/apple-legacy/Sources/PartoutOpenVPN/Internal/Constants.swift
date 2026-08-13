@@ -56,7 +56,8 @@ struct Constants {
 
 extension Constants.ControlChannel {
     static func peerInfo(sslVersion: String? = nil, withPlatform: Bool = true, extra: [String: String]? = nil) -> String {
-        let uiVersion = PartoutConstants.versionIdentifier
+        // XXX: Legacy, to be deleted
+        let uiVersion = "\(PartoutCore.identifier) 0.155.3"
         var info = [
             "IV_VER=2.4",
             "IV_UI_VER=\(uiVersion)",
