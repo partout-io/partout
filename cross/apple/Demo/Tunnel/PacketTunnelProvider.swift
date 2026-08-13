@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import NetworkExtension
-import PartoutCore
 import PartoutRuntime
 
 extension NSObject: @retroactive @unchecked Sendable {}

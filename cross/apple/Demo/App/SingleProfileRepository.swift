@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutCore
+import PartoutRuntime
 
 public final class SingleProfileRepository: Sendable {
     private static let profileId = UUID(uuidString: "B316870C-4970-4981-8CE7-95700B2C33EC")!

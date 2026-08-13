@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import Network
-import PartoutCore
 
 /// A continuous stream of network events.
 final class NetworkMonitor: @unchecked Sendable {

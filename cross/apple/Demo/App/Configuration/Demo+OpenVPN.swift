@@ -3,15 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import PartoutCore
-import PartoutNative
 import PartoutRuntime
 
 extension OpenVPN {
     static var demoModule: OpenVPNModule? {
         do {
             guard let url = Constants.demoURL else { return nil }
-            guard let module = try Demo.parseModule(OpenVPNModule.self, url: url) else { return nil }
+            guard let module = try PartoutImporter().importModule(
+                OpenVPNModule.self,
+                url: url
+            ) else { return nil }
             var builder = module.builder()
             builder.credentials = Constants.demoCredentials
             return try builder.build()

@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-import PartoutCore
+import PartoutRuntime
 
 extension NEProtocolDecoder where Self == ProviderNEProtocolCoder {
     static var shared: Self {

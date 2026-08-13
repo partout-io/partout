@@ -3,13 +3,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import PartoutCore
+import PartoutRuntime
 
 extension WireGuard {
     static var demoModule: WireGuardModule? {
         do {
             guard let url = Constants.demoURL else { return nil }
-            return try Demo.parseModule(WireGuardModule.self, url: url)
+            return try PartoutImporter().importModule(
+                WireGuardModule.self,
+                url: url
+            )
         } catch {
             fatalError("Unable to build: \(error)")
         }
