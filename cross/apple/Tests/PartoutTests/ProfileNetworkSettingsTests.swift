@@ -1,0 +1,197 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+//
+// SPDX-License-Identifier: GPL-3.0
+
+import NetworkExtension
+@testable import PartoutCore
+import Testing
+
+struct ProfileNetworkSettingsTests {
+    @Test
+    func givenRoutes_whenDefaultGateway_thenContains() {
+        var routes: [NEIPv4Route] = []
+        let gw: NEIPv4Route = .default().cloned()
+        gw.gatewayAddress = "10.8.0.1"
+        routes.append(gw)
+        #expect(!routes.contains(.default()))
+        #expect(routes.contains {
+            $0.hasSameDestination(as: .default())
+        })
+    }
+
+    // MARK: Plain
+
+    @Test
+    func givenProfileWithDefaultGateway_whenGetNetworkSettings_thenDoesNothingAboutDNS() throws {
+        let connModule = BogusConnectionModule()
+        let ipModule = IPModule.Builder(
+            ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)
+                .including(routes: [
+                    Route(defaultWithGateway: Address(rawValue: "10.20.30.40")!)
+                ]),
+            ipv6: IPSettings(subnet: Subnet(rawValue: "::1/32")!)
+                .including(routes: [
+                    Route(defaultWithGateway: Address(rawValue: "10:20::30:40")!)
+                ])
+        ).build()
+        let dnsModule = try DNSModule.Builder(
+            servers: ["1.1.1.1", "2.2.2.2", "::100"]
+        ).build()
+        let profile = try Profile.Builder(
+            modules: [connModule, ipModule, dnsModule],
+            activatingModules: true
+        ).build()
+
+        let sut = profile.networkSettings(with: nil)
+
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
+        let expRoutesV4: [NEIPv4Route] = {
+            let route = NEIPv4Route.default().cloned()
+            route.gatewayAddress = "10.20.30.40"
+            return [route]
+        }()
+        let expRoutesV6: [NEIPv6Route] = {
+            let route = NEIPv6Route.default().cloned()
+            route.gatewayAddress = "10:20::30:40"
+            return [route]
+        }()
+        #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
+        #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
+
+        let dnsSettings = try #require(sut.dnsSettings)
+        #expect(dnsSettings.matchDomains == [""])
+    }
+
+    @Test(arguments: [
+        nil as DNSModule.DomainPolicy?,
+        .match,
+        .matchAndSearch
+    ])
+    func givenProfile_whenGetNetworkSettings_thenAppliesProperDNSPolicy(policy: DNSModule.DomainPolicy?) throws {
+        let connectionModule = BogusConnectionModule()
+        let ipModule = IPModule.Builder(
+            ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!),
+            ipv6: IPSettings(subnet: Subnet(rawValue: "::1/32")!)
+        ).build()
+        var dnsModuleBuilder = DNSModule.Builder(
+            servers: ["1.1.1.1", "2.2.2.2", "::100"]
+        )
+        var sut: NEPacketTunnelNetworkSettings
+
+        //
+
+        let profile = try Profile.Builder(
+            modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
+            activatingModules: true
+        ).build()
+        sut = profile.networkSettings(with: nil)
+
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
+        let expRoutesV4: [NEIPv4Route] = []
+        let expRoutesV6: [NEIPv6Route] = []
+        #expect(Set(ipV4Settings.includedRoutes ?? []) == Set(expRoutesV4))
+        #expect(Set(ipV6Settings.includedRoutes ?? []) == Set(expRoutesV6))
+
+        // Fallback without domains
+        #expect(sut.dnsSettings?.matchDomains == [""])
+
+        //
+
+        let domains = ["domain.com"]
+        dnsModuleBuilder.domains = domains
+        dnsModuleBuilder.domainPolicy = policy
+        sut = try Profile.Builder(
+            modules: [connectionModule, ipModule, try dnsModuleBuilder.build()],
+            activatingModules: true
+        ).build().networkSettings(with: nil)
+
+        let dns = try #require(sut.dnsSettings)
+        switch policy {
+        case .match:
+            #expect(dns.searchDomains == nil)
+            #expect(dns.matchDomains == domains)
+            #expect(dns.matchDomainsNoSearch == true)
+        case .matchAndSearch:
+            #expect(dns.searchDomains == domains)
+            #expect(dns.matchDomains == domains)
+            #expect(dns.matchDomainsNoSearch == false)
+        default:
+            #expect(dns.searchDomains == domains)
+            #expect(dns.matchDomains == [""])
+            #expect(dns.matchDomainsNoSearch == false)
+        }
+    }
+
+    // MARK: With remote info
+
+    @Test
+    func givenProfile_whenGetNetworkSettingsWithInfo_thenAppliesInfo() throws {
+        let bogusModule = try DNSModule.Builder(servers: ["1.1.1.1"]).build()
+        let profile = try Profile.Builder(
+            modules: [bogusModule],
+            activeModulesIds: [bogusModule.id]
+        ).build()
+
+        let sut = profile.networkSettings(with: .init(
+            originalModuleId: bogusModule.id,
+            address: Address(rawValue: "5.6.7.8")!,
+            modules: [bogusModule],
+            requiresVirtualDevice: false
+        ))
+
+        #expect(sut.tunnelRemoteAddress == "5.6.7.8")
+        #expect(sut.dnsSettings?.servers == ["1.1.1.1"])
+        #expect(sut.mtu == nil)
+    }
+
+    @Test
+    func givenProfileWithRemoteDefaultGateway_whenExcludeDefaultRoute_thenHasNoRoutes() throws {
+        let connectionModule = BogusConnectionModule()
+        let remoteInfo = TunnelRemoteInfo(
+            originalModuleId: UniqueID(),
+            address: nil,
+            modules: [
+                IPModule.Builder(
+                    ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)
+                        .including(routes: [
+                            Route(defaultWithGateway: nil)
+                        ]),
+                    ipv6: IPSettings(subnet: Subnet(rawValue: "::1/32")!)
+                        .including(routes: [
+                            Route(defaultWithGateway: nil)
+                        ])
+                ).build()
+            ],
+            requiresVirtualDevice: false
+        )
+        let ipModule = IPModule.Builder(
+            ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)
+                .excluding(routes: [
+                    Route(defaultWithGateway: nil)
+                ]),
+            ipv6: IPSettings(subnet: Subnet(rawValue: "::1/32")!)
+                .excluding(routes: [
+                    Route(defaultWithGateway: nil)
+                ])
+        ).build()
+        let profile = try Profile.Builder(
+            modules: [connectionModule, ipModule],
+            activatingModules: true
+        ).build()
+
+        let sut = profile.networkSettings(with: remoteInfo)
+
+        let ipV4Settings = try #require(sut.ipv4Settings)
+        let ipV6Settings = try #require(sut.ipv6Settings)
+        #expect(ipV4Settings.includedRoutes == [])
+        #expect(ipV6Settings.includedRoutes == [])
+    }
+}
+
+private struct BogusConnectionModule: Module {
+    var buildsConnection: Bool {
+        true
+    }
+}

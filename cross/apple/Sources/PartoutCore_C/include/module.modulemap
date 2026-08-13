@@ -1,0 +1,9 @@
+module _PartoutPortable_C {
+    header "portable/common.h"
+    header "portable/conditionals.h"
+    header "portable/endian.h"
+    header "portable/network.h"
+    header "portable/socket.h"
+    header "portable/tun.h"
+    export *
+}

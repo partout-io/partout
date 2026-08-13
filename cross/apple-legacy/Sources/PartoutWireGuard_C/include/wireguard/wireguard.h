@@ -1,0 +1,1 @@
+../../../../../../zig/src/wireguard/c/include/wireguard/wireguard.h

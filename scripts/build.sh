@@ -38,7 +38,7 @@ pushd $root_dir
 generate_swift_models() {
     local openapi=$1
 
-    scripts/gen-models.sh $openapi swift Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+    scripts/gen-models.sh $openapi swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
 }
 
 generate_kotlin_models() {

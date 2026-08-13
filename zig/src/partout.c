@@ -15,5 +15,6 @@
 #include "openvpn/openvpn.h"
 #endif
 #if PARTOUT_WIREGUARD
+#include "wireguard/backend.h"
 #include "wireguard/wireguard.h"
 #endif

@@ -1,0 +1,497 @@
+// swift-tools-version: 5.10
+// The swift-tools-version declares the minimum version of Swift required to build this package.
+
+// Foundation is required by ProcessInfo
+import Foundation
+import PackageDescription
+
+// MARK: Environment
+
+let envDocs = ProcessInfo.processInfo.environment["PP_BUILD_DOCS"] == "1"
+
+// MARK: Configuration
+
+let vendorsConfiguration = VendorsConfiguration(
+    location: .remote(
+        "https://github.com/partout-io/prebuilts/releases/download",
+        version: "0.6.0"
+    ),
+//    location: .local("../../prebuilts/artifacts/"),
+    checksums: [
+        .openSSL: "56c5af93c191fbf0d1b21ed111018e025887fae5da7c573c30850f8082c73821",
+        .mbedTLS: "455fae07a531e13380e6d239d58dce1bc1b5b9b26b914976ae2b2da54bb33073",
+        .wgGo: "036f075b8e23839afc243c00fb4d762226b34d7f1d3a5385c6176c1f84484773"
+    ]
+)
+
+let cryptoLibraries: [CryptoLibrary] = [.openSSL]
+let useFoundationCompatibility: FoundationCompatibility = .off
+
+// Exclude OpenVPN if no crypto libraries
+let areas = Area.allCases.filter {
+    $0 != .openVPN || !cryptoLibraries.isEmpty
+}
+
+// MARK: - Package
+
+// The global settings for C targets
+let globalCSettings: [CSetting] = [
+    .unsafeFlags([
+        "-W", "-Wall", "-Wextra", "-pedantic", "-Werror",
+        "-Wno-nullability-extension"
+    ])
+]
+
+let sharedPartoutCore: Target.Dependency = .product(
+    name: "PartoutCore",
+    package: "partout"
+)
+
+let sharedPartoutCoreC: Target.Dependency = .product(
+    name: "PartoutCore_C",
+    package: "partout"
+)
+
+let package = Package(
+    name: "partout-legacy",
+    platforms: [
+        .iOS(.v16),
+        .macOS(.v13),
+        .tvOS(.v17)
+    ],
+    products: [
+        .library(
+            name: "partout-legacy",
+            targets: ["Partout"]
+        )
+    ],
+    dependencies: [
+        .package(name: "partout", path: "../..")
+    ],
+    targets: [
+        .target(
+            name: "Partout",
+            dependencies: {
+                // These are always included
+                var list: [Target.Dependency] = [
+                    "Partout_C",
+                    "PartoutCrypto_C",
+                    "PartoutLegacyCore",
+                    "PartoutOS"
+                ]
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN")
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("PartoutWireGuard")
+                }
+                return list
+            }(),
+            swiftSettings: areas.swiftSettings + useFoundationCompatibility.swiftSettings
+        ),
+        .target(
+            name: "Partout_C",
+            dependencies: {
+                var list: [Target.Dependency] = [
+                    "PartoutCrypto_C",
+                    "PartoutLegacyCore_C",
+                    sharedPartoutCoreC
+                ]
+                if areas.contains(.openVPN) {
+                    list.append("PartoutOpenVPN_C")
+                }
+                if areas.contains(.wireGuard) {
+                    list.append("PartoutWireGuard_C")
+                }
+                return list
+            }(),
+            cSettings: globalCSettings + cryptoLibraries.cSettings + {
+                var list: [CSetting] = []
+                if areas.contains(.openVPN) {
+                    list.append(.define("PARTOUT_OPENVPN"))
+                }
+                if areas.contains(.wireGuard) {
+                    list.append(.define("PARTOUT_WIREGUARD"))
+                }
+                return list
+            }()
+        )
+    ]
+)
+
+// Swift-DocC for documentation, do not include by default
+if envDocs {
+    package.dependencies.append(
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.1.0")
+    )
+}
+
+// Wrapper = Core + OS
+package.products.append(contentsOf: [
+    .library(
+        name: "PartoutLegacyCore",
+        targets: ["PartoutLegacyCore"]
+    ),
+    .library(
+        name: "PartoutOS",
+        targets: ["PartoutOS"]
+    )
+])
+package.targets.append(contentsOf: [
+    .target(
+        name: "PartoutLegacyCore",
+        dependencies: [
+            "MiniFoundation",
+            "PartoutLegacyCore_C",
+            sharedPartoutCore,
+            sharedPartoutCoreC
+        ],
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    ),
+    .target(
+        name: "PartoutLegacyCore_C",
+        dependencies: [sharedPartoutCoreC],
+        cSettings: globalCSettings
+    ),
+    .target(
+        name: "PartoutOS",
+        dependencies: ["PartoutLegacyCore"],
+        exclude: {
+            var list: [String] = []
+#if swift(>=6.0)
+            list.append(contentsOf: [
+                "AppleNE/Connection/NEUDPSocket.swift",
+                "AppleNE/Connection/NETCPSocket.swift",
+                "AppleNE/Extensions/NWUDPSessionState+Description.swift",
+                "AppleNE/Extensions/NWTCPConnectionState+Description.swift",
+                "AppleNE/Connection/SafeValueObserver.swift"
+            ])
+#endif
+            return list
+        }(),
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    ),
+    .testTarget(
+        name: "PartoutLegacyCoreTests",
+        dependencies: ["PartoutLegacyCore"],
+        exclude: useFoundationCompatibility.coreTestsExclude,
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    ),
+    .testTarget(
+        name: "PartoutOSTests",
+        dependencies: ["PartoutOS"],
+        exclude: {
+            var list: [String] = []
+#if swift(>=6.0)
+            list.append("AppleNE/ValueObserverTests.swift")
+#endif
+            return list
+        }()
+    )
+])
+
+// MARK: OpenVPN
+
+// OpenVPN requires Crypto/TLS wrappers
+if areas.contains(.openVPN) {
+    package.products.append(
+        .library(
+            name: "PartoutOpenVPN",
+            targets: ["PartoutOpenVPN"]
+        )
+    )
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutOpenVPN_C",
+            dependencies: ["PartoutCrypto_C"],
+            cSettings: globalCSettings
+        ),
+        .target(
+            name: "PartoutOpenVPN",
+            dependencies: [
+                "PartoutLegacyCore",
+                "PartoutOpenVPN_C"
+            ],
+            swiftSettings: cryptoLibraries.swiftSettings
+        ),
+        .testTarget(
+            name: "PartoutOpenVPNTests",
+            dependencies: ["PartoutOpenVPN"],
+            exclude: useFoundationCompatibility.openVPNTestsExclude + ["DataPathPerformanceTests.swift"],
+            resources: [
+                .process("Resources")
+            ],
+            swiftSettings: useFoundationCompatibility.swiftSettings
+        )
+    ])
+}
+
+// MARK: WireGuard
+
+if areas.contains(.wireGuard) {
+    package.products.append(
+        .library(
+            name: "PartoutWireGuard",
+            targets: ["PartoutWireGuard"]
+        )
+    )
+    package.targets.append(contentsOf: [
+        vendorsConfiguration.target(for: .wgGo),
+        .target(
+            name: "PartoutWireGuard_C",
+            dependencies: [
+                "PartoutLegacyCore_C",
+                sharedPartoutCoreC,
+                "wg-go"
+            ]
+        )
+    ])
+    package.targets.append(contentsOf: [
+        .target(
+            name: "PartoutWireGuard",
+            dependencies: [
+                "PartoutLegacyCore",
+                "PartoutWireGuard_C"
+            ]
+        ),
+        .testTarget(
+            name: "PartoutWireGuardTests",
+            dependencies: ["PartoutWireGuard"],
+            exclude: useFoundationCompatibility.wireGuardTestsExclude
+        )
+    ])
+}
+
+// MARK: - Crypto
+
+var cryptoDependencies: [Target.Dependency] = [
+    "PartoutLegacyCore_C",
+    sharedPartoutCoreC
+]
+
+for mode in cryptoLibraries {
+    switch mode {
+    case .openSSL:
+        // OpenSSL-based crypto/TLS implementations
+        package.targets.append(
+            vendorsConfiguration.target(for: .openSSL)
+        )
+        cryptoDependencies.append("openssl")
+    case .mbedTLS:
+        // Crypto with OS routines, TLS with MbedTLS
+        package.targets.append(
+            vendorsConfiguration.target(for: .mbedTLS)
+        )
+        cryptoDependencies.append("mbedtls")
+    }
+}
+
+// Include concrete crypto targets if supported
+package.targets.append(
+    .target(
+        name: "PartoutCrypto_C",
+        dependencies: cryptoDependencies,
+        exclude: {
+            // Only Darwin provides the native crypto implementation.
+            var list: [String] = []
+            if !cryptoLibraries.contains(.openSSL) {
+                list.append("crypto_openssl.c")
+            }
+            if !cryptoLibraries.contains(.mbedTLS) {
+                list.append("crypto_mbedtls.c")
+                list.append("crypto_darwin.c")
+            }
+            list.append(contentsOf: [
+                "crypto_linux.c",
+                "crypto_windows.c"
+            ])
+            return list
+        }(),
+        cSettings: globalCSettings
+    )
+)
+package.products.append(
+    .library(
+        name: "PartoutCrypto",
+        targets: ["PartoutCrypto_C"]
+    )
+)
+if !cryptoLibraries.isEmpty {
+    package.targets.append(contentsOf: [
+        .testTarget(
+            name: "PartoutCryptoTests",
+            dependencies: [
+                "PartoutCrypto_C",
+                "PartoutOS"
+            ],
+            exclude: [
+                "CryptoPerformanceTests.swift"
+            ],
+            swiftSettings: cryptoLibraries.swiftSettings
+        )
+    ])
+}
+
+// MARK: - MiniFoundation
+
+package.products.append(
+    .library(
+        name: "MiniFoundation",
+        type: .static,
+        targets: ["MiniFoundation"]
+    )
+)
+package.targets.append(contentsOf: [
+    .target(
+        name: "MiniFoundation",
+        dependencies: [
+            "MiniFoundation_C",
+            sharedPartoutCore
+        ],
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    ),
+    .target(
+        name: "MiniFoundation_C"
+    ),
+    .testTarget(
+        name: "MiniFoundationTests",
+        dependencies: ["MiniFoundation"],
+        resources: [
+            .process("Resources")
+        ],
+        swiftSettings: useFoundationCompatibility.swiftSettings
+    )
+])
+
+// MARK: - Configuration structures
+
+protocol Definable {
+    var define: String { get }
+}
+
+enum Area: Definable, CaseIterable {
+    case openVPN
+    case wireGuard
+
+    var define: String {
+        switch self {
+        case .openVPN: "PARTOUT_OPENVPN"
+        case .wireGuard: "PARTOUT_WIREGUARD"
+        }
+    }
+}
+
+enum CryptoLibrary: Definable {
+    case openSSL
+    case mbedTLS
+
+    var define: String {
+        switch self {
+        case .openSSL: "PARTOUT_CRYPTO_OPENSSL"
+        case .mbedTLS: "PARTOUT_CRYPTO_MBEDTLS"
+        }
+    }
+}
+
+extension Collection where Element: Definable {
+    var cSettings: [CSetting] {
+        map {
+            .define($0.define)
+        }
+    }
+
+    var swiftSettings: [SwiftSetting] {
+        map {
+            .define($0.define)
+        }
+    }
+}
+
+enum FoundationCompatibility {
+    case off
+    case on
+
+    var partoutTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: ["RegistryTests.swift"]
+        }
+    }
+
+    var coreTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "PartoutErrorTests.swift",
+            "ProfileCodingTests.swift",
+            "SecureDataTests.swift",
+            "SensitiveEncoderTests.swift"
+        ]
+        }
+    }
+
+    var openVPNTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "JSONTests.swift",
+            "KeyDecrypterTests.swift",
+            "OpenVPNParserTests.swift",
+            "TLSTests.swift"
+        ]
+        }
+    }
+
+    var wireGuardTestsExclude: [String] {
+        switch self {
+        case .off: []
+        case .on: [
+            "BackendTests.swift"
+        ]
+        }
+    }
+
+    var swiftSettings: [SwiftSetting] {
+        switch self {
+        case .off: []
+        case .on: [.define("MINIF_COMPAT")]
+        }
+    }
+}
+
+enum Vendor: String {
+    case openSSL = "openssl"
+    case mbedTLS = "mbedtls"
+    case wgGo = "wg-go"
+}
+
+struct VendorsConfiguration {
+    enum Location {
+        case local(String)
+        case remote(String, version: String)
+    }
+
+    private let location: Location
+    private let checksums: [Vendor: String]
+
+    init(location: Location, checksums: [Vendor: String]) {
+        self.location = location
+        self.checksums = checksums
+    }
+
+    func target(for vendor: Vendor) -> Target {
+        switch location {
+        case .local(let path):
+            return .binaryTarget(
+                name: vendor.rawValue,
+                path: "\(path)/\(vendor.rawValue).xcframework.zip"
+            )
+        case .remote(let url, let version):
+            return .binaryTarget(
+                name: vendor.rawValue,
+                url: "\(url)/\(version)/\(vendor.rawValue).xcframework.zip",
+                checksum: checksums[vendor]!
+            )
+        }
+    }
+}
