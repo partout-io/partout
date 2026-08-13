@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_linux.c
+../../../../src/c/crypto/crypto_linux.c

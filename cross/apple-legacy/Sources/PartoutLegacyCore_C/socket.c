@@ -1,1 +1,1 @@
-../../../../zig/src/c/portable/socket.c
+../../../../src/c/portable/socket.c

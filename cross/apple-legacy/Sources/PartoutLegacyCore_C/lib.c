@@ -1,1 +1,1 @@
-../../../../zig/src/c/portable/lib.c
+../../../../src/c/portable/lib.c

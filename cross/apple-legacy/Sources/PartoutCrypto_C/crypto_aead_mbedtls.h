@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_aead_mbedtls.h
+../../../../src/c/crypto/crypto_aead_mbedtls.h

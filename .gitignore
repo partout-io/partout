@@ -10,3 +10,7 @@ Package.resolved
 bin
 cross-models
 PartoutNative.xcframework
+
+# Zig
+/.zig-cache/
+/zig-out/

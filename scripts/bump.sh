@@ -14,7 +14,7 @@ fi
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 swift_constants="$root/Sources/PartoutCore/PartoutConstants.swift"
-zig_constants="$root/zig/src/partout.zig"
+zig_constants="$root/src/partout.zig"
 
 swift_pattern='^    public static let version = "[^"]+"$'
 zig_pattern='^const version = "[^"]+";$'

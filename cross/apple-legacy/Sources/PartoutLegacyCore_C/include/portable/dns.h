@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/portable/include/portable/dns.h
+../../../../../../src/c/portable/include/portable/dns.h

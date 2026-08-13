@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - zig/src/partout.zig
+      - src/partout.zig
   workflow_dispatch:
 
 concurrency:
@@ -26,7 +26,7 @@ jobs:
       - name: Parse version
         id: parse_version
         env:
-          ABI_SOURCE: zig/src/partout.zig
+          ABI_SOURCE: src/partout.zig
         run: |
           version=$(sed -nE 's/^.*version = "(.*)".*$/\1/p' "$ABI_SOURCE")
           test -n "$version"
@@ -41,7 +41,7 @@ jobs:
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
           echo "tag=$prebuilts_tag" >> "$GITHUB_OUTPUT"
       - name: Run Zig tests
-        working-directory: zig
+        working-directory: .
         run: |
           zig build test -Dopenvpn=true -Dwireguard=true
       - name: Build XCFramework

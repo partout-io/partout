@@ -286,7 +286,7 @@ fn addAPICodegenStep(b: *std.Build) *std.Build.Step {
         .root_module = generator_module,
     });
     const run = b.addRunArtifact(generator);
-    run.addArg("../scripts/openapi.yaml");
+    run.addArg("scripts/openapi.yaml");
     run.addArg("src/core/api_generated.zig");
     if (excluded_schemas.len > 0) {
         run.addArg("--exclude");

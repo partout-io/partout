@@ -1,1 +1,1 @@
-../../../../zig/src/c/portable/prng.c
+../../../../src/c/portable/prng.c

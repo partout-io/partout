@@ -1,1 +1,1 @@
-../../../../zig/src/wireguard/c/x25519.c
+../../../../src/wireguard/c/x25519.c

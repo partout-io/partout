@@ -150,7 +150,7 @@ endif()
 if(PP_BUILD_LIBRARY)
     find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
     add_custom_target(partout ALL
-        COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_SOURCE_DIR}/zig"
+        COMMAND "${CMAKE_COMMAND}" -E chdir "${CMAKE_CURRENT_SOURCE_DIR}"
             "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
         USES_TERMINAL
         COMMAND_EXPAND_LISTS

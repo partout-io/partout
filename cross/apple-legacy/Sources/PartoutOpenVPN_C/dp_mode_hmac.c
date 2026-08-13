@@ -1,1 +1,1 @@
-../../../../zig/src/openvpn/c/dp_mode_hmac.c
+../../../../src/openvpn/c/dp_mode_hmac.c
