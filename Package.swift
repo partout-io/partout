@@ -5,7 +5,7 @@ import PackageDescription
 
 let partoutNative: Target = .partoutNative(
 //    .local
-    .remote("0.155.2", checksum: "54e9decdd53cc1ebdd5eea469082cc2eae3ed6f5f76d51ec265171396acc96d0")
+    .remote("0.155.2", checksum: "f09ddaf15ceda59129e33568c43592f852dae88246500a3d55d5e346199685e1")
 )
 
 let package = Package(
