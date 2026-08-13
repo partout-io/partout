@@ -66,7 +66,7 @@ let package = Package(
         )
     ],
     dependencies: [
-        .package(path: "../..")
+        .package(name: "partout", path: "../..")
     ],
     targets: [
         .target(
