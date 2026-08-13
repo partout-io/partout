@@ -5,21 +5,9 @@
 @_exported import _PartoutPortable_C
 @_exported import Foundation
 
-public enum PartoutConstants {
+public enum PartoutCore {
     /// The unique identifier of the library.
     public static let identifier = "io.partout"
-
-    /// The library version.
-    public static let version = "0.155.2"
-
-    /// The computed version identifier.
-    public static let versionIdentifier: String = "\(identifier) \(version)"
-
-    /// The C flavor of ``versionIdentifier``.
-    public static var cVersionIdentifier: UnsafePointer<CChar> {
-        // This is safe because the subject is statically allocated.
-        versionIdentifier.withCString(\.self)
-    }
 }
 
 extension LoggerCategory: CaseIterable {
