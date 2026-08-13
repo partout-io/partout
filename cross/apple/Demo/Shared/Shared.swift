@@ -92,17 +92,3 @@ extension Demo {
         return defaults
     }
 }
-
-private final class BasicProfileCoder: ProfileCoder {
-    func string(fromProfile profile: Profile) throws -> String {
-        try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
-    }
-
-    func profile(fromString string: String) throws -> Profile {
-        guard let data = string.data(using: .utf8) else {
-            throw PartoutError(.decoding)
-        }
-        let tagged = try JSONDecoder.shared().decode(TaggedProfile.self, from: data)
-        return try tagged.asProfile()
-    }
-}

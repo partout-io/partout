@@ -868,7 +868,7 @@ private func encoder(
 ) -> JSONEncoder {
     let encoder = JSONEncoder.shared()
     encoder.outputFormatting = [.sortedKeys]
-    var userInfo: [CodingUserInfoKey: Any] = [:]
+    var userInfo: [CodingUserInfoKey: Sendable] = [:]
     if legacySwiftEncoding {
         userInfo[.legacySwiftEncoding] = true
     }

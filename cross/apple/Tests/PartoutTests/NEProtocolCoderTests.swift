@@ -6,12 +6,10 @@
 
 import Foundation
 import NetworkExtension
-@testable import PartoutOS
+@testable import PartoutCore
 import Testing
 
 struct NEProtocolCoderTests {
-    private let registry = Registry(withKnown: true)
-
     @Test(arguments: CoderKind.allCases)
     func roundTripPreservesProfileAndCommonProtocolFields(_ kind: CoderKind) throws {
         let profile = try newProfile()
@@ -69,7 +67,7 @@ struct NEProtocolCoderTests {
         let sut = KeychainNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: bundleIdentifier,
-            coder: CodingRegistry(registry: registry),
+            coder: BasicProfileCoder(),
             keychain: MockKeychain()
         )
 
@@ -81,7 +79,7 @@ struct NEProtocolCoderTests {
     @Test
     func legacyKeychainCoderWritesEncodedProfileWithTitleMetadata() throws {
         let profile = try newProfile()
-        let coder = CodingRegistry(registry: registry)
+        let coder = BasicProfileCoder()
         let keychain = MockKeychain()
         let sut = KeychainNEProtocolCoder(
             .global,
@@ -114,7 +112,7 @@ private extension NEProtocolCoderTests {
         _ kind: CoderKind,
         containing profile: Profile
     ) throws -> (any NEProtocolCoder, MockKeychain) {
-        let coder = CodingRegistry(registry: registry)
+        let coder = BasicProfileCoder()
         let encoded = try coder.string(fromProfile: profile)
         let keychain = MockKeychain(passwords: [profile.id.uuidString: encoded])
 

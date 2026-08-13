@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-import PartoutLegacyCore
-@testable import PartoutOS
+@testable import PartoutCore
 import Testing
 
 struct OnDemandModuleRulesTests {

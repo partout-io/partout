@@ -5,35 +5,11 @@
 import PartoutLegacyCore
 import Testing
 
-struct AsyncStreamTests {
-    @Test
-    func givenCurrentValue_whenEmit_thenMatches() async throws {
-        let sut = CurrentValueStream<Int>(100)
-        let sequence = [5, 7, 67]
-        let expected = [100] + sequence
-        let stream = sut.subscribe()
-        Task {
-            for num in sequence {
-                sut.send(num)
-                try await Task.sleep(for: .milliseconds(100))
-            }
-            sut.finish()
-        }
-        var i = 0
-        for try await num in stream {
-            print("Number: \(num)")
-            #expect(i < expected.count, "Emitted more values than sequence length")
-            #expect(num == expected[i])
-            i += 1
-        }
-    }
-}
-
 #if canImport(Combine)
 import Combine
 import PartoutLegacyCore
 
-extension AsyncStreamTests {
+struct AsyncStreamTests {
     @Test
     func givenKVO_whenIterateStream_thenIsExpected() async throws {
         let sut = KVOObject()
