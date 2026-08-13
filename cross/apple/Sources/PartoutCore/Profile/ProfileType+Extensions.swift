@@ -70,15 +70,9 @@ extension ProfileType where GenericModuleType == Module {
     }
 
     public func firstBuildingConnection(ifActive: Bool = false) -> Module? {
-        guard let found = modules.first(where: \.buildsConnection) else {
-            return nil
+        modules.first {
+            $0.buildsConnection && (!ifActive || isActiveModule(withId: $0.id))
         }
-        if ifActive {
-            guard isActiveModule(withId: found.id) else {
-                return nil
-            }
-        }
-        return found
     }
 
     public var isFinal: Bool {

@@ -104,6 +104,20 @@ struct ProfileModulesTests {
     }
 
     @Test
+    func givenInactiveConnectionBeforeActiveConnection_whenFindActive_thenFindsActive() throws {
+        let inactiveModule = SomeConnectionModule()
+        let activeModule = SomeConnectionModule()
+        var builder = Profile.Builder(
+            modules: [inactiveModule, activeModule],
+            activatingModules: false
+        )
+        builder.activeModulesIds = [activeModule.id]
+        let sut = try builder.build()
+
+        #expect(sut.firstBuildingConnection(ifActive: true)?.id == activeModule.id)
+    }
+
+    @Test
     func givenModules_whenToggle_thenToggles() {
         let oneModule = OneModule()
         var sut = Profile.Builder(modules: [
