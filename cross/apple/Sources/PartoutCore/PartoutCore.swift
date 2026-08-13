@@ -10,6 +10,7 @@
 extension LoggerCategory {
     public static let abi = Self(rawValue: "abi")
     public static let core = Self(rawValue: "core")
+    public static let os = Self(rawValue: "os")
 }
 
 // MARK: Profile
