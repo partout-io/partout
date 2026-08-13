@@ -15,6 +15,7 @@ const builtin = @import("builtin");
 const abi = @import("abi/exports.zig");
 const c_mod = @import("c/exports.zig");
 const core = @import("core/exports.zig");
+const version = @import("version.zig");
 const api = core.api;
 const c = abi.c;
 const c_common = c_mod.common;
@@ -25,8 +26,7 @@ pub const panic = std.debug.FullPanic(panicHandler);
 
 const allocator = std.heap.c_allocator;
 const identifier = "io.partout";
-const version = "0.155.3";
-const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version });
+const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version.string });
 
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
 // var daemon_runtime = DaemonRuntime{};

@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - src/partout.zig
+      - src/version.zig
   workflow_dispatch:
 
 concurrency:
@@ -34,14 +34,14 @@ jobs:
       - name: Parse version
         id: parse_version
         env:
-          ABI_SOURCE: src/partout.zig
+          VERSION_SOURCE: src/version.zig
         run: |
           if [[ "$GITHUB_REF_TYPE" != "branch" ]]; then
             echo "::error::Releases must be dispatched from a branch"
             exit 1
           fi
 
-          version=$(sed -nE 's/^.*version = "(.*)".*$/\1/p' "$ABI_SOURCE")
+          version=$(sed -nE 's/^.*string = "(.*)".*$/\1/p' "$VERSION_SOURCE")
           test -n "$version"
           [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
