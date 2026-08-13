@@ -1,1 +1,1 @@
-../../../../../../zig/src/c/crypto/include/crypto/hmac.h
+../../../../../../src/c/crypto/include/crypto/hmac.h

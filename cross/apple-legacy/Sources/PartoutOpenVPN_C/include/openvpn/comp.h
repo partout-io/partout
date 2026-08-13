@@ -1,1 +1,1 @@
-../../../../../../zig/src/openvpn/c/include/openvpn/comp.h
+../../../../../../src/openvpn/c/include/openvpn/comp.h

@@ -1,1 +1,1 @@
-../../../../../zig/src/partout.h
+../../../../../src/partout.h

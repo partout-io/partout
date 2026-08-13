@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_darwin.c
+../../../../src/c/crypto/crypto_darwin.c

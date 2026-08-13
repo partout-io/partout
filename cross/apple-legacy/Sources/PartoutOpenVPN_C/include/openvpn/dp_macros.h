@@ -1,1 +1,1 @@
-../../../../../../zig/src/openvpn/c/include/openvpn/dp_macros.h
+../../../../../../src/openvpn/c/include/openvpn/dp_macros.h

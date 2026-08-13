@@ -5,7 +5,7 @@ on:
     branches:
       - master
     paths:
-      - zig/src/partout.zig
+      - src/partout.zig
   workflow_dispatch:
 
 concurrency:
@@ -21,15 +21,29 @@ jobs:
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v6
+      - name: Import GPG key
+        uses: crazy-max/ghaction-import-gpg@v7
+        with:
+          gpg_private_key: ${{ secrets.GPG_KEY }}
+          passphrase: ${{ secrets.GPG_PASSPHRASE }}
+          git_user_signingkey: true
+          git_commit_gpgsign: true
+          git_tag_gpgsign: true
       - name: Set up Zig
         uses: mlugg/setup-zig@v2
       - name: Parse version
         id: parse_version
         env:
-          ABI_SOURCE: zig/src/partout.zig
+          ABI_SOURCE: src/partout.zig
         run: |
+          if [[ "$GITHUB_REF_TYPE" != "branch" ]]; then
+            echo "::error::Releases must be dispatched from a branch"
+            exit 1
+          fi
+
           version=$(sed -nE 's/^.*version = "(.*)".*$/\1/p' "$ABI_SOURCE")
           test -n "$version"
+          [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Download latest prebuilts
         id: prebuilts
@@ -41,7 +55,6 @@ jobs:
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
           echo "tag=$prebuilts_tag" >> "$GITHUB_OUTPUT"
       - name: Run Zig tests
-        working-directory: zig
         run: |
           zig build test -Dopenvpn=true -Dwireguard=true
       - name: Build XCFramework
@@ -63,11 +76,42 @@ jobs:
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
           echo "checksum_file=$checksum_file" >> "$GITHUB_OUTPUT"
           echo "prebuilts_version_file=$prebuilts_version_file" >> "$GITHUB_OUTPUT"
+      - name: Update Swift package reference
+        id: update_package
+        env:
+          VERSION: ${{ steps.parse_version.outputs.version }}
+          CHECKSUM_FILE: ${{ steps.build_xcframework.outputs.checksum_file }}
+        run: |
+          if ! ci/update-swift-package.sh \
+            "$VERSION" "$CHECKSUM_FILE" "$GITHUB_REF_NAME"; then
+            echo "::error::Failed to update Package.swift"
+            exit 1
+          fi
+          commit=$(git rev-parse HEAD)
+          git verify-commit "$commit"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
+      - name: Sign release tag
+        env:
+          VERSION: ${{ steps.parse_version.outputs.version }}
+          COMMIT: ${{ steps.update_package.outputs.commit }}
+        run: |
+          if git ls-remote --exit-code --tags \
+            origin "refs/tags/$VERSION" >/dev/null 2>&1; then
+            git fetch --force --no-tags \
+              origin "refs/tags/$VERSION:refs/tags/$VERSION"
+          else
+            git tag -s "$VERSION" "$COMMIT" -m "$VERSION"
+            git push origin "refs/tags/$VERSION"
+          fi
+
+          test "$(git rev-list -n 1 "$VERSION")" = "$COMMIT"
+          git tag --verify "$VERSION"
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:
           name: ${{ steps.parse_version.outputs.version }}
           tag_name: ${{ steps.parse_version.outputs.version }}
+          target_commitish: ${{ steps.update_package.outputs.commit }}
           generate_release_notes: true
           files: |
             ${{ steps.build_xcframework.outputs.archive }}

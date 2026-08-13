@@ -1,1 +1,1 @@
-../../../../zig/src/openvpn/c/dp_mode.c
+../../../../src/openvpn/c/dp_mode.c

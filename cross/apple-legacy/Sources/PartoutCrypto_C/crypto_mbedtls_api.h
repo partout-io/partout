@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_mbedtls_api.h
+../../../../src/c/crypto/crypto_mbedtls_api.h

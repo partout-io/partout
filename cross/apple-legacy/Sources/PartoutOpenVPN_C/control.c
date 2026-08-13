@@ -1,1 +1,1 @@
-../../../../zig/src/openvpn/c/control.c
+../../../../src/openvpn/c/control.c

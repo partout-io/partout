@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_windows.c
+../../../../src/c/crypto/crypto_windows.c

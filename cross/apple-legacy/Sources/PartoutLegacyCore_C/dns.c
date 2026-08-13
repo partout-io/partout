@@ -1,1 +1,1 @@
-../../../../zig/src/c/portable/dns.c
+../../../../src/c/portable/dns.c

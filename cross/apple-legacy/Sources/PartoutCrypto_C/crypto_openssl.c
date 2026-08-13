@@ -1,1 +1,1 @@
-../../../../zig/src/c/crypto/crypto_openssl.c
+../../../../src/c/crypto/crypto_openssl.c
