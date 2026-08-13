@@ -43,6 +43,8 @@ if git diff --quiet -- Package.swift; then
     exit 0
 fi
 
+git config user.name "github-actions[bot]"
+git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 git add Package.swift
 git commit -m "Update PartoutNative to $version"
 git push origin "HEAD:refs/heads/$branch"
