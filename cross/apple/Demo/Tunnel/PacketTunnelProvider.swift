@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import NetworkExtension
-import Partout
+import PartoutCore
+import PartoutRuntime
 
 final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
     private var ctx: PartoutLoggerContext?

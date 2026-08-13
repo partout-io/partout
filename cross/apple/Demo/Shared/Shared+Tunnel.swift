@@ -3,46 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import Partout
-
-extension Registry {
-    static let shared = Registry(
-        withKnown: true,
-        allImplementations: [
-            OpenVPNModule.Implementation(
-                importerBlock: {
-                    StandardOpenVPNParser()
-                },
-                connectionBlock: {
-                    let ctx = PartoutLoggerContext($0.profile.id)
-                    return try _OpenVPNConnectionV3(
-                        ctx,
-                        parameters: $0,
-                        module: $1,
-                        cachesURL: Demo.moduleURL(for: "OpenVPN")
-                    )
-                }
-            ),
-            WireGuardModule.Implementation(
-                keyGenerator: StandardWireGuardKeyGenerator(),
-                importerBlock: {
-                    StandardWireGuardParser()
-                },
-                validatorBlock: {
-                    StandardWireGuardParser()
-                },
-                connectionBlock: {
-                    let ctx = PartoutLoggerContext($0.profile.id)
-                    return try _WireGuardConnectionV2(
-                        ctx,
-                        parameters: $0,
-                        module: $1
-                    )
-                }
-            )
-        ]
-    )
-}
+import PartoutCore
 
 extension NEProtocolDecoder where Self == KeychainNEProtocolCoder {
     static var shared: Self {

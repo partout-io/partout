@@ -7,10 +7,16 @@
 @_exported import _PartoutPortable_C
 #endif
 
-extension LoggerCategory {
+extension LoggerCategory: CaseIterable {
     public static let abi = Self(rawValue: "abi")
     public static let core = Self(rawValue: "core")
     public static let os = Self(rawValue: "os")
+
+    public static let allCases: [LoggerCategory] = [
+        .abi,
+        .core,
+        .os,
+    ]
 }
 
 // MARK: Profile

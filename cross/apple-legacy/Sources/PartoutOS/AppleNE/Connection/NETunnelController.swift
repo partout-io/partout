@@ -4,21 +4,6 @@
 
 @preconcurrency import NetworkExtension
 
-extension Profile {
-    public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {
-        guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
-            pp_log_g(.os, .error, "Unable to parse profile from NETunnelProviderProtocol")
-            throw PartoutError(.decoding)
-        }
-        do {
-            self = try decoder.profile(from: tunnelConfiguration)
-        } catch {
-            pp_log_g(.os, .error, "Unable to decode and process profile: \(error)")
-            throw error
-        }
-    }
-}
-
 /// A controller based on `NEPacketTunnelProvider`.
 public final class NETunnelController: TunnelController {
     nonisolated(unsafe)

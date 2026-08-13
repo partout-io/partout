@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import NetworkExtension
-import PartoutLegacyCore
 
 /// A tunnel strategy based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {

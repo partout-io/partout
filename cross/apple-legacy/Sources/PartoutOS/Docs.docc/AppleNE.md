@@ -27,7 +27,6 @@ The ``NEPTPForwarder`` wrapper is a simple way to build a basic [NEPacketTunnelP
 ### App
 
 - ``NETunnelEnvironment``
-- ``NETunnelManagerRepository``
 - ``NETunnelStrategy``
 
 ### App Extension
