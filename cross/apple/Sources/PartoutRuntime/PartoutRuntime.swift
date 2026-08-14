@@ -13,7 +13,4 @@ public enum PartoutRuntime {
         }
         return String(cString: cVersion)
     }
-
-    /// The computed version identifier.
-    public static let versionIdentifier: String = "\(PartoutCore.identifier) \(version)"
 }
