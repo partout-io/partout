@@ -30,6 +30,7 @@ final class PacketTunnelProvider: NEPacketTunnelProvider, @unchecked Sendable {
             )
 
             var loggerBuilder = PartoutLogger.Builder()
+            loggerBuilder.setDestination(OSLogDestination(.abi), for: [.abi])
             loggerBuilder.setDestination(OSLogDestination(.core), for: [.core])
             loggerBuilder.logsModules = true
             loggerBuilder.setLocalLogger(

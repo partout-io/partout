@@ -247,7 +247,7 @@ extension PartoutTunnelController {
 
         private static func controller(from ref: UnsafeMutableRawPointer?) -> PartoutTunnelController? {
             guard let ref else {
-                pp_log_g(.os, .error, "NETunnelController C bridge received a nil reference")
+                pp_log_g(.core, .error, "NETunnelController C bridge received a nil reference")
                 return nil
             }
             return Unmanaged<PartoutTunnelController>.fromOpaque(ref).takeUnretainedValue()
