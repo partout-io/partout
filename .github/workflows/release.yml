@@ -90,9 +90,9 @@ jobs:
         run: ci/test-zig-apple-vendors.sh "$ARTIFACTS_DIR"
       - name: Run Swift tests with built XCFramework
         run: |
-          package_pattern='^    \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
+          package_pattern='^nativeTarget = \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
           test "$(grep -Ec "$package_pattern" Package.swift)" -eq 1
-          sed -i '' -E "s/$package_pattern/    .local/" Package.swift
+          sed -i '' -E "s/$package_pattern/nativeTarget = .local/" Package.swift
           trap 'git restore -- Package.swift' EXIT
 
           swift test

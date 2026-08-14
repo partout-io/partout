@@ -27,16 +27,16 @@ cd "$repo_root"
 git diff --quiet || fail "working tree has tracked changes"
 git diff --cached --quiet || fail "index has staged changes"
 
-package_pattern='^    \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
+package_pattern='^nativeTarget = \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
 if [[ $(grep -Ec "$package_pattern" Package.swift) -ne 1 ]]; then
     fail "expected exactly one remote binary target in Package.swift"
 fi
 
 sed -i '' -E \
-    "s/$package_pattern/    .remote(\"$version\", checksum: \"$checksum\")/" \
+    "s/$package_pattern/nativeTarget = .remote(\"$version\", checksum: \"$checksum\")/" \
     Package.swift
 grep -Fx \
-    "    .remote(\"$version\", checksum: \"$checksum\")" \
+    "nativeTarget = .remote(\"$version\", checksum: \"$checksum\")" \
     Package.swift >/dev/null || fail "failed to update Package.swift"
 
 git add Package.swift

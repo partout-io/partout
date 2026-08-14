@@ -3,10 +3,11 @@
 
 import PackageDescription
 
-let partoutNative: Target = .partoutNative(
-//    .local
-    .remote("0.155.4", checksum: "e0497bfdcb6140535a70de6a68a9415c517d2cb46188dfbed46ca6f2fdedaebf")
-)
+let nativeTarget: PartoutNativeTarget
+// nativeTarget = .local
+nativeTarget = .remote("0.155.4", checksum: "e0497bfdcb6140535a70de6a68a9415c517d2cb46188dfbed46ca6f2fdedaebf")
+
+let partoutNative: Target = .partoutNative(nativeTarget)
 
 let package = Package(
     name: "partout",
