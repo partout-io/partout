@@ -46,7 +46,7 @@ final class PartoutTunnelController: Sendable {
         guard let delegate else { return }
 
         var cReach = pp_reachability(reachable: isReachable)
-        pp_log(ctx, .os, .debug, "On reachability: \(cReach)")
+        pp_log(ctx, .runtime, .debug, "On reachability: \(cReach)")
         withUnsafePointer(to: &cReach) {
             delegate.on_reachability(delegate.ctx, $0)
         }
@@ -56,7 +56,7 @@ final class PartoutTunnelController: Sendable {
         let delegate = delegateLock.with { self.delegate }
         guard let delegate else { return }
 
-        pp_log(ctx, .os, .debug, "On better path")
+        pp_log(ctx, .runtime, .debug, "On better path")
         delegate.on_better_path(delegate.ctx)
     }
 
@@ -67,7 +67,7 @@ final class PartoutTunnelController: Sendable {
         }
         let profile = try info.profile.asProfile()
         let tunnelSettings = profile.networkSettingsWrapper(with: info, options: options)
-        pp_log(ctx, .os, .info, "Commit tunnel settings: \(tunnelSettings)")
+        pp_log(ctx, .runtime, .info, "Commit tunnel settings: \(tunnelSettings)")
         try await provider.setTunnelNetworkSettings(tunnelSettings)
     }
 
@@ -76,7 +76,7 @@ final class PartoutTunnelController: Sendable {
 
     func reportSnapshot(_ snapshot: TunnelSnapshot) {
         if options.logsSnapshots {
-            pp_log(ctx, .os, .debug, "Report tunnel snapshot: \(snapshot)")
+            pp_log(ctx, .runtime, .debug, "Report tunnel snapshot: \(snapshot)")
         }
         // The runtime already handles the connection events
         // to keep the tunnel environment up to date
@@ -84,10 +84,10 @@ final class PartoutTunnelController: Sendable {
 
     func clearTunnelSettings(withKillSwitch: Bool) async {
         do {
-            pp_log(ctx, .os, .info, "Clear tunnel settings (kill switch = \(withKillSwitch))")
+            pp_log(ctx, .runtime, .info, "Clear tunnel settings (kill switch = \(withKillSwitch))")
             try await provider?.clearTunnelSettings(withKillSwitch: withKillSwitch)
         } catch {
-            pp_log(ctx, .os, .error, "Unable to clear tunnel settings: \(error)")
+            pp_log(ctx, .runtime, .error, "Unable to clear tunnel settings: \(error)")
         }
     }
 
@@ -108,9 +108,9 @@ final class PartoutTunnelController: Sendable {
             return
         }
         if let error {
-            pp_log(ctx, .os, .fault, "Dispose tunnel with error: \(error)")
+            pp_log(ctx, .runtime, .fault, "Dispose tunnel with error: \(error)")
         } else {
-            pp_log(ctx, .os, .notice, "Dispose tunnel")
+            pp_log(ctx, .runtime, .notice, "Dispose tunnel")
         }
         provider.cancelTunnelWithError(error)
     }
@@ -118,7 +118,7 @@ final class PartoutTunnelController: Sendable {
 
 private extension PartoutTunnelController {
     func logReleasedProvider() {
-        pp_log(ctx, .os, .info, "NEPacketTunnelProvider released")
+        pp_log(ctx, .runtime, .info, "NEPacketTunnelProvider released")
     }
 }
 
@@ -321,7 +321,7 @@ public func pp_swift_tun_ctrl_cancel_tunnel(
 
 private extension PartoutTunnelController {
     func logBridgeError(_ message: String, _ error: Error) {
-        pp_log(ctx, .os, .error, "\(message): \(error)")
+        pp_log(ctx, .runtime, .error, "\(message): \(error)")
     }
 }
 
