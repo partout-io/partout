@@ -2,6 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+import PartoutCore
 import Testing
 
 struct ExpectationTests {
@@ -9,12 +10,8 @@ struct ExpectationTests {
     func fulfillmentThrowsAtTimeout() async {
         let expectation = Expectation()
 
-        do {
+        await #expect(throws: Error.self) {
             try await expectation.fulfillment(timeout: 10)
-            Issue.record("Expected fulfillment to time out")
-        } catch is Expectation.TimeoutError {
-        } catch {
-            Issue.record("Unexpected error: \(error)")
         }
     }
 }

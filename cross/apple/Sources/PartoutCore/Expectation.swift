@@ -88,5 +88,5 @@ public actor Expectation {
         }
     }
 
-    struct TimeoutError: Error {}
+    public struct TimeoutError: Error {}
 }
