@@ -1,1 +1,1 @@
-pub const string = "0.155.3";
+pub const number = "0.155.3";

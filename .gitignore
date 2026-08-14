@@ -6,6 +6,7 @@
 **/.swiftpm/xcode
 Package.resolved
 .build
+/prebuilts/
 .cmake*
 bin
 cross-models

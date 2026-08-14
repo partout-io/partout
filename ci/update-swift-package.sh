@@ -7,18 +7,15 @@ fail() {
     exit 1
 }
 
-if [[ $# -ne 3 ]]; then
-    fail "usage: $0 <version> <checksum-file> <branch>"
+if [[ $# -ne 2 ]]; then
+    fail "usage: $0 <version> <checksum-file>"
 fi
 
 version=$1
 checksum_file=$2
-branch=$3
 
 [[ $version =~ ^[0-9A-Za-z.+-]+$ ]] || fail "invalid version: $version"
 [[ -r $checksum_file ]] || fail "checksum file not readable: $checksum_file"
-git check-ref-format --branch "$branch" >/dev/null 2>&1 ||
-    fail "invalid branch: $branch"
 
 checksum=$(tr -d '\r\n' < "$checksum_file")
 [[ $checksum =~ ^[0-9a-f]{64}$ ]] || fail "invalid checksum"
@@ -26,6 +23,9 @@ checksum=$(tr -d '\r\n' < "$checksum_file")
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 repo_root="$(cd "$script_dir/.." && pwd -P)"
 cd "$repo_root"
+
+git diff --quiet || fail "working tree has tracked changes"
+git diff --cached --quiet || fail "index has staged changes"
 
 package_pattern='^    \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
 if [[ $(grep -Ec "$package_pattern" Package.swift) -ne 1 ]]; then
@@ -39,10 +39,5 @@ grep -Fx \
     "    .remote(\"$version\", checksum: \"$checksum\")" \
     Package.swift >/dev/null || fail "failed to update Package.swift"
 
-if git diff --quiet -- Package.swift; then
-    exit 0
-fi
-
 git add Package.swift
 git commit -S -m "Update PartoutNative to $version"
-git push origin "HEAD:refs/heads/$branch"

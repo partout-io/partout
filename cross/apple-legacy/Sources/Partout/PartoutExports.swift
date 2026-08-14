@@ -12,13 +12,3 @@
 #if PARTOUT_WIREGUARD
 @_exported import PartoutWireGuard
 #endif
-
-extension LoggerCategory {
-    public static let partoutCategories: [LoggerCategory] = [
-        .abi,
-        .core,
-        .openvpn,
-        .os,
-        .wireguard
-    ]
-}

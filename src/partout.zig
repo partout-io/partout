@@ -25,8 +25,6 @@ const util = core.util;
 pub const panic = std.debug.FullPanic(panicHandler);
 
 const allocator = std.heap.c_allocator;
-const identifier = "io.partout";
-const version_identifier: [:0]const u8 = std.fmt.comptimePrint("{s} {s}", .{ identifier, version.string });
 
 // const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
 // var daemon_runtime = DaemonRuntime{};
@@ -71,7 +69,7 @@ fn panicHandler(message: []const u8, _: ?usize) noreturn {
 }
 
 pub export fn partout_version() callconv(.c) [*:0]const u8 {
-    return version_identifier.ptr;
+    return version.number.ptr;
 }
 
 pub export fn partout_init(args_pointer: ?*const c.partout_init_args) callconv(.c) void {
@@ -183,4 +181,8 @@ fn mapErrorToCode(err: abi.RuntimeError) c_int {
         error.InvalidArgs => c.PartoutCompletionCodeArgs,
         else => c.PartoutCompletionCodeFailure,
     };
+}
+
+test "version export returns the version number" {
+    try std.testing.expectEqualStrings(version.number, std.mem.span(partout_version()));
 }

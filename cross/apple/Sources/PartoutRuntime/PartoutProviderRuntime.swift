@@ -43,13 +43,6 @@ public final class PartoutProviderRuntime: Sendable {
         pp_log(ctx, .runtime, .debug, "Deinit runtime")
     }
 
-    public static var version: String {
-        guard let cString = partout_version() else {
-            return "undefined"
-        }
-        return String(cString: cString)
-    }
-
     public func startTunnel() async throws {
         pp_log(ctx, .runtime, .notice, "Start runtime")
 
