@@ -3,8 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import Foundation
-import PartoutLegacyCore
-import PartoutOS
+import PartoutCore
 import Testing
 
 struct AppleKeychainTests {

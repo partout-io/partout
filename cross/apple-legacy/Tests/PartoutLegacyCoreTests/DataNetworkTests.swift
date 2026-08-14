@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutLegacyCore
-internal import PartoutLegacyCore_C
+import PartoutCore
 #if canImport(Network)
 import Network
 #endif

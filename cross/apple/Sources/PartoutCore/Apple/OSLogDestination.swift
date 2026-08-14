@@ -7,7 +7,7 @@
 /// A logger destination based on `OSLog`.
 public struct OSLogDestination: LoggerDestination {
     private static var subsystem: String {
-        PartoutConstants.identifier
+        PartoutCore.identifier
     }
 
     public let category: LoggerCategory

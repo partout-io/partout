@@ -192,8 +192,8 @@ private extension ValueObserverTests {
         _ sut: SafeValueObserver<SomeObject>,
         timeout: Int = 1000,
         onValue: @escaping @Sendable (Int) throws -> Bool
-    ) -> (Task<Void, Error>, MiniFoundation.Expectation) {
-        let didStartWaiting = MiniFoundation.Expectation()
+    ) -> (Task<Void, Error>, Expectation) {
+        let didStartWaiting = Expectation()
         let task = Task {
             try await sut.waitForValue(on: \.value, timeout: timeout) { newValue in
                 Task {

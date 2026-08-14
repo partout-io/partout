@@ -2,6 +2,5 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension LoggerCategory {
-    public static let os = Self(rawValue: "os")
-}
+@_exported import MiniFoundation
+@_exported import PartoutCore

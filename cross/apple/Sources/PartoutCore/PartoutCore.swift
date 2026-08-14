@@ -2,14 +2,21 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#if !USE_CMAKE
-@_exported import Foundation
 @_exported import _PartoutPortable_C
-#endif
+@_exported import Foundation
 
-extension LoggerCategory {
+public enum PartoutCore {
+    /// The unique identifier of the library.
+    public static let identifier = "io.partout"
+}
+
+extension LoggerCategory: CaseIterable {
     public static let abi = Self(rawValue: "abi")
     public static let core = Self(rawValue: "core")
+    public static let os = Self(rawValue: "os")
+    public static let runtime = Self(rawValue: "runtime")
+
+    public static let allCases: [LoggerCategory] = [.abi, .core, .os, .runtime]
 }
 
 // MARK: Profile

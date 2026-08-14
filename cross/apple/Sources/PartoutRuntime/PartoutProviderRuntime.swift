@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-import PartoutCore
 import PartoutNative
 
 public final class PartoutProviderRuntime: Sendable {
@@ -41,7 +40,7 @@ public final class PartoutProviderRuntime: Sendable {
     }
 
     deinit {
-        pp_log(ctx, .os, .debug, "Deinit runtime")
+        pp_log(ctx, .runtime, .debug, "Deinit runtime")
     }
 
     public static var version: String {
@@ -52,17 +51,17 @@ public final class PartoutProviderRuntime: Sendable {
     }
 
     public func startTunnel() async throws {
-        pp_log(ctx, .os, .notice, "Start runtime")
+        pp_log(ctx, .runtime, .notice, "Start runtime")
 
         var init_args = partout_init_args(
             logs_private_data: logsPrivateData,
             logger: logger
         )
-        pp_log(ctx, .os, .info, "Initialize Partout library")
+        pp_log(ctx, .runtime, .info, "Initialize Partout library")
         partout_init(&init_args)
 
         let profileJSON = try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
-        pp_log(ctx, .os, .debug, "Profile JSON: \(profileJSON)")
+        pp_log(ctx, .runtime, .debug, "Profile JSON: \(profileJSON)")
 
         let retainedController = Unmanaged.passRetained(controller)
         let retainedEnvironment = Unmanaged.passRetained(environment)
@@ -105,19 +104,19 @@ public final class PartoutProviderRuntime: Sendable {
         case PartoutCompletionCodeOK:
             break
         default:
-            pp_log(ctx, .os, .fault, "Unable to start runtime: result=\(cResult)")
+            pp_log(ctx, .runtime, .fault, "Unable to start runtime: result=\(cResult)")
             throw PartoutError(.invalidValue)
         }
-        pp_log(ctx, .os, .notice, "Runtime started")
+        pp_log(ctx, .runtime, .notice, "Runtime started")
     }
 
     public func holdTunnel() async {
-        pp_log(ctx, .os, .notice, "Hold runtime")
+        pp_log(ctx, .runtime, .notice, "Hold runtime")
         partout_daemon_hold()
     }
 
     public func stopTunnel() async {
-        pp_log(ctx, .os, .notice, "Stop runtime")
+        pp_log(ctx, .runtime, .notice, "Stop runtime")
         partout_daemon_stop()
     }
 
@@ -134,21 +133,21 @@ public final class PartoutProviderRuntime: Sendable {
             case .environment:
                 break
             default:
-                pp_log(ctx, .os, .info, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx)))")
+                pp_log(ctx, .runtime, .info, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx)))")
             }
             return encodedOutput
         } catch {
-            pp_log(ctx, .os, .error, "Unable to handle runtime message: \(error)")
+            pp_log(ctx, .runtime, .error, "Unable to handle runtime message: \(error)")
             return nil
         }
     }
 
     public func sleep() async {
-        pp_log(ctx, .os, .debug, "Runtime is about to sleep")
+        pp_log(ctx, .runtime, .debug, "Runtime is about to sleep")
     }
 
     public nonisolated func wake() {
-        pp_log(ctx, .os, .debug, "Runtime is about to wake up")
+        pp_log(ctx, .runtime, .debug, "Runtime is about to wake up")
     }
 }
 

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @preconcurrency import Network
-import PartoutCore
 
 /// A continuous stream of network events.
 final class NetworkMonitor: @unchecked Sendable {
@@ -67,7 +66,7 @@ private extension NetworkMonitor {
         let isReachable = path.isSatisfiable
         let didChangeReachability = isReachable != previousReachability
         let level: DebugLog.Level = didChangeReachability ? .info : .debug
-        pp_log(ctx, .os, level, "Path updated: \(path.debugDescription)")
+        pp_log(ctx, .runtime, level, "Path updated: \(path.debugDescription)")
 
         reachabilityLock.with {
             currentReachability = isReachable
@@ -86,7 +85,7 @@ private extension NetworkMonitor {
             return
         }
 
-        pp_log(ctx, .os, .notice, "Better network path detected")
+        pp_log(ctx, .runtime, .notice, "Better network path detected")
         subject.send(.betterPath)
     }
 }

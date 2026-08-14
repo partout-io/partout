@@ -6,15 +6,15 @@
 
 import Foundation
 @preconcurrency import NetworkExtension
-@testable import PartoutOS
+@testable import PartoutCore
 import Testing
 
 struct NETunnelStrategyContractTests {
-    @Test(arguments: TunnelStrategyKind.allCases)
-    func saveConfiguresAndPersistsManager(_ kind: TunnelStrategyKind) async throws {
+    @Test
+    func saveConfiguresAndPersistsManager() async throws {
         let store = MockTunnelPreferences(isEnabledOnLoad: false)
         let profile = try Profile.Builder(name: "My profile").build()
-        let strategy = makeStrategy(kind, preferences: store.preferences)
+        let strategy = makeStrategy(preferences: store.preferences)
 
         try await strategy.install(profile, connect: false, options: nil)
 
@@ -29,10 +29,10 @@ struct NETunnelStrategyContractTests {
         #expect(!manager.isOnDemandEnabled)
     }
 
-    @Test(arguments: TunnelStrategyKind.allCases)
-    func unknownProfileOperationsAreNoOps(_ kind: TunnelStrategyKind) async throws {
+    @Test
+    func unknownProfileOperationsAreNoOps() async throws {
         let store = MockTunnelPreferences()
-        let strategy = makeStrategy(kind, preferences: store.preferences)
+        let strategy = makeStrategy(preferences: store.preferences)
         let profileId = Profile.ID()
 
         try await strategy.uninstall(profileId: profileId)
@@ -43,22 +43,21 @@ struct NETunnelStrategyContractTests {
         #expect(await store.actions.isEmpty)
     }
 
-    @Test(arguments: TunnelStrategyKind.allCases)
-    func activeProfilesStartsEmpty(_ kind: TunnelStrategyKind) async throws {
-        let strategy = makeStrategy(kind, preferences: MockTunnelPreferences().preferences)
+    @Test
+    func activeProfilesStartsEmpty() async throws {
+        let strategy = makeStrategy(preferences: MockTunnelPreferences().preferences)
         var iterator = strategy.didUpdateActiveProfiles.makeAsyncIterator()
 
         #expect(await iterator.next()?.isEmpty == true)
     }
 
-    @Test(arguments: TunnelStrategyKind.allCases)
-    func preparedManagerIsPublishedAndCanBeUninstalled(_ kind: TunnelStrategyKind) async throws {
+    @Test
+    func preparedManagerIsPublishedAndCanBeUninstalled() async throws {
         let profile = try Profile.Builder(name: "loaded").build()
         let store = MockTunnelPreferences(
             managers: [makeManager(profileId: profile.id, fingerprint: profile.name)]
         )
         let strategy = try await makePreparedStrategy(
-            kind,
             profile: profile,
             store: store
         )
@@ -170,78 +169,42 @@ private var protocolCoder: ProviderNEProtocolCoder {
     ProviderNEProtocolCoder(
         .global,
         tunnelBundleIdentifier: bundleIdentifier,
-        coder: CodingRegistry(registry: Registry(withKnown: true)),
+        coder: BasicProfileCoder(),
         uid: 100
     )
 }
 
-enum TunnelStrategyKind: CaseIterable, CustomTestStringConvertible, Sendable {
-    case current
-    case legacy
-
-    var testDescription: String {
-        switch self {
-        case .current: "current"
-        case .legacy: "legacy"
-        }
-    }
-}
-
 private func makeStrategy(
-    _ kind: TunnelStrategyKind,
     preferences: NETunnelPreferences
-) -> any TunnelObservableStrategy {
-    switch kind {
-    case .current:
-        return NETunnelStrategy(
-            .global,
-            bundleIdentifier: bundleIdentifier,
-            source: AsyncStream { $0.finish() },
-            coder: protocolCoder,
-            preferences: preferences,
-            fingerprint: { $0.name }
-        )
-    case .legacy:
-        return LegacyNETunnelStrategy(
-            .global,
-            bundleIdentifier: bundleIdentifier,
-            coder: protocolCoder,
-            preferences: preferences
-        )
-    }
+) -> NETunnelStrategy {
+    NETunnelStrategy(
+        .global,
+        bundleIdentifier: bundleIdentifier,
+        source: AsyncStream { $0.finish() },
+        coder: protocolCoder,
+        preferences: preferences,
+        fingerprint: { $0.name }
+    )
 }
 
 private func makePreparedStrategy(
-    _ kind: TunnelStrategyKind,
     profile: Profile,
     store: MockTunnelPreferences
-) async throws -> any TunnelObservableStrategy {
-    switch kind {
-    case .current:
-        let (source, continuation) = AsyncStream.makeStream(of: ProfilesEvent.self)
-        let strategy = NETunnelStrategy(
-            .global,
-            bundleIdentifier: bundleIdentifier,
-            source: source,
-            coder: protocolCoder,
-            preferences: store.preferences,
-            fingerprint: { $0.name }
-        )
-        try await strategy.prepare(purge: false)
-        continuation.yield(.snapshot([profile]))
-        continuation.finish()
-        await store.waitForActionCount(1)
-        return strategy
-    case .legacy:
-        let strategy = LegacyNETunnelStrategy(
-            .global,
-            bundleIdentifier: bundleIdentifier,
-            coder: protocolCoder,
-            preferences: store.preferences
-        )
-        try await strategy.prepare(purge: false)
-        return strategy
-    }
+) async throws -> NETunnelStrategy {
+    let (source, continuation) = AsyncStream.makeStream(of: ProfilesEvent.self)
+    let strategy = NETunnelStrategy(
+        .global,
+        bundleIdentifier: bundleIdentifier,
+        source: source,
+        coder: protocolCoder,
+        preferences: store.preferences,
+        fingerprint: { $0.name }
+    )
+    try await strategy.prepare(purge: false)
+    continuation.yield(.snapshot([profile]))
+    continuation.finish()
+    await store.waitForActionCount(1)
+    return strategy
 }
 
 // MARK: - Preferences mock
@@ -302,7 +265,7 @@ private actor MockTunnelPreferences {
         NETunnelPreferences(
             loadAll: { [weak self] in
                 guard let self else { throw CancellationError() }
-                return await self.performLoadAll()
+                return await self.performLoadAll().value
             },
             load: { [weak self] manager in
                 guard let self else { throw CancellationError() }
@@ -326,12 +289,12 @@ private actor MockTunnelPreferences {
         }
     }
 
-    private func performLoadAll() async -> [NETunnelProviderManager] {
+    private func performLoadAll() async -> SendableManagers {
         record(.loadAll)
         if let loadAllGate {
             await loadAllGate.wait()
         }
-        return managers
+        return SendableManagers(managers)
     }
 
     private func performLoad(_ manager: NETunnelProviderManager) {
@@ -369,6 +332,14 @@ private actor MockTunnelPreferences {
             }
         }
         actionCountContinuations = remaining
+    }
+}
+
+private struct SendableManagers: @unchecked Sendable {
+    let value: [NETunnelProviderManager]
+
+    init(_ value: [NETunnelProviderManager]) {
+        self.value = value
     }
 }
 

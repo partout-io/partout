@@ -99,3 +99,9 @@ extension PartoutError.ModuleField {
         public static let remotes = PartoutError.ModuleField("\(root).remotes")
     }
 }
+
+extension TunnelEnvironmentKeys {
+    public enum OpenVPN {
+        public static let serverConfiguration = TunnelEnvironmentKey<OpenVPNConfiguration>("OpenVPN.serverConfiguration")
+    }
+}

@@ -2,8 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import Foundation
-import Partout
+import PartoutRuntime
 
 enum Demo {
 }
@@ -77,22 +76,19 @@ extension Demo {
 // MARK: - Implementations
 
 extension Demo {
-    static var neProtocolCoder: KeychainNEProtocolCoder {
-        KeychainNEProtocolCoder(
+    static var neProtocolCoder: ProviderNEProtocolCoder {
+        ProviderNEProtocolCoder(
             .global,
             tunnelBundleIdentifier: Demo.tunnelBundleIdentifier,
-            coder: CodingRegistry(registry: .shared),
-            keychain: AppleKeychain(.global, group: "\(teamIdentifier).\(appGroupIdentifier)"),
-            legacyOptions: .init {
-                "PartoutDemo: \($0.name)"
-            }
+            coder: BasicProfileCoder(),
+            uid: 1000
         )
     }
 
-    static let tunnelEnvironment: UserDefaultsEnvironment = {
+    static var tunnelDefaults: UserDefaults {
         guard let defaults = UserDefaults(suiteName: appGroupIdentifier) else {
             fatalError("Not entitled to App Group: \(appGroupIdentifier)")
         }
-        return UserDefaultsEnvironment(profileId: nil, defaults: defaults)
-    }()
+        return defaults
+    }
 }

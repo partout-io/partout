@@ -5,6 +5,19 @@
 import NetworkExtension
 
 extension Profile {
+    public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {
+        guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
+            pp_log_g(.core, .error, "Unable to parse profile from NETunnelProviderProtocol")
+            throw PartoutError(.decoding)
+        }
+        do {
+            self = try decoder.profile(from: tunnelConfiguration)
+        } catch {
+            pp_log_g(.core, .error, "Unable to decode and process profile: \(error)")
+            throw error
+        }
+    }
+
     // TODO: #518, Make internal after migrating to Zig
     public func networkSettings(
         with info: TunnelRemoteInfo?,

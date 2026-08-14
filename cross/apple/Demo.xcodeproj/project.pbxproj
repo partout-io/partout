@@ -13,6 +13,7 @@
 		0E179B2F2B8A6D2C0053163E /* DemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2A2B8A6D2C0053163E /* DemoApp.swift */; };
 		0E179B302B8A6D2C0053163E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2B2B8A6D2C0053163E /* ContentView.swift */; };
 		0E336F682B9232CD00BE7BA6 /* Demo+Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E336F662B9232CD00BE7BA6 /* Demo+Profile.swift */; };
+		0E749EF5302E5C6900C09985 /* SingleProfileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E749EF4302E5C6900C09985 /* SingleProfileRepository.swift */; };
 		0E8441AD302475B500260A8E /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8441AC302475B500260A8E /* partout */; };
 		0E8441AF302475B900260A8E /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8441AE302475B900260A8E /* partout */; };
 		0E8445A82BD8E7360019DF51 /* Files in Resources */ = {isa = PBXBuildFile; fileRef = 0E8445A72BD8E7360019DF51 /* Files */; };
@@ -56,6 +57,7 @@
 		0E179B2A2B8A6D2C0053163E /* DemoApp.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = DemoApp.swift; sourceTree = "<group>"; };
 		0E179B2B2B8A6D2C0053163E /* ContentView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		0E336F662B9232CD00BE7BA6 /* Demo+Profile.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = "Demo+Profile.swift"; sourceTree = "<group>"; };
+		0E749EF4302E5C6900C09985 /* SingleProfileRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SingleProfileRepository.swift; sourceTree = "<group>"; };
 		0E8445A72BD8E7360019DF51 /* Files */ = {isa = PBXFileReference; lastKnownFileType = folder; path = Files; sourceTree = "<group>"; };
 		0E94EE5D2B93571800588243 /* Tunnel.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Tunnel.plist; sourceTree = "<group>"; };
 		0E9CFB7A2B8B34C0009C8D82 /* Shared+App.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Shared+App.swift"; sourceTree = "<group>"; };
@@ -126,6 +128,7 @@
 				0E179B252B8A6D2C0053163E /* App.entitlements */,
 				0E179B2B2B8A6D2C0053163E /* ContentView.swift */,
 				0E179B2A2B8A6D2C0053163E /* DemoApp.swift */,
+				0E749EF4302E5C6900C09985 /* SingleProfileRepository.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -290,6 +293,7 @@
 				0E179B302B8A6D2C0053163E /* ContentView.swift in Sources */,
 				0E9CFB7B2B8B34C0009C8D82 /* Shared+App.swift in Sources */,
 				0E336F682B9232CD00BE7BA6 /* Demo+Profile.swift in Sources */,
+				0E749EF5302E5C6900C09985 /* SingleProfileRepository.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
