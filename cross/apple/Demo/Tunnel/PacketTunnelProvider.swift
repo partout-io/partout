@@ -94,5 +94,5 @@ private nonisolated func logger(
 ) {
     guard let level = DebugLog.Level(rawValue: Int(level)),
           let message else { return }
-    pp_log(.global, .abi, level, String(cString: message))
+    pp_log_g(.abi, level, String(cString: message))
 }
