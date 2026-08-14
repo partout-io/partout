@@ -13,4 +13,9 @@ public enum PartoutRuntime {
         }
         return String(cString: cVersion)
     }
+
+    /// The library identifier and version.
+    public static var versionIdentifier: String {
+        "\(PartoutCore.identifier) \(version)"
+    }
 }

@@ -15,13 +15,13 @@ fi
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 zig_constants="$root/src/version.zig"
 
-zig_pattern='^pub const string = "[^"]+";$'
+zig_pattern='^pub const number = "[^"]+";$'
 if [[ $(grep -Ec "$zig_pattern" "$zig_constants") -ne 1 ]]; then
     echo "Expected exactly one Zig version constant in $zig_constants"
     exit 1
 fi
 
-sed -i '' -E "s/$zig_pattern/pub const string = \"$version\";/" "$zig_constants"
+sed -i '' -E "s/$zig_pattern/pub const number = \"$version\";/" "$zig_constants"
 
 git -C "$root" add "$zig_constants"
 git -C "$root" commit --allow-empty -m "Bump version"

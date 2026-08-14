@@ -50,7 +50,10 @@ let package = Package(
         ),
         .testTarget(
             name: "PartoutTests",
-            dependencies: ["PartoutCore"],
+            dependencies: [
+                "PartoutCore",
+                "PartoutRuntime"
+            ],
             path: "cross/apple/Tests/PartoutTests"
         )
     ],
