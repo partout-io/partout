@@ -16,15 +16,32 @@ fail() {
     exit 1
 }
 
-if [[ $# -lt 1 ]]; then
-    fail "usage: $0 <output.xcframework> [artifacts-directory] [--full] [--monolith]"
-fi
+usage() {
+    cat <<EOF
+usage: $0 [output.xcframework] [artifacts-directory] [--full] [--legacy]
 
-output_argument=$1
+Build PartoutNative.xcframework against the latest vendor prebuilts. With no
+arguments, the output is PartoutNative.xcframework at the repository root and
+the prebuilts cache is prebuilts at the repository root.
+
+options:
+  --full      build every supported platform and architecture
+  --legacy    build a static library that requires external vendor libraries
+  --monolith  build the default dynamic monolith (kept for compatibility)
+  -h, --help  show this help
+EOF
+}
+
+caller_dir=$(pwd)
+script_dir=$(cd "$(dirname "$0")" && pwd)
+zig_dir=$(cd "$script_dir/.." && pwd)
+repo_dir=$zig_dir
+
+output_argument=
 artifacts_argument=
 full_build=0
-monolith_build=0
-shift
+build_mode=monolith
+build_mode_option=
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --full)
@@ -32,17 +49,36 @@ while [[ $# -gt 0 ]]; do
             full_build=1
             ;;
         --monolith)
-            [[ $monolith_build -eq 0 ]] || fail "duplicate option: --monolith"
-            monolith_build=1
+            [[ -z $build_mode_option ]] || fail "duplicate build mode: $1"
+            build_mode=monolith
+            build_mode_option=$1
+            ;;
+        --legacy)
+            [[ -z $build_mode_option ]] || fail "duplicate build mode: $1"
+            build_mode=legacy
+            build_mode_option=$1
+            ;;
+        -h|--help)
+            usage
+            exit 0
             ;;
         -*) fail "unknown option: $1" ;;
         *)
-            [[ -z $artifacts_argument ]] || fail "unexpected argument: $1"
-            artifacts_argument=$1
+            if [[ -z $output_argument ]]; then
+                output_argument=$1
+            elif [[ -z $artifacts_argument ]]; then
+                artifacts_argument=$1
+            else
+                fail "unexpected argument: $1"
+            fi
             ;;
     esac
     shift
 done
+
+if [[ -z $output_argument ]]; then
+    output_argument="$repo_dir/$framework_name.xcframework"
+fi
 
 normalize_arch() {
     case "$1" in
@@ -110,26 +146,19 @@ if [[ $full_build -eq 0 ]]; then
 else
     echo "Building all platform and architecture slices"
 fi
-if [[ $monolith_build -eq 1 ]]; then
+if [[ $build_mode == monolith ]]; then
     echo "Building a dynamic monolith with statically linked vendors"
-    build_mode=monolith
     library_name=libpartout.dylib
     library_extension=dylib
 else
     echo "Building a static library with external vendor implementations"
-    build_mode=legacy
     library_name=libpartout.a
     library_extension=a
 fi
 
-for tool in zig xcrun xcodebuild lipo plutil; do
+for tool in curl ditto lipo plutil swift xcodebuild xcrun zig; do
     command -v "$tool" >/dev/null 2>&1 || fail "missing required tool: $tool"
 done
-
-caller_dir=$(pwd)
-script_dir=$(cd "$(dirname "$0")" && pwd)
-zig_dir=$(cd "$script_dir/.." && pwd)
-repo_dir=$(cd "$script_dir/.." && pwd)
 
 if [[ -n $artifacts_argument ]]; then
     case "$artifacts_argument" in
@@ -137,9 +166,9 @@ if [[ -n $artifacts_argument ]]; then
         *) artifacts_dir="$caller_dir/$artifacts_argument" ;;
     esac
 else
-    artifacts_dir="$repo_dir/.build/artifacts"
+    artifacts_dir="$repo_dir/prebuilts"
 fi
-[[ -d "$artifacts_dir" ]] || fail "missing SwiftPM artifacts directory: $artifacts_dir"
+mkdir -p "$artifacts_dir"
 artifacts_dir=$(cd "$artifacts_dir" && pwd -P)
 
 case "$output_argument" in
@@ -216,6 +245,98 @@ if [[ $full_build -eq 0 ]]; then
         create_active_output=1
     fi
 fi
+
+download_prebuilts() {
+    local repository_url=https://github.com/partout-io/prebuilts
+    local latest_url="$repository_url/releases/latest"
+    local resolved_url
+    local prebuilts_tag
+    local download_url
+    local vendor
+    local archive
+    local release_checksum
+    local expected_checksum
+    local archive_path
+    local actual_checksum
+    local framework
+    local checksum_marker
+    local extracted_checksum
+    local extract_dir
+
+    resolved_url=$(curl -fsSLI --retry 3 \
+        --output /dev/null \
+        --write-out '%{url_effective}' \
+        "$latest_url")
+    prebuilts_tag=${resolved_url##*/}
+    prebuilts_tag=${prebuilts_tag%%\?*}
+    [[ $resolved_url == */releases/tag/* && \
+        $prebuilts_tag =~ ^[0-9A-Za-z._+-]+$ ]] ||
+        fail "unable to resolve the latest prebuilts release: $resolved_url"
+
+    echo "Using prebuilts release $prebuilts_tag"
+    download_url="$repository_url/releases/download/$prebuilts_tag"
+    temp_dir=$(mktemp -d "${TMPDIR:-/tmp}/partout-prebuilts.XXXXXX")
+    trap 'rm -rf "$temp_dir"' EXIT
+
+    for vendor in openssl mbedtls wg-go; do
+        archive="$vendor.xcframework.zip"
+        release_checksum="$archive.checksum"
+        curl -fsSL --retry 3 \
+            --output "$temp_dir/$release_checksum" \
+            "$download_url/$release_checksum"
+        expected_checksum=$(tr -d '\r\n' < "$temp_dir/$release_checksum")
+        [[ $expected_checksum =~ ^[0-9a-f]{64}$ ]] ||
+            fail "invalid checksum in $release_checksum"
+
+        archive_path="$artifacts_dir/$archive"
+        actual_checksum=
+        if [[ -f $archive_path ]]; then
+            actual_checksum=$(swift package compute-checksum "$archive_path")
+        fi
+
+        if [[ $actual_checksum == "$expected_checksum" ]]; then
+            echo "Using cached $archive"
+        else
+            echo "Downloading $archive"
+            curl -fsSL --retry 3 \
+                --output "$temp_dir/$archive" \
+                "$download_url/$archive"
+            actual_checksum=$(swift package compute-checksum "$temp_dir/$archive")
+            [[ $actual_checksum == "$expected_checksum" ]] ||
+                fail "checksum mismatch for $archive"
+            mv "$temp_dir/$archive" "$archive_path"
+        fi
+        mv "$temp_dir/$release_checksum" "$artifacts_dir/$release_checksum"
+
+        framework="$artifacts_dir/$vendor.xcframework"
+        checksum_marker="$artifacts_dir/.$vendor.xcframework.checksum"
+        extracted_checksum=
+        if [[ -f $checksum_marker ]]; then
+            extracted_checksum=$(tr -d '\r\n' < "$checksum_marker")
+        fi
+
+        if [[ -d $framework && $extracted_checksum == "$expected_checksum" ]]; then
+            echo "Using extracted $vendor.xcframework"
+            continue
+        fi
+
+        echo "Extracting $archive"
+        extract_dir="$temp_dir/$vendor"
+        mkdir -p "$extract_dir"
+        ditto -x -k "$archive_path" "$extract_dir"
+        [[ -d "$extract_dir/$vendor.xcframework" ]] ||
+            fail "missing $vendor.xcframework in $archive"
+        rm -rf "$framework"
+        mv "$extract_dir/$vendor.xcframework" "$framework"
+        printf '%s\n' "$expected_checksum" > "$checksum_marker"
+    done
+
+    printf '%s\n' "$prebuilts_tag" > "$artifacts_dir/prebuilts-version.txt"
+    rm -rf "$temp_dir"
+    trap - EXIT
+}
+
+download_prebuilts
 
 find_xcframework() {
     local package=$1
@@ -360,7 +481,7 @@ build_slice() {
         -Dwg-go-include="$wg_go_include"
         -Dwg-go-lib="$wg_go_lib"
     )
-    if [[ $monolith_build -eq 0 ]]; then
+    if [[ $build_mode == legacy ]]; then
         build_options+=(-Dlegacy-build=true)
     fi
 
@@ -375,7 +496,7 @@ build_slice() {
             --release=small \
             "${build_options[@]}"
     )
-    if [[ $monolith_build -eq 1 ]]; then
+    if [[ $build_mode == monolith ]]; then
         link_monolith \
             "$install_root" "$clang_target" "$sdk" \
             "$openssl_lib" "$mbedtls_lib" "$wg_go_lib"
