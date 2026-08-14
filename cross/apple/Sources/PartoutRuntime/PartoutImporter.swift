@@ -10,6 +10,7 @@ public final class PartoutImporter: Sendable {
     public func importModule<M>(_ type: M.Type, url: URL) throws -> M? where M: Decodable {
         let text = try String(contentsOf: url, encoding: .utf8)
         guard let cJSON = partout_import_module(text) else { return nil }
+        defer { free(cJSON) }
         let json = String(cString: cJSON)
         guard let jsonData = json.data(using: .utf8) else { return nil }
         let tagged = try JSONDecoder.shared().decode(TaggedModule.self, from: jsonData)
