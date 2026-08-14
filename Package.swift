@@ -5,7 +5,7 @@ import PackageDescription
 
 let nativeTarget: PartoutNativeTarget
 // nativeTarget = .local
-nativeTarget = .remote("0.155.4", checksum: "e0497bfdcb6140535a70de6a68a9415c517d2cb46188dfbed46ca6f2fdedaebf")
+nativeTarget = .remote("0.160.0", checksum: "0bc4c1bed1d4eea8a2ca2027dc12d70ff6c573f53e72c451ae6cfac04a0060fc")
 
 let partoutNative: Target = .partoutNative(nativeTarget)
 
