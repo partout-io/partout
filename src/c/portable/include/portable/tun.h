@@ -49,7 +49,6 @@ typedef struct {
     void *_Nullable ctx;
     void (*on_reachability)(void *_Nullable ctx, const pp_reachability *reachability);
     void (*on_better_path)(void *_Nullable ctx);
-    char *_Nullable (*_Nonnull environment_value)(void *_Nullable ctx, const char *key);
 } pp_tun_ctrl_delegate;
 
 typedef struct {

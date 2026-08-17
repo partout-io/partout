@@ -388,21 +388,4 @@ Java_io_partout_vpn_PartoutTunnelController_onNativeBetterPathUpdate(JNIEnv *env
     ctrl_delegate->on_better_path(ctrl_delegate->ctx);
 }
 
-JNIEXPORT jstring JNICALL
-Java_io_partout_vpn_PartoutTunnelController_getNativeEnvironmentValue(JNIEnv *env,
-                                                                      jobject thiz,
-                                                                      jlong delegate,
-                                                                      jstring key) {
-    (void)thiz;
-    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
-    if (!ctrl_delegate || !ctrl_delegate->ctx) return NULL;
-    const char *c_key = (*env)->GetStringUTFChars(env, key, NULL);
-    char *c_value = ctrl_delegate->environment_value(ctrl_delegate->ctx, c_key);
-    (*env)->ReleaseStringUTFChars(env, key, c_key);
-    if (!c_value) return NULL;
-    jstring value = (*env)->NewStringUTF(env, c_value);
-    pp_free(c_value);
-    return value;
-}
-
 #endif
