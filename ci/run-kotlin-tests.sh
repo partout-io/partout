@@ -21,6 +21,16 @@ if [[ -z $kotlinc && -x /Applications/Android\ Studio.app/Contents/plugins/Kotli
 fi
 [[ -x $kotlinc ]] || fail "missing required tool: kotlinc"
 
+while [[ -L $kotlinc ]]; do
+    kotlinc_dir=$(cd "$(dirname "$kotlinc")" && pwd -P)
+    kotlinc_target=$(readlink "$kotlinc")
+    case $kotlinc_target in
+        /*) kotlinc=$kotlinc_target ;;
+        *) kotlinc="$kotlinc_dir/$kotlinc_target" ;;
+    esac
+done
+kotlinc=$(cd "$(dirname "$kotlinc")" && pwd -P)/$(basename "$kotlinc")
+
 script_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)
 repo_root=$(cd "$script_dir/.." && pwd -P)
 android_home=${ANDROID_HOME:-${ANDROID_SDK_ROOT:-}}
