@@ -7,7 +7,8 @@ import PartoutLegacyCore
 @testable import PartoutOpenVPN
 import Testing
 
-@OpenVPNActor
+private typealias ControlChannel = ControlChannelV3
+
 struct ControlChannelTests {
     private let fnt: pp_crypto_enc_fnt = .forTesting
 
