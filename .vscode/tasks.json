@@ -8,7 +8,6 @@
       "args": [
         "build",
         "coverage",
-        "-Dembed-c=true",
         "-Dopenvpn=true",
         "-Dwireguard=true"
       ],
