@@ -8,7 +8,6 @@ on:
       - "**/*.md"
       - "scripts/*.sh"
       - "scripts/*.ps1"
-      - "**/*.kt" # For now
 
 concurrency:
   group: ${{ github.ref }}
@@ -27,6 +26,9 @@ jobs:
           - job_name: Run Zig tests
             runner: ubuntu-latest
             suite: zig
+          - job_name: Run Kotlin tests
+            runner: ubuntu-latest
+            suite: kotlin
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 5
     steps:
@@ -37,12 +39,17 @@ jobs:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Run Swift tests
         if: matrix.suite == 'swift'
-        run: |
-          swift test
-          cd cross/apple-legacy && swift test
+        run: ci/run-swift-tests.sh
       - uses: mlugg/setup-zig@v2
         if: matrix.suite == 'zig'
       - name: Run Zig tests
         if: matrix.suite == 'zig'
-        run: |
-          zig build test -Dopenvpn=true -Dwireguard=true
+        run: ci/run-tests.sh
+      - uses: actions/setup-java@v5
+        if: matrix.suite == 'kotlin'
+        with:
+          distribution: temurin
+          java-version: 21
+      - name: Run Kotlin tests
+        if: matrix.suite == 'kotlin'
+        run: ci/run-kotlin-tests.sh

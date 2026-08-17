@@ -87,7 +87,7 @@ jobs:
       - name: Run Zig tests with all vendors
         env:
           ARTIFACTS_DIR: ${{ steps.build_xcframework.outputs.artifacts_dir }}
-        run: ci/test-zig-apple-vendors.sh "$ARTIFACTS_DIR"
+        run: ci/run-tests.sh --apple-vendors "$ARTIFACTS_DIR"
       - name: Run Swift tests with built XCFramework
         run: |
           package_pattern='^nativeTarget = \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
@@ -95,8 +95,7 @@ jobs:
           sed -i '' -E "s/$package_pattern/nativeTarget = .local/" Package.swift
           trap 'git restore -- Package.swift' EXIT
 
-          swift test
-          (cd cross/apple-legacy && swift test)
+          ci/run-swift-tests.sh
 
           git restore -- Package.swift
           trap - EXIT
