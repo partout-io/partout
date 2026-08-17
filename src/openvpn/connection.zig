@@ -24,7 +24,10 @@ const Session = session_mod.Session;
 const SessionDelegate = session_mod.SessionDelegate;
 const SessionError = errors_mod.SessionError;
 const TLSConstants = constants_mod.TLS;
-const server_configuration_environment_key = "OpenVPN.serverConfiguration";
+
+const EnvironmentKeys = struct {
+    const server_configuration = "OpenVPN.serverConfiguration";
+};
 
 pub fn createConnection(
     ptr: ?*anyopaque,
@@ -585,11 +588,11 @@ const OpenVPNConnection = struct {
             return;
         };
         defer self.allocator.free(value);
-        self.controller.setEnvironmentValue(server_configuration_environment_key, value);
+        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, value);
     }
 
     fn clearServerConfiguration(self: *OpenVPNConnection) void {
-        self.controller.setEnvironmentValue(server_configuration_environment_key, null);
+        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, null);
     }
 
     fn clearTunnel(self: *OpenVPNConnection) void {
