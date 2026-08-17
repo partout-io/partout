@@ -93,13 +93,6 @@ public final class NativeTunnelController: TunnelController, Sendable {
             },
             on_better_path: { ctx in
                 ctx?.toSelf.onBetterPath()
-            },
-            environment_value: { ctx, key in
-                guard let data = ctx?.toSelf.environmentData(forKey: String(cString: key)),
-                      let json = String(data: data, encoding: .utf8) else {
-                    return nil
-                }
-                return pp_dup(json)
             }
         )
         fnt.set_delegate(ref, &delegate)
