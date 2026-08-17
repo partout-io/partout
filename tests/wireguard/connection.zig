@@ -707,6 +707,7 @@ const fake_controller_vtable = sandbox.TunnelController.VTable{
     .set_tunnel_settings = fakeSetTunnelSettings,
     .configure_sockets = fakeConfigureSockets,
     .report_snapshot = fakeReportSnapshot,
+    .set_environment_value = fakeSetEnvironmentValue,
     .clear_tunnel_settings = fakeClearTunnelSettings,
     .set_reasserting = fakeSetReasserting,
     .cancel_tunnel_connection = fakeCancelTunnelConnection,
@@ -726,6 +727,8 @@ fn fakeConfigureSockets(ptr: ?*anyopaque, descriptors: []const io.SocketDescript
 }
 
 fn fakeReportSnapshot(_: ?*anyopaque, _: api.TunnelSnapshot) void {}
+
+fn fakeSetEnvironmentValue(_: ?*anyopaque, _: []const u8, _: ?[]const u8) void {}
 
 fn fakeClearTunnelSettings(ptr: ?*anyopaque, _: bool) void {
     const self: *FakeController = @ptrCast(@alignCast(ptr.?));

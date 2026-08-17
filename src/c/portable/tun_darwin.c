@@ -248,6 +248,9 @@ typedef bool (*pp_swift_tun_ctrl_configure_sockets_fn)(void *_Nullable ref,
                                                        size_t fds_len);
 typedef void (*pp_swift_tun_ctrl_report_snapshot_fn)(void *_Nullable ref,
                                                      const char *_Nullable snapshot_json);
+typedef void (*pp_swift_tun_ctrl_set_environment_value_fn)(void *_Nullable ref,
+                                                           const char *_Nullable key,
+                                                           const char *_Nullable value);
 typedef void (*pp_swift_tun_ctrl_clear_tunnel_fn)(void *_Nullable ref,
                                                   bool kill_switch);
 typedef void (*pp_swift_tun_ctrl_cancel_tunnel_fn)(void *_Nullable ref,
@@ -266,6 +269,7 @@ PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_delegate, "pp_swift_tun_ctrl_set_
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_tunnel, "pp_swift_tun_ctrl_set_tunnel", pp_swift_tun_ctrl_set_tunnel_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_configure_sockets, "pp_swift_tun_ctrl_configure_sockets", pp_swift_tun_ctrl_configure_sockets_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_report_snapshot, "pp_swift_tun_ctrl_report_snapshot", pp_swift_tun_ctrl_report_snapshot_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_environment_value, "pp_swift_tun_ctrl_set_environment_value", pp_swift_tun_ctrl_set_environment_value_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_clear_tunnel, "pp_swift_tun_ctrl_clear_tunnel", pp_swift_tun_ctrl_clear_tunnel_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_cancel_tunnel, "pp_swift_tun_ctrl_cancel_tunnel", pp_swift_tun_ctrl_cancel_tunnel_fn)
 
@@ -304,6 +308,12 @@ static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     swift(ref, snapshot_json);
 }
 
+static void pp_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
+    const pp_swift_tun_ctrl_set_environment_value_fn swift = pp_swift_tun_ctrl_set_environment_value();
+    if (!swift) return;
+    swift(ref, key, value);
+}
+
 static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_clear_tunnel(%p)", ref);
     const pp_swift_tun_ctrl_clear_tunnel_fn swift = pp_swift_tun_ctrl_clear_tunnel();
@@ -324,6 +334,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,
         .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
     };

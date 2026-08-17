@@ -422,6 +422,7 @@ const noop_controller_vtable = net.TunnelController.VTable{
     .set_tunnel_settings = noopSetTunnelSettings,
     .configure_sockets = noopConfigureSockets,
     .report_snapshot = noopReportSnapshot,
+    .set_environment_value = noopSetEnvironmentValue,
     .clear_tunnel_settings = noopClearTunnelSettings,
     .set_reasserting = noopSetReasserting,
     .cancel_tunnel_connection = noopCancelTunnelConnection,
@@ -434,6 +435,8 @@ fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.Tun
 fn noopConfigureSockets(_: ?*anyopaque, _: []const net_io.SocketDescriptor) net.TunnelController.Error!void {}
 
 fn noopReportSnapshot(_: ?*anyopaque, _: api.TunnelSnapshot) void {}
+
+fn noopSetEnvironmentValue(_: ?*anyopaque, _: []const u8, _: ?[]const u8) void {}
 
 fn noopClearTunnelSettings(_: ?*anyopaque, _: bool) void {}
 
@@ -681,6 +684,8 @@ pub const MockTunnelController = struct {
     clear_tunnel_settings_count: usize = 0,
     configure_sockets_count: usize = 0,
     report_snapshot_count: usize = 0,
+    set_environment_value_count: usize = 0,
+    remove_environment_value_count: usize = 0,
     snapshot_block: ?*SnapshotBlock = null,
     last_settings_info: ?api.TunnelRemoteInfoWrapper = null,
     last_settings: ?LastTunnelSettings = null,
@@ -700,6 +705,7 @@ const mock_controller_vtable = net.TunnelController.VTable{
     .set_tunnel_settings = mockSetTunnelSettings,
     .configure_sockets = mockConfigureSockets,
     .report_snapshot = mockReportSnapshot,
+    .set_environment_value = mockSetEnvironmentValue,
     .clear_tunnel_settings = mockClearTunnelSettings,
     .set_reasserting = mockSetReasserting,
     .cancel_tunnel_connection = mockCancelTunnelConnection,
@@ -729,6 +735,15 @@ fn mockReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
         }
     }
     _ = snapshot;
+}
+
+fn mockSetEnvironmentValue(ptr: ?*anyopaque, _: []const u8, value: ?[]const u8) void {
+    const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
+    if (value != null) {
+        self.set_environment_value_count += 1;
+    } else {
+        self.remove_environment_value_count += 1;
+    }
 }
 
 fn mockClearTunnelSettings(ptr: ?*anyopaque, with_kill_switch: bool) void {

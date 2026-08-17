@@ -240,6 +240,12 @@ static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     (void)snapshot_json;
 }
 
+static void pp_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
+    (void)ref;
+    (void)key;
+    (void)value;
+}
+
 static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
     (void)kill_switch;
@@ -258,6 +264,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,
         .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
     };

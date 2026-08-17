@@ -49,7 +49,6 @@ typedef struct {
     void *_Nullable ctx;
     void (*on_reachability)(void *_Nullable ctx, const pp_reachability *reachability);
     void (*on_better_path)(void *_Nullable ctx);
-    char *_Nullable (*_Nonnull environment_value)(void *_Nullable ctx, const char *key);
 } pp_tun_ctrl_delegate;
 
 typedef struct {
@@ -64,6 +63,9 @@ typedef struct {
                               size_t fds_len);
     void (*report_snapshot)(void *_Nullable ref,
                             const char *snapshot_json);
+    void (*set_environment_value)(void *_Nullable ref,
+                                  const char *key,
+                                  const char *_Nullable value);
     void (*clear_tunnel)(void *_Nullable ref, bool kill_switch);
     void (*cancel_tunnel)(void *_Nullable ref,
                           const char *_Nullable error_message);

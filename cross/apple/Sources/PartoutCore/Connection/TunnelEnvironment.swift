@@ -18,6 +18,9 @@ public protocol TunnelEnvironmentReader: Sendable {
 
 /// Able to edit an environment.
 public protocol TunnelEnvironmentWriter: Sendable {
+    /// Stores raw JSON data, or removes the key when the value is nil.
+    func setEnvironmentData(_ value: Data?, forKey key: String)
+
     func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable
 
     func removeEnvironmentValue(forKey key: String)

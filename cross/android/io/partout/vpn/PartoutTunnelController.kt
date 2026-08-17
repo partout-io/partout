@@ -52,6 +52,7 @@ internal class PartoutTunnelController(
     // JNI interactions with Native (Swift)
     private var nativeDelegate: Long = 0
     private var isNativeCancelled = false
+    private val environment = mutableMapOf<String, String>()
 
     // Network observers
     private val reachabilityObserver = ReachabilityObserver(service)
@@ -201,6 +202,16 @@ internal class PartoutTunnelController(
         return@synchronized
     }
 
+    override fun setEnvironmentValue(key: String, value: String?) = synchronized(lock) {
+        Log.d(logTag, "setEnvironmentValue($key, ${if (value != null) "value" else "null"})")
+        if (value != null) {
+            environment[key] = value
+        } else {
+            environment.remove(key)
+        }
+        return@synchronized
+    }
+
     override fun clearTunnel(killSwitch: Boolean) = synchronized(lock) {
         if (isNativeCancelled) { return@synchronized }
 
@@ -271,7 +282,7 @@ internal class PartoutTunnelController(
 
     override fun getEnvironmentValue(key: String): String? = synchronized(lock) {
         Log.d(logTag, "getEnvironmentValue($key)")
-        return getNativeEnvironmentValue(nativeDelegate, key)
+        return environment[key]
     }
     //endregion
 
@@ -287,7 +298,6 @@ internal class PartoutTunnelController(
     // Signatures in tun_android.c MUST MATCH!
     private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
     private external fun onNativeBetterPathUpdate(delegate: Long)
-    private external fun getNativeEnvironmentValue(delegate: Long, key: String): String?
 
     private fun NetworkInfo.reachabilitySelection(): ReachabilitySelection {
         val currentNetwork = bestNetworks().firstOrNull()

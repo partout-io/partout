@@ -25,6 +25,10 @@ const SessionDelegate = session_mod.SessionDelegate;
 const SessionError = errors_mod.SessionError;
 const TLSConstants = constants_mod.TLS;
 
+const EnvironmentKeys = struct {
+    const server_configuration = "OpenVPN.serverConfiguration";
+};
+
 pub fn createConnection(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
@@ -224,6 +228,7 @@ const OpenVPNConnection = struct {
         self.current_session = session;
         self.events = events;
 
+        self.clearServerConfiguration();
         _ = self.sendStatus(.connecting, events);
         const descriptor = self.setupLink() catch |err| {
             log.writef(.fault, "Unable to create link: {s}", .{@errorName(err)});
@@ -452,6 +457,7 @@ const OpenVPNConnection = struct {
         log.write(.notice, "Remote options:");
         openvpn_log.logConfiguration(remote_options, false);
         const events = self.events orelse return;
+        self.reportServerConfiguration(remote_options);
 
         const builder = NetworkSettingsBuilder.init(
             &self.configuration,
@@ -511,6 +517,7 @@ const OpenVPNConnection = struct {
         self.controller.clearTunnelSettings(false);
         self.status = .disconnected;
         self.events = null;
+        self.clearServerConfiguration();
         events.last_error(events.ctx, code);
         self.requestCancellation(events, code);
     }
@@ -534,6 +541,7 @@ const OpenVPNConnection = struct {
                     log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
                     self.status = .disconnected;
                     self.events = null;
+                    self.clearServerConfiguration();
                     self.requestCancellation(events, code);
                     return;
                 }
@@ -567,7 +575,24 @@ const OpenVPNConnection = struct {
         log.writef(.info, "Report link status: {s}", .{new_status.raw()});
         self.status = new_status;
         events.status(events.ctx, new_status);
+        if (new_status == .disconnected) self.clearServerConfiguration();
         return true;
+    }
+
+    fn reportServerConfiguration(
+        self: *OpenVPNConnection,
+        configuration: *const api.OpenVPNConfiguration,
+    ) void {
+        const value = core.util.encodeJsonValue(self.allocator, configuration) catch {
+            log.write(.err, "Unable to encode server configuration");
+            return;
+        };
+        defer self.allocator.free(value);
+        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, value);
+    }
+
+    fn clearServerConfiguration(self: *OpenVPNConnection) void {
+        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, null);
     }
 
     fn clearTunnel(self: *OpenVPNConnection) void {

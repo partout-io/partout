@@ -21,6 +21,10 @@ const socketOptions = platform_source.testing.socketOptions;
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
     received_settings_only_info: bool = false,
+    environment_set_calls: usize = 0,
+    environment_remove_calls: usize = 0,
+    received_environment_key: bool = false,
+    received_environment_value: bool = false,
 };
 
 export fn pp_swift_tun_ctrl_set_tunnel(
@@ -39,6 +43,25 @@ export fn pp_swift_tun_ctrl_set_tunnel(
     return true;
 }
 
+export fn pp_swift_tun_ctrl_set_environment_value(
+    ref: ?*anyopaque,
+    key: ?[*:0]const u8,
+    value: ?[*:0]const u8,
+) void {
+    const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return));
+    recorder.received_environment_key = std.mem.eql(u8, std.mem.span(key orelse return), "test.key");
+    if (value) |raw_value| {
+        recorder.environment_set_calls += 1;
+        recorder.received_environment_value = std.mem.eql(
+            u8,
+            std.mem.span(raw_value),
+            "{\"enabled\":true}",
+        );
+    } else {
+        recorder.environment_remove_calls += 1;
+    }
+}
+
 test "platform commits settings when no virtual device is required" {
     // Relies on external Swift bindings layout from tun_darwin.c
     if (builtin.os.tag != .macos) return error.SkipZigTest;
@@ -52,6 +75,23 @@ test "platform commits settings when no virtual device is required" {
     try std.testing.expect(tun == null);
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
     try std.testing.expect(recorder.received_settings_only_info);
+}
+
+test "platform forwards environment values and removals" {
+    if (builtin.os.tag != .macos) return error.SkipZigTest;
+
+    var recorder = TunnelCommitRecorder{};
+    var platform = try Platform.init(.{ .ref = &recorder });
+    defer platform.deinit();
+
+    const controller = platform.tunnelController();
+    controller.setEnvironmentValue("test.key", "{\"enabled\":true}");
+    controller.setEnvironmentValue("test.key", null);
+
+    try std.testing.expectEqual(@as(usize, 1), recorder.environment_set_calls);
+    try std.testing.expectEqual(@as(usize, 1), recorder.environment_remove_calls);
+    try std.testing.expect(recorder.received_environment_key);
+    try std.testing.expect(recorder.received_environment_value);
 }
 
 test "platform socket factory returns current reachability" {

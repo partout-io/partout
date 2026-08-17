@@ -50,6 +50,7 @@ pub const TunnelController = struct {
         set_tunnel_settings: *const fn (?*anyopaque, api.TunnelRemoteInfoWrapper) Error!?TunWrapper,
         configure_sockets: *const fn (?*anyopaque, []const io.SocketDescriptor) Error!void,
         report_snapshot: *const fn (?*anyopaque, api.TunnelSnapshot) void,
+        set_environment_value: *const fn (?*anyopaque, []const u8, ?[]const u8) void,
         clear_tunnel_settings: *const fn (?*anyopaque, bool) void,
         set_reasserting: *const fn (?*anyopaque, bool) void,
         cancel_tunnel_connection: *const fn (?*anyopaque, ?api.PartoutErrorCode) void,
@@ -65,6 +66,12 @@ pub const TunnelController = struct {
 
     pub fn reportSnapshot(self: TunnelController, snapshot: api.TunnelSnapshot) void {
         self.vtable.report_snapshot(self.ptr, snapshot);
+    }
+
+    /// Sets a JSON-encoded environment value, or removes it when null.
+    /// The key and value are borrowed for the duration of the call.
+    pub fn setEnvironmentValue(self: TunnelController, key: []const u8, value: ?[]const u8) void {
+        self.vtable.set_environment_value(self.ptr, key, value);
     }
 
     pub fn clearTunnelSettings(self: TunnelController, with_kill_switch: bool) void {

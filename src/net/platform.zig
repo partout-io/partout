@@ -32,25 +32,12 @@ const TunWrapper = io.TunWrapper;
 pub const Platform = struct {
     pub const FunctionTable = c.pp_tun_ctrl_fnt;
 
-    pub const EnvironmentValueBlock = struct {
-        ptr: ?*anyopaque = null,
-        get: *const fn (?*anyopaque, []const u8) ?[]const u8,
-
-        fn call(self: EnvironmentValueBlock, key: []const u8) ?[]const u8 {
-            return self.get(self.ptr, key);
-        }
-    };
-
     pub const Options = struct {
         /// The optional reference to forward C calls to (e.g. JNI).
         ref: ?*anyopaque = null,
 
         /// The tunnel controller implementation.
         fnt: ?FunctionTable = null,
-
-        /// Requests a value from the tunnel environment.
-        /// ZIGME: Delete this and from pp_tun_ctrl_delegate
-        environment_value: ?EnvironmentValueBlock = null,
 
         /// The socket buffer size.
         socket_buf_size: c_int = 1024 * 1024,
@@ -61,7 +48,6 @@ pub const Platform = struct {
     ref: ?*anyopaque,
     fnt: FunctionTable,
     dns: PlatformDNS,
-    environment_value: ?EnvironmentValueBlock,
     socket_buf_size: c_int,
 
     //#endregion
@@ -96,7 +82,6 @@ pub const Platform = struct {
             .ref = ref_copy,
             .fnt = options.fnt orelse c.pp_tun_ctrl_fnt_current(),
             .dns = .{},
-            .environment_value = options.environment_value,
             .socket_buf_size = options.socket_buf_size,
         };
     }
@@ -106,7 +91,6 @@ pub const Platform = struct {
             .ctx = self,
             .on_reachability = cOnReachability,
             .on_better_path = cOnBetterPath,
-            .environment_value = cEnvironmentValue,
         };
         if (self.ref) |ref| {
             log.writef(.debug, "Platform: Set delegate ({*})", .{ref});
@@ -285,16 +269,6 @@ pub const Platform = struct {
             return error.SocketConfiguration;
         }
     }
-
-    //#region Environment
-
-    fn environmentValue(self: *const Platform, key: []const u8) ?[]const u8 {
-        log.writef(.debug, "Get tunnel environment: {s}", .{key});
-        const block = self.environment_value orelse return null;
-        return block.call(key);
-    }
-
-    //#endregion
 };
 
 //#region Tunnel controller
@@ -303,6 +277,7 @@ const platform_tunnel_controller_vtable = TunnelController.VTable{
     .set_tunnel_settings = ctrlSetTunnelSettings,
     .configure_sockets = ctrlConfigureSockets,
     .report_snapshot = ctrlReportSnapshot,
+    .set_environment_value = ctrlSetEnvironmentValue,
     .clear_tunnel_settings = ctrlClearTunnelSettings,
     .set_reasserting = ctrlSetReasserting,
     .cancel_tunnel_connection = ctrlCancelTunnelConnection,
@@ -349,6 +324,30 @@ fn ctrlReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
     };
     defer allocator.free(c_snapshot);
     self.fnt.report_snapshot.?(self.ref, c_snapshot.ptr);
+}
+
+fn ctrlSetEnvironmentValue(ptr: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
+    const self: *Platform = @ptrCast(@alignCast(ptr.?));
+    const allocator = std.heap.c_allocator;
+
+    var c_key: util.TemporaryCString = .{};
+    c_key.init(allocator, key) catch {
+        log.write(.err, "Unable to encode environment key");
+        return;
+    };
+    defer c_key.deinit();
+
+    if (value) |raw_value| {
+        var c_value: util.TemporaryCString = .{};
+        c_value.init(allocator, raw_value) catch {
+            log.write(.err, "Unable to encode environment value");
+            return;
+        };
+        defer c_value.deinit();
+        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), c_value.ptr());
+    } else {
+        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), null);
+    }
 }
 
 fn ctrlClearTunnelSettings(ptr: ?*anyopaque, with_kill_switch: bool) void {
@@ -459,15 +458,6 @@ fn cOnReachability(ctx: ?*anyopaque, reachability: [*c]const ReachabilityInfo) c
 fn cOnBetterPath(ctx: ?*anyopaque) callconv(.c) void {
     const self: *Platform = @ptrCast(@alignCast(ctx orelse return));
     self.notifyBetterPath();
-}
-
-fn cEnvironmentValue(ctx: ?*anyopaque, key: [*c]const u8) callconv(.c) [*c]u8 {
-    const self: *Platform = @ptrCast(@alignCast(ctx orelse return null));
-    if (key == null) return null;
-    const key_z: [*:0]const u8 = @ptrCast(key);
-    const value = self.environmentValue(std.mem.span(key_z)) orelse return null;
-    const c_value = std.heap.c_allocator.dupeSentinel(u8, value, 0) catch return null;
-    return c_value.ptr;
 }
 
 //#endregion
