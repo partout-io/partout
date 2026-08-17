@@ -11,6 +11,7 @@ final class PartoutTunnelController: Sendable {
     nonisolated(unsafe)
     private weak var provider: NEPacketTunnelProvider?
     private let options: TunnelControllerOptions
+    private let environment: any TunnelEnvironmentWriter
     private let networkMonitor: NetworkMonitor
 
     private let delegateLock = SemaphoreMutex()
@@ -19,11 +20,13 @@ final class PartoutTunnelController: Sendable {
     init(
         _ ctx: PartoutLoggerContext,
         provider: NEPacketTunnelProvider,
-        options: TunnelControllerOptions
+        options: TunnelControllerOptions,
+        environment: any TunnelEnvironmentWriter
     ) {
         self.ctx = ctx
         self.provider = provider
         self.options = options
+        self.environment = environment
 
         networkMonitor = NetworkMonitor(ctx)
 
@@ -80,6 +83,10 @@ final class PartoutTunnelController: Sendable {
         }
         // The runtime already handles the connection events
         // to keep the tunnel environment up to date
+    }
+
+    func setEnvironmentData(_ value: Data?, forKey key: String) {
+        environment.setEnvironmentData(value, forKey: key)
     }
 
     func clearTunnelSettings(withKillSwitch: Bool) async {
@@ -218,6 +225,20 @@ extension PartoutTunnelController {
             }
         }
 
+        static func setEnvironmentValue(
+            _ ref: UnsafeMutableRawPointer?,
+            key: UnsafePointer<CChar>?,
+            value: UnsafePointer<CChar>?
+        ) {
+            guard let controller = controller(from: ref), let key else {
+                return
+            }
+            let data = value.map {
+                Data(String(cString: $0).utf8)
+            }
+            controller.setEnvironmentData(data, forKey: String(cString: key))
+        }
+
         static func clearTunnel(_ ref: UnsafeMutableRawPointer?, killSwitch: Bool) {
             guard let controller = controller(from: ref) else {
                 return
@@ -301,6 +322,15 @@ public func pp_swift_tun_ctrl_report_snapshot(
     _ snapshotJSON: UnsafePointer<CChar>?
 ) {
     PartoutTunnelController.Bindings.reportSnapshot(ref, snapshotJSON: snapshotJSON)
+}
+
+@c(pp_swift_tun_ctrl_set_environment_value)
+public func pp_swift_tun_ctrl_set_environment_value(
+    _ ref: UnsafeMutableRawPointer?,
+    _ key: UnsafePointer<CChar>?,
+    _ value: UnsafePointer<CChar>?
+) {
+    PartoutTunnelController.Bindings.setEnvironmentValue(ref, key: key, value: value)
 }
 
 @c(pp_swift_tun_ctrl_clear_tunnel)

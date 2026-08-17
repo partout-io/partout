@@ -277,6 +277,7 @@ const platform_tunnel_controller_vtable = TunnelController.VTable{
     .set_tunnel_settings = ctrlSetTunnelSettings,
     .configure_sockets = ctrlConfigureSockets,
     .report_snapshot = ctrlReportSnapshot,
+    .set_environment_value = ctrlSetEnvironmentValue,
     .clear_tunnel_settings = ctrlClearTunnelSettings,
     .set_reasserting = ctrlSetReasserting,
     .cancel_tunnel_connection = ctrlCancelTunnelConnection,
@@ -323,6 +324,30 @@ fn ctrlReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
     };
     defer allocator.free(c_snapshot);
     self.fnt.report_snapshot.?(self.ref, c_snapshot.ptr);
+}
+
+fn ctrlSetEnvironmentValue(ptr: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
+    const self: *Platform = @ptrCast(@alignCast(ptr.?));
+    const allocator = std.heap.c_allocator;
+
+    var c_key: util.TemporaryCString = .{};
+    c_key.init(allocator, key) catch {
+        log.write(.err, "Unable to encode environment key");
+        return;
+    };
+    defer c_key.deinit();
+
+    if (value) |raw_value| {
+        var c_value: util.TemporaryCString = .{};
+        c_value.init(allocator, raw_value) catch {
+            log.write(.err, "Unable to encode environment value");
+            return;
+        };
+        defer c_value.deinit();
+        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), c_value.ptr());
+    } else {
+        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), null);
+    }
 }
 
 fn ctrlClearTunnelSettings(ptr: ?*anyopaque, with_kill_switch: bool) void {

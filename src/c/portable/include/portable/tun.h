@@ -63,6 +63,9 @@ typedef struct {
                               size_t fds_len);
     void (*report_snapshot)(void *_Nullable ref,
                             const char *snapshot_json);
+    void (*set_environment_value)(void *_Nullable ref,
+                                  const char *key,
+                                  const char *_Nullable value);
     void (*clear_tunnel)(void *_Nullable ref, bool kill_switch);
     void (*cancel_tunnel)(void *_Nullable ref,
                           const char *_Nullable error_message);

@@ -22,6 +22,17 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
         defaults.data(forKey: key.rawKey(prefix: prefix))
     }
 
+    public func setEnvironmentData(_ value: Data?, forKey key: String) {
+        let fullKey = key.rawKey(prefix: prefix)
+        if let value {
+            defaults.set(value, forKey: fullKey)
+            pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey))")
+        } else {
+            defaults.removeObject(forKey: fullKey)
+            pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.remove(\(fullKey))")
+        }
+    }
+
     public func setEnvironmentValue<T>(_ value: T, forKey key: TunnelEnvironmentKey<T>) where T: Encodable {
         let fullKey = key.keyString.rawKey(prefix: prefix)
         do {

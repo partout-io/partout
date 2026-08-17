@@ -84,6 +84,10 @@ static const kotlin_sig sig_ctrl_onSnapshot = {
     "onSnapshot",
     "(Ljava/lang/String;)V"
 };
+static const kotlin_sig sig_ctrl_setEnvironmentValue = {
+    "setEnvironmentValue",
+    "(Ljava/lang/String;Ljava/lang/String;)V"
+};
 static const kotlin_sig sig_ctrl_clearTunnel = {
     "clearTunnel",
     "(Z)V"
@@ -283,6 +287,56 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+static void pp_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
+    assert(ref);
+    assert(key);
+
+    PP_JNI_ATTACH_OR_RETURN_VOID(env);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_key = NULL;
+    jstring j_value = NULL;
+
+    cls = (*env)->GetObjectClass(env, ref);
+    if (cls == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_environment_value(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(
+        env,
+        cls,
+        sig_ctrl_setEnvironmentValue.name,
+        sig_ctrl_setEnvironmentValue.signature
+    );
+    if (method == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_environment_value(), NULL method");
+        goto cleanup;
+    }
+    j_key = (*env)->NewStringUTF(env, key);
+    if (j_key == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_environment_value(), NULL key");
+        goto cleanup;
+    }
+    j_value = value ? (*env)->NewStringUTF(env, value) : NULL;
+    if (value && j_value == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_environment_value(), NULL value");
+        goto cleanup;
+    }
+    (*env)->CallVoidMethod(env, ref, method, j_key, j_value);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_environment_value(), Kotlin exception");
+    }
+
+cleanup:
+    if (j_value != NULL) (*env)->DeleteLocalRef(env, j_value);
+    if (j_key != NULL) (*env)->DeleteLocalRef(env, j_key);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    PP_JNI_DETACH(env);
+}
+
 // Balance with pp_tun_ctrl_set_tunnel
 static void pp_tun_ctrl_clear_tunnel(void *jni_ref, bool kill_switch) {
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_clear_tunnel(%p)", jni_ref);
@@ -355,6 +409,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
+        .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,
         .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
     };

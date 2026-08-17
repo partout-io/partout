@@ -29,8 +29,14 @@ public final class PartoutProviderRuntime: Sendable {
     ) throws {
         ctx = PartoutLoggerContext(profile.id)
         self.profile = profile
-        environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
-        controller = PartoutTunnelController(ctx, provider: provider, options: options)
+        let environment = UserDefaultsEnvironment(profileId: profile.id, defaults: defaults)
+        self.environment = environment
+        controller = PartoutTunnelController(
+            ctx,
+            provider: provider,
+            options: options,
+            environment: environment
+        )
         messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
         self.logsPrivateData = logsPrivateData
