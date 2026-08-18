@@ -5,8 +5,8 @@
 extension TunnelStatus {
     public func considering(_ environment: TunnelSnapshot.Environment?) -> TunnelStatus {
         if self == .active,
-           let connectionStatus = environment?.connectionStatus {
-            switch connectionStatus {
+           let environment {
+            switch environment.connectionStatus {
             case .connecting:
                 return .activating
             case .connected:
@@ -14,7 +14,10 @@ extension TunnelStatus {
             case .disconnecting:
                 return .deactivating
             case .disconnected:
-                return .inactive
+                // The provider is still alive, so a disconnected connection
+                // without an error is either starting or waiting to retry.
+                // Keep it pending while the separately reported error catches up.
+                return environment.lastErrorCode == nil ? .activating : .inactive
             }
         }
         return self
