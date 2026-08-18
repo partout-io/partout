@@ -99,6 +99,7 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
     partout_daemon_start_args args = {0};
     args.profile = cProfile;
     args.options.is_daemon = false;
+    args.options.cancels_unrecoverable = true;
     args.options.cache_dir = cCacheDir;
     args.options.min_data_count_delta = minDataCountDelta;
     args.bindings = &bindings;
