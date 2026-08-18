@@ -17,7 +17,7 @@ extension OpenVPNModule: ConnectionModule {
     }
 }
 
-extension OpenVPNModule: SerializableModule {
+extension OpenVPNModule: @retroactive SerializableModule {
     public var preferredExtension: String {
         "ovpn"
     }

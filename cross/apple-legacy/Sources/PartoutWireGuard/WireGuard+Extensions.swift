@@ -17,7 +17,7 @@ extension WireGuardModule: ConnectionModule {
     }
 }
 
-extension WireGuardModule: SerializableModule {
+extension WireGuardModule: @retroactive SerializableModule {
     public var preferredExtension: String {
         "conf"
     }
