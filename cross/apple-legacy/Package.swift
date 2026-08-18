@@ -116,7 +116,8 @@ let package = Package(
                 return list
             }()
         )
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
 
 // Swift-DocC for documentation, do not include by default
