@@ -763,12 +763,19 @@ fn renderStruct(w: *std.Io.Writer, doc: Document, schema_item: Schema, omit_disc
         defer std.heap.page_allocator.free(field_type);
         if (isRequired(schema_item, property.name)) {
             const default_value = try defaultValueForSpec(std.heap.page_allocator, doc, property.spec, exclusions);
-            defer std.heap.page_allocator.free(default_value);
-            try w.print("    {s}: {s} = {s},\n", .{
-                zigFieldName(property.name),
-                field_type,
-                default_value,
-            });
+            if (default_value) |value| {
+                defer std.heap.page_allocator.free(value);
+                try w.print("    {s}: {s} = {s},\n", .{
+                    zigFieldName(property.name),
+                    field_type,
+                    value,
+                });
+            } else {
+                try w.print("    {s}: {s},\n", .{
+                    zigFieldName(property.name),
+                    field_type,
+                });
+            }
         } else {
             try w.print("    {s}: ?{s} = null,\n", .{
                 zigFieldName(property.name),
@@ -816,11 +823,42 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
             \\
         );
     }
-    try w.print(
-        \\        var result = {s}{{}};
+    var explicit_field_count: usize = 0;
+    for (schema_item.properties.items, 0..) |property, index| {
+        if (omit_discriminator and std.mem.eql(u8, property.name, "type")) continue;
+        if (!isRequired(schema_item, property.name) or try hasDefaultValueForSpec(std.heap.page_allocator, doc, property.spec, exclusions)) continue;
+
+        const field_type = try typeExprAlloc(std.heap.page_allocator, doc, property.spec, exclusions);
+        defer std.heap.page_allocator.free(field_type);
+        try w.print(
+            \\        const explicit_{d} = try parseJsonField({s}, allocator, object, "{s}", error_info);
+            \\        var owns_explicit_{d} = true;
+            \\        errdefer if (owns_explicit_{d}) deinitJson({s}, allocator, &explicit_{d});
+            \\
+        , .{ index, field_type, property.name, index, index, field_type, index });
+        explicit_field_count += 1;
+    }
+
+    if (explicit_field_count == 0) {
+        try w.print("        var result = {s}{{}};\n", .{name});
+    } else {
+        try w.print("        var result = {s}{{\n", .{name});
+        for (schema_item.properties.items, 0..) |property, index| {
+            if (omit_discriminator and std.mem.eql(u8, property.name, "type")) continue;
+            if (!isRequired(schema_item, property.name) or try hasDefaultValueForSpec(std.heap.page_allocator, doc, property.spec, exclusions)) continue;
+            try w.print("            .{s} = explicit_{d},\n", .{ zigFieldName(property.name), index });
+        }
+        try w.writeAll("        };\n");
+        for (schema_item.properties.items, 0..) |property, index| {
+            if (omit_discriminator and std.mem.eql(u8, property.name, "type")) continue;
+            if (!isRequired(schema_item, property.name) or try hasDefaultValueForSpec(std.heap.page_allocator, doc, property.spec, exclusions)) continue;
+            try w.print("        owns_explicit_{d} = false;\n", .{index});
+        }
+    }
+    try w.writeAll(
         \\        errdefer result.deinit(allocator);
         \\
-    , .{name});
+    );
 
     for (schema_item.properties.items) |property| {
         if (omit_discriminator and std.mem.eql(u8, property.name, "type")) continue;
@@ -828,6 +866,7 @@ fn renderStructMethods(w: *std.Io.Writer, doc: Document, schema_item: Schema, om
         defer std.heap.page_allocator.free(field_type);
         const field = zigFieldName(property.name);
         if (isRequired(schema_item, property.name)) {
+            if (!try hasDefaultValueForSpec(std.heap.page_allocator, doc, property.spec, exclusions)) continue;
             try w.print(
                 \\        result.{s} = try parseJsonField({s}, allocator, object, "{s}", error_info);
                 \\
@@ -1199,10 +1238,10 @@ fn typeExprAlloc(allocator: std.mem.Allocator, doc: Document, spec: TypeSpec, ex
     };
 }
 
-fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSpec, exclusions: SchemaExclusions) AllocError![]const u8 {
+fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSpec, exclusions: SchemaExclusions) AllocError!?[]const u8 {
     return switch (spec) {
-        .none, .raw_json => allocator.dupe(u8, ".{}"),
-        .primitive => |primitive| allocator.dupe(u8, switch (primitive) {
+        .none, .raw_json => try allocator.dupe(u8, ".{}"),
+        .primitive => |primitive| try allocator.dupe(u8, switch (primitive) {
             .string => "\"\"",
             .integer => "0",
             .number => "0",
@@ -1211,14 +1250,14 @@ fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSp
         }),
         .ref => |ref| blk: {
             if (std.mem.eql(u8, ref, "UniqueID")) {
-                break :blk allocator.dupe(u8, "uuid.zero_id");
+                break :blk try allocator.dupe(u8, "uuid.zero_id");
             }
             if (exclusions.contains(ref)) {
                 break :blk try std.fmt.allocPrint(allocator, "manual.defaultValue(manual.{s})", .{zigTypeName(ref)});
             }
             if (doc.schema(ref)) |schema_item| {
                 if (schema_item.enum_names.items.len > 0) {
-                    break :blk allocator.dupe(u8, "undefined");
+                    break :blk null;
                 }
                 if (schema_item.variants.items.len > 0) {
                     var variant: ?Variant = null;
@@ -1228,31 +1267,41 @@ fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSp
                             break;
                         }
                     }
-                    const selected_variant = variant orelse break :blk allocator.dupe(u8, ".{}");
-                    const variant_schema = doc.schema(selected_variant.schema) orelse break :blk allocator.dupe(u8, ".{}");
+                    const selected_variant = variant orelse break :blk try allocator.dupe(u8, ".{}");
+                    const variant_schema = doc.schema(selected_variant.schema) orelse break :blk try allocator.dupe(u8, ".{}");
                     const payload_default = if (variantValueProperty(variant_schema)) |property|
                         try defaultValueForSpec(allocator, doc, property.spec, exclusions)
                     else
                         try allocator.dupe(u8, ".{}");
+                    const value = payload_default orelse break :blk null;
+                    defer allocator.free(value);
                     break :blk try std.fmt.allocPrint(allocator, ".{{ .{s} = {s} }}", .{
                         zigEnumField(selected_variant.raw),
-                        payload_default,
+                        value,
                     });
                 }
                 if (integerType(schema_item.name) != null) {
-                    break :blk allocator.dupe(u8, "0");
+                    break :blk try allocator.dupe(u8, "0");
                 }
                 if (schema_item.typ) |typ| {
-                    if (std.mem.eql(u8, typ, "string")) break :blk allocator.dupe(u8, "\"\"");
-                    if (std.mem.eql(u8, typ, "integer")) break :blk allocator.dupe(u8, "0");
-                    if (std.mem.eql(u8, typ, "number")) break :blk allocator.dupe(u8, "0");
-                    if (std.mem.eql(u8, typ, "boolean")) break :blk allocator.dupe(u8, "false");
+                    if (std.mem.eql(u8, typ, "string")) break :blk try allocator.dupe(u8, "\"\"");
+                    if (std.mem.eql(u8, typ, "integer")) break :blk try allocator.dupe(u8, "0");
+                    if (std.mem.eql(u8, typ, "number")) break :blk try allocator.dupe(u8, "0");
+                    if (std.mem.eql(u8, typ, "boolean")) break :blk try allocator.dupe(u8, "false");
                 }
             }
-            break :blk allocator.dupe(u8, ".{}");
+            break :blk try allocator.dupe(u8, ".{}");
         },
-        .array => allocator.dupe(u8, "&.{}"),
+        .array => try allocator.dupe(u8, "&.{}"),
     };
+}
+
+fn hasDefaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSpec, exclusions: SchemaExclusions) AllocError!bool {
+    if (try defaultValueForSpec(allocator, doc, spec, exclusions)) |value| {
+        allocator.free(value);
+        return true;
+    }
+    return false;
 }
 
 fn isUniqueIDSpec(spec: TypeSpec) bool {

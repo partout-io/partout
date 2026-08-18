@@ -259,7 +259,7 @@ fn isNullValue(value: std.json.Value) bool {
 }
 
 pub const ABIErrorPayload = struct {
-    code: PartoutErrorCode = undefined,
+    code: PartoutErrorCode,
     user_info: ?RawJsonValue = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIErrorPayload {
@@ -280,9 +280,14 @@ pub const ABIErrorPayload = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ABIErrorPayload {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = ABIErrorPayload{};
+        const explicit_0 = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
+        var owns_explicit_0 = true;
+        errdefer if (owns_explicit_0) deinitJson(PartoutErrorCode, allocator, &explicit_0);
+        var result = ABIErrorPayload{
+            .code = explicit_0,
+        };
+        owns_explicit_0 = false;
         errdefer result.deinit(allocator);
-        result.code = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
         result.user_info = try parseOptionalJsonField(RawJsonValue, allocator, object, "userInfo", error_info);
         return result;
     }
@@ -1082,7 +1087,7 @@ pub const ModuleType = enum {
 
 pub const OnDemandModule = struct {
     id: uuid.UUID = uuid.zero_id,
-    policy: OnDemandModulePolicy = undefined,
+    policy: OnDemandModulePolicy,
     with_ssids: RawJsonValue = .{},
     with_other_networks: []const OnDemandModuleOtherNetwork = &.{},
 
@@ -1104,10 +1109,15 @@ pub const OnDemandModule = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!OnDemandModule {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = OnDemandModule{};
+        const explicit_1 = try parseJsonField(OnDemandModulePolicy, allocator, object, "policy", error_info);
+        var owns_explicit_1 = true;
+        errdefer if (owns_explicit_1) deinitJson(OnDemandModulePolicy, allocator, &explicit_1);
+        var result = OnDemandModule{
+            .policy = explicit_1,
+        };
+        owns_explicit_1 = false;
         errdefer result.deinit(allocator);
         result.id = try parseJsonField(uuid.UUID, allocator, object, "id", error_info);
-        result.policy = try parseJsonField(OnDemandModulePolicy, allocator, object, "policy", error_info);
         result.with_ssids = try parseJsonField(RawJsonValue, allocator, object, "withSSIDs", error_info);
         result.with_other_networks = try parseJsonField([]const OnDemandModuleOtherNetwork, allocator, object, "withOtherNetworks", error_info);
         return result;
@@ -1633,7 +1643,7 @@ pub const OpenVPNConfiguration = struct {
 pub const OpenVPNCredentials = struct {
     username: []const u8 = "",
     password: []const u8 = "",
-    otp_method: OpenVPNCredentialsOTPMethod = undefined,
+    otp_method: OpenVPNCredentialsOTPMethod,
     otp: ?[]const u8 = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!OpenVPNCredentials {
@@ -1654,11 +1664,16 @@ pub const OpenVPNCredentials = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!OpenVPNCredentials {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = OpenVPNCredentials{};
+        const explicit_2 = try parseJsonField(OpenVPNCredentialsOTPMethod, allocator, object, "otpMethod", error_info);
+        var owns_explicit_2 = true;
+        errdefer if (owns_explicit_2) deinitJson(OpenVPNCredentialsOTPMethod, allocator, &explicit_2);
+        var result = OpenVPNCredentials{
+            .otp_method = explicit_2,
+        };
+        owns_explicit_2 = false;
         errdefer result.deinit(allocator);
         result.username = try parseJsonField([]const u8, allocator, object, "username", error_info);
         result.password = try parseJsonField([]const u8, allocator, object, "password", error_info);
-        result.otp_method = try parseJsonField(OpenVPNCredentialsOTPMethod, allocator, object, "otpMethod", error_info);
         result.otp = try parseOptionalJsonField([]const u8, allocator, object, "otp", error_info);
         return result;
     }
@@ -2159,7 +2174,7 @@ pub const OpenVPNStaticKeyDirection = enum(i32) {
 };
 
 pub const OpenVPNTLSWrap = struct {
-    strategy: OpenVPNTLSWrapStrategy = undefined,
+    strategy: OpenVPNTLSWrapStrategy,
     key: OpenVPNStaticKey = .{},
     wrapped_key: ?manual.SecureData = null,
 
@@ -2181,9 +2196,14 @@ pub const OpenVPNTLSWrap = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!OpenVPNTLSWrap {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = OpenVPNTLSWrap{};
+        const explicit_0 = try parseJsonField(OpenVPNTLSWrapStrategy, allocator, object, "strategy", error_info);
+        var owns_explicit_0 = true;
+        errdefer if (owns_explicit_0) deinitJson(OpenVPNTLSWrapStrategy, allocator, &explicit_0);
+        var result = OpenVPNTLSWrap{
+            .strategy = explicit_0,
+        };
+        owns_explicit_0 = false;
         errdefer result.deinit(allocator);
-        result.strategy = try parseJsonField(OpenVPNTLSWrapStrategy, allocator, object, "strategy", error_info);
         result.key = try parseJsonField(OpenVPNStaticKey, allocator, object, "key", error_info);
         result.wrapped_key = try parseOptionalJsonField(manual.SecureData, allocator, object, "wrappedKey", error_info);
         return result;
@@ -2926,7 +2946,7 @@ pub const TunnelRemoteInfoWrapper = struct {
 pub const TunnelSnapshot = struct {
     id: uuid.UUID = uuid.zero_id,
     is_enabled: bool = false,
-    status: TunnelStatus = undefined,
+    status: TunnelStatus,
     on_demand: bool = false,
     environment: ?TunnelSnapshotEnvironment = null,
 
@@ -2948,11 +2968,16 @@ pub const TunnelSnapshot = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!TunnelSnapshot {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = TunnelSnapshot{};
+        const explicit_2 = try parseJsonField(TunnelStatus, allocator, object, "status", error_info);
+        var owns_explicit_2 = true;
+        errdefer if (owns_explicit_2) deinitJson(TunnelStatus, allocator, &explicit_2);
+        var result = TunnelSnapshot{
+            .status = explicit_2,
+        };
+        owns_explicit_2 = false;
         errdefer result.deinit(allocator);
         result.id = try parseJsonField(uuid.UUID, allocator, object, "id", error_info);
         result.is_enabled = try parseJsonField(bool, allocator, object, "isEnabled", error_info);
-        result.status = try parseJsonField(TunnelStatus, allocator, object, "status", error_info);
         result.on_demand = try parseJsonField(bool, allocator, object, "onDemand", error_info);
         result.environment = try parseOptionalJsonField(TunnelSnapshotEnvironment, allocator, object, "environment", error_info);
         return result;
@@ -2991,7 +3016,7 @@ pub const TunnelSnapshot = struct {
 };
 
 pub const TunnelSnapshotEnvironment = struct {
-    connection_status: ConnectionStatus = undefined,
+    connection_status: ConnectionStatus,
     data_count: DataCount = .{},
     last_error_code: ?[]const u8 = null,
 
@@ -3013,9 +3038,14 @@ pub const TunnelSnapshotEnvironment = struct {
     pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!TunnelSnapshotEnvironment {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
-        var result = TunnelSnapshotEnvironment{};
+        const explicit_0 = try parseJsonField(ConnectionStatus, allocator, object, "connectionStatus", error_info);
+        var owns_explicit_0 = true;
+        errdefer if (owns_explicit_0) deinitJson(ConnectionStatus, allocator, &explicit_0);
+        var result = TunnelSnapshotEnvironment{
+            .connection_status = explicit_0,
+        };
+        owns_explicit_0 = false;
         errdefer result.deinit(allocator);
-        result.connection_status = try parseJsonField(ConnectionStatus, allocator, object, "connectionStatus", error_info);
         result.data_count = try parseJsonField(DataCount, allocator, object, "dataCount", error_info);
         result.last_error_code = try parseOptionalJsonField([]const u8, allocator, object, "lastErrorCode", error_info);
         return result;
