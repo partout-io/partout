@@ -17,12 +17,6 @@ public protocol NEProtocolEncoder: Sendable {
     ///   - profile: The profile to encode.
     /// - Returns: A `NETunnelProviderProtocol` for use with `NETunnelProviderManager`.
     func protocolConfiguration(from profile: Profile) throws -> NETunnelProviderProtocol
-
-    @available(*, deprecated)
-    func removeProfile(withId profileId: Profile.ID) throws
-
-    @available(*, deprecated)
-    func purge(managers: [NETunnelProviderManager]) async
 }
 
 /// Decodes a `Profile` for use in Network Extension.
@@ -32,15 +26,6 @@ public protocol NEProtocolDecoder: Sendable {
     ///   - protocolConfiguration: The `NETunnelProviderProtocol` to decode.
     /// - Returns: The decoded profile.
     func profile(from protocolConfiguration: NETunnelProviderProtocol) throws -> Profile
-}
-
-@available(*, deprecated)
-extension NEProtocolEncoder {
-    public func removeProfile(withId profileId: Profile.ID) throws {
-    }
-
-    public func purge(managers: [NETunnelProviderManager]) async {
-    }
 }
 
 let NEProtocolCoderServerAddress = "127.0.0.1"
