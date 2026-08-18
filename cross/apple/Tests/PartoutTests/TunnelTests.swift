@@ -166,7 +166,7 @@ struct TunnelTests {
         let stream = sut.snapshotsStream
         let module = IPModule.Builder().build()
         let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
-        let pendingSnapshot = Task {
+        let pendingSnapshot = Task<TunnelSnapshot?, Never> {
             for await snapshots in stream {
                 guard let snapshot = snapshots[profile.id], snapshot.status == .active else {
                     continue
