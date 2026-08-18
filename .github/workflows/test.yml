@@ -20,31 +20,34 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - job_name: Run Swift tests
+          - job_name: Run Zig and Swift tests
             runner: macos-26
-            suite: swift
-          - job_name: Run Zig tests
-            runner: ubuntu-latest
-            suite: zig
+            suite: apple
+            timeout_minutes: 10
           - job_name: Run Kotlin tests
             runner: ubuntu-latest
             suite: kotlin
+            timeout_minutes: 5
     runs-on: ${{ matrix.runner }}
-    timeout-minutes: 5
+    timeout-minutes: ${{ matrix.timeout_minutes }}
     steps:
       - uses: actions/checkout@v6
       - uses: partout-io/action-prepare-xcode-build@master
-        if: matrix.suite == 'swift'
+        if: matrix.suite == 'apple'
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
-      - name: Run Swift tests
-        if: matrix.suite == 'swift'
-        run: ci/run-swift-tests.sh
-      - uses: mlugg/setup-zig@v2
-        if: matrix.suite == 'zig'
+      - name: Set up Zig
+        uses: mlugg/setup-zig@v2
+        if: matrix.suite == 'apple'
       - name: Run Zig tests
-        if: matrix.suite == 'zig'
+        if: matrix.suite == 'apple'
         run: ci/run-tests.sh
+      - name: Build active XCFramework slice
+        if: matrix.suite == 'apple'
+        run: scripts/build-xcframework.sh
+      - name: Run Swift tests
+        if: matrix.suite == 'apple'
+        run: ci/run-swift-tests.sh
       - uses: actions/setup-java@v5
         if: matrix.suite == 'kotlin'
         with:
