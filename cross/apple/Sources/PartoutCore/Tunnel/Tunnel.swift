@@ -218,7 +218,7 @@ private extension Tunnel {
         // Notify .snapshotsStream observers now
         let enriched = strategySnapshots.mapValues {
             guard let env = environments[$0.id] else { return $0 }
-            return $0.with(environment: env.snapshot)
+            return $0.with(environment: env.snapshotIfAvailable)
         }
         guard enriched != snapshots else { return }
         snapshots = enriched

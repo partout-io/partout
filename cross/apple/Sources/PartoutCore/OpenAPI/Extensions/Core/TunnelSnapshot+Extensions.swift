@@ -45,11 +45,26 @@ public typealias OnTunnelSnapshotCallback = @Sendable (TunnelSnapshot) -> Void
 
 extension TunnelEnvironmentReader {
     public var snapshot: TunnelSnapshot.Environment {
-        let connectionStatus = environmentValue(forKey: TunnelEnvironmentKeys.connectionStatus)
-        let dataCount = environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
-        let lastError = environmentValue(forKey: TunnelEnvironmentKeys.lastErrorCode)
+        snapshotIfAvailable ?? TunnelSnapshot.Environment()
+    }
+
+    public var snapshotIfAvailable: TunnelSnapshot.Environment? {
+        // Read all values atomically where the reader supports it. In particular,
+        // NETunnelEnvironment has no values until its first provider response.
+        let values = snapshot(excludingKeys: nil)
+        guard values[TunnelEnvironmentKeys.connectionStatus.keyString] != nil else {
+            return nil
+        }
+        let environment = StaticTunnelEnvironment(profileId: nil, values: values)
+        guard let connectionStatus = environment.environmentValue(
+            forKey: TunnelEnvironmentKeys.connectionStatus
+        ) else {
+            return nil
+        }
+        let dataCount = environment.environmentValue(forKey: TunnelEnvironmentKeys.dataCount)
+        let lastError = environment.environmentValue(forKey: TunnelEnvironmentKeys.lastErrorCode)
         return TunnelSnapshot.Environment(
-            connectionStatus: connectionStatus ?? .disconnected,
+            connectionStatus: connectionStatus,
             dataCount: dataCount ?? DataCount(),
             lastErrorCode: lastError
         )

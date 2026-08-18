@@ -72,6 +72,7 @@ struct TunnelTests {
     @Test
     func givenTunnel_whenDisconnectWithError_thenPublishesLastErrorCode() async throws {
         let env = SharedTunnelEnvironment(profileId: nil)
+        env.setEnvironmentValue(.connected, forKey: TunnelEnvironmentKeys.connectionStatus)
         let sut = try await newTunnel(env: env)
 
         let module = IPModule.Builder().build()
@@ -108,6 +109,7 @@ struct TunnelTests {
     @Test
     func givenTunnel_whenPublishesDataCount_thenIsAvailable() async throws {
         let env = SharedTunnelEnvironment(profileId: nil)
+        env.setEnvironmentValue(.connected, forKey: TunnelEnvironmentKeys.connectionStatus)
         let sut = try await newTunnel(env: env)
         let stream = sut.snapshotsStream
         #expect(await stream.nextElement() == [:])
@@ -156,6 +158,31 @@ struct TunnelTests {
         #expect(active.first?.key == profile.id)
         //        #expect(processor.titleCount == 1) // unused by FakeTunnelStrategy
         #expect(processor.willInstallCount == 1)
+    }
+
+    @Test
+    func givenTunnelWithoutConnectionStatus_whenActive_thenEnvironmentIsUnavailable() async throws {
+        let sut = try await newTunnel(env: SharedTunnelEnvironment(profileId: nil))
+        let stream = sut.snapshotsStream
+        let module = IPModule.Builder().build()
+        let profile = try Profile.Builder(modules: [module], activatingModules: true).build()
+        let pendingSnapshot = Task {
+            for await snapshots in stream {
+                guard let snapshot = snapshots[profile.id], snapshot.status == .active else {
+                    continue
+                }
+                return snapshot
+            }
+            return nil
+        }
+        defer {
+            pendingSnapshot.cancel()
+        }
+
+        try await sut.connect(with: profile)
+
+        let snapshot = try #require(await pendingSnapshot.value)
+        #expect(snapshot.environment == nil)
     }
 
     @Test
@@ -228,6 +255,25 @@ struct TunnelTests {
             .forEach {
                 #expect($0.considering(env) == $0)
             }
+    }
+
+    @Test
+    func givenTunnelEnvironmentWithoutConnectionStatus_thenSnapshotIsUnavailable() {
+        let sut = SharedTunnelEnvironment(profileId: nil)
+        sut.setEnvironmentValue(DataCount(500, 700), forKey: TunnelEnvironmentKeys.dataCount)
+
+        #expect(sut.snapshotIfAvailable == nil)
+    }
+
+    @Test
+    func givenTunnelEnvironmentWithConnectionStatus_thenSnapshotIsAvailable() throws {
+        let sut = SharedTunnelEnvironment(profileId: nil)
+        sut.setEnvironmentValue(.connecting, forKey: TunnelEnvironmentKeys.connectionStatus)
+        sut.setEnvironmentValue(DataCount(500, 700), forKey: TunnelEnvironmentKeys.dataCount)
+
+        let snapshot = try #require(sut.snapshotIfAvailable)
+        #expect(snapshot.connectionStatus == .connecting)
+        #expect(snapshot.dataCount == DataCount(500, 700))
     }
 
     @Test

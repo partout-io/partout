@@ -56,7 +56,10 @@ private extension NETunnelEnvironment {
                 guard let self else { return }
                 guard !Task.isCancelled else { return }
                 do {
-                    latestEnvironment = try await fetchEnvironment(profileId)
+                    let environment = try await fetchEnvironment(profileId)
+                    queue.sync {
+                        latestEnvironment = environment
+                    }
                 } catch {
                     pp_log_id(profileId, .os, .error, "Unable to fetch NE environment for \(profileId): \(error)")
                 }
