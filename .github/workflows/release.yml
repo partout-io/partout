@@ -3,8 +3,8 @@
 # - Read the version from src/version.zig and reject an existing tag.
 # - Download all vendor prebuilts and build the full monolithic XCFramework.
 # - Run Zig tests with all vendors: OpenSSL, MbedTLS, etc.
-# - Temporarily select the local XCFramework and run both Swift test suites.
-# - Restore Package.swift, then update its remote version and checksum.
+# - Verify the built XCFramework is selected locally and run both Swift test suites.
+# - Update Package.swift's remote version and checksum.
 # - Create a signed commit, then create a signed tag that points to it.
 # - Atomically push the commit to master and push the matching tag.
 # - Publish the XCFramework archive, checksum, and prebuilts version.
@@ -90,15 +90,11 @@ jobs:
         run: ci/run-tests.sh --apple-vendors "$ARTIFACTS_DIR"
       - name: Run Swift tests with built XCFramework
         run: |
-          package_pattern='^nativeTarget = \.remote\("[^"]+", checksum: "[0-9a-f]{64}"\)$'
-          test "$(grep -Ec "$package_pattern" Package.swift)" -eq 1
-          sed -i '' -E "s/$package_pattern/nativeTarget = .local/" Package.swift
-          trap 'git restore -- Package.swift' EXIT
+          test -d PartoutNative.xcframework
+          swift package dump-package |
+            grep -F '"path" : "PartoutNative.xcframework"'
 
           ci/run-swift-tests.sh
-
-          git restore -- Package.swift
-          trap - EXIT
       - name: Update Swift package reference
         env:
           VERSION: ${{ steps.parse_version.outputs.version }}

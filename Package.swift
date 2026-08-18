@@ -1,11 +1,19 @@
 // swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
 
+let localNativeURL = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .appendingPathComponent("PartoutNative.xcframework")
+
 let nativeTarget: PartoutNativeTarget
-// nativeTarget = .local
-nativeTarget = .remote("0.160.0", checksum: "0bc4c1bed1d4eea8a2ca2027dc12d70ff6c573f53e72c451ae6cfac04a0060fc")
+if FileManager.default.fileExists(atPath: localNativeURL.path) {
+    nativeTarget = .local
+} else {
+    nativeTarget = .remote("0.160.0", checksum: "0bc4c1bed1d4eea8a2ca2027dc12d70ff6c573f53e72c451ae6cfac04a0060fc")
+}
 
 let partoutNative: Target = .partoutNative(nativeTarget)
 

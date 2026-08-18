@@ -183,6 +183,14 @@ output_path="$output_parent/$(basename "$output_path")"
 [[ "$(basename "$output_path")" == *.xcframework ]] ||
     fail "output must have an .xcframework extension: $output_path"
 
+version_file="$repo_dir/src/version.zig"
+[[ -f $version_file ]] || fail "missing library version file: $version_file"
+library_version=$(sed -nE \
+    's/^pub const number = "([0-9A-Za-z.+-]+)";$/\1/p' \
+    "$version_file")
+[[ -n $library_version && $library_version != *$'\n'* ]] ||
+    fail "unable to determine library version from $version_file"
+
 identifier_matches_platform() {
     local identifier=$1
 
@@ -623,7 +631,7 @@ write_info_plist() {
   <key>CFBundlePackageType</key>
   <string>FMWK</string>
   <key>CFBundleShortVersionString</key>
-  <string>1.0</string>
+  <string>$library_version</string>
   <key>CFBundleVersion</key>
   <string>1</string>
   <key>$minimum_os_key</key>
