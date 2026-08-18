@@ -293,8 +293,17 @@ const Query = struct {
     fn run(self: *Query) void {
         var result: c.pp_dns_result = null;
         var reachability = self.reachability;
+        const hostname = self.hostname orelse {
+            query_pool.mutex.lock();
+            self.status = -1;
+            self.worker_done = true;
+            query_pool.cond.broadcast();
+            self.recycleLocked();
+            query_pool.mutex.unlock();
+            return;
+        };
         const status = self.resolve_fn(
-            self.hostname.?,
+            hostname,
             self.all_addresses,
             if (reachability) |*info| info else null,
             &result,
@@ -312,7 +321,11 @@ const Query = struct {
     fn recycleLocked(self: *Query) void {
         if (!self.caller_done or !self.worker_done) return;
         if (self.result) |result| c.pp_dns_result_free(result);
-        std.heap.c_allocator.free(self.hostname.?);
+        if (self.hostname) |hostname| {
+            std.heap.c_allocator.free(hostname);
+        } else {
+            log.write(.fault, "Completed DNS query has no hostname");
+        }
         self.* = .{};
     }
 };

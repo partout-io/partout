@@ -20,6 +20,7 @@ const util = core.util;
 pub const RuntimeError = net.DaemonError || error{
     CacheDirectory,
     InvalidArgs,
+    InvalidFunctionTable,
     InvalidProfile,
 };
 

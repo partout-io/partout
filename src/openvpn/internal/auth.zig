@@ -117,10 +117,9 @@ pub const PRF = struct {
     }
 
     pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
-        std.debug.assert(self.handshake != null);
-        std.debug.assert(self.session_id != null);
-        std.debug.assert(self.remote_session_id != null);
-        const handshake = self.handshake.?;
+        const handshake = self.handshake orelse return error.Assertion;
+        const session_id = self.session_id orelse return error.Assertion;
+        const remote_session_id = self.remote_session_id orelse return error.Assertion;
 
         var master_data = try prfData(allocator, .{
             .functions = self.functions,
@@ -138,8 +137,8 @@ pub const PRF = struct {
             .secret = master_data.bytes,
             .client_seed = handshake.random2.bytes,
             .server_seed = handshake.server_random2.bytes,
-            .client_session_id = self.session_id.?,
-            .server_session_id = self.remote_session_id.?,
+            .client_session_id = session_id,
+            .server_session_id = remote_session_id,
             .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);

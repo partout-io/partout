@@ -79,6 +79,18 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     try std.testing.expectEqual(Keys.key_length, keys.digest.?.decryption_key.bytes.len);
 }
 
+test "PRF rejects missing retained inputs" {
+    const allocator = std.testing.allocator;
+    var prf = PRF{
+        .functions = c_crypto.pp_crypto_fnt_mock(),
+        .handshake = null,
+        .session_id = null,
+        .remote_session_id = null,
+    };
+
+    try std.testing.expectError(error.Assertion, prf.derive(allocator));
+}
+
 test "Authenticator frames auth and buffers replies and messages" {
     const allocator = std.testing.allocator;
     var authenticator = try Authenticator.init(allocator, .system(), "user", "password");

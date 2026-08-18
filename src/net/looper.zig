@@ -505,7 +505,7 @@ pub const Looper = struct {
 
         if (completion_failure) |err| return err;
         if (holder.failure) |err| return err;
-        return holder.value.?;
+        return holder.value orelse error.Assertion;
     }
 
     pub fn performTask(self: *Looper, task: Task) anyerror!void {

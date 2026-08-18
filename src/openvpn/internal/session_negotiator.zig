@@ -572,9 +572,13 @@ pub const Negotiator = struct {
             username,
             password,
         );
-        self.authenticator.?.with_local_options = self.options.with_local_options;
+        const authenticator = if (self.authenticator) |*value|
+            value
+        else
+            return error.Assertion;
+        authenticator.with_local_options = self.options.with_local_options;
         const tls = self.tls orelse return error.Assertion;
-        try self.authenticator.?.putAuth(tls, self.options.configuration);
+        try authenticator.putAuth(tls, self.options.configuration);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) {
                 log.writef(.fault, "TLS.auth: Failed pulling ciphertext: {s}", .{@errorName(err)});
@@ -627,7 +631,8 @@ pub const Negotiator = struct {
     fn handleControlMessage(self: *Negotiator, message: []const u8) !void {
         log.write(.info, "Received control message");
         if (std.mem.startsWith(u8, message, "AUTH_FAILED")) {
-            if (self.authenticator.?.with_local_options) {
+            const authenticator = self.authenticator orelse return error.Assertion;
+            if (authenticator.with_local_options) {
                 log.write(.err, "Authentication failure, retry without local options");
                 return error.BadCredentialsWithLocalOptions;
             }

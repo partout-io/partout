@@ -32,6 +32,14 @@ const TunWrapper = io.TunWrapper;
 pub const Platform = struct {
     pub const FunctionTable = c.pp_tun_ctrl_fnt;
 
+    fn validateFunctionTable(fnt: FunctionTable) error{InvalidFunctionTable}!void {
+        inline for (@typeInfo(FunctionTable).@"struct".fields) |field| {
+            if (@field(fnt, field.name) == null) {
+                return error.InvalidFunctionTable;
+            }
+        }
+    }
+
     pub const Options = struct {
         /// The optional reference to forward C calls to (e.g. JNI).
         ref: ?*anyopaque = null,
@@ -67,7 +75,9 @@ pub const Platform = struct {
 
     //#endregion
 
-    pub fn init(options: Options) error{OutOfMemory}!Platform {
+    pub fn init(options: Options) error{ OutOfMemory, InvalidFunctionTable }!Platform {
+        const functions = options.fnt orelse c.pp_tun_ctrl_fnt_current();
+        try validateFunctionTable(functions);
         var ref_copy: ?*anyopaque = null;
         if (builtin.abi.isAndroid() and @hasDecl(c, "pp_jni_new_global_ref")) {
             ref_copy = c.pp_jni_new_global_ref(options.ref);
@@ -80,7 +90,7 @@ pub const Platform = struct {
         }
         return .{
             .ref = ref_copy,
-            .fnt = options.fnt orelse c.pp_tun_ctrl_fnt_current(),
+            .fnt = functions,
             .dns = .{},
             .socket_buf_size = options.socket_buf_size,
         };
@@ -94,7 +104,9 @@ pub const Platform = struct {
         };
         if (self.ref) |ref| {
             log.writef(.debug, "Platform: Set delegate ({*})", .{ref});
-            self.fnt.set_delegate.?(ref, &self.delegate);
+            const set_delegate = self.fnt.set_delegate orelse
+                @panic("Platform function table has no set_delegate callback");
+            set_delegate(ref, &self.delegate);
             self.delegate_attached = true;
         }
     }
@@ -102,7 +114,9 @@ pub const Platform = struct {
     pub fn deinit(self: *Platform) void {
         if (self.delegate_attached) {
             log.write(.debug, "Platform: Clear delegate");
-            self.fnt.set_delegate.?(self.ref, null);
+            const set_delegate = self.fnt.set_delegate orelse
+                @panic("Platform function table has no set_delegate callback");
+            set_delegate(self.ref, null);
             self.delegate_attached = false;
         }
         if (builtin.abi.isAndroid() and @hasDecl(c, "pp_jni_delete_global_ref")) {
@@ -265,7 +279,9 @@ pub const Platform = struct {
         var reachability_copy = reachability;
         const reachability_ptr = if (reachability_copy) |*value| value else null;
         log.writef(.debug, "Configure tunnel sockets: count={}", .{descriptors.len});
-        if (!self.fnt.configure_sockets.?(self.ref, reachability_ptr, descriptors.ptr, descriptors.len)) {
+        const configure_sockets = self.fnt.configure_sockets orelse
+            @panic("Platform function table has no configure_sockets callback");
+        if (!configure_sockets(self.ref, reachability_ptr, descriptors.ptr, descriptors.len)) {
             return error.SocketConfiguration;
         }
     }
@@ -294,7 +310,9 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     defer allocator.free(c_info);
 
     log.write(.debug, "Platform: Set tunnel");
-    const maybe_tun = self.fnt.set_tunnel.?(self.ref, c_uuid.ptr(), c_info.ptr);
+    const set_tunnel = self.fnt.set_tunnel orelse
+        @panic("Platform function table has no set_tunnel callback");
+    const maybe_tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr);
     if (!info.requires_virtual_device) {
         log.write(.debug, "Platform: No virtual device required");
         if (maybe_tun) |tun| {
@@ -323,7 +341,9 @@ fn ctrlReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
         return;
     };
     defer allocator.free(c_snapshot);
-    self.fnt.report_snapshot.?(self.ref, c_snapshot.ptr);
+    const report_snapshot = self.fnt.report_snapshot orelse
+        @panic("Platform function table has no report_snapshot callback");
+    report_snapshot(self.ref, c_snapshot.ptr);
 }
 
 fn ctrlSetEnvironmentValue(ptr: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
@@ -336,6 +356,8 @@ fn ctrlSetEnvironmentValue(ptr: ?*anyopaque, key: []const u8, value: ?[]const u8
         return;
     };
     defer c_key.deinit();
+    const set_environment_value = self.fnt.set_environment_value orelse
+        @panic("Platform function table has no set_environment_value callback");
 
     if (value) |raw_value| {
         var c_value: util.TemporaryCString = .{};
@@ -344,30 +366,34 @@ fn ctrlSetEnvironmentValue(ptr: ?*anyopaque, key: []const u8, value: ?[]const u8
             return;
         };
         defer c_value.deinit();
-        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), c_value.ptr());
+        set_environment_value(self.ref, c_key.ptr(), c_value.ptr());
     } else {
-        self.fnt.set_environment_value.?(self.ref, c_key.ptr(), null);
+        set_environment_value(self.ref, c_key.ptr(), null);
     }
 }
 
 fn ctrlClearTunnelSettings(ptr: ?*anyopaque, with_kill_switch: bool) void {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     log.writef(.debug, "Clear tunnel settings: withKillSwitch={}", .{with_kill_switch});
-    self.fnt.clear_tunnel.?(self.ref, with_kill_switch);
+    const clear_tunnel = self.fnt.clear_tunnel orelse
+        @panic("Platform function table has no clear_tunnel callback");
+    clear_tunnel(self.ref, with_kill_switch);
 }
 
 fn ctrlSetReasserting(_: ?*anyopaque, _: bool) void {}
 
 fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, code: ?api.PartoutErrorCode) void {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
+    const cancel_tunnel = self.fnt.cancel_tunnel orelse
+        @panic("Platform function table has no cancel_tunnel callback");
     const raw_code = if (code) |value| @tagName(value) else null;
     if (raw_code) |value| {
         log.writef(.err, "Cancel tunnel connection: {s}", .{value});
-        self.fnt.cancel_tunnel.?(self.ref, value.ptr);
+        cancel_tunnel(self.ref, value.ptr);
         return;
     }
     log.write(.debug, "Cancel tunnel connection");
-    self.fnt.cancel_tunnel.?(self.ref, null);
+    cancel_tunnel(self.ref, null);
 }
 
 //#endregion

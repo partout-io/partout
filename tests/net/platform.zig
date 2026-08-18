@@ -18,6 +18,16 @@ const platformConfigureSocket = platform_source.testing.platformConfigureSocket;
 const reachable = io.testing.reachable;
 const socketOptions = platform_source.testing.socketOptions;
 
+test "platform rejects incomplete function tables" {
+    var functions = io.c.pp_tun_ctrl_fnt_current();
+    functions.report_snapshot = null;
+
+    try std.testing.expectError(
+        error.InvalidFunctionTable,
+        Platform.init(.{ .fnt = functions }),
+    );
+}
+
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
     received_settings_only_info: bool = false,

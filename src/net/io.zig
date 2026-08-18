@@ -202,8 +202,8 @@ pub const SocketWrapper = struct {
         return c.pp_socket_get_fd(self.socket);
     }
 
-    pub fn remoteAddress(self: SocketWrapper) api.Address {
-        return api.Address.parseRaw(self.options.endpoint.address).?;
+    pub fn remoteAddress(self: SocketWrapper) ?api.Address {
+        return api.Address.parseRaw(self.options.endpoint.address);
     }
 
     pub fn remoteProtocol(self: SocketWrapper) api.EndpointProtocol {
