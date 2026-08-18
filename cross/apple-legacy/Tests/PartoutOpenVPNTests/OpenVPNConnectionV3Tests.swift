@@ -433,3 +433,24 @@ private final class MockOpenVPNSession: OpenVPNSessionProtocolV3, @unchecked Sen
         onStop(error)
     }
 }
+
+private final class MockReachabilityObserver: ReachabilityObserver, @unchecked Sendable {
+    private nonisolated let isReachableSubject = PassthroughStream<Bool>()
+
+    func startObserving() {
+        isReachable = true
+    }
+
+    func stopObserving() {
+    }
+
+    var isReachable: Bool = false {
+        didSet {
+            isReachableSubject.send(isReachable)
+        }
+    }
+
+    var isReachableStream: AsyncStream<Bool> {
+        isReachableSubject.subscribe()
+    }
+}

@@ -1,4 +1,4 @@
-// swift-tools-version: 5.10
+// swift-tools-version: 6.3
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 // Foundation is required by ProcessInfo
@@ -116,7 +116,8 @@ let package = Package(
                 return list
             }()
         )
-    ]
+    ],
+    swiftLanguageModes: [.v6]
 )
 
 // Swift-DocC for documentation, do not include by default
@@ -156,19 +157,6 @@ package.targets.append(contentsOf: [
     .target(
         name: "PartoutOS",
         dependencies: ["PartoutLegacyCore"],
-        exclude: {
-            var list: [String] = []
-#if swift(>=6.0)
-            list.append(contentsOf: [
-                "AppleNE/Connection/NEUDPSocket.swift",
-                "AppleNE/Connection/NETCPSocket.swift",
-                "AppleNE/Extensions/NWUDPSessionState+Description.swift",
-                "AppleNE/Extensions/NWTCPConnectionState+Description.swift",
-                "AppleNE/Connection/SafeValueObserver.swift"
-            ])
-#endif
-            return list
-        }(),
         swiftSettings: useFoundationCompatibility.swiftSettings
     ),
     .testTarget(
@@ -179,14 +167,7 @@ package.targets.append(contentsOf: [
     ),
     .testTarget(
         name: "PartoutOSTests",
-        dependencies: ["PartoutOS"],
-        exclude: {
-            var list: [String] = []
-#if swift(>=6.0)
-            list.append("AppleNE/ValueObserverTests.swift")
-#endif
-            return list
-        }()
+        dependencies: ["PartoutOS"]
     )
 ])
 
