@@ -32,10 +32,10 @@ const TunWrapper = io.TunWrapper;
 pub const Platform = struct {
     pub const FunctionTable = c.pp_tun_ctrl_fnt;
 
-    fn validateFunctionTable(fnt: FunctionTable) error{InvalidFunctionTable}!void {
+    fn validateFunctionTable(fnt: FunctionTable) void {
         inline for (@typeInfo(FunctionTable).@"struct".fields) |field| {
             if (@field(fnt, field.name) == null) {
-                return error.InvalidFunctionTable;
+                @panic("Platform function table has no " ++ field.name ++ " callback");
             }
         }
     }
@@ -75,9 +75,9 @@ pub const Platform = struct {
 
     //#endregion
 
-    pub fn init(options: Options) error{ OutOfMemory, InvalidFunctionTable }!Platform {
+    pub fn init(options: Options) error{OutOfMemory}!Platform {
         const functions = options.fnt orelse c.pp_tun_ctrl_fnt_current();
-        try validateFunctionTable(functions);
+        validateFunctionTable(functions);
         var ref_copy: ?*anyopaque = null;
         if (builtin.abi.isAndroid() and @hasDecl(c, "pp_jni_new_global_ref")) {
             ref_copy = c.pp_jni_new_global_ref(options.ref);
