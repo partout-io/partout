@@ -10,7 +10,7 @@ const core = source.core;
 const internal = source.openvpn_internal;
 const ControlPacket = internal.packet.ControlPacket;
 const PacketCode = internal.packet.PacketCode;
-const Serializer = internal.serialization.Serializer;
+const Serializer = internal.control_serializers.Serializer;
 const TestControlChannel = internal.control.ControlChannel(Serializer);
 
 test "control channel fragments payload and retains opcode" {

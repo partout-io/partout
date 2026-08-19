@@ -9,6 +9,7 @@ const auth_mod = @import("auth.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
+const control_serializers_mod = @import("control_serializers.zig");
 const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
 const errors_mod = @import("errors.zig");
@@ -16,7 +17,6 @@ const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
 const push_mod = @import("push.zig");
-const serialization_mod = @import("serialization.zig");
 const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
@@ -24,7 +24,7 @@ const log = core_mod.logging;
 
 const Authenticator = auth_mod.Authenticator;
 const SessionOptions = configuration_mod.SessionOptions;
-const ControlChannel = control_mod.ControlChannel(serialization_mod.Serializer);
+const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
 const DataChannel = data_mod.DataChannel;

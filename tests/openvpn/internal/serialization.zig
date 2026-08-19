@@ -6,18 +6,18 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
+const control_serializers = source.openvpn_internal.control_serializers;
 const packet = source.openvpn_internal.packet;
-const serialization = source.openvpn_internal.serialization;
 
 const ControlPacket = packet.ControlPacket;
 const PacketCode = packet.PacketCode;
-const AuthSerializer = serialization.testing.Auth;
-const CryptSerializer = serialization.testing.Crypt;
-const CryptV2Serializer = serialization.testing.CryptV2;
-const PlainSerializer = serialization.testing.Plain;
-const Serializer = serialization.Serializer;
-const buildAuthKeys = serialization.testing.buildAuthKeys;
-const buildCryptKeys = serialization.testing.buildCryptKeys;
+const AuthSerializer = control_serializers.testing.Auth;
+const CryptSerializer = control_serializers.testing.Crypt;
+const CryptV2Serializer = control_serializers.testing.CryptV2;
+const PlainSerializer = control_serializers.testing.Plain;
+const Serializer = control_serializers.Serializer;
+const buildAuthKeys = control_serializers.testing.buildAuthKeys;
+const buildCryptKeys = control_serializers.testing.buildCryptKeys;
 
 const static_key_content_length = 256;
 const static_key_length = 64;
