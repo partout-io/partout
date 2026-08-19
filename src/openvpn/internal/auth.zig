@@ -144,7 +144,8 @@ pub const PRF = struct {
             .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);
-        std.debug.assert(keys_data.bytes.len == KeysConstants.keys_count * KeysConstants.key_length);
+        if (keys_data.bytes.len != KeysConstants.keys_count * KeysConstants.key_length)
+            @panic("OpenVPN PRF returned an unexpected key-data length");
 
         var parts: [KeysConstants.keys_count]ZeroingData = undefined;
         var initialized: usize = 0;

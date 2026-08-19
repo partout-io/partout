@@ -103,7 +103,8 @@ pub const ActiveContext = struct {
 
     /// Transfers ownership of `negotiator` to this context.
     pub fn addNegotiator(self: *ActiveContext, negotiator: *Negotiator) void {
-        std.debug.assert(negotiator.key < self.negotiators.len);
+        if (negotiator.key >= self.negotiators.len)
+            @panic("Cannot add an OpenVPN negotiator with an out-of-range key");
         log.writef(.info, "Replace negotiator with key {d}", .{negotiator.key});
         if (self.negotiators[negotiator.key]) |old| {
             if (old != negotiator) old.destroy();
@@ -121,8 +122,10 @@ pub const ActiveContext = struct {
         channel: *DataChannel,
         key: u8,
     ) !void {
-        std.debug.assert(key < self.data_channels.len);
-        std.debug.assert(channel.key == key);
+        if (key >= self.data_channels.len)
+            @panic("Cannot install an OpenVPN data channel with an out-of-range key");
+        if (channel.key != key)
+            @panic("Cannot install an OpenVPN data channel under a different key");
         if (self.current_data_pair) |pair| try self.old_keys.append(self.allocator, pair.key);
         if (self.data_channels[key]) |old| {
             if (old != channel) old.destroy();
