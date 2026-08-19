@@ -50,7 +50,6 @@ pub const PacketProcessor = struct {
 
     pub fn deinit(self: *PacketProcessor) void {
         c.openvpn_pkt_proc_free(self.ptr);
-        self.ptr = undefined;
     }
 
     pub fn processPacket(
