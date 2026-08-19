@@ -6,10 +6,12 @@ const std = @import("std");
 
 const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
+const internal_serialization = @import("internal/serialization.zig");
 
 const api = core.api;
 const c_common = c_mod.common;
 const CryptoBackend = c_mod.CryptoBackend;
+const StaticKey = internal_serialization.StaticKey;
 const util = core.util;
 
 pub fn importModule(
@@ -734,19 +736,19 @@ const Builder = struct {
             self.configuration.tls_wrap = switch (strategy) {
                 .auth => .{
                     .strategy = .auth,
-                    .key = .{
-                        .data = try parseStaticKeyData(allocator, lines),
-                        .dir = self.tls_key_direction,
-                    },
+                    .key = StaticKey.parseFileAlloc(
+                        allocator,
+                        lines,
+                        self.tls_key_direction,
+                    ) catch |err| return mapStaticKeyParseError(err),
                 },
                 .crypt => .{
                     .strategy = .crypt,
-                    .key = .{
-                        .data = try parseStaticKeyData(allocator, lines),
-                        .dir = .client,
-                    },
+                    .key = StaticKey.parseFileAlloc(allocator, lines, .client) catch |err|
+                        return mapStaticKeyParseError(err),
                 },
-                .cryptV2 => try parseCryptV2Key(allocator, lines),
+                .cryptV2 => StaticKey.parseCryptV2FileAlloc(allocator, lines) catch |err|
+                    return mapStaticKeyParseError(err),
             };
         }
 
@@ -973,71 +975,10 @@ fn ipv4MaskPrefix(mask: []const u8) ?u8 {
     return prefix;
 }
 
-fn parseStaticKeyData(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.SecureData {
-    const hex = try parseStaticKeyHex(allocator, lines);
-    defer allocator.free(hex);
-    return (try api.SecureData.parseHexAlloc(allocator, hex)) orelse error.MalformedOption;
-}
-
-fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []const u8) ParseError![]u8 {
-    var hex: std.ArrayList(u8) = .empty;
-    defer hex.deinit(allocator);
-
-    var in_key = false;
-    for (lines) |line| {
-        if (line.len == 0 or line[0] == '#') continue;
-        if (std.ascii.eqlIgnoreCase(line, "-----BEGIN OpenVPN Static key V1-----")) {
-            in_key = true;
-            continue;
-        }
-        if (std.ascii.eqlIgnoreCase(line, "-----END OpenVPN Static key V1-----")) {
-            break;
-        }
-        if (!in_key) continue;
-        if (!util.containsOnly(line, "0123456789abcdefABCDEF")) return error.MalformedOption;
-        try hex.appendSlice(allocator, line);
-    }
-    if (hex.items.len != 512) return error.MalformedOption;
-    return try hex.toOwnedSlice(allocator);
-}
-
-fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.OpenVPNTLSWrap {
-    var base64: std.ArrayList(u8) = .empty;
-    defer base64.deinit(allocator);
-    var in_key = false;
-    for (lines) |line| {
-        if (line.len == 0) continue;
-        if (std.ascii.eqlIgnoreCase(line, "-----BEGIN OpenVPN tls-crypt-v2 client key-----")) {
-            in_key = true;
-            continue;
-        }
-        if (std.ascii.eqlIgnoreCase(line, "-----END OpenVPN tls-crypt-v2 client key-----")) {
-            break;
-        }
-        if (in_key) try base64.appendSlice(allocator, line);
-    }
-
-    var encoded = (try api.SecureData.parseRawAlloc(allocator, base64.items)) orelse return error.MalformedOption;
-    defer encoded.deinit(allocator);
-    const decoded = encoded.bytesAlloc(allocator) catch |err| return switch (err) {
+fn mapStaticKeyParseError(err: StaticKey.ParseError) ParseError {
+    return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
-        else => error.MalformedOption,
-    };
-    defer allocator.free(decoded);
-    if (decoded.len <= 256) return error.MalformedOption;
-
-    var static_key = try api.SecureData.initBytesAlloc(allocator, decoded[0..256]);
-    errdefer static_key.deinit(allocator);
-    var wrapped_key = try api.SecureData.initBytesAlloc(allocator, decoded[256..]);
-    errdefer wrapped_key.deinit(allocator);
-
-    return .{
-        .strategy = .cryptV2,
-        .key = .{
-            .data = static_key,
-            .dir = .client,
-        },
-        .wrapped_key = wrapped_key,
+        error.InvalidStaticKey => error.MalformedOption,
     };
 }
 
