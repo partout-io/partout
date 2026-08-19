@@ -144,13 +144,28 @@ pub const PacketProcessor = struct {
 
 /// Applies OpenVPN XOR processing and TCP packet framing around LINK traffic.
 ///
+/// Transport behavior is bound once at creation through `before_read` and
+/// `before_write`. The read buffer only allocates storage when TCP input is
+/// buffered.
+///
 /// Unlike the Swift closure pair, the Zig API returns explicit ownership so
 /// callers can retain output through a synchronous `Looper.write()` call.
 pub const LinkProcessor = struct {
+    const Self = @This();
+    const BeforeRead = *const fn (
+        self: *Self,
+        packets: []const []const u8,
+    ) error{OutOfMemory}![][]u8;
+    const BeforeWrite = *const fn (
+        self: *const Self,
+        packets: []const []const u8,
+    ) error{ OutOfMemory, PacketTooLarge }![][]u8;
+
     allocator: std.mem.Allocator,
     processor: PacketProcessor,
-    is_tcp: bool,
-    tcp_read_buffer: std.ArrayList(u8) = .empty,
+    read_buffer: std.ArrayList(u8) = .empty,
+    before_read: BeforeRead,
+    before_write: BeforeWrite,
 
     pub const Output = struct {
         allocator: std.mem.Allocator,
@@ -172,16 +187,19 @@ pub const LinkProcessor = struct {
     ) !*LinkProcessor {
         const self = try allocator.create(LinkProcessor);
         errdefer allocator.destroy(self);
+        var processor = try PacketProcessor.init(allocator, method);
+        errdefer processor.deinit();
         self.* = .{
             .allocator = allocator,
-            .processor = try PacketProcessor.init(allocator, method),
-            .is_tcp = is_tcp,
+            .processor = processor,
+            .before_read = if (is_tcp) processTCPInbound else processUDPInbound,
+            .before_write = if (is_tcp) processTCPOutbound else processUDPOutbound,
         };
         return self;
     }
 
     pub fn destroy(self: *LinkProcessor) void {
-        self.tcp_read_buffer.deinit(self.allocator);
+        self.read_buffer.deinit(self.allocator);
         self.processor.deinit();
         const allocator = self.allocator;
         allocator.destroy(self);
@@ -191,44 +209,54 @@ pub const LinkProcessor = struct {
         self: *LinkProcessor,
         packets: []const []const u8,
     ) !Output {
-        const owned = if (self.is_tcp)
-            try self.processTCPInbound(packets)
-        else
-            try self.processor.processPackets(
-                self.allocator,
-                packets,
-                PacketDirection.inbound,
-            );
-        return .{ .allocator = self.allocator, .owned_packets = owned };
+        return .{
+            .allocator = self.allocator,
+            .owned_packets = try self.before_read(self, packets),
+        };
     }
 
     pub fn processOutbound(
         self: *const LinkProcessor,
         packets: []const []const u8,
     ) !Output {
-        if (!self.is_tcp) {
-            return .{
-                .allocator = self.allocator,
-                .owned_packets = try self.processor.processPackets(
-                    self.allocator,
-                    packets,
-                    PacketDirection.outbound,
-                ),
-            };
-        }
+        return .{
+            .allocator = self.allocator,
+            .owned_packets = try self.before_write(self, packets),
+        };
+    }
 
+    fn processUDPInbound(
+        self: *LinkProcessor,
+        packets: []const []const u8,
+    ) error{OutOfMemory}![][]u8 {
+        return self.processor.processPackets(
+            self.allocator,
+            packets,
+            PacketDirection.inbound,
+        );
+    }
+
+    fn processUDPOutbound(
+        self: *const LinkProcessor,
+        packets: []const []const u8,
+    ) error{ OutOfMemory, PacketTooLarge }![][]u8 {
+        return self.processor.processPackets(
+            self.allocator,
+            packets,
+            PacketDirection.outbound,
+        );
+    }
+
+    fn processTCPOutbound(
+        self: *const LinkProcessor,
+        packets: []const []const u8,
+    ) error{ OutOfMemory, PacketTooLarge }![][]u8 {
+        if (packets.len == 0) return self.allocator.alloc([]u8, 0);
         const stream = try self.processor.streamFromPackets(self.allocator, packets);
         errdefer self.allocator.free(stream);
-        if (stream.len == 0) {
-            self.allocator.free(stream);
-            return .{
-                .allocator = self.allocator,
-                .owned_packets = try self.allocator.alloc([]u8, 0),
-            };
-        }
         const result = try self.allocator.alloc([]u8, 1);
         result[0] = stream;
-        return .{ .allocator = self.allocator, .owned_packets = result };
+        return result;
     }
 
     fn processTCPInbound(
@@ -237,21 +265,21 @@ pub const LinkProcessor = struct {
     ) ![][]u8 {
         var additional: usize = 0;
         for (packets) |packet| additional = std.math.add(usize, additional, packet.len) catch return error.OutOfMemory;
-        try self.tcp_read_buffer.ensureUnusedCapacity(self.allocator, additional);
-        for (packets) |packet| self.tcp_read_buffer.appendSliceAssumeCapacity(packet);
+        try self.read_buffer.ensureUnusedCapacity(self.allocator, additional);
+        for (packets) |packet| self.read_buffer.appendSliceAssumeCapacity(packet);
 
         var consumed: usize = 0;
         const result = try self.processor.packetsFromStream(
             self.allocator,
-            self.tcp_read_buffer.items,
+            self.read_buffer.items,
             &consumed,
         );
-        if (consumed > self.tcp_read_buffer.items.len)
+        if (consumed > self.read_buffer.items.len)
             @panic("OpenVPN stream parser consumed beyond its input buffer");
         if (consumed > 0) {
-            const remaining = self.tcp_read_buffer.items[consumed..];
-            std.mem.copyForwards(u8, self.tcp_read_buffer.items[0..remaining.len], remaining);
-            self.tcp_read_buffer.shrinkRetainingCapacity(remaining.len);
+            const remaining = self.read_buffer.items[consumed..];
+            std.mem.copyForwards(u8, self.read_buffer.items[0..remaining.len], remaining);
+            self.read_buffer.shrinkRetainingCapacity(remaining.len);
         }
         return result;
     }

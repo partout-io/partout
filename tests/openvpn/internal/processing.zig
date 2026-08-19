@@ -162,6 +162,24 @@ test "LinkProcessor declarations are semantically analyzed" {
     std.testing.refAllDecls(processing.LinkProcessor);
 }
 
+test "LinkProcessor binds UDP processing at creation" {
+    const allocator = std.testing.allocator;
+    const processor = try processing.LinkProcessor.create(allocator, null, false);
+    defer processor.destroy();
+
+    var inbound = try processor.processInbound(&.{ "abc", "de" });
+    defer inbound.deinit();
+    try std.testing.expectEqual(@as(usize, 2), inbound.packets().len);
+    try std.testing.expectEqualStrings("abc", inbound.packets()[0]);
+    try std.testing.expectEqualStrings("de", inbound.packets()[1]);
+
+    var outbound = try processor.processOutbound(&.{ "abc", "de" });
+    defer outbound.deinit();
+    try std.testing.expectEqual(@as(usize, 2), outbound.packets().len);
+    try std.testing.expectEqualStrings("abc", outbound.packets()[0]);
+    try std.testing.expectEqualStrings("de", outbound.packets()[1]);
+}
+
 test "LinkProcessor retains partial TCP frames and returns explicit ownership" {
     const allocator = std.testing.allocator;
     const processor = try processing.LinkProcessor.create(allocator, null, true);
