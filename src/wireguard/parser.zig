@@ -469,21 +469,13 @@ fn isWireGuardEndpoint(raw: []const u8) bool {
 
     _ = std.fmt.parseInt(u16, port, 10) catch return false;
     if (host.len == 0) return false;
-    for (host) |byte| {
-        if (!isURLHostAllowed(byte)) return false;
-    }
-    return true;
-}
-
-/// Foundation's `CharacterSet.urlHostAllowed` is deliberately narrower than
-/// RFC percent-encoded URLs: `%`, `/`, `@`, `#`, and non-ASCII scalars are not
-/// accepted by the Swift WireGuard parser. Keep the same ASCII set here.
-fn isURLHostAllowed(byte: u8) bool {
-    if (std.ascii.isAlphanumeric(byte)) return true;
-    return switch (byte) {
-        '!', '$', '&', '\'', '(', ')', '*', '+', ',', '-', '.', ':', ';', '=', '[', ']', '_', '~' => true,
-        else => false,
-    };
+    // Foundation's `CharacterSet.urlHostAllowed` is deliberately narrower than
+    // RFC percent-encoded URLs: `%`, `/`, `@`, `#`, and non-ASCII scalars are not
+    // accepted by the Swift WireGuard parser. Keep the same ASCII set here.
+    return util.containsOnly(
+        host,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!$&'()*+,-.:;=[]_~",
+    );
 }
 
 fn importParserContext(context: ?core.ImportContext) Parser.Context {

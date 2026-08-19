@@ -401,7 +401,10 @@ fn appendActiveModuleAllowedIPs(
             .DNS => |*dns| if (dns.routes_through_vpn orelse false) {
                 for (dns.servers) |*server| {
                     if (!server.isIPAddress()) continue;
-                    combined[initialized] = try cloneAddressAsHostSubnet(allocator, server);
+                    combined[initialized] = (try api.Subnet.parseRawAlloc(
+                        allocator,
+                        server.raw,
+                    )) orelse return error.IncompleteModule;
                     initialized += 1;
                 }
             },
@@ -429,21 +432,6 @@ fn cloneRouteDestination(
         .v6 => (try api.Subnet.parseRawAlloc(allocator, "::/0")) orelse
             error.IncompleteModule,
         .hostname => error.IncompleteModule,
-    };
-}
-
-fn cloneAddressAsHostSubnet(
-    allocator: std.mem.Allocator,
-    address: *const api.Address,
-) net.ConnectionCreateError!api.Subnet {
-    return .{
-        .address = (try api.Address.parseRawAlloc(allocator, address.raw)) orelse
-            return error.IncompleteModule,
-        .prefix_length = switch (address.family) {
-            .v4 => 32,
-            .v6 => 128,
-            .hostname => return error.IncompleteModule,
-        },
     };
 }
 
