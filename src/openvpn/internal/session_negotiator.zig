@@ -188,7 +188,8 @@ pub const Negotiator = struct {
             mutable.deinit(self.allocator);
         }
 
-        const tls = self.tls orelse return error.Assertion;
+        const tls = self.tls orelse
+            @panic("Cannot transfer TLS state from a negotiator that no longer owns it");
         self.tls = null;
         errdefer self.tls = tls;
         return create(self.allocator, .{
@@ -229,7 +230,8 @@ pub const Negotiator = struct {
         } else {
             const uses_pia_patches = self.options.configuration.uses_pia_patches orelse false;
             const ca_md5_digest: ?[]u8 = if (uses_pia_patches) blk: {
-                const tls = self.tls orelse return error.Assertion;
+                const tls = self.tls orelse
+                    @panic("Initial negotiation requires an owned TLS session");
                 const digest = tls.caMD5(self.allocator) catch {
                     log.write(.err, "PIA CA MD5 could not be computed, skip custom HARD_RESET");
                     break :blk null;
@@ -380,7 +382,8 @@ pub const Negotiator = struct {
         if (self.state != .push) return;
         const next = self.next_push_request_ns orelse return;
         if (core_mod.concurrency.monotonicNs() <= next) return;
-        const tls = self.tls orelse return error.Assertion;
+        const tls = self.tls orelse
+            @panic("Cannot send a push request without an owned TLS session");
         log.write(.info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)");
         tls.putPlainText("PUSH_REQUEST\x00") catch {};
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
@@ -501,7 +504,8 @@ pub const Negotiator = struct {
 
                 log.write(.info, "Start TLS handshake");
                 self.setState(.tls);
-                const tls = self.tls orelse return error.Assertion;
+                const tls = self.tls orelse
+                    @panic("Cannot start the TLS handshake without an owned TLS session");
                 try tls.start();
                 const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
                     log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {s}", .{
@@ -530,7 +534,8 @@ pub const Negotiator = struct {
                     log.write(.err, "TLS.connect: Control packet with empty payload?");
                     return;
                 };
-                const tls = self.tls orelse return error.Assertion;
+                const tls = self.tls orelse
+                    @panic("Cannot process TLS control data without an owned TLS session");
                 log.writef(.info, "TLS.connect: Put received ciphertext [{d}]", .{
                     packet.packetId(),
                 });
@@ -577,7 +582,8 @@ pub const Negotiator = struct {
         else
             @panic("Authenticator initialization produced no value");
         authenticator.with_local_options = self.options.with_local_options;
-        const tls = self.tls orelse return error.Assertion;
+        const tls = self.tls orelse
+            @panic("Cannot authenticate without an owned TLS session");
         try authenticator.putAuth(tls, self.options.configuration);
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
             if (err == error.TLSFailure) {
@@ -601,8 +607,7 @@ pub const Negotiator = struct {
             if (self.isRenegotiating()) {
                 self.setState(.connected);
                 const history = if (self.history) |*value| value else {
-                    log.write(.fault, "Renegotiating connection without former history");
-                    return error.Assertion;
+                    @panic("Renegotiation completed without history from the original connection");
                 };
                 try self.completeConnection(&history.push_reply);
                 return;
@@ -726,20 +731,16 @@ pub const Negotiator = struct {
         push_reply: *const PushReply,
     ) !*DataChannel {
         const session_id = self.channel.sessionId() orelse {
-            log.write(.fault, "Setting up connection without a local sessionId");
-            return error.Assertion;
+            @panic("Cannot create a data channel before the local session ID is established");
         };
         const remote_session_id = self.channel.remoteSessionId() orelse {
-            log.write(.fault, "Setting up connection without a remote sessionId");
-            return error.Assertion;
+            @panic("Cannot create a data channel before the remote session ID is established");
         };
         const authenticator = if (self.authenticator) |*value| value else {
-            log.write(.fault, "Setting up connection without auth response");
-            return error.Assertion;
+            @panic("Cannot create a data channel before authentication starts");
         };
         var handshake = (try authenticator.response(self.allocator)) orelse {
-            log.write(.fault, "Setting up connection without auth response");
-            return error.Assertion;
+            @panic("Cannot create a data channel before authentication produces a handshake");
         };
         defer handshake.deinit(self.allocator);
 

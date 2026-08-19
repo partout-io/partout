@@ -271,8 +271,7 @@ const PIAHardReset = struct {
         prng: PRNG,
     ) ![]u8 {
         if (!isASCII(self.ca_md5_digest)) {
-            log.write(.fault, "Unable to encode string to ASCII");
-            return error.Assertion;
+            @panic("PIA hard-reset CA MD5 digest must contain only ASCII characters");
         }
 
         const cipher_name = try lowerAlloc(allocator, self.cipher_name);

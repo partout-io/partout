@@ -57,7 +57,8 @@ pub const Serializer = union(enum) {
                     allocator,
                     backend,
                     wrap.key,
-                    wrap.wrapped_key orelse return error.Assertion,
+                    wrap.wrapped_key orelse
+                        @panic("TLS Crypt V2 configuration requires a wrapped client key"),
                 ) },
             };
         }

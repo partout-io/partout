@@ -545,7 +545,8 @@ pub const Authenticator = struct {
         allocator: std.mem.Allocator,
         source: ZeroingData,
     ) !void {
-        if (source.bytes.len > std.math.maxInt(u16)) return error.Assertion;
+        if (source.bytes.len > std.math.maxInt(u16))
+            @panic("OpenVPN PRF field exceeds the 65535-byte protocol limit");
         var encoded: [2]u8 = undefined;
         std.mem.writeInt(u16, &encoded, @intCast(source.bytes.len), .big);
         try destination.append(allocator, &encoded);

@@ -420,7 +420,8 @@ pub const Session = struct {
             },
         };
         log.write(.info, "Start VPN session");
-        const processor = self.link_processor orelse return error.Assertion;
+        const processor = self.link_processor orelse
+            @panic("Session cannot start before its link processor is configured");
         const data_link = DataLink.init(
             self.allocator,
             self.looper,
@@ -571,8 +572,7 @@ pub const Session = struct {
         const context = self.state.activeContext() orelse return;
         context.last_received_ns = core.concurrency.monotonicNs();
         var negotiator = context.currentNegotiator() orelse {
-            log.write(.fault, "No negotiator");
-            return error.Assertion;
+            @panic("Active session received link packets without a negotiator");
         };
         if (negotiator.shouldRenegotiate())
             negotiator = try self.startRenegotiationOnQueue(negotiator, .client);
@@ -675,7 +675,8 @@ pub const Session = struct {
 
     fn startNegotiationOnQueue(self: *Session) !*Negotiator {
         log.write(.info, "Start negotiation");
-        const context = self.state.activeContext() orelse return error.Assertion;
+        const context = self.state.activeContext() orelse
+            @panic("Cannot start negotiation while the session is stopped");
         const tls = try TLSWrapper.create(self.allocator, TLSParameters{
             .backend = self.options.backend,
             .caches_directory = self.caches_directory,
@@ -687,7 +688,8 @@ pub const Session = struct {
         errdefer if (!tls_transferred) tls.destroy();
         const negotiator = try Negotiator.create(self.allocator, .{
             .looper = self.looper,
-            .link_processor = self.link_processor orelse return error.Assertion,
+            .link_processor = self.link_processor orelse
+                @panic("Cannot start negotiation before the link processor is configured"),
             .remote_endpoint = &context.remote_endpoint,
             .channel = self.control_channel,
             .prng = self.prng,
@@ -717,7 +719,8 @@ pub const Session = struct {
             else
                 "Renegotiation request from client",
         );
-        const context = self.state.activeContext() orelse return error.Assertion;
+        const context = self.state.activeContext() orelse
+            @panic("Cannot start renegotiation while the session is stopped");
         const negotiator = try previous.forRenegotiation(initiated_by);
         context.addNegotiator(negotiator);
         try negotiator.start();
@@ -808,7 +811,8 @@ pub const Session = struct {
     fn negotiationTickOnQueue(raw: ?*anyopaque) !void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const context = self.state.activeContext() orelse return;
-        const negotiator = context.currentNegotiator() orelse return error.Assertion;
+        const negotiator = context.currentNegotiator() orelse
+            @panic("Active session negotiation timer fired without a negotiator");
         if (try negotiator.tick()) try self.scheduleNegotiationTick();
     }
 
