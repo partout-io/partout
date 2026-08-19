@@ -159,6 +159,15 @@ test "compares optional strings" {
     try std.testing.expect(!util.optionalStringsEqual("alpha", "beta"));
 }
 
+test "runtime platform version has major and minor components" {
+    const version = try util.platformVersionAlloc(std.testing.allocator);
+    defer std.testing.allocator.free(version);
+    const separator = std.mem.indexOfScalar(u8, version, '.') orelse
+        return error.TestUnexpectedResult;
+    try std.testing.expect(separator > 0);
+    try std.testing.expect(separator + 1 < version.len);
+}
+
 test "appends owned string copies" {
     const allocator = std.testing.allocator;
     var list: std.ArrayList([]u8) = .empty;

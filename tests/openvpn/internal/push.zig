@@ -265,15 +265,6 @@ test "PUSH_REPLY signals a continuation fragment" {
     );
 }
 
-test "runtime platform version has major and minor components" {
-    const version = try push.testing.platformVersion(std.testing.allocator);
-    defer std.testing.allocator.free(version);
-    const separator = std.mem.indexOfScalar(u8, version, '.') orelse
-        return error.TestUnexpectedResult;
-    try std.testing.expect(separator > 0);
-    try std.testing.expect(separator + 1 < version.len);
-}
-
 test "peer info has one trailing newline" {
     const info = try push.testing.formatPeerInfo(
         std.testing.allocator,
