@@ -151,7 +151,7 @@ pub fn PRNGWith(comptime Provider: type) type {
         ) !ZeroingData {
             var result = try ZeroingData.init(allocator, length);
             errdefer result.deinit(allocator);
-            try self.fill(result.bytes());
+            try self.fill(result.asSlice());
             return result;
         }
     };
@@ -183,9 +183,9 @@ pub const ZeroingData = struct {
         source: []const u8,
         null_terminated: bool,
     ) !ZeroingData {
-        const length = source.len + @intFromBool(null_terminated);
-        var result = fromC(c_common.pp_zd_create(length));
-        const result_bytes = result.bytes();
+        const result_length = source.len + @intFromBool(null_terminated);
+        var result = fromC(c_common.pp_zd_create(result_length));
+        const result_bytes = result.asSlice();
         @memcpy(result_bytes[0..source.len], source);
         if (null_terminated) result_bytes[source.len] = 0;
         return result;
@@ -219,9 +219,17 @@ pub const ZeroingData = struct {
     }
 
     /// Borrowed view valid until the next mutation or deinitialization.
-    pub fn bytes(self: ZeroingData) []u8 {
+    pub fn asSlice(self: ZeroingData) []u8 {
         const ptr = self.cPtr();
         return ptr.*.bytes[0..ptr.*.length];
+    }
+
+    pub fn bytes(self: ZeroingData) [*c]const u8 {
+        return c_common.pp_zd_bytes(self.cPtr());
+    }
+
+    pub fn mutableBytes(self: ZeroingData) [*c]u8 {
+        return c_common.pp_zd_mutable_bytes(self.cPtr());
     }
 
     pub fn length(self: ZeroingData) usize {
@@ -257,13 +265,13 @@ pub const ZeroingData = struct {
     }
 
     pub fn networkU16(self: ZeroingData, offset: usize) !u16 {
-        const data = self.bytes();
+        const data = self.asSlice();
         if (offset > data.len or data.len - offset < 2) return error.OutOfBounds;
         return std.mem.readInt(u16, data[offset..][0..2], .big);
     }
 
     pub fn nullTerminatedString(self: ZeroingData, offset: usize) ?[]const u8 {
-        const data = self.bytes();
+        const data = self.asSlice();
         if (offset > data.len) return null;
         const tail = data[offset..];
         const end = std.mem.indexOfScalar(u8, tail, 0) orelse return null;

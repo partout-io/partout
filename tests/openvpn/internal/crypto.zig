@@ -28,9 +28,9 @@ test "ZeroingData delegates append and slice to pp_zd" {
     var data = try crypto.ZeroingData.initCopy(allocator, "abc");
     defer data.deinit(allocator);
     try data.append(allocator, "def");
-    try std.testing.expectEqualStrings("abcdef", data.bytes());
+    try std.testing.expectEqualStrings("abcdef", data.asSlice());
 
     var part = try data.sliceCopy(allocator, 2, 3);
     defer part.deinit(allocator);
-    try std.testing.expectEqualStrings("cde", part.bytes());
+    try std.testing.expectEqualStrings("cde", part.asSlice());
 }

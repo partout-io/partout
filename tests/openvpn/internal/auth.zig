@@ -38,15 +38,15 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
 
     const allocator = std.testing.allocator;
     var pre_master = try ZeroingData.init(allocator, Keys.pre_master_length);
-    @memset(pre_master.bytes(), 0x10);
+    @memset(pre_master.asSlice(), 0x10);
     var random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random1.bytes(), 0x21);
+    @memset(random1.asSlice(), 0x21);
     var random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random2.bytes(), 0x32);
+    @memset(random2.asSlice(), 0x32);
     var server_random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random1.bytes(), 0x43);
+    @memset(server_random1.asSlice(), 0x43);
     var server_random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random2.bytes(), 0x54);
+    @memset(server_random2.asSlice(), 0x54);
     var handshake = Handshake{
         .pre_master = pre_master.move(),
         .random1 = random1.move(),
@@ -90,7 +90,7 @@ test "Authenticator frames auth and buffers replies and messages" {
         .digest = .sha256,
     });
     defer auth_data.deinit(allocator);
-    const framed = auth_data.bytes();
+    const framed = auth_data.asSlice();
     try std.testing.expectEqualSlices(u8, &ControlConstants.tls_prefix, framed[0..ControlConstants.tls_prefix.len]);
     try std.testing.expect(framed.len > ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
     try std.testing.expect(std.mem.indexOf(u8, framed, "IV_MTU=1600\n") != null);
@@ -115,8 +115,8 @@ test "Authenticator frames auth and buffers replies and messages" {
     try std.testing.expectEqual(api.OpenVPNDigest.sha256, authenticator.server_options.?.digest.?);
     var handshake = (try authenticator.response(allocator)).?;
     defer handshake.deinit(allocator);
-    try std.testing.expectEqual(@as(u8, 0x11), handshake.server_random1.bytes()[0]);
-    try std.testing.expectEqual(@as(u8, 0x22), handshake.server_random2.bytes()[0]);
+    try std.testing.expectEqual(@as(u8, 0x11), handshake.server_random1.asSlice()[0]);
+    try std.testing.expectEqual(@as(u8, 0x22), handshake.server_random2.asSlice()[0]);
 
     try authenticator.appendControlData("AUTH_FAILED\x00PUSH_REPLY,route\x00partial");
     const messages = try authenticator.parseMessages(allocator);
@@ -127,7 +127,7 @@ test "Authenticator frames auth and buffers replies and messages" {
     try std.testing.expectEqual(@as(usize, 2), messages.len);
     try std.testing.expectEqualStrings("AUTH_FAILED", messages[0]);
     try std.testing.expectEqualStrings("PUSH_REPLY,route", messages[1]);
-    try std.testing.expectEqualStrings("partial", authenticator.control_buffer.bytes());
+    try std.testing.expectEqualStrings("partial", authenticator.control_buffer.asSlice());
 }
 
 test "server OCC extracts only runtime-relevant values" {

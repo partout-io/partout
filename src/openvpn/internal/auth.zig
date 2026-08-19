@@ -126,9 +126,9 @@ pub const PRF = struct {
         var master_data = try prfData(allocator, .{
             .functions = self.functions,
             .label = KeysConstants.label1,
-            .secret = handshake.pre_master.bytes(),
-            .client_seed = handshake.random1.bytes(),
-            .server_seed = handshake.server_random1.bytes(),
+            .secret = handshake.pre_master.asSlice(),
+            .client_seed = handshake.random1.asSlice(),
+            .server_seed = handshake.server_random1.asSlice(),
             .size = KeysConstants.pre_master_length,
         });
         defer master_data.deinit(allocator);
@@ -136,9 +136,9 @@ pub const PRF = struct {
         var keys_data = try prfData(allocator, .{
             .functions = self.functions,
             .label = KeysConstants.label2,
-            .secret = master_data.bytes(),
-            .client_seed = handshake.random2.bytes(),
-            .server_seed = handshake.server_random2.bytes(),
+            .secret = master_data.asSlice(),
+            .client_seed = handshake.random2.asSlice(),
+            .server_seed = handshake.server_random2.asSlice(),
             .client_session_id = session_id,
             .server_session_id = remote_session_id,
             .size = KeysConstants.keys_count * KeysConstants.key_length,
@@ -180,7 +180,7 @@ pub const PRF = struct {
             input.functions,
             "MD5",
             input.secret[0..half_rounded_up],
-            seed.bytes(),
+            seed.asSlice(),
             input.size,
         );
         defer hash1.deinit(allocator);
@@ -189,13 +189,13 @@ pub const PRF = struct {
             input.functions,
             "SHA1",
             input.secret[half..][0..half_rounded_up],
-            seed.bytes(),
+            seed.asSlice(),
             input.size,
         );
         defer hash2.deinit(allocator);
 
         const result = try ZeroingData.init(allocator, input.size);
-        for (result.bytes(), hash1.bytes(), hash2.bytes()) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
+        for (result.asSlice(), hash1.asSlice(), hash2.asSlice()) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
         return result;
     }
 
@@ -217,11 +217,11 @@ pub const PRF = struct {
             defer chain_and_seed.deinit(allocator);
             try chain_and_seed.append(allocator, seed);
 
-            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.bytes());
+            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.asSlice());
             defer block.deinit(allocator);
-            try output.append(allocator, block.bytes());
+            try output.append(allocator, block.asSlice());
 
-            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.bytes());
+            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.asSlice());
             chain.deinit(allocator);
             chain = next_chain.move();
         }
@@ -242,7 +242,7 @@ pub const PRF = struct {
         var buffer = try ZeroingData.init(allocator, hmac_max_length);
         errdefer buffer.deinit(allocator);
         var context = c_crypto.pp_hmac_ctx{
-            .dst = buffer.bytes().ptr,
+            .dst = buffer.mutableBytes(),
             .dst_len = buffer.length(),
             .digest_name = digest_name.ptr,
             .secret = secret.ptr,
@@ -363,7 +363,7 @@ pub const Authenticator = struct {
         var raw = try self.authData(configuration);
         defer raw.deinit(self.allocator);
         log.write(.info, "TLS.auth: Put plaintext");
-        try tls.putRawPlainText(raw.bytes());
+        try tls.putRawPlainText(raw.asSlice());
     }
 
     fn authData(
@@ -436,7 +436,7 @@ pub const Authenticator = struct {
         if (self.control_buffer.length() < minimum_length) return false;
         if (!std.mem.eql(
             u8,
-            self.control_buffer.bytes()[0..prefix_length],
+            self.control_buffer.asSlice()[0..prefix_length],
             &ControlConstants.tls_prefix,
         )) return error.WrongControlDataPrefix;
 
@@ -503,7 +503,7 @@ pub const Authenticator = struct {
         }
         var offset: usize = 0;
         while (offset < self.control_buffer.length()) {
-            const tail = self.control_buffer.bytes()[offset..];
+            const tail = self.control_buffer.asSlice()[offset..];
             const length = std.mem.indexOfScalar(u8, tail, 0) orelse break;
             const message = tail[0..length];
             if (!std.unicode.utf8ValidateSlice(message)) break;

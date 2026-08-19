@@ -54,13 +54,13 @@ test "client and server tls-crypt keys are complementary" {
     defer server.deinit(std.testing.allocator);
     try std.testing.expectEqualSlices(
         u8,
-        client.cipher.?.encryption_key.bytes(),
-        server.cipher.?.decryption_key.bytes(),
+        client.cipher.?.encryption_key.asSlice(),
+        server.cipher.?.decryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
-        client.digest.?.encryption_key.bytes(),
-        server.digest.?.decryption_key.bytes(),
+        client.digest.?.encryption_key.asSlice(),
+        server.digest.?.decryption_key.asSlice(),
     );
 }
 
@@ -76,8 +76,8 @@ test "tls-auth without key direction uses the shared HMAC quadrant" {
     defer secure.deinit(std.testing.allocator);
     var keys = try buildAuthKeys(std.testing.allocator, .{ .data = secure, .dir = null });
     defer keys.deinit(std.testing.allocator);
-    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.bytes(), 1));
-    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.bytes(), 1));
+    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.asSlice(), 1));
+    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.asSlice(), 1));
 }
 
 test "static tls-auth key directions match the Swift key vectors" {
@@ -103,12 +103,12 @@ test "static tls-auth key directions match the Swift key vectors" {
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        bidirectional.digest.?.encryption_key.bytes(),
+        bidirectional.digest.?.encryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        bidirectional.digest.?.decryption_key.bytes(),
+        bidirectional.digest.?.decryption_key.asSlice(),
     );
 
     var client = try buildAuthKeys(allocator, .{
@@ -119,12 +119,12 @@ test "static tls-auth key directions match the Swift key vectors" {
     try std.testing.expectEqualSlices(
         u8,
         client_send,
-        client.digest.?.encryption_key.bytes(),
+        client.digest.?.encryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        client.digest.?.decryption_key.bytes(),
+        client.digest.?.decryption_key.asSlice(),
     );
 }
 
