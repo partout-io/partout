@@ -71,8 +71,7 @@ pub const DataPathDecryptResult = struct {
     keep_alive: bool,
 
     pub fn deinit(self: *DataPathDecryptResult, allocator: std.mem.Allocator) void {
-        for (self.packets) |packet| allocator.free(packet);
-        allocator.free(self.packets);
+        core_mod.util.freeSliceOfStrings(allocator, self.packets);
     }
 };
 
@@ -127,10 +126,7 @@ pub const DataPath = struct {
         key: u8,
     ) ![][]u8 {
         var result: std.ArrayList([]u8) = .empty;
-        errdefer {
-            for (result.items) |packet| allocator.free(packet);
-            result.deinit(allocator);
-        }
+        errdefer core_mod.util.deinitListOfStrings(allocator, &result);
         try result.ensureTotalCapacity(allocator, packets.len);
         for (packets) |packet| {
             self.out_packet_id = std.math.add(u32, self.out_packet_id, 1) catch {
@@ -154,10 +150,7 @@ pub const DataPath = struct {
         packets: []const []const u8,
     ) !DataPathDecryptResult {
         var result: std.ArrayList([]u8) = .empty;
-        errdefer {
-            for (result.items) |packet| allocator.free(packet);
-            result.deinit(allocator);
-        }
+        errdefer core_mod.util.deinitListOfStrings(allocator, &result);
         try result.ensureTotalCapacity(allocator, packets.len);
         var keep_alive = false;
         for (packets) |packet| {
@@ -491,7 +484,7 @@ pub const DataLink = struct {
             log.write(.err, "Unable to decrypt packets, is DataChannel properly configured?");
             return err;
         };
-        defer DataLink.freePackets(self.allocator, decrypted);
+        defer core_mod.util.freeSliceOfStrings(self.allocator, decrypted);
         if (decrypted.len == 0) return;
 
         self.callbacks.report_inbound_data_count(
@@ -512,7 +505,7 @@ pub const DataLink = struct {
             log.write(.err, "Unable to encrypt packets, is DataChannel properly configured?");
             return err;
         };
-        defer DataLink.freePackets(self.allocator, encrypted);
+        defer core_mod.util.freeSliceOfStrings(self.allocator, encrypted);
         if (encrypted.len == 0) return;
 
         self.callbacks.report_outbound_data_count(
@@ -552,11 +545,6 @@ pub const DataLink = struct {
         var result: usize = 0;
         for (packets) |packet| result +|= packet.len;
         return result;
-    }
-
-    fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-        for (packets) |packet| allocator.free(packet);
-        allocator.free(packets);
     }
 
     fn asConstPackets(packets: []const []u8) []const []const u8 {

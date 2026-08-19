@@ -218,7 +218,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             resend_after_ms: i64,
         ) ![][]u8 {
             var raw_packets: std.ArrayList([]u8) = .empty;
-            errdefer freePacketList(self.allocator, &raw_packets);
+            errdefer core_mod.util.deinitListOfStrings(self.allocator, &raw_packets);
             const now = core_mod.concurrency.monotonicNs() / std.time.ns_per_ms;
             for (self.outbound_queue.items) |*packet| {
                 if (self.sent_dates_ms.get(packet.packetId())) |sent| {
@@ -295,11 +295,6 @@ pub fn ControlChannel(comptime Serializer: type) type {
 
         fn packetLessThan(_: void, lhs: ControlPacket, rhs: ControlPacket) bool {
             return lhs.packetId() < rhs.packetId();
-        }
-
-        fn freePacketList(allocator: std.mem.Allocator, packets: *std.ArrayList([]u8)) void {
-            for (packets.items) |packet| allocator.free(packet);
-            packets.deinit(allocator);
         }
     };
 }

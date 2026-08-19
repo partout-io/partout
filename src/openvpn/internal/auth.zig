@@ -497,17 +497,14 @@ pub const Authenticator = struct {
         allocator: std.mem.Allocator,
     ) ![][]u8 {
         var messages: std.ArrayList([]u8) = .empty;
-        errdefer {
-            for (messages.items) |message| allocator.free(message);
-            messages.deinit(allocator);
-        }
+        errdefer core_mod.util.deinitListOfStrings(allocator, &messages);
         var offset: usize = 0;
         while (offset < self.control_buffer.length()) {
             const tail = self.control_buffer.asSlice()[offset..];
             const length = std.mem.indexOfScalar(u8, tail, 0) orelse break;
             const message = tail[0..length];
             if (!std.unicode.utf8ValidateSlice(message)) break;
-            try messages.append(allocator, try allocator.dupe(u8, message));
+            try core_mod.util.appendOwned(allocator, &messages, message);
             offset += length + 1;
         }
         try self.control_buffer.removePrefix(self.allocator, offset);
@@ -598,7 +595,7 @@ const ServerOCC = struct {
         var result: ServerOCC = .{};
         var lines = std.mem.splitScalar(u8, string, ',');
         while (lines.next()) |raw_line| {
-            const line = std.mem.trim(u8, raw_line, " \t\r\n");
+            const line = core_mod.util.trim(raw_line);
             var components = std.mem.tokenizeAny(u8, line, " \t\r\n");
             const option = components.next() orelse continue;
             const value = components.next() orelse continue;

@@ -237,10 +237,8 @@ const Builder = struct {
         self.configuration.deinit(allocator);
         self.data_ciphers.deinit(allocator);
         self.remotes.deinit(allocator);
-        for (self.routes4.items) |*route| route.deinit(allocator);
-        self.routes4.deinit(allocator);
-        for (self.routes6.items) |*route| route.deinit(allocator);
-        self.routes6.deinit(allocator);
+        util.deinitList(api.Route, allocator, &self.routes4);
+        util.deinitList(api.Route, allocator, &self.routes6);
         util.deinitListOfStrings(allocator, &self.dns_servers);
         util.deinitListOfStrings(allocator, &self.search_domains);
         util.deinitListOfStrings(allocator, &self.proxy_bypass_domains);

@@ -93,7 +93,7 @@ pub const PacketProcessor = struct {
         until: *usize,
     ) ![][]u8 {
         var packets: std.ArrayList([]u8) = .empty;
-        errdefer freePacketList(allocator, &packets);
+        errdefer core_mod.util.deinitListOfStrings(allocator, &packets);
         until.* = 0;
         while (until.* < stream.len) {
             var received: usize = 0;
@@ -104,9 +104,11 @@ pub const PacketProcessor = struct {
                 &received,
             ) orelse break);
             defer c_common.pp_zd_free(zeroing);
-            const copy = try allocator.dupe(u8, zeroing.*.bytes[0..zeroing.*.length]);
-            errdefer allocator.free(copy);
-            try packets.append(allocator, copy);
+            try core_mod.util.appendOwned(
+                allocator,
+                &packets,
+                zeroing.*.bytes[0..zeroing.*.length],
+            );
             until.* += received;
         }
         return packets.toOwnedSlice(allocator);
@@ -138,11 +140,6 @@ pub const PacketProcessor = struct {
         if (offset != capacity)
             @panic("OpenVPN stream serializer wrote a length different from its advertised capacity");
         return allocator.dupe(u8, zeroing.*.bytes[0..offset]);
-    }
-
-    fn freePacketList(allocator: std.mem.Allocator, packets: *std.ArrayList([]u8)) void {
-        for (packets.items) |packet| allocator.free(packet);
-        packets.deinit(allocator);
     }
 };
 

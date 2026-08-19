@@ -112,7 +112,7 @@ const OpenVPNConnection = struct {
             error.CryptoFailure => return error.IdGeneration,
         };
         const endpoints = maybe_endpoints orelse return error.IncompleteModule;
-        errdefer deinitEndpoints(allocator, endpoints);
+        errdefer core.util.freeSlice(api.ExtendedEndpoint, allocator, endpoints);
         if (endpoints.len == 0) return error.IncompleteModule;
 
         var credentials = if (openvpn.credentials) |value|
@@ -169,7 +169,7 @@ const OpenVPNConnection = struct {
         self.deinitQueuedEvents();
         self.event_lock.deinit();
         self.endpoint_resolver.deinit(self.allocator);
-        deinitEndpoints(self.allocator, self.endpoints);
+        core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.cache_dir);
@@ -462,7 +462,7 @@ const OpenVPNConnection = struct {
             self.failTunnelSetup(session, tunnelErrorCode(err));
             return;
         };
-        defer NetworkSettingsBuilder.deinitModules(self.allocator, modules);
+        defer core.util.freeSlice(api.TaggedModule, self.allocator, modules);
 
         const info = api.TunnelRemoteInfoWrapper{
             .profile = self.profile.*,
@@ -770,7 +770,8 @@ const EndpointResolver = struct {
         self: *EndpointResolver,
         allocator: std.mem.Allocator,
     ) void {
-        if (self.resolved) |resolved| deinitEndpoints(allocator, resolved);
+        if (self.resolved) |resolved|
+            core.util.freeSlice(api.ExtendedEndpoint, allocator, resolved);
         self.resolved = null;
         self.next_resolved_index = 0;
     }
@@ -817,15 +818,9 @@ fn resolveEndpoint(
         reachability,
         timeout_ms,
     );
-    defer {
-        for (records) |record| record.deinit(allocator);
-        allocator.free(records);
-    }
+    defer core.util.freeSlice(net.DNSRecord, allocator, records);
     var result: std.ArrayList(api.ExtendedEndpoint) = .empty;
-    errdefer {
-        for (result.items) |*resolved| resolved.deinit(allocator);
-        result.deinit(allocator);
-    }
+    errdefer core.util.deinitList(api.ExtendedEndpoint, allocator, &result);
     for (records) |record| {
         const resolved_address = api.Address.parseRaw(record.address) orelse continue;
         if (!resolved_address.isIPAddress()) continue;
@@ -959,14 +954,6 @@ fn cloneEndpoint(
         .proto = endpoint.proto,
         .owned = true,
     };
-}
-
-fn deinitEndpoints(
-    allocator: std.mem.Allocator,
-    endpoints: []api.ExtendedEndpoint,
-) void {
-    for (endpoints) |*endpoint| endpoint.deinit(allocator);
-    allocator.free(endpoints);
 }
 
 const openvpn_connection_vtable = net.Connection.VTable{

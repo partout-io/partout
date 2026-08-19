@@ -435,7 +435,7 @@ pub const Negotiator = struct {
             log.writef(.err, "Failed control packet serialization: {s}", .{@errorName(err)});
             return err;
         };
-        defer freePackets(self.allocator, raw_packets);
+        defer core_mod.util.freeSliceOfStrings(self.allocator, raw_packets);
         if (raw_packets.len == 0) return;
         for (raw_packets) |_|
             log.write(.info, "Send control packet");
@@ -619,7 +619,7 @@ pub const Negotiator = struct {
         }
 
         const messages = try authenticator.parseMessages(self.allocator);
-        defer freePackets(self.allocator, messages);
+        defer core_mod.util.freeSliceOfStrings(self.allocator, messages);
         for (messages) |message| {
             log.write(.info, "Parsed control message");
             self.handleControlMessage(message) catch |err| {
@@ -847,11 +847,6 @@ pub const Negotiator = struct {
         self.enqueueControlPackets(.controlV1, self.key, ciphertext) catch |err| {
             return errors_mod.sessionError(err);
         };
-    }
-
-    fn freePackets(allocator: std.mem.Allocator, packets: [][]u8) void {
-        for (packets) |packet| allocator.free(packet);
-        allocator.free(packets);
     }
 
     fn removeAllAlloc(
