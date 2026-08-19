@@ -3,11 +3,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const core = @import("source").core;
 const io = @import("source").net_io;
 const platform_source = @import("source").net_platform;
+const c = @import("source").c_exports.io;
 
 const Platform = platform_source.Platform;
 const ReachabilityInfo = io.ReachabilityInfo;
@@ -27,34 +27,36 @@ const TunnelCommitRecorder = struct {
     received_environment_value: bool = false,
 };
 
-export fn pp_swift_tun_ctrl_set_tunnel(
+fn recordSetTunnel(
     ref: ?*anyopaque,
-    _: ?[*:0]const u8,
-    info_json: ?[*:0]const u8,
-) bool {
-    const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return false));
-    const json = std.mem.span(info_json orelse return false);
+    _: [*c]const u8,
+    info_json: [*c]const u8,
+) callconv(.c) c.pp_tun {
+    const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return null));
+    if (info_json == null) return null;
+    const json = std.mem.span(info_json);
     recorder.calls += 1;
     recorder.received_settings_only_info = std.mem.indexOf(
         u8,
         json,
         "\"requiresVirtualDevice\":false",
     ) != null;
-    return true;
+    return null;
 }
 
-export fn pp_swift_tun_ctrl_set_environment_value(
+fn recordEnvironmentValue(
     ref: ?*anyopaque,
-    key: ?[*:0]const u8,
-    value: ?[*:0]const u8,
-) void {
+    key: [*c]const u8,
+    value: [*c]const u8,
+) callconv(.c) void {
     const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return));
-    recorder.received_environment_key = std.mem.eql(u8, std.mem.span(key orelse return), "test.key");
-    if (value) |raw_value| {
+    if (key == null) return;
+    recorder.received_environment_key = std.mem.eql(u8, std.mem.span(key), "test.key");
+    if (value != null) {
         recorder.environment_set_calls += 1;
         recorder.received_environment_value = std.mem.eql(
             u8,
-            std.mem.span(raw_value),
+            std.mem.span(value),
             "{\"enabled\":true}",
         );
     } else {
@@ -62,12 +64,16 @@ export fn pp_swift_tun_ctrl_set_environment_value(
     }
 }
 
-test "platform commits settings when no virtual device is required" {
-    // Relies on external Swift bindings layout from tun_darwin.c
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
+fn platformOptions(recorder: *TunnelCommitRecorder) Platform.Options {
+    var functions = c.pp_tun_ctrl_fnt_current();
+    functions.set_tunnel = recordSetTunnel;
+    functions.set_environment_value = recordEnvironmentValue;
+    return .{ .ref = recorder, .fnt = functions };
+}
 
+test "platform commits settings when no virtual device is required" {
     var recorder = TunnelCommitRecorder{};
-    var platform = try Platform.init(.{ .ref = &recorder });
+    var platform = try Platform.init(platformOptions(&recorder));
     defer platform.deinit();
 
     const tun = try platform.tunnelController().setTunnelSettings(.{});
@@ -78,10 +84,8 @@ test "platform commits settings when no virtual device is required" {
 }
 
 test "platform forwards environment values and removals" {
-    if (builtin.os.tag != .macos) return error.SkipZigTest;
-
     var recorder = TunnelCommitRecorder{};
-    var platform = try Platform.init(.{ .ref = &recorder });
+    var platform = try Platform.init(platformOptions(&recorder));
     defer platform.deinit();
 
     const controller = platform.tunnelController();
