@@ -58,17 +58,18 @@ pub const NegotiatorState = enum(u8) {
 pub const NegotiationHistory = struct {
     push_reply: PushReply,
 
-    pub fn init(push_reply: *PushReply) NegotiationHistory {
-        const moved = push_reply.*;
-        push_reply.* = undefined;
-        return .{ .push_reply = moved };
+    pub fn init(
+        allocator: std.mem.Allocator,
+        push_reply: *const PushReply,
+    ) !NegotiationHistory {
+        return .{ .push_reply = try push_reply.clone(allocator) };
     }
 
     pub fn clone(
         self: NegotiationHistory,
         allocator: std.mem.Allocator,
     ) !NegotiationHistory {
-        return .{ .push_reply = try self.push_reply.clone(allocator) };
+        return init(allocator, &self.push_reply);
     }
 
     pub fn deinit(self: *NegotiationHistory, allocator: std.mem.Allocator) void {
@@ -706,16 +707,9 @@ pub const Negotiator = struct {
         log.writef(.info, "Complete connection of key {d}", .{self.key});
         const data_channel = try self.newDataChannel(push_reply);
         errdefer data_channel.destroy();
-        var reply_copy = try push_reply.clone(self.allocator);
-        var reply_transferred = false;
-        errdefer if (!reply_transferred) reply_copy.deinit(self.allocator);
-        var history = NegotiationHistory.init(&reply_copy);
-        reply_transferred = true;
-        var history_transferred = false;
-        errdefer if (!history_transferred) history.deinit(self.allocator);
+        const history = try NegotiationHistory.init(self.allocator, push_reply);
         if (self.history) |*old| old.deinit(self.allocator);
         self.history = history;
-        history_transferred = true;
         if (self.authenticator) |*authenticator| authenticator.reset();
         try self.options.on_connected(
             self.options.callback_context,

@@ -26,7 +26,8 @@ test "NegotiatorState preserves Swift ordering" {
 
 test "negotiation history deep-clones push options" {
     var reply = (try PushReply.parse(std.testing.allocator, "PUSH_REPLY,ping 10")).?;
-    var history = NegotiationHistory.init(&reply);
+    defer reply.deinit(std.testing.allocator);
+    var history = try NegotiationHistory.init(std.testing.allocator, &reply);
     defer history.deinit(std.testing.allocator);
     var copy = try history.clone(std.testing.allocator);
     defer copy.deinit(std.testing.allocator);
