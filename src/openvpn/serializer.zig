@@ -5,10 +5,10 @@
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
-const internal_serialization = @import("internal/serialization.zig");
+const keys_mod = @import("internal/keys.zig");
 
 const api = core.api;
-const StaticKey = internal_serialization.StaticKey;
+const StaticKey = keys_mod.StaticKey;
 
 pub fn serializeModule(
     _: ?*anyopaque,

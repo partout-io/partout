@@ -6,12 +6,12 @@ const std = @import("std");
 
 const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
-const internal_serialization = @import("internal/serialization.zig");
+const keys_mod = @import("internal/keys.zig");
 
 const api = core.api;
 const c_common = c_mod.common;
 const CryptoBackend = c_mod.CryptoBackend;
-const StaticKey = internal_serialization.StaticKey;
+const StaticKey = keys_mod.StaticKey;
 const util = core.util;
 
 pub fn importModule(
