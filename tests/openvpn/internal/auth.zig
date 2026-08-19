@@ -5,7 +5,8 @@
 const std = @import("std");
 const source = @import("source");
 
-const api = source.core.api;
+const core = source.core;
+const api = core.api;
 const c_crypto = source.c_crypto;
 const auth = source.openvpn_internal.auth;
 const constants = source.openvpn_internal.constants;
@@ -120,14 +121,14 @@ test "Authenticator frames auth and buffers replies and messages" {
 
     try authenticator.appendControlData("AUTH_FAILED\x00PUSH_REPLY,route\x00partial");
     const messages = try authenticator.parseMessages(allocator);
-    defer {
-        for (messages) |message| allocator.free(message);
-        allocator.free(messages);
-    }
+    defer core.util.freeSliceOfStrings(allocator, messages);
     try std.testing.expectEqual(@as(usize, 2), messages.len);
     try std.testing.expectEqualStrings("AUTH_FAILED", messages[0]);
     try std.testing.expectEqualStrings("PUSH_REPLY,route", messages[1]);
     try std.testing.expectEqualStrings("partial", authenticator.control_buffer.asSlice());
+
+    authenticator.reset();
+    try std.testing.expectEqual(@as(usize, 0), authenticator.control_buffer.length());
 }
 
 test "server OCC extracts only runtime-relevant values" {

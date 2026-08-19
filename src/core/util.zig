@@ -278,6 +278,16 @@ pub fn platformVersionAlloc(allocator: std.mem.Allocator) ![]u8 {
     return detected orelse allocator.dupe(u8, "0.0");
 }
 
+/// Parses an enum by comparing `value` case-insensitively with each field's
+/// string returned by `raw()`.
+pub fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
+    inline for (std.meta.fields(T)) |field| {
+        const candidate: T = @field(T, field.name);
+        if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+    }
+    return null;
+}
+
 fn darwinVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
     var buffer: [64]u8 = @splat(0);
     var length = buffer.len;

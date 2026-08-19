@@ -324,7 +324,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "cipher")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.legacy_cipher = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.legacy_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers") or std.ascii.eqlIgnoreCase(option, "ncp-ciphers")) {
@@ -334,7 +334,7 @@ const Builder = struct {
             while (ciphers.next()) |cipher| {
                 const is_optional = std.mem.startsWith(u8, cipher, "?");
                 const name = if (is_optional) cipher[1..] else cipher;
-                const parsed_cipher = parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
+                const parsed_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
                     if (is_optional) continue;
                     return error.UnsupportedConfiguration;
                 };
@@ -345,12 +345,12 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.data_ciphers_fallback = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.data_ciphers_fallback = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "auth")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.digest = parseRawIgnoreCase(api.OpenVPNDigest, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.configuration.digest = util.parseRawIgnoreCase(api.OpenVPNDigest, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "comp-lzo")) {
@@ -927,14 +927,6 @@ fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
     inline for (std.meta.fields(api.IPSocketType)) |field| {
         const socket_type: api.IPSocketType = @field(api.IPSocketType, field.name);
         if (std.ascii.eqlIgnoreCase(value, socket_type.raw())) return socket_type;
-    }
-    return null;
-}
-
-fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
-    inline for (std.meta.fields(T)) |field| {
-        const candidate: T = @field(T, field.name);
-        if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
     }
     return null;
 }

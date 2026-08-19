@@ -159,6 +159,12 @@ test "compares optional strings" {
     try std.testing.expect(!util.optionalStringsEqual("alpha", "beta"));
 }
 
+test "parses enum raw values case-insensitively" {
+    try std.testing.expectEqual(RawValue.alpha, util.parseRawIgnoreCase(RawValue, "ALPHA"));
+    try std.testing.expectEqual(RawValue.beta, util.parseRawIgnoreCase(RawValue, "beta-value"));
+    try std.testing.expectEqual(null, util.parseRawIgnoreCase(RawValue, "unknown"));
+}
+
 test "runtime platform version has major and minor components" {
     const version = try util.platformVersionAlloc(std.testing.allocator);
     defer std.testing.allocator.free(version);
@@ -298,5 +304,17 @@ const ClearItem = struct {
 
     pub fn deinit(self: *ClearItem) void {
         self.deinit_count.* += 1;
+    }
+};
+
+const RawValue = enum {
+    alpha,
+    beta,
+
+    pub fn raw(self: RawValue) []const u8 {
+        return switch (self) {
+            .alpha => "alpha",
+            .beta => "beta-value",
+        };
     }
 };

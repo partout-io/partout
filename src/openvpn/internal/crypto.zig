@@ -240,6 +240,10 @@ pub const ZeroingData = struct {
         c_common.pp_zd_zero(self.cPtr());
     }
 
+    pub fn clear(self: *ZeroingData) void {
+        c_common.pp_zd_resize(self.cPtr(), 0);
+    }
+
     pub fn append(
         self: *ZeroingData,
         _: std.mem.Allocator,

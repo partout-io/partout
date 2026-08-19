@@ -33,4 +33,9 @@ test "ZeroingData delegates append and slice to pp_zd" {
     var part = try data.sliceCopy(allocator, 2, 3);
     defer part.deinit(allocator);
     try std.testing.expectEqualStrings("cde", part.asSlice());
+
+    data.clear();
+    try std.testing.expectEqual(@as(usize, 0), data.length());
+    try data.append(allocator, "new");
+    try std.testing.expectEqualStrings("new", data.asSlice());
 }

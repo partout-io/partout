@@ -64,9 +64,9 @@ pub const Handshake = struct {
 /// Parameters for deriving the four OpenVPN key-method 2 keys.
 pub const PRF = struct {
     functions: c_crypto.pp_crypto_fnt,
-    handshake: ?Handshake,
-    session_id: ?[]u8,
-    remote_session_id: ?[]u8,
+    handshake: Handshake,
+    session_id: []u8,
+    remote_session_id: []u8,
 
     /// Clones all input data so this value may outlive the negotiation that
     /// produced it.
@@ -108,28 +108,18 @@ pub const PRF = struct {
     }
 
     pub fn deinit(self: *PRF, allocator: std.mem.Allocator) void {
-        if (self.handshake) |*value| value.deinit(allocator);
-        if (self.session_id) |value| allocator.free(value);
-        if (self.remote_session_id) |value| allocator.free(value);
-        self.handshake = null;
-        self.session_id = null;
-        self.remote_session_id = null;
+        self.handshake.deinit(allocator);
+        allocator.free(self.session_id);
+        allocator.free(self.remote_session_id);
     }
 
     pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
-        const handshake = self.handshake orelse
-            @panic("PRF has no retained handshake");
-        const session_id = self.session_id orelse
-            @panic("PRF has no retained client session ID");
-        const remote_session_id = self.remote_session_id orelse
-            @panic("PRF has no retained server session ID");
-
         var master_data = try prfData(allocator, .{
             .functions = self.functions,
             .label = KeysConstants.label1,
-            .secret = handshake.pre_master.asSlice(),
-            .client_seed = handshake.random1.asSlice(),
-            .server_seed = handshake.server_random1.asSlice(),
+            .secret = self.handshake.pre_master.asSlice(),
+            .client_seed = self.handshake.random1.asSlice(),
+            .server_seed = self.handshake.server_random1.asSlice(),
             .size = KeysConstants.pre_master_length,
         });
         defer master_data.deinit(allocator);
@@ -138,10 +128,10 @@ pub const PRF = struct {
             .functions = self.functions,
             .label = KeysConstants.label2,
             .secret = master_data.asSlice(),
-            .client_seed = handshake.random2.asSlice(),
-            .server_seed = handshake.server_random2.asSlice(),
-            .client_session_id = session_id,
-            .server_session_id = remote_session_id,
+            .client_seed = self.handshake.random2.asSlice(),
+            .server_seed = self.handshake.server_random2.asSlice(),
+            .client_session_id = self.session_id,
+            .server_session_id = self.remote_session_id,
             .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);
@@ -209,7 +199,7 @@ pub const PRF = struct {
         size: usize,
     ) !ZeroingData {
         var output = try ZeroingData.init(allocator, 0);
-        errdefer output.deinit(allocator);
+        defer output.deinit(allocator);
         var chain = try hmac(allocator, functions, digest_name, secret, seed);
         defer chain.deinit(allocator);
 
@@ -227,9 +217,7 @@ pub const PRF = struct {
             chain = next_chain.move();
         }
 
-        const truncated = try output.sliceCopy(allocator, 0, size);
-        output.deinit(allocator);
-        return truncated;
+        return output.sliceCopy(allocator, 0, size);
     }
 
     fn hmac(
@@ -241,7 +229,7 @@ pub const PRF = struct {
     ) !ZeroingData {
         const hmac_max_length = 128;
         var buffer = try ZeroingData.init(allocator, hmac_max_length);
-        errdefer buffer.deinit(allocator);
+        defer buffer.deinit(allocator);
         var context = c_crypto.pp_hmac_ctx{
             .dst = buffer.mutableBytes(),
             .dst_len = buffer.length(),
@@ -254,27 +242,11 @@ pub const PRF = struct {
         const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.length()) return error.UnsupportedAlgorithm;
-        const result = try buffer.sliceCopy(allocator, 0, length);
-        buffer.deinit(allocator);
-        return result;
+        return buffer.sliceCopy(allocator, 0, length);
     }
 
     pub const testing = struct {
-        pub fn initWithFunctions(
-            allocator: std.mem.Allocator,
-            functions: c_crypto.pp_crypto_fnt,
-            handshake: *const Handshake,
-            session_id: []const u8,
-            remote_session_id: []const u8,
-        ) !PRF {
-            return PRF.initWithFunctions(
-                allocator,
-                functions,
-                handshake,
-                session_id,
-                remote_session_id,
-            );
-        }
+        pub const initWithFunctions = PRF.initWithFunctions;
     };
 };
 
@@ -341,7 +313,7 @@ pub const Authenticator = struct {
 
     pub fn reset(self: *Authenticator) void {
         const allocator = self.allocator;
-        self.control_buffer.zero();
+        self.control_buffer.clear();
         self.pre_master.zero();
         self.random1.zero();
         self.random2.zero();
@@ -462,17 +434,14 @@ pub const Authenticator = struct {
             KeysConstants.random_length,
         );
         errdefer server_random2.deinit(self.allocator);
-        var server_options_data = try self.control_buffer.sliceCopy(
-            self.allocator,
-            offset,
-            options_length,
-        );
-        defer server_options_data.deinit(self.allocator);
-        offset += options_length;
+        const options_end = offset + @as(usize, options_length);
+        const server_options_data = self.control_buffer.asSlice()[offset..options_end];
+        offset = options_end;
 
         log.write(.info, "TLS.auth: Parsed server random");
 
-        const parsed_options: ?ServerOCC = if (server_options_data.nullTerminatedString(0)) |value| blk: {
+        const parsed_options: ?ServerOCC = if (std.mem.indexOfScalar(u8, server_options_data, 0)) |end| blk: {
+            const value = server_options_data[0..end];
             log.writef(.info, "TLS.auth: Parsed server options (string): \"{s}\"", .{value});
             const options = ServerOCC.parse(value);
             log.writef(.info, "TLS.auth: Server options: cipher={s}, digest={s}", .{
@@ -543,7 +512,7 @@ pub const Authenticator = struct {
         source: ZeroingData,
     ) !void {
         if (source.length() > std.math.maxInt(u16))
-            @panic("OpenVPN PRF field exceeds the 65535-byte protocol limit");
+            @panic("OpenVPN auth field exceeds the 65535-byte protocol limit");
         var encoded: [2]u8 = undefined;
         std.mem.writeInt(u16, &encoded, @intCast(source.length()), .big);
         try destination.append(allocator, &encoded);
@@ -568,13 +537,7 @@ pub const Authenticator = struct {
 
 pub const testing = struct {
     pub const ServerOptions = ServerOCC;
-
-    pub fn authData(
-        authenticator: *Authenticator,
-        configuration: *const api.OpenVPNConfiguration,
-    ) !ZeroingData {
-        return authenticator.authData(configuration);
-    }
+    pub const authData = Authenticator.authData;
 };
 
 const PRFInput = struct {
@@ -602,27 +565,14 @@ const ServerOCC = struct {
             const value = components.next() orelse continue;
 
             if (std.ascii.eqlIgnoreCase(option, "cipher")) {
-                result.cipher = parseCipher(value);
+                result.cipher = core_mod.util.parseRawIgnoreCase(api.OpenVPNCipher, value);
             } else if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
-                if (result.cipher == null) result.cipher = parseCipher(value);
+                if (result.cipher == null)
+                    result.cipher = core_mod.util.parseRawIgnoreCase(api.OpenVPNCipher, value);
             } else if (std.ascii.eqlIgnoreCase(option, "auth")) {
-                result.digest = parseDigest(value);
+                result.digest = core_mod.util.parseRawIgnoreCase(api.OpenVPNDigest, value);
             }
         }
         return result;
-    }
-
-    fn parseCipher(value: []const u8) ?api.OpenVPNCipher {
-        inline for (std.meta.tags(api.OpenVPNCipher)) |candidate| {
-            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
-        }
-        return null;
-    }
-
-    fn parseDigest(value: []const u8) ?api.OpenVPNDigest {
-        inline for (std.meta.tags(api.OpenVPNDigest)) |candidate| {
-            if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
-        }
-        return null;
     }
 };
