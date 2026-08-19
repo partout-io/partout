@@ -51,22 +51,6 @@ pub const ConnectionContext = struct {
 };
 
 const OpenVPNConnection = struct {
-    const LinkSetup = struct {
-        descriptor: net.Looper.Descriptor,
-        endpoint: api.ExtendedEndpoint,
-
-        fn deinit(self: *LinkSetup, allocator: std.mem.Allocator) void {
-            self.endpoint.deinit(allocator);
-            self.endpoint = .{};
-        }
-
-        fn takeEndpoint(self: *LinkSetup) api.ExtendedEndpoint {
-            const endpoint = self.endpoint;
-            self.endpoint = .{};
-            return endpoint;
-        }
-    };
-
     allocator: std.mem.Allocator,
     module_id: api.UUID,
     profile: *const api.Profile,
@@ -246,8 +230,8 @@ const OpenVPNConnection = struct {
 
         self.clearServerConfiguration();
         _ = self.sendStatus(.connecting, events);
-        var link = self.setupLink() catch |err| {
-            log.writef(.fault, "Unable to create link: {s}", .{@errorName(err)});
+        const current_endpoint = self.setupLink(session) catch |err| {
+            log.writef(.fault, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.setDelegate(null);
             session.shutdown(errors_mod.sessionError(err), null) catch {};
@@ -257,16 +241,7 @@ const OpenVPNConnection = struct {
                 else => error.UnableToStart,
             };
         };
-        defer link.deinit(self.allocator);
-        session.setLink(link.descriptor, link.endpoint) catch |err| {
-            log.writef(.err, "Unable to attach link: {s}", .{@errorName(err)});
-            _ = self.sendStatus(.disconnected, events);
-            session.setDelegate(null);
-            session.shutdown(err, null) catch {};
-            self.events = null;
-            return error.UnableToStart;
-        };
-        self.current_endpoint = link.takeEndpoint();
+        self.current_endpoint = current_endpoint;
         return true;
     }
 
@@ -332,7 +307,8 @@ const OpenVPNConnection = struct {
 
     fn setupLink(
         self: *OpenVPNConnection,
-    ) (std.mem.Allocator.Error || error{ ExhaustedEndpoints, LinkNotActive })!LinkSetup {
+        session: *Session,
+    ) (std.mem.Allocator.Error || error{ ExhaustedEndpoints, LinkNotActive } || Session.Error)!api.ExtendedEndpoint {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
@@ -359,10 +335,8 @@ const OpenVPNConnection = struct {
         log.writef(.info, "Link type is {s}", .{
             owned_endpoint.proto.socket_type.raw(),
         });
-        return .{
-            .descriptor = descriptor,
-            .endpoint = owned_endpoint,
-        };
+        try session.setLink(descriptor, owned_endpoint);
+        return owned_endpoint;
     }
 
     fn sessionDnsTimeout(self: *const OpenVPNConnection) u32 {
