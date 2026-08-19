@@ -575,7 +575,7 @@ pub const Negotiator = struct {
         const authenticator = if (self.authenticator) |*value|
             value
         else
-            return error.Assertion;
+            @panic("Authenticator initialization produced no value");
         authenticator.with_local_options = self.options.with_local_options;
         const tls = self.tls orelse return error.Assertion;
         try authenticator.putAuth(tls, self.options.configuration);
@@ -631,7 +631,8 @@ pub const Negotiator = struct {
     fn handleControlMessage(self: *Negotiator, message: []const u8) !void {
         log.write(.info, "Received control message");
         if (std.mem.startsWith(u8, message, "AUTH_FAILED")) {
-            const authenticator = self.authenticator orelse return error.Assertion;
+            const authenticator = self.authenticator orelse
+                @panic("AUTH_FAILED received without an authenticator");
             if (authenticator.with_local_options) {
                 log.write(.err, "Authentication failure, retry without local options");
                 return error.BadCredentialsWithLocalOptions;

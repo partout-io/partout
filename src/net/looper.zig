@@ -505,7 +505,8 @@ pub const Looper = struct {
 
         if (completion_failure) |err| return err;
         if (holder.failure) |err| return err;
-        return holder.value orelse error.Assertion;
+        return holder.value orelse
+            @panic("Looper task completed without a result");
     }
 
     pub fn performTask(self: *Looper, task: Task) anyerror!void {

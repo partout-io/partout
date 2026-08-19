@@ -117,9 +117,12 @@ pub const PRF = struct {
     }
 
     pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
-        const handshake = self.handshake orelse return error.Assertion;
-        const session_id = self.session_id orelse return error.Assertion;
-        const remote_session_id = self.remote_session_id orelse return error.Assertion;
+        const handshake = self.handshake orelse
+            @panic("PRF has no retained handshake");
+        const session_id = self.session_id orelse
+            @panic("PRF has no retained client session ID");
+        const remote_session_id = self.remote_session_id orelse
+            @panic("PRF has no retained server session ID");
 
         var master_data = try prfData(allocator, .{
             .functions = self.functions,
