@@ -84,7 +84,8 @@ pub const Drainer = struct {
     ///
     /// The caller must previously have paired this call with `enter`.
     pub fn leaveLocked(self: *Drainer) void {
-        std.debug.assert(self.in_flight > 0);
+        if (self.in_flight == 0)
+            @panic("Drainer.leaveLocked() requires a matching enter()");
         self.in_flight -= 1;
         if (self.in_flight == 0) {
             self.drained.broadcast();
@@ -231,7 +232,8 @@ pub const RunAfter = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        std.debug.assert(self.state != .stopping);
+        if (self.state == .stopping)
+            @panic("Cannot start a stopping RunAfter");
         try self.startLocked();
     }
 
@@ -280,10 +282,12 @@ pub const RunAfter = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        std.debug.assert(self.state != .stopping);
+        if (self.state == .stopping)
+            @panic("Cannot schedule a stopping RunAfter");
         switch (request) {
             .replace => |options| {
-                std.debug.assert(!self.scheduling);
+                if (self.scheduling)
+                    @panic("Cannot replace a RunAfter callback while appended callbacks are pending");
                 try self.startLocked();
                 self.replaceLocked(
                     options.delay_ms,
@@ -292,7 +296,8 @@ pub const RunAfter = struct {
                 );
             },
             .append => |options| {
-                std.debug.assert(self.scheduling or self.state != .scheduled);
+                if (!self.scheduling and self.state == .scheduled)
+                    @panic("Cannot append a RunAfter callback while a replacement callback is pending");
                 try self.startLocked();
                 self.appendLocked(
                     options.scheduled,
@@ -406,7 +411,8 @@ pub const RunAfter = struct {
                 self.mutex.unlock();
                 return;
             }
-            std.debug.assert(self.state == .scheduled);
+            if (self.state != .scheduled)
+                @panic("RunAfter worker woke without scheduled work");
             const generation = self.generation;
             const deadline_ns = self.deadline_ns orelse deadline: {
                 const value = deadlineAfterMs(monotonicNs(), self.delay_ms);

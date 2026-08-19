@@ -179,7 +179,8 @@ pub const ControlPacket = struct {
         );
         const serialized_length = c.openvpn_ctrl_serialize(destination.ptr + header_length, packet);
         const written = header_length + serialized_length;
-        std.debug.assert(written == capacity);
+        if (written != capacity)
+            @panic("OpenVPN control serializer wrote a length different from its advertised capacity");
         return destination;
     }
 

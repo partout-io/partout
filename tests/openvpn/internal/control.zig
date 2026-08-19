@@ -101,6 +101,16 @@ test "tls-auth channels round trip fragmented payloads" {
     try expectProtectedRoundTrip(.auth, 7);
 }
 
+test "tls-crypt-v2 requires a wrapped key" {
+    const configuration = api.OpenVPNConfiguration{ .tls_wrap = .{
+        .strategy = .cryptV2,
+    } };
+    try std.testing.expectError(
+        error.MissingWrappedKey,
+        Serializer.forConfiguration(std.testing.allocator, .mock, &configuration),
+    );
+}
+
 test "tls-crypt-v2 carries the wrapped key only on leading WKC packets" {
     const allocator = std.testing.allocator;
     var key_bytes: [256]u8 = undefined;

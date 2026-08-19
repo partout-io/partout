@@ -27,6 +27,16 @@ pub const SessionOptions = struct {
     soft_negotiation_timeout_ms: u64 = 120_000,
 };
 
+pub const ValidationError = error{
+    MissingWrappedKey,
+};
+
+pub fn validate(configuration: *const api.OpenVPNConfiguration) ValidationError!void {
+    const wrap = configuration.tls_wrap orelse return;
+    if (wrap.strategy == .cryptV2 and wrap.wrapped_key == null)
+        return error.MissingWrappedKey;
+}
+
 pub fn cipherKeySize(cipher: api.OpenVPNCipher) u16 {
     return switch (cipher) {
         .aes128cbc, .aes128gcm => 128,

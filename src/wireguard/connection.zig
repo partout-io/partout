@@ -408,7 +408,8 @@ fn appendActiveModuleAllowedIPs(
             else => {},
         }
     }
-    std.debug.assert(initialized == combined.len);
+    if (initialized != combined.len)
+        @panic("WireGuard allowed-IP allocation count does not match initialized routes");
 
     // The old subnet elements were moved into `combined`; only release their
     // container here so their owned address strings remain live.

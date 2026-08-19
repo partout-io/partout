@@ -48,7 +48,8 @@ pub const PeerEndpointResolver = struct {
         }
 
         fn setValue(self: *Cache, entries: []ResolvedEndpoint) void {
-            std.debug.assert(self.entries == null);
+            if (self.entries != null)
+                @panic("Peer endpoint resolver cache cannot overwrite live entries");
             self.entries = entries;
         }
 

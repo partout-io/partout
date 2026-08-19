@@ -24,7 +24,8 @@ pub fn TemporaryCStringWithCapacity(comptime capacity: usize) type {
             fallback_allocator: std.mem.Allocator,
             value: []const u8,
         ) error{OutOfMemory}!void {
-            std.debug.assert(self.value == null);
+            if (self.value != null)
+                @panic("TemporaryCString.init() called while already initialized");
 
             self.stack_allocator = std.heap.stackFallback(capacity, fallback_allocator);
             self.allocator = self.stack_allocator.get();

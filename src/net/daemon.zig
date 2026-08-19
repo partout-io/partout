@@ -201,7 +201,8 @@ pub const Daemon = struct {
         //
         // The daemon must not be deallocated before a full stop, unless it
         // wasn't started in the first place.
-        std.debug.assert(self.state == .initial or self.state == .stopped);
+        if (self.state != .initial and self.state != .stopped)
+            @panic("Daemon.destroy() requires an initial or fully stopped daemon");
 
         // Also cancels the timer
         self.resume_gate_timer.deinit();
@@ -217,7 +218,8 @@ pub const Daemon = struct {
             gate.stopObserving();
             gate.deinit();
         }
-        std.debug.assert(self.connection_runtime == null);
+        if (self.connection_runtime != null)
+            @panic("Daemon.destroy() cannot release a live connection runtime");
         self.profile.deinit(self.allocator);
         self.allocator.destroy(self);
 
@@ -777,7 +779,8 @@ pub const Daemon = struct {
     }
 
     fn initConnectionRuntime(self: *Daemon) Error!void {
-        std.debug.assert(self.connection_runtime == null);
+        if (self.connection_runtime != null)
+            @panic("Cannot initialize a second daemon connection runtime");
         const module = activeConnectionModule(&self.profile) orelse return;
 
         const looper = try self.allocator.create(Looper);

@@ -321,7 +321,8 @@ pub const WriteQueue = struct {
             return true;
         };
         const remaining = first.data.len - self.offset;
-        std.debug.assert(written <= remaining);
+        if (written > remaining)
+            @panic("WriteQueue cannot advance past the pending packet");
         if (written < remaining) {
             self.offset += written;
             return false;

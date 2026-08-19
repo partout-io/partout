@@ -899,9 +899,12 @@ fn mockCreate(
     module: net_conn.ConnectionModule,
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
-    std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile));
-    std.debug.assert(parameters.controller.ptr != null);
+    if (module.typeOf() != .OpenVPN)
+        @panic("OpenVPN mock received a non-OpenVPN module");
+    if (!api.hasConnection(parameters.profile))
+        @panic("OpenVPN mock requires a connection profile");
+    if (parameters.controller.ptr == null)
+        @panic("OpenVPN mock requires a tunnel controller");
     var created = try allocator.create(DaemonMockConnection);
     created.* = .{ .allocator = allocator };
     return created.asConnection();
@@ -971,8 +974,10 @@ fn blockingCreate(
     module: net_conn.ConnectionModule,
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
-    std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile));
+    if (module.typeOf() != .OpenVPN)
+        @panic("Blocking OpenVPN mock received a non-OpenVPN module");
+    if (!api.hasConnection(parameters.profile))
+        @panic("Blocking OpenVPN mock requires a connection profile");
     const self: *BlockingStopConnection = @ptrCast(@alignCast(ptr.?));
     return self.asConnection();
 }

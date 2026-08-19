@@ -40,6 +40,7 @@ pub const Serializer = union(enum) {
         backend: CryptoBackend,
         configuration: *const api.OpenVPNConfiguration,
     ) !Serializer {
+        try configuration_mod.validate(configuration);
         if (configuration.tls_wrap) |wrap| {
             return switch (wrap.strategy) {
                 .auth => .{ .auth = try AuthSerializer.init(
@@ -57,8 +58,7 @@ pub const Serializer = union(enum) {
                     allocator,
                     backend,
                     wrap.key,
-                    wrap.wrapped_key orelse
-                        @panic("TLS Crypt V2 configuration requires a wrapped client key"),
+                    wrap.wrapped_key.?,
                 ) },
             };
         }
@@ -434,7 +434,8 @@ const CryptSerializer = struct {
         if (decrypted_count == 0) return errors_mod.cryptoError(native_error);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
-        std.debug.assert(total <= decrypted.len);
+        if (total > decrypted.len)
+            @panic("OpenVPN crypto backend returned plaintext larger than its destination buffer");
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
         return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {

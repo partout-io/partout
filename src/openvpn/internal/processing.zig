@@ -135,7 +135,8 @@ pub const PacketProcessor = struct {
                 packet.len,
             );
         }
-        std.debug.assert(offset == capacity);
+        if (offset != capacity)
+            @panic("OpenVPN stream serializer wrote a length different from its advertised capacity");
         return allocator.dupe(u8, zeroing.*.bytes[0..offset]);
     }
 
@@ -249,7 +250,8 @@ pub const LinkProcessor = struct {
             self.tcp_read_buffer.items,
             &consumed,
         );
-        std.debug.assert(consumed <= self.tcp_read_buffer.items.len);
+        if (consumed > self.tcp_read_buffer.items.len)
+            @panic("OpenVPN stream parser consumed beyond its input buffer");
         if (consumed > 0) {
             const remaining = self.tcp_read_buffer.items[consumed..];
             std.mem.copyForwards(u8, self.tcp_read_buffer.items[0..remaining.len], remaining);

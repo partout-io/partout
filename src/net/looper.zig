@@ -212,7 +212,6 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .idle) {
             self.lock.unlock();
-            std.debug.assert(false);
             return error.AlreadyStarted;
         }
         self.state = .starting;
@@ -426,7 +425,8 @@ pub const Looper = struct {
         self.joinWorker();
 
         self.lock.lock();
-        std.debug.assert(self.waiter_count > 0);
+        if (self.waiter_count == 0)
+            @panic("Looper stop completion has no registered waiter");
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
@@ -498,7 +498,8 @@ pub const Looper = struct {
             self.condition.wait(&self.lock);
         }
         const completion_failure = completion.failure;
-        std.debug.assert(self.waiter_count > 0);
+        if (self.waiter_count == 0)
+            @panic("Looper task completion has no registered waiter");
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
@@ -539,7 +540,8 @@ pub const Looper = struct {
             self.condition.wait(&self.lock);
         }
         const completion_failure = completion.failure;
-        std.debug.assert(self.waiter_count > 0);
+        if (self.waiter_count == 0)
+            @panic("Looper attach completion has no registered waiter");
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
@@ -576,7 +578,8 @@ pub const Looper = struct {
             self.condition.wait(&self.lock);
         }
         const completion_failure = completion.failure;
-        std.debug.assert(self.waiter_count > 0);
+        if (self.waiter_count == 0)
+            @panic("Looper detach completion has no registered waiter");
         self.waiter_count -= 1;
         self.condition.broadcast();
         self.lock.unlock();
@@ -1104,7 +1107,7 @@ pub const Looper = struct {
             },
             .stopped => {
                 self.lock.unlock();
-                std.debug.assert(false);
+                log.write(.debug, "Ignore duplicate Looper finish");
                 return;
             },
             else => {},

@@ -605,8 +605,8 @@ fn decryptKey(
     pem: []const u8,
     passphrase: []const u8,
 ) ![]u8 {
-    std.debug.assert(std.mem.eql(u8, "secret", passphrase));
-    std.debug.assert(std.mem.indexOf(u8, pem, "Proc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,0123456789ABCDEF\n\nciphertext") != null);
+    try std.testing.expectEqualStrings("secret", passphrase);
+    try std.testing.expect(std.mem.indexOf(u8, pem, "Proc-Type: 4,ENCRYPTED\nDEK-Info: AES-256-CBC,0123456789ABCDEF\n\nciphertext") != null);
     return try allocator.dupe(u8, decrypted_private_key);
 }
 

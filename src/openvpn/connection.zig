@@ -99,6 +99,8 @@ const OpenVPNConnection = struct {
             sandbox.profile,
         );
         errdefer configuration.deinit(allocator);
+        configuration_mod.validate(&configuration) catch
+            return error.IncompleteModule;
 
         const prng = PRNG.system();
         const maybe_endpoints = configuration_mod.processedRemotes(
