@@ -224,6 +224,10 @@ pub const ZeroingData = struct {
         return ptr.*.bytes[0..ptr.*.length];
     }
 
+    pub fn length(self: ZeroingData) usize {
+        return c_common.pp_zd_length(self.cPtr());
+    }
+
     pub fn zero(self: *ZeroingData) void {
         c_common.pp_zd_zero(self.cPtr());
     }
@@ -271,7 +275,7 @@ pub const ZeroingData = struct {
         _: std.mem.Allocator,
         count: usize,
     ) !void {
-        if (count > self.bytes().len) return error.OutOfBounds;
+        if (count > self.length()) return error.OutOfBounds;
         c_common.pp_zd_remove_until(self.cPtr(), count);
     }
 };

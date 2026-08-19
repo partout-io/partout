@@ -73,10 +73,10 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
 
     var keys = try prf.derive(allocator);
     defer keys.deinit(allocator);
-    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.bytes().len);
-    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.bytes().len);
-    try std.testing.expectEqual(Keys.key_length, keys.digest.?.encryption_key.bytes().len);
-    try std.testing.expectEqual(Keys.key_length, keys.digest.?.decryption_key.bytes().len);
+    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.length());
+    try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.length());
+    try std.testing.expectEqual(Keys.key_length, keys.digest.?.encryption_key.length());
+    try std.testing.expectEqual(Keys.key_length, keys.digest.?.decryption_key.length());
 }
 
 test "Authenticator frames auth and buffers replies and messages" {
