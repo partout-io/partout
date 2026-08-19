@@ -5,6 +5,7 @@
 const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
+const version = @import("../../version.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
@@ -412,7 +413,7 @@ pub const Authenticator = struct {
             &.{};
         const peer_info = try push_mod.peerInfoAlloc(
             allocator,
-            "io.partout 0.151.0",
+            std.fmt.comptimePrint("{s} {s}", .{ version.identifier, version.number }),
             self.ssl_version,
             extra_lines,
         );
