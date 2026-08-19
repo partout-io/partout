@@ -151,7 +151,7 @@ pub fn PRNGWith(comptime Provider: type) type {
         ) !ZeroingData {
             var result = try ZeroingData.init(allocator, length);
             errdefer result.deinit(allocator);
-            try self.fill(result.bytes);
+            try self.fill(result.bytes());
             return result;
         }
     };
@@ -166,7 +166,6 @@ const SystemRandom = struct {
 
 pub const ZeroingData = struct {
     ptr: ?*c_common.pp_zd = null,
-    bytes: []u8 = @constCast(&[_]u8{}),
 
     pub fn init(_: std.mem.Allocator, count: usize) !ZeroingData {
         return fromC(c_common.pp_zd_create(count));
@@ -186,16 +185,14 @@ pub const ZeroingData = struct {
     ) !ZeroingData {
         const length = source.len + @intFromBool(null_terminated);
         var result = fromC(c_common.pp_zd_create(length));
-        @memcpy(result.bytes[0..source.len], source);
-        if (null_terminated) result.bytes[source.len] = 0;
+        const result_bytes = result.bytes();
+        @memcpy(result_bytes[0..source.len], source);
+        if (null_terminated) result_bytes[source.len] = 0;
         return result;
     }
 
     fn fromC(ptr: *c_common.pp_zd) ZeroingData {
-        return .{
-            .ptr = ptr,
-            .bytes = ptr.*.bytes[0..ptr.*.length],
-        };
+        return .{ .ptr = ptr };
     }
 
     pub fn clone(self: ZeroingData, _: std.mem.Allocator) !ZeroingData {
@@ -221,9 +218,14 @@ pub const ZeroingData = struct {
         return c_common.pp_zd_make_copy(self.cPtr());
     }
 
+    /// Borrowed view valid until the next mutation or deinitialization.
+    pub fn bytes(self: ZeroingData) []u8 {
+        const ptr = self.cPtr();
+        return ptr.*.bytes[0..ptr.*.length];
+    }
+
     pub fn zero(self: *ZeroingData) void {
         c_common.pp_zd_zero(self.cPtr());
-        self.refresh();
     }
 
     pub fn append(
@@ -234,12 +236,10 @@ pub const ZeroingData = struct {
         const other = c_common.pp_zd_create_from_data(suffix.ptr, suffix.len);
         defer c_common.pp_zd_free(other);
         c_common.pp_zd_append(self.cPtr(), other);
-        self.refresh();
     }
 
     pub fn appendData(self: *ZeroingData, other: ZeroingData) void {
         c_common.pp_zd_append(self.cPtr(), other.cPtr());
-        self.refresh();
     }
 
     pub fn sliceCopy(
@@ -253,13 +253,15 @@ pub const ZeroingData = struct {
     }
 
     pub fn networkU16(self: ZeroingData, offset: usize) !u16 {
-        if (offset > self.bytes.len or self.bytes.len - offset < 2) return error.OutOfBounds;
-        return std.mem.readInt(u16, self.bytes[offset..][0..2], .big);
+        const data = self.bytes();
+        if (offset > data.len or data.len - offset < 2) return error.OutOfBounds;
+        return std.mem.readInt(u16, data[offset..][0..2], .big);
     }
 
     pub fn nullTerminatedString(self: ZeroingData, offset: usize) ?[]const u8 {
-        if (offset > self.bytes.len) return null;
-        const tail = self.bytes[offset..];
+        const data = self.bytes();
+        if (offset > data.len) return null;
+        const tail = data[offset..];
         const end = std.mem.indexOfScalar(u8, tail, 0) orelse return null;
         return tail[0..end];
     }
@@ -269,13 +271,7 @@ pub const ZeroingData = struct {
         _: std.mem.Allocator,
         count: usize,
     ) !void {
-        if (count > self.bytes.len) return error.OutOfBounds;
+        if (count > self.bytes().len) return error.OutOfBounds;
         c_common.pp_zd_remove_until(self.cPtr(), count);
-        self.refresh();
-    }
-
-    fn refresh(self: *ZeroingData) void {
-        const ptr = self.cPtr();
-        self.bytes = ptr.*.bytes[0..ptr.*.length];
     }
 };

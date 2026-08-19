@@ -126,9 +126,9 @@ pub const PRF = struct {
         var master_data = try prfData(allocator, .{
             .functions = self.functions,
             .label = KeysConstants.label1,
-            .secret = handshake.pre_master.bytes,
-            .client_seed = handshake.random1.bytes,
-            .server_seed = handshake.server_random1.bytes,
+            .secret = handshake.pre_master.bytes(),
+            .client_seed = handshake.random1.bytes(),
+            .server_seed = handshake.server_random1.bytes(),
             .size = KeysConstants.pre_master_length,
         });
         defer master_data.deinit(allocator);
@@ -136,15 +136,15 @@ pub const PRF = struct {
         var keys_data = try prfData(allocator, .{
             .functions = self.functions,
             .label = KeysConstants.label2,
-            .secret = master_data.bytes,
-            .client_seed = handshake.random2.bytes,
-            .server_seed = handshake.server_random2.bytes,
+            .secret = master_data.bytes(),
+            .client_seed = handshake.random2.bytes(),
+            .server_seed = handshake.server_random2.bytes(),
             .client_session_id = session_id,
             .server_session_id = remote_session_id,
             .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
         defer keys_data.deinit(allocator);
-        if (keys_data.bytes.len != KeysConstants.keys_count * KeysConstants.key_length)
+        if (keys_data.bytes().len != KeysConstants.keys_count * KeysConstants.key_length)
             @panic("OpenVPN PRF returned an unexpected key-data length");
 
         var parts: [KeysConstants.keys_count]ZeroingData = undefined;
@@ -180,7 +180,7 @@ pub const PRF = struct {
             input.functions,
             "MD5",
             input.secret[0..half_rounded_up],
-            seed.bytes,
+            seed.bytes(),
             input.size,
         );
         defer hash1.deinit(allocator);
@@ -189,13 +189,13 @@ pub const PRF = struct {
             input.functions,
             "SHA1",
             input.secret[half..][0..half_rounded_up],
-            seed.bytes,
+            seed.bytes(),
             input.size,
         );
         defer hash2.deinit(allocator);
 
         const result = try ZeroingData.init(allocator, input.size);
-        for (result.bytes, hash1.bytes, hash2.bytes) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
+        for (result.bytes(), hash1.bytes(), hash2.bytes()) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
         return result;
     }
 
@@ -212,16 +212,16 @@ pub const PRF = struct {
         var chain = try hmac(allocator, functions, digest_name, secret, seed);
         defer chain.deinit(allocator);
 
-        while (output.bytes.len < size) {
+        while (output.bytes().len < size) {
             var chain_and_seed = try chain.clone(allocator);
             defer chain_and_seed.deinit(allocator);
             try chain_and_seed.append(allocator, seed);
 
-            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.bytes);
+            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.bytes());
             defer block.deinit(allocator);
-            try output.append(allocator, block.bytes);
+            try output.append(allocator, block.bytes());
 
-            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.bytes);
+            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.bytes());
             chain.deinit(allocator);
             chain = next_chain.move();
         }
@@ -242,8 +242,8 @@ pub const PRF = struct {
         var buffer = try ZeroingData.init(allocator, hmac_max_length);
         errdefer buffer.deinit(allocator);
         var context = c_crypto.pp_hmac_ctx{
-            .dst = buffer.bytes.ptr,
-            .dst_len = buffer.bytes.len,
+            .dst = buffer.bytes().ptr,
+            .dst_len = buffer.bytes().len,
             .digest_name = digest_name.ptr,
             .secret = secret.ptr,
             .secret_len = secret.len,
@@ -252,7 +252,7 @@ pub const PRF = struct {
         };
         const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
-        if (length == 0 or length > buffer.bytes.len) return error.UnsupportedAlgorithm;
+        if (length == 0 or length > buffer.bytes().len) return error.UnsupportedAlgorithm;
         const result = try buffer.sliceCopy(allocator, 0, length);
         buffer.deinit(allocator);
         return result;
@@ -363,7 +363,7 @@ pub const Authenticator = struct {
         var raw = try self.authData(configuration);
         defer raw.deinit(self.allocator);
         log.write(.info, "TLS.auth: Put plaintext");
-        try tls.putRawPlainText(raw.bytes);
+        try tls.putRawPlainText(raw.bytes());
     }
 
     fn authData(
@@ -433,10 +433,10 @@ pub const Authenticator = struct {
     pub fn parseAuthReply(self: *Authenticator) !bool {
         const prefix_length = ControlConstants.tls_prefix.len;
         const minimum_length = prefix_length + 2 * KeysConstants.random_length + 2;
-        if (self.control_buffer.bytes.len < minimum_length) return false;
+        if (self.control_buffer.bytes().len < minimum_length) return false;
         if (!std.mem.eql(
             u8,
-            self.control_buffer.bytes[0..prefix_length],
+            self.control_buffer.bytes()[0..prefix_length],
             &ControlConstants.tls_prefix,
         )) return error.WrongControlDataPrefix;
 
@@ -447,7 +447,7 @@ pub const Authenticator = struct {
         offset += KeysConstants.random_length;
         const options_length = try self.control_buffer.networkU16(offset);
         offset += 2;
-        if (self.control_buffer.bytes.len - offset < options_length) return false;
+        if (self.control_buffer.bytes().len - offset < options_length) return false;
 
         var server_random1 = try self.control_buffer.sliceCopy(
             self.allocator,
@@ -502,8 +502,8 @@ pub const Authenticator = struct {
             messages.deinit(allocator);
         }
         var offset: usize = 0;
-        while (offset < self.control_buffer.bytes.len) {
-            const tail = self.control_buffer.bytes[offset..];
+        while (offset < self.control_buffer.bytes().len) {
+            const tail = self.control_buffer.bytes()[offset..];
             const length = std.mem.indexOfScalar(u8, tail, 0) orelse break;
             const message = tail[0..length];
             if (!std.unicode.utf8ValidateSlice(message)) break;
@@ -544,10 +544,10 @@ pub const Authenticator = struct {
         allocator: std.mem.Allocator,
         source: ZeroingData,
     ) !void {
-        if (source.bytes.len > std.math.maxInt(u16))
+        if (source.bytes().len > std.math.maxInt(u16))
             @panic("OpenVPN PRF field exceeds the 65535-byte protocol limit");
         var encoded: [2]u8 = undefined;
-        std.mem.writeInt(u16, &encoded, @intCast(source.bytes.len), .big);
+        std.mem.writeInt(u16, &encoded, @intCast(source.bytes().len), .big);
         try destination.append(allocator, &encoded);
         destination.appendData(source);
     }
