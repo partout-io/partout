@@ -4,6 +4,7 @@
 
 const std = @import("std");
 
+const api = @import("source").core.api;
 const io = @import("source").net_io;
 const c = io.c;
 
@@ -29,4 +30,21 @@ test "maps native write backpressure results" {
 test "constructs empty reachability" {
     const reachability = reachabilityNone();
     try std.testing.expect(!reachability.reachable);
+}
+
+test "socket wrapper reports an invalid remote address" {
+    const wrapper = io.SocketWrapper{
+        .socket = null,
+        .options = .{
+            .endpoint = .{
+                .address = " \t",
+                .proto = api.EndpointProtocol.init(.udp, 1194),
+            },
+            .timeout_ms = 0,
+            .buf_size = 0,
+        },
+        .closes_on_empty_read = false,
+    };
+
+    try std.testing.expect(wrapper.remoteAddress() == null);
 }

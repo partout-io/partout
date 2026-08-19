@@ -293,8 +293,10 @@ const Query = struct {
     fn run(self: *Query) void {
         var result: c.pp_dns_result = null;
         var reachability = self.reachability;
+        const hostname = self.hostname orelse
+            @panic("Active DNS query has no hostname");
         const status = self.resolve_fn(
-            self.hostname.?,
+            hostname,
             self.all_addresses,
             if (reachability) |*info| info else null,
             &result,
@@ -311,8 +313,10 @@ const Query = struct {
 
     fn recycleLocked(self: *Query) void {
         if (!self.caller_done or !self.worker_done) return;
+        const hostname = self.hostname orelse
+            @panic("Recyclable DNS query has no hostname");
         if (self.result) |result| c.pp_dns_result_free(result);
-        std.heap.c_allocator.free(self.hostname.?);
+        std.heap.c_allocator.free(hostname);
         self.* = .{};
     }
 };

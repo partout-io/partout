@@ -39,7 +39,8 @@ pub fn TemporaryCStringWithCapacity(comptime capacity: usize) type {
         }
 
         pub fn slice(self: *const Self) [:0]const u8 {
-            return self.value.?;
+            return self.value orelse
+                @panic("TemporaryCString used before init or after deinit");
         }
 
         pub fn ptr(self: *const Self) [*:0]const u8 {

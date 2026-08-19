@@ -131,7 +131,7 @@ test "snapshot publisher filters data-count-only snapshots by minimum delta" {
 
 const SnapshotRecorder = struct {
     count: usize = 0,
-    last_snapshot: api.TunnelSnapshot = .{},
+    last_snapshot: api.TunnelSnapshot = .{ .status = .inactive },
 
     fn reportSnapshot(ptr: *const anyopaque, snapshot: api.TunnelSnapshot) void {
         const self: *SnapshotRecorder = @ptrCast(@alignCast(@constCast(ptr)));

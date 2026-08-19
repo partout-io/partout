@@ -327,11 +327,12 @@ pub const RunAfter = struct {
         if (!self.scheduling) {
             self.scheduling = true;
             self.replaceAtLocked(scheduled.deadline_ns, runScheduled, self);
-        } else if ((self.state == .scheduled or
-            self.state == .running_scheduled) and
-            scheduled.deadline_ns < self.deadline_ns.?)
-        {
-            self.replaceAtLocked(scheduled.deadline_ns, runScheduled, self);
+        } else if (self.state == .scheduled or self.state == .running_scheduled) {
+            const current_deadline = self.deadline_ns orelse
+                @panic("scheduled RunAfter has no deadline");
+            if (scheduled.deadline_ns < current_deadline) {
+                self.replaceAtLocked(scheduled.deadline_ns, runScheduled, self);
+            }
         }
     }
 
@@ -494,9 +495,11 @@ pub const RunAfter = struct {
                 due_tail = scheduled;
             } else {
                 previous = scheduled;
-                if (next_deadline_ns == null or
-                    scheduled.deadline_ns < next_deadline_ns.?)
-                {
+                if (next_deadline_ns) |deadline_ns| {
+                    if (scheduled.deadline_ns < deadline_ns) {
+                        next_deadline_ns = scheduled.deadline_ns;
+                    }
+                } else {
                     next_deadline_ns = scheduled.deadline_ns;
                 }
             }
@@ -834,7 +837,12 @@ pub fn sleepMs(value: u64) void {
         .nsec = @intCast((value % std.time.ms_per_s) * std.time.ns_per_ms),
     };
     var remaining: std.c.timespec = undefined;
-    while (std.c.nanosleep(&request, &remaining) != 0) {
+    while (true) {
+        const result = std.c.nanosleep(&request, &remaining);
+        if (result == 0) return;
+        if (std.c.errno(result) != .INTR) {
+            @panic("nanosleep failed");
+        }
         request = remaining;
     }
 }
@@ -850,8 +858,9 @@ pub fn monotonicNs() u64 {
         const windows = std.os.windows;
         var frequency: windows.LARGE_INTEGER = undefined;
         var counter: windows.LARGE_INTEGER = undefined;
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool());
-        std.debug.assert(windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool());
+        if (!windows.ntdll.RtlQueryPerformanceFrequency(&frequency).toBool()) return 0;
+        if (!windows.ntdll.RtlQueryPerformanceCounter(&counter).toBool()) return 0;
+        if (frequency <= 0 or counter < 0) return 0;
         const ticks: u64 = @bitCast(counter);
         const ticks_per_second: u64 = @bitCast(frequency);
         return @intCast((@as(u128, ticks) * std.time.ns_per_s) / ticks_per_second);
