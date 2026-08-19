@@ -28,6 +28,66 @@ const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const PacketCode = packet_mod.PacketCode;
 const ZeroingData = crypto_mod.ZeroingData;
 
+pub const StaticKey = struct {
+    const content_length = 256;
+    const key_count = 4;
+    const key_length = content_length / key_count;
+
+    data: ZeroingData,
+    direction: ?api.OpenVPNStaticKeyDirection,
+
+    pub fn init(
+        allocator: std.mem.Allocator,
+        key: api.OpenVPNStaticKey,
+    ) !StaticKey {
+        const bytes = try key.data.bytesAlloc(allocator);
+        defer {
+            @memset(bytes, 0);
+            allocator.free(bytes);
+        }
+        if (bytes.len != content_length) return error.InvalidStaticKey;
+        return .{
+            .data = try ZeroingData.initCopy(allocator, bytes),
+            .direction = key.dir,
+        };
+    }
+
+    pub fn deinit(self: *StaticKey, allocator: std.mem.Allocator) void {
+        self.data.deinit(allocator);
+    }
+
+    pub fn cipherEncryptKey(self: StaticKey) ![]const u8 {
+        const direction = self.direction orelse return error.MissingStaticKeyDirection;
+        return self.keyAt(switch (direction) {
+            .server => 0,
+            .client => 2,
+        });
+    }
+
+    pub fn cipherDecryptKey(self: StaticKey) ![]const u8 {
+        const direction = self.direction orelse return error.MissingStaticKeyDirection;
+        return self.keyAt(switch (direction) {
+            .server => 2,
+            .client => 0,
+        });
+    }
+
+    pub fn hmacSendKey(self: StaticKey) []const u8 {
+        return self.keyAt(if (self.direction == .client) 3 else 1);
+    }
+
+    pub fn hmacReceiveKey(self: StaticKey) []const u8 {
+        return self.keyAt(if (self.direction == .server) 3 else 1);
+    }
+
+    fn keyAt(self: StaticKey, index: usize) []const u8 {
+        const bytes = self.data.asSlice();
+        if (bytes.len != content_length)
+            @panic("invalid OpenVPN static key length");
+        return bytes[index * key_length .. (index + 1) * key_length];
+    }
+};
+
 /// Concrete serializer variants selected once when a control channel is built.
 pub const Serializer = union(enum) {
     plain: PlainSerializer,
@@ -215,22 +275,11 @@ const AuthSerializer = struct {
         allocator: std.mem.Allocator,
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
-        const bytes = try decodeStaticKey(allocator, key);
-        defer {
-            @memset(bytes, 0);
-            allocator.free(bytes);
-        }
-        const send_index: usize = switch (key.dir orelse .server) {
-            .server => 1,
-            .client => 3,
-        };
-        const receive_index: usize = switch (key.dir orelse .client) {
-            .server => 3,
-            .client => 1,
-        };
-        var send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, send_index));
+        var static_key = try StaticKey.init(allocator, key);
+        defer static_key.deinit(allocator);
+        var send = try ZeroingData.initCopy(allocator, static_key.hmacSendKey());
         errdefer send.deinit(allocator);
-        const receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, receive_index));
+        const receive = try ZeroingData.initCopy(allocator, static_key.hmacReceiveKey());
         return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
     }
 
@@ -338,24 +387,15 @@ const CryptSerializer = struct {
         allocator: std.mem.Allocator,
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
-        const direction = key.dir orelse return error.MissingStaticKeyDirection;
-        const bytes = try decodeStaticKey(allocator, key);
-        defer {
-            @memset(bytes, 0);
-            allocator.free(bytes);
-        }
-        const cipher_send_index: usize = if (direction == .server) 0 else 2;
-        const cipher_receive_index: usize = if (direction == .server) 2 else 0;
-        const hmac_send_index: usize = if (direction == .server) 1 else 3;
-        const hmac_receive_index: usize = if (direction == .server) 3 else 1;
-
-        var cipher_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_send_index));
+        var static_key = try StaticKey.init(allocator, key);
+        defer static_key.deinit(allocator);
+        var cipher_send = try ZeroingData.initCopy(allocator, try static_key.cipherEncryptKey());
         errdefer cipher_send.deinit(allocator);
-        var cipher_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_receive_index));
+        var cipher_receive = try ZeroingData.initCopy(allocator, try static_key.cipherDecryptKey());
         errdefer cipher_receive.deinit(allocator);
-        var hmac_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_send_index));
+        var hmac_send = try ZeroingData.initCopy(allocator, static_key.hmacSendKey());
         errdefer hmac_send.deinit(allocator);
-        const hmac_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_receive_index));
+        const hmac_receive = try ZeroingData.initCopy(allocator, static_key.hmacReceiveKey());
         return CryptoKeys.init(
             CryptoKeyPair.init(cipher_send, cipher_receive),
             CryptoKeyPair.init(hmac_send, hmac_receive),
@@ -505,23 +545,6 @@ const CryptV2Serializer = struct {
     }
 };
 
-fn decodeStaticKey(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) ![]u8 {
-    const bytes = try key.data.bytesAlloc(allocator);
-    errdefer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    if (bytes.len != static_key_content_length) return error.InvalidStaticKey;
-    return bytes;
-}
-
-fn staticKeyQuadrant(bytes: []const u8, index: usize) []const u8 {
-    return bytes[index * static_key_length .. (index + 1) * static_key_length];
-}
-
 fn unixSeconds() u32 {
     return c_common.pp_time_unix_seconds();
 }
@@ -545,6 +568,3 @@ pub const testing = struct {
         return CryptSerializer.deriveKeys(allocator, key);
     }
 };
-
-const static_key_content_length = 256;
-const static_key_length = 64;
