@@ -50,8 +50,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
         }
 
         pub fn destroy(self: *Self) void {
-            clearPacketList(&self.inbound_queue);
-            clearPacketList(&self.outbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.inbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.outbound_queue);
             self.inbound_queue.deinit(self.allocator);
             self.outbound_queue.deinit(self.allocator);
             self.pending_acks.deinit();
@@ -68,8 +68,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 self.session_id = local;
                 self.remote_session_id = null;
             }
-            clearPacketList(&self.inbound_queue);
-            clearPacketList(&self.outbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.inbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.outbound_queue);
             self.current_inbound_id = 0;
             self.current_outbound_id = 0;
             self.pending_acks.clearRetainingCapacity();
@@ -297,9 +297,4 @@ pub fn ControlChannel(comptime Serializer: type) type {
             return lhs.packetId() < rhs.packetId();
         }
     };
-}
-
-fn clearPacketList(packets: *std.ArrayList(ControlPacket)) void {
-    for (packets.items) |*packet| packet.deinit();
-    packets.clearRetainingCapacity();
 }

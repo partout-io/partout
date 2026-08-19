@@ -258,9 +258,7 @@ pub const Negotiator = struct {
     }
 
     pub fn cancel(self: *Negotiator) void {
-        var iterator = self.pending_packets.valueIterator();
-        while (iterator.next()) |packet| packet.deinit();
-        self.pending_packets.clearRetainingCapacity();
+        core_mod.util.clearMap(ControlPacket, &self.pending_packets);
         if (self.authenticator) |*authenticator| authenticator.deinit();
         self.authenticator = null;
     }

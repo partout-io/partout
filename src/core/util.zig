@@ -105,6 +105,30 @@ pub fn defaultCacheDir(allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
     return allocator.dupe(u8, "/tmp");
 }
 
+/// Calls `deinit` on every item in a list, then clears it while retaining its
+/// allocation.
+pub fn clearList(
+    comptime T: type,
+    list: *std.ArrayList(T),
+) void {
+    for (list.items) |*item| item.deinit();
+    list.clearRetainingCapacity();
+}
+
+/// Calls `deinit` on every value in a map, then clears it while retaining its
+/// allocation.
+pub fn clearMap(
+    comptime T: type,
+    map: anytype,
+) void {
+    var iterator = map.valueIterator();
+    while (iterator.next()) |value| {
+        const item: *T = value;
+        item.deinit();
+    }
+    map.clearRetainingCapacity();
+}
+
 /// Calls `deinit` on every item in a list, then deinitializes the list.
 pub fn deinitList(
     comptime T: type,

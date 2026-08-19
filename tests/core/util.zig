@@ -216,6 +216,40 @@ test "deinitializes lists of owned items" {
     try std.testing.expectEqual(@as(usize, 2), deinit_count);
 }
 
+test "clears lists of owned items while retaining capacity" {
+    const allocator = std.testing.allocator;
+    var deinit_count: usize = 0;
+    var list: std.ArrayList(ClearItem) = .empty;
+    defer list.deinit(allocator);
+
+    try list.append(allocator, .{ .deinit_count = &deinit_count });
+    try list.append(allocator, .{ .deinit_count = &deinit_count });
+    const capacity = list.capacity;
+
+    util.clearList(ClearItem, &list);
+
+    try std.testing.expectEqual(@as(usize, 2), deinit_count);
+    try std.testing.expectEqual(@as(usize, 0), list.items.len);
+    try std.testing.expectEqual(capacity, list.capacity);
+}
+
+test "clears maps of owned items while retaining capacity" {
+    const allocator = std.testing.allocator;
+    var deinit_count: usize = 0;
+    var map = std.AutoHashMap(u32, ClearItem).init(allocator);
+    defer map.deinit();
+
+    try map.put(1, .{ .deinit_count = &deinit_count });
+    try map.put(2, .{ .deinit_count = &deinit_count });
+    const capacity = map.capacity();
+
+    util.clearMap(ClearItem, &map);
+
+    try std.testing.expectEqual(@as(usize, 2), deinit_count);
+    try std.testing.expectEqual(@as(usize, 0), map.count());
+    try std.testing.expectEqual(capacity, map.capacity());
+}
+
 test "deinitializes slices of owned items" {
     const allocator = std.testing.allocator;
     var deinit_count: usize = 0;
@@ -246,6 +280,14 @@ const OwnedItem = struct {
 
     pub fn deinit(self: *OwnedItem, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
+        self.deinit_count.* += 1;
+    }
+};
+
+const ClearItem = struct {
+    deinit_count: *usize,
+
+    pub fn deinit(self: *ClearItem) void {
         self.deinit_count.* += 1;
     }
 };
