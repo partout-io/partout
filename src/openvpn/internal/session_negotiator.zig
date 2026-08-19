@@ -73,7 +73,6 @@ pub const NegotiationHistory = struct {
 
     pub fn deinit(self: *NegotiationHistory, allocator: std.mem.Allocator) void {
         self.push_reply.deinit(allocator);
-        self.* = undefined;
     }
 };
 

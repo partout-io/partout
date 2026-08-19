@@ -72,7 +72,6 @@ pub const Serializer = union(enum) {
             .crypt => |*value| value.deinit(),
             .crypt_v2 => |*value| value.deinit(allocator),
         }
-        self.* = undefined;
     }
 
     pub fn reset(self: *Serializer) void {
@@ -237,7 +236,6 @@ const AuthSerializer = struct {
 
     pub fn deinit(self: *AuthSerializer) void {
         self.functions.cbc_free.?(self.cbc);
-        self.* = undefined;
     }
 
     pub fn reset(_: *AuthSerializer) void {}
@@ -366,7 +364,6 @@ const CryptSerializer = struct {
 
     pub fn deinit(self: *CryptSerializer) void {
         self.functions.ctr_free.?(self.ctr);
-        self.* = undefined;
     }
 
     pub fn reset(_: *CryptSerializer) void {}
@@ -472,7 +469,6 @@ const CryptV2Serializer = struct {
         self.serializer.deinit();
         @memset(self.wrapped_key, 0);
         allocator.free(self.wrapped_key);
-        self.* = undefined;
     }
 
     pub fn reset(self: *CryptV2Serializer) void {

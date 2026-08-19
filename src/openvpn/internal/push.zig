@@ -57,7 +57,6 @@ pub const PushReply = struct {
     pub fn deinit(self: *PushReply, allocator: std.mem.Allocator) void {
         self.options.deinit(allocator);
         allocator.free(self.original);
-        self.* = undefined;
     }
 };
 

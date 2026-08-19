@@ -62,7 +62,6 @@ pub const DataPathDecryptedAndParsedTuple = struct {
         allocator: std.mem.Allocator,
     ) void {
         allocator.free(self.data);
-        self.* = undefined;
     }
 };
 
@@ -74,7 +73,6 @@ pub const DataPathDecryptResult = struct {
     pub fn deinit(self: *DataPathDecryptResult, allocator: std.mem.Allocator) void {
         for (self.packets) |packet| allocator.free(packet);
         allocator.free(self.packets);
-        self.* = undefined;
     }
 };
 
@@ -285,7 +283,6 @@ pub const DataPathWrapper = struct {
 
     pub fn deinit(self: *DataPathWrapper) void {
         self.data_path.destroy();
-        self.* = undefined;
     }
 
     pub fn encrypt(

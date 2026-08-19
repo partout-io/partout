@@ -165,7 +165,6 @@ pub const LinkProcessor = struct {
 
         pub fn deinit(self: *Output) void {
             core_mod.util.freeSliceOfStrings(self.allocator, self.owned_packets);
-            self.* = undefined;
         }
     };
 

@@ -23,7 +23,6 @@ pub const CryptoKeys = struct {
         pub fn deinit(self: *KeyPair, allocator: std.mem.Allocator) void {
             self.encryption_key.deinit(allocator);
             self.decryption_key.deinit(allocator);
-            self.* = undefined;
         }
     };
 
@@ -96,7 +95,6 @@ pub const CryptoKeysBridge = struct {
         c_common.pp_zd_free(self.cipher_decryption_key);
         c_common.pp_zd_free(self.hmac_encryption_key);
         c_common.pp_zd_free(self.hmac_decryption_key);
-        self.* = undefined;
     }
 
     /// Borrowed pointer valid while the bridge remains alive and unmoved.

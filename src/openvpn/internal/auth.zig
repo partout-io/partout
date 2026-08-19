@@ -57,7 +57,6 @@ pub const Handshake = struct {
         self.random2.deinit(allocator);
         self.server_random1.deinit(allocator);
         self.server_random2.deinit(allocator);
-        self.* = undefined;
     }
 };
 
@@ -336,7 +335,6 @@ pub const Authenticator = struct {
         if (self.server_random2) |*value| value.deinit(allocator);
         if (self.username) |*value| value.deinit(allocator);
         if (self.password) |*value| value.deinit(allocator);
-        self.* = undefined;
     }
 
     pub fn reset(self: *Authenticator) void {
