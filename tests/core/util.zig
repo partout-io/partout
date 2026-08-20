@@ -124,6 +124,16 @@ test "checks byte allow-lists" {
     try std.testing.expect(!util.containsOnly("cad", "abc"));
 }
 
+test "converts seconds to milliseconds safely" {
+    try std.testing.expectEqual(@as(u64, 1500), util.secondsToMilliseconds(1.5));
+    try std.testing.expectEqual(@as(u64, 0), util.secondsToMilliseconds(-1));
+    try std.testing.expectEqual(@as(u64, 0), util.secondsToMilliseconds(std.math.nan(f64)));
+    try std.testing.expectEqual(
+        std.math.maxInt(u64),
+        util.secondsToMilliseconds(std.math.inf(f64)),
+    );
+}
+
 test "returns owned default cache directory" {
     const allocator = std.testing.allocator;
     const cache_dir = try util.defaultCacheDir(allocator);

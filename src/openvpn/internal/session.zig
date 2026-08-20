@@ -610,7 +610,7 @@ pub const Session = struct {
             }
 
             try processDataPackets(context, &grouped);
-            var parsed = negotiator.readInboundPacket(packet, 0) catch |err| {
+            var parsed = self.control_channel.readInboundPacket(packet, 0) catch |err| {
                 log.writef(.err, "Dropped malformed packet: {s}", .{@errorName(err)});
                 continue;
             };
@@ -631,7 +631,7 @@ pub const Session = struct {
                 else => {},
             }
             negotiator.sendAck(&parsed);
-            const inbound = try negotiator.enqueueInboundPacket(parsed.move());
+            const inbound = try self.control_channel.enqueueInboundPacket(parsed.move());
             var inbound_ids: [ControlConstants.number_of_keys]u32 = undefined;
             const inbound_count = @min(inbound.len, inbound_ids.len);
             for (inbound[0..inbound_count], 0..) |owned, index|
@@ -875,20 +875,20 @@ pub const Session = struct {
     ) ?u64 {
         if (context.push_reply) |reply| {
             if (reply.options.keep_alive_interval) |seconds|
-                if (seconds > 0) return secondsToMs(seconds);
+                if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
         }
         if (self.configuration.keep_alive_interval) |seconds|
-            if (seconds > 0) return secondsToMs(seconds);
+            if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
         return null;
     }
 
     fn keepAliveTimeoutMs(self: *const Session, context: *ActiveContext) u64 {
         if (context.push_reply) |reply| {
             if (reply.options.keep_alive_timeout) |seconds|
-                if (seconds > 0) return secondsToMs(seconds);
+                if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
         }
         if (self.configuration.keep_alive_timeout) |seconds|
-            if (seconds > 0) return secondsToMs(seconds);
+            if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
         return self.options.ping_timeout_ms;
     }
 
@@ -957,14 +957,6 @@ pub const Session = struct {
                 return error.Reconnect;
             },
         };
-    }
-
-    fn secondsToMs(seconds: f64) u64 {
-        if (!(seconds > 0)) return 0;
-        const milliseconds = seconds * 1000.0;
-        if (milliseconds >= @as(f64, @floatFromInt(std.math.maxInt(u64))))
-            return std.math.maxInt(u64);
-        return @intFromFloat(milliseconds);
     }
 
     const SetDelegateRequest = struct {

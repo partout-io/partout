@@ -95,6 +95,16 @@ pub fn containsOnly(value: []const u8, allowed: []const u8) bool {
     return true;
 }
 
+/// Converts seconds to whole milliseconds, clamping invalid and overflowing
+/// values to the range of `u64`.
+pub fn secondsToMilliseconds(seconds: f64) u64 {
+    if (!(seconds > 0)) return 0;
+    const milliseconds = seconds * std.time.ms_per_s;
+    if (milliseconds >= @as(f64, @floatFromInt(std.math.maxInt(u64))))
+        return std.math.maxInt(u64);
+    return @intFromFloat(milliseconds);
+}
+
 /// Returns an allocator-owned path to the system temporary directory.
 pub fn defaultCacheDir(allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
     const env_names = [_][:0]const u8{ "TMPDIR", "TMP", "TEMP" };
