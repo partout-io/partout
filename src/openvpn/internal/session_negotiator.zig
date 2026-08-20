@@ -107,16 +107,19 @@ pub const Negotiator = struct {
         prng: PRNG,
         tls: *TLSWrapper,
         options: NegotiatorOptions,
+
+        fn negotiationTimeoutMs(self: *const Init) u64 {
+            // Renegotiation has a more tolerant timeout.
+            return if (self.renegotiation != null)
+                self.options.session_options.soft_negotiation_timeout_ms
+            else
+                self.options.session_options.negotiation_timeout_ms;
+        }
     };
 
     /// `tls` and `history` transfer only when creation succeeds.
     pub fn create(allocator: std.mem.Allocator, init: Init) !*Negotiator {
         const self = try allocator.create(Negotiator);
-        // Renegotiation has a more tolerant timeout.
-        const negotiation_timeout_ms = if (init.renegotiation != null)
-            init.options.session_options.soft_negotiation_timeout_ms
-        else
-            init.options.session_options.negotiation_timeout_ms;
         self.* = .{
             .allocator = allocator,
             .key = init.key,
@@ -130,7 +133,7 @@ pub const Negotiator = struct {
             .tls = init.tls,
             .options = init.options,
             .start_time_ns = core_mod.concurrency.monotonicNs(),
-            .negotiation_timeout_ms = negotiation_timeout_ms,
+            .negotiation_timeout_ms = init.negotiationTimeoutMs(),
         };
         return self;
     }
