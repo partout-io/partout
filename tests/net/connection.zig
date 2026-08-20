@@ -14,6 +14,19 @@ const api = core.api;
 const ConnectionRegistry = conn.ConnectionRegistry;
 const activeConnectionModule = conn.activeConnectionModule;
 
+test "connection accepts only valid status transitions" {
+    try std.testing.expect(conn.canChangeStatus(.disconnected, .connecting));
+    try std.testing.expect(!conn.canChangeStatus(.disconnected, .connected));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .connected));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .disconnecting));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .disconnected));
+    try std.testing.expect(conn.canChangeStatus(.connected, .disconnecting));
+    try std.testing.expect(conn.canChangeStatus(.connected, .disconnected));
+    try std.testing.expect(conn.canChangeStatus(.disconnecting, .disconnected));
+    try std.testing.expect(!conn.canChangeStatus(.connected, .connecting));
+    try std.testing.expect(!conn.canChangeStatus(.connected, .connected));
+}
+
 test "connection options match Swift defaults" {
     const options = sandbox.ConnectionOptions{};
 

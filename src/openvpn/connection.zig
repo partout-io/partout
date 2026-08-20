@@ -9,6 +9,7 @@ const net = @import("../net/exports.zig");
 const configuration_mod = @import("internal/configuration.zig");
 const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
+const endpoint_resolver_mod = @import("internal/endpoint_resolver.zig");
 const errors_mod = @import("internal/errors.zig");
 const logging_mod = @import("internal/logging.zig");
 const session_mod = @import("internal/session.zig");
@@ -17,6 +18,7 @@ const settings_mod = @import("internal/settings.zig");
 const api = core.api;
 const log = core.logging;
 const openvpn_log = logging_mod;
+const EndpointResolver = endpoint_resolver_mod.EndpointResolver;
 const SessionOptions = configuration_mod.SessionOptions;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
@@ -37,17 +39,17 @@ pub fn createConnection(
 ) net.ConnectionCreateError!net.Connection {
     const raw = ptr orelse return error.MissingConnectionImplementation;
     const context: *const ConnectionContext = @ptrCast(@alignCast(raw));
-    return OpenVPNConnection.create(
-        allocator,
-        context,
-        module,
-        sandbox,
-    );
+    return OpenVPNConnection.create(allocator, context, module, sandbox);
 }
 
 /// Inputs selected by the OpenVPN module implementation.
 pub const ConnectionContext = struct {
     session_options: SessionOptions = .{},
+};
+
+pub const testing = struct {
+    pub const codeForTunnelError = tunnelErrorCode;
+    pub const isRecoverableSessionError = isRecoverable;
 };
 
 const OpenVPNConnection = struct {
@@ -73,9 +75,9 @@ const OpenVPNConnection = struct {
     current_endpoint: ?api.ExtendedEndpoint = null,
     tunnel: ?net.TunWrapper = null,
 
-    event_lock: core.Mutex = .{},
-    event_head: ?*DelegateEventNode = null,
-    event_tail: ?*DelegateEventNode = null,
+    delegate_events: DelegateEventQueue = .{},
+
+    // MARK: - Public API
 
     fn create(
         allocator: std.mem.Allocator,
@@ -91,9 +93,7 @@ const OpenVPNConnection = struct {
             value
         else
             return error.IncompleteModule;
-        const looper = sandbox.looper;
-
-        var configuration = try configurationApplyingActiveModules(
+        var configuration = try configuration_mod.applyingActiveModules(
             allocator,
             source_configuration,
             sandbox.profile,
@@ -102,11 +102,10 @@ const OpenVPNConnection = struct {
         configuration_mod.validate(&configuration) catch
             return error.IncompleteModule;
 
-        const prng = PRNG.system();
         const maybe_endpoints = configuration_mod.processedRemotes(
             allocator,
             &configuration,
-            prng,
+            PRNG.system(),
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
             error.CryptoFailure => return error.IdGeneration,
@@ -131,7 +130,6 @@ const OpenVPNConnection = struct {
         errdefer allocator.free(cache_dir);
 
         const created = try allocator.create(OpenVPNConnection);
-        errdefer allocator.destroy(created);
         var session_options = context.session_options;
         session_options.write_timeout_ms = sandbox.options.link_write_timeout;
         session_options.min_data_count_interval_ms =
@@ -143,7 +141,7 @@ const OpenVPNConnection = struct {
             .controller = sandbox.controller,
             .resolver = sandbox.resolver,
             .factory = sandbox.factory,
-            .looper = looper,
+            .looper = sandbox.looper,
             .serialized_executor = sandbox.serialized_executor,
             .connection_options = sandbox.options,
             .session_options = session_options,
@@ -159,15 +157,9 @@ const OpenVPNConnection = struct {
 
     fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit _OpenVPNConnectionV3");
-        if (self.current_session) |session| {
-            session.setDelegate(null);
-            session.destroy();
-            self.current_session = null;
-        }
-        self.clearTunnel();
-        self.clearCurrentEndpoint();
-        self.deinitQueuedEvents();
-        self.event_lock.deinit();
+        self.destroyCurrentSession();
+        self.clearLink();
+        self.delegate_events.deinit(self.allocator);
         self.endpoint_resolver.deinit(self.allocator);
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
@@ -175,13 +167,6 @@ const OpenVPNConnection = struct {
         self.allocator.free(self.cache_dir);
         const allocator = self.allocator;
         allocator.destroy(self);
-    }
-
-    fn asConnection(self: *OpenVPNConnection) net.Connection {
-        return .{
-            .ptr = self,
-            .vtable = &openvpn_connection_vtable,
-        };
     }
 
     fn start(
@@ -195,13 +180,8 @@ const OpenVPNConnection = struct {
             return false;
         }
 
-        if (self.current_session) |old_session| {
-            old_session.setDelegate(null);
-            old_session.destroy();
-            self.current_session = null;
-        }
-        self.clearTunnel();
-        self.clearCurrentEndpoint();
+        self.destroyCurrentSession();
+        self.clearLink();
 
         const ca_filename = api.moduleCacheFilename(
             self.allocator,
@@ -215,6 +195,7 @@ const OpenVPNConnection = struct {
         const session = Session.create(self.allocator, .{
             .executor = self.serialized_executor,
             .looper = self.looper,
+            .delegate = self.sessionDelegate(),
             .configuration = self.configuration,
             .credentials = self.credentials,
             .prng = PRNG.system(),
@@ -225,7 +206,6 @@ const OpenVPNConnection = struct {
             log.writef(.err, "Unable to create session: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
-        session.setDelegate(self.sessionDelegate());
         self.current_session = session;
         self.events = events;
 
@@ -269,9 +249,8 @@ const OpenVPNConnection = struct {
             log.write(.err, "Link shut down due to timeout");
         };
         if (graceful) log.write(.notice, "Link shut down gracefully");
-        self.discardQueuedEvents();
-        self.clearTunnel();
-        self.clearCurrentEndpoint();
+        self.delegate_events.clear(self.allocator);
+        self.clearLink();
         self.controller.clearTunnelSettings(false);
         _ = self.sendStatus(.disconnected, events);
         self.events = null;
@@ -306,6 +285,17 @@ const OpenVPNConnection = struct {
         session.looperDidTerminate(failure);
     }
 
+    // MARK: - Private construction
+
+    fn asConnection(self: *OpenVPNConnection) net.Connection {
+        return .{
+            .ptr = self,
+            .vtable = &openvpn_connection_vtable,
+        };
+    }
+
+    // MARK: - Link setup
+
     fn setupLink(
         self: *OpenVPNConnection,
         session: *Session,
@@ -317,21 +307,18 @@ const OpenVPNConnection = struct {
             self.allocator,
             &self.resolver,
             reachability,
-            self.sessionDnsTimeout(),
+            self.connection_options.dns_timeout,
         );
 
-        var owned_endpoint = try cloneEndpoint(self.allocator, endpoint);
+        var owned_endpoint = try endpoint.clone(self.allocator);
         errdefer owned_endpoint.deinit(self.allocator);
         log.writef(.notice, "Connect to {s}", .{owned_endpoint});
-        const descriptor = self.factory.create(
+        const descriptor = try self.factory.create(
             self.allocator,
             owned_endpoint,
             reachability,
-            self.sessionLinkTimeout(),
-        ) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.LinkNotActive => return error.LinkNotActive,
-        };
+            self.connection_options.link_activity_timeout,
+        );
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
             owned_endpoint.proto.socket_type.raw(),
@@ -340,13 +327,7 @@ const OpenVPNConnection = struct {
         return owned_endpoint;
     }
 
-    fn sessionDnsTimeout(self: *const OpenVPNConnection) u32 {
-        return self.connection_options.dns_timeout;
-    }
-
-    fn sessionLinkTimeout(self: *const OpenVPNConnection) u32 {
-        return self.connection_options.link_activity_timeout;
-    }
+    // MARK: - Session delegate
 
     fn sessionDelegate(self: *OpenVPNConnection) SessionDelegate {
         return .{
@@ -356,22 +337,12 @@ const OpenVPNConnection = struct {
     }
 
     fn enqueueDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
-        const node = self.allocator.create(DelegateEventNode) catch {
+        self.delegate_events.append(self.allocator, event) catch {
             var owned_event = event;
             owned_event.deinit(self.allocator);
             log.write(.err, "Unable to enqueue session delegate event");
             return;
         };
-        node.* = .{ .event = event };
-
-        self.event_lock.lock();
-        if (self.event_tail) |tail| {
-            tail.next = node;
-        } else {
-            self.event_head = node;
-        }
-        self.event_tail = node;
-        self.event_lock.unlock();
         self.serialized_executor.run(self, handleDelegateEventsTask);
     }
 
@@ -381,22 +352,11 @@ const OpenVPNConnection = struct {
     }
 
     fn handleDelegateEvents(self: *OpenVPNConnection) void {
-        while (self.takeDelegateEvent()) |node| {
-            self.handleDelegateEvent(node.event);
-            var event = node.event;
+        while (self.delegate_events.take(self.allocator)) |queued_event| {
+            var event = queued_event;
+            self.handleDelegateEvent(event);
             event.deinit(self.allocator);
-            self.allocator.destroy(node);
         }
-    }
-
-    fn takeDelegateEvent(self: *OpenVPNConnection) ?*DelegateEventNode {
-        self.event_lock.lock();
-        defer self.event_lock.unlock();
-        const node = self.event_head orelse return null;
-        self.event_head = node.next;
-        if (self.event_head == null) self.event_tail = null;
-        node.next = null;
-        return node;
     }
 
     fn handleDelegateEvent(
@@ -506,14 +466,11 @@ const OpenVPNConnection = struct {
         const events = self.events orelse return;
         session.setDelegate(null);
         session.shutdown(error.Reconnect, null) catch {};
-        self.clearTunnel();
-        self.clearCurrentEndpoint();
+        self.clearLink();
         self.controller.clearTunnelSettings(false);
-        self.status = .disconnected;
-        self.events = null;
-        self.clearServerConfiguration();
+        self.markDisconnected();
         events.last_error(events.ctx, code);
-        self.requestCancellation(events, code);
+        events.cancel(events.ctx, code);
     }
 
     fn handleDidStop(
@@ -521,8 +478,7 @@ const OpenVPNConnection = struct {
         cause: ?SessionError,
     ) void {
         const events = self.events orelse return;
-        self.clearTunnel();
-        self.clearCurrentEndpoint();
+        self.clearLink();
         self.controller.clearTunnelSettings(false);
 
         if (self.status == .disconnecting) return;
@@ -533,10 +489,8 @@ const OpenVPNConnection = struct {
                 if (!isRecoverable(err)) {
                     log.write(.err, "Disconnection is not recoverable");
                     log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
-                    self.status = .disconnected;
-                    self.events = null;
-                    self.clearServerConfiguration();
-                    self.requestCancellation(events, code);
+                    self.markDisconnected();
+                    events.cancel(events.ctx, code);
                     return;
                 }
             }
@@ -546,12 +500,10 @@ const OpenVPNConnection = struct {
         _ = self.sendStatus(.disconnected, events);
     }
 
-    fn requestCancellation(
-        _: *OpenVPNConnection,
-        events: net.Connection.Events,
-        code: ?api.PartoutErrorCode,
-    ) void {
-        events.cancel(events.ctx, code);
+    fn markDisconnected(self: *OpenVPNConnection) void {
+        self.status = .disconnected;
+        self.events = null;
+        self.clearServerConfiguration();
     }
 
     fn sendStatus(
@@ -559,7 +511,7 @@ const OpenVPNConnection = struct {
         new_status: api.ConnectionStatus,
         events: net.Connection.Events,
     ) bool {
-        if (!canChangeStatus(self.status, new_status)) {
+        if (!net.canChangeStatus(self.status, new_status)) {
             log.writef(.err, "Ignore unexpected status change: {s} -> {s}", .{
                 self.status.raw(),
                 new_status.raw(),
@@ -589,26 +541,20 @@ const OpenVPNConnection = struct {
         self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, null);
     }
 
-    fn clearTunnel(self: *OpenVPNConnection) void {
+    // MARK: - Cleanup
+
+    fn destroyCurrentSession(self: *OpenVPNConnection) void {
+        const session = self.current_session orelse return;
+        session.setDelegate(null);
+        session.destroy();
+        self.current_session = null;
+    }
+
+    fn clearLink(self: *OpenVPNConnection) void {
         if (self.tunnel) |*tunnel| tunnel.deinit();
         self.tunnel = null;
-    }
-
-    fn clearCurrentEndpoint(self: *OpenVPNConnection) void {
         if (self.current_endpoint) |*endpoint| endpoint.deinit(self.allocator);
         self.current_endpoint = null;
-    }
-
-    fn discardQueuedEvents(self: *OpenVPNConnection) void {
-        while (self.takeDelegateEvent()) |node| {
-            var event = node.event;
-            event.deinit(self.allocator);
-            self.allocator.destroy(node);
-        }
-    }
-
-    fn deinitQueuedEvents(self: *OpenVPNConnection) void {
-        self.discardQueuedEvents();
     }
 };
 
@@ -651,6 +597,67 @@ const DelegateEventNode = struct {
     next: ?*DelegateEventNode = null,
 };
 
+const DelegateEventQueue = struct {
+    lock: core.Mutex = .{},
+    head: ?*DelegateEventNode = null,
+    tail: ?*DelegateEventNode = null,
+
+    fn append(
+        self: *DelegateEventQueue,
+        allocator: std.mem.Allocator,
+        event: DelegateEvent,
+    ) std.mem.Allocator.Error!void {
+        const node = try allocator.create(DelegateEventNode);
+        node.* = .{ .event = event };
+
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.tail) |tail| {
+            tail.next = node;
+        } else {
+            self.head = node;
+        }
+        self.tail = node;
+    }
+
+    fn take(
+        self: *DelegateEventQueue,
+        allocator: std.mem.Allocator,
+    ) ?DelegateEvent {
+        self.lock.lock();
+        const node = self.head orelse {
+            self.lock.unlock();
+            return null;
+        };
+        self.head = node.next;
+        if (self.head == null) self.tail = null;
+        self.lock.unlock();
+
+        defer allocator.destroy(node);
+        return node.event;
+    }
+
+    fn clear(
+        self: *DelegateEventQueue,
+        allocator: std.mem.Allocator,
+    ) void {
+        while (self.take(allocator)) |queued_event| {
+            var event = queued_event;
+            event.deinit(allocator);
+        }
+    }
+
+    fn deinit(
+        self: *DelegateEventQueue,
+        allocator: std.mem.Allocator,
+    ) void {
+        self.clear(allocator);
+        self.lock.deinit();
+    }
+};
+
+// MARK: - Session delegate callbacks
+
 fn sessionDidStart(
     raw: ?*anyopaque,
     session: *anyopaque,
@@ -658,7 +665,7 @@ fn sessionDidStart(
     remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    const endpoint = cloneEndpoint(self.allocator, remote_endpoint) catch {
+    const endpoint = remote_endpoint.clone(self.allocator) catch {
         log.write(.err, "Unable to copy started endpoint");
         return;
     };
@@ -698,227 +705,7 @@ fn sessionDidUpdateDataCount(
     } });
 }
 
-const session_delegate_vtable = SessionDelegate.VTable{
-    .did_start = sessionDidStart,
-    .did_stop = sessionDidStop,
-    .did_update_data_count = sessionDidUpdateDataCount,
-};
-
-const EndpointResolver = struct {
-    endpoints: []const api.ExtendedEndpoint,
-    next_endpoint_index: usize = 0,
-    resolved: ?[]api.ExtendedEndpoint = null,
-    next_resolved_index: usize = 0,
-
-    fn init(endpoints: []const api.ExtendedEndpoint) EndpointResolver {
-        std.debug.assert(endpoints.len > 0);
-        return .{ .endpoints = endpoints };
-    }
-
-    fn deinit(self: *EndpointResolver, allocator: std.mem.Allocator) void {
-        self.clearResolved(allocator);
-    }
-
-    fn next(
-        self: *EndpointResolver,
-        allocator: std.mem.Allocator,
-        resolver: *const net.DNSResolver,
-        reachability: ?net.ReachabilityInfo,
-        timeout_ms: u32,
-    ) (std.mem.Allocator.Error || error{ExhaustedEndpoints})!api.ExtendedEndpoint {
-        while (true) {
-            if (self.resolved) |resolved| {
-                if (self.next_resolved_index < resolved.len) {
-                    const endpoint = resolved[self.next_resolved_index];
-                    self.next_resolved_index += 1;
-                    return endpoint;
-                }
-                self.clearResolved(allocator);
-            }
-
-            if (self.next_endpoint_index >= self.endpoints.len) {
-                self.next_endpoint_index = 0;
-                return error.ExhaustedEndpoints;
-            }
-            const source = self.endpoints[self.next_endpoint_index];
-            self.next_endpoint_index += 1;
-            self.resolved = resolveEndpoint(
-                allocator,
-                resolver,
-                source,
-                reachability,
-                timeout_ms,
-            ) catch |err| switch (err) {
-                error.OutOfMemory => return error.OutOfMemory,
-                error.NetworkUnreachable,
-                error.ResolutionFailure,
-                error.Timeout,
-                => {
-                    log.writef(.err, "Unable to resolve {s}: {s}", .{
-                        log.sensitive(source.address),
-                        @errorName(err),
-                    });
-                    continue;
-                },
-            };
-            self.next_resolved_index = 0;
-        }
-    }
-
-    fn clearResolved(
-        self: *EndpointResolver,
-        allocator: std.mem.Allocator,
-    ) void {
-        if (self.resolved) |resolved|
-            core.util.freeSlice(api.ExtendedEndpoint, allocator, resolved);
-        self.resolved = null;
-        self.next_resolved_index = 0;
-    }
-};
-
-fn resolveEndpoint(
-    allocator: std.mem.Allocator,
-    resolver: *const net.DNSResolver,
-    endpoint: api.ExtendedEndpoint,
-    reachability: ?net.ReachabilityInfo,
-    timeout_ms: u32,
-) net.DNSResolver.Error![]api.ExtendedEndpoint {
-    const address = api.Address.parseRaw(endpoint.address) orelse
-        return error.ResolutionFailure;
-    if (address.isIPAddress()) {
-        const mapped = try resolver.resolveAddress(
-            allocator,
-            endpoint.address,
-            reachability,
-            timeout_ms,
-        );
-        defer allocator.free(mapped);
-        const mapped_address = api.Address.parseRaw(mapped) orelse
-            return error.ResolutionFailure;
-        if (!mapped_address.isIPAddress() or
-            !isCompatibleAddress(endpoint, mapped_address.family == .v6))
-        {
-            return error.ResolutionFailure;
-        }
-        const result = try allocator.alloc(api.ExtendedEndpoint, 1);
-        errdefer allocator.free(result);
-        result[0] = .{
-            .address = try allocator.dupe(u8, mapped),
-            .proto = endpoint.proto,
-            .owned = true,
-        };
-        return result;
-    }
-
-    const records = try resolver.resolve(
-        allocator,
-        endpoint.address,
-        std.EnumSet(net.DNSResolver.Flag).initEmpty(),
-        reachability,
-        timeout_ms,
-    );
-    defer core.util.freeSlice(net.DNSRecord, allocator, records);
-    var result: std.ArrayList(api.ExtendedEndpoint) = .empty;
-    errdefer core.util.deinitList(api.ExtendedEndpoint, allocator, &result);
-    for (records) |record| {
-        const resolved_address = api.Address.parseRaw(record.address) orelse continue;
-        if (!resolved_address.isIPAddress()) continue;
-        if (!isCompatibleAddress(endpoint, record.is_ipv6)) continue;
-        try result.append(allocator, .{
-            .address = try allocator.dupe(u8, record.address),
-            .proto = endpoint.proto,
-            .owned = true,
-        });
-    }
-    return result.toOwnedSlice(allocator);
-}
-
-fn isCompatibleAddress(endpoint: api.ExtendedEndpoint, is_ipv6: bool) bool {
-    return switch (endpoint.proto.socket_type) {
-        .udp4, .tcp4 => !is_ipv6,
-        .udp6, .tcp6 => is_ipv6,
-        .udp, .tcp => true,
-    };
-}
-
-fn configurationApplyingActiveModules(
-    allocator: std.mem.Allocator,
-    source: *const api.OpenVPNConfiguration,
-    profile: *const api.Profile,
-) net.ConnectionCreateError!api.OpenVPNConfiguration {
-    var configuration = source.clone(allocator) catch |err| switch (err) {
-        error.OutOfMemory => return error.OutOfMemory,
-        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.IncompleteModule,
-    };
-    errdefer configuration.deinit(allocator);
-
-    var add_ipv4 = false;
-    var add_ipv6 = false;
-    for (profile.modules) |*module| {
-        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
-        switch (module.*) {
-            .IP => |*ip| {
-                if (ip.ipv4) |*settings| {
-                    add_ipv4 = add_ipv4 or routesDefaultThroughVPN(settings);
-                }
-                if (ip.ipv6) |*settings| {
-                    add_ipv6 = add_ipv6 or routesDefaultThroughVPN(settings);
-                }
-            },
-            else => {},
-        }
-    }
-    try appendRoutingPolicy(allocator, &configuration, .IPv4, add_ipv4);
-    try appendRoutingPolicy(allocator, &configuration, .IPv6, add_ipv6);
-    return configuration;
-}
-
-fn routesDefaultThroughVPN(settings: *const api.IPSettings) bool {
-    return containsDefaultRoute(settings.included_routes) and
-        !containsDefaultRoute(settings.excluded_routes);
-}
-
-fn containsDefaultRoute(routes: []const api.Route) bool {
-    for (routes) |route| {
-        if (route.destination == null) return true;
-    }
-    return false;
-}
-
-fn appendRoutingPolicy(
-    allocator: std.mem.Allocator,
-    configuration: *api.OpenVPNConfiguration,
-    policy: api.OpenVPNRoutingPolicy,
-    should_append: bool,
-) std.mem.Allocator.Error!void {
-    if (!should_append) return;
-    const previous = configuration.routing_policies orelse &.{};
-    if (std.mem.indexOfScalar(api.OpenVPNRoutingPolicy, previous, policy) != null)
-        return;
-    const updated = try allocator.alloc(
-        api.OpenVPNRoutingPolicy,
-        previous.len + 1,
-    );
-    @memcpy(updated[0..previous.len], previous);
-    updated[previous.len] = policy;
-    if (configuration.routing_policies) |owned| allocator.free(owned);
-    configuration.routing_policies = updated;
-}
-
-fn canChangeStatus(
-    current: api.ConnectionStatus,
-    next: api.ConnectionStatus,
-) bool {
-    if (current == next) return false;
-    return switch (current) {
-        .disconnected => next == .connecting,
-        .connecting => next == .connected or
-            next == .disconnecting or
-            next == .disconnected,
-        .connected => next == .disconnecting or next == .disconnected,
-        .disconnecting => next == .disconnected,
-    };
-}
+// MARK: - Errors
 
 fn isRecoverable(err: SessionError) bool {
     return switch (err) {
@@ -944,25 +731,7 @@ fn tunnelErrorCode(err: anyerror) api.PartoutErrorCode {
     };
 }
 
-fn cloneEndpoint(
-    allocator: std.mem.Allocator,
-    endpoint: api.ExtendedEndpoint,
-) std.mem.Allocator.Error!api.ExtendedEndpoint {
-    return .{
-        .address = try allocator.dupe(u8, endpoint.address),
-        .proto = endpoint.proto,
-        .owned = true,
-    };
-}
-
-const openvpn_connection_vtable = net.Connection.VTable{
-    .start = start,
-    .stop = stop,
-    .network_change = networkChange,
-    .better_path = betterPath,
-    .destroy = destroy,
-    .looper_terminated = looperDidTerminate,
-};
+// MARK: - Connection callbacks
 
 fn start(
     ptr: *anyopaque,
@@ -1008,16 +777,19 @@ fn destroy(ptr: *anyopaque) void {
     self.destroy();
 }
 
-pub const testing = struct {
-    pub const codeForTunnelError = tunnelErrorCode;
-    pub const isRecoverableSessionError = isRecoverable;
-    pub const statusCanChange = canChangeStatus;
+// MARK: - Vtables
 
-    pub fn configurationWithActiveModules(
-        allocator: std.mem.Allocator,
-        source: *const api.OpenVPNConfiguration,
-        profile: *const api.Profile,
-    ) net.ConnectionCreateError!api.OpenVPNConfiguration {
-        return configurationApplyingActiveModules(allocator, source, profile);
-    }
+const openvpn_connection_vtable = net.Connection.VTable{
+    .start = start,
+    .stop = stop,
+    .network_change = networkChange,
+    .better_path = betterPath,
+    .destroy = destroy,
+    .looper_terminated = looperDidTerminate,
+};
+
+const session_delegate_vtable = SessionDelegate.VTable{
+    .did_start = sessionDidStart,
+    .did_stop = sessionDidStop,
+    .did_update_data_count = sessionDidUpdateDataCount,
 };

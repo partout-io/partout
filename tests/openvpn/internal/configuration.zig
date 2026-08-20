@@ -8,6 +8,48 @@ const source = @import("source");
 const api = source.core.api;
 const configuration = source.openvpn_internal.configuration;
 
+test "active default IP modules add OpenVPN routing policies" {
+    const allocator = std.testing.allocator;
+    const ip_id: api.UUID = "11111111-1111-4111-8111-111111111111".*;
+    const openvpn_id: api.UUID = "22222222-2222-4222-8222-222222222222".*;
+    const included = [_]api.Route{.{}};
+    const modules = [_]api.TaggedModule{
+        .{ .IP = .{
+            .id = ip_id,
+            .ipv4 = .{
+                .subnets = &.{},
+                .included_routes = &included,
+                .excluded_routes = &.{},
+            },
+        } },
+        .{ .OpenVPN = .{
+            .id = openvpn_id,
+            .configuration = .{},
+        } },
+    };
+    const active_ids = [_]api.UUID{ ip_id, openvpn_id };
+    const profile = api.Profile{
+        .id = "33333333-3333-4333-8333-333333333333".*,
+        .name = "OpenVPN",
+        .modules = &modules,
+        .active_modules_ids = &active_ids,
+    };
+    var configured = try configuration.applyingActiveModules(
+        allocator,
+        &.{},
+        &profile,
+    );
+    defer configured.deinit(allocator);
+
+    const policies = configured.routing_policies orelse
+        return error.TestUnexpectedResult;
+    try std.testing.expectEqualSlices(
+        api.OpenVPNRoutingPolicy,
+        &.{.IPv4},
+        policies,
+    );
+}
+
 test "fallbacks mirror Swift configuration defaults" {
     const options = api.OpenVPNConfiguration{};
     try std.testing.expectEqual(api.OpenVPNCipher.aes128cbc, configuration.fallbackCipher(&options));

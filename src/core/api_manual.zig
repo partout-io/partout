@@ -239,6 +239,17 @@ pub const ExtendedEndpoint = struct {
     proto: EndpointProtocol = .{},
     owned: bool = false,
 
+    pub fn clone(
+        self: ExtendedEndpoint,
+        allocator: std.mem.Allocator,
+    ) error{OutOfMemory}!ExtendedEndpoint {
+        return .{
+            .address = try allocator.dupe(u8, self.address),
+            .proto = self.proto,
+            .owned = true,
+        };
+    }
+
     pub fn init(raw_address: []const u8, proto: EndpointProtocol) ?ExtendedEndpoint {
         const parsed_address = Address.parseRaw(raw_address) orelse return null;
         return .{

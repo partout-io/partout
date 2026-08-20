@@ -23,6 +23,22 @@ pub const StartError = std.mem.Allocator.Error || error{
     UnableToStart,
 };
 
+/// Reports whether a connection may move directly between two statuses.
+pub fn canChangeStatus(
+    current: api.ConnectionStatus,
+    next: api.ConnectionStatus,
+) bool {
+    if (current == next) return false;
+    return switch (current) {
+        .disconnected => next == .connecting,
+        .connecting => next == .connected or
+            next == .disconnecting or
+            next == .disconnected,
+        .connected => next == .disconnecting or next == .disconnected,
+        .disconnecting => next == .disconnected,
+    };
+}
+
 /// Manages a set of supported implementations to pick the right
 /// one to build a connection with. The goal of the registry is
 /// to couple a module with a sandbox to establish a

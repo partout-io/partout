@@ -6,6 +6,26 @@ const std = @import("std");
 
 const api = @import("source").core_api;
 
+test "recognizes default routes" {
+    const default_route = api.Route{};
+    const specific_route = api.Route{
+        .destination = api.Subnet.parseRaw("192.0.2.0/24").?,
+    };
+
+    try std.testing.expect(api.containsDefaultRoute(&.{default_route}));
+    try std.testing.expect(!api.containsDefaultRoute(&.{specific_route}));
+    try std.testing.expect(api.routesDefaultThroughVPN(&.{
+        .included_routes = &.{default_route},
+    }));
+    try std.testing.expect(!api.routesDefaultThroughVPN(&.{
+        .included_routes = &.{default_route},
+        .excluded_routes = &.{default_route},
+    }));
+    try std.testing.expect(!api.routesDefaultThroughVPN(&.{
+        .included_routes = &.{specific_route},
+    }));
+}
+
 test "module cache filenames prefix arbitrary filenames with the module id" {
     const allocator = std.testing.allocator;
     const module_id: api.UUID = "11111111-1111-4111-8111-111111111111".*;
