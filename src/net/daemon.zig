@@ -909,24 +909,18 @@ fn buildSettingsOnlyTunnelInfo(
     allocator: std.mem.Allocator,
     profile: *const api.Profile,
 ) !?api.TunnelRemoteInfoWrapper {
-    var modules: std.ArrayList(api.TaggedModule) = .empty;
-    defer modules.deinit(allocator);
-
+    var original_module_id: ?api.UUID = null;
     for (profile.modules) |*module| {
         if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
         if (api.typeBuildsConnection(api.moduleType(module))) continue;
-        try modules.append(allocator, module.*);
-    }
-
-    if (modules.items.len == 0) {
-        return null;
+        original_module_id = api.moduleId(module);
+        break;
     }
 
     const info = api.TunnelRemoteInfoWrapper{
         .profile = profile.*,
-        .original_module_id = api.moduleId(&modules.items[0]),
+        .original_module_id = original_module_id orelse return null,
         .requires_virtual_device = false,
-        .modules = modules.items,
     };
     return try info.clone(allocator);
 }

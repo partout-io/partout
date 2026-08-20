@@ -636,6 +636,8 @@ fn snapshotTunnelSettings(info: api.TunnelRemoteInfoWrapper) MockTunnelControlle
     var snapshot = MockTunnelController.LastTunnelSettings{
         .requires_virtual_device = info.requires_virtual_device,
         .original_module_id = info.original_module_id,
+        .profile_module_count = info.profile.modules.len,
+        .profile_active_module_count = info.profile.active_modules_ids.len,
         .module_count = if (info.modules) |modules| modules.len else 0,
     };
     const modules = info.modules orelse return snapshot;
@@ -669,6 +671,8 @@ pub const MockTunnelController = struct {
     pub const LastTunnelSettings = struct {
         requires_virtual_device: bool,
         original_module_id: api.UUID,
+        profile_module_count: usize,
+        profile_active_module_count: usize,
         module_count: usize,
         has_dns_module: bool = false,
         dns_server_count: usize = 0,

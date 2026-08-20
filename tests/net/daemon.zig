@@ -164,6 +164,10 @@ test "connection daemon starts settings-only profile" {
     try sut.start();
     try std.testing.expect(sut.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+    const settings = controller.last_settings orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 1), settings.profile_module_count);
+    try std.testing.expectEqual(@as(usize, 1), settings.profile_active_module_count);
+    try std.testing.expectEqual(@as(usize, 0), settings.module_count);
 
     sut.stop();
     try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
