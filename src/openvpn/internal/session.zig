@@ -226,7 +226,8 @@ pub const Session = struct {
     }
 
     pub fn setTunnel(self: *Session, descriptor: net.Looper.Descriptor) Error!void {
-        errdefer descriptor.io.cleanup();
+        var descriptor_transferred = false;
+        defer if (!descriptor_transferred) descriptor.io.cleanup();
 
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
         self.lifecycle_lock.lock();
@@ -245,6 +246,7 @@ pub const Session = struct {
             .on_read = .{ .context = self, .callback = onTunnelRead },
             .on_failure = .{ .context = self, .callback = onSideFailure },
         }) catch |err| return errors_mod.sessionError(err);
+        descriptor_transferred = true;
     }
 
     /// Prepares state on the looper, detaches from this external thread, then
