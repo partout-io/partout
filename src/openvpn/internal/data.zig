@@ -7,6 +7,7 @@ const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
+const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
@@ -28,60 +29,48 @@ const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const ZeroingData = crypto_mod.ZeroingData;
 
-pub const DataPathParameters = struct {
-    backend: CryptoBackend,
-    cipher: ?api.OpenVPNCipher,
-    digest: ?api.OpenVPNDigest,
-    compression_framing: api.OpenVPNCompressionFraming,
-    compression_algorithm: api.OpenVPNCompressionAlgorithm,
-    peer_id: ?u32,
-};
-
-pub const DataPathDecryptedAndParsedTuple = struct {
-    packet_id: u32,
-    header: u8,
-    is_keep_alive: bool,
-    data: []u8,
-
-    pub fn init(
-        packet_id: u32,
-        header: u8,
-        is_keep_alive: bool,
-        data: []u8,
-    ) DataPathDecryptedAndParsedTuple {
-        return .{
-            .packet_id = packet_id,
-            .header = header,
-            .is_keep_alive = is_keep_alive,
-            .data = data,
-        };
-    }
-
-    pub fn deinit(
-        self: *DataPathDecryptedAndParsedTuple,
-        allocator: std.mem.Allocator,
-    ) void {
-        allocator.free(self.data);
-    }
-};
-
-/// Owning Zig representation of Swift's bulk-decrypt result tuple.
-pub const DataPathDecryptResult = struct {
-    packets: [][]u8,
-    keep_alive: bool,
-
-    pub fn deinit(self: *DataPathDecryptResult, allocator: std.mem.Allocator) void {
-        core_mod.util.freeSliceOfStrings(allocator, self.packets);
-    }
-};
-
 /// C-backed OpenVPN data path.
 ///
-/// `mode` ownership transfers to `create` on success and is ultimately
+/// `mode` ownership transfers to `createWithMode` on success and is ultimately
 /// released by `destroy`. Cryptographic/framing transforms, replay-window
 /// bookkeeping, and ping recognition delegate to the existing C routines;
 /// this type only owns buffers and orchestrates packet batches.
 pub const DataPath = struct {
+    pub const Parameters = struct {
+        backend: CryptoBackend,
+        cipher: ?api.OpenVPNCipher,
+        digest: ?api.OpenVPNDigest,
+        compression_framing: api.OpenVPNCompressionFraming,
+        peer_id: ?u32,
+    };
+
+    pub const DecryptedPacket = struct {
+        packet_id: u32,
+        is_keep_alive: bool,
+        data: []u8,
+
+        pub fn deinit(self: *DecryptedPacket, allocator: std.mem.Allocator) void {
+            allocator.free(self.data);
+        }
+    };
+
+    pub const DecryptResult = struct {
+        packets: [][]u8,
+        keep_alive: bool,
+
+        pub fn deinit(self: *DecryptResult, allocator: std.mem.Allocator) void {
+            core_mod.util.freeSliceOfStrings(allocator, self.packets);
+        }
+    };
+
+    pub const Error = std.mem.Allocator.Error || error{
+        CompressionMismatch,
+        CryptoFailure,
+        DataPathFailure,
+        Reconnect,
+        UnsupportedAlgorithm,
+    };
+
     allocator: std.mem.Allocator,
     mode: *c.openvpn_dp_mode,
     enc_buffer: *c_common.pp_zd,
@@ -93,7 +82,7 @@ pub const DataPath = struct {
     const initial_buffer_size: usize = 64 * 1024;
     const max_packet_id: u32 = std.math.maxInt(u32) - 10 * 1024;
 
-    pub fn create(
+    fn createWithMode(
         allocator: std.mem.Allocator,
         mode: *c.openvpn_dp_mode,
         peer_id: u32,
@@ -108,6 +97,75 @@ pub const DataPath = struct {
             .replay = c.openvpn_replay_create(),
         };
         return self;
+    }
+
+    pub fn createWithPRF(
+        allocator: std.mem.Allocator,
+        parameters: Parameters,
+        prf: *const PRF,
+        prng: PRNG,
+    ) Error!*DataPath {
+        var seed = try prng.safeData(DataConstants.prng_seed_length);
+        defer seed.deinit();
+        return createWithSeed(allocator, parameters, prf, seed);
+    }
+
+    fn createWithSeed(
+        allocator: std.mem.Allocator,
+        parameters: Parameters,
+        prf: *const PRF,
+        seed: ZeroingData,
+    ) Error!*DataPath {
+        const functions = (c_exports_mod.cryptoFunctionTable(parameters.backend) catch
+            return error.UnsupportedAlgorithm).enc;
+        const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
+        if (!init_seed(seed.bytes(), seed.length())) return error.CryptoFailure;
+        var keys = prf.derive() catch return error.CryptoFailure;
+        defer keys.deinit();
+        return createWithKeys(allocator, parameters, functions, &keys);
+    }
+
+    fn createWithKeys(
+        allocator: std.mem.Allocator,
+        parameters: Parameters,
+        functions: c_crypto.pp_crypto_enc_fnt,
+        keys: *const CryptoKeys,
+    ) Error!*DataPath {
+        var bridge = CryptoKeysBridge.init(keys);
+        defer bridge.deinit();
+
+        const framing = nativeFraming(parameters.compression_framing);
+        const cipher_name = if (parameters.cipher) |cipher| cipher.raw() else null;
+        const is_aead = if (parameters.cipher) |cipher|
+            configuration_mod.cipherEmbedsDigest(cipher)
+        else
+            false;
+        const mode: *c.openvpn_dp_mode = if (is_aead) blk: {
+            const name = cipher_name orelse return error.UnsupportedAlgorithm;
+            break :blk c.openvpn_dp_mode_ad_create_aead(
+                @ptrCast(&functions),
+                name.ptr,
+                DataConstants.aead_tag_length,
+                DataConstants.aead_id_length,
+                @ptrCast(bridge.native()),
+                framing,
+            ) orelse return error.UnsupportedAlgorithm;
+        } else blk: {
+            const digest = parameters.digest orelse return error.UnsupportedAlgorithm;
+            break :blk c.openvpn_dp_mode_hmac_create_cbc(
+                @ptrCast(&functions),
+                if (cipher_name) |value| value.ptr else null,
+                digest.raw().ptr,
+                @ptrCast(bridge.native()),
+                framing,
+            ) orelse return error.UnsupportedAlgorithm;
+        };
+        errdefer c.openvpn_dp_mode_free(mode);
+        return createWithMode(
+            allocator,
+            mode,
+            parameters.peer_id orelse c.OpenVPNPacketPeerIdDisabled,
+        );
     }
 
     pub fn destroy(self: *const DataPath) void {
@@ -148,7 +206,7 @@ pub const DataPath = struct {
         self: *DataPath,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) !DataPathDecryptResult {
+    ) !DecryptResult {
         var result: std.ArrayList([]u8) = .empty;
         errdefer core_mod.util.deinitListOfStrings(allocator, &result);
         try result.ensureTotalCapacity(allocator, packets.len);
@@ -170,7 +228,6 @@ pub const DataPath = struct {
                 continue;
             }
             result.appendAssumeCapacity(tuple.data);
-            tuple.data = @constCast(&[_]u8{});
         }
         return .{
             .packets = try result.toOwnedSlice(allocator),
@@ -186,7 +243,7 @@ pub const DataPath = struct {
         packet_id: u32,
     ) ![]u8 {
         const capacity = c.openvpn_dp_mode_assemble_and_encrypt_capacity(self.mode, packet.len);
-        self.resize(self.enc_buffer, capacity);
+        ensureCapacity(self.enc_buffer, capacity);
         var native_error = emptyNativeError();
         const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_assemble_and_encrypt(
             self.mode,
@@ -205,32 +262,31 @@ pub const DataPath = struct {
         self: *DataPath,
         allocator: std.mem.Allocator,
         packet: []const u8,
-    ) !DataPathDecryptedAndParsedTuple {
-        self.resize(self.dec_buffer, packet.len);
+    ) !DecryptedPacket {
+        ensureCapacity(self.dec_buffer, packet.len);
         var packet_id: u32 = 0;
-        var header: u8 = 0;
+        var ignored_header: u8 = 0;
         var keep_alive = false;
         var native_error = emptyNativeError();
         const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_decrypt_and_parse(
             self.mode,
             @ptrCast(self.dec_buffer),
             &packet_id,
-            &header,
+            &ignored_header,
             &keep_alive,
             packet.ptr,
             packet.len,
             &native_error,
         ) orelse return nativeError(native_error));
         defer c_common.pp_zd_free(data);
-        return .init(
-            packet_id,
-            header,
-            keep_alive,
-            try allocator.dupe(u8, data.*.bytes[0..data.*.length]),
-        );
+        return .{
+            .packet_id = packet_id,
+            .is_keep_alive = keep_alive,
+            .data = try allocator.dupe(u8, data.*.bytes[0..data.*.length]),
+        };
     }
 
-    fn resize(_: *DataPath, buffer: *c_common.pp_zd, count: usize) void {
+    fn ensureCapacity(buffer: *c_common.pp_zd, count: usize) void {
         if (buffer.*.length >= count) return;
         const new_count = std.mem.alignForward(usize, count, resize_step);
         c_common.pp_zd_resize(buffer, new_count);
@@ -248,136 +304,11 @@ pub const DataPath = struct {
         CryptoFailure,
         DataPathFailure,
     } {
-        if (native.dp_code == c.OpenVPNDataPathErrorNone) return error.DataPathFailure;
         return switch (native.dp_code) {
+            c.OpenVPNDataPathErrorNone => error.DataPathFailure,
             c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
             c.OpenVPNDataPathErrorCrypto => errors_mod.cryptoError(native.crypto_code),
             else => error.DataPathFailure,
-        };
-    }
-};
-
-/// Owning facade over the concrete C-backed data path.
-pub const DataPathWrapper = struct {
-    pub const Parameters = DataPathParameters;
-    pub const Error = std.mem.Allocator.Error || error{
-        CompressionMismatch,
-        CryptoFailure,
-        DataPathFailure,
-        Reconnect,
-        UnsupportedAlgorithm,
-    };
-
-    data_path: *DataPath,
-
-    pub fn init(data_path: *DataPath) DataPathWrapper {
-        return .{ .data_path = data_path };
-    }
-
-    pub fn deinit(self: *DataPathWrapper) void {
-        self.data_path.destroy();
-    }
-
-    pub fn encrypt(
-        self: DataPathWrapper,
-        allocator: std.mem.Allocator,
-        packets: []const []const u8,
-        key: u8,
-    ) Error![][]u8 {
-        return self.data_path.encryptPackets(allocator, packets, key);
-    }
-
-    pub fn decrypt(
-        self: DataPathWrapper,
-        allocator: std.mem.Allocator,
-        packets: []const []const u8,
-    ) Error!DataPathDecryptResult {
-        return self.data_path.decryptPackets(allocator, packets);
-    }
-
-    pub fn createWithPRF(
-        allocator: std.mem.Allocator,
-        parameters: DataPathParameters,
-        prf: *const PRF,
-        prng: PRNG,
-    ) Error!DataPathWrapper {
-        var seed = try prng.safeData(DataConstants.prng_seed_length);
-        defer seed.deinit();
-        return createWithSeed(allocator, parameters, prf, seed);
-    }
-
-    fn createWithSeed(
-        allocator: std.mem.Allocator,
-        parameters: DataPathParameters,
-        prf: *const PRF,
-        seed: ZeroingData,
-    ) Error!DataPathWrapper {
-        const functions = (c_exports_mod.cryptoFunctionTable(parameters.backend) catch
-            return error.UnsupportedAlgorithm).enc;
-        const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
-        _ = init_seed(seed.bytes(), seed.length());
-        var keys = prf.derive() catch return error.CryptoFailure;
-        defer keys.deinit();
-        return createWithKeys(allocator, parameters, functions, &keys);
-    }
-
-    fn createWithKeys(
-        allocator: std.mem.Allocator,
-        parameters: DataPathParameters,
-        functions: c_crypto.pp_crypto_enc_fnt,
-        keys: *const CryptoKeys,
-    ) !DataPathWrapper {
-        var bridge = CryptoKeysBridge.init(keys);
-        defer bridge.deinit();
-
-        const framing = nativeFraming(parameters.compression_framing);
-        const cipher_name = if (parameters.cipher) |cipher|
-            cipher.raw()
-        else
-            null;
-        const digest_name = if (parameters.digest) |digest|
-            digest.raw()
-        else
-            null;
-
-        const mode: *c.openvpn_dp_mode = if (isAEAD(parameters.cipher)) blk: {
-            const name = cipher_name orelse return error.UnsupportedAlgorithm;
-            break :blk c.openvpn_dp_mode_ad_create_aead(
-                @ptrCast(&functions),
-                name.ptr,
-                DataConstants.aead_tag_length,
-                DataConstants.aead_id_length,
-                @ptrCast(bridge.native()),
-                framing,
-            ) orelse return error.UnsupportedAlgorithm;
-        } else blk: {
-            const digest = digest_name orelse return error.UnsupportedAlgorithm;
-            break :blk c.openvpn_dp_mode_hmac_create_cbc(
-                @ptrCast(&functions),
-                if (cipher_name) |value| value.ptr else null,
-                digest.ptr,
-                @ptrCast(bridge.native()),
-                framing,
-            ) orelse return if (cipher_name != null)
-                error.UnsupportedAlgorithm
-            else
-                error.UnsupportedAlgorithm;
-        };
-        errdefer c.openvpn_dp_mode_free(mode);
-
-        const implementation = try DataPath.create(
-            allocator,
-            mode,
-            parameters.peer_id orelse c.OpenVPNPacketPeerIdDisabled,
-        );
-        return init(implementation);
-    }
-
-    fn isAEAD(cipher: ?api.OpenVPNCipher) bool {
-        const value = cipher orelse return false;
-        return switch (value) {
-            .aes128gcm, .aes192gcm, .aes256gcm => true,
-            else => false,
         };
     }
 
@@ -395,13 +326,13 @@ pub const DataPathWrapper = struct {
 pub const DataChannel = struct {
     allocator: std.mem.Allocator,
     key: u8,
-    data_path: DataPathWrapper,
+    data_path: *DataPath,
 
     /// `data_path` ownership transfers only when this function succeeds.
     pub fn create(
         allocator: std.mem.Allocator,
         key: u8,
-        data_path: DataPathWrapper,
+        data_path: *DataPath,
     ) !*DataChannel {
         const self = try allocator.create(DataChannel);
         self.* = .{
@@ -414,7 +345,7 @@ pub const DataChannel = struct {
 
     pub fn destroy(self: *DataChannel) void {
         const allocator = self.allocator;
-        self.data_path.deinit();
+        self.data_path.destroy();
         allocator.destroy(self);
     }
 
@@ -424,7 +355,7 @@ pub const DataChannel = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
     ) ![][]u8 {
-        return self.data_path.encrypt(allocator, packets, self.key);
+        return self.data_path.encryptPackets(allocator, packets, self.key);
     }
 
     /// The caller owns the returned packet rows and outer slice.
@@ -433,7 +364,7 @@ pub const DataChannel = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
     ) ![][]u8 {
-        const result = try self.data_path.decrypt(allocator, packets);
+        const result = try self.data_path.decryptPackets(allocator, packets);
         if (result.keep_alive)
             log.write(.debug, "Data: Received ping, do nothing");
         return result.packets;
@@ -516,28 +447,28 @@ pub const DataLink = struct {
         var processed = try self.link_processor.processOutbound(asConstPackets(encrypted));
         defer processed.deinit();
 
-        const timeout = timeout_ms orelse {
+        if (timeout_ms) |timeout| {
+            if (!self.looper.isOnQueue()) return error.ReentrantCall;
+
+            const start = core_mod.concurrency.monotonicNs();
+            const deadline = start +| timeout *| @as(u64, std.time.ns_per_ms);
+            while (true) {
+                self.looper.write(processed.packets(), .link, true) catch |err| {
+                    if (core_mod.concurrency.monotonicNs() < deadline) continue;
+                    log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
+                        @errorName(err),
+                    });
+                    return error.Timeout;
+                };
+                return;
+            }
+        } else {
             self.looper.writeQueued(processed.packets(), .link) catch |err| {
                 log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
                     @errorName(err),
                 });
                 return err;
             };
-            return;
-        };
-        if (!self.looper.isOnQueue()) return error.ReentrantCall;
-
-        const start = core_mod.concurrency.monotonicNs();
-        const deadline = start +| timeout *| @as(u64, std.time.ns_per_ms);
-        while (true) {
-            self.looper.write(processed.packets(), .link, true) catch |err| {
-                if (core_mod.concurrency.monotonicNs() < deadline) continue;
-                log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
-                    @errorName(err),
-                });
-                return error.Timeout;
-            };
-            return;
         }
     }
 
@@ -566,7 +497,7 @@ pub const DataLinkPair = struct {
         key: ?u8,
         timeout_ms: ?u64,
     ) !void {
-        try self.link.send(packets, key orelse self.key, timeout_ms);
+        return self.link.send(packets, key orelse self.key, timeout_ms);
     }
 
     pub fn receive(
@@ -574,7 +505,7 @@ pub const DataLinkPair = struct {
         packets: []const []const u8,
         key: u8,
     ) !void {
-        try self.link.receive(packets, key);
+        return self.link.receive(packets, key);
     }
 };
 
@@ -597,11 +528,11 @@ pub const testing = struct {
         framing: api.OpenVPNCompressionFraming,
         authenticated: bool,
     ) !*DataPath {
-        const native_framing = DataPathWrapper.nativeFraming(framing);
+        const native_framing = DataPath.nativeFraming(framing);
         const mode = if (authenticated)
             c.openvpn_dp_mode_hmac_create_mock(native_framing)
         else
             c.openvpn_dp_mode_ad_create_mock(native_framing);
-        return DataPath.create(allocator, mode, peer_id);
+        return DataPath.createWithMode(allocator, mode, peer_id);
     }
 };

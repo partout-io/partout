@@ -28,8 +28,7 @@ const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serial
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
 const DataChannel = data_mod.DataChannel;
-const DataPathParameters = data_mod.DataPathParameters;
-const DataPathWrapper = data_mod.DataPathWrapper;
+const DataPath = data_mod.DataPath;
 const LinkProcessor = processing_mod.LinkProcessor;
 const PacketCode = packet_mod.PacketCode;
 const PRF = auth_mod.PRF;
@@ -740,7 +739,7 @@ pub const Negotiator = struct {
             options.cipher
         else
             null;
-        const parameters = DataPathParameters{
+        const parameters = DataPath.Parameters{
             .backend = self.options.session_options.backend,
             .cipher = configuration_mod.negotiatedDataChannelCipher(
                 self.options.configuration,
@@ -750,8 +749,6 @@ pub const Negotiator = struct {
             .digest = configuration_mod.fallbackDigest(self.options.configuration),
             .compression_framing = push_reply.options.compression_framing orelse
                 configuration_mod.fallbackCompressionFraming(self.options.configuration),
-            .compression_algorithm = push_reply.options.compression_algorithm orelse
-                configuration_mod.fallbackCompressionAlgorithm(self.options.configuration),
             .peer_id = push_reply.options.peer_id,
         };
         var prf = try PRF.init(
@@ -762,13 +759,13 @@ pub const Negotiator = struct {
             remote_session_id,
         );
         defer prf.deinit(self.allocator);
-        var data_path = try DataPathWrapper.createWithPRF(
+        const data_path = try DataPath.createWithPRF(
             self.allocator,
             parameters,
             &prf,
             self.prng,
         );
-        errdefer data_path.deinit();
+        errdefer data_path.destroy();
         return DataChannel.create(self.allocator, self.key, data_path);
     }
 
