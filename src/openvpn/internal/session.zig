@@ -593,7 +593,7 @@ pub const Session = struct {
                 continue;
             };
             if (code == .dataV2) {
-                if (packet.len -| 1 < c.OpenVPNPacketPeerIdLength) {
+                if (packet.len <= c.OpenVPNPacketPeerIdLength) {
                     log.write(.err, "Dropped malformed packet (missing peerId)");
                     continue;
                 }
@@ -861,9 +861,11 @@ pub const Session = struct {
         context: *ActiveContext,
     ) !void {
         const last_received = context.last_received_ns orelse return;
-        const timeout_ns = self.keepAliveTimeoutMs(context) *|
-            @as(u64, std.time.ns_per_ms);
-        if (core.concurrency.monotonicNs() -| last_received > timeout_ns)
+        const deadline = core.concurrency.deadlineAfterMs(
+            last_received,
+            self.keepAliveTimeoutMs(context),
+        );
+        if (core.concurrency.monotonicNs() > deadline)
             return error.Timeout;
     }
 
@@ -910,23 +912,33 @@ pub const Session = struct {
     fn reportInboundDataCount(raw: ?*anyopaque, count: usize) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const context = self.state.activeContext() orelse return;
-        context.data_count.inbound +|= @intCast(count);
+        context.data_count.inbound = std.math.add(
+            u64,
+            context.data_count.inbound,
+            @intCast(count),
+        ) catch std.math.maxInt(u64);
         self.delegateCurrentDataCount(context);
     }
 
     fn reportOutboundDataCount(raw: ?*anyopaque, count: usize) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const context = self.state.activeContext() orelse return;
-        context.data_count.outbound +|= @intCast(count);
+        context.data_count.outbound = std.math.add(
+            u64,
+            context.data_count.outbound,
+            @intCast(count),
+        ) catch std.math.maxInt(u64);
         self.delegateCurrentDataCount(context);
     }
 
     fn delegateCurrentDataCount(self: *Session, context: *ActiveContext) void {
         const now = core.concurrency.monotonicNs();
         if (context.last_data_count_ns) |last| {
-            const minimum = self.options.min_data_count_interval_ms *|
-                @as(u64, std.time.ns_per_ms);
-            if (now -| last < minimum) return;
+            const next = core.concurrency.deadlineAfterMs(
+                last,
+                self.options.min_data_count_interval_ms,
+            );
+            if (self.options.min_data_count_interval_ms > 0 and now < next) return;
         }
         context.last_data_count_ns = now;
         if (self.delegate) |delegate| delegate.didUpdateDataCount(self, .{

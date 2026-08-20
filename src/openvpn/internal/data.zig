@@ -451,7 +451,7 @@ pub const DataLink = struct {
             if (!self.looper.isOnQueue()) return error.ReentrantCall;
 
             const start = core_mod.concurrency.monotonicNs();
-            const deadline = start +| timeout *| @as(u64, std.time.ns_per_ms);
+            const deadline = core_mod.concurrency.deadlineAfterMs(start, timeout);
             while (true) {
                 self.looper.write(processed.packets(), .link, true) catch |err| {
                     if (core_mod.concurrency.monotonicNs() < deadline) continue;
@@ -474,7 +474,9 @@ pub const DataLink = struct {
 
     fn flatCount(packets: []const []u8) usize {
         var result: usize = 0;
-        for (packets) |packet| result +|= packet.len;
+        for (packets) |packet| {
+            result = std.math.add(usize, result, packet.len) catch std.math.maxInt(usize);
+        }
         return result;
     }
 

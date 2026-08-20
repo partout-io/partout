@@ -310,7 +310,7 @@ pub const SnapshotPublisher = struct {
     fn dataCountDelta(lhs: api.DataCount, rhs: api.DataCount) u64 {
         const received_delta = uintDelta(lhs.received, rhs.received);
         const sent_delta = uintDelta(lhs.sent, rhs.sent);
-        return received_delta +| sent_delta;
+        return std.math.add(u64, received_delta, sent_delta) catch std.math.maxInt(u64);
     }
 
     fn uintDelta(lhs: u64, rhs: u64) u64 {

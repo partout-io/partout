@@ -796,7 +796,8 @@ const WindowsCondition = struct {
 
         const now_100ns: u64 = @intCast(windows.ntdll.RtlGetSystemTimePrecise());
         const remaining_100ns = (remaining_ns - 1) / 100 + 1;
-        const absolute_100ns = now_100ns +| remaining_100ns;
+        const absolute_100ns = std.math.add(u64, now_100ns, remaining_100ns) catch
+            std.math.maxInt(u64);
         var timeout: windows.LARGE_INTEGER = @intCast(@min(
             absolute_100ns,
             @as(u64, std.math.maxInt(windows.LARGE_INTEGER)),
@@ -895,12 +896,16 @@ pub fn monotonicNs() u64 {
     if (std.c.clock_gettime(clock_id, &timestamp) != 0) return 0;
     const seconds: u64 = @intCast(timestamp.sec);
     const nanoseconds: u64 = @intCast(timestamp.nsec);
-    return seconds *| @as(u64, std.time.ns_per_s) +| nanoseconds;
+    const seconds_ns = std.math.mul(u64, seconds, std.time.ns_per_s) catch
+        return std.math.maxInt(u64);
+    return std.math.add(u64, seconds_ns, nanoseconds) catch std.math.maxInt(u64);
 }
 
 /// Computes a saturating absolute deadline from an integer millisecond delay.
-fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
-    return now_ns +| delay_ms *| @as(u64, std.time.ns_per_ms);
+pub fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
+    const delay_ns = std.math.mul(u64, delay_ms, std.time.ns_per_ms) catch
+        return std.math.maxInt(u64);
+    return std.math.add(u64, now_ns, delay_ns) catch std.math.maxInt(u64);
 }
 
 /// Returns the nanoseconds remaining before an absolute deadline.
@@ -929,7 +934,7 @@ fn timespecAfterNs(now: std.c.timespec, duration_ns: u64) std.c.timespec {
     nanoseconds += duration_ns % std.time.ns_per_s;
     if (nanoseconds >= std.time.ns_per_s) {
         nanoseconds -= std.time.ns_per_s;
-        extra_seconds +|= 1;
+        extra_seconds += 1;
     }
     if (extra_seconds > max_seconds - now_seconds) {
         return .{

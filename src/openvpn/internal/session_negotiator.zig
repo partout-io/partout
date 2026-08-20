@@ -394,7 +394,8 @@ pub const Negotiator = struct {
         defer self.allocator.free(ciphertext);
         log.write(.info, "TLS.ifconfig: Send pulled ciphertext");
         try self.enqueueControlPackets(.controlV1, self.key, ciphertext);
-        self.next_push_request_ns = deadlineAfter(
+        self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
+            core_mod.concurrency.monotonicNs(),
             self.options.session_options.push_request_interval_ms,
         );
     }
@@ -610,7 +611,8 @@ pub const Negotiator = struct {
                 return;
             }
             self.setState(.push);
-            self.next_push_request_ns = deadlineAfter(
+            self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
+                core_mod.concurrency.monotonicNs(),
                 self.options.session_options.retransmission_interval_ms,
             );
         }
@@ -776,18 +778,14 @@ pub const Negotiator = struct {
     }
 
     fn elapsedMs(self: *const Negotiator) u64 {
-        return (core_mod.concurrency.monotonicNs() -| self.start_time_ns) /
-            std.time.ns_per_ms;
+        const now = core_mod.concurrency.monotonicNs();
+        if (now <= self.start_time_ns) return 0;
+        return (now - self.start_time_ns) / std.time.ns_per_ms;
     }
 
     fn setState(self: *Negotiator, state: NegotiatorState) void {
         self.state = state;
         log.writef(.info, "Negotiator: {d} -> {s}", .{ self.key, @tagName(state) });
-    }
-
-    fn deadlineAfter(delay_ms: u64) u64 {
-        return core_mod.concurrency.monotonicNs() +|
-            delay_ms *| @as(u64, std.time.ns_per_ms);
     }
 
     fn secondsToMs(seconds: f64) u64 {

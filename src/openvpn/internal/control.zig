@@ -222,7 +222,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             const now = core_mod.concurrency.monotonicNs() / std.time.ns_per_ms;
             for (self.outbound_queue.items) |*packet| {
                 if (self.sent_dates_ms.get(packet.packetId())) |sent| {
-                    const elapsed_ms = now -| sent;
+                    const elapsed_ms = if (now > sent) now - sent else 0;
                     if (resend_after_ms > 0 and elapsed_ms < @as(u64, @intCast(resend_after_ms))) {
                         log.writef(.info, "Control: Skip writing packet with packetId {d} (sent on {d}, {d} seconds ago < {d})", .{
                             packet.packetId(),
