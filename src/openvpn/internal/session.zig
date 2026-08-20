@@ -269,8 +269,9 @@ pub const Session = struct {
             request,
             SessionOnQueue.prepareShutdown,
         ) catch |err| {
-            // A stopped looper has already serialized final state; its owner
-            // routes `OnFinish` through `looperDidTerminate` while Session lives.
+            // Swift owns its looper and logs any perform failure here. Zig's
+            // looper is externally owned: Cancelled means OnFinish through
+            // looperDidTerminate owns finalization, so do not shut down twice.
             if (err == error.Cancelled) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
@@ -380,6 +381,9 @@ pub const Session = struct {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const cause = failureError(failure);
         self.requestShutdownFromAnyThread(
+            // Swift wraps every link failure as an I/O failure, making even a
+            // crypto/data-path cause recoverable; tunnel failures stay unchanged.
+            // Preserve that link-only behavior with Zig's reconnect signal.
             if (cause == error.CryptoFailure) error.Reconnect else cause,
         );
     }
@@ -470,6 +474,9 @@ pub const Session = struct {
             .context = self,
             .callback = callback,
         }) catch |err| {
+            // Swift lets its timer task feed perform cancellation back into
+            // shutdown. Here Cancelled means looperDidTerminate already owns
+            // finalization, so another shutdown request would be redundant.
             if (err != error.Cancelled)
                 self.requestShutdownFromAnyThread(errors_mod.sessionError(err));
         };
@@ -481,6 +488,9 @@ pub const Session = struct {
             .io => |details| errors_mod.sessionError(details.cause),
             .wait => |code| {
                 log.writef(.err, "OpenVPN looper wait failed with native code: {}", .{code});
+                // Swift's private WaitError becomes a recoverable OpenVPN
+                // connection failure. Zig cannot carry its native code in an
+                // error value, so log it above and preserve the reconnect choice.
                 return error.Reconnect;
             },
         };
@@ -574,6 +584,8 @@ const SessionOnQueue = struct {
             .stopped => |context| context,
             .active => {
                 log.write(.err, "Session is not stopped");
+                // Match Swift's setLinkOnQueue: starting over an active session
+                // is a cancelled lifecycle operation, not an in-place restart.
                 return error.OperationCancelled;
             },
         };
@@ -720,6 +732,9 @@ const SessionOnQueue = struct {
                 .hardResetServerV2 => {
                     if (negotiator.isConnected()) {
                         log.write(.notice, "OpenVPN server requested a fresh session; reconnecting");
+                        // Swift reports recoverable(staleSession) here. Zig
+                        // collapses that wrapper to Reconnect: a connected session
+                        // cannot accept a fresh server session ID in place.
                         return error.Reconnect;
                     }
                 },
@@ -837,6 +852,9 @@ const SessionOnQueue = struct {
         data_channel: *DataChannel,
         push_reply: *const PushReply,
     ) !void {
+        // Swift silently drops a negotiation completion after active state is
+        // gone. Treat it as stale instead: the negotiated data has no context
+        // to commit into, so propagate the recoverable reconnect signal.
         const active = self.session.state.activeState() orelse return error.Reconnect;
         const context = active.context;
         log.writef(.info, "Negotiation succeeded, set key {d} as current", .{key});
@@ -988,6 +1006,8 @@ const SessionOnQueue = struct {
 };
 
 fn shouldSendExitNotification(cause: ?SessionError) bool {
+    // Mirror Swift's `error == nil || error == networkChanged` choice: notify
+    // only for an orderly stop or path change; other failures tear down at once.
     return if (cause) |value| value == error.NetworkChanged else true;
 }
 
