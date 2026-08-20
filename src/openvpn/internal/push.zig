@@ -63,7 +63,7 @@ pub fn peerInfoAlloc(
     allocator: std.mem.Allocator,
     ui_version: []const u8,
     ssl_version: ?[]const u8,
-    extra_lines: []const []const u8,
+    data_ciphers: ?[]const api.OpenVPNCipher,
 ) ![]u8 {
     const platform_version = try core_mod.util.platformVersionAlloc(allocator);
     defer allocator.free(platform_version);
@@ -73,7 +73,7 @@ pub fn peerInfoAlloc(
         ssl_version,
         core_mod.util.platformName(),
         platform_version,
-        extra_lines,
+        data_ciphers,
     );
 }
 
@@ -87,7 +87,7 @@ fn formatPeerInfoAlloc(
     ssl_version: ?[]const u8,
     platform: []const u8,
     platform_version: []const u8,
-    extra_lines: []const []const u8,
+    data_ciphers: ?[]const api.OpenVPNCipher,
 ) ![]u8 {
     var output: std.Io.Writer.Allocating = .init(allocator);
     errdefer output.deinit();
@@ -116,8 +116,13 @@ fn formatPeerInfoAlloc(
         writer.print("{s}={s}\n", .{ field.name, value }) catch
             return error.OutOfMemory;
     }
-    for (extra_lines) |line| {
-        writer.print("{s}\n", .{line}) catch return error.OutOfMemory;
+    if (data_ciphers) |ciphers| {
+        writer.writeAll("IV_CIPHERS=") catch return error.OutOfMemory;
+        for (ciphers, 0..) |cipher, index| {
+            if (index > 0) writer.writeByte(':') catch return error.OutOfMemory;
+            writer.writeAll(cipher.raw()) catch return error.OutOfMemory;
+        }
+        writer.writeByte('\n') catch return error.OutOfMemory;
     }
     return output.toOwnedSlice() catch error.OutOfMemory;
 }

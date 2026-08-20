@@ -272,7 +272,7 @@ test "peer info has one trailing newline" {
         "TLSv1.3",
         "linux",
         "6.1",
-        &.{"IV_CIPHERS=AES-256-GCM"},
+        &.{.aes256gcm},
     );
     defer std.testing.allocator.free(info);
     try std.testing.expect(std.mem.indexOf(u8, info, "IV_MTU=1600\n") != null);

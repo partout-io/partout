@@ -24,6 +24,7 @@ const KeysConstants = constants_mod.Keys;
 const PRNG = crypto_mod.PRNG;
 const TLSWrapper = tls_mod.TLSWrapper;
 const ZeroingData = crypto_mod.ZeroingData;
+const library_version = std.fmt.comptimePrint("{s} {s}", .{ version.identifier, version.number });
 
 /// Key-method 2 client/server random material.
 pub const Handshake = struct {
@@ -105,6 +106,7 @@ pub const PRF = struct {
     }
 
     pub fn derive(self: *const PRF) !CryptoKeys {
+        const keys_size = KeysConstants.keys_count * KeysConstants.key_length;
         var master_data = try prfData(.{
             .functions = self.functions,
             .label = KeysConstants.label1,
@@ -123,10 +125,10 @@ pub const PRF = struct {
             .server_seed = self.handshake.server_random2.asSlice(),
             .client_session_id = self.session_id,
             .server_session_id = self.remote_session_id,
-            .size = KeysConstants.keys_count * KeysConstants.key_length,
+            .size = keys_size,
         });
         defer keys_data.deinit();
-        if (keys_data.length() != KeysConstants.keys_count * KeysConstants.key_length)
+        if (keys_data.length() != keys_size)
             @panic("OpenVPN PRF returned an unexpected key-data length");
 
         var parts: [KeysConstants.keys_count]ZeroingData = undefined;
@@ -186,7 +188,7 @@ pub const PRF = struct {
         size: usize,
     ) !ZeroingData {
         var output = ZeroingData.init(0);
-        defer output.deinit();
+        errdefer output.deinit();
         var chain = try hmac(functions, digest_name, secret, seed);
         defer chain.deinit();
 
@@ -197,14 +199,16 @@ pub const PRF = struct {
 
             var block = try hmac(functions, digest_name, secret, chain_and_seed.asSlice());
             defer block.deinit();
-            output.append(block.asSlice());
+            const remaining = size - output.length();
+            const block_bytes = block.asSlice();
+            output.append(block_bytes[0..@min(remaining, block_bytes.len)]);
 
             const next_chain = try hmac(functions, digest_name, secret, chain.asSlice());
             chain.deinit();
             chain = next_chain;
         }
 
-        return output.sliceCopy(0, size);
+        return output;
     }
 
     fn hmac(
@@ -262,23 +266,16 @@ pub const Authenticator = struct {
         errdefer random1.deinit();
         var random2 = try prng.safeData(KeysConstants.random_length);
         errdefer random2.deinit();
-        const control_buffer = ZeroingData.init(0);
-
-        var username_data: ?ZeroingData = null;
-        var password_data: ?ZeroingData = null;
-        if (username != null and password != null) {
-            username_data = ZeroingData.initString(username.?, true);
-            password_data = ZeroingData.initString(password.?, true);
-        }
+        const has_credentials = username != null and password != null;
 
         return .{
             .allocator = allocator,
-            .control_buffer = control_buffer,
+            .control_buffer = ZeroingData.init(0),
             .pre_master = pre_master,
             .random1 = random1,
             .random2 = random2,
-            .username = username_data,
-            .password = password_data,
+            .username = if (has_credentials) ZeroingData.initCopy(username.?) else null,
+            .password = if (has_credentials) ZeroingData.initCopy(password.?) else null,
         };
     }
 
@@ -339,41 +336,28 @@ pub const Authenticator = struct {
         );
         defer allocator.free(local_options);
         log.writef(.info, "TLS.auth: Local options: {s}", .{local_options});
-        var local_options_data = ZeroingData.initString(local_options, true);
-        defer local_options_data.deinit();
-        appendSized(&raw, local_options_data);
+        appendSizedString(&raw, local_options);
 
         if (self.username != null and self.password != null) {
-            appendSized(&raw, self.username.?);
-            appendSized(&raw, self.password.?);
+            appendSizedString(&raw, self.username.?.asSlice());
+            appendSizedString(&raw, self.password.?.asSlice());
         } else {
             raw.append(&.{ 0, 0, 0, 0 });
         }
 
-        const negotiated = try configuration_mod.negotiableDataCiphers(
+        const negotiated_ciphers = try configuration_mod.negotiableDataCiphers(
             allocator,
             configuration,
         );
-        defer if (negotiated) |value| allocator.free(value);
-        const cipher_line = if (negotiated) |ciphers|
-            try cipherLineAlloc(allocator, ciphers)
-        else
-            null;
-        defer if (cipher_line) |value| allocator.free(value);
-        const extra_lines: []const []const u8 = if (cipher_line) |value|
-            &.{value}
-        else
-            &.{};
+        defer if (negotiated_ciphers) |value| allocator.free(value);
         const peer_info = try push_mod.peerInfoAlloc(
             allocator,
-            std.fmt.comptimePrint("{s} {s}", .{ version.identifier, version.number }),
+            library_version,
             self.ssl_version,
-            extra_lines,
+            negotiated_ciphers,
         );
         defer allocator.free(peer_info);
-        var peer_info_data = ZeroingData.initString(peer_info, true);
-        defer peer_info_data.deinit();
-        appendSized(&raw, peer_info_data);
+        appendSizedString(&raw, peer_info);
         return raw;
     }
 
@@ -435,7 +419,7 @@ pub const Authenticator = struct {
         if (self.server_random2) |*value| value.deinit();
         self.server_random1 = server_random1;
         self.server_random2 = server_random2;
-        if (parsed_options) |value| self.server_options = value;
+        self.server_options = parsed_options;
         return true;
     }
 
@@ -447,9 +431,10 @@ pub const Authenticator = struct {
     ) ![][]u8 {
         var messages: std.ArrayList([]u8) = .empty;
         errdefer core_mod.util.deinitListOfStrings(allocator, &messages);
+        const buffered = self.control_buffer.asSlice();
         var offset: usize = 0;
-        while (offset < self.control_buffer.length()) {
-            const tail = self.control_buffer.asSlice()[offset..];
+        while (offset < buffered.len) {
+            const tail = buffered[offset..];
             const length = std.mem.indexOfScalar(u8, tail, 0) orelse break;
             const message = tail[0..length];
             if (!std.unicode.utf8ValidateSlice(message)) break;
@@ -473,31 +458,17 @@ pub const Authenticator = struct {
         };
     }
 
-    fn appendSized(
+    fn appendSizedString(
         destination: *ZeroingData,
-        source: ZeroingData,
+        source: []const u8,
     ) void {
-        if (source.length() > std.math.maxInt(u16))
+        if (source.len >= std.math.maxInt(u16))
             @panic("OpenVPN auth field exceeds the 65535-byte protocol limit");
         var encoded: [2]u8 = undefined;
-        std.mem.writeInt(u16, &encoded, @intCast(source.length()), .big);
+        std.mem.writeInt(u16, &encoded, @intCast(source.len + 1), .big);
         destination.append(&encoded);
-        destination.appendData(source);
-    }
-
-    fn cipherLineAlloc(
-        allocator: std.mem.Allocator,
-        ciphers: []const api.OpenVPNCipher,
-    ) ![]u8 {
-        var output: std.Io.Writer.Allocating = .init(allocator);
-        errdefer output.deinit();
-        const writer = &output.writer;
-        writer.writeAll("IV_CIPHERS=") catch return error.OutOfMemory;
-        for (ciphers, 0..) |cipher, index| {
-            if (index > 0) writer.writeByte(':') catch return error.OutOfMemory;
-            writer.writeAll(cipher.raw()) catch return error.OutOfMemory;
-        }
-        return output.toOwnedSlice();
+        destination.append(source);
+        destination.append(&.{0});
     }
 };
 
