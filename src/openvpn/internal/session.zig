@@ -126,9 +126,7 @@ pub const Session = struct {
     state: SessionState = .{ .stopped = .{ .with_local_options = true } },
     link_processor: ?*LinkProcessor = null,
 
-    shutdown_request_lock: core.Mutex = .{},
-    shutdown_pending: bool = false,
-    shutdown_request_cause: ?SessionError = null,
+    shutdown_state: ShutdownState = .{},
 
     pub const Init = struct {
         executor: net.SerializedExecutor,
@@ -172,7 +170,7 @@ pub const Session = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
         self.allocator.free(self.ca_filename);
-        self.shutdown_request_lock.deinit();
+        self.shutdown_state.deinit();
         self.lifecycle_lock.deinit();
         const allocator = self.allocator;
         allocator.destroy(self);
@@ -256,7 +254,7 @@ pub const Session = struct {
         cause: ?SessionError,
         timeout_ms: ?u64,
     ) Error!void {
-        if (!self.claimShutdownFromAnyThread()) return;
+        if (!self.shutdown_state.claim()) return;
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -290,7 +288,7 @@ pub const Session = struct {
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
-        _ = self.claimShutdownFromAnyThread();
+        _ = self.shutdown_state.claim();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -352,35 +350,17 @@ pub const Session = struct {
     // MARK: - From any thread
 
     fn requestShutdownFromAnyThread(self: *Session, cause: SessionError) void {
-        self.shutdown_request_lock.lock();
-        if (self.shutdown_pending or self.shutdown_request_cause != null) {
-            self.shutdown_request_lock.unlock();
-            return;
-        }
-        self.shutdown_request_cause = cause;
-        self.shutdown_request_lock.unlock();
+        if (!self.shutdown_state.request(cause)) return;
         self.executor.run(self, shutdownFromAnyThread);
     }
 
     fn shutdownFromAnyThread(raw: *anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw));
-        self.shutdown_request_lock.lock();
-        const cause = self.shutdown_request_cause;
-        self.shutdown_request_cause = null;
-        self.shutdown_request_lock.unlock();
-        self.shutdown(cause orelse return, null) catch |err| {
+        self.shutdown(self.shutdown_state.takeRequest() orelse return, null) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
         };
-    }
-
-    fn claimShutdownFromAnyThread(self: *Session) bool {
-        self.shutdown_request_lock.lock();
-        defer self.shutdown_request_lock.unlock();
-        if (self.shutdown_pending) return false;
-        self.shutdown_pending = true;
-        return true;
     }
 
     // MARK: - Callback boundaries
@@ -524,6 +504,40 @@ pub const Session = struct {
         std.debug.assert(self.looper.isOnQueue());
         return &self.on_queue;
     }
+
+    const ShutdownState = struct {
+        lock: core.Mutex = .{},
+        claimed: bool = false,
+        requested_cause: ?SessionError = null,
+
+        fn deinit(self: *ShutdownState) void {
+            self.lock.deinit();
+        }
+
+        fn request(self: *ShutdownState, cause: SessionError) bool {
+            self.lock.lock();
+            defer self.lock.unlock();
+            if (self.claimed or self.requested_cause != null) return false;
+            self.requested_cause = cause;
+            return true;
+        }
+
+        fn takeRequest(self: *ShutdownState) ?SessionError {
+            self.lock.lock();
+            defer self.lock.unlock();
+            const cause = self.requested_cause;
+            self.requested_cause = null;
+            return cause;
+        }
+
+        fn claim(self: *ShutdownState) bool {
+            self.lock.lock();
+            defer self.lock.unlock();
+            if (self.claimed) return false;
+            self.claimed = true;
+            return true;
+        }
+    };
 
     const ShutdownRequest = struct {
         cause: ?SessionError,
