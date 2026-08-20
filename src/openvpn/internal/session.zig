@@ -350,13 +350,17 @@ pub const Session = struct {
     // MARK: - From any thread
 
     fn requestShutdownFromAnyThread(self: *Session, cause: SessionError) void {
-        if (!self.shutdown_state.request(cause)) return;
+        if (!self.shutdown_state.enqueue(.{
+            .cause = cause,
+            .timeout_ms = null,
+        })) return;
         self.executor.run(self, shutdownFromAnyThread);
     }
 
     fn shutdownFromAnyThread(raw: *anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw));
-        self.shutdown(self.shutdown_state.takeRequest() orelse return, null) catch |err| {
+        const request = self.shutdown_state.takeRequest() orelse return;
+        self.shutdown(request.cause, request.timeout_ms) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
@@ -505,29 +509,34 @@ pub const Session = struct {
         return &self.on_queue;
     }
 
+    const ShutdownRequest = struct {
+        cause: ?SessionError,
+        timeout_ms: ?u64,
+    };
+
     const ShutdownState = struct {
         lock: core.Mutex = .{},
         claimed: bool = false,
-        requested_cause: ?SessionError = null,
+        requested: ?ShutdownRequest = null,
 
         fn deinit(self: *ShutdownState) void {
             self.lock.deinit();
         }
 
-        fn request(self: *ShutdownState, cause: SessionError) bool {
+        fn enqueue(self: *ShutdownState, request: ShutdownRequest) bool {
             self.lock.lock();
             defer self.lock.unlock();
-            if (self.claimed or self.requested_cause != null) return false;
-            self.requested_cause = cause;
+            if (self.claimed or self.requested != null) return false;
+            self.requested = request;
             return true;
         }
 
-        fn takeRequest(self: *ShutdownState) ?SessionError {
+        fn takeRequest(self: *ShutdownState) ?ShutdownRequest {
             self.lock.lock();
             defer self.lock.unlock();
-            const cause = self.requested_cause;
-            self.requested_cause = null;
-            return cause;
+            const request = self.requested;
+            self.requested = null;
+            return request;
         }
 
         fn claim(self: *ShutdownState) bool {
@@ -537,11 +546,6 @@ pub const Session = struct {
             self.claimed = true;
             return true;
         }
-    };
-
-    const ShutdownRequest = struct {
-        cause: ?SessionError,
-        timeout_ms: ?u64,
     };
 };
 
