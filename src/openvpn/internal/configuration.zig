@@ -110,6 +110,41 @@ pub fn negotiatedDataChannelCipher(
     return fallbackCipher(configuration);
 }
 
+pub fn credentialsForAuthentication(
+    allocator: std.mem.Allocator,
+    credentials: api.OpenVPNCredentials,
+) !api.OpenVPNCredentials {
+    const username = try allocator.dupe(u8, credentials.username);
+    errdefer allocator.free(username);
+
+    const password = switch (credentials.otp_method) {
+        .none => try allocator.dupe(u8, credentials.password),
+        .append => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            break :blk try std.mem.concat(allocator, u8, &.{ credentials.password, otp });
+        },
+        .encode => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            const encoded_password = try core_mod.util.base64EncodeAlloc(allocator, credentials.password);
+            defer allocator.free(encoded_password);
+            const encoded_otp = try core_mod.util.base64EncodeAlloc(allocator, otp);
+            defer allocator.free(encoded_otp);
+            break :blk try std.fmt.allocPrint(
+                allocator,
+                "SCRV1:{s}:{s}",
+                .{ encoded_password, encoded_otp },
+            );
+        },
+    };
+
+    return .{
+        .username = username,
+        .password = password,
+        .otp_method = .none,
+        .otp = null,
+    };
+}
+
 /// Builds the legacy OCC/auth-options string sent during key-method-2 auth.
 pub fn localOptionsStringAlloc(
     allocator: std.mem.Allocator,

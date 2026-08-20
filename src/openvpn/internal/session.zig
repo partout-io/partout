@@ -290,7 +290,6 @@ pub const Session = struct {
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
-        const queue = self.onQueue();
         _ = self.claimShutdownFromAnyThread();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
@@ -306,7 +305,7 @@ pub const Session = struct {
                 code,
             }),
         };
-        queue.finishShutdown(
+        self.onQueue().finishShutdown(
             if (failure) |value| failureError(value) else null,
         );
     }
@@ -317,7 +316,7 @@ pub const Session = struct {
         var owned_configuration = try init.configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
         var owned_credentials = if (init.credentials) |value|
-            try forAuthentication(allocator, value)
+            try configuration_mod.credentialsForAuthentication(allocator, value)
         else
             null;
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
@@ -404,11 +403,10 @@ pub const Session = struct {
         packets: net.Looper.Packets,
     ) !net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        const queue = self.onQueue();
         const processor = self.link_processor orelse return .keep;
         var processed = try processor.processInbound(packets);
         defer processed.deinit();
-        try queue.receiveLink(processed.packets());
+        try self.onQueue().receiveLink(processed.packets());
         return .keep;
     }
 
@@ -976,46 +974,10 @@ const SessionOnQueue = struct {
     }
 };
 
-fn forAuthentication(
-    allocator: std.mem.Allocator,
-    credentials: api.OpenVPNCredentials,
-) !api.OpenVPNCredentials {
-    const username = try allocator.dupe(u8, credentials.username);
-    errdefer allocator.free(username);
-
-    const password = switch (credentials.otp_method) {
-        .none => try allocator.dupe(u8, credentials.password),
-        .append => blk: {
-            const otp = credentials.otp orelse return error.OTPRequired;
-            break :blk try std.mem.concat(allocator, u8, &.{ credentials.password, otp });
-        },
-        .encode => blk: {
-            const otp = credentials.otp orelse return error.OTPRequired;
-            const encoded_password = try core.util.base64EncodeAlloc(allocator, credentials.password);
-            defer allocator.free(encoded_password);
-            const encoded_otp = try core.util.base64EncodeAlloc(allocator, otp);
-            defer allocator.free(encoded_otp);
-            break :blk try std.fmt.allocPrint(
-                allocator,
-                "SCRV1:{s}:{s}",
-                .{ encoded_password, encoded_otp },
-            );
-        },
-    };
-
-    return .{
-        .username = username,
-        .password = password,
-        .otp_method = .none,
-        .otp = null,
-    };
-}
-
 fn shouldSendExitNotification(cause: ?SessionError) bool {
     return if (cause) |value| value == error.NetworkChanged else true;
 }
 
 pub const testing = struct {
-    pub const forAuthentication = session_mod.forAuthentication;
     pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
 };

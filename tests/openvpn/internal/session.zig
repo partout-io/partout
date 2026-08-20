@@ -8,7 +8,6 @@ const source = @import("source");
 const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
-const forAuthentication = source.openvpn_internal.session.testing.forAuthentication;
 const shouldSendExitNotification = source.openvpn_internal.session.testing.shouldSendExitNotification;
 
 test "Session declarations are semantically analyzed" {
@@ -52,28 +51,6 @@ test "Session borrows an externally managed Looper" {
     try looper.perform(void, null, Callbacks.barrier);
     try looper.stop();
     looper_started = false;
-}
-
-test "forAuthentication appends and encodes OTP" {
-    const allocator = std.testing.allocator;
-
-    var appended = try forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .append,
-        .otp = "123",
-    });
-    defer appended.deinit(allocator);
-    try std.testing.expectEqualStrings("pass123", appended.password);
-
-    var encoded = try forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .encode,
-        .otp = "123",
-    });
-    defer encoded.deinit(allocator);
-    try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
 }
 
 test "session sends exit notification only for requested and network-change shutdowns" {

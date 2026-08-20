@@ -134,3 +134,25 @@ test "processed remotes randomize only hostnames" {
     for (prefix) |byte| try std.testing.expect(std.ascii.isHex(byte));
     try std.testing.expectEqualStrings("192.0.2.1", processed[1].address);
 }
+
+test "credentialsForAuthentication appends and encodes OTP" {
+    const allocator = std.testing.allocator;
+
+    var appended = try configuration.credentialsForAuthentication(allocator, .{
+        .username = "user",
+        .password = "pass",
+        .otp_method = .append,
+        .otp = "123",
+    });
+    defer appended.deinit(allocator);
+    try std.testing.expectEqualStrings("pass123", appended.password);
+
+    var encoded = try configuration.credentialsForAuthentication(allocator, .{
+        .username = "user",
+        .password = "pass",
+        .otp_method = .encode,
+        .otp = "123",
+    });
+    defer encoded.deinit(allocator);
+    try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
+}
