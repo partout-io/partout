@@ -270,9 +270,10 @@ pub const Session = struct {
             SessionOnQueue.prepareShutdown,
         ) catch |err| {
             // Swift owns its looper and logs any perform failure here. Zig's
-            // looper is externally owned: Cancelled means OnFinish through
-            // looperDidTerminate owns finalization, so do not shut down twice.
-            if (err == error.Cancelled) return;
+            // looper is externally owned: LooperUnavailable means OnFinish
+            // through looperDidTerminate owns finalization, so do not shut down
+            // twice.
+            if (err == error.LooperUnavailable) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
@@ -474,10 +475,10 @@ pub const Session = struct {
             .context = self,
             .callback = callback,
         }) catch |err| {
-            // Swift lets its timer task feed perform cancellation back into
-            // shutdown. Here Cancelled means looperDidTerminate already owns
+            // Swift lets its timer task feed perform failure back into shutdown.
+            // Here LooperUnavailable means looperDidTerminate already owns
             // finalization, so another shutdown request would be redundant.
-            if (err != error.Cancelled)
+            if (err != error.LooperUnavailable)
                 self.requestShutdownFromAnyThread(errors_mod.sessionError(err));
         };
     }
@@ -584,9 +585,9 @@ const SessionOnQueue = struct {
             .stopped => |context| context,
             .active => {
                 log.write(.err, "Session is not stopped");
-                // Match Swift's setLinkOnQueue: starting over an active session
-                // is a cancelled lifecycle operation, not an in-place restart.
-                return error.OperationCancelled;
+                // Swift calls this operationCancelled. Name the concrete Zig
+                // state instead: this is not an in-place restart.
+                return error.SessionAlreadyActive;
             },
         };
         log.write(.info, "Start VPN session");

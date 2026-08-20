@@ -87,7 +87,7 @@ pub const Looper = struct {
     };
 
     const Errors = queue_mod.Errors;
-    const SubmissionError = std.mem.Allocator.Error || Errors.Cancelled;
+    const SubmissionError = std.mem.Allocator.Error || Errors.LooperUnavailable;
     const CompletionError = queue_mod.CompletionError;
     const RetryScheduleError = std.mem.Allocator.Error || std.Thread.SpawnError;
     pub const InitError = std.mem.Allocator.Error || Errors.MuxFailure;
@@ -96,13 +96,11 @@ pub const Looper = struct {
         Errors.AlreadyStarted;
     pub const AttachError = SubmissionError ||
         Errors.MuxFailure ||
-        Errors.OperationCancelled ||
+        Errors.SideAlreadyAttached ||
         Errors.ReentrantCall;
     pub const DetachError = SubmissionError || Errors.ReentrantCall;
     pub const ResumeReadingError = SubmissionError;
-    pub const StopError = SubmissionError ||
-        Errors.InvalidState ||
-        Errors.ReentrantCall;
+    pub const StopError = SubmissionError || Errors.ReentrantCall;
     pub const WriteError = SubmissionError ||
         io.Error ||
         Errors.TransformFailure ||
@@ -181,7 +179,7 @@ pub const Looper = struct {
         self.read_retries = .{ false, false };
         self.write_retries = .{ false, false };
         if (self.stop_completion) |completion| {
-            completeNow(completion, error.Cancelled);
+            completeNow(completion, error.LooperUnavailable);
             self.stop_completion = null;
         }
         self.releaseCompletionsLocked();
@@ -352,12 +350,13 @@ pub const Looper = struct {
     ///
     /// The stop command runs after work that the looper has already accepted.
     /// Entering `.stopping` rejects new work, and delayed commands that have not
-    /// become ready are cancelled when the worker finishes. Calling `stop`
-    /// before `start`, or after the worker has already stopped, is a no-op.
+    /// become ready complete with `error.LooperUnavailable` when the worker
+    /// finishes. Calling `stop` before `start`, or after the worker has already
+    /// stopped, is a no-op.
     ///
     /// This function must run outside the looper thread and outside callbacks
     /// that borrow looper-owned state. It waits for an in-progress `start` or
-    /// `stop` transition, but returns `error.Cancelled` if `deinit` takes
+    /// `stop` transition, but returns `error.LooperUnavailable` if `deinit` takes
     /// ownership of shutdown. Failure to allocate the stop command is returned
     /// to the caller.
     ///
@@ -387,9 +386,9 @@ pub const Looper = struct {
                 @panic("Looper remained starting after wait");
             },
             .deinitializing => {
-                // `deinit` owns shutdown and will cancel pending work and join.
+                // `deinit` completes pending work with LooperUnavailable and joins.
                 self.lock.unlock();
-                return error.Cancelled;
+                return error.LooperUnavailable;
             },
             .stopping => {
                 // Another caller initiated shutdown; wait for it to finish.
@@ -432,7 +431,7 @@ pub const Looper = struct {
         self.lock.unlock();
         if (completion_failure) |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.Cancelled => return error.Cancelled,
+            error.LooperUnavailable => return error.LooperUnavailable,
             else => log.writefAndFailDebug("Ignoring unexpected Looper stop completion error: {s}", .{
                 @errorName(err),
             }),
@@ -482,7 +481,7 @@ pub const Looper = struct {
         if (self.state != .started) {
             self.lock.unlock();
             log.writef(.debug, "Ignoring perform before start() or after finish", .{});
-            return error.Cancelled;
+            return error.LooperUnavailable;
         }
         const node = self.createCommandNode(.{ .perform = .{
             .task = .{ .context = &holder, .callback = Holder.run },
@@ -524,7 +523,7 @@ pub const Looper = struct {
         if (self.state != .started) {
             self.lock.unlock();
             log.writef(.debug, "Ignoring attach before start() or after finish", .{});
-            return error.Cancelled;
+            return error.LooperUnavailable;
         }
         const node = self.createCommandNode(.{ .attach = .{
             .arguments = arguments,
@@ -547,8 +546,8 @@ pub const Looper = struct {
         self.lock.unlock();
         if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
-            error.Cancelled => error.Cancelled,
-            error.OperationCancelled => error.OperationCancelled,
+            error.LooperUnavailable => error.LooperUnavailable,
+            error.SideAlreadyAttached => error.SideAlreadyAttached,
             error.MuxFailure => error.MuxFailure,
         };
     }
@@ -562,7 +561,7 @@ pub const Looper = struct {
         if (self.state != .started) {
             self.lock.unlock();
             log.writef(.debug, "Ignoring detach before start() or after finish", .{});
-            return error.Cancelled;
+            return error.LooperUnavailable;
         }
         const node = self.createCommandNode(.{ .detach = .{
             .side = side,
@@ -585,7 +584,7 @@ pub const Looper = struct {
         self.lock.unlock();
         if (completion_failure) |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
-            else => error.Cancelled,
+            else => error.LooperUnavailable,
         };
     }
 
@@ -604,7 +603,7 @@ pub const Looper = struct {
     pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
         self.lock.lock();
         defer self.lock.unlock();
-        if (self.state != .started) return error.Cancelled;
+        if (self.state != .started) return error.LooperUnavailable;
         const node = try self.createCommandNode(.{ .enable_read = .{
             .side = side,
             .id = null,
@@ -624,7 +623,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            return error.Cancelled;
+            return error.LooperUnavailable;
         }
         const current = self.sideIO(side) orelse {
             self.lock.unlock();
@@ -651,7 +650,7 @@ pub const Looper = struct {
             });
             return error.TransformFailure;
         };
-        if (self.state != .started) return error.Cancelled;
+        if (self.state != .started) return error.LooperUnavailable;
         const attached = self.sideIO(side) orelse {
             log.writef(.debug, "Ignoring detached {} during processing", .{side});
             return;
@@ -685,7 +684,7 @@ pub const Looper = struct {
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
-            return error.Cancelled;
+            return error.LooperUnavailable;
         }
         const side_io = self.sideIO(side) orelse {
             self.lock.unlock();
@@ -804,13 +803,13 @@ pub const Looper = struct {
         completion: *Completion,
     ) void {
         if (self.state != .started) {
-            self.queueCompletionLocked(completion, error.Cancelled);
+            self.queueCompletionLocked(completion, error.LooperUnavailable);
             return;
         }
 
         const side = std.meta.activeTag(arguments.pair);
         if (self.sideIO(side) != null) {
-            self.queueCompletionLocked(completion, error.OperationCancelled);
+            self.queueCompletionLocked(completion, error.SideAlreadyAttached);
             return;
         }
         const descriptor = switch (arguments.pair) {
@@ -1324,9 +1323,9 @@ pub const Looper = struct {
             const next = node.next;
             self.clearRetryForCommand(node.command);
             switch (node.command) {
-                .attach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
-                .detach => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
-                .perform => |command| self.queueCompletionLocked(command.completion, error.Cancelled),
+                .attach => |command| self.queueCompletionLocked(command.completion, error.LooperUnavailable),
+                .detach => |command| self.queueCompletionLocked(command.completion, error.LooperUnavailable),
+                .perform => |command| self.queueCompletionLocked(command.completion, error.LooperUnavailable),
                 else => {},
             }
             self.allocator.destroy(node);

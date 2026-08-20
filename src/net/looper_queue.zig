@@ -125,19 +125,18 @@ pub const AttachArguments = struct {
 /// error name here makes misspellings in set compositions a compile error.
 pub const Errors = struct {
     pub const AlreadyStarted = error{AlreadyStarted};
-    pub const Cancelled = error{Cancelled};
-    pub const InvalidState = error{InvalidState};
+    pub const LooperUnavailable = error{LooperUnavailable};
     pub const MuxFailure = error{MuxFailure};
-    pub const OperationCancelled = error{OperationCancelled};
     pub const ReentrantCall = error{ReentrantCall};
+    pub const SideAlreadyAttached = error{SideAlreadyAttached};
     pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
 
 pub const CompletionError = std.mem.Allocator.Error ||
-    Errors.Cancelled ||
+    Errors.LooperUnavailable ||
     Errors.MuxFailure ||
-    Errors.OperationCancelled;
+    Errors.SideAlreadyAttached;
 
 pub const Completion = struct {
     // Completion state.
