@@ -355,8 +355,7 @@ pub const SecureData = struct {
 
     /// Encodes raw bytes in the representation used by the API schema.
     pub fn initBytesAlloc(allocator: std.mem.Allocator, bytes: []const u8) AllocError!SecureData {
-        const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(bytes.len));
-        _ = std.base64.standard.Encoder.encode(encoded, bytes);
+        const encoded = try util.base64EncodeAlloc(allocator, bytes);
         return .{
             .base64 = encoded,
             .owned = true,

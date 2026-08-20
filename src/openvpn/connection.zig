@@ -212,17 +212,16 @@ const OpenVPNConnection = struct {
             return error.UnableToStart;
         };
         defer self.allocator.free(ca_filename);
-        const session = Session.create(
-            self.allocator,
-            self.serialized_executor,
-            self.looper,
-            self.configuration,
-            self.credentials,
-            PRNG.system(),
-            self.cache_dir,
-            ca_filename,
-            self.session_options,
-        ) catch |err| {
+        const session = Session.create(self.allocator, .{
+            .executor = self.serialized_executor,
+            .looper = self.looper,
+            .configuration = self.configuration,
+            .credentials = self.credentials,
+            .prng = PRNG.system(),
+            .caches_directory = self.cache_dir,
+            .ca_filename = ca_filename,
+            .options = self.session_options,
+        }) catch |err| {
             log.writef(.err, "Unable to create session: {s}", .{@errorName(err)});
             return error.UnableToStart;
         };
@@ -656,7 +655,7 @@ fn sessionDidStart(
     raw: ?*anyopaque,
     session: *anyopaque,
     remote_endpoint: api.ExtendedEndpoint,
-    remote_options: api.OpenVPNConfiguration,
+    remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
     const endpoint = cloneEndpoint(self.allocator, remote_endpoint) catch {

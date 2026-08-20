@@ -27,16 +27,13 @@ const c = helpers_mod.c;
 const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
-const ActivePhase = session_context_mod.ActivePhase;
 const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const DataChannel = data_mod.DataChannel;
 const DataLink = data_mod.DataLink;
-const IdleContext = session_context_mod.IdleContext;
 const LinkProcessor = processing_mod.LinkProcessor;
 const Negotiator = session_negotiator_mod.Negotiator;
-const NegotiatorOptions = session_negotiator_mod.NegotiatorOptions;
 const OCCPacket = packet_mod.OCCPacket;
 const PacketCode = packet_mod.PacketCode;
 const PRNG = crypto_mod.PRNG;
@@ -45,7 +42,6 @@ const RenegotiationType = session_negotiator_mod.RenegotiationType;
 const Serializer = control_serializers_mod.Serializer;
 const SessionState = session_context_mod.SessionState;
 const SessionError = errors_mod.SessionError;
-const TLSParameters = tls_mod.TLSParameters;
 const TLSWrapper = tls_mod.TLSWrapper;
 
 /// Type-erased observer for major session events.
@@ -61,7 +57,7 @@ pub const SessionDelegate = struct {
             ?*anyopaque,
             *anyopaque,
             api.ExtendedEndpoint,
-            api.OpenVPNConfiguration,
+            *const api.OpenVPNConfiguration,
         ) void,
         did_stop: *const fn (?*anyopaque, *anyopaque, ?SessionError) void,
         did_update_data_count: *const fn (
@@ -75,7 +71,7 @@ pub const SessionDelegate = struct {
         self: SessionDelegate,
         session: *anyopaque,
         remote_endpoint: api.ExtendedEndpoint,
-        remote_options: api.OpenVPNConfiguration,
+        remote_options: *const api.OpenVPNConfiguration,
     ) void {
         self.vtable.did_start(
             self.context,
@@ -133,8 +129,7 @@ pub const Session = struct {
     shutdown_pending: bool = false,
     shutdown_request_cause: ?SessionError = null,
 
-    pub fn create(
-        allocator: std.mem.Allocator,
+    pub const Init = struct {
         executor: net.SerializedExecutor,
         looper: *net.Looper,
         configuration: api.OpenVPNConfiguration,
@@ -143,66 +138,45 @@ pub const Session = struct {
         caches_directory: []const u8,
         ca_filename: []const u8,
         options: SessionOptions,
-    ) Error!*Session {
-        return createUnwrapped(
-            allocator,
-            executor,
-            looper,
-            configuration,
-            credentials,
-            prng,
-            caches_directory,
-            ca_filename,
-            options,
-        ) catch |err| errors_mod.sessionError(err);
+    };
+
+    pub fn create(allocator: std.mem.Allocator, init: Init) Error!*Session {
+        return createUnwrapped(allocator, init) catch |err| errors_mod.sessionError(err);
     }
 
-    fn createUnwrapped(
-        allocator: std.mem.Allocator,
-        executor: net.SerializedExecutor,
-        looper: *net.Looper,
-        configuration: api.OpenVPNConfiguration,
-        credentials: ?api.OpenVPNCredentials,
-        prng: PRNG,
-        caches_directory: []const u8,
-        ca_filename: []const u8,
-        options: SessionOptions,
-    ) !*Session {
-        var owned_configuration = try configuration.clone(allocator);
+    fn createUnwrapped(allocator: std.mem.Allocator, init: Init) !*Session {
+        var owned_configuration = try init.configuration.clone(allocator);
         errdefer owned_configuration.deinit(allocator);
-        var owned_credentials = if (credentials) |value|
+        var owned_credentials = if (init.credentials) |value|
             try forAuthentication(allocator, value)
         else
             null;
         errdefer if (owned_credentials) |*value| value.deinit(allocator);
-        const owned_caches_directory = try allocator.dupe(u8, caches_directory);
+        const owned_caches_directory = try allocator.dupe(u8, init.caches_directory);
         errdefer allocator.free(owned_caches_directory);
-        const owned_ca_filename = try allocator.dupe(u8, ca_filename);
+        const owned_ca_filename = try allocator.dupe(u8, init.ca_filename);
         errdefer allocator.free(owned_ca_filename);
         const serializer = try Serializer.forConfiguration(
             allocator,
-            options.backend,
+            init.options.backend,
             &owned_configuration,
         );
-        const control_channel = try ControlChannel.create(allocator, prng, serializer);
+        const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
         errdefer control_channel.destroy();
 
         const self = try allocator.create(Session);
-        errdefer allocator.destroy(self);
         self.* = .{
             .allocator = allocator,
             .configuration = owned_configuration,
             .credentials = owned_credentials,
-            .prng = prng,
+            .prng = init.prng,
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
-            .options = options,
-            .executor = executor,
-            .looper = looper,
+            .options = init.options,
+            .executor = init.executor,
+            .looper = init.looper,
             .control_channel = control_channel,
         };
-        errdefer self.shutdown_request_lock.deinit();
-        errdefer self.lifecycle_lock.deinit();
         return self;
     }
 
@@ -226,7 +200,6 @@ pub const Session = struct {
             .active => |active| active.context.destroy(),
         }
         if (self.link_processor) |processor| processor.destroy();
-        self.link_processor = null;
         self.control_channel.destroy();
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
@@ -243,8 +216,7 @@ pub const Session = struct {
             self.delegate = delegate;
             return;
         }
-        var request = SetDelegateRequest{ .session = self, .delegate = delegate };
-        _ = self.looper.perform(void, &request, setDelegateOnQueue) catch {};
+        _ = self.performOnQueue(void, delegate, setDelegateOnQueue) catch {};
     }
 
     pub fn setLink(
@@ -278,9 +250,7 @@ pub const Session = struct {
             remote_endpoint.plainSocketType() == .tcp,
         );
         self.link_processor = processor;
-        var attached = false;
         errdefer {
-            if (attached) self.looper.detach(.link) catch {};
             if (self.link_processor == processor) {
                 self.link_processor = null;
                 processor.destroy();
@@ -293,13 +263,9 @@ pub const Session = struct {
             .on_read = .{ .context = self, .callback = onLinkRead },
             .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
-        attached = true;
         descriptor_transferred = true;
-        var request = SetLinkRequest{
-            .session = self,
-            .remote_endpoint = remote_endpoint,
-        };
-        try self.looper.perform(void, &request, setLinkOnQueue);
+        errdefer self.looper.detach(.link) catch {};
+        try self.performOnQueue(void, remote_endpoint, setLinkOnQueue);
     }
 
     pub fn setTunnel(self: *Session, descriptor: net.Looper.Descriptor) Error!void {
@@ -308,8 +274,7 @@ pub const Session = struct {
     }
 
     fn setTunnelUnwrapped(self: *Session, descriptor: net.Looper.Descriptor) !void {
-        var descriptor_transferred = false;
-        defer if (!descriptor_transferred) descriptor.io.cleanup();
+        errdefer descriptor.io.cleanup();
 
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
@@ -328,7 +293,6 @@ pub const Session = struct {
             .on_read = .{ .context = self, .callback = onTunnelRead },
             .on_failure = .{ .context = self, .callback = onSideFailure },
         });
-        descriptor_transferred = true;
     }
 
     /// Prepares state on the looper, detaches from this external thread, then
@@ -351,14 +315,13 @@ pub const Session = struct {
         if (self.looper.isOnQueue()) return error.ReentrantCall;
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
-        var prepare = ShutdownOnQueueRequest{
-            .session = self,
+        const request = ShutdownRequest{
             .cause = cause,
             .timeout_ms = timeout_ms,
         };
-        const should_detach = self.looper.perform(
+        const should_detach = self.performOnQueue(
             bool,
-            &prepare,
+            request,
             prepareShutdownOnQueue,
         ) catch |err| {
             // A stopped looper has already serialized final state; its owner
@@ -374,8 +337,7 @@ pub const Session = struct {
         // State must still leave `.stopping` if a side failed independently.
         if (self.looper.isTunAttached()) self.looper.detach(.tun) catch {};
         if (self.looper.isLinkAttached()) self.looper.detach(.link) catch {};
-        var finish = FinishShutdownRequest{ .session = self, .cause = cause };
-        try self.looper.perform(void, &finish, finishShutdownOnQueue);
+        try self.performOnQueue(void, cause, finishShutdownOnQueue);
     }
 
     fn requestShutdown(self: *Session, cause: SessionError) void {
@@ -408,9 +370,10 @@ pub const Session = struct {
         return true;
     }
 
-    fn setLinkOnQueue(raw: ?*anyopaque) !void {
-        const request: *SetLinkRequest = @ptrCast(@alignCast(raw.?));
-        const self = request.session;
+    fn setLinkOnQueue(
+        self: *Session,
+        remote_endpoint: api.ExtendedEndpoint,
+    ) !void {
         std.debug.assert(self.looper.isOnQueue());
         const idle = switch (self.state) {
             .stopped => |context| context,
@@ -437,22 +400,23 @@ pub const Session = struct {
             self.allocator,
             data_link,
             idle.with_local_options,
-            request.remote_endpoint,
+            remote_endpoint,
         );
         self.state = .{ .active = .{
             .phase = .starting,
             .context = active_context,
         } };
-        _ = self.startNegotiationOnQueue() catch |err| {
+        self.startNegotiationOnQueue() catch |err| {
             active_context.destroy();
             self.state = .{ .stopped = idle };
             return err;
         };
     }
 
-    fn prepareShutdownOnQueue(raw: ?*anyopaque) !bool {
-        const request: *ShutdownOnQueueRequest = @ptrCast(@alignCast(raw.?));
-        const self = request.session;
+    fn prepareShutdownOnQueue(
+        self: *Session,
+        request: ShutdownRequest,
+    ) !bool {
         std.debug.assert(self.looper.isOnQueue());
         const active = self.state.activeState() orelse {
             log.write(.debug, "Ignore stop request, stopped or already stopping");
@@ -479,9 +443,8 @@ pub const Session = struct {
         return true;
     }
 
-    fn finishShutdownOnQueue(raw: ?*anyopaque) !void {
-        const request: *FinishShutdownRequest = @ptrCast(@alignCast(raw.?));
-        request.session.finishShutdown(request.cause);
+    fn finishShutdownOnQueue(self: *Session, cause: ?SessionError) !void {
+        self.finishShutdown(cause);
     }
 
     fn finishShutdown(self: *Session, cause: ?SessionError) void {
@@ -495,12 +458,8 @@ pub const Session = struct {
         // as well as in the normal shutdown path.
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
-        const retries_without_local_options = if (cause) |value|
-            value == error.BadCredentialsWithLocalOptions
-        else
-            false;
-        const next_with_local_options = if (retries_without_local_options)
-            false
+        const next_with_local_options = if (cause) |value|
+            active.context.with_local_options and value != error.BadCredentialsWithLocalOptions
         else
             active.context.with_local_options;
         active.context.destroy();
@@ -592,11 +551,9 @@ pub const Session = struct {
                 });
                 continue;
             };
-            if (code == .dataV2) {
-                if (packet.len <= c.OpenVPNPacketPeerIdLength) {
-                    log.write(.err, "Dropped malformed packet (missing peerId)");
-                    continue;
-                }
+            if (code == .dataV2 and packet.len <= c.OpenVPNPacketPeerIdLength) {
+                log.write(.err, "Dropped malformed packet (missing peerId)");
+                continue;
             }
 
             if (code == .dataV1 or code == .dataV2) {
@@ -624,21 +581,12 @@ pub const Session = struct {
                     }
                 },
                 .softResetV1 => {
-                    if (!negotiator.isRenegotiating()) {
-                        negotiator = try self.startRenegotiationOnQueue(negotiator, .server);
-                    }
+                    negotiator = try self.startRenegotiationOnQueue(negotiator, .server);
                 },
                 else => {},
             }
             negotiator.sendAck(&parsed);
             const inbound = try self.control_channel.enqueueInboundPacket(parsed.move());
-            var inbound_ids: [ControlConstants.number_of_keys]u32 = undefined;
-            const inbound_count = @min(inbound.len, inbound_ids.len);
-            for (inbound[0..inbound_count], 0..) |owned, index|
-                inbound_ids[index] = owned.packetId();
-            log.writef(.debug, "Pending inbound queue: {any}", .{
-                inbound_ids[0..inbound_count],
-            });
             defer {
                 for (inbound) |*owned| owned.deinit();
                 self.allocator.free(inbound);
@@ -673,11 +621,11 @@ pub const Session = struct {
         try pair.send(packets, null, null);
     }
 
-    fn startNegotiationOnQueue(self: *Session) !*Negotiator {
+    fn startNegotiationOnQueue(self: *Session) !void {
         log.write(.info, "Start negotiation");
         const context = self.state.activeContext() orelse
             @panic("Cannot start negotiation while the session is stopped");
-        const tls = try TLSWrapper.create(self.allocator, TLSParameters{
+        const tls = try TLSWrapper.create(self.allocator, .{
             .backend = self.options.backend,
             .caches_directory = self.caches_directory,
             .ca_filename = self.ca_filename,
@@ -694,13 +642,20 @@ pub const Session = struct {
             .channel = self.control_channel,
             .prng = self.prng,
             .tls = tls,
-            .options = self.negotiatorOptions(context.with_local_options),
+            .options = .{
+                .configuration = &self.configuration,
+                .credentials = if (self.credentials) |*value| value else null,
+                .with_local_options = context.with_local_options,
+                .session_options = self.options,
+                .callback_context = self,
+                .on_connected = onNegotiatorConnected,
+                .on_error = onNegotiatorError,
+            },
         });
         tls_transferred = true;
         context.addNegotiator(negotiator);
         try negotiator.start();
         try self.scheduleNegotiationTick();
-        return negotiator;
     }
 
     fn startRenegotiationOnQueue(
@@ -728,21 +683,6 @@ pub const Session = struct {
         return negotiator;
     }
 
-    fn negotiatorOptions(
-        self: *Session,
-        with_local_options: bool,
-    ) NegotiatorOptions {
-        return .{
-            .configuration = &self.configuration,
-            .credentials = if (self.credentials) |*value| value else null,
-            .with_local_options = with_local_options,
-            .session_options = self.options,
-            .callback_context = self,
-            .on_connected = onNegotiatorConnected,
-            .on_error = onNegotiatorError,
-        };
-    }
-
     fn onNegotiatorConnected(
         raw: ?*anyopaque,
         key: u8,
@@ -755,15 +695,13 @@ pub const Session = struct {
         log.writef(.info, "Negotiation succeeded, set key {d} as current", .{key});
         var reply = push_reply.clone(self.allocator) catch |err|
             return errors_mod.sessionError(err);
-        var reply_transferred = false;
-        errdefer if (!reply_transferred) reply.deinit(self.allocator);
+        errdefer reply.deinit(self.allocator);
         log.writef(.info, "Replace key {d} with new data channel", .{
             data_channel.key,
         });
         context.setDataChannel(data_channel, key) catch |err|
             return errors_mod.sessionError(err);
         context.setPushReply(reply);
-        reply_transferred = true;
         context.removeOldNegotiators();
         const negotiator_keys = context.negotiatorKeys();
         log.writef(.info, "Negotiators: {any}", .{negotiator_keys.slice()});
@@ -776,7 +714,7 @@ pub const Session = struct {
         if (self.delegate) |delegate| delegate.didStart(
             self,
             context.remote_endpoint,
-            context.push_reply.?.options,
+            &context.push_reply.?.options,
         );
     }
 
@@ -800,12 +738,7 @@ pub const Session = struct {
 
     fn onNegotiationTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.looper.performTask(.{
-            .context = self,
-            .callback = negotiationTickOnQueue,
-        }) catch |err| {
-            if (err != error.Cancelled) self.requestShutdown(errors_mod.sessionError(err));
-        };
+        self.performTimerTask(negotiationTickOnQueue);
     }
 
     fn negotiationTickOnQueue(raw: ?*anyopaque) !void {
@@ -828,9 +761,16 @@ pub const Session = struct {
 
     fn onPingTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
+        self.performTimerTask(pingOnQueue);
+    }
+
+    fn performTimerTask(
+        self: *Session,
+        callback: *const fn (?*anyopaque) anyerror!void,
+    ) void {
         self.looper.performTask(.{
             .context = self,
-            .callback = pingOnQueue,
+            .callback = callback,
         }) catch |err| {
             if (err != error.Cancelled) self.requestShutdown(errors_mod.sessionError(err));
         };
@@ -873,23 +813,28 @@ pub const Session = struct {
         self: *const Session,
         context: *ActiveContext,
     ) ?u64 {
-        if (context.push_reply) |reply| {
-            if (reply.options.keep_alive_interval) |seconds|
-                if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
-        }
-        if (self.configuration.keep_alive_interval) |seconds|
-            if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
-        return null;
+        const pushed = if (context.push_reply) |reply|
+            reply.options.keep_alive_interval
+        else
+            null;
+        return keepAliveMilliseconds(pushed, self.configuration.keep_alive_interval);
     }
 
     fn keepAliveTimeoutMs(self: *const Session, context: *ActiveContext) u64 {
-        if (context.push_reply) |reply| {
-            if (reply.options.keep_alive_timeout) |seconds|
-                if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
-        }
-        if (self.configuration.keep_alive_timeout) |seconds|
+        const pushed = if (context.push_reply) |reply|
+            reply.options.keep_alive_timeout
+        else
+            null;
+        return keepAliveMilliseconds(pushed, self.configuration.keep_alive_timeout) orelse
+            self.options.ping_timeout_ms;
+    }
+
+    fn keepAliveMilliseconds(pushed: ?f64, configured: ?f64) ?u64 {
+        for ([_]?f64{ pushed, configured }) |candidate| {
+            const seconds = candidate orelse continue;
             if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
-        return self.options.ping_timeout_ms;
+        }
+        return null;
     }
 
     fn sendExitPacketOnQueue(self: *Session, timeout_ms: u64) !void {
@@ -912,22 +857,22 @@ pub const Session = struct {
     fn reportInboundDataCount(raw: ?*anyopaque, count: usize) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const context = self.state.activeContext() orelse return;
-        context.data_count.inbound = std.math.add(
-            u64,
-            context.data_count.inbound,
-            @intCast(count),
-        ) catch std.math.maxInt(u64);
-        self.delegateCurrentDataCount(context);
+        self.addDataCount(context, &context.data_count.inbound, count);
     }
 
     fn reportOutboundDataCount(raw: ?*anyopaque, count: usize) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const context = self.state.activeContext() orelse return;
-        context.data_count.outbound = std.math.add(
-            u64,
-            context.data_count.outbound,
-            @intCast(count),
-        ) catch std.math.maxInt(u64);
+        self.addDataCount(context, &context.data_count.outbound, count);
+    }
+
+    fn addDataCount(
+        self: *Session,
+        context: *ActiveContext,
+        total: *u64,
+        count: usize,
+    ) void {
+        total.* = std.math.add(u64, total.*, @intCast(count)) catch std.math.maxInt(u64);
         self.delegateCurrentDataCount(context);
     }
 
@@ -949,9 +894,8 @@ pub const Session = struct {
 
     fn failureError(failure: net.Looper.Failure) SessionError {
         return switch (failure) {
-            .user => |cause| errors_mod.sessionError(cause),
+            .user, .system => |cause| errors_mod.sessionError(cause),
             .io => |details| errors_mod.sessionError(details.cause),
-            .system => |cause| errors_mod.sessionError(cause),
             .wait => |code| {
                 log.writef(.err, "OpenVPN looper wait failed with native code: {}", .{code});
                 return error.Reconnect;
@@ -959,30 +903,33 @@ pub const Session = struct {
         };
     }
 
-    const SetDelegateRequest = struct {
-        session: *Session,
-        delegate: ?SessionDelegate,
-    };
+    fn performOnQueue(
+        self: *Session,
+        comptime Result: type,
+        arguments: anytype,
+        comptime callback: anytype,
+    ) !Result {
+        const Arguments = @TypeOf(arguments);
+        const Request = struct {
+            session: *Session,
+            arguments: Arguments,
 
-    fn setDelegateOnQueue(raw: ?*anyopaque) !void {
-        const request: *SetDelegateRequest = @ptrCast(@alignCast(raw.?));
-        request.session.delegate = request.delegate;
+            fn run(raw: ?*anyopaque) anyerror!Result {
+                const request: *@This() = @ptrCast(@alignCast(raw.?));
+                return callback(request.session, request.arguments);
+            }
+        };
+        var request = Request{ .session = self, .arguments = arguments };
+        return self.looper.perform(Result, &request, Request.run);
     }
 
-    const SetLinkRequest = struct {
-        session: *Session,
-        remote_endpoint: api.ExtendedEndpoint,
-    };
+    fn setDelegateOnQueue(self: *Session, delegate: ?SessionDelegate) !void {
+        self.delegate = delegate;
+    }
 
-    const ShutdownOnQueueRequest = struct {
-        session: *Session,
+    const ShutdownRequest = struct {
         cause: ?SessionError,
         timeout_ms: ?u64,
-    };
-
-    const FinishShutdownRequest = struct {
-        session: *Session,
-        cause: ?SessionError,
     };
 };
 
@@ -1001,9 +948,9 @@ fn forAuthentication(
         },
         .encode => blk: {
             const otp = credentials.otp orelse return error.OTPRequired;
-            const encoded_password = try base64Alloc(allocator, credentials.password);
+            const encoded_password = try core.util.base64EncodeAlloc(allocator, credentials.password);
             defer allocator.free(encoded_password);
-            const encoded_otp = try base64Alloc(allocator, otp);
+            const encoded_otp = try core.util.base64EncodeAlloc(allocator, otp);
             defer allocator.free(encoded_otp);
             break :blk try std.fmt.allocPrint(
                 allocator,
@@ -1019,12 +966,6 @@ fn forAuthentication(
         .otp_method = .none,
         .otp = null,
     };
-}
-
-fn base64Alloc(allocator: std.mem.Allocator, value: []const u8) ![]u8 {
-    const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(value.len));
-    _ = std.base64.standard.Encoder.encode(encoded, value);
-    return encoded;
 }
 
 fn shouldSendExitNotification(cause: ?SessionError) bool {

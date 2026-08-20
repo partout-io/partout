@@ -70,6 +70,16 @@ pub fn borrowedCString(ptr: [*:0]const u8) [:0]const u8 {
     return std.mem.span(ptr);
 }
 
+/// Base64-encodes `input` into an allocator-owned buffer.
+pub fn base64EncodeAlloc(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+) error{OutOfMemory}![]u8 {
+    const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(input.len));
+    _ = std.base64.standard.Encoder.encode(encoded, input);
+    return encoded;
+}
+
 /// Deep-copies a slice of owned strings.
 ///
 /// The returned slice and each string inside it are allocated with `allocator`.

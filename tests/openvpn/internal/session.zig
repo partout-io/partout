@@ -33,17 +33,16 @@ test "Session borrows an externally managed Looper" {
     var looper_started = true;
     defer if (looper_started) looper.stop() catch {};
 
-    const session = try Session.create(
-        allocator,
-        executor.interface(),
-        &looper,
-        .{},
-        null,
-        PRNG.system(),
-        "",
-        "11111111-1111-4111-8111-111111111111-ca.pem",
-        .{ .backend = .mock },
-    );
+    const session = try Session.create(allocator, .{
+        .executor = executor.interface(),
+        .looper = &looper,
+        .configuration = .{},
+        .credentials = null,
+        .prng = PRNG.system(),
+        .caches_directory = "",
+        .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
+        .options = .{ .backend = .mock },
+    });
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
     try std.testing.expect(session.looper == &looper);

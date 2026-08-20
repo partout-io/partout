@@ -113,6 +113,13 @@ test "borrows C strings without dropping sentinel metadata" {
     try std.testing.expectEqual(@as(u8, 0), borrowed[borrowed.len]);
 }
 
+test "encodes Base64 into owned storage" {
+    const encoded = try util.base64EncodeAlloc(std.testing.allocator, "hello");
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expectEqualStrings("aGVsbG8=", encoded);
+}
+
 test "trims common ASCII whitespace" {
     try std.testing.expectEqualStrings("hello", util.trim(" \r\t\nhello \n\t"));
     try std.testing.expectEqualStrings("", util.trim(" \r\t\n"));

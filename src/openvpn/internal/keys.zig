@@ -201,13 +201,11 @@ pub const StaticKey = struct {
         @memcpy(combined[0..key_bytes.len], key_bytes);
         @memcpy(combined[key_bytes.len..], wrapped);
 
-        const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(combined.len));
+        const encoded = try core_mod.util.base64EncodeAlloc(allocator, combined);
         defer {
             @memset(encoded, 0);
             allocator.free(encoded);
         }
-        _ = std.base64.standard.Encoder.encode(encoded, combined);
-
         var output: std.Io.Writer.Allocating = .init(allocator);
         errdefer output.deinit();
         const writer = &output.writer;
