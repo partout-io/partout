@@ -143,7 +143,7 @@ const SystemRandom = struct {
 };
 
 pub const ZeroingData = struct {
-    ptr: ?*c_common.pp_zd = null,
+    ptr: *c_common.pp_zd,
 
     pub fn init(count: usize) ZeroingData {
         return fromC(c_common.pp_zd_create(count));
@@ -171,18 +171,11 @@ pub const ZeroingData = struct {
     }
 
     pub fn deinit(self: *ZeroingData) void {
-        if (self.ptr) |ptr| c_common.pp_zd_free(ptr);
-        self.* = .{};
-    }
-
-    pub fn move(self: *ZeroingData) ZeroingData {
-        const result = self.*;
-        self.* = .{};
-        return result;
+        c_common.pp_zd_free(self.ptr);
     }
 
     fn cPtr(self: ZeroingData) *c_common.pp_zd {
-        return self.ptr orelse @panic("use of deinitialized ZeroingData");
+        return self.ptr;
     }
 
     fn cCopy(self: ZeroingData) *c_common.pp_zd {

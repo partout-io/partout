@@ -141,8 +141,8 @@ pub const PRF = struct {
         }
 
         return CryptoKeys.init(
-            CryptoKeyPair.init(parts[0].move(), parts[2].move()),
-            CryptoKeyPair.init(parts[1].move(), parts[3].move()),
+            CryptoKeyPair.init(parts[0], parts[2]),
+            CryptoKeyPair.init(parts[1], parts[3]),
         );
     }
 
@@ -199,9 +199,9 @@ pub const PRF = struct {
             defer block.deinit();
             output.append(block.asSlice());
 
-            var next_chain = try hmac(functions, digest_name, secret, chain.asSlice());
+            const next_chain = try hmac(functions, digest_name, secret, chain.asSlice());
             chain.deinit();
-            chain = next_chain.move();
+            chain = next_chain;
         }
 
         return output.sliceCopy(0, size);
@@ -433,8 +433,8 @@ pub const Authenticator = struct {
 
         if (self.server_random1) |*value| value.deinit();
         if (self.server_random2) |*value| value.deinit();
-        self.server_random1 = server_random1.move();
-        self.server_random2 = server_random2.move();
+        self.server_random1 = server_random1;
+        self.server_random2 = server_random2;
         if (parsed_options) |value| self.server_options = value;
         return true;
     }

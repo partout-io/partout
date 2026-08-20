@@ -49,11 +49,11 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     var server_random2 = ZeroingData.init(Keys.random_length);
     @memset(server_random2.asMutableSlice(), 0x54);
     var handshake = Handshake{
-        .pre_master = pre_master.move(),
-        .random1 = random1.move(),
-        .random2 = random2.move(),
-        .server_random1 = server_random1.move(),
-        .server_random2 = server_random2.move(),
+        .pre_master = pre_master,
+        .random1 = random1,
+        .random2 = random2,
+        .server_random1 = server_random1,
+        .server_random2 = server_random2,
     };
     var functions = c_crypto.pp_crypto_fnt_mock();
     functions.hmac_do = Fake.hmac;
