@@ -160,7 +160,8 @@ pub const Daemon = struct {
         // Clone profile for safety, then log it.
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
-        log.writef(.notice, "Decoded profile: {s}", .{&profile});
+        log.write(.notice, "Decoded profile:");
+        log.writeProfile(.notice, &profile);
 
         const daemon = try allocator.create(Daemon);
         errdefer allocator.destroy(daemon);

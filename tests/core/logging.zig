@@ -38,6 +38,43 @@ const ReplacementLogger = struct {
     }
 };
 
+const ProfileLogger = struct {
+    var saw_id = false;
+    var saw_name = false;
+    var saw_header = false;
+    var saw_inactive_wireguard = false;
+    var saw_active_on_demand = false;
+
+    fn reset() void {
+        saw_id = false;
+        saw_name = false;
+        saw_header = false;
+        saw_inactive_wireguard = false;
+        saw_active_on_demand = false;
+    }
+
+    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+        const message = std.mem.span(raw_message);
+        saw_id = saw_id or std.mem.eql(
+            u8,
+            message,
+            "\tID: 00000000-0000-0000-0000-000000000000",
+        );
+        saw_name = saw_name or std.mem.eql(u8, message, "\tName: Test profile");
+        saw_header = saw_header or std.mem.eql(u8, message, "\tModules:");
+        saw_inactive_wireguard = saw_inactive_wireguard or std.mem.eql(
+            u8,
+            message,
+            "\t\t- WireGuardModule: <redacted>",
+        );
+        saw_active_on_demand = saw_active_on_demand or std.mem.eql(
+            u8,
+            message,
+            "\t\t+ OnDemandModule: <redacted>",
+        );
+    }
+};
+
 const ReconfiguringValue = struct {
     pub fn logging_formatter(
         allocator: std.mem.Allocator,
@@ -82,6 +119,43 @@ test "external logger callback receives log messages" {
     try std.testing.expect(TestLogger.called);
     try std.testing.expect(TestLogger.saw_level);
     try std.testing.expect(TestLogger.saw_message);
+}
+
+test "profile modules log active and inactive prefixes" {
+    ProfileLogger.reset();
+    logging.init(false, ProfileLogger.log);
+    defer logging.deinit();
+
+    const wireguard_id = api.UUID{
+        '1', '1', '1', '1', '1', '1', '1', '1', '-',
+        '1', '1', '1', '1', '-', '4', '1', '1', '1',
+        '-', '8', '1', '1', '1', '-', '1', '1', '1',
+        '1', '1', '1', '1', '1', '1', '1', '1', '1',
+    };
+    const on_demand_id = api.UUID{
+        '2', '2', '2', '2', '2', '2', '2', '2', '-',
+        '2', '2', '2', '2', '-', '4', '2', '2', '2',
+        '-', '8', '2', '2', '2', '-', '2', '2', '2',
+        '2', '2', '2', '2', '2', '2', '2', '2', '2',
+    };
+    const modules = [_]api.TaggedModule{
+        .{ .WireGuard = .{ .id = wireguard_id } },
+        .{ .OnDemand = .{ .id = on_demand_id, .policy = .any } },
+    };
+    const active_modules_ids = [_]api.UUID{on_demand_id};
+    const profile = api.Profile{
+        .name = "Test profile",
+        .modules = &modules,
+        .active_modules_ids = &active_modules_ids,
+    };
+
+    logging.writeProfile(.notice, &profile);
+
+    try std.testing.expect(ProfileLogger.saw_id);
+    try std.testing.expect(ProfileLogger.saw_name);
+    try std.testing.expect(ProfileLogger.saw_header);
+    try std.testing.expect(ProfileLogger.saw_inactive_wireguard);
+    try std.testing.expect(ProfileLogger.saw_active_on_demand);
 }
 
 test "sentinel log messages cross the C callback without copying" {
