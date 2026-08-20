@@ -599,7 +599,7 @@ pub const Negotiator = struct {
     fn handleControlData(self: *Negotiator, data: []const u8) !void {
         const authenticator = if (self.authenticator) |*value| value else return;
         log.write(.info, "Pulled plain control data");
-        try authenticator.appendControlData(data);
+        authenticator.appendControlData(data);
         if (self.state == .auth) {
             if (!try authenticator.parseAuthReply()) return;
             if (self.isRenegotiating()) {
@@ -730,10 +730,10 @@ pub const Negotiator = struct {
         const authenticator = if (self.authenticator) |*value| value else {
             @panic("Cannot create a data channel before authentication starts");
         };
-        var handshake = (try authenticator.response(self.allocator)) orelse {
+        var handshake = authenticator.response() orelse {
             @panic("Cannot create a data channel before authentication produces a handshake");
         };
-        defer handshake.deinit(self.allocator);
+        defer handshake.deinit();
 
         log.write(.notice, "Set up encryption");
         const server_cipher = if (authenticator.server_options) |options|

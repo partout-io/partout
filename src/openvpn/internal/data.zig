@@ -301,8 +301,8 @@ pub const DataPathWrapper = struct {
         prf: *const PRF,
         prng: PRNG,
     ) Error!DataPathWrapper {
-        var seed = try prng.safeData(allocator, DataConstants.prng_seed_length);
-        defer seed.deinit(allocator);
+        var seed = try prng.safeData(DataConstants.prng_seed_length);
+        defer seed.deinit();
         return createWithSeed(allocator, parameters, prf, seed);
     }
 
@@ -316,8 +316,8 @@ pub const DataPathWrapper = struct {
             return error.UnsupportedAlgorithm).enc;
         const init_seed = functions.init_seed orelse return error.UnsupportedAlgorithm;
         _ = init_seed(seed.bytes(), seed.length());
-        var keys = prf.derive(allocator) catch return error.CryptoFailure;
-        defer keys.deinit(allocator);
+        var keys = prf.derive() catch return error.CryptoFailure;
+        defer keys.deinit();
         return createWithKeys(allocator, parameters, functions, &keys);
     }
 
@@ -327,7 +327,7 @@ pub const DataPathWrapper = struct {
         functions: c_crypto.pp_crypto_enc_fnt,
         keys: *const CryptoKeys,
     ) !DataPathWrapper {
-        var bridge = try CryptoKeysBridge.init(allocator, keys);
+        var bridge = CryptoKeysBridge.init(keys);
         defer bridge.deinit();
 
         const framing = nativeFraming(parameters.compression_framing);

@@ -38,16 +38,16 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     };
 
     const allocator = std.testing.allocator;
-    var pre_master = try ZeroingData.init(allocator, Keys.pre_master_length);
-    @memset(pre_master.asSlice(), 0x10);
-    var random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random1.asSlice(), 0x21);
-    var random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(random2.asSlice(), 0x32);
-    var server_random1 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random1.asSlice(), 0x43);
-    var server_random2 = try ZeroingData.init(allocator, Keys.random_length);
-    @memset(server_random2.asSlice(), 0x54);
+    var pre_master = ZeroingData.init(Keys.pre_master_length);
+    @memset(pre_master.asMutableSlice(), 0x10);
+    var random1 = ZeroingData.init(Keys.random_length);
+    @memset(random1.asMutableSlice(), 0x21);
+    var random2 = ZeroingData.init(Keys.random_length);
+    @memset(random2.asMutableSlice(), 0x32);
+    var server_random1 = ZeroingData.init(Keys.random_length);
+    @memset(server_random1.asMutableSlice(), 0x43);
+    var server_random2 = ZeroingData.init(Keys.random_length);
+    @memset(server_random2.asMutableSlice(), 0x54);
     var handshake = Handshake{
         .pre_master = pre_master.move(),
         .random1 = random1.move(),
@@ -68,12 +68,12 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
     );
     defer prf.deinit(allocator);
 
-    handshake.deinit(allocator);
+    handshake.deinit();
     allocator.free(session_id);
     allocator.free(remote_session_id);
 
-    var keys = try prf.derive(allocator);
-    defer keys.deinit(allocator);
+    var keys = try prf.derive();
+    defer keys.deinit();
     try std.testing.expectEqual(Keys.key_length, keys.cipher.?.encryption_key.length());
     try std.testing.expectEqual(Keys.key_length, keys.cipher.?.decryption_key.length());
     try std.testing.expectEqual(Keys.key_length, keys.digest.?.encryption_key.length());
@@ -90,7 +90,7 @@ test "Authenticator frames auth and buffers replies and messages" {
         .data_ciphers = &ciphers,
         .digest = .sha256,
     });
-    defer auth_data.deinit(allocator);
+    defer auth_data.deinit();
     const framed = auth_data.asSlice();
     try std.testing.expectEqualSlices(u8, &ControlConstants.tls_prefix, framed[0..ControlConstants.tls_prefix.len]);
     try std.testing.expect(framed.len > ControlConstants.tls_prefix.len + Keys.pre_master_length + 2 * Keys.random_length);
@@ -108,18 +108,18 @@ test "Authenticator frames auth and buffers replies and messages" {
     try reply.appendSlice(allocator, &options_length);
     try reply.appendSlice(allocator, server_options);
 
-    try authenticator.appendControlData(reply.items[0 .. reply.items.len - 2]);
+    authenticator.appendControlData(reply.items[0 .. reply.items.len - 2]);
     try std.testing.expect(!try authenticator.parseAuthReply());
-    try authenticator.appendControlData(reply.items[reply.items.len - 2 ..]);
+    authenticator.appendControlData(reply.items[reply.items.len - 2 ..]);
     try std.testing.expect(try authenticator.parseAuthReply());
     try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, authenticator.server_options.?.cipher.?);
     try std.testing.expectEqual(api.OpenVPNDigest.sha256, authenticator.server_options.?.digest.?);
-    var handshake = (try authenticator.response(allocator)).?;
-    defer handshake.deinit(allocator);
+    var handshake = authenticator.response().?;
+    defer handshake.deinit();
     try std.testing.expectEqual(@as(u8, 0x11), handshake.server_random1.asSlice()[0]);
     try std.testing.expectEqual(@as(u8, 0x22), handshake.server_random2.asSlice()[0]);
 
-    try authenticator.appendControlData("AUTH_FAILED\x00PUSH_REPLY,route\x00partial");
+    authenticator.appendControlData("AUTH_FAILED\x00PUSH_REPLY,route\x00partial");
     const messages = try authenticator.parseMessages(allocator);
     defer core.util.freeSliceOfStrings(allocator, messages);
     try std.testing.expectEqual(@as(usize, 2), messages.len);

@@ -289,7 +289,7 @@ const ConfigurationWriter = struct {
         wrap: api.OpenVPNTLSWrap,
     ) core.SerializeError!void {
         var key = StaticKey.init(allocator, wrap.key) catch |err| return mapStaticKeyError(err);
-        defer key.deinit(allocator);
+        defer key.deinit();
         const tag = switch (wrap.strategy) {
             .auth => "tls-auth",
             .crypt => "tls-crypt",

@@ -20,9 +20,9 @@ pub const CryptoKeys = struct {
             };
         }
 
-        pub fn deinit(self: *KeyPair, allocator: std.mem.Allocator) void {
-            self.encryption_key.deinit(allocator);
-            self.decryption_key.deinit(allocator);
+        pub fn deinit(self: *KeyPair) void {
+            self.encryption_key.deinit();
+            self.decryption_key.deinit();
         }
     };
 
@@ -33,10 +33,9 @@ pub const CryptoKeys = struct {
         return .{ .cipher = cipher, .digest = digest };
     }
 
-    pub fn deinit(self: *CryptoKeys, allocator: std.mem.Allocator) void {
-        if (self.cipher) |*value| value.deinit(allocator);
-        if (self.digest) |*value| value.deinit(allocator);
-        self.* = .{};
+    pub fn deinit(self: *CryptoKeys) void {
+        if (self.cipher) |*value| value.deinit();
+        if (self.digest) |*value| value.deinit();
     }
 };
 
@@ -47,30 +46,19 @@ pub const CryptoKeysBridge = struct {
     hmac_decryption_key: *c_common.pp_zd,
     c_keys: c_crypto.pp_crypto_keys,
 
-    pub fn init(
-        allocator: std.mem.Allocator,
-        keys: *const CryptoKeys,
-    ) !CryptoKeysBridge {
-        const cipher_encryption_key = try copyOptional(
-            allocator,
+    pub fn init(keys: *const CryptoKeys) CryptoKeysBridge {
+        const cipher_encryption_key = copyOptional(
             if (keys.cipher) |value| value.encryption_key else null,
         );
-        errdefer c_common.pp_zd_free(cipher_encryption_key);
-        const cipher_decryption_key = try copyOptional(
-            allocator,
+        const cipher_decryption_key = copyOptional(
             if (keys.cipher) |value| value.decryption_key else null,
         );
-        errdefer c_common.pp_zd_free(cipher_decryption_key);
-        const hmac_encryption_key = try copyOptional(
-            allocator,
+        const hmac_encryption_key = copyOptional(
             if (keys.digest) |value| value.encryption_key else null,
         );
-        errdefer c_common.pp_zd_free(hmac_encryption_key);
-        const hmac_decryption_key = try copyOptional(
-            allocator,
+        const hmac_decryption_key = copyOptional(
             if (keys.digest) |value| value.decryption_key else null,
         );
-        errdefer c_common.pp_zd_free(hmac_decryption_key);
 
         return .{
             .cipher_encryption_key = cipher_encryption_key,
@@ -102,14 +90,8 @@ pub const CryptoKeysBridge = struct {
         return &self.c_keys;
     }
 
-    fn copyOptional(
-        allocator: std.mem.Allocator,
-        value: ?ZeroingData,
-    ) !*c_common.pp_zd {
-        return if (value) |data| try data.cCopy() else blk: {
-            _ = allocator;
-            break :blk c_common.pp_zd_create(0);
-        };
+    fn copyOptional(value: ?ZeroingData) *c_common.pp_zd {
+        return if (value) |data| data.cCopy() else c_common.pp_zd_create(0);
     }
 };
 
@@ -144,14 +126,10 @@ pub fn PRNGWith(comptime Provider: type) type {
             return bytes;
         }
 
-        pub fn safeData(
-            self: Self,
-            allocator: std.mem.Allocator,
-            length: usize,
-        ) !ZeroingData {
-            var result = try ZeroingData.init(allocator, length);
-            errdefer result.deinit(allocator);
-            try self.fill(result.asSlice());
+        pub fn safeData(self: Self, length: usize) !ZeroingData {
+            var result = ZeroingData.init(length);
+            errdefer result.deinit();
+            try self.fill(result.asMutableSlice());
             return result;
         }
     };
@@ -167,25 +145,18 @@ const SystemRandom = struct {
 pub const ZeroingData = struct {
     ptr: ?*c_common.pp_zd = null,
 
-    pub fn init(_: std.mem.Allocator, count: usize) !ZeroingData {
+    pub fn init(count: usize) ZeroingData {
         return fromC(c_common.pp_zd_create(count));
     }
 
-    pub fn initCopy(
-        _: std.mem.Allocator,
-        source: []const u8,
-    ) !ZeroingData {
+    pub fn initCopy(source: []const u8) ZeroingData {
         return fromC(c_common.pp_zd_create_from_data(source.ptr, source.len));
     }
 
-    pub fn initString(
-        _: std.mem.Allocator,
-        source: []const u8,
-        null_terminated: bool,
-    ) !ZeroingData {
+    pub fn initString(source: []const u8, null_terminated: bool) ZeroingData {
         const result_length = source.len + @intFromBool(null_terminated);
-        var result = fromC(c_common.pp_zd_create(result_length));
-        const result_bytes = result.asSlice();
+        var result = init(result_length);
+        const result_bytes = result.asMutableSlice();
         @memcpy(result_bytes[0..source.len], source);
         if (null_terminated) result_bytes[source.len] = 0;
         return result;
@@ -195,11 +166,11 @@ pub const ZeroingData = struct {
         return .{ .ptr = ptr };
     }
 
-    pub fn clone(self: ZeroingData, _: std.mem.Allocator) !ZeroingData {
+    pub fn clone(self: ZeroingData) ZeroingData {
         return fromC(c_common.pp_zd_make_copy(self.cPtr()));
     }
 
-    pub fn deinit(self: *ZeroingData, _: std.mem.Allocator) void {
+    pub fn deinit(self: *ZeroingData) void {
         if (self.ptr) |ptr| c_common.pp_zd_free(ptr);
         self.* = .{};
     }
@@ -214,21 +185,25 @@ pub const ZeroingData = struct {
         return self.ptr orelse @panic("use of deinitialized ZeroingData");
     }
 
-    fn cCopy(self: ZeroingData) !*c_common.pp_zd {
+    fn cCopy(self: ZeroingData) *c_common.pp_zd {
         return c_common.pp_zd_make_copy(self.cPtr());
     }
 
     /// Borrowed view valid until the next mutation or deinitialization.
-    pub fn asSlice(self: ZeroingData) []u8 {
-        const ptr = self.cPtr();
-        return ptr.*.bytes[0..ptr.*.length];
+    pub fn asSlice(self: ZeroingData) []const u8 {
+        return self.bytes()[0..self.length()];
+    }
+
+    /// Borrowed mutable view valid until the next mutation or deinitialization.
+    pub fn asMutableSlice(self: *ZeroingData) []u8 {
+        return self.mutableBytes()[0..self.length()];
     }
 
     pub fn bytes(self: ZeroingData) [*c]const u8 {
         return c_common.pp_zd_bytes(self.cPtr());
     }
 
-    pub fn mutableBytes(self: ZeroingData) [*c]u8 {
+    pub fn mutableBytes(self: *ZeroingData) [*c]u8 {
         return c_common.pp_zd_mutable_bytes(self.cPtr());
     }
 
@@ -244,14 +219,8 @@ pub const ZeroingData = struct {
         c_common.pp_zd_resize(self.cPtr(), 0);
     }
 
-    pub fn append(
-        self: *ZeroingData,
-        _: std.mem.Allocator,
-        suffix: []const u8,
-    ) !void {
-        const other = c_common.pp_zd_create_from_data(suffix.ptr, suffix.len);
-        defer c_common.pp_zd_free(other);
-        c_common.pp_zd_append(self.cPtr(), other);
+    pub fn append(self: *ZeroingData, suffix: []const u8) void {
+        c_common.pp_zd_append_data(self.cPtr(), suffix.ptr, suffix.len);
     }
 
     pub fn appendData(self: *ZeroingData, other: ZeroingData) void {
@@ -260,12 +229,12 @@ pub const ZeroingData = struct {
 
     pub fn sliceCopy(
         self: ZeroingData,
-        _: std.mem.Allocator,
         offset: usize,
         count: usize,
     ) !ZeroingData {
-        const slice = c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse return error.OutOfBounds;
-        return fromC(slice);
+        const total_length = self.length();
+        if (offset > total_length or count > total_length - offset) return error.OutOfBounds;
+        return fromC(c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse unreachable);
     }
 
     pub fn networkU16(self: ZeroingData, offset: usize) !u16 {
@@ -284,7 +253,6 @@ pub const ZeroingData = struct {
 
     pub fn removePrefix(
         self: *ZeroingData,
-        _: std.mem.Allocator,
         count: usize,
     ) !void {
         if (count > self.length()) return error.OutOfBounds;

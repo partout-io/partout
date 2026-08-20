@@ -32,7 +32,7 @@ pub const StaticKey = struct {
             @memset(bytes, 0);
             allocator.free(bytes);
         }
-        return initBytes(allocator, bytes, key.dir);
+        return initBytes(bytes, key.dir);
     }
 
     pub fn initFile(
@@ -64,7 +64,7 @@ pub const StaticKey = struct {
         var bytes: [content_length]u8 = undefined;
         defer @memset(&bytes, 0);
         _ = std.fmt.hexToBytes(&bytes, hex.items) catch return error.InvalidStaticKey;
-        return initBytes(allocator, &bytes, direction);
+        return initBytes(&bytes, direction);
     }
 
     pub fn parseFileAlloc(
@@ -73,7 +73,7 @@ pub const StaticKey = struct {
         direction: ?api.OpenVPNStaticKeyDirection,
     ) ParseError!api.OpenVPNStaticKey {
         var key = try initFile(allocator, lines, direction);
-        defer key.deinit(allocator);
+        defer key.deinit();
         return key.apiKeyAlloc(allocator);
     }
 
@@ -108,8 +108,8 @@ pub const StaticKey = struct {
             return error.InvalidStaticKey;
         if (decoded.len <= content_length) return error.InvalidStaticKey;
 
-        var static_key = try initBytes(allocator, decoded[0..content_length], .client);
-        defer static_key.deinit(allocator);
+        var static_key = try initBytes(decoded[0..content_length], .client);
+        defer static_key.deinit();
         var key = try static_key.apiKeyAlloc(allocator);
         errdefer key.deinit(allocator);
         const wrapped_key = try api.SecureData.initBytesAlloc(allocator, decoded[content_length..]);
@@ -120,8 +120,8 @@ pub const StaticKey = struct {
         };
     }
 
-    pub fn deinit(self: *StaticKey, allocator: std.mem.Allocator) void {
-        self.data.deinit(allocator);
+    pub fn deinit(self: *StaticKey) void {
+        self.data.deinit();
     }
 
     pub fn cipherEncryptKey(self: StaticKey) ![]const u8 {
@@ -222,13 +222,12 @@ pub const StaticKey = struct {
     }
 
     fn initBytes(
-        allocator: std.mem.Allocator,
         bytes: []const u8,
         direction: ?api.OpenVPNStaticKeyDirection,
     ) ParseError!StaticKey {
         if (bytes.len != content_length) return error.InvalidStaticKey;
         return .{
-            .data = try ZeroingData.initCopy(allocator, bytes),
+            .data = ZeroingData.initCopy(bytes),
             .direction = direction,
         };
     }

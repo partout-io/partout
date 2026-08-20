@@ -64,6 +64,7 @@ pp_zd *_Nullable pp_zd_make_slice(const pp_zd *zd, size_t offset, size_t length)
 // MARK: Side effect
 
 void pp_zd_append(pp_zd *zd, const pp_zd *other);
+void pp_zd_append_data(pp_zd *zd, const uint8_t *bytes, size_t length);
 void pp_zd_resize(pp_zd *zd, size_t new_length);
 void pp_zd_remove_until(pp_zd *zd, size_t offset);
 void pp_zd_zero(pp_zd *zd);

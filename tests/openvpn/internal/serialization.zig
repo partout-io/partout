@@ -49,9 +49,9 @@ test "client and server tls-crypt keys are complementary" {
     var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
     defer secure.deinit(std.testing.allocator);
     var client = try buildCryptKeys(std.testing.allocator, .{ .data = secure, .dir = .client });
-    defer client.deinit(std.testing.allocator);
+    defer client.deinit();
     var server = try buildCryptKeys(std.testing.allocator, .{ .data = secure, .dir = .server });
-    defer server.deinit(std.testing.allocator);
+    defer server.deinit();
     try std.testing.expectEqualSlices(
         u8,
         client.cipher.?.encryption_key.asSlice(),
@@ -75,7 +75,7 @@ test "tls-auth without key direction uses the shared HMAC quadrant" {
     var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
     defer secure.deinit(std.testing.allocator);
     var keys = try buildAuthKeys(std.testing.allocator, .{ .data = secure, .dir = null });
-    defer keys.deinit(std.testing.allocator);
+    defer keys.deinit();
     try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.asSlice(), 1));
     try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.asSlice(), 1));
 }
@@ -99,7 +99,7 @@ test "static tls-auth key directions match the Swift key vectors" {
         .data = secure,
         .dir = null,
     });
-    defer bidirectional.deinit(allocator);
+    defer bidirectional.deinit();
     try std.testing.expectEqualSlices(
         u8,
         shared,
@@ -115,7 +115,7 @@ test "static tls-auth key directions match the Swift key vectors" {
         .data = secure,
         .dir = .client,
     });
-    defer client.deinit(allocator);
+    defer client.deinit();
     try std.testing.expectEqualSlices(
         u8,
         client_send,

@@ -33,31 +33,22 @@ pub const Handshake = struct {
     server_random1: ZeroingData,
     server_random2: ZeroingData,
 
-    pub fn clone(self: Handshake, allocator: std.mem.Allocator) !Handshake {
-        var pre_master = try self.pre_master.clone(allocator);
-        errdefer pre_master.deinit(allocator);
-        var random1 = try self.random1.clone(allocator);
-        errdefer random1.deinit(allocator);
-        var random2 = try self.random2.clone(allocator);
-        errdefer random2.deinit(allocator);
-        var server_random1 = try self.server_random1.clone(allocator);
-        errdefer server_random1.deinit(allocator);
-        const server_random2 = try self.server_random2.clone(allocator);
+    pub fn clone(self: Handshake) Handshake {
         return .{
-            .pre_master = pre_master,
-            .random1 = random1,
-            .random2 = random2,
-            .server_random1 = server_random1,
-            .server_random2 = server_random2,
+            .pre_master = self.pre_master.clone(),
+            .random1 = self.random1.clone(),
+            .random2 = self.random2.clone(),
+            .server_random1 = self.server_random1.clone(),
+            .server_random2 = self.server_random2.clone(),
         };
     }
 
-    pub fn deinit(self: *Handshake, allocator: std.mem.Allocator) void {
-        self.pre_master.deinit(allocator);
-        self.random1.deinit(allocator);
-        self.random2.deinit(allocator);
-        self.server_random1.deinit(allocator);
-        self.server_random2.deinit(allocator);
+    pub fn deinit(self: *Handshake) void {
+        self.pre_master.deinit();
+        self.random1.deinit();
+        self.random2.deinit();
+        self.server_random1.deinit();
+        self.server_random2.deinit();
     }
 };
 
@@ -94,8 +85,8 @@ pub const PRF = struct {
         session_id: []const u8,
         remote_session_id: []const u8,
     ) !PRF {
-        var owned_handshake = try handshake.clone(allocator);
-        errdefer owned_handshake.deinit(allocator);
+        var owned_handshake = handshake.clone();
+        errdefer owned_handshake.deinit();
         const owned_session_id = try allocator.dupe(u8, session_id);
         errdefer allocator.free(owned_session_id);
         const owned_remote_session_id = try allocator.dupe(u8, remote_session_id);
@@ -108,13 +99,13 @@ pub const PRF = struct {
     }
 
     pub fn deinit(self: *PRF, allocator: std.mem.Allocator) void {
-        self.handshake.deinit(allocator);
+        self.handshake.deinit();
         allocator.free(self.session_id);
         allocator.free(self.remote_session_id);
     }
 
-    pub fn derive(self: *const PRF, allocator: std.mem.Allocator) !CryptoKeys {
-        var master_data = try prfData(allocator, .{
+    pub fn derive(self: *const PRF) !CryptoKeys {
+        var master_data = try prfData(.{
             .functions = self.functions,
             .label = KeysConstants.label1,
             .secret = self.handshake.pre_master.asSlice(),
@@ -122,9 +113,9 @@ pub const PRF = struct {
             .server_seed = self.handshake.server_random1.asSlice(),
             .size = KeysConstants.pre_master_length,
         });
-        defer master_data.deinit(allocator);
+        defer master_data.deinit();
 
-        var keys_data = try prfData(allocator, .{
+        var keys_data = try prfData(.{
             .functions = self.functions,
             .label = KeysConstants.label2,
             .secret = master_data.asSlice(),
@@ -134,16 +125,15 @@ pub const PRF = struct {
             .server_session_id = self.remote_session_id,
             .size = KeysConstants.keys_count * KeysConstants.key_length,
         });
-        defer keys_data.deinit(allocator);
+        defer keys_data.deinit();
         if (keys_data.length() != KeysConstants.keys_count * KeysConstants.key_length)
             @panic("OpenVPN PRF returned an unexpected key-data length");
 
         var parts: [KeysConstants.keys_count]ZeroingData = undefined;
         var initialized: usize = 0;
-        errdefer for (parts[0..initialized]) |*part| part.deinit(allocator);
+        errdefer for (parts[0..initialized]) |*part| part.deinit();
         for (&parts, 0..) |*part, index| {
             part.* = try keys_data.sliceCopy(
-                allocator,
                 index * KeysConstants.key_length,
                 KeysConstants.key_length,
             );
@@ -156,80 +146,76 @@ pub const PRF = struct {
         );
     }
 
-    fn prfData(allocator: std.mem.Allocator, input: PRFInput) !ZeroingData {
-        var seed = try ZeroingData.initCopy(allocator, input.label);
-        defer seed.deinit(allocator);
-        try seed.append(allocator, input.client_seed);
-        try seed.append(allocator, input.server_seed);
-        if (input.client_session_id) |value| try seed.append(allocator, value);
-        if (input.server_session_id) |value| try seed.append(allocator, value);
+    fn prfData(input: PRFInput) !ZeroingData {
+        var seed = ZeroingData.initCopy(input.label);
+        defer seed.deinit();
+        seed.append(input.client_seed);
+        seed.append(input.server_seed);
+        if (input.client_session_id) |value| seed.append(value);
+        if (input.server_session_id) |value| seed.append(value);
 
         const half = input.secret.len / 2;
         const half_rounded_up = half + (input.secret.len & 1);
         var hash1 = try keysHash(
-            allocator,
             input.functions,
             "MD5",
             input.secret[0..half_rounded_up],
             seed.asSlice(),
             input.size,
         );
-        defer hash1.deinit(allocator);
+        defer hash1.deinit();
         var hash2 = try keysHash(
-            allocator,
             input.functions,
             "SHA1",
             input.secret[half..][0..half_rounded_up],
             seed.asSlice(),
             input.size,
         );
-        defer hash2.deinit(allocator);
+        defer hash2.deinit();
 
-        const result = try ZeroingData.init(allocator, input.size);
-        for (result.asSlice(), hash1.asSlice(), hash2.asSlice()) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
+        var result = ZeroingData.init(input.size);
+        for (result.asMutableSlice(), hash1.asSlice(), hash2.asSlice()) |*dst, lhs, rhs| dst.* = lhs ^ rhs;
         return result;
     }
 
     fn keysHash(
-        allocator: std.mem.Allocator,
         functions: c_crypto.pp_crypto_fnt,
         digest_name: [:0]const u8,
         secret: []const u8,
         seed: []const u8,
         size: usize,
     ) !ZeroingData {
-        var output = try ZeroingData.init(allocator, 0);
-        defer output.deinit(allocator);
-        var chain = try hmac(allocator, functions, digest_name, secret, seed);
-        defer chain.deinit(allocator);
+        var output = ZeroingData.init(0);
+        defer output.deinit();
+        var chain = try hmac(functions, digest_name, secret, seed);
+        defer chain.deinit();
 
         while (output.length() < size) {
-            var chain_and_seed = try chain.clone(allocator);
-            defer chain_and_seed.deinit(allocator);
-            try chain_and_seed.append(allocator, seed);
+            var chain_and_seed = chain.clone();
+            defer chain_and_seed.deinit();
+            chain_and_seed.append(seed);
 
-            var block = try hmac(allocator, functions, digest_name, secret, chain_and_seed.asSlice());
-            defer block.deinit(allocator);
-            try output.append(allocator, block.asSlice());
+            var block = try hmac(functions, digest_name, secret, chain_and_seed.asSlice());
+            defer block.deinit();
+            output.append(block.asSlice());
 
-            var next_chain = try hmac(allocator, functions, digest_name, secret, chain.asSlice());
-            chain.deinit(allocator);
+            var next_chain = try hmac(functions, digest_name, secret, chain.asSlice());
+            chain.deinit();
             chain = next_chain.move();
         }
 
-        return output.sliceCopy(allocator, 0, size);
+        return output.sliceCopy(0, size);
     }
 
     fn hmac(
-        allocator: std.mem.Allocator,
         functions: c_crypto.pp_crypto_fnt,
         digest_name: [:0]const u8,
         secret: []const u8,
         data: []const u8,
     ) !ZeroingData {
         const hmac_max_length = 128;
-        var buffer = try ZeroingData.init(allocator, hmac_max_length);
-        defer buffer.deinit(allocator);
+        var buffer = ZeroingData.init(hmac_max_length);
+        defer buffer.deinit();
         var context = c_crypto.pp_hmac_ctx{
             .dst = buffer.mutableBytes(),
             .dst_len = buffer.length(),
@@ -242,7 +228,7 @@ pub const PRF = struct {
         const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.length()) return error.UnsupportedAlgorithm;
-        return buffer.sliceCopy(allocator, 0, length);
+        return buffer.sliceCopy(0, length);
     }
 
     pub const testing = struct {
@@ -270,22 +256,19 @@ pub const Authenticator = struct {
         username: ?[]const u8,
         password: ?[]const u8,
     ) !Authenticator {
-        var pre_master = try prng.safeData(allocator, KeysConstants.pre_master_length);
-        errdefer pre_master.deinit(allocator);
-        var random1 = try prng.safeData(allocator, KeysConstants.random_length);
-        errdefer random1.deinit(allocator);
-        var random2 = try prng.safeData(allocator, KeysConstants.random_length);
-        errdefer random2.deinit(allocator);
-        var control_buffer = try ZeroingData.init(allocator, 0);
-        errdefer control_buffer.deinit(allocator);
+        var pre_master = try prng.safeData(KeysConstants.pre_master_length);
+        errdefer pre_master.deinit();
+        var random1 = try prng.safeData(KeysConstants.random_length);
+        errdefer random1.deinit();
+        var random2 = try prng.safeData(KeysConstants.random_length);
+        errdefer random2.deinit();
+        const control_buffer = ZeroingData.init(0);
 
         var username_data: ?ZeroingData = null;
-        errdefer if (username_data) |*value| value.deinit(allocator);
         var password_data: ?ZeroingData = null;
-        errdefer if (password_data) |*value| value.deinit(allocator);
         if (username != null and password != null) {
-            username_data = try ZeroingData.initString(allocator, username.?, true);
-            password_data = try ZeroingData.initString(allocator, password.?, true);
+            username_data = ZeroingData.initString(username.?, true);
+            password_data = ZeroingData.initString(password.?, true);
         }
 
         return .{
@@ -300,27 +283,25 @@ pub const Authenticator = struct {
     }
 
     pub fn deinit(self: *Authenticator) void {
-        const allocator = self.allocator;
-        self.control_buffer.deinit(allocator);
-        self.pre_master.deinit(allocator);
-        self.random1.deinit(allocator);
-        self.random2.deinit(allocator);
-        if (self.server_random1) |*value| value.deinit(allocator);
-        if (self.server_random2) |*value| value.deinit(allocator);
-        if (self.username) |*value| value.deinit(allocator);
-        if (self.password) |*value| value.deinit(allocator);
+        self.control_buffer.deinit();
+        self.pre_master.deinit();
+        self.random1.deinit();
+        self.random2.deinit();
+        if (self.server_random1) |*value| value.deinit();
+        if (self.server_random2) |*value| value.deinit();
+        if (self.username) |*value| value.deinit();
+        if (self.password) |*value| value.deinit();
     }
 
     pub fn reset(self: *Authenticator) void {
-        const allocator = self.allocator;
         self.control_buffer.clear();
         self.pre_master.zero();
         self.random1.zero();
         self.random2.zero();
-        if (self.server_random1) |*value| value.deinit(allocator);
-        if (self.server_random2) |*value| value.deinit(allocator);
-        if (self.username) |*value| value.deinit(allocator);
-        if (self.password) |*value| value.deinit(allocator);
+        if (self.server_random1) |*value| value.deinit();
+        if (self.server_random2) |*value| value.deinit();
+        if (self.username) |*value| value.deinit();
+        if (self.password) |*value| value.deinit();
         self.server_random1 = null;
         self.server_random2 = null;
         self.server_options = null;
@@ -334,7 +315,7 @@ pub const Authenticator = struct {
         configuration: *const api.OpenVPNConfiguration,
     ) !void {
         var raw = try self.authData(configuration);
-        defer raw.deinit(self.allocator);
+        defer raw.deinit();
         log.write(.info, "TLS.auth: Put plaintext");
         try tls.putRawPlainText(raw.asSlice());
     }
@@ -344,8 +325,8 @@ pub const Authenticator = struct {
         configuration: *const api.OpenVPNConfiguration,
     ) !ZeroingData {
         const allocator = self.allocator;
-        var raw = try ZeroingData.initCopy(allocator, &ControlConstants.tls_prefix);
-        errdefer raw.deinit(allocator);
+        var raw = ZeroingData.initCopy(&ControlConstants.tls_prefix);
+        errdefer raw.deinit();
 
         raw.appendData(self.pre_master);
         raw.appendData(self.random1);
@@ -358,15 +339,15 @@ pub const Authenticator = struct {
         );
         defer allocator.free(local_options);
         log.writef(.info, "TLS.auth: Local options: {s}", .{local_options});
-        var local_options_data = try ZeroingData.initString(allocator, local_options, true);
-        defer local_options_data.deinit(allocator);
-        try appendSized(&raw, allocator, local_options_data);
+        var local_options_data = ZeroingData.initString(local_options, true);
+        defer local_options_data.deinit();
+        appendSized(&raw, local_options_data);
 
         if (self.username != null and self.password != null) {
-            try appendSized(&raw, allocator, self.username.?);
-            try appendSized(&raw, allocator, self.password.?);
+            appendSized(&raw, self.username.?);
+            appendSized(&raw, self.password.?);
         } else {
-            try raw.append(allocator, &.{ 0, 0, 0, 0 });
+            raw.append(&.{ 0, 0, 0, 0 });
         }
 
         const negotiated = try configuration_mod.negotiableDataCiphers(
@@ -390,17 +371,17 @@ pub const Authenticator = struct {
             extra_lines,
         );
         defer allocator.free(peer_info);
-        var peer_info_data = try ZeroingData.initString(allocator, peer_info, true);
-        defer peer_info_data.deinit(allocator);
-        try appendSized(&raw, allocator, peer_info_data);
+        var peer_info_data = ZeroingData.initString(peer_info, true);
+        defer peer_info_data.deinit();
+        appendSized(&raw, peer_info_data);
         return raw;
     }
 
     pub fn appendControlData(
         self: *Authenticator,
         data: []const u8,
-    ) !void {
-        return self.control_buffer.append(self.allocator, data);
+    ) void {
+        self.control_buffer.append(data);
     }
 
     pub fn parseAuthReply(self: *Authenticator) !bool {
@@ -423,17 +404,15 @@ pub const Authenticator = struct {
         if (self.control_buffer.length() - offset < options_length) return false;
 
         var server_random1 = try self.control_buffer.sliceCopy(
-            self.allocator,
             random1_offset,
             KeysConstants.random_length,
         );
-        errdefer server_random1.deinit(self.allocator);
+        errdefer server_random1.deinit();
         var server_random2 = try self.control_buffer.sliceCopy(
-            self.allocator,
             random2_offset,
             KeysConstants.random_length,
         );
-        errdefer server_random2.deinit(self.allocator);
+        errdefer server_random2.deinit();
         const options_end = offset + @as(usize, options_length);
         const server_options_data = self.control_buffer.asSlice()[offset..options_end];
         offset = options_end;
@@ -450,10 +429,10 @@ pub const Authenticator = struct {
             });
             break :blk options;
         } else null;
-        try self.control_buffer.removePrefix(self.allocator, offset);
+        try self.control_buffer.removePrefix(offset);
 
-        if (self.server_random1) |*value| value.deinit(self.allocator);
-        if (self.server_random2) |*value| value.deinit(self.allocator);
+        if (self.server_random1) |*value| value.deinit();
+        if (self.server_random2) |*value| value.deinit();
         self.server_random1 = server_random1.move();
         self.server_random2 = server_random2.move();
         if (parsed_options) |value| self.server_options = value;
@@ -477,45 +456,32 @@ pub const Authenticator = struct {
             try core_mod.util.appendOwned(allocator, &messages, message);
             offset += length + 1;
         }
-        try self.control_buffer.removePrefix(self.allocator, offset);
+        try self.control_buffer.removePrefix(offset);
         return messages.toOwnedSlice(allocator);
     }
 
     /// Returns an owned handshake once both server randoms are available.
-    pub fn response(
-        self: *const Authenticator,
-        allocator: std.mem.Allocator,
-    ) !?Handshake {
+    pub fn response(self: *const Authenticator) ?Handshake {
         const remote1 = self.server_random1 orelse return null;
         const remote2 = self.server_random2 orelse return null;
-        var pre_master = try self.pre_master.clone(allocator);
-        errdefer pre_master.deinit(allocator);
-        var random1 = try self.random1.clone(allocator);
-        errdefer random1.deinit(allocator);
-        var random2 = try self.random2.clone(allocator);
-        errdefer random2.deinit(allocator);
-        var server_random1 = try remote1.clone(allocator);
-        errdefer server_random1.deinit(allocator);
-        const server_random2 = try remote2.clone(allocator);
         return .{
-            .pre_master = pre_master,
-            .random1 = random1,
-            .random2 = random2,
-            .server_random1 = server_random1,
-            .server_random2 = server_random2,
+            .pre_master = self.pre_master.clone(),
+            .random1 = self.random1.clone(),
+            .random2 = self.random2.clone(),
+            .server_random1 = remote1.clone(),
+            .server_random2 = remote2.clone(),
         };
     }
 
     fn appendSized(
         destination: *ZeroingData,
-        allocator: std.mem.Allocator,
         source: ZeroingData,
-    ) !void {
+    ) void {
         if (source.length() > std.math.maxInt(u16))
             @panic("OpenVPN auth field exceeds the 65535-byte protocol limit");
         var encoded: [2]u8 = undefined;
         std.mem.writeInt(u16, &encoded, @intCast(source.length()), .big);
-        try destination.append(allocator, &encoded);
+        destination.append(&encoded);
         destination.appendData(source);
     }
 

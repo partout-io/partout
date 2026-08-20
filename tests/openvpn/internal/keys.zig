@@ -25,14 +25,14 @@ test "static key exposes the Swift API" {
     defer secure.deinit(std.testing.allocator);
 
     var server = try StaticKey.init(std.testing.allocator, .{ .data = secure, .dir = .server });
-    defer server.deinit(std.testing.allocator);
+    defer server.deinit();
     try std.testing.expect(std.mem.allEqual(u8, try server.cipherEncryptKey(), 0));
     try std.testing.expect(std.mem.allEqual(u8, try server.cipherDecryptKey(), 2));
     try std.testing.expect(std.mem.allEqual(u8, server.hmacSendKey(), 1));
     try std.testing.expect(std.mem.allEqual(u8, server.hmacReceiveKey(), 3));
 
     var client = try StaticKey.init(std.testing.allocator, .{ .data = secure, .dir = .client });
-    defer client.deinit(std.testing.allocator);
+    defer client.deinit();
     try std.testing.expect(std.mem.allEqual(u8, try client.cipherEncryptKey(), 2));
     try std.testing.expect(std.mem.allEqual(u8, try client.cipherDecryptKey(), 0));
     try std.testing.expect(std.mem.allEqual(u8, client.hmacSendKey(), 3));
@@ -68,7 +68,7 @@ test "static key exposes the Swift API" {
     try std.testing.expectEqual(api.OpenVPNStaticKeyDirection.server, parsed.dir.?);
 
     var bidirectional = try StaticKey.init(std.testing.allocator, .{ .data = secure });
-    defer bidirectional.deinit(std.testing.allocator);
+    defer bidirectional.deinit();
     try std.testing.expectError(error.MissingStaticKeyDirection, bidirectional.cipherEncryptKey());
     try std.testing.expectError(error.MissingStaticKeyDirection, bidirectional.cipherDecryptKey());
     try std.testing.expect(std.mem.allEqual(u8, bidirectional.hmacSendKey(), 1));

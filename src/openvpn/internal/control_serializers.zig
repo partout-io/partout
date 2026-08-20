@@ -194,8 +194,8 @@ const AuthSerializer = struct {
     ) !AuthSerializer {
         const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
-        defer keys.deinit(allocator);
-        var bridge = try CryptoKeysBridge.init(allocator, &keys);
+        defer keys.deinit();
+        var bridge = CryptoKeysBridge.init(&keys);
         defer bridge.deinit();
         const cbc = functions.cbc_create.?(null, digest.raw().ptr, bridge.native()) orelse return error.UnsupportedAlgorithm;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
@@ -218,10 +218,9 @@ const AuthSerializer = struct {
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
         var static_key = try StaticKey.init(allocator, key);
-        defer static_key.deinit(allocator);
-        var send = try ZeroingData.initCopy(allocator, static_key.hmacSendKey());
-        errdefer send.deinit(allocator);
-        const receive = try ZeroingData.initCopy(allocator, static_key.hmacReceiveKey());
+        defer static_key.deinit();
+        const send = ZeroingData.initCopy(static_key.hmacSendKey());
+        const receive = ZeroingData.initCopy(static_key.hmacReceiveKey());
         return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
     }
 
@@ -301,8 +300,8 @@ const CryptSerializer = struct {
     ) !CryptSerializer {
         const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
-        defer keys.deinit(allocator);
-        var bridge = try CryptoKeysBridge.init(allocator, &keys);
+        defer keys.deinit();
+        var bridge = CryptoKeysBridge.init(&keys);
         defer bridge.deinit();
         const cipher_name: [:0]const u8 = "AES-256-CTR";
         const digest_name: [:0]const u8 = "SHA256";
@@ -330,14 +329,13 @@ const CryptSerializer = struct {
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
         var static_key = try StaticKey.init(allocator, key);
-        defer static_key.deinit(allocator);
-        var cipher_send = try ZeroingData.initCopy(allocator, try static_key.cipherEncryptKey());
-        errdefer cipher_send.deinit(allocator);
-        var cipher_receive = try ZeroingData.initCopy(allocator, try static_key.cipherDecryptKey());
-        errdefer cipher_receive.deinit(allocator);
-        var hmac_send = try ZeroingData.initCopy(allocator, static_key.hmacSendKey());
-        errdefer hmac_send.deinit(allocator);
-        const hmac_receive = try ZeroingData.initCopy(allocator, static_key.hmacReceiveKey());
+        defer static_key.deinit();
+        const cipher_send_key = try static_key.cipherEncryptKey();
+        const cipher_receive_key = try static_key.cipherDecryptKey();
+        const cipher_send = ZeroingData.initCopy(cipher_send_key);
+        const cipher_receive = ZeroingData.initCopy(cipher_receive_key);
+        const hmac_send = ZeroingData.initCopy(static_key.hmacSendKey());
+        const hmac_receive = ZeroingData.initCopy(static_key.hmacReceiveKey());
         return CryptoKeys.init(
             CryptoKeyPair.init(cipher_send, cipher_receive),
             CryptoKeyPair.init(hmac_send, hmac_receive),
