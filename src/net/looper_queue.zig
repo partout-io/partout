@@ -214,6 +214,10 @@ pub const CommandNode = struct {
     command: Command,
     timer: core.RunAfter.Scheduled = .{},
 
+    // Synchronous callers keep their node on the stack until completion.
+    // Asynchronous commands set this when allocating a persistent node.
+    allocated: bool = false,
+
     // Intrusive command queue linkage.
     next: ?*CommandNode = null,
 };

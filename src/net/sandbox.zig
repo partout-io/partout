@@ -270,12 +270,23 @@ pub const NetworkMonitor = struct {
 /// this value at creation; lifecycle calls must not replace it.
 pub const SerializedExecutor = struct {
     pub const Block = *const fn (*anyopaque) void;
+    pub const RunError = std.mem.Allocator.Error || error{Closed};
 
     ptr: *anyopaque,
-    run_block: *const fn (*anyopaque, *anyopaque, Block) void,
+    run_block: *const fn (*anyopaque, *anyopaque, Block) RunError!void,
 
+    /// Best-effort submission for producers that can safely drop stale work.
     pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
-        self.run_block(self.ptr, block_ptr, block);
+        self.tryRun(block_ptr, block) catch {};
+    }
+
+    /// Submits work and reports whether the executor accepted ownership of it.
+    pub fn tryRun(
+        self: SerializedExecutor,
+        block_ptr: *anyopaque,
+        block: Block,
+    ) RunError!void {
+        return self.run_block(self.ptr, block_ptr, block);
     }
 };
 

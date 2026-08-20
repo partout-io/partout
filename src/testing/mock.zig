@@ -60,12 +60,12 @@ pub const MockSerializedExecutor = struct {
         ptr: *anyopaque,
         block_ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
-    ) void {
+    ) net.SerializedExecutor.RunError!void {
         const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
-        self.actor.schedule(.{
+        try self.actor.schedule(.{
             .ptr = block_ptr,
             .block = block,
-        }) catch @panic("Unable to schedule mock serialized work");
+        });
     }
 
     fn perform(_: *MockSerializedExecutor, message: Message) error{}!void {

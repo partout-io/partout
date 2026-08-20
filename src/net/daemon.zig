@@ -387,17 +387,15 @@ pub const Daemon = struct {
         ctx: *anyopaque,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
-    ) void {
+    ) sandbox.SerializedExecutor.RunError!void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         // RunAfter callbacks must return without waiting for the actor. This
         // lets cancellation drain a callback even when stop currently owns the
         // actor, and preserves FIFO ordering with a later restart.
-        self.actor.schedule(.{ .onConnectionBlock = .{
+        try self.actor.schedule(.{ .onConnectionBlock = .{
             .ptr = ptr,
             .block = block,
-        } }) catch |err| {
-            log.writef(.err, "Unable to enqueue serialized connection work: {s}", .{@errorName(err)});
-        };
+        } });
     }
 
     // #endregion

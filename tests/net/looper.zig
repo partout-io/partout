@@ -309,6 +309,35 @@ test "out-of-band write returns the underlying I/O error" {
     try looper.stop();
 }
 
+test "synchronous lifecycle commands do not allocate" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var pipe = try Pipe.init();
+    defer pipe.deinit();
+    var mock = MockIO{};
+    var looper = try Looper.init(failing.allocator(), .{
+        .on_finish = .{ .callback = noopFinish },
+    });
+    defer looper.deinit();
+    try looper.start();
+    try looper.attach(.{
+        .pair = .{ .link = descriptor(pipe, &mock) },
+    });
+
+    // Refuse every later allocation. perform(), detach(), and stop() must use
+    // their caller-owned command nodes and still complete normally.
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectEqual(
+        @as(u8, 42),
+        try looper.perform(u8, null, returnFortyTwo),
+    );
+    try looper.detach(.link);
+    try std.testing.expect(mock.cleaned.load(.acquire));
+    try looper.stop();
+    try std.testing.expect(!failing.has_induced_failure);
+}
+
 const FailureProbe = struct {
     looper: *Looper = undefined,
     did_run: AtomicBool = AtomicBool.init(false),

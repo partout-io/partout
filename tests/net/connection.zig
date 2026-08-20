@@ -24,6 +24,30 @@ test "connection options match Swift defaults" {
     try std.testing.expect(options.user_info == null);
 }
 
+test "serialized executor reports rejected work" {
+    const Rejecting = struct {
+        fn run(
+            _: *anyopaque,
+            _: *anyopaque,
+            _: sandbox.SerializedExecutor.Block,
+        ) sandbox.SerializedExecutor.RunError!void {
+            return error.Closed;
+        }
+
+        fn block(_: *anyopaque) void {}
+    };
+    var context: u8 = 0;
+    const executor = sandbox.SerializedExecutor{
+        .ptr = &context,
+        .run_block = Rejecting.run,
+    };
+
+    try std.testing.expectError(
+        error.Closed,
+        executor.tryRun(&context, Rejecting.block),
+    );
+}
+
 test "finds the active connection module" {
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator,

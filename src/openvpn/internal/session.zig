@@ -131,6 +131,7 @@ pub const Session = struct {
     pub const Init = struct {
         executor: net.SerializedExecutor,
         looper: *net.Looper,
+        delegate: ?SessionDelegate = null,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
@@ -156,7 +157,12 @@ pub const Session = struct {
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
 
-        self.shutdown(null, 0) catch {};
+        self.shutdown(null, 0) catch |err| {
+            log.writef(.fault, "Unable to detach Session before destruction: {s}", .{
+                @errorName(err),
+            });
+            @panic("Session.destroy() cannot release an attached session");
+        };
         self.negotiation_timer.deinit();
         self.ping_timer.deinit();
 
@@ -181,7 +187,11 @@ pub const Session = struct {
             self.onQueue().setDelegate(delegate);
             return;
         }
-        _ = self.performOnQueue(void, delegate, SessionOnQueue.setDelegate) catch {};
+        _ = self.performOnQueue(void, delegate, SessionOnQueue.setDelegate) catch |err| {
+            log.writef(.err, "Unable to update Session delegate: {s}", .{
+                @errorName(err),
+            });
+        };
     }
 
     pub fn setLink(
@@ -256,7 +266,6 @@ pub const Session = struct {
         cause: ?SessionError,
         timeout_ms: ?u64,
     ) Error!void {
-        if (!self.shutdown_state.claim()) return;
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
         self.lifecycle_lock.lock();
         defer self.lifecycle_lock.unlock();
@@ -280,19 +289,27 @@ pub const Session = struct {
             return errors_mod.sessionError(err);
         };
         if (!should_detach) return;
-        // Detach is best-effort, matching Swift's nonthrowing detach calls.
-        // State must still leave `.stopping` if a side failed independently.
-        if (self.looper.isTunAttached()) self.looper.detach(.tun) catch {};
-        if (self.looper.isLinkAttached()) self.looper.detach(.link) catch {};
-        self.performOnQueue(void, cause, SessionOnQueue.finishShutdown) catch |err|
+        // These synchronous commands are caller-owned and allocation-free.
+        // Never release the Session state until every attached side has dropped
+        // its callbacks and borrowed native I/O.
+        if (self.looper.isTunAttached()) self.looper.detach(.tun) catch |err| switch (err) {
+            error.LooperUnavailable => return,
+            error.ReentrantCall => return errors_mod.sessionError(err),
+        };
+        if (self.looper.isLinkAttached()) self.looper.detach(.link) catch |err| switch (err) {
+            error.LooperUnavailable => return,
+            error.ReentrantCall => return errors_mod.sessionError(err),
+        };
+        self.performOnQueue(void, cause, SessionOnQueue.finishShutdown) catch |err| {
+            if (err == error.LooperUnavailable) return;
             return errors_mod.sessionError(err);
+        };
     }
 
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
     pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
-        _ = self.shutdown_state.claim();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -347,7 +364,19 @@ pub const Session = struct {
             .looper = init.looper,
             .control_channel = control_channel,
             .on_queue = SessionOnQueue.init(self),
+            .delegate = init.delegate,
         };
+        errdefer {
+            self.ping_timer.deinit();
+            self.negotiation_timer.deinit();
+            self.shutdown_state.deinit();
+            self.lifecycle_lock.deinit();
+            allocator.destroy(self);
+        }
+        // A later schedule is therefore infallible. In particular, negotiation
+        // can commit DataChannel ownership before arming the first ping.
+        try self.negotiation_timer.start();
+        try self.ping_timer.start();
         return self;
     }
 
@@ -358,7 +387,12 @@ pub const Session = struct {
             .cause = cause,
             .timeout_ms = null,
         })) return;
-        self.executor.run(self, shutdownFromAnyThread);
+        self.executor.tryRun(self, shutdownFromAnyThread) catch |err| {
+            self.shutdown_state.clearRequest();
+            log.writef(.err, "Unable to enqueue session shutdown: {s}", .{
+                @errorName(err),
+            });
+        };
     }
 
     fn shutdownFromAnyThread(raw: *anyopaque) void {
@@ -529,7 +563,6 @@ pub const Session = struct {
 
     const ShutdownState = struct {
         lock: core.Mutex = .{},
-        claimed: bool = false,
         requested: ?ShutdownRequest = null,
 
         fn deinit(self: *ShutdownState) void {
@@ -539,7 +572,7 @@ pub const Session = struct {
         fn enqueue(self: *ShutdownState, request: ShutdownRequest) bool {
             self.lock.lock();
             defer self.lock.unlock();
-            if (self.claimed or self.requested != null) return false;
+            if (self.requested != null) return false;
             self.requested = request;
             return true;
         }
@@ -552,12 +585,16 @@ pub const Session = struct {
             return request;
         }
 
-        fn claim(self: *ShutdownState) bool {
+        fn clearRequest(self: *ShutdownState) void {
             self.lock.lock();
             defer self.lock.unlock();
-            if (self.claimed) return false;
-            self.claimed = true;
-            return true;
+            self.requested = null;
+        }
+
+        fn hasRequest(self: *ShutdownState) bool {
+            self.lock.lock();
+            defer self.lock.unlock();
+            return self.requested != null;
         }
     };
 };
@@ -627,8 +664,10 @@ const SessionOnQueue = struct {
             return false;
         };
         if (active.phase == .stopping) {
-            log.write(.debug, "Ignore stop request, stopped or already stopping");
-            return false;
+            // A prior call may have been interrupted by looper teardown or a
+            // rejected reentrant detach. Resume the detach/finish transaction.
+            log.write(.debug, "Resume stop request already in progress");
+            return true;
         }
         if (request.cause) |cause| {
             log.writef(.err, "Shut down with failure: {s}", .{@errorName(cause)});
@@ -819,7 +858,7 @@ const SessionOnQueue = struct {
         tls_transferred = true;
         context.addNegotiator(negotiator);
         try negotiator.start();
-        try self.scheduleNegotiationTick();
+        self.scheduleNegotiationTick();
     }
 
     fn startRenegotiation(
@@ -843,7 +882,7 @@ const SessionOnQueue = struct {
         const negotiator = try previous.forRenegotiation(initiated_by);
         context.addNegotiator(negotiator);
         try negotiator.start();
-        try self.scheduleNegotiationTick();
+        self.scheduleNegotiationTick();
         return negotiator;
     }
 
@@ -875,8 +914,7 @@ const SessionOnQueue = struct {
         log.writef(.info, "Data channels: {any}", .{data_keys.slice()});
         if (active.phase == .started) return;
         active.phase = .started;
-        self.scheduleNextPing(context) catch |err|
-            return errors_mod.sessionError(err);
+        self.scheduleNextPing(context);
         if (self.session.delegate) |delegate| delegate.didStart(
             self.session,
             context.remote_endpoint,
@@ -886,26 +924,30 @@ const SessionOnQueue = struct {
 
     // MARK: Timers and keep-alive
 
-    fn scheduleNegotiationTick(self: *SessionOnQueue) !void {
-        try self.session.negotiation_timer.scheduleReplacing(
+    fn scheduleNegotiationTick(self: *SessionOnQueue) void {
+        self.session.negotiation_timer.scheduleReplacing(
             self.session.options.tick_interval_ms,
             Session.onNegotiationTimer,
             self.session,
-        );
+        ) catch unreachable;
     }
 
     fn negotiationTick(self: *SessionOnQueue) !void {
         const context = self.session.state.activeContext() orelse return;
         const negotiator = context.currentNegotiator() orelse
             @panic("Active session negotiation timer fired without a negotiator");
-        if (try negotiator.tick()) try self.scheduleNegotiationTick();
+        if (try negotiator.tick()) self.scheduleNegotiationTick();
     }
 
-    fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) !void {
+    fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) void {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.session.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay);
-        try self.session.ping_timer.scheduleReplacing(delay, Session.onPingTimer, self.session);
+        self.session.ping_timer.scheduleReplacing(
+            delay,
+            Session.onPingTimer,
+            self.session,
+        ) catch unreachable;
     }
 
     fn ping(self: *SessionOnQueue) !void {
@@ -924,7 +966,7 @@ const SessionOnQueue = struct {
             const ping_packet: []const u8 = &constants_mod.Data.ping_string;
             try pair.send(&.{ping_packet}, null, null);
         }
-        try self.scheduleNextPing(context);
+        self.scheduleNextPing(context);
     }
 
     fn checkPingTimeout(self: *SessionOnQueue, context: *ActiveContext) !void {
@@ -1014,4 +1056,12 @@ fn shouldSendExitNotification(cause: ?SessionError) bool {
 
 pub const testing = struct {
     pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
+
+    pub fn requestShutdownFromAnyThread(session: *Session, cause: SessionError) void {
+        session.requestShutdownFromAnyThread(cause);
+    }
+
+    pub fn hasPendingShutdown(session: *Session) bool {
+        return session.shutdown_state.hasRequest();
+    }
 };
