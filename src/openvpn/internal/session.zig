@@ -481,6 +481,31 @@ pub const Session = struct {
 
     // MARK: - Private helpers
 
+    fn performOnQueue(
+        self: *Session,
+        comptime Result: type,
+        arguments: anytype,
+        comptime callback: anytype,
+    ) !Result {
+        const Arguments = @TypeOf(arguments);
+        const Request = struct {
+            session: *Session,
+            arguments: Arguments,
+
+            fn run(raw: ?*anyopaque) anyerror!Result {
+                const request: *@This() = @ptrCast(@alignCast(raw.?));
+                return callback(request.session.onQueue(), request.arguments);
+            }
+        };
+        var request = Request{ .session = self, .arguments = arguments };
+        return self.looper.perform(Result, &request, Request.run);
+    }
+
+    fn onQueue(self: *Session) *SessionOnQueue {
+        std.debug.assert(self.looper.isOnQueue());
+        return &self.on_queue;
+    }
+
     fn performTimerTask(
         self: *Session,
         callback: *const fn (?*anyopaque) anyerror!void,
@@ -509,31 +534,6 @@ pub const Session = struct {
                 return error.Reconnect;
             },
         };
-    }
-
-    fn performOnQueue(
-        self: *Session,
-        comptime Result: type,
-        arguments: anytype,
-        comptime callback: anytype,
-    ) !Result {
-        const Arguments = @TypeOf(arguments);
-        const Request = struct {
-            session: *Session,
-            arguments: Arguments,
-
-            fn run(raw: ?*anyopaque) anyerror!Result {
-                const request: *@This() = @ptrCast(@alignCast(raw.?));
-                return callback(request.session.onQueue(), request.arguments);
-            }
-        };
-        var request = Request{ .session = self, .arguments = arguments };
-        return self.looper.perform(Result, &request, Request.run);
-    }
-
-    fn onQueue(self: *Session) *SessionOnQueue {
-        std.debug.assert(self.looper.isOnQueue());
-        return &self.on_queue;
     }
 
     const ShutdownRequest = struct {
