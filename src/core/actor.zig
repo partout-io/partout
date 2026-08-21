@@ -59,20 +59,26 @@ pub fn ActorWithFinish(
 
         allocator: std.mem.Allocator,
         context: *Context,
-        mutex: concurrency.Mutex = .{},
-        cond: concurrency.Condition = .{},
-        thread: ?std.Thread = null,
-        thread_id: ?std.Thread.Id = null,
-        accepting: bool = false,
-        head: ?*Job = null,
-        tail: ?*Job = null,
+        mutex: concurrency.Mutex,
+        cond: concurrency.Condition,
+        thread: ?std.Thread,
+        thread_id: ?std.Thread.Id,
+        accepting: bool,
+        head: ?*Job,
+        tail: ?*Job,
 
         pub fn create(allocator: std.mem.Allocator, context: *Context) CreateError!*Self {
             const self = try allocator.create(Self);
             self.* = .{
                 .allocator = allocator,
                 .context = context,
+                .mutex = .{},
+                .cond = .{},
+                .thread = null,
+                .thread_id = null,
                 .accepting = true,
+                .head = null,
+                .tail = null,
             };
             errdefer {
                 self.cond.deinit();

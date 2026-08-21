@@ -51,13 +51,13 @@ pub const ActiveContext = struct {
 
     negotiators: [ControlConstants.number_of_keys]?*Negotiator,
     data_channels: [ControlConstants.number_of_keys]?*DataChannel,
-    old_keys: std.ArrayList(u8) = .empty,
-    current_negotiator_key: ?u8 = null,
-    current_data_pair: ?DataLinkPair = null,
-    push_reply: ?PushReply = null,
-    last_received_ns: ?u64 = null,
-    last_data_count_ns: ?u64 = null,
-    data_count: BidirectionalState(u64) = .init(0),
+    old_keys: std.ArrayList(u8),
+    current_negotiator_key: ?u8,
+    current_data_pair: ?DataLinkPair,
+    push_reply: ?PushReply,
+    last_received_ns: ?u64,
+    last_data_count_ns: ?u64,
+    data_count: BidirectionalState(u64),
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -79,6 +79,13 @@ pub const ActiveContext = struct {
             },
             .negotiators = [_]?*Negotiator{null} ** ControlConstants.number_of_keys,
             .data_channels = [_]?*DataChannel{null} ** ControlConstants.number_of_keys,
+            .old_keys = .empty,
+            .current_negotiator_key = null,
+            .current_data_pair = null,
+            .push_reply = null,
+            .last_received_ns = null,
+            .last_data_count_ns = null,
+            .data_count = .init(0),
         };
         return self;
     }

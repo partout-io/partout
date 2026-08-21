@@ -111,34 +111,34 @@ pub const Looper = struct {
     options: Options,
 
     // Lifecycle synchronization.
-    lock: core.Mutex = .{},
-    condition: core.Condition = .{},
-    state: State = .idle,
+    lock: core.Mutex,
+    condition: core.Condition,
+    state: State,
 
     // Command submission and synchronous completion.
-    commands: CommandQueue = .{},
-    completions: CompletionQueue = .{},
-    stop_completion: ?*Completion = null,
-    waiter_count: usize = 0,
+    commands: CommandQueue,
+    completions: CompletionQueue,
+    stop_completion: ?*Completion,
+    waiter_count: usize,
 
     // Delayed command scheduler.
-    scheduler: core.RunAfter = .{},
+    scheduler: core.RunAfter,
 
     // Mux-owned resources.
     mux: c.pp_mux,
-    fd_set: ?DescriptorSet = null,
+    fd_set: ?DescriptorSet,
 
     // Attached sides and their scheduled retries.
-    link: ?*SideIO = null,
-    tun: ?*SideIO = null,
-    next_side_id: u64 = 1,
+    link: ?*SideIO,
+    tun: ?*SideIO,
+    next_side_id: u64,
     // The size of these follows `number_of_descriptors`.
-    read_retries: [2]bool = .{ false, false },
-    write_retries: [2]bool = .{ false, false },
+    read_retries: [2]bool,
+    write_retries: [2]bool,
 
     // Worker ownership and identity.
-    worker_thread: ?std.Thread = null,
-    loop_thread_id: ?std.Thread.Id = null,
+    worker_thread: ?std.Thread,
+    loop_thread_id: ?std.Thread.Id,
 
     /// Prevents deadlock on callback reentrancy.
     threadlocal var borrowed_callback_depth: usize = 0;
@@ -156,7 +156,23 @@ pub const Looper = struct {
         return .{
             .allocator = allocator,
             .options = resolved_options,
+            .lock = .{},
+            .condition = .{},
+            .state = .idle,
+            .commands = .{},
+            .completions = .{},
+            .stop_completion = null,
+            .waiter_count = 0,
+            .scheduler = .{},
             .mux = mux,
+            .fd_set = null,
+            .link = null,
+            .tun = null,
+            .next_side_id = 1,
+            .read_retries = .{ false, false },
+            .write_retries = .{ false, false },
+            .worker_thread = null,
+            .loop_thread_id = null,
         };
     }
 
@@ -1356,12 +1372,12 @@ pub const Looper = struct {
         write_queue: WriteQueue,
 
         // Mux event and cleanup state.
-        is_reading: bool = true,
-        is_writing: bool = false,
-        did_cleanup: bool = false,
+        is_reading: bool,
+        is_writing: bool,
+        did_cleanup: bool,
 
         // In-flight transform synchronization.
-        transform_drainer: core.Drainer = .{},
+        transform_drainer: core.Drainer,
 
         fn create(
             allocator: std.mem.Allocator,
@@ -1384,6 +1400,10 @@ pub const Looper = struct {
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
                 .write_queue = WriteQueue.init(allocator),
+                .is_reading = true,
+                .is_writing = false,
+                .did_cleanup = false,
+                .transform_drainer = .{},
             };
             return self;
         }
@@ -1441,13 +1461,18 @@ pub const Looper = struct {
     const DescriptorSet = struct {
         allocator: std.mem.Allocator,
 
-        readable: std.ArrayList(io.FileDescriptor) = .empty,
-        writable: std.ArrayList(io.FileDescriptor) = .empty,
+        readable: std.ArrayList(io.FileDescriptor),
+        writable: std.ArrayList(io.FileDescriptor),
 
-        allocation_failed: bool = false,
+        allocation_failed: bool,
 
         fn init(allocator: std.mem.Allocator) std.mem.Allocator.Error!DescriptorSet {
-            var self = DescriptorSet{ .allocator = allocator };
+            var self = DescriptorSet{
+                .allocator = allocator,
+                .readable = .empty,
+                .writable = .empty,
+                .allocation_failed = false,
+            };
             errdefer self.deinit();
             try self.readable.ensureTotalCapacity(allocator, number_of_descriptors);
             try self.writable.ensureTotalCapacity(allocator, number_of_descriptors);

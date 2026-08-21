@@ -65,20 +65,24 @@ pub const ConnectionGate = struct {
         }
     };
 
-    mutex: core.Mutex = .{},
+    mutex: core.Mutex,
     reachability_block: ReachabilityBlock,
-    on_ready: ?OnReadyBlock = null,
-    observing: bool = false,
-    state: State = .{
-        .enabled = false,
-        .network_available = false,
-        .connection_status = .disconnected,
-    },
+    on_ready: ?OnReadyBlock,
+    observing: bool,
+    state: State,
 
     pub fn init(reachability_block: ?ReachabilityBlock) ConnectionGate {
         return .{
+            .mutex = .{},
             .reachability_block = reachability_block orelse .{
                 .is_reachable = neverReachable,
+            },
+            .on_ready = null,
+            .observing = false,
+            .state = .{
+                .enabled = false,
+                .network_available = false,
+                .connection_status = .disconnected,
             },
         };
     }

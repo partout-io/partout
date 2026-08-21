@@ -12,15 +12,20 @@ const log = core.logging;
 
 pub const EndpointResolver = struct {
     endpoints: []const api.ExtendedEndpoint,
-    next_endpoint_index: usize = 0,
-    resolved: ?[]api.ExtendedEndpoint = null,
-    next_resolved_index: usize = 0,
+    next_endpoint_index: usize,
+    resolved: ?[]api.ExtendedEndpoint,
+    next_resolved_index: usize,
 
     // MARK: - Public API
 
     pub fn init(endpoints: []const api.ExtendedEndpoint) EndpointResolver {
         std.debug.assert(endpoints.len > 0);
-        return .{ .endpoints = endpoints };
+        return .{
+            .endpoints = endpoints,
+            .next_endpoint_index = 0,
+            .resolved = null,
+            .next_resolved_index = 0,
+        };
     }
 
     pub fn deinit(self: *EndpointResolver, allocator: std.mem.Allocator) void {

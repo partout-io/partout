@@ -163,7 +163,7 @@ pub const LinkProcessor = struct {
 
     allocator: std.mem.Allocator,
     processor: PacketProcessor,
-    read_buffer: std.ArrayList(u8) = .empty,
+    read_buffer: std.ArrayList(u8),
     before_read: BeforeRead,
     before_write: BeforeWrite,
 
@@ -192,6 +192,7 @@ pub const LinkProcessor = struct {
         self.* = .{
             .allocator = allocator,
             .processor = processor,
+            .read_buffer = .empty,
             .before_read = if (is_tcp) processTCPInbound else processUDPInbound,
             .before_write = if (is_tcp) processTCPOutbound else processUDPOutbound,
         };

@@ -138,19 +138,19 @@ pub const Daemon = struct {
 
     // Internal state
     actor: *Actor,
-    state: State = .initial,
-    stop_mode: StopMode = .clear_environment,
-    connection_runtime: ?ConnectionRuntime = null,
-    gate: ?ConnectionGate = null,
+    state: State,
+    stop_mode: StopMode,
+    connection_runtime: ?ConnectionRuntime,
+    gate: ?ConnectionGate,
     snapshot_publisher: SnapshotPublisher,
-    resume_gate_timer: core.RunAfter = .{},
-    is_evaluating_connection: bool = false,
-    cancellation_requested: bool = false,
-    is_deinitializing: bool = false,
+    resume_gate_timer: core.RunAfter,
+    is_evaluating_connection: bool,
+    cancellation_requested: bool,
+    is_deinitializing: bool,
 
     // Testing only
-    test_status_history: [64]api.ConnectionStatus = undefined,
-    test_status_count: usize = 0,
+    test_status_history: [64]api.ConnectionStatus,
+    test_status_count: usize,
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -177,12 +177,22 @@ pub const Daemon = struct {
             .factory = context.objects.factory,
             .monitor = context.objects.monitor,
             .options = context.options,
+            .state = .initial,
+            .stop_mode = .clear_environment,
+            .connection_runtime = null,
+            .gate = null,
             .snapshot_publisher = SnapshotPublisher.init(
                 profile.id,
                 reportSnapshot,
                 daemon,
                 context.options.min_data_count_delta,
             ),
+            .resume_gate_timer = .{},
+            .is_evaluating_connection = false,
+            .cancellation_requested = false,
+            .is_deinitializing = false,
+            .test_status_history = undefined,
+            .test_status_count = 0,
         };
         errdefer {
             daemon.is_deinitializing = true;

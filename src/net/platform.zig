@@ -64,14 +64,14 @@ pub const Platform = struct {
 
     /// Protects access to event handlers from the outside, because
     /// reachability and better path signals may come from any thread.
-    callbacksMutex: core.Mutex = .{},
-    monitor_drainer: core.Drainer = .{},
+    callbacksMutex: core.Mutex,
+    monitor_drainer: core.Drainer,
 
-    current_reachability: ?ReachabilityInfo = null,
-    monitor_event_handler: ?NetworkMonitor.EventHandler = null,
-    better_path_count: usize = 0,
-    delegate: c.pp_tun_ctrl_delegate = undefined,
-    delegate_attached: bool = false,
+    current_reachability: ?ReachabilityInfo,
+    monitor_event_handler: ?NetworkMonitor.EventHandler,
+    better_path_count: usize,
+    delegate: c.pp_tun_ctrl_delegate,
+    delegate_attached: bool,
 
     //#endregion
 
@@ -93,6 +93,13 @@ pub const Platform = struct {
             .fnt = functions,
             .dns = .{},
             .socket_buf_size = options.socket_buf_size,
+            .callbacksMutex = .{},
+            .monitor_drainer = .{},
+            .current_reachability = null,
+            .monitor_event_handler = null,
+            .better_path_count = 0,
+            .delegate = undefined,
+            .delegate_attached = false,
         };
     }
 

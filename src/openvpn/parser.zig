@@ -127,11 +127,11 @@ pub const Parser = struct {
         contents: []const u8,
         context: Context,
     ) ParseError!api.OpenVPNConfiguration {
-        var builder = Builder{
-            .context = context,
-            .decrypt_key_ctx = self.decrypt_key_ctx,
-            .decrypt_key = self.decrypt_key,
-        };
+        var builder = Builder.init(
+            context,
+            self.decrypt_key_ctx,
+            self.decrypt_key,
+        );
         defer builder.deinit(allocator);
 
         var lines = std.mem.splitScalar(u8, contents, '\n');
@@ -207,33 +207,69 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
 }
 
 const Builder = struct {
-    configuration: api.OpenVPNConfiguration = .{},
-    legacy_cipher: ?api.OpenVPNCipher = null,
-    data_ciphers_fallback: ?api.OpenVPNCipher = null,
-    data_ciphers: std.ArrayList(api.OpenVPNCipher) = .empty,
-    remotes: std.ArrayList(RemoteBuilder) = .empty,
-    routes4: std.ArrayList(api.Route) = .empty,
-    routes6: std.ArrayList(api.Route) = .empty,
-    dns_servers: std.ArrayList([]u8) = .empty,
-    search_domains: std.ArrayList([]u8) = .empty,
-    proxy_bypass_domains: std.ArrayList([]u8) = .empty,
-    routing_policies: std.ArrayList(api.OpenVPNRoutingPolicy) = .empty,
-    no_pull_mask: std.ArrayList(api.OpenVPNPullMask) = .empty,
-    current_block_name: ?[]const u8 = null,
-    current_block_lines: std.ArrayList([]const u8) = .empty,
-    tls_strategy: ?api.OpenVPNTLSWrapStrategy = null,
-    tls_key_lines: ?[][]const u8 = null,
-    tls_key_direction: ?api.OpenVPNStaticKeyDirection = null,
-    default_protocol: api.IPSocketType = .udp,
-    default_port: u16 = 1194,
-    topology: Topology = .net30,
-    ifconfig4: ?IfconfigArguments = null,
-    ifconfig6: ?IfconfigArguments = null,
-    route_gateway4_argument_count: ?usize = null,
-    found_option: bool = false,
-    context: Parser.Context = .{},
-    decrypt_key_ctx: ?*anyopaque = null,
-    decrypt_key: ?Parser.DecryptKey = null,
+    configuration: api.OpenVPNConfiguration,
+    legacy_cipher: ?api.OpenVPNCipher,
+    data_ciphers_fallback: ?api.OpenVPNCipher,
+    data_ciphers: std.ArrayList(api.OpenVPNCipher),
+    remotes: std.ArrayList(RemoteBuilder),
+    routes4: std.ArrayList(api.Route),
+    routes6: std.ArrayList(api.Route),
+    dns_servers: std.ArrayList([]u8),
+    search_domains: std.ArrayList([]u8),
+    proxy_bypass_domains: std.ArrayList([]u8),
+    routing_policies: std.ArrayList(api.OpenVPNRoutingPolicy),
+    no_pull_mask: std.ArrayList(api.OpenVPNPullMask),
+    current_block_name: ?[]const u8,
+    current_block_lines: std.ArrayList([]const u8),
+    tls_strategy: ?api.OpenVPNTLSWrapStrategy,
+    tls_key_lines: ?[][]const u8,
+    tls_key_direction: ?api.OpenVPNStaticKeyDirection,
+    default_protocol: api.IPSocketType,
+    default_port: u16,
+    topology: Topology,
+    ifconfig4: ?IfconfigArguments,
+    ifconfig6: ?IfconfigArguments,
+    route_gateway4_argument_count: ?usize,
+    found_option: bool,
+    context: Parser.Context,
+    decrypt_key_ctx: ?*anyopaque,
+    decrypt_key: ?Parser.DecryptKey,
+
+    fn init(
+        context: Parser.Context,
+        decrypt_key_ctx: ?*anyopaque,
+        decrypt_key: ?Parser.DecryptKey,
+    ) Builder {
+        return .{
+            .configuration = .{},
+            .legacy_cipher = null,
+            .data_ciphers_fallback = null,
+            .data_ciphers = .empty,
+            .remotes = .empty,
+            .routes4 = .empty,
+            .routes6 = .empty,
+            .dns_servers = .empty,
+            .search_domains = .empty,
+            .proxy_bypass_domains = .empty,
+            .routing_policies = .empty,
+            .no_pull_mask = .empty,
+            .current_block_name = null,
+            .current_block_lines = .empty,
+            .tls_strategy = null,
+            .tls_key_lines = null,
+            .tls_key_direction = null,
+            .default_protocol = .udp,
+            .default_port = 1194,
+            .topology = .net30,
+            .ifconfig4 = null,
+            .ifconfig6 = null,
+            .route_gateway4_argument_count = null,
+            .found_option = false,
+            .context = context,
+            .decrypt_key_ctx = decrypt_key_ctx,
+            .decrypt_key = decrypt_key,
+        };
+    }
 
     fn deinit(self: *Builder, allocator: std.mem.Allocator) void {
         self.configuration.deinit(allocator);

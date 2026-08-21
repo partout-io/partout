@@ -69,13 +69,13 @@ const OpenVPNConnection = struct {
     endpoint_resolver: EndpointResolver,
     cache_dir: []u8,
 
-    status: api.ConnectionStatus = .disconnected,
-    events: ?net.Connection.Events = null,
-    current_session: ?*Session = null,
-    current_endpoint: ?api.ExtendedEndpoint = null,
-    tunnel: ?net.TunWrapper = null,
+    status: api.ConnectionStatus,
+    events: ?net.Connection.Events,
+    current_session: ?*Session,
+    current_endpoint: ?api.ExtendedEndpoint,
+    tunnel: ?net.TunWrapper,
 
-    delegate_events: DelegateEventQueue = .{},
+    delegate_events: DelegateEventQueue,
 
     // MARK: - Public API
 
@@ -150,6 +150,12 @@ const OpenVPNConnection = struct {
             .endpoints = endpoints,
             .endpoint_resolver = EndpointResolver.init(endpoints),
             .cache_dir = cache_dir,
+            .status = .disconnected,
+            .events = null,
+            .current_session = null,
+            .current_endpoint = null,
+            .tunnel = null,
+            .delegate_events = DelegateEventQueue.init(),
         };
         log.write(.notice, "Using v3 connection");
         return created.asConnection();
@@ -594,13 +600,21 @@ const DelegateEvent = union(enum) {
 
 const DelegateEventNode = struct {
     event: DelegateEvent,
-    next: ?*DelegateEventNode = null,
+    next: ?*DelegateEventNode,
 };
 
 const DelegateEventQueue = struct {
-    lock: core.Mutex = .{},
-    head: ?*DelegateEventNode = null,
-    tail: ?*DelegateEventNode = null,
+    lock: core.Mutex,
+    head: ?*DelegateEventNode,
+    tail: ?*DelegateEventNode,
+
+    fn init() DelegateEventQueue {
+        return .{
+            .lock = .{},
+            .head = null,
+            .tail = null,
+        };
+    }
 
     fn append(
         self: *DelegateEventQueue,
@@ -608,7 +622,10 @@ const DelegateEventQueue = struct {
         event: DelegateEvent,
     ) std.mem.Allocator.Error!void {
         const node = try allocator.create(DelegateEventNode);
-        node.* = .{ .event = event };
+        node.* = .{
+            .event = event,
+            .next = null,
+        };
 
         self.lock.lock();
         defer self.lock.unlock();

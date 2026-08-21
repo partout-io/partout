@@ -170,7 +170,7 @@ pub const Session = struct {
             .looper = init.looper,
             .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
             .lifecycle_lock = .{},
-            .shutdown_state = .{},
+            .shutdown_state = ShutdownState.init(),
         };
         errdefer {
             self.on_queue.deinit();
@@ -542,8 +542,15 @@ pub const Session = struct {
     };
 
     const ShutdownState = struct {
-        lock: core.Mutex = .{},
-        requested: ?ShutdownRequest = null,
+        lock: core.Mutex,
+        requested: ?ShutdownRequest,
+
+        fn init() ShutdownState {
+            return .{
+                .lock = .{},
+                .requested = null,
+            };
+        }
 
         fn deinit(self: *ShutdownState) void {
             self.lock.deinit();
@@ -587,11 +594,11 @@ pub const Session = struct {
 const SessionOnQueue = struct {
     session: *Session,
     control_channel: *ControlChannel,
-    negotiation_timer: core.RunAfter = .{},
-    ping_timer: core.RunAfter = .{},
+    negotiation_timer: core.RunAfter,
+    ping_timer: core.RunAfter,
     delegate: ?SessionDelegate,
-    state: SessionState = .{ .stopped = .{ .with_local_options = true } },
-    link_processor: ?*LinkProcessor = null,
+    state: SessionState,
+    link_processor: ?*LinkProcessor,
 
     fn init(
         session: *Session,
@@ -601,7 +608,11 @@ const SessionOnQueue = struct {
         return .{
             .session = session,
             .control_channel = control_channel,
+            .negotiation_timer = .{},
+            .ping_timer = .{},
             .delegate = delegate,
+            .state = .{ .stopped = .{ .with_local_options = true } },
+            .link_processor = null,
         };
     }
 

@@ -90,11 +90,11 @@ pub const Negotiator = struct {
 
     start_time_ns: u64,
     negotiation_timeout_ms: u64,
-    state: NegotiatorState = .idle,
-    authenticator: ?Authenticator = null,
-    next_push_request_ns: ?u64 = null,
-    continued_push_reply_message: ?[]u8 = null,
-    should_resend_wrapped_key: bool = false,
+    state: NegotiatorState,
+    authenticator: ?Authenticator,
+    next_push_request_ns: ?u64,
+    continued_push_reply_message: ?[]u8,
+    should_resend_wrapped_key: bool,
 
     pub const Init = struct {
         key: u8 = 0,
@@ -134,6 +134,11 @@ pub const Negotiator = struct {
             .options = init.options,
             .start_time_ns = core_mod.concurrency.monotonicNs(),
             .negotiation_timeout_ms = init.negotiationTimeoutMs(),
+            .state = .idle,
+            .authenticator = null,
+            .next_push_request_ns = null,
+            .continued_push_reply_message = null,
+            .should_resend_wrapped_key = false,
         };
         return self;
     }
