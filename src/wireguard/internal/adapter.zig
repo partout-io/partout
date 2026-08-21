@@ -54,8 +54,8 @@ pub const WireGuardAdapter = struct {
     tunnel: ?net.TunWrapper = null,
 
     /// Concrete failures produced while activating the WireGuard tunnel.
-    /// The connection logs these locally before exposing only the generic
-    /// `UnableToStart` error through `net.Connection`.
+    /// The connection preserves allocator failures and logs/erases the
+    /// WireGuard-specific failures to `UnableToStart` at the generic boundary.
     pub const ActivationError = BuildConfigurationError ||
         TunnelRemoteInfoBuilder.Error ||
         net.TunnelController.Error ||

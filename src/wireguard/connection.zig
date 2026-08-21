@@ -173,7 +173,10 @@ const WireGuardConnection = struct {
                     log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
                 },
             }
-            return error.UnableToStart;
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.UnableToStart,
+            };
         };
         log.writef(.info, "Tunnel interface is {s}", .{
             self.adapter.interfaceName() orelse "unknown",
@@ -215,8 +218,10 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
-            .resumed => events.status(events.ctx, .connected),
-            .retry => self.scheduleTemporaryShutdownRetry(),
+            // Temporary shutdown is invisible to the generic status machine,
+            // so resuming must not emit a duplicate `.connected` transition.
+            .resumed => {},
+            .retry => self.scheduleTemporaryShutdownRetry(events),
         }
     }
 
@@ -288,7 +293,10 @@ const WireGuardConnection = struct {
         };
     }
 
-    fn scheduleTemporaryShutdownRetry(self: *WireGuardConnection) void {
+    fn scheduleTemporaryShutdownRetry(
+        self: *WireGuardConnection,
+        events: net.Connection.Events,
+    ) void {
         // `.retry` is an authoritative adapter outcome. The connection owns
         // when to retry and does not inspect the adapter's internal state.
         log.writef(.debug, "Retry backend restart in {} milliseconds", .{
@@ -299,8 +307,27 @@ const WireGuardConnection = struct {
             onTemporaryShutdownRetry,
             self,
         ) catch |err| {
-            log.writef(.err, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
+            self.handleTemporaryShutdownRetrySchedulingFailure(events, err);
         };
+    }
+
+    fn handleTemporaryShutdownRetrySchedulingFailure(
+        self: *WireGuardConnection,
+        events: net.Connection.Events,
+        err: std.Thread.SpawnError,
+    ) void {
+        log.writef(.fault, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
+
+        // No later reachability event is guaranteed after an online signal.
+        // Finalize the suspended tunnel before reporting a terminal failure so
+        // callers never retain a connected status with no running backend.
+        self.stopDataCountTimer();
+        self.adapter.stop(self.allocator);
+        self.events = null;
+
+        const code = api.codeForError(err);
+        events.last_error(events.ctx, code);
+        events.cancel(events.ctx, code);
     }
 
     fn cancelTemporaryShutdownRetry(self: *WireGuardConnection) void {
@@ -320,8 +347,9 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
-            .resumed => events.status(events.ctx, .connected),
-            .retry => self.scheduleTemporaryShutdownRetry(),
+            // See networkChange(): external status remained `.connected`.
+            .resumed => {},
+            .retry => self.scheduleTemporaryShutdownRetry(events),
         }
     }
 };
@@ -519,5 +547,16 @@ pub const testing = struct {
     pub fn waitForTemporaryShutdownRetry(connection: net.Connection) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(connection.ptr));
         self.temporary_shutdown_retry_timer.wait();
+    }
+
+    pub fn simulateTemporaryShutdownRetrySchedulingFailure(
+        connection: net.Connection,
+        events: net.Connection.Events,
+    ) void {
+        const self: *WireGuardConnection = @ptrCast(@alignCast(connection.ptr));
+        self.handleTemporaryShutdownRetrySchedulingFailure(
+            events,
+            error.ThreadQuotaExceeded,
+        );
     }
 };

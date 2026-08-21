@@ -175,7 +175,7 @@ test "WireGuard connection parses runtime data count" {
     try std.testing.expectEqual(@as(u64, 5678), data_count.sent);
 }
 
-test "WireGuard connection erases adapter activation errors at the generic boundary" {
+test "WireGuard connection erases backend activation errors at the generic boundary" {
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
@@ -206,6 +206,42 @@ test "WireGuard connection erases adapter activation errors at the generic bound
 
     try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .connecting,
+        .disconnected,
+    }, recorder.statuses[0..recorder.status_count]);
+}
+
+test "WireGuard connection preserves allocator errors at the generic boundary" {
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
+    defer fake_backend.deinit(allocator);
+    var context = ConnectionContext.init(fake_backend.backend());
+    var controller = FakeController{};
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    const created = try connection.createConnection(&context, allocator, module, .{
+        .profile = &tagged,
+        .controller = controller.controller(),
+        .resolver = mock.noopDNSResolver(),
+        .factory = mock.noopSocketFactory(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
+    });
+    defer created.destroy();
+
+    try std.testing.expectError(error.OutOfMemory, created.start(recorder.events()));
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .connecting,
         .disconnected,
@@ -543,9 +579,61 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
     try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .connecting,
+        .connected,
+    }, recorder.statuses[0..recorder.status_count]);
 
     created.stop(1000, recorder.events());
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
+}
+
+test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    var context = ConnectionContext.init(fake_backend.backend());
+    var controller = FakeController{};
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    const created = try connection.createConnection(&context, allocator, module, .{
+        .profile = &tagged,
+        .controller = controller.controller(),
+        .resolver = mock.noopDNSResolver(),
+        .factory = mock.noopSocketFactory(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
+    });
+    defer created.destroy();
+
+    try std.testing.expect(try created.start(recorder.events()));
+    adapter.testing.setNetworkChangeBehavior(
+        connection.testing.adapter(created),
+        .suspend_backend_when_offline,
+    );
+    created.networkChange(.{ .reachable = false }, recorder.events());
+    connection.testing.simulateTemporaryShutdownRetrySchedulingFailure(
+        created,
+        recorder.events(),
+    );
+
+    try std.testing.expect(connection.testing.adapter(created).isStopped());
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
+    try std.testing.expectEqual(@as(usize, 1), recorder.cancel_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.cancel_code.?);
 }
 
 const FakeBackend = struct {
@@ -555,6 +643,7 @@ const FakeBackend = struct {
     bump_sockets_count: usize = 0,
     disable_roaming_count: usize = 0,
     fail_turn_on_number: ?usize = null,
+    out_of_memory_turn_on_number: ?usize = null,
     last_settings: ?[]u8 = null,
     last_set_config: ?[]u8 = null,
 
@@ -589,6 +678,8 @@ fn fakeTurnOn(
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.turn_on_count += 1;
+    if (self.out_of_memory_turn_on_number == self.turn_on_count)
+        return error.OutOfMemory;
     if (self.last_settings) |value| allocator.free(value);
     self.last_settings = try allocator.dupe(u8, settings);
     if (self.fail_turn_on_number == self.turn_on_count) return -1;
@@ -744,6 +835,9 @@ const EventRecorder = struct {
     status_count: usize = 0,
     has_data_count: AtomicBool = AtomicBool.init(false),
     data_count: api.DataCount = .{},
+    last_error: ?api.PartoutErrorCode = null,
+    cancel_count: usize = 0,
+    cancel_code: ?api.PartoutErrorCode = null,
 
     fn events(self: *EventRecorder) conn.Connection.Events {
         return .{
@@ -762,7 +856,10 @@ fn recordStatus(ctx: *anyopaque, status_value: api.ConnectionStatus) void {
     self.status_count += 1;
 }
 
-fn recordLastError(_: *anyopaque, _: api.PartoutErrorCode) void {}
+fn recordLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    self.last_error = code;
+}
 
 fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
@@ -770,4 +867,8 @@ fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     self.has_data_count.store(true, .release);
 }
 
-fn recordCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {}
+fn recordCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    self.cancel_count += 1;
+    self.cancel_code = code;
+}
