@@ -117,8 +117,8 @@ pub const Session = struct {
     executor: net.SerializedExecutor,
     looper: *net.Looper,
     on_queue: SessionOnQueue,
-    lifecycle_lock: core.Mutex = .{},
-    shutdown_state: ShutdownState = .{},
+    lifecycle_lock: core.Mutex,
+    shutdown_state: ShutdownState,
 
     pub const Init = struct {
         executor: net.SerializedExecutor,
@@ -169,6 +169,8 @@ pub const Session = struct {
             .executor = init.executor,
             .looper = init.looper,
             .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
+            .lifecycle_lock = .{},
+            .shutdown_state = .{},
         };
         errdefer {
             self.on_queue.deinit();
