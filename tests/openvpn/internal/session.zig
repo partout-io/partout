@@ -66,6 +66,7 @@ test "shutdown mailbox clears rejected work and coalesces accepted signals" {
             raw: *anyopaque,
             _: *anyopaque,
             _: net.SerializedExecutor.Block,
+            _: ?net.SerializedExecutor.Block,
         ) net.SerializedExecutor.RunError!void {
             const state: *State = @ptrCast(@alignCast(raw));
             state.count += 1;

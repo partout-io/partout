@@ -692,6 +692,7 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
     // actor, so its serialized block must have been queued before this call.
     sut.stop();
     try std.testing.expectEqual(@as(usize, 0), delayed_connection.serialized_count);
+    try std.testing.expectEqual(@as(usize, 1), delayed_connection.discarded_count);
 }
 
 fn stopDaemon(sut: *Daemon) void {
@@ -711,6 +712,7 @@ const DelayedConnection = struct {
     allow_timer_enqueue: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     stop_entered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     serialized_count: usize = 0,
+    discarded_count: usize = 0,
 
     fn implementation(self: *DelayedConnection) net.ConnectionImplementation {
         return .{
@@ -753,7 +755,11 @@ const DelayedConnection = struct {
         while (self.pause_timer_before_enqueue and !self.allow_timer_enqueue.load(.acquire)) {
             std.Thread.yield() catch {};
         }
-        self.serialized_executor.?.run(self, onSerialized);
+        self.serialized_executor.?.tryRunOwned(
+            self,
+            onSerialized,
+            onDiscarded,
+        ) catch onDiscarded(self);
     }
 
     fn onSerialized(ctx: *anyopaque) void {
@@ -763,6 +769,11 @@ const DelayedConnection = struct {
         self.ran_on_start_thread = current == self.start_thread.?;
         self.ran_off_timer_thread = current != self.timer_thread.?;
         self.did_run.store(true, .release);
+    }
+
+    fn onDiscarded(ctx: *anyopaque) void {
+        const self: *DelayedConnection = @ptrCast(@alignCast(ctx));
+        self.discarded_count += 1;
     }
 
     fn stop(ptr: *anyopaque, _: u32, events: net.Connection.Events) void {

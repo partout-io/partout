@@ -20,6 +20,7 @@ pub const MockSerializedExecutor = struct {
     const Message = struct {
         ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
+        discard: ?net.SerializedExecutor.Block,
     };
     const ExecutorActor = core.Actor(MockSerializedExecutor, Message, error{}, perform);
 
@@ -53,6 +54,7 @@ pub const MockSerializedExecutor = struct {
         self.actor.perform(.{
             .ptr = self,
             .block = drainBarrier,
+            .discard = null,
         }) catch @panic("Unable to drain mock serialized work");
     }
 
@@ -60,11 +62,13 @@ pub const MockSerializedExecutor = struct {
         ptr: *anyopaque,
         block_ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
+        discard: ?net.SerializedExecutor.Block,
     ) net.SerializedExecutor.RunError!void {
         const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
         try self.actor.schedule(.{
             .ptr = block_ptr,
             .block = block,
+            .discard = discard,
         });
     }
 

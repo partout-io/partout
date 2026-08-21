@@ -43,6 +43,7 @@ test "serialized executor reports rejected work" {
             _: *anyopaque,
             _: *anyopaque,
             _: sandbox.SerializedExecutor.Block,
+            _: ?sandbox.SerializedExecutor.Block,
         ) sandbox.SerializedExecutor.RunError!void {
             return error.Closed;
         }

@@ -272,6 +272,7 @@ pub const Daemon = struct {
         onConnectionBlock: struct {
             ptr: *anyopaque,
             block: sandbox.SerializedExecutor.Block,
+            discard: ?sandbox.SerializedExecutor.Block,
         },
     };
 
@@ -290,7 +291,11 @@ pub const Daemon = struct {
             .onConnectionCancel => |code| self.handleConnectionCancel(code),
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnectionRuntime(),
-            .onConnectionBlock => |payload| self.handleConnectionBlock(payload.ptr, payload.block),
+            .onConnectionBlock => |payload| self.handleConnectionBlock(
+                payload.ptr,
+                payload.block,
+                payload.discard,
+            ),
         }
     }
 
@@ -397,6 +402,7 @@ pub const Daemon = struct {
         ctx: *anyopaque,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
+        discard: ?sandbox.SerializedExecutor.Block,
     ) sandbox.SerializedExecutor.RunError!void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         // RunAfter callbacks must return without waiting for the actor. This
@@ -405,6 +411,7 @@ pub const Daemon = struct {
         try self.actor.schedule(.{ .onConnectionBlock = .{
             .ptr = ptr,
             .block = block,
+            .discard = discard,
         } });
     }
 
@@ -744,11 +751,15 @@ pub const Daemon = struct {
         self: *const Daemon,
         ptr: *anyopaque,
         block: sandbox.SerializedExecutor.Block,
+        discard: ?sandbox.SerializedExecutor.Block,
     ) void {
         // A timer may have elapsed just before stop cancelled it. Dropping the
         // queued task here prevents stale work from touching a stopped
         // connection while still allowing the timer thread to drain normally.
-        if (self.state != .started) return;
+        if (self.state != .started) {
+            if (discard) |callback| callback(ptr);
+            return;
+        }
         block(ptr);
     }
 
