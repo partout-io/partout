@@ -105,6 +105,62 @@ fn initLooper(on_finish: Looper.OnFinish) !Looper {
     return Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
 }
 
+fn scheduleTimer(
+    looper: *Looper,
+    timer: *Looper.Timer,
+    delay_ms: u64,
+    task: Looper.TimedTask,
+) !void {
+    const Request = struct {
+        looper: *Looper,
+        timer: *Looper.Timer,
+        delay_ms: u64,
+        task: Looper.TimedTask,
+
+        fn run(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            try self.looper.scheduleReplacing(
+                self.timer,
+                self.delay_ms,
+                self.task,
+            );
+        }
+    };
+    var request = Request{
+        .looper = looper,
+        .timer = timer,
+        .delay_ms = delay_ms,
+        .task = task,
+    };
+    try looper.performTask(.{ .context = &request, .callback = Request.run });
+}
+
+fn cancelTimer(looper: *Looper, timer: *Looper.Timer) !void {
+    const Request = struct {
+        looper: *Looper,
+        timer: *Looper.Timer,
+
+        fn run(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.looper.cancelTimer(self.timer);
+        }
+    };
+    var request = Request{ .looper = looper, .timer = timer };
+    try looper.performTask(.{ .context = &request, .callback = Request.run });
+}
+
+const TimerProbe = struct {
+    looper: *Looper,
+    did_run: AtomicBool = AtomicBool.init(false),
+    ran_on_looper: AtomicBool = AtomicBool.init(false),
+
+    fn run(raw: ?*anyopaque) void {
+        const self: *TimerProbe = @ptrCast(@alignCast(raw.?));
+        self.ran_on_looper.store(self.looper.isOnQueue(), .release);
+        self.did_run.store(true, .release);
+    }
+};
+
 fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
     return .{
         .fd = pipe.fds[0],
@@ -131,6 +187,78 @@ test "perform completes synchronously with its result" {
         try looper.perform(u8, null, returnFortyTwo),
     );
     try looper.stop();
+}
+
+test "independent timers execute on the shared looper" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var first_timer = Looper.Timer{};
+    var second_timer = Looper.Timer{};
+    var first_probe = TimerProbe{ .looper = &looper };
+    var second_probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &first_timer, 1, .{
+        .context = &first_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &second_timer, 1, .{
+        .context = &second_probe,
+        .callback = TimerProbe.run,
+    });
+
+    waitUntil(&first_probe.did_run);
+    waitUntil(&second_probe.did_run);
+    try std.testing.expect(first_probe.ran_on_looper.load(.acquire));
+    try std.testing.expect(second_probe.ran_on_looper.load(.acquire));
+    try looper.stop();
+}
+
+test "replacing and cancelling timers suppresses stale callbacks" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var replaced_timer = Looper.Timer{};
+    var cancelled_timer = Looper.Timer{};
+    var stale_probe = TimerProbe{ .looper = &looper };
+    var replacement_probe = TimerProbe{ .looper = &looper };
+    var cancelled_probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &replaced_timer, 50, .{
+        .context = &stale_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &replaced_timer, 1, .{
+        .context = &replacement_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &cancelled_timer, 10, .{
+        .context = &cancelled_probe,
+        .callback = TimerProbe.run,
+    });
+    try cancelTimer(&looper, &cancelled_timer);
+
+    waitUntil(&replacement_probe.did_run);
+    source.core.concurrency.sleepMs(75);
+    try std.testing.expect(!stale_probe.did_run.load(.acquire));
+    try std.testing.expect(!cancelled_probe.did_run.load(.acquire));
+    try looper.stop();
+}
+
+test "stopping the looper cancels pending timers" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var timer = Looper.Timer{};
+    var probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &timer, 60_000, .{
+        .context = &probe,
+        .callback = TimerProbe.run,
+    });
+
+    try looper.stop();
+    try std.testing.expect(!probe.did_run.load(.acquire));
 }
 
 test "deinit does not invoke the finish callback" {

@@ -99,6 +99,24 @@ pub const Task = struct {
     }
 };
 
+/// Infallible task submitted for delayed execution on the looper worker.
+/// Error handling belongs to the owner because a task failure must not stop a
+/// daemon-scoped looper shared by otherwise independent consumers.
+pub const TimedTask = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque) void,
+
+    pub fn call(self: TimedTask) void {
+        self.callback(self.context);
+    }
+};
+
+/// Identity of one replaceable delayed task. The looper never retains this
+/// value's address; callers may store it inline with their queue-owned state.
+pub const Timer = struct {
+    id: ?u64 = null,
+};
+
 /// A descriptor includes:
 /// - The `fd` to watch for I/O events.
 /// - The `io` interface to perform reads and writes.
@@ -205,6 +223,10 @@ pub const Command = union(enum) {
         task: Task,
         completion: *Completion,
     },
+    timed_task: struct {
+        id: u64,
+        task: ?TimedTask,
+    },
     stop,
 };
 
@@ -220,6 +242,9 @@ pub const CommandNode = struct {
 
     // Intrusive command queue linkage.
     next: ?*CommandNode = null,
+
+    // Intrusive linkage while a timed task is pending or ready.
+    timer_next: ?*CommandNode = null,
 };
 
 /// A plain FIFO for the pending worker commands. Not thread-safe.

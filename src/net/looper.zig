@@ -36,6 +36,8 @@ pub const Looper = struct {
     pub const OnFailure = queue_mod.OnFailure;
     pub const OnFinish = queue_mod.OnFinish;
     pub const Task = queue_mod.Task;
+    pub const TimedTask = queue_mod.TimedTask;
+    pub const Timer = queue_mod.Timer;
 
     // Side attachment.
     pub const Descriptor = queue_mod.Descriptor;
@@ -90,6 +92,7 @@ pub const Looper = struct {
     const SubmissionError = std.mem.Allocator.Error || Errors.LooperUnavailable;
     const CompletionError = queue_mod.CompletionError;
     const RetryScheduleError = std.mem.Allocator.Error || std.Thread.SpawnError;
+    pub const ScheduleTimerError = std.mem.Allocator.Error || Errors.LooperUnavailable;
     pub const InitError = std.mem.Allocator.Error || Errors.MuxFailure;
     pub const StartError = std.mem.Allocator.Error ||
         std.Thread.SpawnError ||
@@ -123,6 +126,8 @@ pub const Looper = struct {
 
     // Delayed command scheduler.
     scheduler: core.RunAfter,
+    timers_head: ?*CommandNode,
+    next_timer_id: u64,
 
     // Mux-owned resources.
     mux: c.pp_mux,
@@ -164,6 +169,8 @@ pub const Looper = struct {
             .stop_completion = null,
             .waiter_count = 0,
             .scheduler = .{},
+            .timers_head = null,
+            .next_timer_id = 1,
             .mux = mux,
             .fd_set = null,
             .link = null,
@@ -517,6 +524,58 @@ pub const Looper = struct {
         return self.perform(void, task.context, task.callback);
     }
 
+    /// Replaces one delayed task and executes its callback on the looper.
+    ///
+    /// This operation is queue-confined. The looper owns the internal command;
+    /// `timer` is only an identity token and its address is never retained.
+    pub fn scheduleReplacing(
+        self: *Looper,
+        timer: *Timer,
+        delay_ms: u64,
+        task: TimedTask,
+    ) ScheduleTimerError!void {
+        if (!self.isOnQueue())
+            @panic("Looper.scheduleReplacing() must run on the looper queue");
+
+        const node = try self.createCommandNode(.{ .timed_task = .{
+            .id = 0,
+            .task = task,
+        } });
+        errdefer self.allocator.destroy(node);
+
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.state != .started) return error.LooperUnavailable;
+
+        const id = self.nextTimerIdLocked();
+        node.command.timed_task.id = id;
+        self.registerTimerLocked(node);
+        // start() owns scheduler thread creation, so scheduling while the
+        // looper is started cannot fail with a thread-spawn error.
+        self.scheduler.scheduleAppending(
+            &node.timer,
+            delay_ms,
+            onScheduledCommand,
+            self,
+        ) catch unreachable;
+
+        if (timer.id) |previous_id| self.cancelTimerLocked(previous_id);
+        timer.id = id;
+    }
+
+    /// Cancels one delayed task. After this returns, its borrowed callback
+    /// context cannot be invoked, even if the scheduler deadline races with
+    /// cancellation. A token whose task has already run is harmless.
+    pub fn cancelTimer(self: *Looper, timer: *Timer) void {
+        if (!self.isOnQueue())
+            @panic("Looper.cancelTimer() must run on the looper queue");
+        const id = timer.id orelse return;
+        self.lock.lock();
+        self.cancelTimerLocked(id);
+        self.lock.unlock();
+        timer.id = null;
+    }
+
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
     pub fn attach(self: *Looper, arguments: AttachArguments) AttachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
@@ -775,6 +834,14 @@ pub const Looper = struct {
                     // processing the rest of this detached command batch.
                     self.lock.unlock();
                     self.lock.lock();
+                },
+                .timed_task => |command| {
+                    self.unregisterTimerLocked(node);
+                    if (command.task) |task| {
+                        self.lock.unlock();
+                        task.call();
+                        self.lock.lock();
+                    }
                 },
                 .stop => {
                     log.writef(.info, "Stop looper", .{});
@@ -1284,6 +1351,66 @@ pub const Looper = struct {
         return node;
     }
 
+    fn nextTimerIdLocked(self: *Looper) u64 {
+        const id = self.next_timer_id;
+        self.next_timer_id +%= 1;
+        if (self.next_timer_id == 0) self.next_timer_id = 1;
+        return id;
+    }
+
+    fn registerTimerLocked(self: *Looper, node: *CommandNode) void {
+        node.timer_next = self.timers_head;
+        self.timers_head = node;
+    }
+
+    fn unregisterTimerLocked(self: *Looper, node: *CommandNode) void {
+        var previous: ?*CommandNode = null;
+        var current = self.timers_head;
+        while (current) |candidate| {
+            if (candidate == node) {
+                if (previous) |before| {
+                    before.timer_next = candidate.timer_next;
+                } else {
+                    self.timers_head = candidate.timer_next;
+                }
+                candidate.timer_next = null;
+                return;
+            }
+            previous = candidate;
+            current = candidate.timer_next;
+        }
+    }
+
+    fn cancelTimerLocked(self: *Looper, id: u64) void {
+        var current = self.timers_head;
+        while (current) |node| : (current = node.timer_next) {
+            switch (node.command) {
+                .timed_task => |command| if (command.id == id) {
+                    // The scheduler may already be moving this command to the
+                    // ready queue. Clearing the task under the looper lock is
+                    // the cancellation barrier for its borrowed context.
+                    node.command.timed_task.task = null;
+                    return;
+                },
+                else => unreachable,
+            }
+        }
+    }
+
+    fn isActiveTimerCommand(command: Command) bool {
+        return switch (command) {
+            .timed_task => |timer| timer.task != null,
+            else => true,
+        };
+    }
+
+    fn unregisterTimerCommandLocked(self: *Looper, node: *CommandNode) void {
+        switch (node.command) {
+            .timed_task => self.unregisterTimerLocked(node),
+            else => {},
+        }
+    }
+
     fn onScheduledCommand(
         scheduled: *core.RunAfter.Scheduled,
         outcome: core.RunAfter.Scheduled.Outcome,
@@ -1294,10 +1421,14 @@ pub const Looper = struct {
         defer self.lock.unlock();
 
         self.clearRetryForCommand(node.command);
-        if (outcome == .elapsed and self.state == .started) {
+        if (outcome == .elapsed and
+            self.state == .started and
+            isActiveTimerCommand(node.command))
+        {
             self.commands.append(node);
             self.wakeLocked();
         } else {
+            self.unregisterTimerCommandLocked(node);
             self.allocator.destroy(node);
         }
     }
@@ -1320,6 +1451,7 @@ pub const Looper = struct {
             const next = node.next;
             const allocated = node.allocated;
             self.clearRetryForCommand(node.command);
+            self.unregisterTimerCommandLocked(node);
             switch (node.command) {
                 .attach => |command| self.queueCompletionLocked(command.completion, error.LooperUnavailable),
                 .detach => |command| self.queueCompletionLocked(command.completion, error.LooperUnavailable),
