@@ -171,6 +171,13 @@ const OpenVPNConnection = struct {
         allocator.destroy(self);
     }
 
+    fn asConnection(self: *OpenVPNConnection) net.Connection {
+        return .{
+            .ptr = self,
+            .vtable = &openvpn_connection_vtable,
+        };
+    }
+
     fn start(
         self: *OpenVPNConnection,
         events: net.Connection.Events,
@@ -194,10 +201,15 @@ const OpenVPNConnection = struct {
             return error.UnableToStart;
         };
         defer self.allocator.free(ca_filename);
+
+        const session_delegate = SessionDelegate{
+            .context = self,
+            .vtable = &session_delegate_vtable,
+        };
         const session = Session.create(self.allocator, .{
             .lifecycle_executor = self.serialized_executor,
             .looper = self.looper,
-            .delegate = self.sessionDelegate(),
+            .delegate = session_delegate,
             .configuration = self.configuration,
             .credentials = self.credentials,
             .prng = PRNG.system(),
@@ -283,15 +295,6 @@ const OpenVPNConnection = struct {
         session.looperDidTerminate(failure);
     }
 
-    // MARK: - Private construction
-
-    fn asConnection(self: *OpenVPNConnection) net.Connection {
-        return .{
-            .ptr = self,
-            .vtable = &openvpn_connection_vtable,
-        };
-    }
-
     // MARK: - Link setup
 
     fn setupLink(
@@ -326,13 +329,6 @@ const OpenVPNConnection = struct {
     }
 
     // MARK: - Session delegate
-
-    fn sessionDelegate(self: *OpenVPNConnection) SessionDelegate {
-        return .{
-            .context = self,
-            .vtable = &session_delegate_vtable,
-        };
-    }
 
     fn handleDidStart(
         self: *OpenVPNConnection,
