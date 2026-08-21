@@ -383,20 +383,6 @@ pub const Session = struct {
         try self.onQueue().scheduleNegotiationCheck(delay_ms);
     }
 
-    fn onNegotiationTimer(raw: ?*anyopaque) void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.onQueue().checkNegotiation() catch |err| {
-            self.reportFailure(errors_mod.sessionError(err));
-        };
-    }
-
-    fn onPingTimer(raw: ?*anyopaque) void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.onQueue().ping() catch |err| {
-            self.reportFailure(errors_mod.sessionError(err));
-        };
-    }
-
     fn dataChannelForKey(raw: ?*anyopaque, key: u8) ?*DataChannel {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         return self.onQueue().dataChannelForKey(key);
@@ -852,11 +838,29 @@ const SessionOnQueue = struct {
         try self.session.looper.scheduleReplacing(
             &self.negotiation_timer,
             delay_ms,
-            .{
-                .context = self.session,
-                .callback = Session.onNegotiationTimer,
-            },
+            .{ .context = self, .callback = onNegotiationTimer },
         );
+    }
+
+    fn scheduleNextPing(
+        self: *SessionOnQueue,
+        context: *ActiveContext,
+    ) !void {
+        const delay_ms = self.keepAliveIntervalMs(context) orelse
+            self.session.options.ping_timeout_check_interval_ms;
+        log.logTimeMs(.debug, "Schedule ping check after ", delay_ms);
+        try self.session.looper.scheduleReplacing(
+            &self.ping_timer,
+            delay_ms,
+            .{ .context = self, .callback = onPingTimer },
+        );
+    }
+
+    fn onNegotiationTimer(raw: ?*anyopaque) void {
+        const self: *SessionOnQueue = @ptrCast(@alignCast(raw.?));
+        self.checkNegotiation() catch |err| {
+            self.session.reportFailure(errors_mod.sessionError(err));
+        };
     }
 
     fn checkNegotiation(self: *SessionOnQueue) !void {
@@ -868,18 +872,11 @@ const SessionOnQueue = struct {
         try negotiator.checkNegotiation();
     }
 
-    fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) !void {
-        const delay_ms = self.keepAliveIntervalMs(context) orelse
-            self.session.options.ping_timeout_check_interval_ms;
-        log.logTimeMs(.debug, "Schedule ping check after ", delay_ms);
-        try self.session.looper.scheduleReplacing(
-            &self.ping_timer,
-            delay_ms,
-            .{
-                .context = self.session,
-                .callback = Session.onPingTimer,
-            },
-        );
+    fn onPingTimer(raw: ?*anyopaque) void {
+        const self: *SessionOnQueue = @ptrCast(@alignCast(raw.?));
+        self.ping() catch |err| {
+            self.session.reportFailure(errors_mod.sessionError(err));
+        };
     }
 
     fn ping(self: *SessionOnQueue) !void {
