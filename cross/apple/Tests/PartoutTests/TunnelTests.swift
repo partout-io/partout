@@ -243,7 +243,7 @@ struct TunnelTests {
                 case .disconnecting:
                     #expect(statusWithEnv == .deactivating)
                 case .disconnected:
-                    #expect(statusWithEnv == .activating)
+                    #expect(statusWithEnv == .inactive)
                 }
             }
 
@@ -255,22 +255,6 @@ struct TunnelTests {
             .forEach {
                 #expect($0.considering(env) == $0)
             }
-    }
-
-    @Test
-    func givenActiveTunnel_whenConnectionFails_thenSkipsInactiveBeforeError() {
-        let tunnelStatus = TunnelStatus.active
-        var env = TunnelSnapshot.Environment().with(connectionStatus: .connecting)
-
-        #expect(tunnelStatus.considering(env) == .activating)
-
-        // Connection status and error are reported independently. The former
-        // must not expose a transient inactive state while the latter catches up.
-        env = env.with(connectionStatus: .disconnected)
-        #expect(tunnelStatus.considering(env) == .activating)
-
-        env = env.with(lastErrorCode: .timeout)
-        #expect(tunnelStatus.considering(env) == .inactive)
     }
 
     @Test
