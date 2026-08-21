@@ -20,11 +20,20 @@ test "Session borrows an externally managed Looper" {
         fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
 
         fn barrier(_: ?*anyopaque) !void {}
+
+        fn established(
+            _: ?*anyopaque,
+            _: *anyopaque,
+            _: source.core.api.ExtendedEndpoint,
+            _: *const source.core.api.OpenVPNConfiguration,
+        ) void {}
+
+        fn failed(_: ?*anyopaque, _: *anyopaque, _: Session.Error) void {}
+
+        fn dataCount(_: ?*anyopaque, _: *anyopaque, _: source.core.api.DataCount) void {}
     };
 
     const allocator = std.testing.allocator;
-    const executor = try source.mock.MockSerializedExecutor.create(allocator);
-    defer executor.destroy();
     var looper = try net.Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
@@ -34,8 +43,12 @@ test "Session borrows an externally managed Looper" {
     defer if (looper_started) looper.stop() catch {};
 
     const session = try Session.create(allocator, .{
-        .lifecycle_executor = executor.interface(),
         .looper = &looper,
+        .events = .{
+            .established = Callbacks.established,
+            .failed = Callbacks.failed,
+            .data_count = Callbacks.dataCount,
+        },
         .configuration = .{},
         .credentials = null,
         .prng = PRNG.system(),
@@ -55,27 +68,31 @@ test "Session borrows an externally managed Looper" {
     looper_started = false;
 }
 
-test "shutdown mailbox clears rejected work and coalesces accepted signals" {
-    const RecordingExecutor = struct {
+test "Session reports protocol failures without owning shutdown policy" {
+    const RecordingEvents = struct {
         const State = struct {
             count: usize = 0,
-            rejects: bool = true,
+            last: ?Session.Error = null,
         };
 
-        fn run(
-            raw: *anyopaque,
+        fn established(
+            _: ?*anyopaque,
             _: *anyopaque,
-            _: net.SerializedExecutor.Block,
-            _: ?net.SerializedExecutor.Block,
-        ) net.SerializedExecutor.RunError!void {
-            const state: *State = @ptrCast(@alignCast(raw));
+            _: source.core.api.ExtendedEndpoint,
+            _: *const source.core.api.OpenVPNConfiguration,
+        ) void {}
+
+        fn failed(raw: ?*anyopaque, _: *anyopaque, cause: Session.Error) void {
+            const state: *State = @ptrCast(@alignCast(raw.?));
             state.count += 1;
-            if (state.rejects) return error.Closed;
+            state.last = cause;
         }
+
+        fn dataCount(_: ?*anyopaque, _: *anyopaque, _: source.core.api.DataCount) void {}
     };
 
     const allocator = std.testing.allocator;
-    var executor_state = RecordingExecutor.State{};
+    var event_state = RecordingEvents.State{};
     var looper = try net.Looper.init(allocator, .{
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
@@ -87,9 +104,11 @@ test "shutdown mailbox clears rejected work and coalesces accepted signals" {
     defer if (looper_started) looper.stop() catch {};
 
     const session = try Session.create(allocator, .{
-        .lifecycle_executor = .{
-            .ptr = &executor_state,
-            .run_block = RecordingExecutor.run,
+        .events = .{
+            .context = &event_state,
+            .established = RecordingEvents.established,
+            .failed = RecordingEvents.failed,
+            .data_count = RecordingEvents.dataCount,
         },
         .looper = &looper,
         .configuration = .{},
@@ -102,19 +121,10 @@ test "shutdown mailbox clears rejected work and coalesces accepted signals" {
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
 
-    // A no-op shutdown while stopped must not permanently suppress later work.
-    try session.shutdown(null, 0);
-    session_testing.requestShutdownFromAnyThread(session, error.Reconnect);
-    try std.testing.expectEqual(@as(usize, 1), executor_state.count);
-    try std.testing.expect(!session_testing.hasPendingShutdown(session));
-
-    // Once accepted, the first signal occupies the mailbox and later signals
-    // do not enqueue redundant lifecycle work.
-    executor_state.rejects = false;
-    session_testing.requestShutdownFromAnyThread(session, error.Reconnect);
-    session_testing.requestShutdownFromAnyThread(session, error.TLSFailure);
-    try std.testing.expectEqual(@as(usize, 2), executor_state.count);
-    try std.testing.expect(session_testing.hasPendingShutdown(session));
+    session_testing.reportFailure(session, error.Reconnect);
+    session_testing.reportFailure(session, error.TLSFailure);
+    try std.testing.expectEqual(@as(usize, 2), event_state.count);
+    try std.testing.expectEqual(error.TLSFailure, event_state.last.?);
 
     session.destroy();
     session_destroyed = true;

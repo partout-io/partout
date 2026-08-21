@@ -217,7 +217,7 @@ pub const Connection = struct {
         self.vtable.better_path(self.ptr, events);
     }
 
-    pub fn looperDidTerminate(
+    pub fn looperTerminated(
         self: Connection,
         failure: ?looper.Looper.Failure,
     ) void {

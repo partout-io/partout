@@ -701,17 +701,17 @@ pub const Daemon = struct {
 
         log.write(.fault, "Daemon-owned looper terminated");
 
-        // An unrecoverable connection may already have requested provider
-        // cancellation while synchronously handling the looper finish.
+        // An earlier connection failure may already have requested provider
+        // cancellation before this actor message was consumed.
         if (self.cancellation_requested) return;
 
         if (looperFailureCode(failure)) |code| {
             self.handleLastError(code);
         }
 
-        // Stop every producer before placing the replacement behind any work
-        // it already submitted to the actor. The queued recovery message is
-        // therefore a simple FIFO drain barrier for the old connection.
+        // The looper terminal callback already stopped protocol producers and
+        // released their queue-confined state. Finalize the connection before
+        // replacing the daemon-owned runtime.
         if (self.connection_runtime) |runtime| {
             runtime.connection.stop(0, self.events());
         }
@@ -889,9 +889,9 @@ pub const Daemon = struct {
     ) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         if (self.connection_runtime) |runtime| {
-            // Session teardown must stay on the looper queue. It may enqueue
-            // connection work first; actor FIFO preserves that ordering.
-            runtime.connection.looperDidTerminate(failure);
+            // Protocol cleanup must stay on the terminating looper queue.
+            // Lifecycle policy remains on the daemon actor below.
+            runtime.connection.looperTerminated(failure);
         }
         self.actor.schedule(.{ .onLooperTerminated = failure }) catch |err| {
             log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});

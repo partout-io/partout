@@ -44,67 +44,31 @@ const SessionState = session_context_mod.SessionState;
 const SessionError = errors_mod.SessionError;
 const TLSWrapper = tls_mod.TLSWrapper;
 
-/// Type-erased observer for major session events.
+/// Immutable event sink for facts produced by the protocol engine.
 ///
 /// Values passed to callbacks are borrowed for the duration of the callback.
-/// Callbacks execute on the session looper.
-pub const SessionDelegate = struct {
+/// `established` and `data_count` run on the looper; `failed` may run from any
+/// callback thread. Callbacks must return promptly and transport facts to the
+/// owner's execution context; the owner decides whether and how to stop the
+/// Session.
+pub const SessionEvents = struct {
     context: ?*anyopaque = null,
-    vtable: *const VTable,
-
-    pub const VTable = struct {
-        did_start: *const fn (
-            ?*anyopaque,
-            *anyopaque,
-            api.ExtendedEndpoint,
-            *const api.OpenVPNConfiguration,
-        ) void,
-        did_stop: *const fn (?*anyopaque, *anyopaque, ?SessionError) void,
-        did_update_data_count: *const fn (
-            ?*anyopaque,
-            *anyopaque,
-            api.DataCount,
-        ) void,
-    };
-
-    pub fn didStart(
-        self: SessionDelegate,
-        session: *anyopaque,
-        remote_endpoint: api.ExtendedEndpoint,
-        remote_options: *const api.OpenVPNConfiguration,
-    ) void {
-        self.vtable.did_start(
-            self.context,
-            session,
-            remote_endpoint,
-            remote_options,
-        );
-    }
-
-    pub fn didStop(
-        self: SessionDelegate,
-        session: *anyopaque,
-        cause: ?SessionError,
-    ) void {
-        self.vtable.did_stop(self.context, session, cause);
-    }
-
-    pub fn didUpdateDataCount(
-        self: SessionDelegate,
-        session: *anyopaque,
-        count: api.DataCount,
-    ) void {
-        self.vtable.did_update_data_count(self.context, session, count);
-    }
+    established: *const fn (
+        ?*anyopaque,
+        *anyopaque,
+        api.ExtendedEndpoint,
+        *const api.OpenVPNConfiguration,
+    ) void,
+    failed: *const fn (?*anyopaque, *anyopaque, SessionError) void,
+    data_count: *const fn (?*anyopaque, *anyopaque, api.DataCount) void,
 };
 
 /// Default V3 OpenVPN session implementation.
 ///
 /// `Session` is heap-only: callbacks and timer contexts borrow this stable
 /// address until `destroy` joins them. Its `Looper` is borrowed and dedicated
-/// to this session for the same lifetime. Callers must invoke public lifecycle
-/// operations from `lifecycle_executor`; mutable protocol and lifecycle state
-/// is confined to `on_queue`.
+/// to this session for the same lifetime. Mutable protocol state is confined
+/// to `on_queue`; its owner retains lifecycle policy.
 pub const Session = struct {
     pub const Error = errors_mod.SessionError;
 
@@ -116,15 +80,13 @@ pub const Session = struct {
     ca_filename: []u8,
     options: SessionOptions,
 
-    lifecycle_executor: net.SerializedExecutor,
     looper: *net.Looper,
+    events: SessionEvents,
     on_queue: SessionOnQueue,
-    shutdown_mailbox: ShutdownMailbox,
 
     pub const Init = struct {
-        lifecycle_executor: net.SerializedExecutor,
         looper: *net.Looper,
-        delegate: ?SessionDelegate = null,
+        events: SessionEvents,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         prng: PRNG,
@@ -167,22 +129,18 @@ pub const Session = struct {
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
             .options = init.options,
-            .lifecycle_executor = init.lifecycle_executor,
             .looper = init.looper,
-            .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
-            .shutdown_mailbox = ShutdownMailbox.init(),
+            .events = init.events,
+            .on_queue = SessionOnQueue.init(self, control_channel),
         };
-        errdefer {
-            self.on_queue.deinit();
-            self.shutdown_mailbox.deinit();
-        }
+        errdefer self.on_queue.deinit();
         // A later schedule is therefore infallible. In particular, negotiation
         // can commit DataChannel ownership before arming the first ping.
         try self.on_queue.startTimers();
         return self;
     }
 
-    /// Must run outside every looper, timer, and delegate callback while the
+    /// Must run outside every looper, timer, and event callback while the
     /// borrowed looper remains alive and running. This does not stop or
     /// deinitialize the looper.
     pub fn destroy(self: *Session) void {
@@ -203,21 +161,8 @@ pub const Session = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
         self.allocator.free(self.ca_filename);
-        self.shutdown_mailbox.deinit();
         const allocator = self.allocator;
         allocator.destroy(self);
-    }
-
-    pub fn setDelegate(self: *Session, delegate: ?SessionDelegate) void {
-        if (self.looper.isOnQueue()) {
-            self.onQueue().setDelegate(delegate);
-            return;
-        }
-        _ = self.performOnQueue(void, delegate, SessionOnQueue.setDelegate) catch |err| {
-            log.writef(.err, "Unable to update Session delegate: {s}", .{
-                @errorName(err),
-            });
-        };
     }
 
     pub fn setLink(
@@ -324,7 +269,7 @@ pub const Session = struct {
         ) catch |err| {
             // Swift owns its looper and logs any perform failure here. Zig's
             // looper is externally owned: LooperUnavailable means OnFinish
-            // through looperDidTerminate owns finalization, so do not shut down
+            // through looperTerminated owns finalization, so do not shut down
             // twice.
             if (err == error.LooperUnavailable) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
@@ -356,7 +301,7 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperDidTerminate(self: *Session, failure: ?net.Looper.Failure) void {
+    pub fn looperTerminated(self: *Session, failure: ?net.Looper.Failure) void {
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -376,39 +321,21 @@ pub const Session = struct {
         );
     }
 
-    // MARK: - From any thread
-
-    fn requestShutdownFromAnyThread(self: *Session, cause: SessionError) void {
-        if (!self.shutdown_mailbox.enqueue(cause)) return;
-        self.lifecycle_executor.tryRun(self, shutdownFromAnyThread) catch |err| {
-            self.shutdown_mailbox.clear();
-            log.writef(.err, "Unable to enqueue session shutdown: {s}", .{
-                @errorName(err),
-            });
-        };
-    }
-
-    fn shutdownFromAnyThread(raw: *anyopaque) void {
-        const self: *Session = @ptrCast(@alignCast(raw));
-        const cause = self.shutdown_mailbox.take() orelse return;
-        self.shutdown(cause, null) catch |err| {
-            log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
-                @errorName(err),
-            });
-        };
+    fn reportFailure(self: *Session, cause: SessionError) void {
+        self.events.failed(self.events.context, self, cause);
     }
 
     // MARK: - Callback boundaries
 
     fn onSideFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.requestShutdownFromAnyThread(failureError(failure));
+        self.reportFailure(failureError(failure));
     }
 
     fn onLinkFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const cause = failureError(failure);
-        self.requestShutdownFromAnyThread(
+        self.reportFailure(
             // Swift wraps every link failure as an I/O failure, making even a
             // crypto/data-path cause recoverable; tunnel failures stay unchanged.
             // Preserve that link-only behavior with Zig's reconnect signal.
@@ -446,12 +373,12 @@ pub const Session = struct {
 
     fn onNegotiatorError(raw: ?*anyopaque, _: u8, cause: SessionError) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.requestShutdownFromAnyThread(cause);
+        self.reportFailure(cause);
     }
 
     fn onTLSVerificationFailure(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.requestShutdownFromAnyThread(error.TLSFailure);
+        self.reportFailure(error.TLSFailure);
     }
 
     fn scheduleNegotiationCheck(
@@ -537,10 +464,10 @@ pub const Session = struct {
             .callback = callback,
         }) catch |err| {
             // Swift lets its timer task feed perform failure back into shutdown.
-            // Here LooperUnavailable means looperDidTerminate already owns
-            // finalization, so another shutdown request would be redundant.
+            // Here LooperUnavailable means looperTerminated already owns
+            // protocol cleanup, so another failure event would be redundant.
             if (err != error.LooperUnavailable)
-                self.requestShutdownFromAnyThread(errors_mod.sessionError(err));
+                self.reportFailure(errors_mod.sessionError(err));
         };
     }
 
@@ -562,53 +489,6 @@ pub const Session = struct {
         cause: ?SessionError,
         timeout_ms: ?u64,
     };
-
-    /// Single-slot, first-error-wins handoff from callback threads to the
-    /// lifecycle executor. This only transports work; `SessionOnQueue.state`
-    /// remains the authoritative session lifecycle.
-    const ShutdownMailbox = struct {
-        lock: core.Mutex,
-        pending: ?SessionError,
-
-        fn init() ShutdownMailbox {
-            return .{
-                .lock = .{},
-                .pending = null,
-            };
-        }
-
-        fn deinit(self: *ShutdownMailbox) void {
-            self.lock.deinit();
-        }
-
-        fn enqueue(self: *ShutdownMailbox, cause: SessionError) bool {
-            self.lock.lock();
-            defer self.lock.unlock();
-            if (self.pending != null) return false;
-            self.pending = cause;
-            return true;
-        }
-
-        fn take(self: *ShutdownMailbox) ?SessionError {
-            self.lock.lock();
-            defer self.lock.unlock();
-            const cause = self.pending;
-            self.pending = null;
-            return cause;
-        }
-
-        fn clear(self: *ShutdownMailbox) void {
-            self.lock.lock();
-            defer self.lock.unlock();
-            self.pending = null;
-        }
-
-        fn hasPending(self: *ShutdownMailbox) bool {
-            self.lock.lock();
-            defer self.lock.unlock();
-            return self.pending != null;
-        }
-    };
 };
 
 // MARK: - On queue
@@ -621,21 +501,18 @@ const SessionOnQueue = struct {
     control_channel: *ControlChannel,
     negotiation_scheduler: core.RunAfter,
     ping_timer: core.RunAfter,
-    delegate: ?SessionDelegate,
     state: SessionState,
     link_processor: ?*LinkProcessor,
 
     fn init(
         session: *Session,
         control_channel: *ControlChannel,
-        delegate: ?SessionDelegate,
     ) SessionOnQueue {
         return .{
             .session = session,
             .control_channel = control_channel,
             .negotiation_scheduler = .{},
             .ping_timer = .{},
-            .delegate = delegate,
             .state = .{
                 .stopped = .{
                     .with_local_options = true,
@@ -664,10 +541,6 @@ const SessionOnQueue = struct {
     fn cancelTimers(self: *SessionOnQueue) void {
         self.negotiation_scheduler.cancel();
         self.ping_timer.cancel();
-    }
-
-    fn setDelegate(self: *SessionOnQueue, delegate: ?SessionDelegate) void {
-        self.delegate = delegate;
     }
 
     // MARK: Lifecycle
@@ -786,7 +659,6 @@ const SessionOnQueue = struct {
             .with_local_options = next_with_local_options,
         } };
         self.clearLinkProcessor();
-        if (self.delegate) |delegate| delegate.didStop(self.session, cause);
     }
 
     fn sendExitPacket(self: *SessionOnQueue, timeout_ms: u64) !void {
@@ -998,7 +870,8 @@ const SessionOnQueue = struct {
         if (active.phase == .started) return;
         active.phase = .started;
         self.scheduleNextPing(context);
-        if (self.delegate) |delegate| delegate.didStart(
+        self.session.events.established(
+            self.session.events.context,
             self.session,
             context.remote_endpoint,
             &context.push_reply.?.options,
@@ -1105,10 +978,10 @@ const SessionOnQueue = struct {
         count: usize,
     ) void {
         total.* = std.math.add(u64, total.*, @intCast(count)) catch std.math.maxInt(u64);
-        self.delegateCurrentDataCount(context);
+        self.reportCurrentDataCount(context);
     }
 
-    fn delegateCurrentDataCount(self: *SessionOnQueue, context: *ActiveContext) void {
+    fn reportCurrentDataCount(self: *SessionOnQueue, context: *ActiveContext) void {
         const now = core.concurrency.monotonicNs();
         if (context.last_data_count_ns) |last| {
             const next = core.concurrency.deadlineAfterMs(
@@ -1118,7 +991,7 @@ const SessionOnQueue = struct {
             if (self.session.options.min_data_count_interval_ms > 0 and now < next) return;
         }
         context.last_data_count_ns = now;
-        if (self.delegate) |delegate| delegate.didUpdateDataCount(self.session, .{
+        self.session.events.data_count(self.session.events.context, self.session, .{
             .received = context.data_count.inbound,
             .sent = context.data_count.outbound,
         });
@@ -1134,12 +1007,8 @@ fn shouldSendExitNotification(cause: ?SessionError) bool {
 pub const testing = struct {
     pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
 
-    pub fn requestShutdownFromAnyThread(session: *Session, cause: SessionError) void {
-        session.requestShutdownFromAnyThread(cause);
-    }
-
-    pub fn hasPendingShutdown(session: *Session) bool {
-        return session.shutdown_mailbox.hasPending();
+    pub fn reportFailure(session: *Session, cause: SessionError) void {
+        session.reportFailure(cause);
     }
 
     pub fn timersStarted(session: *Session) bool {

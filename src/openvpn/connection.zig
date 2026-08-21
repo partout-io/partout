@@ -23,7 +23,7 @@ const SessionOptions = configuration_mod.SessionOptions;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
-const SessionDelegate = session_mod.SessionDelegate;
+const SessionEvents = session_mod.SessionEvents;
 const SessionError = errors_mod.SessionError;
 const TLSConstants = constants_mod.TLS;
 
@@ -202,14 +202,15 @@ const OpenVPNConnection = struct {
         };
         defer self.allocator.free(ca_filename);
 
-        const session_delegate = SessionDelegate{
+        const session_events = SessionEvents{
             .context = self,
-            .vtable = &session_delegate_vtable,
+            .established = sessionEstablished,
+            .failed = sessionFailed,
+            .data_count = sessionDataCount,
         };
         const session = Session.create(self.allocator, .{
-            .lifecycle_executor = self.serialized_executor,
             .looper = self.looper,
-            .delegate = session_delegate,
+            .events = session_events,
             .configuration = self.configuration,
             .credentials = self.credentials,
             .prng = PRNG.system(),
@@ -228,7 +229,6 @@ const OpenVPNConnection = struct {
         const current_endpoint = self.setupLink(session) catch |err| {
             log.writef(.fault, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
-            session.setDelegate(null);
             session.shutdown(errors_mod.sessionError(err), null) catch {};
             self.events = null;
             return switch (err) {
@@ -253,10 +253,6 @@ const OpenVPNConnection = struct {
 
         _ = self.sendStatus(.disconnecting, events);
         log.write(.info, "User requested disconnection");
-        // The generic Connection contract forbids callbacks after stop().
-        // Removing the delegate also lets shutdown complete synchronously
-        // without queueing a didStop event behind the daemon's stop message.
-        session.setDelegate(null);
         var graceful = true;
         session.shutdown(null, timeout_ms) catch {
             graceful = false;
@@ -277,7 +273,7 @@ const OpenVPNConnection = struct {
 
     fn betterPath(
         self: *OpenVPNConnection,
-        _: net.Connection.Events,
+        events: net.Connection.Events,
     ) void {
         const session = self.current_session orelse return;
         if (self.status == .disconnected or self.status == .disconnecting) return;
@@ -285,14 +281,15 @@ const OpenVPNConnection = struct {
         session.shutdown(error.NetworkChanged, null) catch |err| {
             log.writef(.err, "Better-path shutdown failed: {s}", .{@errorName(err)});
         };
+        self.finalizeSession(events, .{ .session_failed = error.NetworkChanged });
     }
 
-    fn looperDidTerminate(
+    fn looperTerminated(
         self: *OpenVPNConnection,
         failure: ?net.Looper.Failure,
     ) void {
         const session = self.current_session orelse return;
-        session.looperDidTerminate(failure);
+        session.looperTerminated(failure);
     }
 
     // MARK: - Link setup
@@ -328,15 +325,16 @@ const OpenVPNConnection = struct {
         return owned_endpoint;
     }
 
-    // MARK: - Session delegate
+    // MARK: - Session events
 
-    fn handleDidStart(
+    fn handleSessionEstablished(
         self: *OpenVPNConnection,
         session: *Session,
         remote_endpoint: api.ExtendedEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
-        log.write(.notice, "Session did start");
+        if (self.status != .connecting) return;
+        log.write(.notice, "Session established");
         const address = api.Address.parseRaw(remote_endpoint.address) orelse {
             self.failTunnelSetup(session, .invalidValue);
             return;
@@ -350,6 +348,7 @@ const OpenVPNConnection = struct {
         openvpn_log.logConfiguration(&self.configuration, true);
         log.write(.notice, "Remote options:");
         openvpn_log.logConfiguration(remote_options, false);
+        std.debug.assert(self.events != null);
         const events = self.events orelse return;
         self.reportServerConfiguration(remote_options);
 
@@ -404,22 +403,28 @@ const OpenVPNConnection = struct {
             code.raw(),
         });
         const events = self.events orelse return;
-        session.setDelegate(null);
         session.shutdown(error.Reconnect, null) catch {};
         self.finalizeSession(events, .{ .tunnel_setup_failed = code });
     }
 
-    fn handleDidStop(
+    fn handleSessionFailure(
         self: *OpenVPNConnection,
-        cause: ?SessionError,
+        cause: SessionError,
     ) void {
+        if (self.status == .disconnected or self.status == .disconnecting) return;
+        std.debug.assert(self.current_session != null);
+        const session = self.current_session orelse return;
+        std.debug.assert(self.events != null);
         const events = self.events orelse return;
-        self.finalizeSession(events, .{ .session_stopped = cause });
+        session.shutdown(cause, null) catch |err| {
+            log.writef(.err, "Session failure shutdown failed: {s}", .{@errorName(err)});
+        };
+        self.finalizeSession(events, .{ .session_failed = cause });
     }
 
-    /// Releases connection-owned resources after the Session has stopped or
-    /// had its delegate removed. Reporting stays here so every terminal path
-    /// observes the same cleanup-before-callback ordering.
+    /// Releases connection-owned resources after the Session has stopped.
+    /// Reporting stays here so every terminal path observes the same
+    /// cleanup-before-callback ordering.
     fn finalizeSession(
         self: *OpenVPNConnection,
         events: net.Connection.Events,
@@ -438,24 +443,20 @@ const OpenVPNConnection = struct {
                 events.last_error(events.ctx, code);
                 events.cancel(events.ctx, code);
             },
-            .session_stopped => |cause| {
-                if (self.status == .disconnecting) return;
-                if (cause) |err| {
-                    log.writef(.err, "Session did stop: {s}", .{@errorName(err)});
-                    if (errors_mod.partoutCode(err)) |code| {
-                        events.last_error(events.ctx, code);
-                        if (!isRecoverable(err)) {
-                            log.write(.err, "Disconnection is not recoverable");
-                            log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
-                            self.markDisconnected();
-                            events.cancel(events.ctx, code);
-                            return;
-                        }
+            .session_failed => |cause| {
+                log.writef(.err, "Session failed: {s}", .{@errorName(cause)});
+                if (errors_mod.partoutCode(cause)) |code| {
+                    events.last_error(events.ctx, code);
+                    if (!isRecoverable(cause)) {
+                        log.write(.err, "Disconnection is not recoverable");
+                        log.writef(.info, "Report link failure: {s}", .{@errorName(cause)});
+                        self.markDisconnected();
+                        events.cancel(events.ctx, code);
+                        return;
                     }
-                } else {
-                    log.write(.notice, "Session did stop");
                 }
                 _ = self.sendStatus(.disconnected, events);
+                self.events = null;
             },
         }
     }
@@ -505,7 +506,6 @@ const OpenVPNConnection = struct {
 
     fn destroyCurrentSession(self: *OpenVPNConnection) void {
         const session = self.current_session orelse return;
-        session.setDelegate(null);
         session.destroy();
         self.current_session = null;
     }
@@ -521,78 +521,78 @@ const OpenVPNConnection = struct {
 const SessionFinalization = union(enum) {
     explicit_stop,
     tunnel_setup_failed: api.PartoutErrorCode,
-    session_stopped: ?SessionError,
+    session_failed: SessionError,
 };
 
-const DelegateEvent = union(enum) {
-    did_start: struct {
+const SessionEvent = union(enum) {
+    established: struct {
         session: *anyopaque,
         remote_endpoint: api.ExtendedEndpoint,
         remote_options: api.OpenVPNConfiguration,
     },
-    did_stop: struct {
+    failed: struct {
         session: *anyopaque,
-        cause: ?SessionError,
+        cause: SessionError,
     },
-    did_update_data_count: struct {
+    data_count: struct {
         session: *anyopaque,
         data_count: api.DataCount,
     },
 
-    fn session(self: DelegateEvent) *anyopaque {
+    fn session(self: SessionEvent) *anyopaque {
         return switch (self) {
-            .did_start => |payload| payload.session,
-            .did_stop => |payload| payload.session,
-            .did_update_data_count => |payload| payload.session,
+            .established => |payload| payload.session,
+            .failed => |payload| payload.session,
+            .data_count => |payload| payload.session,
         };
     }
 
-    fn isLifecycle(self: DelegateEvent) bool {
+    fn isRequired(self: SessionEvent) bool {
         return switch (self) {
-            .did_start, .did_stop => true,
-            .did_update_data_count => false,
+            .established, .failed => true,
+            .data_count => false,
         };
     }
 
-    fn deinit(self: *DelegateEvent, allocator: std.mem.Allocator) void {
+    fn deinit(self: *SessionEvent, allocator: std.mem.Allocator) void {
         switch (self.*) {
-            .did_start => |*payload| {
+            .established => |*payload| {
                 payload.remote_endpoint.deinit(allocator);
                 payload.remote_options.deinit(allocator);
             },
-            .did_stop, .did_update_data_count => {},
+            .failed, .data_count => {},
         }
     }
 };
 
-const DelegateEventTask = struct {
+const SessionEventTask = struct {
     allocator: std.mem.Allocator,
     connection: *OpenVPNConnection,
-    event: DelegateEvent,
+    event: SessionEvent,
 
     fn run(raw: *anyopaque) void {
-        const task: *DelegateEventTask = @ptrCast(@alignCast(raw));
+        const task: *SessionEventTask = @ptrCast(@alignCast(raw));
         defer task.deinit();
-        consumeDelegateEvent(task.connection, task.event);
+        consumeSessionEvent(task.connection, task.event);
     }
 
     fn discard(raw: *anyopaque) void {
-        const task: *DelegateEventTask = @ptrCast(@alignCast(raw));
+        const task: *SessionEventTask = @ptrCast(@alignCast(raw));
         task.deinit();
     }
 
-    fn deinit(task: *DelegateEventTask) void {
+    fn deinit(task: *SessionEventTask) void {
         task.event.deinit(task.allocator);
         task.allocator.destroy(task);
     }
 };
 
-fn sendDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
-    const is_lifecycle = event.isLifecycle();
-    const task = self.allocator.create(DelegateEventTask) catch |err| {
+fn sendSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
+    const is_required = event.isRequired();
+    const task = self.allocator.create(SessionEventTask) catch |err| {
         var owned_event = event;
         owned_event.deinit(self.allocator);
-        rejectDelegateEvent(err, is_lifecycle);
+        rejectSessionEvent(err, is_required);
         return;
     };
     task.* = .{
@@ -602,39 +602,39 @@ fn sendDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
     };
     self.serialized_executor.tryRunOwned(
         task,
-        DelegateEventTask.run,
-        DelegateEventTask.discard,
+        SessionEventTask.run,
+        SessionEventTask.discard,
     ) catch |err| {
-        DelegateEventTask.discard(task);
-        rejectDelegateEvent(err, is_lifecycle);
+        SessionEventTask.discard(task);
+        rejectSessionEvent(err, is_required);
     };
 }
 
-fn rejectDelegateEvent(err: core.SerializedExecutor.RunError, is_lifecycle: bool) void {
+fn rejectSessionEvent(err: core.SerializedExecutor.RunError, is_required: bool) void {
     if (err == error.Closed) return;
-    // Lifecycle callbacks have no error channel. Continuing would strand the
+    // Required facts have no error channel. Continuing would strand the
     // connection between states; match Swift's nonthrowing stream delivery.
-    if (is_lifecycle) @panic("Unable to deliver OpenVPN session lifecycle event");
-    log.writef(.err, "Unable to send session delegate event: {s}", .{@errorName(err)});
+    if (is_required) @panic("Unable to deliver required OpenVPN session event");
+    log.writef(.err, "Unable to send session event: {s}", .{@errorName(err)});
 }
 
-fn consumeDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
+fn consumeSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
     const current = self.current_session orelse {
         log.write(.debug, "Ignore event without current session");
         return;
     };
     if (event.session() != @as(*anyopaque, @ptrCast(current))) {
-        log.write(.info, "Ignoring delegate event from old session");
+        log.write(.info, "Ignoring event from old session");
         return;
     }
     switch (event) {
-        .did_start => |payload| self.handleDidStart(
+        .established => |payload| self.handleSessionEstablished(
             current,
             payload.remote_endpoint,
             &payload.remote_options,
         ),
-        .did_stop => |payload| self.handleDidStop(payload.cause),
-        .did_update_data_count => |payload| {
+        .failed => |payload| self.handleSessionFailure(payload.cause),
+        .data_count => |payload| {
             if (self.status != .connected) return;
             log.writef(.debug, "Updated data count: received={d}, sent={d}", .{
                 payload.data_count.received,
@@ -646,9 +646,9 @@ fn consumeDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
     }
 }
 
-// MARK: - Session delegate callbacks
+// MARK: - Session event callbacks
 
-fn sessionDidStart(
+fn sessionEstablished(
     raw: ?*anyopaque,
     session: *anyopaque,
     remote_endpoint: api.ExtendedEndpoint,
@@ -656,37 +656,37 @@ fn sessionDidStart(
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
     const endpoint = remote_endpoint.clone(self.allocator) catch
-        @panic("Unable to retain OpenVPN session lifecycle event");
+        @panic("Unable to retain required OpenVPN session event");
     const options = remote_options.clone(self.allocator) catch {
         endpoint.deinit(self.allocator);
-        @panic("Unable to retain OpenVPN session lifecycle event");
+        @panic("Unable to retain required OpenVPN session event");
     };
-    sendDelegateEvent(self, .{ .did_start = .{
+    sendSessionEvent(self, .{ .established = .{
         .session = session,
         .remote_endpoint = endpoint,
         .remote_options = options,
     } });
 }
 
-fn sessionDidStop(
+fn sessionFailed(
     raw: ?*anyopaque,
     session: *anyopaque,
-    cause: ?SessionError,
+    cause: SessionError,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    sendDelegateEvent(self, .{ .did_stop = .{
+    sendSessionEvent(self, .{ .failed = .{
         .session = session,
         .cause = cause,
     } });
 }
 
-fn sessionDidUpdateDataCount(
+fn sessionDataCount(
     raw: ?*anyopaque,
     session: *anyopaque,
     data_count: api.DataCount,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    sendDelegateEvent(self, .{ .did_update_data_count = .{
+    sendSessionEvent(self, .{ .data_count = .{
         .session = session,
         .data_count = data_count,
     } });
@@ -751,12 +751,12 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     self.betterPath(events);
 }
 
-fn looperDidTerminate(
+fn looperTerminated(
     ptr: *anyopaque,
     failure: ?net.Looper.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.looperDidTerminate(failure);
+    self.looperTerminated(failure);
 }
 
 fn destroy(ptr: *anyopaque) void {
@@ -772,11 +772,5 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .network_change = networkChange,
     .better_path = betterPath,
     .destroy = destroy,
-    .looper_terminated = looperDidTerminate,
-};
-
-const session_delegate_vtable = SessionDelegate.VTable{
-    .did_start = sessionDidStart,
-    .did_stop = sessionDidStop,
-    .did_update_data_count = sessionDidUpdateDataCount,
+    .looper_terminated = looperTerminated,
 };
