@@ -73,6 +73,20 @@ pub fn isActiveProfileModule(profile: *const gen.Profile, module_id: uuid.UUID) 
     return false;
 }
 
+/// Reports whether a route list contains the default route.
+pub fn containsDefaultRoute(routes: []const gen.Route) bool {
+    for (routes) |route| {
+        if (route.destination == null) return true;
+    }
+    return false;
+}
+
+/// Reports whether IP settings route the default route through the tunnel.
+pub fn routesDefaultThroughVPN(settings: *const gen.IPSettings) bool {
+    return containsDefaultRoute(settings.included_routes) and
+        !containsDefaultRoute(settings.excluded_routes);
+}
+
 /// Returns the schema id stored in a tagged module.
 ///
 /// Custom modules currently do not have a schema-level id, so they use the zero

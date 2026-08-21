@@ -46,16 +46,16 @@ const WireGuardConnection = struct {
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
     /// Actor-owned event sink used only by serialized connection work.
-    events: ?net.Connection.Events = null,
+    events: ?net.Connection.Events,
     /// Daemon-owned sandbox capability captured once at creation. Timer threads
     /// use it to enqueue work without retaining or inspecting the unrelated
     /// connection event callbacks.
     serialized_executor: net.SerializedExecutor,
-    data_count_timer: core.RunAfter = .{},
-    data_count_timer_active: bool = false,
+    data_count_timer: core.RunAfter,
+    data_count_timer_active: bool,
     data_count_interval_ms: u32,
-    temporary_shutdown_retry_timer: core.RunAfter = .{},
-    temporary_shutdown_retry_delay_ms: u32 = 2000,
+    temporary_shutdown_retry_timer: core.RunAfter,
+    temporary_shutdown_retry_delay_ms: u32,
 
     fn create(
         allocator: std.mem.Allocator,
@@ -90,8 +90,13 @@ const WireGuardConnection = struct {
             .allocator = allocator,
             .adapter = undefined,
             .configuration = configuration,
+            .events = null,
             .serialized_executor = sandbox.serialized_executor,
+            .data_count_timer = .{},
+            .data_count_timer_active = false,
             .data_count_interval_ms = sandbox.options.min_data_count_interval,
+            .temporary_shutdown_retry_timer = .{},
+            .temporary_shutdown_retry_delay_ms = 2000,
         };
         created.adapter = WireGuardAdapter.init(
             module_id,
@@ -401,14 +406,18 @@ fn appendActiveModuleAllowedIPs(
             .DNS => |*dns| if (dns.routes_through_vpn orelse false) {
                 for (dns.servers) |*server| {
                     if (!server.isIPAddress()) continue;
-                    combined[initialized] = try cloneAddressAsHostSubnet(allocator, server);
+                    combined[initialized] = (try api.Subnet.parseRawAlloc(
+                        allocator,
+                        server.raw,
+                    )) orelse return error.IncompleteModule;
                     initialized += 1;
                 }
             },
             else => {},
         }
     }
-    std.debug.assert(initialized == combined.len);
+    if (initialized != combined.len)
+        @panic("WireGuard allowed-IP allocation count does not match initialized routes");
 
     // The old subnet elements were moved into `combined`; only release their
     // container here so their owned address strings remain live.
@@ -428,21 +437,6 @@ fn cloneRouteDestination(
         .v6 => (try api.Subnet.parseRawAlloc(allocator, "::/0")) orelse
             error.IncompleteModule,
         .hostname => error.IncompleteModule,
-    };
-}
-
-fn cloneAddressAsHostSubnet(
-    allocator: std.mem.Allocator,
-    address: *const api.Address,
-) net.ConnectionCreateError!api.Subnet {
-    return .{
-        .address = (try api.Address.parseRawAlloc(allocator, address.raw)) orelse
-            return error.IncompleteModule,
-        .prefix_length = switch (address.family) {
-            .v4 => 32,
-            .v6 => 128,
-            .hostname => return error.IncompleteModule,
-        },
     };
 }
 

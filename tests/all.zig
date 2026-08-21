@@ -44,6 +44,7 @@ comptime {
         _ = @import("openvpn/internal/data.zig");
         _ = @import("openvpn/internal/errors.zig");
         _ = @import("openvpn/internal/helpers.zig");
+        _ = @import("openvpn/internal/keys.zig");
         _ = @import("openvpn/internal/logging.zig");
         _ = @import("openvpn/internal/packet.zig");
         _ = @import("openvpn/internal/processing.zig");

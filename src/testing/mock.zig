@@ -20,6 +20,7 @@ pub const MockSerializedExecutor = struct {
     const Message = struct {
         ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
+        discard: ?net.SerializedExecutor.Block,
     };
     const ExecutorActor = core.Actor(MockSerializedExecutor, Message, error{}, perform);
 
@@ -53,6 +54,7 @@ pub const MockSerializedExecutor = struct {
         self.actor.perform(.{
             .ptr = self,
             .block = drainBarrier,
+            .discard = null,
         }) catch @panic("Unable to drain mock serialized work");
     }
 
@@ -60,12 +62,14 @@ pub const MockSerializedExecutor = struct {
         ptr: *anyopaque,
         block_ptr: *anyopaque,
         block: net.SerializedExecutor.Block,
-    ) void {
+        discard: ?net.SerializedExecutor.Block,
+    ) net.SerializedExecutor.RunError!void {
         const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
-        self.actor.schedule(.{
+        try self.actor.schedule(.{
             .ptr = block_ptr,
             .block = block,
-        }) catch @panic("Unable to schedule mock serialized work");
+            .discard = discard,
+        });
     }
 
     fn perform(_: *MockSerializedExecutor, message: Message) error{}!void {
@@ -636,6 +640,8 @@ fn snapshotTunnelSettings(info: api.TunnelRemoteInfoWrapper) MockTunnelControlle
     var snapshot = MockTunnelController.LastTunnelSettings{
         .requires_virtual_device = info.requires_virtual_device,
         .original_module_id = info.original_module_id,
+        .profile_module_count = info.profile.modules.len,
+        .profile_active_module_count = info.profile.active_modules_ids.len,
         .module_count = if (info.modules) |modules| modules.len else 0,
     };
     const modules = info.modules orelse return snapshot;
@@ -669,6 +675,8 @@ pub const MockTunnelController = struct {
     pub const LastTunnelSettings = struct {
         requires_virtual_device: bool,
         original_module_id: api.UUID,
+        profile_module_count: usize,
+        profile_active_module_count: usize,
         module_count: usize,
         has_dns_module: bool = false,
         dns_server_count: usize = 0,
@@ -899,9 +907,12 @@ fn mockCreate(
     module: net_conn.ConnectionModule,
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
-    std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile));
-    std.debug.assert(parameters.controller.ptr != null);
+    if (module.typeOf() != .OpenVPN)
+        @panic("OpenVPN mock received a non-OpenVPN module");
+    if (!api.hasConnection(parameters.profile))
+        @panic("OpenVPN mock requires a connection profile");
+    if (parameters.controller.ptr == null)
+        @panic("OpenVPN mock requires a tunnel controller");
     var created = try allocator.create(DaemonMockConnection);
     created.* = .{ .allocator = allocator };
     return created.asConnection();
@@ -971,8 +982,10 @@ fn blockingCreate(
     module: net_conn.ConnectionModule,
     parameters: net_sandbox.Sandbox,
 ) net_conn.CreateError!net_conn.Connection {
-    std.debug.assert(module.typeOf() == .OpenVPN);
-    std.debug.assert(api.hasConnection(parameters.profile));
+    if (module.typeOf() != .OpenVPN)
+        @panic("Blocking OpenVPN mock received a non-OpenVPN module");
+    if (!api.hasConnection(parameters.profile))
+        @panic("Blocking OpenVPN mock requires a connection profile");
     const self: *BlockingStopConnection = @ptrCast(@alignCast(ptr.?));
     return self.asConnection();
 }

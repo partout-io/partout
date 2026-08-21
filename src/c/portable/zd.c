@@ -106,11 +106,16 @@ pp_zd *pp_zd_make_slice(const pp_zd *zd, size_t offset, size_t length) {
 // MARK: Side effect
 
 void pp_zd_append(pp_zd *zd, const pp_zd *other) {
+    pp_zd_append_data(zd, other->bytes, other->length);
+}
+
+void pp_zd_append_data(pp_zd *zd, const uint8_t *bytes, size_t length) {
     pp_assert(zd);
-    size_t new_len = zd->length + other->length;
+    pp_assert(length <= SIZE_MAX - zd->length);
+    size_t new_len = zd->length + length;
     uint8_t *new_bytes = pp_alloc(new_len);
     memcpy(new_bytes, zd->bytes, zd->length);
-    memcpy(new_bytes + zd->length, other->bytes, other->length);
+    memcpy(new_bytes + zd->length, bytes, length);
 
     pp_zero(zd->bytes, zd->length);
     pp_free(zd->bytes);

@@ -239,6 +239,17 @@ pub const ExtendedEndpoint = struct {
     proto: EndpointProtocol = .{},
     owned: bool = false,
 
+    pub fn clone(
+        self: ExtendedEndpoint,
+        allocator: std.mem.Allocator,
+    ) error{OutOfMemory}!ExtendedEndpoint {
+        return .{
+            .address = try allocator.dupe(u8, self.address),
+            .proto = self.proto,
+            .owned = true,
+        };
+    }
+
     pub fn init(raw_address: []const u8, proto: EndpointProtocol) ?ExtendedEndpoint {
         const parsed_address = Address.parseRaw(raw_address) orelse return null;
         return .{
@@ -355,8 +366,7 @@ pub const SecureData = struct {
 
     /// Encodes raw bytes in the representation used by the API schema.
     pub fn initBytesAlloc(allocator: std.mem.Allocator, bytes: []const u8) AllocError!SecureData {
-        const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(bytes.len));
-        _ = std.base64.standard.Encoder.encode(encoded, bytes);
+        const encoded = try util.base64EncodeAlloc(allocator, bytes);
         return .{
             .base64 = encoded,
             .owned = true,

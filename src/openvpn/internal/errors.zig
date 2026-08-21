@@ -44,7 +44,7 @@ pub fn sessionError(err: anyerror) SessionError {
         error.BadCredentials => error.BadCredentials,
         error.BadCredentialsWithLocalOptions => error.BadCredentialsWithLocalOptions,
         error.CompressionMismatch => error.CompressionMismatch,
-        error.ConnectionFailure, error.DataPathFailure, error.Assertion => error.ConnectionFailure,
+        error.ConnectionFailure, error.DataPathFailure => error.ConnectionFailure,
         error.CryptoFailure => error.CryptoFailure,
         error.NetworkChanged => error.NetworkChanged,
         error.NoRouting => error.NoRouting,

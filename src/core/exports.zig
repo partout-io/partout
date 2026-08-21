@@ -32,6 +32,7 @@ pub const Mutex = concurrency.Mutex;
 pub const Registry = registry.Registry;
 pub const RunAfter = concurrency.RunAfter;
 pub const SerializeError = registry.SerializeError;
+pub const SerializedExecutor = concurrency.SerializedExecutor;
 
 pub const isGeneratedId = uuid.isV4;
 pub const newId = uuid.newId;

@@ -10,6 +10,7 @@ const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
 const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
+const keys_mod = @import("keys.zig");
 const packet_mod = @import("packet.zig");
 
 const api = core_mod.api;
@@ -26,6 +27,7 @@ const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const PacketCode = packet_mod.PacketCode;
+const StaticKey = keys_mod.StaticKey;
 const ZeroingData = crypto_mod.ZeroingData;
 
 /// Concrete serializer variants selected once when a control channel is built.
@@ -40,6 +42,7 @@ pub const Serializer = union(enum) {
         backend: CryptoBackend,
         configuration: *const api.OpenVPNConfiguration,
     ) !Serializer {
+        try configuration_mod.validate(configuration);
         if (configuration.tls_wrap) |wrap| {
             return switch (wrap.strategy) {
                 .auth => .{ .auth = try AuthSerializer.init(
@@ -57,7 +60,7 @@ pub const Serializer = union(enum) {
                     allocator,
                     backend,
                     wrap.key,
-                    wrap.wrapped_key orelse return error.Assertion,
+                    wrap.wrapped_key.?,
                 ) },
             };
         }
@@ -71,7 +74,6 @@ pub const Serializer = union(enum) {
             .crypt => |*value| value.deinit(),
             .crypt_v2 => |*value| value.deinit(allocator),
         }
-        self.* = undefined;
     }
 
     pub fn reset(self: *Serializer) void {
@@ -192,8 +194,8 @@ const AuthSerializer = struct {
     ) !AuthSerializer {
         const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
-        defer keys.deinit(allocator);
-        var bridge = try CryptoKeysBridge.init(allocator, &keys);
+        defer keys.deinit();
+        var bridge = CryptoKeysBridge.init(&keys);
         defer bridge.deinit();
         const cbc = functions.cbc_create.?(null, digest.raw().ptr, bridge.native()) orelse return error.UnsupportedAlgorithm;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
@@ -215,28 +217,15 @@ const AuthSerializer = struct {
         allocator: std.mem.Allocator,
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
-        const bytes = try decodeStaticKey(allocator, key);
-        defer {
-            @memset(bytes, 0);
-            allocator.free(bytes);
-        }
-        const send_index: usize = switch (key.dir orelse .server) {
-            .server => 1,
-            .client => 3,
-        };
-        const receive_index: usize = switch (key.dir orelse .client) {
-            .server => 3,
-            .client => 1,
-        };
-        var send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, send_index));
-        errdefer send.deinit(allocator);
-        const receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, receive_index));
+        var static_key = try StaticKey.init(allocator, key);
+        defer static_key.deinit();
+        const send = ZeroingData.initCopy(static_key.hmacSendKey());
+        const receive = ZeroingData.initCopy(static_key.hmacReceiveKey());
         return CryptoKeys.init(null, CryptoKeyPair.init(send, receive));
     }
 
     pub fn deinit(self: *AuthSerializer) void {
         self.functions.cbc_free.?(self.cbc);
-        self.* = undefined;
     }
 
     pub fn reset(_: *AuthSerializer) void {}
@@ -311,8 +300,8 @@ const CryptSerializer = struct {
     ) !CryptSerializer {
         const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
-        defer keys.deinit(allocator);
-        var bridge = try CryptoKeysBridge.init(allocator, &keys);
+        defer keys.deinit();
+        var bridge = CryptoKeysBridge.init(&keys);
         defer bridge.deinit();
         const cipher_name: [:0]const u8 = "AES-256-CTR";
         const digest_name: [:0]const u8 = "SHA256";
@@ -339,24 +328,14 @@ const CryptSerializer = struct {
         allocator: std.mem.Allocator,
         key: api.OpenVPNStaticKey,
     ) !CryptoKeys {
-        const direction = key.dir orelse return error.MissingStaticKeyDirection;
-        const bytes = try decodeStaticKey(allocator, key);
-        defer {
-            @memset(bytes, 0);
-            allocator.free(bytes);
-        }
-        const cipher_send_index: usize = if (direction == .server) 0 else 2;
-        const cipher_receive_index: usize = if (direction == .server) 2 else 0;
-        const hmac_send_index: usize = if (direction == .server) 1 else 3;
-        const hmac_receive_index: usize = if (direction == .server) 3 else 1;
-
-        var cipher_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_send_index));
-        errdefer cipher_send.deinit(allocator);
-        var cipher_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, cipher_receive_index));
-        errdefer cipher_receive.deinit(allocator);
-        var hmac_send = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_send_index));
-        errdefer hmac_send.deinit(allocator);
-        const hmac_receive = try ZeroingData.initCopy(allocator, staticKeyQuadrant(bytes, hmac_receive_index));
+        var static_key = try StaticKey.init(allocator, key);
+        defer static_key.deinit();
+        const cipher_send_key = try static_key.cipherEncryptKey();
+        const cipher_receive_key = try static_key.cipherDecryptKey();
+        const cipher_send = ZeroingData.initCopy(cipher_send_key);
+        const cipher_receive = ZeroingData.initCopy(cipher_receive_key);
+        const hmac_send = ZeroingData.initCopy(static_key.hmacSendKey());
+        const hmac_receive = ZeroingData.initCopy(static_key.hmacReceiveKey());
         return CryptoKeys.init(
             CryptoKeyPair.init(cipher_send, cipher_receive),
             CryptoKeyPair.init(hmac_send, hmac_receive),
@@ -365,7 +344,6 @@ const CryptSerializer = struct {
 
     pub fn deinit(self: *CryptSerializer) void {
         self.functions.ctr_free.?(self.ctr);
-        self.* = undefined;
     }
 
     pub fn reset(_: *CryptSerializer) void {}
@@ -436,7 +414,8 @@ const CryptSerializer = struct {
         if (decrypted_count == 0) return errors_mod.cryptoError(native_error);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
-        std.debug.assert(total <= decrypted.len);
+        if (total > decrypted.len)
+            @panic("OpenVPN crypto backend returned plaintext larger than its destination buffer");
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
         return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
@@ -471,7 +450,6 @@ const CryptV2Serializer = struct {
         self.serializer.deinit();
         @memset(self.wrapped_key, 0);
         allocator.free(self.wrapped_key);
-        self.* = undefined;
     }
 
     pub fn reset(self: *CryptV2Serializer) void {
@@ -507,23 +485,6 @@ const CryptV2Serializer = struct {
     }
 };
 
-fn decodeStaticKey(
-    allocator: std.mem.Allocator,
-    key: api.OpenVPNStaticKey,
-) ![]u8 {
-    const bytes = try key.data.bytesAlloc(allocator);
-    errdefer {
-        @memset(bytes, 0);
-        allocator.free(bytes);
-    }
-    if (bytes.len != static_key_content_length) return error.InvalidStaticKey;
-    return bytes;
-}
-
-fn staticKeyQuadrant(bytes: []const u8, index: usize) []const u8 {
-    return bytes[index * static_key_length .. (index + 1) * static_key_length];
-}
-
 fn unixSeconds() u32 {
     return c_common.pp_time_unix_seconds();
 }
@@ -547,6 +508,3 @@ pub const testing = struct {
         return CryptSerializer.deriveKeys(allocator, key);
     }
 };
-
-const static_key_content_length = 256;
-const static_key_length = 64;

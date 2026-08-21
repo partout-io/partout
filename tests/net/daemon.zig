@@ -164,6 +164,10 @@ test "connection daemon starts settings-only profile" {
     try sut.start();
     try std.testing.expect(sut.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+    const settings = controller.last_settings orelse return error.TestUnexpectedResult;
+    try std.testing.expectEqual(@as(usize, 1), settings.profile_module_count);
+    try std.testing.expectEqual(@as(usize, 1), settings.profile_active_module_count);
+    try std.testing.expectEqual(@as(usize, 0), settings.module_count);
 
     sut.stop();
     try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
@@ -366,7 +370,7 @@ test "connection daemon resets data count when connection disconnects" {
     try std.testing.expectEqual(api.DataCount{}, events.data_count);
 }
 
-test "connection daemon honors disabled cancellation for connection requests" {
+test "connection daemon publishes terminal status when cancellation is disabled" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
@@ -395,6 +399,17 @@ test "connection daemon honors disabled cancellation for connection requests" {
     defer sut.stop();
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
     try std.testing.expect(!controller.reasserting);
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .disconnected,
+        .connecting,
+        .disconnected,
+    }, sut.testStatuses());
+
+    monitor.setReachable(false);
+    monitor.setReachable(true);
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(@as(usize, 1), capture.start_count);
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
@@ -688,6 +703,7 @@ test "connection daemon drains an overlapping timer callback and drops stale wor
     // actor, so its serialized block must have been queued before this call.
     sut.stop();
     try std.testing.expectEqual(@as(usize, 0), delayed_connection.serialized_count);
+    try std.testing.expectEqual(@as(usize, 1), delayed_connection.discarded_count);
 }
 
 fn stopDaemon(sut: *Daemon) void {
@@ -707,6 +723,7 @@ const DelayedConnection = struct {
     allow_timer_enqueue: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     stop_entered: std.atomic.Value(bool) = std.atomic.Value(bool).init(false),
     serialized_count: usize = 0,
+    discarded_count: usize = 0,
 
     fn implementation(self: *DelayedConnection) net.ConnectionImplementation {
         return .{
@@ -749,7 +766,11 @@ const DelayedConnection = struct {
         while (self.pause_timer_before_enqueue and !self.allow_timer_enqueue.load(.acquire)) {
             std.Thread.yield() catch {};
         }
-        self.serialized_executor.?.run(self, onSerialized);
+        self.serialized_executor.?.tryRunOwned(
+            self,
+            onSerialized,
+            onDiscarded,
+        ) catch onDiscarded(self);
     }
 
     fn onSerialized(ctx: *anyopaque) void {
@@ -759,6 +780,11 @@ const DelayedConnection = struct {
         self.ran_on_start_thread = current == self.start_thread.?;
         self.ran_off_timer_thread = current != self.timer_thread.?;
         self.did_run.store(true, .release);
+    }
+
+    fn onDiscarded(ctx: *anyopaque) void {
+        const self: *DelayedConnection = @ptrCast(@alignCast(ctx));
+        self.discarded_count += 1;
     }
 
     fn stop(ptr: *anyopaque, _: u32, events: net.Connection.Events) void {
@@ -912,6 +938,7 @@ const SandboxCapture = struct {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.start_count += 1;
         if (self.cancel_on_start) |code| {
+            events.status(events.ctx, .connecting);
             events.cancel(events.ctx, code);
         }
         if (self.disconnect_on_start) {

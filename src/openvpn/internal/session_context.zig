@@ -51,13 +51,13 @@ pub const ActiveContext = struct {
 
     negotiators: [ControlConstants.number_of_keys]?*Negotiator,
     data_channels: [ControlConstants.number_of_keys]?*DataChannel,
-    old_keys: std.ArrayList(u8) = .empty,
-    current_negotiator_key: ?u8 = null,
-    current_data_pair: ?DataLinkPair = null,
-    push_reply: ?PushReply = null,
-    last_received_ns: ?u64 = null,
-    last_data_count_ns: ?u64 = null,
-    data_count: BidirectionalState(u64) = .init(0),
+    old_keys: std.ArrayList(u8),
+    current_negotiator_key: ?u8,
+    current_data_pair: ?DataLinkPair,
+    push_reply: ?PushReply,
+    last_received_ns: ?u64,
+    last_data_count_ns: ?u64,
+    data_count: BidirectionalState(u64),
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -79,6 +79,13 @@ pub const ActiveContext = struct {
             },
             .negotiators = [_]?*Negotiator{null} ** ControlConstants.number_of_keys,
             .data_channels = [_]?*DataChannel{null} ** ControlConstants.number_of_keys,
+            .old_keys = .empty,
+            .current_negotiator_key = null,
+            .current_data_pair = null,
+            .push_reply = null,
+            .last_received_ns = null,
+            .last_data_count_ns = null,
+            .data_count = .init(0),
         };
         return self;
     }
@@ -103,7 +110,8 @@ pub const ActiveContext = struct {
 
     /// Transfers ownership of `negotiator` to this context.
     pub fn addNegotiator(self: *ActiveContext, negotiator: *Negotiator) void {
-        std.debug.assert(negotiator.key < self.negotiators.len);
+        if (negotiator.key >= self.negotiators.len)
+            @panic("Cannot add an OpenVPN negotiator with an out-of-range key");
         log.writef(.info, "Replace negotiator with key {d}", .{negotiator.key});
         if (self.negotiators[negotiator.key]) |old| {
             if (old != negotiator) old.destroy();
@@ -121,8 +129,10 @@ pub const ActiveContext = struct {
         channel: *DataChannel,
         key: u8,
     ) !void {
-        std.debug.assert(key < self.data_channels.len);
-        std.debug.assert(channel.key == key);
+        if (key >= self.data_channels.len)
+            @panic("Cannot install an OpenVPN data channel with an out-of-range key");
+        if (channel.key != key)
+            @panic("Cannot install an OpenVPN data channel under a different key");
         if (self.current_data_pair) |pair| try self.old_keys.append(self.allocator, pair.key);
         if (self.data_channels[key]) |old| {
             if (old != channel) old.destroy();

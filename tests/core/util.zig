@@ -113,6 +113,13 @@ test "borrows C strings without dropping sentinel metadata" {
     try std.testing.expectEqual(@as(u8, 0), borrowed[borrowed.len]);
 }
 
+test "encodes Base64 into owned storage" {
+    const encoded = try util.base64EncodeAlloc(std.testing.allocator, "hello");
+    defer std.testing.allocator.free(encoded);
+
+    try std.testing.expectEqualStrings("aGVsbG8=", encoded);
+}
+
 test "trims common ASCII whitespace" {
     try std.testing.expectEqualStrings("hello", util.trim(" \r\t\nhello \n\t"));
     try std.testing.expectEqualStrings("", util.trim(" \r\t\n"));
@@ -122,6 +129,16 @@ test "checks byte allow-lists" {
     try std.testing.expect(util.containsOnly("", ""));
     try std.testing.expect(util.containsOnly("cab", "abc"));
     try std.testing.expect(!util.containsOnly("cad", "abc"));
+}
+
+test "converts seconds to milliseconds safely" {
+    try std.testing.expectEqual(@as(u64, 1500), util.secondsToMilliseconds(1.5));
+    try std.testing.expectEqual(@as(u64, 0), util.secondsToMilliseconds(-1));
+    try std.testing.expectEqual(@as(u64, 0), util.secondsToMilliseconds(std.math.nan(f64)));
+    try std.testing.expectEqual(
+        std.math.maxInt(u64),
+        util.secondsToMilliseconds(std.math.inf(f64)),
+    );
 }
 
 test "returns owned default cache directory" {
@@ -157,6 +174,21 @@ test "compares optional strings" {
     try std.testing.expect(!util.optionalStringsEqual(null, "alpha"));
     try std.testing.expect(util.optionalStringsEqual("alpha", "alpha"));
     try std.testing.expect(!util.optionalStringsEqual("alpha", "beta"));
+}
+
+test "parses enum raw values case-insensitively" {
+    try std.testing.expectEqual(RawValue.alpha, util.parseRawIgnoreCase(RawValue, "ALPHA"));
+    try std.testing.expectEqual(RawValue.beta, util.parseRawIgnoreCase(RawValue, "beta-value"));
+    try std.testing.expectEqual(null, util.parseRawIgnoreCase(RawValue, "unknown"));
+}
+
+test "runtime platform version has major and minor components" {
+    const version = try util.platformVersionAlloc(std.testing.allocator);
+    defer std.testing.allocator.free(version);
+    const separator = std.mem.indexOfScalar(u8, version, '.') orelse
+        return error.TestUnexpectedResult;
+    try std.testing.expect(separator > 0);
+    try std.testing.expect(separator + 1 < version.len);
 }
 
 test "appends owned string copies" {
@@ -216,6 +248,40 @@ test "deinitializes lists of owned items" {
     try std.testing.expectEqual(@as(usize, 2), deinit_count);
 }
 
+test "clears lists of owned items while retaining capacity" {
+    const allocator = std.testing.allocator;
+    var deinit_count: usize = 0;
+    var list: std.ArrayList(ClearItem) = .empty;
+    defer list.deinit(allocator);
+
+    try list.append(allocator, .{ .deinit_count = &deinit_count });
+    try list.append(allocator, .{ .deinit_count = &deinit_count });
+    const capacity = list.capacity;
+
+    util.clearList(ClearItem, &list);
+
+    try std.testing.expectEqual(@as(usize, 2), deinit_count);
+    try std.testing.expectEqual(@as(usize, 0), list.items.len);
+    try std.testing.expectEqual(capacity, list.capacity);
+}
+
+test "clears maps of owned items while retaining capacity" {
+    const allocator = std.testing.allocator;
+    var deinit_count: usize = 0;
+    var map = std.AutoHashMap(u32, ClearItem).init(allocator);
+    defer map.deinit();
+
+    try map.put(1, .{ .deinit_count = &deinit_count });
+    try map.put(2, .{ .deinit_count = &deinit_count });
+    const capacity = map.capacity();
+
+    util.clearMap(ClearItem, &map);
+
+    try std.testing.expectEqual(@as(usize, 2), deinit_count);
+    try std.testing.expectEqual(@as(usize, 0), map.count());
+    try std.testing.expectEqual(capacity, map.capacity());
+}
+
 test "deinitializes slices of owned items" {
     const allocator = std.testing.allocator;
     var deinit_count: usize = 0;
@@ -247,5 +313,25 @@ const OwnedItem = struct {
     pub fn deinit(self: *OwnedItem, allocator: std.mem.Allocator) void {
         allocator.free(self.value);
         self.deinit_count.* += 1;
+    }
+};
+
+const ClearItem = struct {
+    deinit_count: *usize,
+
+    pub fn deinit(self: *ClearItem) void {
+        self.deinit_count.* += 1;
+    }
+};
+
+const RawValue = enum {
+    alpha,
+    beta,
+
+    pub fn raw(self: RawValue) []const u8 {
+        return switch (self) {
+            .alpha => "alpha",
+            .beta => "beta-value",
+        };
     }
 };

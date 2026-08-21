@@ -10,7 +10,7 @@ const core = source.core;
 const internal = source.openvpn_internal;
 const ControlPacket = internal.packet.ControlPacket;
 const PacketCode = internal.packet.PacketCode;
-const Serializer = internal.serialization.Serializer;
+const Serializer = internal.control_serializers.Serializer;
 const TestControlChannel = internal.control.ControlChannel(Serializer);
 
 test "control channel fragments payload and retains opcode" {
@@ -99,6 +99,16 @@ test "control channel suppresses retransmission until ACK" {
 
 test "tls-auth channels round trip fragmented payloads" {
     try expectProtectedRoundTrip(.auth, 7);
+}
+
+test "tls-crypt-v2 requires a wrapped key" {
+    const configuration = api.OpenVPNConfiguration{ .tls_wrap = .{
+        .strategy = .cryptV2,
+    } };
+    try std.testing.expectError(
+        error.MissingWrappedKey,
+        Serializer.forConfiguration(std.testing.allocator, .mock, &configuration),
+    );
 }
 
 test "tls-crypt-v2 carries the wrapped key only on leading WKC packets" {

@@ -76,7 +76,7 @@ pub const Parser = struct {
         context: Context,
     ) ParseError!api.WireGuardConfiguration {
         var section: Section = .none;
-        var interface_builder = InterfaceBuilder{};
+        var interface_builder = InterfaceBuilder.init();
         defer interface_builder.deinit(allocator);
         var has_interface = false;
 
@@ -117,7 +117,7 @@ pub const Parser = struct {
                 if (section == .peer) try appendBuiltPeer(allocator, &peers, &peer_builder);
                 if (section == .none) return error.NoInterface;
                 section = .peer;
-                peer_builder = PeerBuilder{};
+                peer_builder = PeerBuilder.init();
                 continue;
             }
 
@@ -187,11 +187,21 @@ pub const ParseError = std.mem.Allocator.Error || error{
 };
 
 const InterfaceBuilder = struct {
-    interface: api.WireGuardLocalInterface = .{},
-    seen_keys: std.EnumSet(InterfaceKey) = std.EnumSet(InterfaceKey).initEmpty(),
-    addresses: std.ArrayList(api.Subnet) = .empty,
-    dns_servers: std.ArrayList(api.Address) = .empty,
-    dns_domains: std.ArrayList(api.Address) = .empty,
+    interface: api.WireGuardLocalInterface,
+    seen_keys: std.EnumSet(InterfaceKey),
+    addresses: std.ArrayList(api.Subnet),
+    dns_servers: std.ArrayList(api.Address),
+    dns_domains: std.ArrayList(api.Address),
+
+    fn init() InterfaceBuilder {
+        return .{
+            .interface = .{},
+            .seen_keys = std.EnumSet(InterfaceKey).initEmpty(),
+            .addresses = .empty,
+            .dns_servers = .empty,
+            .dns_domains = .empty,
+        };
+    }
 
     fn deinit(self: *InterfaceBuilder, allocator: std.mem.Allocator) void {
         self.interface.deinit(allocator);
@@ -268,9 +278,17 @@ const InterfaceBuilder = struct {
 };
 
 const PeerBuilder = struct {
-    peer: api.WireGuardRemoteInterface = .{},
-    seen_keys: std.EnumSet(PeerKey) = std.EnumSet(PeerKey).initEmpty(),
-    allowed_ips: std.ArrayList(api.Subnet) = .empty,
+    peer: api.WireGuardRemoteInterface,
+    seen_keys: std.EnumSet(PeerKey),
+    allowed_ips: std.ArrayList(api.Subnet),
+
+    fn init() PeerBuilder {
+        return .{
+            .peer = .{},
+            .seen_keys = std.EnumSet(PeerKey).initEmpty(),
+            .allowed_ips = .empty,
+        };
+    }
 
     fn deinit(self: *PeerBuilder, allocator: std.mem.Allocator) void {
         self.peer.deinit(allocator);
@@ -469,21 +487,13 @@ fn isWireGuardEndpoint(raw: []const u8) bool {
 
     _ = std.fmt.parseInt(u16, port, 10) catch return false;
     if (host.len == 0) return false;
-    for (host) |byte| {
-        if (!isURLHostAllowed(byte)) return false;
-    }
-    return true;
-}
-
-/// Foundation's `CharacterSet.urlHostAllowed` is deliberately narrower than
-/// RFC percent-encoded URLs: `%`, `/`, `@`, `#`, and non-ASCII scalars are not
-/// accepted by the Swift WireGuard parser. Keep the same ASCII set here.
-fn isURLHostAllowed(byte: u8) bool {
-    if (std.ascii.isAlphanumeric(byte)) return true;
-    return switch (byte) {
-        '!', '$', '&', '\'', '(', ')', '*', '+', ',', '-', '.', ':', ';', '=', '[', ']', '_', '~' => true,
-        else => false,
-    };
+    // Foundation's `CharacterSet.urlHostAllowed` is deliberately narrower than
+    // RFC percent-encoded URLs: `%`, `/`, `@`, `#`, and non-ASCII scalars are not
+    // accepted by the Swift WireGuard parser. Keep the same ASCII set here.
+    return util.containsOnly(
+        host,
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!$&'()*+,-.:;=[]_~",
+    );
 }
 
 fn importParserContext(context: ?core.ImportContext) Parser.Context {

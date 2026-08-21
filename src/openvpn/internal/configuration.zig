@@ -16,16 +16,59 @@ pub const SessionOptions = struct {
     backend: CryptoBackend = .default(),
     max_packets: usize = 100,
     write_timeout_ms: u64 = 5_000,
-    min_data_count_interval_ms: u64 = 3_000,
-    negotiation_timeout_ms: u64 = 30_000,
     hard_reset_timeout_ms: u64 = 10_000,
+    negotiation_timeout_ms: u64 = 30_000,
+    soft_negotiation_timeout_ms: u64 = 120_000,
     tick_interval_ms: u64 = 200,
     retransmission_interval_ms: u64 = 100,
     push_request_interval_ms: u64 = 2_000,
     ping_timeout_check_interval_ms: u64 = 10_000,
     ping_timeout_ms: u64 = 120_000,
-    soft_negotiation_timeout_ms: u64 = 120_000,
+    min_data_count_interval_ms: u64 = 3_000,
 };
+
+pub const ValidationError = error{
+    MissingWrappedKey,
+};
+
+pub fn applyingActiveModules(
+    allocator: std.mem.Allocator,
+    source: *const api.OpenVPNConfiguration,
+    profile: *const api.Profile,
+) error{ OutOfMemory, IncompleteModule }!api.OpenVPNConfiguration {
+    var configuration = source.clone(allocator) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.InvalidJson, error.InvalidModel, error.UnsupportedModel => return error.IncompleteModule,
+    };
+    errdefer configuration.deinit(allocator);
+
+    var add_ipv4 = false;
+    var add_ipv6 = false;
+    for (profile.modules) |*module| {
+        if (!api.isActiveProfileModule(profile, api.moduleId(module))) continue;
+        switch (module.*) {
+            .IP => |*ip| {
+                if (ip.ipv4) |*settings| {
+                    add_ipv4 = add_ipv4 or api.routesDefaultThroughVPN(settings);
+                }
+                if (ip.ipv6) |*settings| {
+                    add_ipv6 = add_ipv6 or api.routesDefaultThroughVPN(settings);
+                }
+            },
+            else => {},
+        }
+    }
+    try appendRoutingPolicy(allocator, &configuration, .IPv4, add_ipv4);
+    try appendRoutingPolicy(allocator, &configuration, .IPv6, add_ipv6);
+    return configuration;
+}
+
+pub fn cipherEmbedsDigest(cipher: api.OpenVPNCipher) bool {
+    return switch (cipher) {
+        .aes128gcm, .aes192gcm, .aes256gcm => true,
+        else => false,
+    };
+}
 
 pub fn cipherKeySize(cipher: api.OpenVPNCipher) u16 {
     return switch (cipher) {
@@ -35,10 +78,70 @@ pub fn cipherKeySize(cipher: api.OpenVPNCipher) u16 {
     };
 }
 
-pub fn cipherEmbedsDigest(cipher: api.OpenVPNCipher) bool {
-    return switch (cipher) {
-        .aes128gcm, .aes192gcm, .aes256gcm => true,
-        else => false,
+pub fn containsCipher(ciphers: []const api.OpenVPNCipher, wanted: api.OpenVPNCipher) bool {
+    return std.mem.indexOfScalar(api.OpenVPNCipher, ciphers, wanted) != null;
+}
+
+pub fn credentialsForAuthentication(
+    allocator: std.mem.Allocator,
+    credentials: api.OpenVPNCredentials,
+) !api.OpenVPNCredentials {
+    const username = try allocator.dupe(u8, credentials.username);
+    errdefer allocator.free(username);
+
+    const password = switch (credentials.otp_method) {
+        .none => try allocator.dupe(u8, credentials.password),
+        .append => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            break :blk try std.mem.concat(allocator, u8, &.{ credentials.password, otp });
+        },
+        .encode => blk: {
+            const otp = credentials.otp orelse return error.OTPRequired;
+            const encoded_password = try core_mod.util.base64EncodeAlloc(allocator, credentials.password);
+            defer allocator.free(encoded_password);
+            const encoded_otp = try core_mod.util.base64EncodeAlloc(allocator, otp);
+            defer allocator.free(encoded_otp);
+            break :blk try std.fmt.allocPrint(
+                allocator,
+                "SCRV1:{s}:{s}",
+                .{ encoded_password, encoded_otp },
+            );
+        },
+    };
+
+    return .{
+        .username = username,
+        .password = password,
+        .otp_method = .none,
+        .otp = null,
+    };
+}
+
+/// Returns an owned endpoint with a random hexadecimal hostname prefix, or an
+/// owned clone of an IP endpoint.
+pub fn endpointWithRandomPrefix(
+    allocator: std.mem.Allocator,
+    endpoint: api.ExtendedEndpoint,
+    length: usize,
+    prng: PRNG,
+) !api.ExtendedEndpoint {
+    const address = api.Address.parseRaw(endpoint.address) orelse
+        return endpoint.clone(allocator);
+    if (address.family != .hostname) return endpoint.clone(allocator);
+
+    const prefix = try prng.data(allocator, length);
+    defer allocator.free(prefix);
+    const encoded = try allocator.alloc(u8, prefix.len * 2);
+    defer allocator.free(encoded);
+    const alphabet = "0123456789abcdef";
+    for (prefix, 0..) |byte, index| {
+        encoded[index * 2] = alphabet[byte >> 4];
+        encoded[index * 2 + 1] = alphabet[byte & 0x0f];
+    }
+    return .{
+        .address = try std.fmt.allocPrint(allocator, "{s}.{s}", .{ encoded, endpoint.address }),
+        .proto = endpoint.proto,
+        .owned = true,
     };
 }
 
@@ -50,8 +153,10 @@ pub fn fallbackCipher(configuration: *const api.OpenVPNConfiguration) api.OpenVP
     return .aes128cbc;
 }
 
-pub fn fallbackDigest(configuration: *const api.OpenVPNConfiguration) api.OpenVPNDigest {
-    return configuration.digest orelse .sha1;
+pub fn fallbackCompressionAlgorithm(
+    configuration: *const api.OpenVPNConfiguration,
+) api.OpenVPNCompressionAlgorithm {
+    return configuration.compression_algorithm orelse .disabled;
 }
 
 pub fn fallbackCompressionFraming(
@@ -60,44 +165,13 @@ pub fn fallbackCompressionFraming(
     return configuration.compression_framing orelse .disabled;
 }
 
-pub fn fallbackCompressionAlgorithm(
-    configuration: *const api.OpenVPNConfiguration,
-) api.OpenVPNCompressionAlgorithm {
-    return configuration.compression_algorithm orelse .disabled;
+pub fn fallbackDigest(configuration: *const api.OpenVPNConfiguration) api.OpenVPNDigest {
+    return configuration.digest orelse .sha1;
 }
 
-pub fn containsCipher(ciphers: []const api.OpenVPNCipher, wanted: api.OpenVPNCipher) bool {
-    return std.mem.indexOfScalar(api.OpenVPNCipher, ciphers, wanted) != null;
-}
-
-/// Returns an owned negotiation list. The configured fallback is appended if
-/// it was not explicitly advertised, matching the Swift extension.
-pub fn negotiableDataCiphers(
-    allocator: std.mem.Allocator,
-    configuration: *const api.OpenVPNConfiguration,
-) !?[]api.OpenVPNCipher {
-    const advertised = configuration.data_ciphers orelse return null;
-    if (advertised.len == 0) return null;
-    const fallback = configuration.cipher;
-    const append_fallback = fallback != null and !containsCipher(advertised, fallback.?);
-    const result = try allocator.alloc(api.OpenVPNCipher, advertised.len + @intFromBool(append_fallback));
-    @memcpy(result[0..advertised.len], advertised);
-    if (append_fallback) result[advertised.len] = fallback.?;
-    return result;
-}
-
-pub fn negotiatedDataChannelCipher(
-    configuration: *const api.OpenVPNConfiguration,
-    pushed: *const api.OpenVPNConfiguration,
-    server_cipher: ?api.OpenVPNCipher,
-) api.OpenVPNCipher {
-    if (pushed.cipher) |cipher| return cipher;
-    if (server_cipher) |cipher| {
-        if (configuration.data_ciphers) |advertised| {
-            if (containsCipher(advertised, cipher) or configuration.cipher == cipher) return cipher;
-        }
-    }
-    return fallbackCipher(configuration);
+pub fn hasPullMask(configuration: *const api.OpenVPNConfiguration, mask: api.OpenVPNPullMask) bool {
+    const masks = configuration.no_pull_mask orelse return false;
+    return std.mem.indexOfScalar(api.OpenVPNPullMask, masks, mask) != null;
 }
 
 /// Builds the legacy OCC/auth-options string sent during key-method-2 auth.
@@ -131,48 +205,34 @@ pub fn localOptionsStringAlloc(
     return output.toOwnedSlice();
 }
 
-pub fn hasPullMask(configuration: *const api.OpenVPNConfiguration, mask: api.OpenVPNPullMask) bool {
-    const masks = configuration.no_pull_mask orelse return false;
-    return std.mem.indexOfScalar(api.OpenVPNPullMask, masks, mask) != null;
+/// Returns an owned negotiation list. The configured fallback is appended if
+/// it was not explicitly advertised, matching the Swift extension.
+pub fn negotiableDataCiphers(
+    allocator: std.mem.Allocator,
+    configuration: *const api.OpenVPNConfiguration,
+) !?[]api.OpenVPNCipher {
+    const advertised = configuration.data_ciphers orelse return null;
+    if (advertised.len == 0) return null;
+    const fallback = configuration.cipher;
+    const append_fallback = fallback != null and !containsCipher(advertised, fallback.?);
+    const result = try allocator.alloc(api.OpenVPNCipher, advertised.len + @intFromBool(append_fallback));
+    @memcpy(result[0..advertised.len], advertised);
+    if (append_fallback) result[advertised.len] = fallback.?;
+    return result;
 }
 
-/// Returns an owned endpoint with a random hexadecimal hostname prefix, or an
-/// owned clone of an IP endpoint.
-pub fn endpointWithRandomPrefix(
-    allocator: std.mem.Allocator,
-    endpoint: api.ExtendedEndpoint,
-    length: usize,
-    prng: PRNG,
-) !api.ExtendedEndpoint {
-    const address = api.Address.parseRaw(endpoint.address) orelse {
-        return .{
-            .address = try allocator.dupe(u8, endpoint.address),
-            .proto = endpoint.proto,
-            .owned = true,
-        };
-    };
-    if (address.family != .hostname) {
-        return .{
-            .address = try allocator.dupe(u8, endpoint.address),
-            .proto = endpoint.proto,
-            .owned = true,
-        };
+pub fn negotiatedDataChannelCipher(
+    configuration: *const api.OpenVPNConfiguration,
+    pushed: *const api.OpenVPNConfiguration,
+    server_cipher: ?api.OpenVPNCipher,
+) api.OpenVPNCipher {
+    if (pushed.cipher) |cipher| return cipher;
+    if (server_cipher) |cipher| {
+        if (configuration.data_ciphers) |advertised| {
+            if (containsCipher(advertised, cipher) or configuration.cipher == cipher) return cipher;
+        }
     }
-
-    const prefix = try prng.data(allocator, length);
-    defer allocator.free(prefix);
-    const encoded = try allocator.alloc(u8, prefix.len * 2);
-    defer allocator.free(encoded);
-    const alphabet = "0123456789abcdef";
-    for (prefix, 0..) |byte, index| {
-        encoded[index * 2] = alphabet[byte >> 4];
-        encoded[index * 2 + 1] = alphabet[byte & 0x0f];
-    }
-    return .{
-        .address = try std.fmt.allocPrint(allocator, "{s}.{s}", .{ encoded, endpoint.address }),
-        .proto = endpoint.proto,
-        .owned = true,
-    };
+    return fallbackCipher(configuration);
 }
 
 /// Returns an owned copy of the configured remotes after applying endpoint
@@ -202,12 +262,34 @@ pub fn processedRemotes(
         result[index] = if (configuration.randomize_hostnames orelse false)
             try endpointWithRandomPrefix(allocator, endpoint, 6, prng)
         else
-            .{
-                .address = try allocator.dupe(u8, endpoint.address),
-                .proto = endpoint.proto,
-                .owned = true,
-            };
+            try endpoint.clone(allocator);
         initialized += 1;
     }
     return result;
+}
+
+pub fn validate(configuration: *const api.OpenVPNConfiguration) ValidationError!void {
+    const wrap = configuration.tls_wrap orelse return;
+    if (wrap.strategy == .cryptV2 and wrap.wrapped_key == null)
+        return error.MissingWrappedKey;
+}
+
+fn appendRoutingPolicy(
+    allocator: std.mem.Allocator,
+    configuration: *api.OpenVPNConfiguration,
+    policy: api.OpenVPNRoutingPolicy,
+    should_append: bool,
+) std.mem.Allocator.Error!void {
+    if (!should_append) return;
+    const previous = configuration.routing_policies orelse &.{};
+    if (std.mem.indexOfScalar(api.OpenVPNRoutingPolicy, previous, policy) != null)
+        return;
+    const updated = try allocator.alloc(
+        api.OpenVPNRoutingPolicy,
+        previous.len + 1,
+    );
+    @memcpy(updated[0..previous.len], previous);
+    updated[previous.len] = policy;
+    if (configuration.routing_policies) |owned| allocator.free(owned);
+    configuration.routing_policies = updated;
 }

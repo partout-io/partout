@@ -151,6 +151,21 @@ test "formats extended endpoints and infers plain socket type" {
     try std.testing.expectEqualStrings("vpn.example.com:UDP:1194", raw);
 }
 
+test "clones extended endpoints" {
+    const allocator = std.testing.allocator;
+    const endpoint = api.ExtendedEndpoint.init(
+        "vpn.example.com",
+        .init(.udp, 1194),
+    ).?;
+    var cloned = try endpoint.clone(allocator);
+    defer cloned.deinit(allocator);
+
+    try std.testing.expectEqualStrings(endpoint.address, cloned.address);
+    try std.testing.expectEqual(endpoint.proto, cloned.proto);
+    try std.testing.expect(cloned.owned);
+    try std.testing.expect(endpoint.address.ptr != cloned.address.ptr);
+}
+
 test "parses endpoint protocols" {
     const proto = api.EndpointProtocol.parseRaw("UDP4:1194") orelse return error.TestUnexpectedResult;
     try std.testing.expectEqual(api.IPSocketType.udp4, proto.socket_type);

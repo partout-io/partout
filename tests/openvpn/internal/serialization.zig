@@ -6,18 +6,18 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
+const control_serializers = source.openvpn_internal.control_serializers;
 const packet = source.openvpn_internal.packet;
-const serialization = source.openvpn_internal.serialization;
 
 const ControlPacket = packet.ControlPacket;
 const PacketCode = packet.PacketCode;
-const AuthSerializer = serialization.testing.Auth;
-const CryptSerializer = serialization.testing.Crypt;
-const CryptV2Serializer = serialization.testing.CryptV2;
-const PlainSerializer = serialization.testing.Plain;
-const Serializer = serialization.Serializer;
-const buildAuthKeys = serialization.testing.buildAuthKeys;
-const buildCryptKeys = serialization.testing.buildCryptKeys;
+const AuthSerializer = control_serializers.testing.Auth;
+const CryptSerializer = control_serializers.testing.Crypt;
+const CryptV2Serializer = control_serializers.testing.CryptV2;
+const PlainSerializer = control_serializers.testing.Plain;
+const Serializer = control_serializers.Serializer;
+const buildAuthKeys = control_serializers.testing.buildAuthKeys;
+const buildCryptKeys = control_serializers.testing.buildCryptKeys;
 
 const static_key_content_length = 256;
 const static_key_length = 64;
@@ -49,18 +49,18 @@ test "client and server tls-crypt keys are complementary" {
     var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
     defer secure.deinit(std.testing.allocator);
     var client = try buildCryptKeys(std.testing.allocator, .{ .data = secure, .dir = .client });
-    defer client.deinit(std.testing.allocator);
+    defer client.deinit();
     var server = try buildCryptKeys(std.testing.allocator, .{ .data = secure, .dir = .server });
-    defer server.deinit(std.testing.allocator);
+    defer server.deinit();
     try std.testing.expectEqualSlices(
         u8,
-        client.cipher.?.encryption_key.bytes,
-        server.cipher.?.decryption_key.bytes,
+        client.cipher.?.encryption_key.asSlice(),
+        server.cipher.?.decryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
-        client.digest.?.encryption_key.bytes,
-        server.digest.?.decryption_key.bytes,
+        client.digest.?.encryption_key.asSlice(),
+        server.digest.?.decryption_key.asSlice(),
     );
 }
 
@@ -75,9 +75,9 @@ test "tls-auth without key direction uses the shared HMAC quadrant" {
     var secure = try api.SecureData.initBytesAlloc(std.testing.allocator, &bytes);
     defer secure.deinit(std.testing.allocator);
     var keys = try buildAuthKeys(std.testing.allocator, .{ .data = secure, .dir = null });
-    defer keys.deinit(std.testing.allocator);
-    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.bytes, 1));
-    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.bytes, 1));
+    defer keys.deinit();
+    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.encryption_key.asSlice(), 1));
+    try std.testing.expect(std.mem.allEqual(u8, keys.digest.?.decryption_key.asSlice(), 1));
 }
 
 test "static tls-auth key directions match the Swift key vectors" {
@@ -99,32 +99,32 @@ test "static tls-auth key directions match the Swift key vectors" {
         .data = secure,
         .dir = null,
     });
-    defer bidirectional.deinit(allocator);
+    defer bidirectional.deinit();
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        bidirectional.digest.?.encryption_key.bytes,
+        bidirectional.digest.?.encryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        bidirectional.digest.?.decryption_key.bytes,
+        bidirectional.digest.?.decryption_key.asSlice(),
     );
 
     var client = try buildAuthKeys(allocator, .{
         .data = secure,
         .dir = .client,
     });
-    defer client.deinit(allocator);
+    defer client.deinit();
     try std.testing.expectEqualSlices(
         u8,
         client_send,
-        client.digest.?.encryption_key.bytes,
+        client.digest.?.encryption_key.asSlice(),
     );
     try std.testing.expectEqualSlices(
         u8,
         shared,
-        client.digest.?.decryption_key.bytes,
+        client.digest.?.decryption_key.asSlice(),
     );
 }
 

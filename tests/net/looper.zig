@@ -105,6 +105,62 @@ fn initLooper(on_finish: Looper.OnFinish) !Looper {
     return Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
 }
 
+fn scheduleTimer(
+    looper: *Looper,
+    timer: *Looper.Timer,
+    delay_ms: u64,
+    task: Looper.TimedTask,
+) !void {
+    const Request = struct {
+        looper: *Looper,
+        timer: *Looper.Timer,
+        delay_ms: u64,
+        task: Looper.TimedTask,
+
+        fn run(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            try self.looper.scheduleReplacing(
+                self.timer,
+                self.delay_ms,
+                self.task,
+            );
+        }
+    };
+    var request = Request{
+        .looper = looper,
+        .timer = timer,
+        .delay_ms = delay_ms,
+        .task = task,
+    };
+    try looper.performTask(.{ .context = &request, .callback = Request.run });
+}
+
+fn cancelTimer(looper: *Looper, timer: *Looper.Timer) !void {
+    const Request = struct {
+        looper: *Looper,
+        timer: *Looper.Timer,
+
+        fn run(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.looper.cancelTimer(self.timer);
+        }
+    };
+    var request = Request{ .looper = looper, .timer = timer };
+    try looper.performTask(.{ .context = &request, .callback = Request.run });
+}
+
+const TimerProbe = struct {
+    looper: *Looper,
+    did_run: AtomicBool = AtomicBool.init(false),
+    ran_on_looper: AtomicBool = AtomicBool.init(false),
+
+    fn run(raw: ?*anyopaque) void {
+        const self: *TimerProbe = @ptrCast(@alignCast(raw.?));
+        self.ran_on_looper.store(self.looper.isOnQueue(), .release);
+        self.did_run.store(true, .release);
+    }
+};
+
 fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
     return .{
         .fd = pipe.fds[0],
@@ -131,6 +187,78 @@ test "perform completes synchronously with its result" {
         try looper.perform(u8, null, returnFortyTwo),
     );
     try looper.stop();
+}
+
+test "independent timers execute on the shared looper" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var first_timer = Looper.Timer{};
+    var second_timer = Looper.Timer{};
+    var first_probe = TimerProbe{ .looper = &looper };
+    var second_probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &first_timer, 1, .{
+        .context = &first_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &second_timer, 1, .{
+        .context = &second_probe,
+        .callback = TimerProbe.run,
+    });
+
+    waitUntil(&first_probe.did_run);
+    waitUntil(&second_probe.did_run);
+    try std.testing.expect(first_probe.ran_on_looper.load(.acquire));
+    try std.testing.expect(second_probe.ran_on_looper.load(.acquire));
+    try looper.stop();
+}
+
+test "replacing and cancelling timers suppresses stale callbacks" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var replaced_timer = Looper.Timer{};
+    var cancelled_timer = Looper.Timer{};
+    var stale_probe = TimerProbe{ .looper = &looper };
+    var replacement_probe = TimerProbe{ .looper = &looper };
+    var cancelled_probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &replaced_timer, 50, .{
+        .context = &stale_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &replaced_timer, 1, .{
+        .context = &replacement_probe,
+        .callback = TimerProbe.run,
+    });
+    try scheduleTimer(&looper, &cancelled_timer, 10, .{
+        .context = &cancelled_probe,
+        .callback = TimerProbe.run,
+    });
+    try cancelTimer(&looper, &cancelled_timer);
+
+    waitUntil(&replacement_probe.did_run);
+    source.core.concurrency.sleepMs(75);
+    try std.testing.expect(!stale_probe.did_run.load(.acquire));
+    try std.testing.expect(!cancelled_probe.did_run.load(.acquire));
+    try looper.stop();
+}
+
+test "stopping the looper cancels pending timers" {
+    var looper = try initLooper(.{ .callback = noopFinish });
+    defer looper.deinit();
+    try looper.start();
+
+    var timer = Looper.Timer{};
+    var probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &timer, 60_000, .{
+        .context = &probe,
+        .callback = TimerProbe.run,
+    });
+
+    try looper.stop();
+    try std.testing.expect(!probe.did_run.load(.acquire));
 }
 
 test "deinit does not invoke the finish callback" {
@@ -226,27 +354,27 @@ test "work is rejected before start and after terminal cleanup" {
     try looper.start();
     try looper.stop();
 
-    try std.testing.expect(finish_probe.oob_was_cancelled.load(.acquire));
-    try std.testing.expectError(error.Cancelled, looper.resumeReading(.link));
+    try std.testing.expect(finish_probe.oob_got_looper_unavailable.load(.acquire));
+    try std.testing.expectError(error.LooperUnavailable, looper.resumeReading(.link));
     try std.testing.expectError(
-        error.Cancelled,
+        error.LooperUnavailable,
         looper.performTask(.{ .callback = noopTask }),
     );
-    try std.testing.expectError(error.Cancelled, looper.detach(.link));
+    try std.testing.expectError(error.LooperUnavailable, looper.detach(.link));
     try std.testing.expectError(
-        error.Cancelled,
+        error.LooperUnavailable,
         looper.writeQueued(&.{"discarded"}, .link),
     );
 }
 
 const FinishProbe = struct {
     looper: *Looper = undefined,
-    oob_was_cancelled: AtomicBool = AtomicBool.init(false),
+    oob_got_looper_unavailable: AtomicBool = AtomicBool.init(false),
 
     fn onFinish(raw: ?*anyopaque, _: ?Looper.Failure) void {
         const self: *FinishProbe = @ptrCast(@alignCast(raw.?));
         self.looper.write(&.{"discarded"}, .link, true) catch |err| {
-            self.oob_was_cancelled.store(err == error.Cancelled, .release);
+            self.oob_got_looper_unavailable.store(err == error.LooperUnavailable, .release);
         };
     }
 };
@@ -307,6 +435,35 @@ test "out-of-band write returns the underlying I/O error" {
 
     try looper.detach(.link);
     try looper.stop();
+}
+
+test "synchronous lifecycle commands do not allocate" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var pipe = try Pipe.init();
+    defer pipe.deinit();
+    var mock = MockIO{};
+    var looper = try Looper.init(failing.allocator(), .{
+        .on_finish = .{ .callback = noopFinish },
+    });
+    defer looper.deinit();
+    try looper.start();
+    try looper.attach(.{
+        .pair = .{ .link = descriptor(pipe, &mock) },
+    });
+
+    // Refuse every later allocation. perform(), detach(), and stop() must use
+    // their caller-owned command nodes and still complete normally.
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectEqual(
+        @as(u8, 42),
+        try looper.perform(u8, null, returnFortyTwo),
+    );
+    try looper.detach(.link);
+    try std.testing.expect(mock.cleaned.load(.acquire));
+    try looper.stop();
+    try std.testing.expect(!failing.has_induced_failure);
 }
 
 const FailureProbe = struct {
@@ -461,7 +618,7 @@ const DetachWorker = struct {
     }
 };
 
-test "deinit cancels a detach queued during a running command" {
+test "deinit completes a queued detach with LooperUnavailable" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
 
     var pipe = try Pipe.init();
@@ -510,7 +667,7 @@ test "deinit cancels a detach queued during a running command" {
     waitUntil(&detacher.done);
     detach_thread.join();
     detacher_joined = true;
-    try std.testing.expect(detacher.failure.? == error.Cancelled);
+    try std.testing.expect(detacher.failure.? == error.LooperUnavailable);
 
     blocking_task.release.store(true, .release);
     blocking_thread.join();
@@ -523,7 +680,7 @@ test "deinit cancels a detach queued during a running command" {
     try std.testing.expect(mock.cleaned.load(.acquire));
 }
 
-test "deinit cancels a perform queued during a running command" {
+test "deinit completes a queued perform with LooperUnavailable" {
     var blocking_task = BlockingTask{};
     var looper = try initLooper(.{ .callback = noopFinish });
     var needs_deinit = true;
@@ -571,7 +728,7 @@ test "deinit cancels a perform queued during a running command" {
     needs_deinit = false;
 
     try std.testing.expect(blocking_worker.failure == null);
-    try std.testing.expect(worker.was_cancelled.load(.acquire));
+    try std.testing.expect(worker.got_looper_unavailable.load(.acquire));
     try std.testing.expect(deinit_worker.done.load(.acquire));
 }
 
@@ -591,14 +748,14 @@ const PerformWorker = struct {
     task: Looper.Task = .{ .callback = noopTask },
     started: AtomicBool = AtomicBool.init(false),
     done: AtomicBool = AtomicBool.init(false),
-    was_cancelled: AtomicBool = AtomicBool.init(false),
+    got_looper_unavailable: AtomicBool = AtomicBool.init(false),
     failure: ?anyerror = null,
 
     fn run(self: *PerformWorker) void {
         self.started.store(true, .release);
         self.looper.performTask(self.task) catch |err| {
             self.failure = err;
-            self.was_cancelled.store(err == error.Cancelled, .release);
+            self.got_looper_unavailable.store(err == error.LooperUnavailable, .release);
         };
         self.done.store(true, .release);
     }

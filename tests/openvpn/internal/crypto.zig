@@ -24,13 +24,23 @@ test "PRNG binds its provider at compile time" {
 }
 
 test "ZeroingData delegates append and slice to pp_zd" {
-    const allocator = std.testing.allocator;
-    var data = try crypto.ZeroingData.initCopy(allocator, "abc");
-    defer data.deinit(allocator);
-    try data.append(allocator, "def");
-    try std.testing.expectEqualStrings("abcdef", data.bytes);
+    var data = crypto.ZeroingData.initCopy("abc");
+    defer data.deinit();
+    data.append("def");
+    try std.testing.expectEqualStrings("abcdef", data.asSlice());
+    data.append(data.asSlice()[1..3]);
+    try std.testing.expectEqualStrings("abcdefbc", data.asSlice());
 
-    var part = try data.sliceCopy(allocator, 2, 3);
-    defer part.deinit(allocator);
-    try std.testing.expectEqualStrings("cde", part.bytes);
+    var part = try data.sliceCopy(2, 3);
+    defer part.deinit();
+    try std.testing.expectEqualStrings("cde", part.asSlice());
+    try std.testing.expectError(
+        error.OutOfBounds,
+        data.sliceCopy(std.math.maxInt(usize), 1),
+    );
+
+    data.clear();
+    try std.testing.expectEqual(@as(usize, 0), data.length());
+    data.append("new");
+    try std.testing.expectEqualStrings("new", data.asSlice());
 }

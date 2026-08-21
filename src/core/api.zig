@@ -85,6 +85,7 @@ pub const WireGuardLocalInterface = gen.WireGuardLocalInterface;
 pub const WireGuardModule = gen.WireGuardModule;
 pub const WireGuardRemoteInterface = gen.WireGuardRemoteInterface;
 
+pub const containsDefaultRoute = extensions.containsDefaultRoute;
 pub const encodeModule = extensions.encodeModule;
 pub const encodeModuleZ = extensions.encodeModuleZ;
 pub const encodeProfile = extensions.encodeProfile;
@@ -96,6 +97,7 @@ pub const moduleCacheFilename = extensions.moduleCacheFilename;
 pub const moduleId = extensions.moduleId;
 pub const moduleType = extensions.moduleType;
 pub const parseModule = extensions.parseModule;
+pub const routesDefaultThroughVPN = extensions.routesDefaultThroughVPN;
 pub const typeBuildsConnection = extensions.typeBuildsConnection;
 
 // ZIGME: Map errors to code enum (LLM: don't touch this)

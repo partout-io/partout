@@ -6,6 +6,7 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
+const util = source.core.util;
 const NetworkSettingsBuilder = source.openvpn_internal.settings.NetworkSettingsBuilder;
 
 test "NetworkSettingsBuilder requires a remote tunnel address for IP settings" {
@@ -15,7 +16,7 @@ test "NetworkSettingsBuilder requires a remote tunnel address for IP settings" {
     {
         const remote = api.OpenVPNConfiguration{};
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         try std.testing.expectEqual(@as(usize, 0), result.len);
     }
 
@@ -25,7 +26,7 @@ test "NetworkSettingsBuilder requires a remote tunnel address for IP settings" {
             .ipv4 = .{ .subnets = &subnets },
         };
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         try std.testing.expectEqual(@as(usize, 1), result.len);
         try std.testing.expect(result[0] == .IP);
     }
@@ -50,7 +51,7 @@ test "NetworkSettingsBuilder merges local and pushed routes unless routes are ma
     {
         const local = api.OpenVPNConfiguration{ .routes4 = &local_routes };
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         const routes = result[0].IP.ipv4.?.included_routes;
         try std.testing.expectEqual(@as(usize, 4), routes.len);
         try std.testing.expectEqualStrings("1.1.0.0", routes[0].destination.?.address.raw);
@@ -64,7 +65,7 @@ test "NetworkSettingsBuilder merges local and pushed routes unless routes are ma
             .no_pull_mask = &masks,
         };
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         const routes = result[0].IP.ipv4.?.included_routes;
         try std.testing.expectEqual(@as(usize, 2), routes.len);
         try std.testing.expectEqualStrings("1.1.0.0", routes[0].destination.?.address.raw);
@@ -95,7 +96,7 @@ test "NetworkSettingsBuilder applies routing policies and remote gateways" {
         .routing_policies = &policies,
     };
     const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
     const ip = result[0].IP;
 
     try std.testing.expectEqual(@as(usize, 2), ip.ipv4.?.included_routes.len);
@@ -123,7 +124,7 @@ test "NetworkSettingsBuilder gives remote DNS precedence" {
     const remote = api.OpenVPNConfiguration{ .dns_servers = &remote_servers };
     const builder = NetworkSettingsBuilder.init(&local, &remote);
     const result = try builder.modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
     try std.testing.expectEqual(@as(usize, 1), result.len);
     try std.testing.expectEqual(@as(usize, 2), result[0].DNS.servers.len);
 }
@@ -145,7 +146,7 @@ test "NetworkSettingsBuilder merges DNS servers and domains unless DNS is masked
             .search_domains = &local_search,
         };
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         const dns = result[0].DNS;
         try std.testing.expectEqual(@as(usize, 3), dns.servers.len);
         try std.testing.expectEqualStrings("1.1.1.1", dns.servers[0].raw);
@@ -165,7 +166,7 @@ test "NetworkSettingsBuilder merges DNS servers and domains unless DNS is masked
             .no_pull_mask = &masks,
         };
         const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
         const dns = result[0].DNS;
         try std.testing.expectEqual(@as(usize, 2), dns.servers.len);
         try std.testing.expectEqual(@as(usize, 2), dns.search_domains.?.len);
@@ -198,7 +199,7 @@ test "NetworkSettingsBuilder places primary DNS domain first and deduplicates se
     };
 
     const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
     const dns = result[0].DNS;
     const search = dns.search_domains orelse return error.TestUnexpectedResult;
 
@@ -220,7 +221,7 @@ test "NetworkSettingsBuilder includes a lone primary DNS domain in search domain
     };
 
     const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
     const dns = result[0].DNS;
     const search = dns.search_domains orelse return error.TestUnexpectedResult;
 
@@ -239,7 +240,7 @@ test "NetworkSettingsBuilder omits malformed DNS without discarding proxy" {
     const remote = api.OpenVPNConfiguration{};
     const builder = NetworkSettingsBuilder.init(&local, &remote);
     const result = try builder.modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
 
     try std.testing.expectEqual(@as(usize, 1), result.len);
     try std.testing.expect(result[0] == .HTTPProxy);
@@ -257,7 +258,7 @@ test "NetworkSettingsBuilder omits malformed proxy without discarding DNS" {
     const remote = api.OpenVPNConfiguration{};
     const builder = NetworkSettingsBuilder.init(&local, &remote);
     const result = try builder.modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
 
     try std.testing.expectEqual(@as(usize, 1), result.len);
     try std.testing.expect(result[0] == .DNS);
@@ -271,7 +272,7 @@ test "NetworkSettingsBuilder applies pushed MTU with local fallback" {
         const remote = api.OpenVPNConfiguration{ .mtu = 1300 };
         const builder = NetworkSettingsBuilder.init(&local, &remote);
         const result = try builder.modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
 
         try std.testing.expectEqual(@as(usize, 1), result.len);
         try std.testing.expectEqual(@as(?i32, 1300), result[0].IP.mtu);
@@ -282,7 +283,7 @@ test "NetworkSettingsBuilder applies pushed MTU with local fallback" {
         const remote = api.OpenVPNConfiguration{};
         const builder = NetworkSettingsBuilder.init(&local, &remote);
         const result = try builder.modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
 
         try std.testing.expectEqual(@as(usize, 1), result.len);
         try std.testing.expectEqual(@as(?i32, 1400), result[0].IP.mtu);
@@ -293,7 +294,7 @@ test "NetworkSettingsBuilder applies pushed MTU with local fallback" {
         const remote = api.OpenVPNConfiguration{ .mtu = 0 };
         const builder = NetworkSettingsBuilder.init(&local, &remote);
         const result = try builder.modules(allocator);
-        defer NetworkSettingsBuilder.deinitModules(allocator, result);
+        defer util.freeSlice(api.TaggedModule, allocator, result);
 
         try std.testing.expectEqual(@as(usize, 1), result.len);
         try std.testing.expectEqual(@as(?i32, 1400), result[0].IP.mtu);
@@ -314,7 +315,7 @@ test "NetworkSettingsBuilder builds endpoint, PAC, and merged proxy bypass setti
         .proxy_bypass_domains = &remote_bypass,
     };
     const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
     try std.testing.expectEqual(@as(usize, 1), result.len);
     const proxy = result[0].HTTPProxy;
     try std.testing.expectEqualStrings("192.0.2.1", proxy.proxy.?.address);
@@ -339,7 +340,7 @@ test "NetworkSettingsBuilder builds endpoint, PAC, and merged proxy bypass setti
         &masked_local,
         &remote,
     ).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, masked_result);
+    defer util.freeSlice(api.TaggedModule, allocator, masked_result);
     const masked = masked_result[0].HTTPProxy;
     try std.testing.expect(masked.secure_proxy == null);
     try std.testing.expect(masked.pac_url == null);
@@ -353,7 +354,7 @@ test "NetworkSettingsBuilder accepts an empty PAC URL" {
     };
     const remote = api.OpenVPNConfiguration{};
     const result = try NetworkSettingsBuilder.init(&local, &remote).modules(allocator);
-    defer NetworkSettingsBuilder.deinitModules(allocator, result);
+    defer util.freeSlice(api.TaggedModule, allocator, result);
 
     try std.testing.expectEqual(@as(usize, 1), result.len);
     try std.testing.expectEqualStrings("", result[0].HTTPProxy.pac_url.?);

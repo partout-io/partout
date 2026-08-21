@@ -14,6 +14,19 @@ const api = core.api;
 const ConnectionRegistry = conn.ConnectionRegistry;
 const activeConnectionModule = conn.activeConnectionModule;
 
+test "connection accepts only valid status transitions" {
+    try std.testing.expect(conn.canChangeStatus(.disconnected, .connecting));
+    try std.testing.expect(!conn.canChangeStatus(.disconnected, .connected));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .connected));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .disconnecting));
+    try std.testing.expect(conn.canChangeStatus(.connecting, .disconnected));
+    try std.testing.expect(conn.canChangeStatus(.connected, .disconnecting));
+    try std.testing.expect(conn.canChangeStatus(.connected, .disconnected));
+    try std.testing.expect(conn.canChangeStatus(.disconnecting, .disconnected));
+    try std.testing.expect(!conn.canChangeStatus(.connected, .connecting));
+    try std.testing.expect(!conn.canChangeStatus(.connected, .connected));
+}
+
 test "connection options match Swift defaults" {
     const options = sandbox.ConnectionOptions{};
 
@@ -22,6 +35,31 @@ test "connection options match Swift defaults" {
     try std.testing.expectEqual(@as(u32, 5000), options.link_write_timeout);
     try std.testing.expectEqual(@as(u32, 1000), options.min_data_count_interval);
     try std.testing.expect(options.user_info == null);
+}
+
+test "serialized executor reports rejected work" {
+    const Rejecting = struct {
+        fn run(
+            _: *anyopaque,
+            _: *anyopaque,
+            _: sandbox.SerializedExecutor.Block,
+            _: ?sandbox.SerializedExecutor.Block,
+        ) sandbox.SerializedExecutor.RunError!void {
+            return error.Closed;
+        }
+
+        fn block(_: *anyopaque) void {}
+    };
+    var context: u8 = 0;
+    const executor = sandbox.SerializedExecutor{
+        .ptr = &context,
+        .run_block = Rejecting.run,
+    };
+
+    try std.testing.expectError(
+        error.Closed,
+        executor.tryRun(&context, Rejecting.block),
+    );
 }
 
 test "finds the active connection module" {
