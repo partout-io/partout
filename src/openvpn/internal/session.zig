@@ -138,6 +138,51 @@ pub const Session = struct {
         return createFallible(allocator, init) catch |err| errors_mod.sessionError(err);
     }
 
+    fn createFallible(allocator: std.mem.Allocator, init: Init) !*Session {
+        var owned_configuration = try init.configuration.clone(allocator);
+        errdefer owned_configuration.deinit(allocator);
+        var owned_credentials = if (init.credentials) |value|
+            try configuration_mod.credentialsForAuthentication(allocator, value)
+        else
+            null;
+        errdefer if (owned_credentials) |*value| value.deinit(allocator);
+        const owned_caches_directory = try allocator.dupe(u8, init.caches_directory);
+        errdefer allocator.free(owned_caches_directory);
+        const owned_ca_filename = try allocator.dupe(u8, init.ca_filename);
+        errdefer allocator.free(owned_ca_filename);
+        const serializer = try Serializer.forConfiguration(
+            allocator,
+            init.options.backend,
+            &owned_configuration,
+        );
+        const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
+        errdefer control_channel.destroy();
+
+        const self = try allocator.create(Session);
+        self.* = .{
+            .allocator = allocator,
+            .configuration = owned_configuration,
+            .credentials = owned_credentials,
+            .prng = init.prng,
+            .caches_directory = owned_caches_directory,
+            .ca_filename = owned_ca_filename,
+            .options = init.options,
+            .executor = init.executor,
+            .looper = init.looper,
+            .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
+        };
+        errdefer {
+            self.on_queue.deinitTimers();
+            self.shutdown_state.deinit();
+            self.lifecycle_lock.deinit();
+            allocator.destroy(self);
+        }
+        // A later schedule is therefore infallible. In particular, negotiation
+        // can commit DataChannel ownership before arming the first ping.
+        try self.on_queue.startTimers();
+        return self;
+    }
+
     /// Must run outside every looper, timer, and delegate callback while the
     /// borrowed looper remains alive and running. This does not stop or
     /// deinitialize the looper.
@@ -316,53 +361,6 @@ pub const Session = struct {
         self.onQueue().finishShutdown(
             if (failure) |value| failureError(value) else null,
         );
-    }
-
-    // MARK: - Private construction
-
-    fn createFallible(allocator: std.mem.Allocator, init: Init) !*Session {
-        var owned_configuration = try init.configuration.clone(allocator);
-        errdefer owned_configuration.deinit(allocator);
-        var owned_credentials = if (init.credentials) |value|
-            try configuration_mod.credentialsForAuthentication(allocator, value)
-        else
-            null;
-        errdefer if (owned_credentials) |*value| value.deinit(allocator);
-        const owned_caches_directory = try allocator.dupe(u8, init.caches_directory);
-        errdefer allocator.free(owned_caches_directory);
-        const owned_ca_filename = try allocator.dupe(u8, init.ca_filename);
-        errdefer allocator.free(owned_ca_filename);
-        const serializer = try Serializer.forConfiguration(
-            allocator,
-            init.options.backend,
-            &owned_configuration,
-        );
-        const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
-        errdefer control_channel.destroy();
-
-        const self = try allocator.create(Session);
-        self.* = .{
-            .allocator = allocator,
-            .configuration = owned_configuration,
-            .credentials = owned_credentials,
-            .prng = init.prng,
-            .caches_directory = owned_caches_directory,
-            .ca_filename = owned_ca_filename,
-            .options = init.options,
-            .executor = init.executor,
-            .looper = init.looper,
-            .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
-        };
-        errdefer {
-            self.on_queue.deinitTimers();
-            self.shutdown_state.deinit();
-            self.lifecycle_lock.deinit();
-            allocator.destroy(self);
-        }
-        // A later schedule is therefore infallible. In particular, negotiation
-        // can commit DataChannel ownership before arming the first ping.
-        try self.on_queue.startTimers();
-        return self;
     }
 
     // MARK: - From any thread
