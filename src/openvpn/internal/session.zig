@@ -116,16 +116,8 @@ pub const Session = struct {
 
     executor: net.SerializedExecutor,
     looper: *net.Looper,
-    control_channel: *ControlChannel,
     on_queue: SessionOnQueue,
     lifecycle_lock: core.Mutex = .{},
-    negotiation_timer: core.RunAfter = .{},
-    ping_timer: core.RunAfter = .{},
-
-    delegate: ?SessionDelegate = null,
-    state: SessionState = .{ .stopped = .{ .with_local_options = true } },
-    link_processor: ?*LinkProcessor = null,
-
     shutdown_state: ShutdownState = .{},
 
     pub const Init = struct {
@@ -154,8 +146,7 @@ pub const Session = struct {
             @panic("Session.destroy() must run outside looper callbacks");
 
         log.write(.debug, "Deinit OpenVPNSession");
-        self.negotiation_timer.cancel();
-        self.ping_timer.cancel();
+        self.on_queue.cancelTimers();
 
         self.shutdown(null, 0) catch |err| {
             log.writef(.fault, "Unable to detach Session before destruction: {s}", .{
@@ -163,15 +154,7 @@ pub const Session = struct {
             });
             @panic("Session.destroy() cannot release an attached session");
         };
-        self.negotiation_timer.deinit();
-        self.ping_timer.deinit();
-
-        switch (self.state) {
-            .stopped => {},
-            .active => |active| active.context.destroy(),
-        }
-        if (self.link_processor) |processor| processor.destroy();
-        self.control_channel.destroy();
+        self.on_queue.deinit();
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
@@ -215,13 +198,19 @@ pub const Session = struct {
             self.configuration.xor_method,
             remote_endpoint.plainSocketType() == .tcp,
         ) catch |err| return errors_mod.sessionError(err);
-        self.link_processor = processor;
-        errdefer {
-            if (self.link_processor == processor) {
-                self.link_processor = null;
-                processor.destroy();
-            }
-        }
+        self.performOnQueue(
+            void,
+            processor,
+            SessionOnQueue.installLinkProcessor,
+        ) catch |err| {
+            processor.destroy();
+            return errors_mod.sessionError(err);
+        };
+        errdefer self.performOnQueue(
+            void,
+            processor,
+            SessionOnQueue.discardLinkProcessor,
+        ) catch {};
 
         log.write(.info, "Attach LINK");
         self.looper.attach(.{
@@ -362,21 +351,17 @@ pub const Session = struct {
             .options = init.options,
             .executor = init.executor,
             .looper = init.looper,
-            .control_channel = control_channel,
-            .on_queue = SessionOnQueue.init(self),
-            .delegate = init.delegate,
+            .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
         };
         errdefer {
-            self.ping_timer.deinit();
-            self.negotiation_timer.deinit();
+            self.on_queue.deinitTimers();
             self.shutdown_state.deinit();
             self.lifecycle_lock.deinit();
             allocator.destroy(self);
         }
         // A later schedule is therefore infallible. In particular, negotiation
         // can commit DataChannel ownership before arming the first ping.
-        try self.negotiation_timer.start();
-        try self.ping_timer.start();
+        try self.on_queue.startTimers();
         return self;
     }
 
@@ -428,7 +413,7 @@ pub const Session = struct {
         packets: net.Looper.Packets,
     ) !net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        const processor = self.link_processor orelse return .keep;
+        const processor = self.onQueue().link_processor orelse return .keep;
         var processed = try processor.processInbound(packets);
         defer processed.deinit();
         try self.onQueue().receiveLink(processed.packets());
@@ -601,24 +586,88 @@ pub const Session = struct {
 
 // MARK: - On queue
 
-/// A serialized view created once with its stable parent pointer and embedded
-/// in `Session`. Methods below never acquire Session locks, and external
-/// callbacks re-enter through `Session.onQueue`.
+/// Owns mutable protocol state confined to the looper. It is created before
+/// callbacks can run and deinitialized after timers and looper callbacks have
+/// drained. Queue callbacks re-enter through `Session.onQueue`.
 const SessionOnQueue = struct {
     session: *Session,
+    control_channel: *ControlChannel,
+    negotiation_timer: core.RunAfter = .{},
+    ping_timer: core.RunAfter = .{},
+    delegate: ?SessionDelegate,
+    state: SessionState = .{ .stopped = .{ .with_local_options = true } },
+    link_processor: ?*LinkProcessor = null,
 
-    fn init(session: *Session) SessionOnQueue {
-        return .{ .session = session };
+    fn init(
+        session: *Session,
+        control_channel: *ControlChannel,
+        delegate: ?SessionDelegate,
+    ) SessionOnQueue {
+        return .{
+            .session = session,
+            .control_channel = control_channel,
+            .delegate = delegate,
+        };
+    }
+
+    fn deinit(self: *SessionOnQueue) void {
+        self.deinitTimers();
+        switch (self.state) {
+            .stopped => {},
+            .active => |active| active.context.destroy(),
+        }
+        self.clearLinkProcessor();
+        self.control_channel.destroy();
+    }
+
+    fn startTimers(self: *SessionOnQueue) std.Thread.SpawnError!void {
+        try self.negotiation_timer.start();
+        try self.ping_timer.start();
+    }
+
+    fn cancelTimers(self: *SessionOnQueue) void {
+        self.negotiation_timer.cancel();
+        self.ping_timer.cancel();
+    }
+
+    fn deinitTimers(self: *SessionOnQueue) void {
+        self.negotiation_timer.deinit();
+        self.ping_timer.deinit();
     }
 
     fn setDelegate(self: *SessionOnQueue, delegate: ?SessionDelegate) void {
-        self.session.delegate = delegate;
+        self.delegate = delegate;
     }
 
     // MARK: Lifecycle
 
+    fn installLinkProcessor(
+        self: *SessionOnQueue,
+        processor: *LinkProcessor,
+    ) void {
+        if (self.link_processor != null)
+            @panic("Session link processor is already installed");
+        self.link_processor = processor;
+    }
+
+    fn discardLinkProcessor(
+        self: *SessionOnQueue,
+        processor: *LinkProcessor,
+    ) void {
+        if (self.link_processor) |installed| {
+            if (installed != processor)
+                @panic("Session link processor changed before rollback");
+            self.clearLinkProcessor();
+        }
+    }
+
+    fn clearLinkProcessor(self: *SessionOnQueue) void {
+        if (self.link_processor) |processor| processor.destroy();
+        self.link_processor = null;
+    }
+
     fn setLink(self: *SessionOnQueue, remote_endpoint: api.ExtendedEndpoint) !void {
-        const idle = switch (self.session.state) {
+        const idle = switch (self.state) {
             .stopped => |context| context,
             .active => {
                 log.write(.err, "Session is not stopped");
@@ -628,7 +677,7 @@ const SessionOnQueue = struct {
             },
         };
         log.write(.info, "Start VPN session");
-        const processor = self.session.link_processor orelse
+        const processor = self.link_processor orelse
             @panic("Session cannot start before its link processor is configured");
         const data_link = DataLink.init(
             self.session.allocator,
@@ -647,19 +696,19 @@ const SessionOnQueue = struct {
             idle.with_local_options,
             remote_endpoint,
         );
-        self.session.state = .{ .active = .{
+        self.state = .{ .active = .{
             .phase = .starting,
             .context = active_context,
         } };
         self.startNegotiation() catch |err| {
             active_context.destroy();
-            self.session.state = .{ .stopped = idle };
+            self.state = .{ .stopped = idle };
             return err;
         };
     }
 
     fn prepareShutdown(self: *SessionOnQueue, request: Session.ShutdownRequest) bool {
-        const active = self.session.state.activeState() orelse {
+        const active = self.state.activeState() orelse {
             log.write(.debug, "Ignore stop request, stopped or already stopping");
             return false;
         };
@@ -675,8 +724,7 @@ const SessionOnQueue = struct {
             log.write(.info, "Shut down on request");
         }
         active.phase = .stopping;
-        self.session.negotiation_timer.cancel();
-        self.session.ping_timer.cancel();
+        self.cancelTimers();
 
         if (shouldSendExitNotification(request.cause)) self.sendExitPacket(
             request.timeout_ms orelse self.session.options.write_timeout_ms,
@@ -687,30 +735,31 @@ const SessionOnQueue = struct {
     }
 
     fn finishShutdown(self: *SessionOnQueue, cause: ?SessionError) void {
-        const active = switch (self.session.state) {
-            .stopped => return,
+        const active = switch (self.state) {
+            .stopped => {
+                self.clearLinkProcessor();
+                return;
+            },
             .active => |value| value,
         };
         // Terminal looper failures bypass prepareShutdown(), so cancel
-        // both Session-owned replacements for the Swift context's Tasks here
+        // both queue-owned replacements for the Swift context's Tasks here
         // as well as in the normal shutdown path.
-        self.session.negotiation_timer.cancel();
-        self.session.ping_timer.cancel();
+        self.cancelTimers();
         const next_with_local_options = if (cause) |value|
             active.context.with_local_options and value != error.BadCredentialsWithLocalOptions
         else
             active.context.with_local_options;
         active.context.destroy();
-        self.session.state = .{ .stopped = .{
+        self.state = .{ .stopped = .{
             .with_local_options = next_with_local_options,
         } };
-        if (self.session.link_processor) |processor| processor.destroy();
-        self.session.link_processor = null;
-        if (self.session.delegate) |delegate| delegate.didStop(self.session, cause);
+        self.clearLinkProcessor();
+        if (self.delegate) |delegate| delegate.didStop(self.session, cause);
     }
 
     fn sendExitPacket(self: *SessionOnQueue, timeout_ms: u64) !void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         if (context.remote_endpoint.plainSocketType() != .udp) return;
         const pair = context.current_data_pair orelse return;
         log.write(.info, "Send OCCPacket exit");
@@ -723,7 +772,7 @@ const SessionOnQueue = struct {
     // MARK: Packet I/O
 
     fn receiveLink(self: *SessionOnQueue, packets: []const []const u8) !void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         context.last_received_ns = core.concurrency.monotonicNs();
         var negotiator = context.currentNegotiator() orelse {
             @panic("Active session received link packets without a negotiator");
@@ -762,7 +811,7 @@ const SessionOnQueue = struct {
             }
 
             try self.processDataPackets(context, &grouped);
-            var parsed = self.session.control_channel.readInboundPacket(packet, 0) catch |err| {
+            var parsed = self.control_channel.readInboundPacket(packet, 0) catch |err| {
                 log.writef(.err, "Dropped malformed packet: {s}", .{@errorName(err)});
                 continue;
             };
@@ -784,7 +833,7 @@ const SessionOnQueue = struct {
                 else => {},
             }
             negotiator.sendAck(&parsed);
-            const inbound = try self.session.control_channel.enqueueInboundPacket(parsed.move());
+            const inbound = try self.control_channel.enqueueInboundPacket(parsed.move());
             defer {
                 for (inbound) |*owned| owned.deinit();
                 self.session.allocator.free(inbound);
@@ -813,7 +862,7 @@ const SessionOnQueue = struct {
     }
 
     fn receiveTunnel(self: *SessionOnQueue, packets: []const []const u8) !void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeout(context);
         try pair.send(packets, null, null);
@@ -823,7 +872,7 @@ const SessionOnQueue = struct {
 
     fn startNegotiation(self: *SessionOnQueue) !void {
         log.write(.info, "Start negotiation");
-        const context = self.session.state.activeContext() orelse
+        const context = self.state.activeContext() orelse
             @panic("Cannot start negotiation while the session is stopped");
         const tls = try TLSWrapper.create(self.session.allocator, .{
             .backend = self.session.options.backend,
@@ -839,10 +888,10 @@ const SessionOnQueue = struct {
         errdefer if (!tls_transferred) tls.destroy();
         const negotiator = try Negotiator.create(self.session.allocator, .{
             .looper = self.session.looper,
-            .link_processor = self.session.link_processor orelse
+            .link_processor = self.link_processor orelse
                 @panic("Cannot start negotiation before the link processor is configured"),
             .remote_endpoint = &context.remote_endpoint,
-            .channel = self.session.control_channel,
+            .channel = self.control_channel,
             .prng = self.session.prng,
             .tls = tls,
             .options = .{
@@ -877,7 +926,7 @@ const SessionOnQueue = struct {
             else
                 "Renegotiation request from client",
         );
-        const context = self.session.state.activeContext() orelse
+        const context = self.state.activeContext() orelse
             @panic("Cannot start renegotiation while the session is stopped");
         const negotiator = try previous.forRenegotiation(initiated_by);
         context.addNegotiator(negotiator);
@@ -895,7 +944,7 @@ const SessionOnQueue = struct {
         // Swift silently drops a negotiation completion after active state is
         // gone. Treat it as stale instead: the negotiated data has no context
         // to commit into, so propagate the recoverable reconnect signal.
-        const active = self.session.state.activeState() orelse return error.Reconnect;
+        const active = self.state.activeState() orelse return error.Reconnect;
         const context = active.context;
         log.writef(.info, "Negotiation succeeded, set key {d} as current", .{key});
         var reply = push_reply.clone(self.session.allocator) catch |err|
@@ -915,7 +964,7 @@ const SessionOnQueue = struct {
         if (active.phase == .started) return;
         active.phase = .started;
         self.scheduleNextPing(context);
-        if (self.session.delegate) |delegate| delegate.didStart(
+        if (self.delegate) |delegate| delegate.didStart(
             self.session,
             context.remote_endpoint,
             &context.push_reply.?.options,
@@ -925,7 +974,7 @@ const SessionOnQueue = struct {
     // MARK: Timers and keep-alive
 
     fn scheduleNegotiationTick(self: *SessionOnQueue) void {
-        self.session.negotiation_timer.scheduleReplacing(
+        self.negotiation_timer.scheduleReplacing(
             self.session.options.tick_interval_ms,
             Session.onNegotiationTimer,
             self.session,
@@ -933,7 +982,7 @@ const SessionOnQueue = struct {
     }
 
     fn negotiationTick(self: *SessionOnQueue) !void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         const negotiator = context.currentNegotiator() orelse
             @panic("Active session negotiation timer fired without a negotiator");
         if (try negotiator.tick()) self.scheduleNegotiationTick();
@@ -943,7 +992,7 @@ const SessionOnQueue = struct {
         const delay = self.keepAliveIntervalMs(context) orelse
             self.session.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay);
-        self.session.ping_timer.scheduleReplacing(
+        self.ping_timer.scheduleReplacing(
             delay,
             Session.onPingTimer,
             self.session,
@@ -951,7 +1000,7 @@ const SessionOnQueue = struct {
     }
 
     fn ping(self: *SessionOnQueue) !void {
-        const context = self.session.state.activeContext() orelse {
+        const context = self.state.activeContext() orelse {
             log.write(.debug, "Ping cancelled, session stopped");
             return;
         };
@@ -1007,17 +1056,17 @@ const SessionOnQueue = struct {
     // MARK: Data callbacks
 
     fn dataChannelForKey(self: *SessionOnQueue, key: u8) ?*DataChannel {
-        const context = self.session.state.activeContext() orelse return null;
+        const context = self.state.activeContext() orelse return null;
         return context.dataChannel(key);
     }
 
     fn reportInboundDataCount(self: *SessionOnQueue, count: usize) void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         self.addDataCount(context, &context.data_count.inbound, count);
     }
 
     fn reportOutboundDataCount(self: *SessionOnQueue, count: usize) void {
-        const context = self.session.state.activeContext() orelse return;
+        const context = self.state.activeContext() orelse return;
         self.addDataCount(context, &context.data_count.outbound, count);
     }
 
@@ -1041,7 +1090,7 @@ const SessionOnQueue = struct {
             if (self.session.options.min_data_count_interval_ms > 0 and now < next) return;
         }
         context.last_data_count_ns = now;
-        if (self.session.delegate) |delegate| delegate.didUpdateDataCount(self.session, .{
+        if (self.delegate) |delegate| delegate.didUpdateDataCount(self.session, .{
             .received = context.data_count.inbound,
             .sent = context.data_count.outbound,
         });
@@ -1063,5 +1112,10 @@ pub const testing = struct {
 
     pub fn hasPendingShutdown(session: *Session) bool {
         return session.shutdown_state.hasRequest();
+    }
+
+    pub fn timersStarted(session: *Session) bool {
+        return session.on_queue.negotiation_timer.thread != null and
+            session.on_queue.ping_timer.thread != null;
     }
 };
