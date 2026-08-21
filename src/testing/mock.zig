@@ -163,7 +163,7 @@ pub const MockRuntime = struct {
             },
             .options = .{
                 .starts_immediately = false,
-                .cancels_unrecoverable = true,
+                .cancels_unrecoverable = args.options.cancels_unrecoverable,
                 .stop_delay_ms = 2000,
                 .reconnection_delay_ms = 2000,
                 .min_data_count_delta = args.options.min_data_count_delta,

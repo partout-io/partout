@@ -86,6 +86,7 @@ public final class PartoutProviderRuntime: Sendable {
             let daemonOptions = partout_daemon_options(
                 is_daemon: false,
                 starts_immediately: false,
+                cancels_unrecoverable: false,
                 cache_dir: cCacheDir,
                 min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
             )

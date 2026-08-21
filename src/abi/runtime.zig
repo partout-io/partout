@@ -28,6 +28,7 @@ pub const DaemonOptions = struct {
     cache_dir: [:0]const u8,
     is_daemon: bool,
     starts_immediately: bool,
+    cancels_unrecoverable: bool,
     min_data_count_delta: u64,
 
     pub fn init(
@@ -78,6 +79,7 @@ pub const DaemonOptions = struct {
             .cache_dir = cache_dir,
             .is_daemon = args.options.is_daemon,
             .starts_immediately = args.options.starts_immediately,
+            .cancels_unrecoverable = args.options.cancels_unrecoverable,
             .min_data_count_delta = args.options.min_data_count_delta,
         };
     }
@@ -153,7 +155,7 @@ pub const DaemonRuntime = struct {
                 },
                 .options = .{
                     .starts_immediately = options.starts_immediately,
-                    .cancels_unrecoverable = true,
+                    .cancels_unrecoverable = options.cancels_unrecoverable,
                     .min_data_count_delta = options.min_data_count_delta,
                     .events = self.events.interface(),
                     .cache_dir = options.cache_dir,

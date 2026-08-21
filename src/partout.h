@@ -70,6 +70,7 @@ typedef struct __partout_daemon_bindings {
 typedef struct {
     bool is_daemon;
     bool starts_immediately;
+    bool cancels_unrecoverable;
     /* Cache root. Defaults to the system temporary directory if NULL. */
     const char *cache_dir;
     uint64_t min_data_count_delta;

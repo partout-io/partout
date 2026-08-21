@@ -35,6 +35,7 @@ fn daemonStartArgs(profile: ?[*:0]const u8) c.partout_daemon_start_args {
         .options = .{
             .is_daemon = false,
             .starts_immediately = false,
+            .cancels_unrecoverable = true,
             .cache_dir = "/tmp",
             .min_data_count_delta = 4096,
         },
@@ -56,6 +57,7 @@ test "daemon options parse DNS-only profile" {
         options.cache_dir,
     );
     try std.testing.expect(!options.is_daemon);
+    try std.testing.expect(options.cancels_unrecoverable);
     try std.testing.expectEqual(@as(u64, 4096), options.min_data_count_delta);
 }
 
