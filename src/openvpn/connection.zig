@@ -75,8 +75,6 @@ const OpenVPNConnection = struct {
     current_endpoint: ?api.ExtendedEndpoint,
     tunnel: ?net.TunWrapper,
 
-    delegate_events: DelegateEventQueue,
-
     // MARK: - Public API
 
     fn create(
@@ -155,7 +153,6 @@ const OpenVPNConnection = struct {
             .current_session = null,
             .current_endpoint = null,
             .tunnel = null,
-            .delegate_events = DelegateEventQueue.init(),
         };
         log.write(.notice, "Using v3 connection");
         return created.asConnection();
@@ -165,7 +162,6 @@ const OpenVPNConnection = struct {
         log.write(.debug, "Deinit _OpenVPNConnectionV3");
         self.destroyCurrentSession();
         self.clearLink();
-        self.delegate_events.deinit(self.allocator);
         self.endpoint_resolver.deinit(self.allocator);
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
@@ -255,7 +251,6 @@ const OpenVPNConnection = struct {
             log.write(.err, "Link shut down due to timeout");
         };
         if (graceful) log.write(.notice, "Link shut down gracefully");
-        self.delegate_events.clear(self.allocator);
         self.finalizeSession(events, .explicit_stop);
     }
 
@@ -337,60 +332,6 @@ const OpenVPNConnection = struct {
             .context = self,
             .vtable = &session_delegate_vtable,
         };
-    }
-
-    fn enqueueDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
-        self.delegate_events.append(self.allocator, event) catch {
-            var owned_event = event;
-            owned_event.deinit(self.allocator);
-            log.write(.err, "Unable to enqueue session delegate event");
-            return;
-        };
-        self.serialized_executor.run(self, handleDelegateEventsTask);
-    }
-
-    fn handleDelegateEventsTask(raw: *anyopaque) void {
-        const self: *OpenVPNConnection = @ptrCast(@alignCast(raw));
-        self.handleDelegateEvents();
-    }
-
-    fn handleDelegateEvents(self: *OpenVPNConnection) void {
-        while (self.delegate_events.take(self.allocator)) |queued_event| {
-            var event = queued_event;
-            self.handleDelegateEvent(event);
-            event.deinit(self.allocator);
-        }
-    }
-
-    fn handleDelegateEvent(
-        self: *OpenVPNConnection,
-        event: DelegateEvent,
-    ) void {
-        const current = self.current_session orelse {
-            log.write(.debug, "Ignore event without current session");
-            return;
-        };
-        if (event.session() != @as(*anyopaque, @ptrCast(current))) {
-            log.write(.info, "Ignoring delegate event from old session");
-            return;
-        }
-        switch (event) {
-            .did_start => |payload| self.handleDidStart(
-                current,
-                payload.remote_endpoint,
-                &payload.remote_options,
-            ),
-            .did_stop => |payload| self.handleDidStop(payload.cause),
-            .did_update_data_count => |payload| {
-                if (self.status != .connected) return;
-                log.writef(.debug, "Updated data count: received={d}, sent={d}", .{
-                    payload.data_count.received,
-                    payload.data_count.sent,
-                });
-                const events = self.events orelse return;
-                events.data_count(events.ctx, payload.data_count);
-            },
-        }
     }
 
     fn handleDidStart(
@@ -621,80 +562,81 @@ const DelegateEvent = union(enum) {
     }
 };
 
-const DelegateEventNode = struct {
+const DelegateEventTask = struct {
+    allocator: std.mem.Allocator,
+    connection: *OpenVPNConnection,
     event: DelegateEvent,
-    next: ?*DelegateEventNode,
-};
 
-const DelegateEventQueue = struct {
-    lock: core.Mutex,
-    head: ?*DelegateEventNode,
-    tail: ?*DelegateEventNode,
-
-    fn init() DelegateEventQueue {
-        return .{
-            .lock = .{},
-            .head = null,
-            .tail = null,
-        };
+    fn run(raw: *anyopaque) void {
+        const task: *DelegateEventTask = @ptrCast(@alignCast(raw));
+        defer task.deinit();
+        consumeDelegateEvent(task.connection, task.event);
     }
 
-    fn append(
-        self: *DelegateEventQueue,
-        allocator: std.mem.Allocator,
-        event: DelegateEvent,
-    ) std.mem.Allocator.Error!void {
-        const node = try allocator.create(DelegateEventNode);
-        node.* = .{
-            .event = event,
-            .next = null,
-        };
-
-        self.lock.lock();
-        defer self.lock.unlock();
-        if (self.tail) |tail| {
-            tail.next = node;
-        } else {
-            self.head = node;
-        }
-        self.tail = node;
+    fn discard(raw: *anyopaque) void {
+        const task: *DelegateEventTask = @ptrCast(@alignCast(raw));
+        task.deinit();
     }
 
-    fn take(
-        self: *DelegateEventQueue,
-        allocator: std.mem.Allocator,
-    ) ?DelegateEvent {
-        self.lock.lock();
-        const node = self.head orelse {
-            self.lock.unlock();
-            return null;
-        };
-        self.head = node.next;
-        if (self.head == null) self.tail = null;
-        self.lock.unlock();
-
-        defer allocator.destroy(node);
-        return node.event;
-    }
-
-    fn clear(
-        self: *DelegateEventQueue,
-        allocator: std.mem.Allocator,
-    ) void {
-        while (self.take(allocator)) |queued_event| {
-            var event = queued_event;
-            event.deinit(allocator);
-        }
-    }
-
-    fn deinit(
-        self: *DelegateEventQueue,
-        allocator: std.mem.Allocator,
-    ) void {
-        self.clear(allocator);
-        self.lock.deinit();
+    fn deinit(task: *DelegateEventTask) void {
+        task.event.deinit(task.allocator);
+        task.allocator.destroy(task);
     }
 };
+
+fn sendDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
+    const task = self.allocator.create(DelegateEventTask) catch |err| {
+        var owned_event = event;
+        owned_event.deinit(self.allocator);
+        log.writef(.err, "Unable to send session delegate event: {s}", .{
+            @errorName(err),
+        });
+        return;
+    };
+    task.* = .{
+        .allocator = self.allocator,
+        .connection = self,
+        .event = event,
+    };
+    self.serialized_executor.tryRunOwned(
+        task,
+        DelegateEventTask.run,
+        DelegateEventTask.discard,
+    ) catch |err| {
+        DelegateEventTask.discard(task);
+        log.writef(.err, "Unable to send session delegate event: {s}", .{
+            @errorName(err),
+        });
+    };
+}
+
+fn consumeDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
+    const current = self.current_session orelse {
+        log.write(.debug, "Ignore event without current session");
+        return;
+    };
+    if (event.session() != @as(*anyopaque, @ptrCast(current))) {
+        log.write(.info, "Ignoring delegate event from old session");
+        return;
+    }
+    switch (event) {
+        .did_start => |payload| self.handleDidStart(
+            current,
+            payload.remote_endpoint,
+            &payload.remote_options,
+        ),
+        .did_stop => |payload| self.handleDidStop(payload.cause),
+        .did_update_data_count => |payload| {
+            if (self.status != .connected) return;
+            log.writef(.debug, "Updated data count: received={d}, sent={d}", .{
+                payload.data_count.received,
+                payload.data_count.sent,
+            });
+            const events = self.events orelse return;
+            events.data_count(events.ctx, payload.data_count);
+        },
+    }
+}
 
 // MARK: - Session delegate callbacks
 
@@ -714,7 +656,7 @@ fn sessionDidStart(
         log.write(.err, "Unable to copy pushed options");
         return;
     };
-    self.enqueueDelegateEvent(.{ .did_start = .{
+    sendDelegateEvent(self, .{ .did_start = .{
         .session = session,
         .remote_endpoint = endpoint,
         .remote_options = options,
@@ -727,7 +669,7 @@ fn sessionDidStop(
     cause: ?SessionError,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    self.enqueueDelegateEvent(.{ .did_stop = .{
+    sendDelegateEvent(self, .{ .did_stop = .{
         .session = session,
         .cause = cause,
     } });
@@ -739,7 +681,7 @@ fn sessionDidUpdateDataCount(
     data_count: api.DataCount,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    self.enqueueDelegateEvent(.{ .did_update_data_count = .{
+    sendDelegateEvent(self, .{ .did_update_data_count = .{
         .session = session,
         .data_count = data_count,
     } });
