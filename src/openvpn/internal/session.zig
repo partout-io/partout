@@ -411,10 +411,7 @@ pub const Session = struct {
         packets: net.Looper.Packets,
     ) !net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        const processor = self.onQueue().link_processor orelse return .keep;
-        var processed = try processor.processInbound(packets);
-        defer processed.deinit();
-        try self.onQueue().receiveLink(processed.packets());
+        try self.onQueue().receiveLink(packets);
         return .keep;
     }
 
@@ -769,7 +766,11 @@ const SessionOnQueue = struct {
 
     // MARK: Packet I/O
 
-    fn receiveLink(self: *SessionOnQueue, packets: []const []const u8) !void {
+    fn receiveLink(self: *SessionOnQueue, packets: net.Looper.Packets) !void {
+        const processor = self.link_processor orelse return;
+        var processed = try processor.processInbound(packets);
+        defer processed.deinit();
+
         const context = self.state.activeContext() orelse return;
         context.last_received_ns = core.concurrency.monotonicNs();
         var negotiator = context.currentNegotiator() orelse {
@@ -781,7 +782,7 @@ const SessionOnQueue = struct {
         var grouped = [_]std.ArrayList([]const u8){.empty} **
             ControlConstants.number_of_keys;
         defer for (&grouped) |*list| list.deinit(self.session.allocator);
-        for (packets) |packet| {
+        for (processed.packets()) |packet| {
             if (packet.len == 0) {
                 log.write(.err, "Dropped malformed packet (missing opcode)");
                 continue;
