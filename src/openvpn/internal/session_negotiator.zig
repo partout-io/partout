@@ -65,6 +65,12 @@ pub const NegotiatorOptions = struct {
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
+    // The Session owns the stable timer worker; this callback lets the
+    // Negotiator own when its next check is armed.
+    schedule_negotiation_check: *const fn (
+        ?*anyopaque,
+        u64,
+    ) std.Thread.SpawnError!void,
     on_connected: *const fn (
         ?*anyopaque,
         u8,
@@ -205,7 +211,7 @@ pub const Negotiator = struct {
     pub fn start(self: *Negotiator) !void {
         std.debug.assert(self.looper.isOnQueue());
         try self.channel.reset(self.renegotiation == null);
-        _ = try self.tick();
+        try self.checkNegotiation();
 
         if (self.renegotiation) |kind| {
             if (kind == .client) try self.enqueueControlPackets(.softResetV1, "");
@@ -239,9 +245,8 @@ pub const Negotiator = struct {
         );
     }
 
-    /// Performs the former recursive `Task.sleep` check once. The Session owns
-    /// the stable timer and calls this method again when it returns `true`.
-    pub fn tick(self: *Negotiator) !bool {
+    /// Performs and rearms the former recursive `Task.sleep` check.
+    pub fn checkNegotiation(self: *Negotiator) !void {
         std.debug.assert(self.looper.isOnQueue());
         const elapsed = self.elapsedMs();
         if (self.state == .idle and elapsed > self.options.session_options.hard_reset_timeout_ms) {
@@ -253,7 +258,12 @@ pub const Negotiator = struct {
 
         if (!self.isRenegotiating()) try self.pushRequest();
         if (self.remote_endpoint.plainSocketType() == .udp) try self.flushControlQueue();
-        return self.state != .connected;
+        if (self.state != .connected) {
+            try self.options.schedule_negotiation_check(
+                self.options.callback_context,
+                self.options.session_options.tick_interval_ms,
+            );
+        }
     }
 
     pub fn sendAck(self: *const Negotiator, packet: *const ControlPacket) void {

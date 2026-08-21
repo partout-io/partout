@@ -454,14 +454,26 @@ pub const Session = struct {
         self.requestShutdownFromAnyThread(error.TLSFailure);
     }
 
-    fn onNegotiationTimer(raw: ?*anyopaque) void {
+    fn scheduleNegotiationCheck(
+        raw: ?*anyopaque,
+        delay_ms: u64,
+    ) std.Thread.SpawnError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.performTimerTask(negotiationTick);
+        try self.onQueue().negotiation_scheduler.scheduleReplacing(
+            delay_ms,
+            onNegotiationTimer,
+            self,
+        );
     }
 
-    fn negotiationTick(raw: ?*anyopaque) !void {
+    fn onNegotiationTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().negotiationTick();
+        self.performTimerTask(checkNegotiation);
+    }
+
+    fn checkNegotiation(raw: ?*anyopaque) !void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        try self.onQueue().checkNegotiation();
     }
 
     fn onPingTimer(raw: ?*anyopaque) void {
@@ -607,7 +619,7 @@ pub const Session = struct {
 const SessionOnQueue = struct {
     session: *Session,
     control_channel: *ControlChannel,
-    negotiation_timer: core.RunAfter,
+    negotiation_scheduler: core.RunAfter,
     ping_timer: core.RunAfter,
     delegate: ?SessionDelegate,
     state: SessionState,
@@ -621,7 +633,7 @@ const SessionOnQueue = struct {
         return .{
             .session = session,
             .control_channel = control_channel,
-            .negotiation_timer = .{},
+            .negotiation_scheduler = .{},
             .ping_timer = .{},
             .delegate = delegate,
             .state = .{
@@ -634,7 +646,7 @@ const SessionOnQueue = struct {
     }
 
     fn deinit(self: *SessionOnQueue) void {
-        self.negotiation_timer.deinit();
+        self.negotiation_scheduler.deinit();
         self.ping_timer.deinit();
         switch (self.state) {
             .stopped => {},
@@ -645,12 +657,12 @@ const SessionOnQueue = struct {
     }
 
     fn startTimers(self: *SessionOnQueue) std.Thread.SpawnError!void {
-        try self.negotiation_timer.start();
+        try self.negotiation_scheduler.start();
         try self.ping_timer.start();
     }
 
     fn cancelTimers(self: *SessionOnQueue) void {
-        self.negotiation_timer.cancel();
+        self.negotiation_scheduler.cancel();
         self.ping_timer.cancel();
     }
 
@@ -923,6 +935,7 @@ const SessionOnQueue = struct {
                 .with_local_options = context.with_local_options,
                 .session_options = self.session.options,
                 .callback_context = self.session,
+                .schedule_negotiation_check = Session.scheduleNegotiationCheck,
                 .on_connected = Session.didNegotiate,
                 .on_error = Session.onNegotiatorError,
             },
@@ -930,7 +943,6 @@ const SessionOnQueue = struct {
         tls_transferred = true;
         context.addNegotiator(negotiator);
         try negotiator.start();
-        self.scheduleNegotiationTick();
     }
 
     fn startRenegotiation(
@@ -954,7 +966,6 @@ const SessionOnQueue = struct {
         const negotiator = try previous.forRenegotiation(initiated_by);
         context.addNegotiator(negotiator);
         try negotiator.start();
-        self.scheduleNegotiationTick();
         return negotiator;
     }
 
@@ -996,19 +1007,13 @@ const SessionOnQueue = struct {
 
     // MARK: Timers and keep-alive
 
-    fn scheduleNegotiationTick(self: *SessionOnQueue) void {
-        self.negotiation_timer.scheduleReplacing(
-            self.session.options.tick_interval_ms,
-            Session.onNegotiationTimer,
-            self.session,
-        ) catch unreachable;
-    }
-
-    fn negotiationTick(self: *SessionOnQueue) !void {
-        const context = self.state.activeContext() orelse return;
+    fn checkNegotiation(self: *SessionOnQueue) !void {
+        const active = self.state.activeState() orelse return;
+        if (active.phase == .stopping) return;
+        const context = active.context;
         const negotiator = context.currentNegotiator() orelse
             @panic("Active session negotiation timer fired without a negotiator");
-        if (try negotiator.tick()) self.scheduleNegotiationTick();
+        try negotiator.checkNegotiation();
     }
 
     fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) void {
@@ -1138,7 +1143,7 @@ pub const testing = struct {
     }
 
     pub fn timersStarted(session: *Session) bool {
-        return session.on_queue.negotiation_timer.thread != null and
+        return session.on_queue.negotiation_scheduler.thread != null and
             session.on_queue.ping_timer.thread != null;
     }
 };
