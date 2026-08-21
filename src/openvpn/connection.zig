@@ -455,6 +455,8 @@ const OpenVPNConnection = struct {
                         return;
                     }
                 }
+                // The .disconnected status will trigger a reconnection
+                // in the daemon.
                 _ = self.sendStatus(.disconnected, events);
                 self.events = null;
             },
