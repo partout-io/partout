@@ -446,7 +446,7 @@ pub const Session = struct {
 
     fn onNegotiationTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.dispatchTimerTask(negotiationTick);
+        self.performTimerTask(negotiationTick);
     }
 
     fn negotiationTick(raw: ?*anyopaque) !void {
@@ -456,7 +456,7 @@ pub const Session = struct {
 
     fn onPingTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.dispatchTimerTask(ping);
+        self.performTimerTask(ping);
     }
 
     fn ping(raw: ?*anyopaque) !void {
@@ -481,7 +481,7 @@ pub const Session = struct {
 
     // MARK: - Private helpers
 
-    fn dispatchTimerTask(
+    fn performTimerTask(
         self: *Session,
         callback: *const fn (?*anyopaque) anyerror!void,
     ) void {
