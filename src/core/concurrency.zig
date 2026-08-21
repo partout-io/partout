@@ -93,6 +93,44 @@ pub const Drainer = struct {
     }
 };
 
+/// Execution capability for asynchronously submitted work that must share one
+/// serialized context.
+///
+/// `run_block` must enqueue accepted work and return without invoking it inline.
+/// For owned work it must eventually invoke exactly one of `block` or `discard`.
+pub const SerializedExecutor = struct {
+    pub const Block = *const fn (*anyopaque) void;
+    pub const RunError = std.mem.Allocator.Error || error{Closed};
+
+    ptr: *anyopaque,
+    run_block: *const fn (*anyopaque, *anyopaque, Block, ?Block) RunError!void,
+
+    /// Best-effort submission for producers that can safely drop stale work.
+    pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
+        self.tryRun(block_ptr, block) catch {};
+    }
+
+    /// Submits work and reports whether the executor accepted it.
+    pub fn tryRun(
+        self: SerializedExecutor,
+        block_ptr: *anyopaque,
+        block: Block,
+    ) RunError!void {
+        return self.run_block(self.ptr, block_ptr, block, null);
+    }
+
+    /// Transfers ownership of `block_ptr` on success. If the executor cannot
+    /// run `block`, it must invoke `discard` instead.
+    pub fn tryRunOwned(
+        self: SerializedExecutor,
+        block_ptr: *anyopaque,
+        block: Block,
+        discard: Block,
+    ) RunError!void {
+        return self.run_block(self.ptr, block_ptr, block, discard);
+    }
+};
+
 /// Reusable single-threaded executor for delayed, one-shot callbacks.
 ///
 /// `scheduleReplacing` manages one replaceable callback, whereas
