@@ -281,7 +281,10 @@ const OpenVPNConnection = struct {
         session.shutdown(error.NetworkChanged, null) catch |err| {
             log.writef(.err, "Better-path shutdown failed: {s}", .{@errorName(err)});
         };
-        self.finalizeSession(events, .{ .session_failed = error.NetworkChanged });
+        self.finalizeSession(events, .{ .failure = .{
+            .cause = .networkChanged,
+            .disposition = .reconnect,
+        } });
     }
 
     fn looperTerminated(
@@ -404,7 +407,10 @@ const OpenVPNConnection = struct {
         });
         const events = self.events orelse return;
         session.shutdown(error.Reconnect, null) catch {};
-        self.finalizeSession(events, .{ .tunnel_setup_failed = code });
+        self.finalizeSession(events, .{ .failure = .{
+            .cause = code,
+            .disposition = .cancel,
+        } });
     }
 
     fn handleSessionFailure(
@@ -419,7 +425,19 @@ const OpenVPNConnection = struct {
         session.shutdown(cause, null) catch |err| {
             log.writef(.err, "Session failure shutdown failed: {s}", .{@errorName(err)});
         };
-        self.finalizeSession(events, .{ .session_failed = cause });
+        log.writef(.err, "Session failed: {s}", .{@errorName(cause)});
+        const disposition: SessionFailureDisposition = if (isRecoverable(cause))
+            .reconnect
+        else
+            .cancel;
+        if (disposition == .cancel) {
+            log.write(.err, "Disconnection is not recoverable");
+            log.writef(.info, "Report link failure: {s}", .{@errorName(cause)});
+        }
+        self.finalizeSession(events, .{ .failure = .{
+            .cause = errors_mod.partoutCode(cause),
+            .disposition = disposition,
+        } });
     }
 
     /// Releases connection-owned resources after the Session has stopped.
@@ -438,32 +456,27 @@ const OpenVPNConnection = struct {
                 _ = self.sendStatus(.disconnected, events);
                 self.events = null;
             },
-            .tunnel_setup_failed => |code| {
-                self.markDisconnected();
-                events.last_error(events.ctx, code);
-                events.cancel(events.ctx, code);
-            },
-            .session_failed => |cause| {
-                log.writef(.err, "Session failed: {s}", .{@errorName(cause)});
-                if (errors_mod.partoutCode(cause)) |code| {
-                    events.last_error(events.ctx, code);
-                    if (!isRecoverable(cause)) {
-                        log.write(.err, "Disconnection is not recoverable");
-                        log.writef(.info, "Report link failure: {s}", .{@errorName(cause)});
-                        self.markDisconnected();
-                        events.cancel(events.ctx, code);
-                        return;
-                    }
+            .failure => |failure| {
+                if (failure.disposition == .cancel) {
+                    self.prepareTerminalCancellation();
                 }
-                // The .disconnected status will trigger a reconnection
-                // in the daemon.
-                _ = self.sendStatus(.disconnected, events);
-                self.events = null;
+                if (failure.cause) |cause| {
+                    events.last_error(events.ctx, cause);
+                }
+                switch (failure.disposition) {
+                    .reconnect => {
+                        // The .disconnected status will trigger a reconnection
+                        // in the daemon.
+                        _ = self.sendStatus(.disconnected, events);
+                        self.events = null;
+                    },
+                    .cancel => events.cancel(events.ctx, failure.cause),
+                }
             },
         }
     }
 
-    fn markDisconnected(self: *OpenVPNConnection) void {
+    fn prepareTerminalCancellation(self: *OpenVPNConnection) void {
         self.status = .disconnected;
         self.events = null;
         self.clearServerConfiguration();
@@ -522,8 +535,15 @@ const OpenVPNConnection = struct {
 
 const SessionFinalization = union(enum) {
     explicit_stop,
-    tunnel_setup_failed: api.PartoutErrorCode,
-    session_failed: SessionError,
+    failure: struct {
+        cause: ?api.PartoutErrorCode,
+        disposition: SessionFailureDisposition,
+    },
+};
+
+const SessionFailureDisposition = enum {
+    reconnect,
+    cancel,
 };
 
 const SessionEvent = union(enum) {
@@ -575,7 +595,7 @@ const SessionEventTask = struct {
     fn run(raw: *anyopaque) void {
         const task: *SessionEventTask = @ptrCast(@alignCast(raw));
         defer task.deinit();
-        consumeSessionEvent(task.connection, task.event);
+        handleSessionEvent(task.connection, task.event);
     }
 
     fn discard(raw: *anyopaque) void {
@@ -594,7 +614,7 @@ fn sendSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
     const task = self.allocator.create(SessionEventTask) catch |err| {
         var owned_event = event;
         owned_event.deinit(self.allocator);
-        rejectSessionEvent(err, is_required);
+        handleUndeliveredSessionEvent(err, is_required);
         return;
     };
     task.* = .{
@@ -608,11 +628,11 @@ fn sendSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
         SessionEventTask.discard,
     ) catch |err| {
         SessionEventTask.discard(task);
-        rejectSessionEvent(err, is_required);
+        handleUndeliveredSessionEvent(err, is_required);
     };
 }
 
-fn rejectSessionEvent(err: core.SerializedExecutor.RunError, is_required: bool) void {
+fn handleUndeliveredSessionEvent(err: core.SerializedExecutor.RunError, is_required: bool) void {
     if (err == error.Closed) return;
     // Required facts have no error channel. Continuing would strand the
     // connection between states; match Swift's nonthrowing stream delivery.
@@ -620,7 +640,7 @@ fn rejectSessionEvent(err: core.SerializedExecutor.RunError, is_required: bool) 
     log.writef(.err, "Unable to send session event: {s}", .{@errorName(err)});
 }
 
-fn consumeSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
+fn handleSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
     const current = self.current_session orelse {
         log.write(.debug, "Ignore event without current session");
         return;
