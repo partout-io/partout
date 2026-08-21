@@ -256,10 +256,7 @@ const OpenVPNConnection = struct {
         };
         if (graceful) log.write(.notice, "Link shut down gracefully");
         self.delegate_events.clear(self.allocator);
-        self.clearLink();
-        self.controller.clearTunnelSettings(false);
-        _ = self.sendStatus(.disconnected, events);
-        self.events = null;
+        self.finalizeSession(events, .explicit_stop);
     }
 
     fn networkChange(
@@ -472,11 +469,7 @@ const OpenVPNConnection = struct {
         const events = self.events orelse return;
         session.setDelegate(null);
         session.shutdown(error.Reconnect, null) catch {};
-        self.clearLink();
-        self.controller.clearTunnelSettings(false);
-        self.markDisconnected();
-        events.last_error(events.ctx, code);
-        events.cancel(events.ctx, code);
+        self.finalizeSession(events, .{ .tunnel_setup_failed = code });
     }
 
     fn handleDidStop(
@@ -484,26 +477,50 @@ const OpenVPNConnection = struct {
         cause: ?SessionError,
     ) void {
         const events = self.events orelse return;
+        self.finalizeSession(events, .{ .session_stopped = cause });
+    }
+
+    /// Releases connection-owned resources after the Session has stopped or
+    /// had its delegate removed. Reporting stays here so every terminal path
+    /// observes the same cleanup-before-callback ordering.
+    fn finalizeSession(
+        self: *OpenVPNConnection,
+        events: net.Connection.Events,
+        finalization: SessionFinalization,
+    ) void {
         self.clearLink();
         self.controller.clearTunnelSettings(false);
 
-        if (self.status == .disconnecting) return;
-        if (cause) |err| {
-            log.writef(.err, "Session did stop: {s}", .{@errorName(err)});
-            if (errors_mod.partoutCode(err)) |code| {
+        switch (finalization) {
+            .explicit_stop => {
+                _ = self.sendStatus(.disconnected, events);
+                self.events = null;
+            },
+            .tunnel_setup_failed => |code| {
+                self.markDisconnected();
                 events.last_error(events.ctx, code);
-                if (!isRecoverable(err)) {
-                    log.write(.err, "Disconnection is not recoverable");
-                    log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
-                    self.markDisconnected();
-                    events.cancel(events.ctx, code);
-                    return;
+                events.cancel(events.ctx, code);
+            },
+            .session_stopped => |cause| {
+                if (self.status == .disconnecting) return;
+                if (cause) |err| {
+                    log.writef(.err, "Session did stop: {s}", .{@errorName(err)});
+                    if (errors_mod.partoutCode(err)) |code| {
+                        events.last_error(events.ctx, code);
+                        if (!isRecoverable(err)) {
+                            log.write(.err, "Disconnection is not recoverable");
+                            log.writef(.info, "Report link failure: {s}", .{@errorName(err)});
+                            self.markDisconnected();
+                            events.cancel(events.ctx, code);
+                            return;
+                        }
+                    }
+                } else {
+                    log.write(.notice, "Session did stop");
                 }
-            }
-        } else {
-            log.write(.notice, "Session did stop");
+                _ = self.sendStatus(.disconnected, events);
+            },
         }
-        _ = self.sendStatus(.disconnected, events);
     }
 
     fn markDisconnected(self: *OpenVPNConnection) void {
@@ -562,6 +579,12 @@ const OpenVPNConnection = struct {
         if (self.current_endpoint) |*endpoint| endpoint.deinit(self.allocator);
         self.current_endpoint = null;
     }
+};
+
+const SessionFinalization = union(enum) {
+    explicit_stop,
+    tunnel_setup_failed: api.PartoutErrorCode,
+    session_stopped: ?SessionError,
 };
 
 const DelegateEvent = union(enum) {
