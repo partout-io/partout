@@ -150,15 +150,14 @@ pub const Session = struct {
         errdefer allocator.free(owned_caches_directory);
         const owned_ca_filename = try allocator.dupe(u8, init.ca_filename);
         errdefer allocator.free(owned_ca_filename);
+        const self = try allocator.create(Session);
+        errdefer allocator.destroy(self);
         const serializer = try Serializer.forConfiguration(
             allocator,
             init.options.backend,
             &owned_configuration,
         );
         const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
-        errdefer control_channel.destroy();
-
-        const self = try allocator.create(Session);
         self.* = .{
             .allocator = allocator,
             .configuration = owned_configuration,
@@ -172,10 +171,9 @@ pub const Session = struct {
             .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
         };
         errdefer {
-            self.on_queue.deinitTimers();
+            self.on_queue.deinit();
             self.shutdown_state.deinit();
             self.lifecycle_lock.deinit();
-            allocator.destroy(self);
         }
         // A later schedule is therefore infallible. In particular, negotiation
         // can commit DataChannel ownership before arming the first ping.
