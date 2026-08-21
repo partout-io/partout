@@ -255,12 +255,22 @@ pub const Session = struct {
 
         log.write(.info, "Attach LINK");
         self.looper.attach(.{
-            .pair = .{ .link = descriptor },
-            .on_read = .{ .context = self, .callback = onLinkRead },
-            .on_failure = .{ .context = self, .callback = onLinkFailure },
+            .pair = .{
+                .link = descriptor,
+            },
+            .on_read = .{
+                .context = self,
+                .callback = onLinkRead,
+            },
+            .on_failure = .{
+                .context = self,
+                .callback = onLinkFailure,
+            },
         }) catch |err| return errors_mod.sessionError(err);
         descriptor_transferred = true;
         errdefer self.looper.detach(.link) catch {};
+
+        // Initiate the session on the attached link.
         self.performOnQueue(void, remote_endpoint, SessionOnQueue.setLink) catch |err|
             return errors_mod.sessionError(err);
     }
@@ -280,9 +290,17 @@ pub const Session = struct {
         }
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
-            .pair = .{ .tun = descriptor },
-            .on_read = .{ .context = self, .callback = onTunnelRead },
-            .on_failure = .{ .context = self, .callback = onSideFailure },
+            .pair = .{
+                .tun = descriptor,
+            },
+            .on_read = .{
+                .context = self,
+                .callback = onTunnelRead,
+            },
+            .on_failure = .{
+                .context = self,
+                .callback = onSideFailure,
+            },
         }) catch |err| return errors_mod.sessionError(err);
         descriptor_transferred = true;
     }
@@ -1038,7 +1056,7 @@ const SessionOnQueue = struct {
             reply.options.keep_alive_interval
         else
             null;
-        return keepAliveMilliseconds(pushed, self.session.configuration.keep_alive_interval);
+        return keepAliveMs(pushed, self.session.configuration.keep_alive_interval);
     }
 
     fn keepAliveTimeoutMs(self: *SessionOnQueue, context: *ActiveContext) u64 {
@@ -1046,11 +1064,11 @@ const SessionOnQueue = struct {
             reply.options.keep_alive_timeout
         else
             null;
-        return keepAliveMilliseconds(pushed, self.session.configuration.keep_alive_timeout) orelse
+        return keepAliveMs(pushed, self.session.configuration.keep_alive_timeout) orelse
             self.session.options.ping_timeout_ms;
     }
 
-    fn keepAliveMilliseconds(pushed: ?f64, configured: ?f64) ?u64 {
+    fn keepAliveMs(pushed: ?f64, configured: ?f64) ?u64 {
         for ([_]?f64{ pushed, configured }) |candidate| {
             const seconds = candidate orelse continue;
             if (seconds > 0) return core.util.secondsToMilliseconds(seconds);
