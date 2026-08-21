@@ -47,10 +47,9 @@ const TLSWrapper = tls_mod.TLSWrapper;
 /// Immutable event sink for facts produced by the protocol engine.
 ///
 /// Values passed to callbacks are borrowed for the duration of the callback.
-/// `established` and `data_count` run on the looper; `failed` may run from any
-/// callback thread. Callbacks must return promptly and transport facts to the
-/// owner's execution context; the owner decides whether and how to stop the
-/// Session.
+/// Callbacks run on the looper and must return promptly by transporting facts
+/// to the owner's execution context; the owner decides whether and how to stop
+/// the Session.
 pub const SessionEvents = struct {
     context: ?*anyopaque = null,
     established: *const fn (
@@ -65,10 +64,10 @@ pub const SessionEvents = struct {
 
 /// Default V3 OpenVPN session implementation.
 ///
-/// `Session` is heap-only: callbacks and timer contexts borrow this stable
-/// address until `destroy` joins them. Its `Looper` is borrowed and dedicated
-/// to this session for the same lifetime. Mutable protocol state is confined
-/// to `on_queue`; its owner retains lifecycle policy.
+/// `Session` is heap-only: callbacks borrow this stable address until their
+/// looper attachment or timer is cancelled. Its `Looper` is borrowed for the
+/// same lifetime. Mutable protocol state is confined to `on_queue`; its owner
+/// retains lifecycle policy.
 pub const Session = struct {
     pub const Error = errors_mod.SessionError;
 
@@ -134,22 +133,17 @@ pub const Session = struct {
             .on_queue = SessionOnQueue.init(self, control_channel),
         };
         errdefer self.on_queue.deinit();
-        // A later schedule is therefore infallible. In particular, negotiation
-        // can commit DataChannel ownership before arming the first ping.
-        try self.on_queue.startTimers();
         return self;
     }
 
-    /// Must run outside every looper, timer, and event callback while the
-    /// borrowed looper remains alive and running. This does not stop or
-    /// deinitialize the looper.
+    /// Must run outside every looper and event callback while the borrowed
+    /// looper remains alive and running. This does not stop or deinitialize the
+    /// looper.
     pub fn destroy(self: *Session) void {
         if (self.looper.isOnQueue())
             @panic("Session.destroy() must run outside looper callbacks");
 
         log.write(.debug, "Deinit OpenVPNSession");
-        self.on_queue.cancelTimers();
-
         self.shutdown(null, 0) catch |err| {
             log.writef(.fault, "Unable to detach Session before destruction: {s}", .{
                 @errorName(err),
@@ -384,33 +378,23 @@ pub const Session = struct {
     fn scheduleNegotiationCheck(
         raw: ?*anyopaque,
         delay_ms: u64,
-    ) std.Thread.SpawnError!void {
+    ) net.Looper.ScheduleTimerError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().negotiation_scheduler.scheduleReplacing(
-            delay_ms,
-            onNegotiationTimer,
-            self,
-        );
+        try self.onQueue().scheduleNegotiationCheck(delay_ms);
     }
 
     fn onNegotiationTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.performTimerTask(checkNegotiation);
-    }
-
-    fn checkNegotiation(raw: ?*anyopaque) !void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().checkNegotiation();
+        self.onQueue().checkNegotiation() catch |err| {
+            self.reportFailure(errors_mod.sessionError(err));
+        };
     }
 
     fn onPingTimer(raw: ?*anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.performTimerTask(ping);
-    }
-
-    fn ping(raw: ?*anyopaque) !void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().ping();
+        self.onQueue().ping() catch |err| {
+            self.reportFailure(errors_mod.sessionError(err));
+        };
     }
 
     fn dataChannelForKey(raw: ?*anyopaque, key: u8) ?*DataChannel {
@@ -455,22 +439,6 @@ pub const Session = struct {
         return &self.on_queue;
     }
 
-    fn performTimerTask(
-        self: *Session,
-        callback: *const fn (?*anyopaque) anyerror!void,
-    ) void {
-        self.looper.performTask(.{
-            .context = self,
-            .callback = callback,
-        }) catch |err| {
-            // Swift lets its timer task feed perform failure back into shutdown.
-            // Here LooperUnavailable means looperTerminated already owns
-            // protocol cleanup, so another failure event would be redundant.
-            if (err != error.LooperUnavailable)
-                self.reportFailure(errors_mod.sessionError(err));
-        };
-    }
-
     fn failureError(failure: net.Looper.Failure) SessionError {
         return switch (failure) {
             .user, .system => |cause| errors_mod.sessionError(cause),
@@ -499,8 +467,8 @@ pub const Session = struct {
 const SessionOnQueue = struct {
     session: *Session,
     control_channel: *ControlChannel,
-    negotiation_scheduler: core.RunAfter,
-    ping_timer: core.RunAfter,
+    negotiation_timer: net.Looper.Timer,
+    ping_timer: net.Looper.Timer,
     state: SessionState,
     link_processor: ?*LinkProcessor,
 
@@ -511,7 +479,7 @@ const SessionOnQueue = struct {
         return .{
             .session = session,
             .control_channel = control_channel,
-            .negotiation_scheduler = .{},
+            .negotiation_timer = .{},
             .ping_timer = .{},
             .state = .{
                 .stopped = .{
@@ -523,8 +491,6 @@ const SessionOnQueue = struct {
     }
 
     fn deinit(self: *SessionOnQueue) void {
-        self.negotiation_scheduler.deinit();
-        self.ping_timer.deinit();
         switch (self.state) {
             .stopped => {},
             .active => |active| active.context.destroy(),
@@ -533,14 +499,9 @@ const SessionOnQueue = struct {
         self.control_channel.destroy();
     }
 
-    fn startTimers(self: *SessionOnQueue) std.Thread.SpawnError!void {
-        try self.negotiation_scheduler.start();
-        try self.ping_timer.start();
-    }
-
     fn cancelTimers(self: *SessionOnQueue) void {
-        self.negotiation_scheduler.cancel();
-        self.ping_timer.cancel();
+        self.session.looper.cancelTimer(&self.negotiation_timer);
+        self.session.looper.cancelTimer(&self.ping_timer);
     }
 
     // MARK: Lifecycle
@@ -605,6 +566,7 @@ const SessionOnQueue = struct {
             .context = active_context,
         } };
         self.startNegotiation() catch |err| {
+            self.cancelTimers();
             active_context.destroy();
             self.state = .{ .stopped = idle };
             return err;
@@ -612,6 +574,10 @@ const SessionOnQueue = struct {
     }
 
     fn prepareShutdown(self: *SessionOnQueue, request: Session.ShutdownRequest) bool {
+        // Negotiation may arm a check before a later startup operation fails
+        // and restores .stopped. Always sever timer callback contexts before
+        // deciding whether an active shutdown transaction is needed.
+        self.cancelTimers();
         const active = self.state.activeState() orelse {
             log.write(.debug, "Ignore stop request, stopped or already stopping");
             return false;
@@ -628,7 +594,6 @@ const SessionOnQueue = struct {
             log.write(.info, "Shut down on request");
         }
         active.phase = .stopping;
-        self.cancelTimers();
 
         if (shouldSendExitNotification(request.cause)) self.sendExitPacket(
             request.timeout_ms orelse self.session.options.write_timeout_ms,
@@ -646,9 +611,8 @@ const SessionOnQueue = struct {
             },
             .active => |value| value,
         };
-        // Terminal looper failures bypass prepareShutdown(), so cancel
-        // both queue-owned replacements for the Swift context's Tasks here
-        // as well as in the normal shutdown path.
+        // Terminal looper failures bypass prepareShutdown(), so cancel both
+        // queue-owned timers here as well as in the normal shutdown path.
         self.cancelTimers();
         const next_with_local_options = if (cause) |value|
             active.context.with_local_options and value != error.BadCredentialsWithLocalOptions
@@ -869,7 +833,8 @@ const SessionOnQueue = struct {
         log.writef(.info, "Data channels: {any}", .{data_keys.slice()});
         if (active.phase == .started) return;
         active.phase = .started;
-        self.scheduleNextPing(context);
+        self.scheduleNextPing(context) catch |err|
+            return errors_mod.sessionError(err);
         self.session.events.established(
             self.session.events.context,
             self.session,
@@ -880,6 +845,20 @@ const SessionOnQueue = struct {
 
     // MARK: Timers and keep-alive
 
+    fn scheduleNegotiationCheck(
+        self: *SessionOnQueue,
+        delay_ms: u64,
+    ) net.Looper.ScheduleTimerError!void {
+        try self.session.looper.scheduleReplacing(
+            &self.negotiation_timer,
+            delay_ms,
+            .{
+                .context = self.session,
+                .callback = Session.onNegotiationTimer,
+            },
+        );
+    }
+
     fn checkNegotiation(self: *SessionOnQueue) !void {
         const active = self.state.activeState() orelse return;
         if (active.phase == .stopping) return;
@@ -889,15 +868,18 @@ const SessionOnQueue = struct {
         try negotiator.checkNegotiation();
     }
 
-    fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) void {
-        const delay = self.keepAliveIntervalMs(context) orelse
+    fn scheduleNextPing(self: *SessionOnQueue, context: *ActiveContext) !void {
+        const delay_ms = self.keepAliveIntervalMs(context) orelse
             self.session.options.ping_timeout_check_interval_ms;
-        log.logTimeMs(.debug, "Schedule ping check after ", delay);
-        self.ping_timer.scheduleReplacing(
-            delay,
-            Session.onPingTimer,
-            self.session,
-        ) catch unreachable;
+        log.logTimeMs(.debug, "Schedule ping check after ", delay_ms);
+        try self.session.looper.scheduleReplacing(
+            &self.ping_timer,
+            delay_ms,
+            .{
+                .context = self.session,
+                .callback = Session.onPingTimer,
+            },
+        );
     }
 
     fn ping(self: *SessionOnQueue) !void {
@@ -916,7 +898,7 @@ const SessionOnQueue = struct {
             const ping_packet: []const u8 = &constants_mod.Data.ping_string;
             try pair.send(&.{ping_packet}, null, null);
         }
-        self.scheduleNextPing(context);
+        try self.scheduleNextPing(context);
     }
 
     fn checkPingTimeout(self: *SessionOnQueue, context: *ActiveContext) !void {
@@ -1009,10 +991,5 @@ pub const testing = struct {
 
     pub fn reportFailure(session: *Session, cause: SessionError) void {
         session.reportFailure(cause);
-    }
-
-    pub fn timersStarted(session: *Session) bool {
-        return session.on_queue.negotiation_scheduler.thread != null and
-            session.on_queue.ping_timer.thread != null;
     }
 };

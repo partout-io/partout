@@ -59,7 +59,6 @@ test "Session borrows an externally managed Looper" {
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
     try std.testing.expect(session.looper == &looper);
-    try std.testing.expect(session_testing.timersStarted(session));
 
     session.destroy();
     session_destroyed = true;

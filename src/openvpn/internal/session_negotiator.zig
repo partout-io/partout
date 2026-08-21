@@ -65,12 +65,12 @@ pub const NegotiatorOptions = struct {
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
-    // The Session owns the stable timer worker; this callback lets the
+    // The Session owns the looper timer token; this callback lets the
     // Negotiator own when its next check is armed.
     schedule_negotiation_check: *const fn (
         ?*anyopaque,
         u64,
-    ) std.Thread.SpawnError!void,
+    ) net_mod.Looper.ScheduleTimerError!void,
     on_connected: *const fn (
         ?*anyopaque,
         u8,
