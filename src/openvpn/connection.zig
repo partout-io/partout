@@ -547,6 +547,13 @@ const DelegateEvent = union(enum) {
         };
     }
 
+    fn isLifecycle(self: DelegateEvent) bool {
+        return switch (self) {
+            .did_start, .did_stop => true,
+            .did_update_data_count => false,
+        };
+    }
+
     fn deinit(self: *DelegateEvent, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .did_start => |*payload| {
@@ -581,12 +588,11 @@ const DelegateEventTask = struct {
 };
 
 fn sendDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
+    const is_lifecycle = event.isLifecycle();
     const task = self.allocator.create(DelegateEventTask) catch |err| {
         var owned_event = event;
         owned_event.deinit(self.allocator);
-        log.writef(.err, "Unable to send session delegate event: {s}", .{
-            @errorName(err),
-        });
+        rejectDelegateEvent(err, is_lifecycle);
         return;
     };
     task.* = .{
@@ -600,10 +606,16 @@ fn sendDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
         DelegateEventTask.discard,
     ) catch |err| {
         DelegateEventTask.discard(task);
-        log.writef(.err, "Unable to send session delegate event: {s}", .{
-            @errorName(err),
-        });
+        rejectDelegateEvent(err, is_lifecycle);
     };
+}
+
+fn rejectDelegateEvent(err: core.SerializedExecutor.RunError, is_lifecycle: bool) void {
+    if (err == error.Closed) return;
+    // Lifecycle callbacks have no error channel. Continuing would strand the
+    // connection between states; match Swift's nonthrowing stream delivery.
+    if (is_lifecycle) @panic("Unable to deliver OpenVPN session lifecycle event");
+    log.writef(.err, "Unable to send session delegate event: {s}", .{@errorName(err)});
 }
 
 fn consumeDelegateEvent(self: *OpenVPNConnection, event: DelegateEvent) void {
@@ -643,14 +655,11 @@ fn sessionDidStart(
     remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    const endpoint = remote_endpoint.clone(self.allocator) catch {
-        log.write(.err, "Unable to copy started endpoint");
-        return;
-    };
+    const endpoint = remote_endpoint.clone(self.allocator) catch
+        @panic("Unable to retain OpenVPN session lifecycle event");
     const options = remote_options.clone(self.allocator) catch {
         endpoint.deinit(self.allocator);
-        log.write(.err, "Unable to copy pushed options");
-        return;
+        @panic("Unable to retain OpenVPN session lifecycle event");
     };
     sendDelegateEvent(self, .{ .did_start = .{
         .session = session,
