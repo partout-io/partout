@@ -102,7 +102,9 @@ pub const SessionDelegate = struct {
 ///
 /// `Session` is heap-only: callbacks and timer contexts borrow this stable
 /// address until `destroy` joins them. Its `Looper` is borrowed and dedicated
-/// to this session for the same lifetime.
+/// to this session for the same lifetime. Callers must invoke public lifecycle
+/// operations from `lifecycle_executor`; mutable protocol and lifecycle state
+/// is confined to `on_queue`.
 pub const Session = struct {
     pub const Error = errors_mod.SessionError;
 
@@ -114,14 +116,13 @@ pub const Session = struct {
     ca_filename: []u8,
     options: SessionOptions,
 
-    executor: net.SerializedExecutor,
+    lifecycle_executor: net.SerializedExecutor,
     looper: *net.Looper,
     on_queue: SessionOnQueue,
-    lifecycle_lock: core.Mutex,
-    shutdown_state: ShutdownState,
+    shutdown_mailbox: ShutdownMailbox,
 
     pub const Init = struct {
-        executor: net.SerializedExecutor,
+        lifecycle_executor: net.SerializedExecutor,
         looper: *net.Looper,
         delegate: ?SessionDelegate = null,
         configuration: api.OpenVPNConfiguration,
@@ -166,16 +167,14 @@ pub const Session = struct {
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
             .options = init.options,
-            .executor = init.executor,
+            .lifecycle_executor = init.lifecycle_executor,
             .looper = init.looper,
             .on_queue = SessionOnQueue.init(self, control_channel, init.delegate),
-            .lifecycle_lock = .{},
-            .shutdown_state = ShutdownState.init(),
+            .shutdown_mailbox = ShutdownMailbox.init(),
         };
         errdefer {
             self.on_queue.deinit();
-            self.shutdown_state.deinit();
-            self.lifecycle_lock.deinit();
+            self.shutdown_mailbox.deinit();
         }
         // A later schedule is therefore infallible. In particular, negotiation
         // can commit DataChannel ownership before arming the first ping.
@@ -204,8 +203,7 @@ pub const Session = struct {
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
         self.allocator.free(self.caches_directory);
         self.allocator.free(self.ca_filename);
-        self.shutdown_state.deinit();
-        self.lifecycle_lock.deinit();
+        self.shutdown_mailbox.deinit();
         const allocator = self.allocator;
         allocator.destroy(self);
     }
@@ -231,8 +229,6 @@ pub const Session = struct {
         defer if (!descriptor_transferred) descriptor.io.cleanup();
 
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
-        self.lifecycle_lock.lock();
-        defer self.lifecycle_lock.unlock();
         if (self.looper.isLinkAttached()) {
             log.write(.err, "Link interface already set");
             return;
@@ -274,8 +270,6 @@ pub const Session = struct {
         defer if (!descriptor_transferred) descriptor.io.cleanup();
 
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
-        self.lifecycle_lock.lock();
-        defer self.lifecycle_lock.unlock();
         if (!self.looper.isLinkAttached()) {
             log.write(.err, "Set link interface first");
             return;
@@ -301,13 +295,11 @@ pub const Session = struct {
         timeout_ms: ?u64,
     ) Error!void {
         if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
-        self.lifecycle_lock.lock();
-        defer self.lifecycle_lock.unlock();
         const request = ShutdownRequest{
             .cause = cause,
             .timeout_ms = timeout_ms,
         };
-        const should_detach = self.performOnQueue(
+        const should_shutdown = self.performOnQueue(
             bool,
             request,
             SessionOnQueue.prepareShutdown,
@@ -322,7 +314,8 @@ pub const Session = struct {
             });
             return errors_mod.sessionError(err);
         };
-        if (!should_detach) return;
+        // Another shutdown request is already in progress.
+        if (!should_shutdown) return;
         // These synchronous commands are caller-owned and allocation-free.
         // Never release the Session state until every attached side has dropped
         // its callbacks and borrowed native I/O.
@@ -339,6 +332,8 @@ pub const Session = struct {
             return errors_mod.sessionError(err);
         };
     }
+
+    // MARK: - From looper thread
 
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
@@ -366,12 +361,9 @@ pub const Session = struct {
     // MARK: - From any thread
 
     fn requestShutdownFromAnyThread(self: *Session, cause: SessionError) void {
-        if (!self.shutdown_state.enqueue(.{
-            .cause = cause,
-            .timeout_ms = null,
-        })) return;
-        self.executor.tryRun(self, shutdownFromAnyThread) catch |err| {
-            self.shutdown_state.clearRequest();
+        if (!self.shutdown_mailbox.enqueue(cause)) return;
+        self.lifecycle_executor.tryRun(self, shutdownFromAnyThread) catch |err| {
+            self.shutdown_mailbox.clear();
             log.writef(.err, "Unable to enqueue session shutdown: {s}", .{
                 @errorName(err),
             });
@@ -380,8 +372,8 @@ pub const Session = struct {
 
     fn shutdownFromAnyThread(raw: *anyopaque) void {
         const self: *Session = @ptrCast(@alignCast(raw));
-        const request = self.shutdown_state.takeRequest() orelse return;
-        self.shutdown(request.cause, request.timeout_ms) catch |err| {
+        const cause = self.shutdown_mailbox.take() orelse return;
+        self.shutdown(cause, null) catch |err| {
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
@@ -541,47 +533,50 @@ pub const Session = struct {
         timeout_ms: ?u64,
     };
 
-    const ShutdownState = struct {
+    /// Single-slot, first-error-wins handoff from callback threads to the
+    /// lifecycle executor. This only transports work; `SessionOnQueue.state`
+    /// remains the authoritative session lifecycle.
+    const ShutdownMailbox = struct {
         lock: core.Mutex,
-        requested: ?ShutdownRequest,
+        pending: ?SessionError,
 
-        fn init() ShutdownState {
+        fn init() ShutdownMailbox {
             return .{
                 .lock = .{},
-                .requested = null,
+                .pending = null,
             };
         }
 
-        fn deinit(self: *ShutdownState) void {
+        fn deinit(self: *ShutdownMailbox) void {
             self.lock.deinit();
         }
 
-        fn enqueue(self: *ShutdownState, request: ShutdownRequest) bool {
+        fn enqueue(self: *ShutdownMailbox, cause: SessionError) bool {
             self.lock.lock();
             defer self.lock.unlock();
-            if (self.requested != null) return false;
-            self.requested = request;
+            if (self.pending != null) return false;
+            self.pending = cause;
             return true;
         }
 
-        fn takeRequest(self: *ShutdownState) ?ShutdownRequest {
+        fn take(self: *ShutdownMailbox) ?SessionError {
             self.lock.lock();
             defer self.lock.unlock();
-            const request = self.requested;
-            self.requested = null;
-            return request;
+            const cause = self.pending;
+            self.pending = null;
+            return cause;
         }
 
-        fn clearRequest(self: *ShutdownState) void {
+        fn clear(self: *ShutdownMailbox) void {
             self.lock.lock();
             defer self.lock.unlock();
-            self.requested = null;
+            self.pending = null;
         }
 
-        fn hasRequest(self: *ShutdownState) bool {
+        fn hasPending(self: *ShutdownMailbox) bool {
             self.lock.lock();
             defer self.lock.unlock();
-            return self.requested != null;
+            return self.pending != null;
         }
     };
 };
@@ -611,13 +606,18 @@ const SessionOnQueue = struct {
             .negotiation_timer = .{},
             .ping_timer = .{},
             .delegate = delegate,
-            .state = .{ .stopped = .{ .with_local_options = true } },
+            .state = .{
+                .stopped = .{
+                    .with_local_options = true,
+                },
+            },
             .link_processor = null,
         };
     }
 
     fn deinit(self: *SessionOnQueue) void {
-        self.deinitTimers();
+        self.negotiation_timer.deinit();
+        self.ping_timer.deinit();
         switch (self.state) {
             .stopped => {},
             .active => |active| active.context.destroy(),
@@ -634,11 +634,6 @@ const SessionOnQueue = struct {
     fn cancelTimers(self: *SessionOnQueue) void {
         self.negotiation_timer.cancel();
         self.ping_timer.cancel();
-    }
-
-    fn deinitTimers(self: *SessionOnQueue) void {
-        self.negotiation_timer.deinit();
-        self.ping_timer.deinit();
     }
 
     fn setDelegate(self: *SessionOnQueue, delegate: ?SessionDelegate) void {
@@ -719,8 +714,8 @@ const SessionOnQueue = struct {
             return false;
         };
         if (active.phase == .stopping) {
-            // A prior call may have been interrupted by looper teardown or a
-            // rejected reentrant detach. Resume the detach/finish transaction.
+            // Resume a transaction interrupted by looper teardown or a
+            // rejected detach without introducing a second lifecycle state.
             log.write(.debug, "Resume stop request already in progress");
             return true;
         }
@@ -1121,7 +1116,7 @@ pub const testing = struct {
     }
 
     pub fn hasPendingShutdown(session: *Session) bool {
-        return session.shutdown_state.hasRequest();
+        return session.shutdown_mailbox.hasPending();
     }
 
     pub fn timersStarted(session: *Session) bool {

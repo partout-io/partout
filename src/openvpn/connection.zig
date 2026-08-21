@@ -199,7 +199,7 @@ const OpenVPNConnection = struct {
         };
         defer self.allocator.free(ca_filename);
         const session = Session.create(self.allocator, .{
-            .executor = self.serialized_executor,
+            .lifecycle_executor = self.serialized_executor,
             .looper = self.looper,
             .delegate = self.sessionDelegate(),
             .configuration = self.configuration,

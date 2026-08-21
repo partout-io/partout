@@ -34,7 +34,7 @@ test "Session borrows an externally managed Looper" {
     defer if (looper_started) looper.stop() catch {};
 
     const session = try Session.create(allocator, .{
-        .executor = executor.interface(),
+        .lifecycle_executor = executor.interface(),
         .looper = &looper,
         .configuration = .{},
         .credentials = null,
@@ -55,21 +55,26 @@ test "Session borrows an externally managed Looper" {
     looper_started = false;
 }
 
-test "rejected executor admission releases the shutdown request" {
-    const RejectingExecutor = struct {
+test "shutdown mailbox clears rejected work and coalesces accepted signals" {
+    const RecordingExecutor = struct {
+        const State = struct {
+            count: usize = 0,
+            rejects: bool = true,
+        };
+
         fn run(
             raw: *anyopaque,
             _: *anyopaque,
             _: net.SerializedExecutor.Block,
         ) net.SerializedExecutor.RunError!void {
-            const count: *usize = @ptrCast(@alignCast(raw));
-            count.* += 1;
-            return error.Closed;
+            const state: *State = @ptrCast(@alignCast(raw));
+            state.count += 1;
+            if (state.rejects) return error.Closed;
         }
     };
 
     const allocator = std.testing.allocator;
-    var rejected_count: usize = 0;
+    var executor_state = RecordingExecutor.State{};
     var looper = try net.Looper.init(allocator, .{
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
@@ -81,9 +86,9 @@ test "rejected executor admission releases the shutdown request" {
     defer if (looper_started) looper.stop() catch {};
 
     const session = try Session.create(allocator, .{
-        .executor = .{
-            .ptr = &rejected_count,
-            .run_block = RejectingExecutor.run,
+        .lifecycle_executor = .{
+            .ptr = &executor_state,
+            .run_block = RecordingExecutor.run,
         },
         .looper = &looper,
         .configuration = .{},
@@ -99,8 +104,16 @@ test "rejected executor admission releases the shutdown request" {
     // A no-op shutdown while stopped must not permanently suppress later work.
     try session.shutdown(null, 0);
     session_testing.requestShutdownFromAnyThread(session, error.Reconnect);
-    try std.testing.expectEqual(@as(usize, 1), rejected_count);
+    try std.testing.expectEqual(@as(usize, 1), executor_state.count);
     try std.testing.expect(!session_testing.hasPendingShutdown(session));
+
+    // Once accepted, the first signal occupies the mailbox and later signals
+    // do not enqueue redundant lifecycle work.
+    executor_state.rejects = false;
+    session_testing.requestShutdownFromAnyThread(session, error.Reconnect);
+    session_testing.requestShutdownFromAnyThread(session, error.TLSFailure);
+    try std.testing.expectEqual(@as(usize, 2), executor_state.count);
+    try std.testing.expect(session_testing.hasPendingShutdown(session));
 
     session.destroy();
     session_destroyed = true;
