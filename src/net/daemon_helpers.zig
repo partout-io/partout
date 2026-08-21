@@ -65,20 +65,24 @@ pub const ConnectionGate = struct {
         }
     };
 
-    mutex: core.Mutex = .{},
+    mutex: core.Mutex,
     reachability_block: ReachabilityBlock,
-    on_ready: ?OnReadyBlock = null,
-    observing: bool = false,
-    state: State = .{
-        .enabled = false,
-        .network_available = false,
-        .connection_status = .disconnected,
-    },
+    on_ready: ?OnReadyBlock,
+    observing: bool,
+    state: State,
 
     pub fn init(reachability_block: ?ReachabilityBlock) ConnectionGate {
         return .{
+            .mutex = .{},
             .reachability_block = reachability_block orelse .{
                 .is_reachable = neverReachable,
+            },
+            .on_ready = null,
+            .observing = false,
+            .state = .{
+                .enabled = false,
+                .network_available = false,
+                .connection_status = .disconnected,
             },
         };
     }
@@ -310,7 +314,7 @@ pub const SnapshotPublisher = struct {
     fn dataCountDelta(lhs: api.DataCount, rhs: api.DataCount) u64 {
         const received_delta = uintDelta(lhs.received, rhs.received);
         const sent_delta = uintDelta(lhs.sent, rhs.sent);
-        return received_delta +| sent_delta;
+        return std.math.add(u64, received_delta, sent_delta) catch std.math.maxInt(u64);
     }
 
     fn uintDelta(lhs: u64, rhs: u64) u64 {

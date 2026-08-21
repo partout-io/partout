@@ -84,11 +84,50 @@ pub const Drainer = struct {
     ///
     /// The caller must previously have paired this call with `enter`.
     pub fn leaveLocked(self: *Drainer) void {
-        std.debug.assert(self.in_flight > 0);
+        if (self.in_flight == 0)
+            @panic("Drainer.leaveLocked() requires a matching enter()");
         self.in_flight -= 1;
         if (self.in_flight == 0) {
             self.drained.broadcast();
         }
+    }
+};
+
+/// Execution capability for asynchronously submitted work that must share one
+/// serialized context.
+///
+/// `run_block` must enqueue accepted work and return without invoking it inline.
+/// For owned work it must eventually invoke exactly one of `block` or `discard`.
+pub const SerializedExecutor = struct {
+    pub const Block = *const fn (*anyopaque) void;
+    pub const RunError = std.mem.Allocator.Error || error{Closed};
+
+    ptr: *anyopaque,
+    run_block: *const fn (*anyopaque, *anyopaque, Block, ?Block) RunError!void,
+
+    /// Best-effort submission for producers that can safely drop stale work.
+    pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
+        self.tryRun(block_ptr, block) catch {};
+    }
+
+    /// Submits work and reports whether the executor accepted it.
+    pub fn tryRun(
+        self: SerializedExecutor,
+        block_ptr: *anyopaque,
+        block: Block,
+    ) RunError!void {
+        return self.run_block(self.ptr, block_ptr, block, null);
+    }
+
+    /// Transfers ownership of `block_ptr` on success. If the executor cannot
+    /// run `block`, it must invoke `discard` instead.
+    pub fn tryRunOwned(
+        self: SerializedExecutor,
+        block_ptr: *anyopaque,
+        block: Block,
+        discard: Block,
+    ) RunError!void {
+        return self.run_block(self.ptr, block_ptr, block, discard);
     }
 };
 
@@ -231,7 +270,8 @@ pub const RunAfter = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        std.debug.assert(self.state != .stopping);
+        if (self.state == .stopping)
+            @panic("Cannot start a stopping RunAfter");
         try self.startLocked();
     }
 
@@ -280,10 +320,12 @@ pub const RunAfter = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
 
-        std.debug.assert(self.state != .stopping);
+        if (self.state == .stopping)
+            @panic("Cannot schedule a stopping RunAfter");
         switch (request) {
             .replace => |options| {
-                std.debug.assert(!self.scheduling);
+                if (self.scheduling)
+                    @panic("Cannot replace a RunAfter callback while appended callbacks are pending");
                 try self.startLocked();
                 self.replaceLocked(
                     options.delay_ms,
@@ -292,7 +334,8 @@ pub const RunAfter = struct {
                 );
             },
             .append => |options| {
-                std.debug.assert(self.scheduling or self.state != .scheduled);
+                if (!self.scheduling and self.state == .scheduled)
+                    @panic("Cannot append a RunAfter callback while a replacement callback is pending");
                 try self.startLocked();
                 self.appendLocked(
                     options.scheduled,
@@ -406,7 +449,8 @@ pub const RunAfter = struct {
                 self.mutex.unlock();
                 return;
             }
-            std.debug.assert(self.state == .scheduled);
+            if (self.state != .scheduled)
+                @panic("RunAfter worker woke without scheduled work");
             const generation = self.generation;
             const deadline_ns = self.deadline_ns orelse deadline: {
                 const value = deadlineAfterMs(monotonicNs(), self.delay_ms);
@@ -790,7 +834,8 @@ const WindowsCondition = struct {
 
         const now_100ns: u64 = @intCast(windows.ntdll.RtlGetSystemTimePrecise());
         const remaining_100ns = (remaining_ns - 1) / 100 + 1;
-        const absolute_100ns = now_100ns +| remaining_100ns;
+        const absolute_100ns = std.math.add(u64, now_100ns, remaining_100ns) catch
+            std.math.maxInt(u64);
         var timeout: windows.LARGE_INTEGER = @intCast(@min(
             absolute_100ns,
             @as(u64, std.math.maxInt(windows.LARGE_INTEGER)),
@@ -889,12 +934,16 @@ pub fn monotonicNs() u64 {
     if (std.c.clock_gettime(clock_id, &timestamp) != 0) return 0;
     const seconds: u64 = @intCast(timestamp.sec);
     const nanoseconds: u64 = @intCast(timestamp.nsec);
-    return seconds *| @as(u64, std.time.ns_per_s) +| nanoseconds;
+    const seconds_ns = std.math.mul(u64, seconds, std.time.ns_per_s) catch
+        return std.math.maxInt(u64);
+    return std.math.add(u64, seconds_ns, nanoseconds) catch std.math.maxInt(u64);
 }
 
 /// Computes a saturating absolute deadline from an integer millisecond delay.
-fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
-    return now_ns +| delay_ms *| @as(u64, std.time.ns_per_ms);
+pub fn deadlineAfterMs(now_ns: u64, delay_ms: u64) u64 {
+    const delay_ns = std.math.mul(u64, delay_ms, std.time.ns_per_ms) catch
+        return std.math.maxInt(u64);
+    return std.math.add(u64, now_ns, delay_ns) catch std.math.maxInt(u64);
 }
 
 /// Returns the nanoseconds remaining before an absolute deadline.
@@ -923,7 +972,7 @@ fn timespecAfterNs(now: std.c.timespec, duration_ns: u64) std.c.timespec {
     nanoseconds += duration_ns % std.time.ns_per_s;
     if (nanoseconds >= std.time.ns_per_s) {
         nanoseconds -= std.time.ns_per_s;
-        extra_seconds +|= 1;
+        extra_seconds += 1;
     }
     if (extra_seconds > max_seconds - now_seconds) {
         return .{

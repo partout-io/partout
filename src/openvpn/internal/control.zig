@@ -21,12 +21,12 @@ pub fn ControlChannel(comptime Serializer: type) type {
         allocator: std.mem.Allocator,
         prng: PRNG,
         serializer: Serializer,
-        session_id: ?[c.OpenVPNPacketSessionIdLength]u8 = null,
-        remote_session_id: ?[c.OpenVPNPacketSessionIdLength]u8 = null,
-        inbound_queue: std.ArrayList(ControlPacket) = .empty,
-        outbound_queue: std.ArrayList(ControlPacket) = .empty,
-        current_inbound_id: u32 = 0,
-        current_outbound_id: u32 = 0,
+        session_id: ?[c.OpenVPNPacketSessionIdLength]u8,
+        remote_session_id: ?[c.OpenVPNPacketSessionIdLength]u8,
+        inbound_queue: std.ArrayList(ControlPacket),
+        outbound_queue: std.ArrayList(ControlPacket),
+        current_inbound_id: u32,
+        current_outbound_id: u32,
         pending_acks: std.AutoHashMap(u32, void),
         sent_dates_ms: std.AutoHashMap(u32, u64),
 
@@ -43,6 +43,12 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 .allocator = allocator,
                 .prng = prng,
                 .serializer = owned_serializer,
+                .session_id = null,
+                .remote_session_id = null,
+                .inbound_queue = .empty,
+                .outbound_queue = .empty,
+                .current_inbound_id = 0,
+                .current_outbound_id = 0,
                 .pending_acks = std.AutoHashMap(u32, void).init(allocator),
                 .sent_dates_ms = std.AutoHashMap(u32, u64).init(allocator),
             };
@@ -50,8 +56,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
         }
 
         pub fn destroy(self: *Self) void {
-            clearPacketList(&self.inbound_queue);
-            clearPacketList(&self.outbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.inbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.outbound_queue);
             self.inbound_queue.deinit(self.allocator);
             self.outbound_queue.deinit(self.allocator);
             self.pending_acks.deinit();
@@ -68,8 +74,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 self.session_id = local;
                 self.remote_session_id = null;
             }
-            clearPacketList(&self.inbound_queue);
-            clearPacketList(&self.outbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.inbound_queue);
+            core_mod.util.clearList(ControlPacket, &self.outbound_queue);
             self.current_inbound_id = 0;
             self.current_outbound_id = 0;
             self.pending_acks.clearRetainingCapacity();
@@ -218,11 +224,11 @@ pub fn ControlChannel(comptime Serializer: type) type {
             resend_after_ms: i64,
         ) ![][]u8 {
             var raw_packets: std.ArrayList([]u8) = .empty;
-            errdefer freePacketList(self.allocator, &raw_packets);
+            errdefer core_mod.util.deinitListOfStrings(self.allocator, &raw_packets);
             const now = core_mod.concurrency.monotonicNs() / std.time.ns_per_ms;
             for (self.outbound_queue.items) |*packet| {
                 if (self.sent_dates_ms.get(packet.packetId())) |sent| {
-                    const elapsed_ms = now -| sent;
+                    const elapsed_ms = if (now > sent) now - sent else 0;
                     if (resend_after_ms > 0 and elapsed_ms < @as(u64, @intCast(resend_after_ms))) {
                         log.writef(.info, "Control: Skip writing packet with packetId {d} (sent on {d}, {d} seconds ago < {d})", .{
                             packet.packetId(),
@@ -296,15 +302,5 @@ pub fn ControlChannel(comptime Serializer: type) type {
         fn packetLessThan(_: void, lhs: ControlPacket, rhs: ControlPacket) bool {
             return lhs.packetId() < rhs.packetId();
         }
-
-        fn freePacketList(allocator: std.mem.Allocator, packets: *std.ArrayList([]u8)) void {
-            for (packets.items) |packet| allocator.free(packet);
-            packets.deinit(allocator);
-        }
     };
-}
-
-fn clearPacketList(packets: *std.ArrayList(ControlPacket)) void {
-    for (packets.items) |*packet| packet.deinit();
-    packets.clearRetainingCapacity();
 }

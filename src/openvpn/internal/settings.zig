@@ -33,10 +33,7 @@ pub const NetworkSettingsBuilder = struct {
         openvpn_log.logNegotiatedOptions(self.remote_options);
         log.write(.info, "Build modules from local/remote options");
         var result: std.ArrayList(api.TaggedModule) = .empty;
-        errdefer {
-            for (result.items) |*module| module.deinit(allocator);
-            result.deinit(allocator);
-        }
+        errdefer core_mod.util.deinitList(api.TaggedModule, allocator, &result);
 
         if (try self.ipModule(allocator)) |module| try result.append(allocator, .{ .IP = module });
         const dns = self.dnsModule(allocator) catch |err| switch (err) {
@@ -58,11 +55,6 @@ pub const NetworkSettingsBuilder = struct {
         };
         if (http_proxy) |module| try result.append(allocator, .{ .HTTPProxy = module });
         return result.toOwnedSlice(allocator);
-    }
-
-    pub fn deinitModules(allocator: std.mem.Allocator, modules_value: []api.TaggedModule) void {
-        for (modules_value) |*module| module.deinit(allocator);
-        allocator.free(modules_value);
     }
 
     fn pulls(self: NetworkSettingsBuilder, mask: api.OpenVPNPullMask) bool {
@@ -206,7 +198,7 @@ pub const NetworkSettingsBuilder = struct {
         log.writef(.info, "\tDNS: Set servers {s}", .{raw_servers.items});
 
         const servers = try addressesAlloc(allocator, raw_servers.items);
-        errdefer freeAddresses(allocator, servers);
+        errdefer core_mod.util.freeSlice(api.Address, allocator, servers);
 
         const raw_domain = if (self.pulls(.dns))
             self.remote_options.dns_domain orelse self.local_options.dns_domain
@@ -242,7 +234,8 @@ pub const NetworkSettingsBuilder = struct {
             try addressesAlloc(allocator, raw_search.items)
         else
             null;
-        errdefer if (search_domains) |domains| freeAddresses(allocator, domains);
+        errdefer if (search_domains) |domains|
+            core_mod.util.freeSlice(api.Address, allocator, domains);
 
         return .{
             .id = try core_mod.newId(),
@@ -298,7 +291,7 @@ pub const NetworkSettingsBuilder = struct {
                 .{raw_bypass.items},
             );
         const bypass = try addressesAlloc(allocator, raw_bypass.items);
-        errdefer freeAddresses(allocator, bypass);
+        errdefer core_mod.util.freeSlice(api.Address, allocator, bypass);
 
         return .{
             .id = try core_mod.newId(),
@@ -325,11 +318,6 @@ fn addressesAlloc(
         initialized += 1;
     }
     return addresses;
-}
-
-fn freeAddresses(allocator: std.mem.Allocator, addresses: []api.Address) void {
-    for (addresses) |*address| address.deinit(allocator);
-    allocator.free(addresses);
 }
 
 fn appendUniqueString(

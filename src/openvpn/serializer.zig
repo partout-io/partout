@@ -5,7 +5,10 @@
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
+const keys_mod = @import("internal/keys.zig");
+
 const api = core.api;
+const StaticKey = keys_mod.StaticKey;
 
 pub fn serializeModule(
     _: ?*anyopaque,
@@ -285,67 +288,29 @@ const ConfigurationWriter = struct {
         allocator: std.mem.Allocator,
         wrap: api.OpenVPNTLSWrap,
     ) core.SerializeError!void {
+        var key = StaticKey.init(allocator, wrap.key) catch |err| return mapStaticKeyError(err);
+        defer key.deinit();
         const tag = switch (wrap.strategy) {
             .auth => "tls-auth",
             .crypt => "tls-crypt",
             .cryptV2 => "tls-crypt-v2",
         };
         if (wrap.strategy == .auth) {
-            if (wrap.key.dir) |direction| try self.line("key-direction {}", .{direction.raw()});
+            if (key.direction) |direction| try self.line("key-direction {}", .{direction.raw()});
         }
 
-        try self.line("<{s}>", .{tag});
-        switch (wrap.strategy) {
-            .auth, .crypt => try self.staticKey(allocator, wrap.key),
-            .cryptV2 => try self.cryptV2Key(allocator, wrap),
+        const contents = switch (wrap.strategy) {
+            .auth, .crypt => key.fileContentsAlloc(allocator),
+            .cryptV2 => key.cryptV2FileContentsAlloc(
+                allocator,
+                wrap.wrapped_key orelse return error.SerializationFailed,
+            ),
+        } catch |err| return mapStaticKeyError(err);
+        defer {
+            @memset(contents, 0);
+            allocator.free(contents);
         }
-        try self.line("</{s}>", .{tag});
-    }
-
-    fn staticKey(
-        self: *ConfigurationWriter,
-        allocator: std.mem.Allocator,
-        key: api.OpenVPNStaticKey,
-    ) core.SerializeError!void {
-        const hex = key.data.hexAlloc(allocator) catch |err| return mapEncodeError(err);
-        defer allocator.free(hex);
-        if (hex.len != 512) return error.SerializationFailed;
-
-        try self.line("# 2048 bit OpenVPN static key", .{});
-        try self.line("-----BEGIN OpenVPN Static key V1-----", .{});
-        var offset: usize = 0;
-        while (offset < hex.len) : (offset += 32) {
-            try self.line("{s}", .{hex[offset..@min(offset + 32, hex.len)]});
-        }
-        try self.line("-----END OpenVPN Static key V1-----", .{});
-    }
-
-    fn cryptV2Key(
-        self: *ConfigurationWriter,
-        allocator: std.mem.Allocator,
-        wrap: api.OpenVPNTLSWrap,
-    ) core.SerializeError!void {
-        const key = wrap.key.data.bytesAlloc(allocator) catch |err| return mapEncodeError(err);
-        defer allocator.free(key);
-        if (key.len != 256) return error.SerializationFailed;
-
-        const wrapped_data = wrap.wrapped_key orelse return error.SerializationFailed;
-        const wrapped = wrapped_data.bytesAlloc(allocator) catch |err| return mapEncodeError(err);
-        defer allocator.free(wrapped);
-        const combined_len = std.math.add(usize, key.len, wrapped.len) catch return error.SerializationFailed;
-        const combined = try allocator.alloc(u8, combined_len);
-        defer allocator.free(combined);
-        @memcpy(combined[0..key.len], key);
-        @memcpy(combined[key.len..], wrapped);
-
-        var encoded = try api.SecureData.initBytesAlloc(allocator, combined);
-        defer encoded.deinit(allocator);
-        try self.line("-----BEGIN OpenVPN tls-crypt-v2 client key-----", .{});
-        var offset: usize = 0;
-        while (offset < encoded.base64.len) : (offset += 64) {
-            try self.line("{s}", .{encoded.base64[offset..@min(offset + 64, encoded.base64.len)]});
-        }
-        try self.line("-----END OpenVPN tls-crypt-v2 client key-----", .{});
+        try self.block(tag, contents);
     }
 };
 
@@ -368,6 +333,13 @@ fn socketTypeRaw(value: api.IPSocketType) []const u8 {
 }
 
 fn mapEncodeError(err: api.EncodeError) core.SerializeError {
+    return switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        else => error.SerializationFailed,
+    };
+}
+
+fn mapStaticKeyError(err: anyerror) core.SerializeError {
     return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
         else => error.SerializationFailed,

@@ -5,6 +5,7 @@ import android.net.VpnService
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.NativeTunnelControllerJNI
+import io.partout.extensions.modulesForTunnelSettings
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
@@ -113,7 +114,7 @@ internal class PartoutTunnelController(
         // Apply modules to VPN builder
         var appliedAddressSettings = false
         var appliedDnsSettings = false
-        info.modules?.forEach {
+        info.modulesForTunnelSettings.forEach {
             when (it) {
                 is TaggedModuleDNS -> {
                     Log.i(logTag, "DNS: ${it.value}")

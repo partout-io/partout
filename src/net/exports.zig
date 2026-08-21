@@ -45,3 +45,5 @@ pub const SocketDescriptor = io.SocketDescriptor;
 pub const SocketFactory = sandbox.SocketFactory;
 pub const TunnelController = sandbox.TunnelController;
 pub const TunWrapper = io.TunWrapper;
+
+pub const canChangeStatus = conn.canChangeStatus;

@@ -33,11 +33,15 @@ pub const PeerEndpointResolver = struct {
     resolver: net.DNSResolver,
     factory: ?net.SocketFactory,
     timeout_ms: u32,
-    cache: Cache = .{},
+    cache: Cache,
 
     /// `null` means unresolved; a non-null empty slice is a valid result.
     const Cache = struct {
-        entries: ?[]ResolvedEndpoint = null,
+        entries: ?[]ResolvedEndpoint,
+
+        fn init() Cache {
+            return .{ .entries = null };
+        }
 
         fn value(self: *const Cache) ?[]const ResolvedEndpoint {
             return self.entries;
@@ -48,7 +52,8 @@ pub const PeerEndpointResolver = struct {
         }
 
         fn setValue(self: *Cache, entries: []ResolvedEndpoint) void {
-            std.debug.assert(self.entries == null);
+            if (self.entries != null)
+                @panic("Peer endpoint resolver cache cannot overwrite live entries");
             self.entries = entries;
         }
 
@@ -65,10 +70,13 @@ pub const PeerEndpointResolver = struct {
     /// Owns entries while the resolution map is being assembled.
     const List = struct {
         allocator: std.mem.Allocator,
-        entries: std.ArrayList(ResolvedEndpoint) = .empty,
+        entries: std.ArrayList(ResolvedEndpoint),
 
         fn init(allocator: std.mem.Allocator) List {
-            return .{ .allocator = allocator };
+            return .{
+                .allocator = allocator,
+                .entries = .empty,
+            };
         }
 
         fn append(self: *List, entry: ResolvedEndpoint) error{OutOfMemory}!void {
@@ -99,6 +107,7 @@ pub const PeerEndpointResolver = struct {
             .resolver = resolver,
             .factory = factory,
             .timeout_ms = timeout_ms,
+            .cache = Cache.init(),
         };
     }
 

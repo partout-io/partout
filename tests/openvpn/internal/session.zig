@@ -8,7 +8,7 @@ const source = @import("source");
 const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
-const forAuthentication = source.openvpn_internal.session.testing.forAuthentication;
+const session_testing = source.openvpn_internal.session.testing;
 const shouldSendExitNotification = source.openvpn_internal.session.testing.shouldSendExitNotification;
 
 test "Session declarations are semantically analyzed" {
@@ -20,11 +20,20 @@ test "Session borrows an externally managed Looper" {
         fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
 
         fn barrier(_: ?*anyopaque) !void {}
+
+        fn established(
+            _: ?*anyopaque,
+            _: *anyopaque,
+            _: source.core.api.ExtendedEndpoint,
+            _: *const source.core.api.OpenVPNConfiguration,
+        ) void {}
+
+        fn failed(_: ?*anyopaque, _: *anyopaque, _: Session.Error) void {}
+
+        fn dataCount(_: ?*anyopaque, _: *anyopaque, _: source.core.api.DataCount) void {}
     };
 
     const allocator = std.testing.allocator;
-    const executor = try source.mock.MockSerializedExecutor.create(allocator);
-    defer executor.destroy();
     var looper = try net.Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
@@ -33,17 +42,20 @@ test "Session borrows an externally managed Looper" {
     var looper_started = true;
     defer if (looper_started) looper.stop() catch {};
 
-    const session = try Session.create(
-        allocator,
-        executor.interface(),
-        &looper,
-        .{},
-        null,
-        PRNG.system(),
-        "",
-        "11111111-1111-4111-8111-111111111111-ca.pem",
-        .{ .backend = .mock },
-    );
+    const session = try Session.create(allocator, .{
+        .looper = &looper,
+        .events = .{
+            .established = Callbacks.established,
+            .failed = Callbacks.failed,
+            .data_count = Callbacks.dataCount,
+        },
+        .configuration = .{},
+        .credentials = null,
+        .prng = PRNG.system(),
+        .caches_directory = "",
+        .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
+        .options = .{ .backend = .mock },
+    });
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
     try std.testing.expect(session.looper == &looper);
@@ -55,26 +67,68 @@ test "Session borrows an externally managed Looper" {
     looper_started = false;
 }
 
-test "forAuthentication appends and encodes OTP" {
+test "Session reports protocol failures without owning shutdown policy" {
+    const RecordingEvents = struct {
+        const State = struct {
+            count: usize = 0,
+            last: ?Session.Error = null,
+        };
+
+        fn established(
+            _: ?*anyopaque,
+            _: *anyopaque,
+            _: source.core.api.ExtendedEndpoint,
+            _: *const source.core.api.OpenVPNConfiguration,
+        ) void {}
+
+        fn failed(raw: ?*anyopaque, _: *anyopaque, cause: Session.Error) void {
+            const state: *State = @ptrCast(@alignCast(raw.?));
+            state.count += 1;
+            state.last = cause;
+        }
+
+        fn dataCount(_: ?*anyopaque, _: *anyopaque, _: source.core.api.DataCount) void {}
+    };
+
     const allocator = std.testing.allocator;
-
-    var appended = try forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .append,
-        .otp = "123",
+    var event_state = RecordingEvents.State{};
+    var looper = try net.Looper.init(allocator, .{
+        .on_finish = .{ .callback = struct {
+            fn call(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        }.call },
     });
-    defer appended.deinit(allocator);
-    try std.testing.expectEqualStrings("pass123", appended.password);
+    defer looper.deinit();
+    try looper.start();
+    var looper_started = true;
+    defer if (looper_started) looper.stop() catch {};
 
-    var encoded = try forAuthentication(allocator, .{
-        .username = "user",
-        .password = "pass",
-        .otp_method = .encode,
-        .otp = "123",
+    const session = try Session.create(allocator, .{
+        .events = .{
+            .context = &event_state,
+            .established = RecordingEvents.established,
+            .failed = RecordingEvents.failed,
+            .data_count = RecordingEvents.dataCount,
+        },
+        .looper = &looper,
+        .configuration = .{},
+        .credentials = null,
+        .prng = PRNG.system(),
+        .caches_directory = "",
+        .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
+        .options = .{ .backend = .mock },
     });
-    defer encoded.deinit(allocator);
-    try std.testing.expectEqualStrings("SCRV1:cGFzcw==:MTIz", encoded.password);
+    var session_destroyed = false;
+    defer if (!session_destroyed) session.destroy();
+
+    session_testing.reportFailure(session, error.Reconnect);
+    session_testing.reportFailure(session, error.TLSFailure);
+    try std.testing.expectEqual(@as(usize, 2), event_state.count);
+    try std.testing.expectEqual(error.TLSFailure, event_state.last.?);
+
+    session.destroy();
+    session_destroyed = true;
+    try looper.stop();
+    looper_started = false;
 }
 
 test "session sends exit notification only for requested and network-change shutdowns" {

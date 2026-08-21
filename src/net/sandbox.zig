@@ -264,20 +264,7 @@ pub const NetworkMonitor = struct {
     }
 };
 
-/// Execution capability for work that must share the connection's serialized
-/// lifecycle context. This is deliberately separate from connection events:
-/// it schedules work rather than reporting an observation. Connections retain
-/// this value at creation; lifecycle calls must not replace it.
-pub const SerializedExecutor = struct {
-    pub const Block = *const fn (*anyopaque) void;
-
-    ptr: *anyopaque,
-    run_block: *const fn (*anyopaque, *anyopaque, Block) void,
-
-    pub fn run(self: SerializedExecutor, block_ptr: *anyopaque, block: Block) void {
-        self.run_block(self.ptr, block_ptr, block);
-    }
-};
+pub const SerializedExecutor = core.SerializedExecutor;
 
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {

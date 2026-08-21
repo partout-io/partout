@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 pub const TemporaryCString = TemporaryCStringWithCapacity(256);
 
@@ -24,7 +25,8 @@ pub fn TemporaryCStringWithCapacity(comptime capacity: usize) type {
             fallback_allocator: std.mem.Allocator,
             value: []const u8,
         ) error{OutOfMemory}!void {
-            std.debug.assert(self.value == null);
+            if (self.value != null)
+                @panic("TemporaryCString.init() called while already initialized");
 
             self.stack_allocator = std.heap.stackFallback(capacity, fallback_allocator);
             self.allocator = self.stack_allocator.get();
@@ -68,6 +70,16 @@ pub fn borrowedCString(ptr: [*:0]const u8) [:0]const u8 {
     return std.mem.span(ptr);
 }
 
+/// Base64-encodes `input` into an allocator-owned buffer.
+pub fn base64EncodeAlloc(
+    allocator: std.mem.Allocator,
+    input: []const u8,
+) error{OutOfMemory}![]u8 {
+    const encoded = try allocator.alloc(u8, std.base64.standard.Encoder.calcSize(input.len));
+    _ = std.base64.standard.Encoder.encode(encoded, input);
+    return encoded;
+}
+
 /// Deep-copies a slice of owned strings.
 ///
 /// The returned slice and each string inside it are allocated with `allocator`.
@@ -93,6 +105,16 @@ pub fn containsOnly(value: []const u8, allowed: []const u8) bool {
     return true;
 }
 
+/// Converts seconds to whole milliseconds, clamping invalid and overflowing
+/// values to the range of `u64`.
+pub fn secondsToMilliseconds(seconds: f64) u64 {
+    if (!(seconds > 0)) return 0;
+    const milliseconds = seconds * std.time.ms_per_s;
+    if (milliseconds >= @as(f64, @floatFromInt(std.math.maxInt(u64))))
+        return std.math.maxInt(u64);
+    return @intFromFloat(milliseconds);
+}
+
 /// Returns an allocator-owned path to the system temporary directory.
 pub fn defaultCacheDir(allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
     const env_names = [_][:0]const u8{ "TMPDIR", "TMP", "TEMP" };
@@ -102,6 +124,30 @@ pub fn defaultCacheDir(allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
         if (path.len > 0) return allocator.dupe(u8, path);
     }
     return allocator.dupe(u8, "/tmp");
+}
+
+/// Calls `deinit` on every item in a list, then clears it while retaining its
+/// allocation.
+pub fn clearList(
+    comptime T: type,
+    list: *std.ArrayList(T),
+) void {
+    for (list.items) |*item| item.deinit();
+    list.clearRetainingCapacity();
+}
+
+/// Calls `deinit` on every value in a map, then clears it while retaining its
+/// allocation.
+pub fn clearMap(
+    comptime T: type,
+    map: anytype,
+) void {
+    var iterator = map.valueIterator();
+    while (iterator.next()) |value| {
+        const item: *T = value;
+        item.deinit();
+    }
+    map.clearRetainingCapacity();
 }
 
 /// Calls `deinit` on every item in a list, then deinitializes the list.
@@ -215,6 +261,103 @@ pub fn ownedSliceOfCStrings(
 pub fn optionalStringsEqual(lhs: ?[]const u8, rhs: ?[]const u8) bool {
     if (lhs == null or rhs == null) return lhs == null and rhs == null;
     return std.mem.eql(u8, lhs.?, rhs.?);
+}
+
+/// Returns the normalized platform name used in protocol metadata.
+pub fn platformName() []const u8 {
+    if (builtin.target.abi.isAndroid()) return "android";
+    return switch (builtin.os.tag) {
+        .ios, .maccatalyst => "ios",
+        .tvos => "tvos",
+        .macos => "mac",
+        .linux => "linux",
+        .windows => "windows",
+        else => "unknown",
+    };
+}
+
+/// Returns the runtime operating-system major/minor version.
+/// The caller owns the returned string.
+pub fn platformVersionAlloc(allocator: std.mem.Allocator) ![]u8 {
+    const detected = if (builtin.os.tag.isDarwin())
+        try darwinVersionAlloc(allocator)
+    else switch (builtin.os.tag) {
+        .dragonfly,
+        .freebsd,
+        .haiku,
+        .hurd,
+        .illumos,
+        .linux,
+        .netbsd,
+        .openbsd,
+        .serenity,
+        => try posixVersionAlloc(allocator),
+        .windows => try windowsVersionAlloc(allocator),
+        else => null,
+    };
+    return detected orelse allocator.dupe(u8, "0.0");
+}
+
+/// Parses an enum by comparing `value` case-insensitively with each field's
+/// string returned by `raw()`.
+pub fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
+    inline for (std.meta.fields(T)) |field| {
+        const candidate: T = @field(T, field.name);
+        if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
+    }
+    return null;
+}
+
+fn darwinVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
+    var buffer: [64]u8 = @splat(0);
+    var length = buffer.len;
+    if (std.c.sysctlbyname(
+        "kern.osproductversion",
+        @ptrCast(&buffer),
+        &length,
+        null,
+        0,
+    ) == 0) {
+        const bounded = buffer[0..@min(length, buffer.len)];
+        if (try majorMinorAlloc(allocator, std.mem.sliceTo(bounded, 0))) |version|
+            return version;
+    }
+    return posixVersionAlloc(allocator);
+}
+
+fn posixVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
+    const information = std.posix.uname();
+    return majorMinorAlloc(allocator, std.mem.sliceTo(&information.release, 0));
+}
+
+fn windowsVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
+    var information: std.os.windows.RTL_OSVERSIONINFOW = std.mem.zeroes(
+        std.os.windows.RTL_OSVERSIONINFOW,
+    );
+    information.dwOSVersionInfoSize = @sizeOf(@TypeOf(information));
+    if (std.os.windows.ntdll.RtlGetVersion(&information) != .SUCCESS) return null;
+    return try std.fmt.allocPrint(
+        allocator,
+        "{d}.{d}",
+        .{ information.dwMajorVersion, information.dwMinorVersion },
+    );
+}
+
+fn majorMinorAlloc(
+    allocator: std.mem.Allocator,
+    raw: []const u8,
+) !?[]u8 {
+    var components = std.mem.splitScalar(u8, raw, '.');
+    const major = numericPrefix(components.next() orelse return null);
+    const minor = numericPrefix(components.next() orelse return null);
+    if (major.len == 0 or minor.len == 0) return null;
+    return try std.fmt.allocPrint(allocator, "{s}.{s}", .{ major, minor });
+}
+
+fn numericPrefix(value: []const u8) []const u8 {
+    var end: usize = 0;
+    while (end < value.len and std.ascii.isDigit(value[end])) : (end += 1) {}
+    return value[0..end];
 }
 
 /// Parses JSON into a generic value tree.

@@ -99,6 +99,24 @@ pub const Task = struct {
     }
 };
 
+/// Infallible task submitted for delayed execution on the looper worker.
+/// Error handling belongs to the owner because a task failure must not stop a
+/// daemon-scoped looper shared by otherwise independent consumers.
+pub const TimedTask = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque) void,
+
+    pub fn call(self: TimedTask) void {
+        self.callback(self.context);
+    }
+};
+
+/// Identity of one replaceable delayed task. The looper never retains this
+/// value's address; callers may store it inline with their queue-owned state.
+pub const Timer = struct {
+    id: ?u64 = null,
+};
+
 /// A descriptor includes:
 /// - The `fd` to watch for I/O events.
 /// - The `io` interface to perform reads and writes.
@@ -125,19 +143,18 @@ pub const AttachArguments = struct {
 /// error name here makes misspellings in set compositions a compile error.
 pub const Errors = struct {
     pub const AlreadyStarted = error{AlreadyStarted};
-    pub const Cancelled = error{Cancelled};
-    pub const InvalidState = error{InvalidState};
+    pub const LooperUnavailable = error{LooperUnavailable};
     pub const MuxFailure = error{MuxFailure};
-    pub const OperationCancelled = error{OperationCancelled};
     pub const ReentrantCall = error{ReentrantCall};
+    pub const SideAlreadyAttached = error{SideAlreadyAttached};
     pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
 
 pub const CompletionError = std.mem.Allocator.Error ||
-    Errors.Cancelled ||
+    Errors.LooperUnavailable ||
     Errors.MuxFailure ||
-    Errors.OperationCancelled;
+    Errors.SideAlreadyAttached;
 
 pub const Completion = struct {
     // Completion state.
@@ -206,6 +223,10 @@ pub const Command = union(enum) {
         task: Task,
         completion: *Completion,
     },
+    timed_task: struct {
+        id: u64,
+        task: ?TimedTask,
+    },
     stop,
 };
 
@@ -215,8 +236,15 @@ pub const CommandNode = struct {
     command: Command,
     timer: core.RunAfter.Scheduled = .{},
 
+    // Synchronous callers keep their node on the stack until completion.
+    // Asynchronous commands set this when allocating a persistent node.
+    allocated: bool = false,
+
     // Intrusive command queue linkage.
     next: ?*CommandNode = null,
+
+    // Intrusive linkage while a timed task is pending or ready.
+    timer_next: ?*CommandNode = null,
 };
 
 /// A plain FIFO for the pending worker commands. Not thread-safe.
@@ -321,7 +349,8 @@ pub const WriteQueue = struct {
             return true;
         };
         const remaining = first.data.len - self.offset;
-        std.debug.assert(written <= remaining);
+        if (written > remaining)
+            @panic("WriteQueue cannot advance past the pending packet");
         if (written < remaining) {
             self.offset += written;
             return false;

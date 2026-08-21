@@ -144,6 +144,39 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
     dispatchCString(logger, @intFromEnum(level), message);
 }
 
+/// Logs a profile using the structured layout of the legacy Apple runtime.
+pub fn writeProfile(level: Level, profile: *const api.Profile) void {
+    writef(level, "\tID: {s}", .{profile.id});
+    writef(level, "\tName: {s}", .{profile.name});
+    if (profile.behavior) |behavior| {
+        writef(level, "\tBehavior: {any}", .{behavior});
+    }
+    writeProfileModules(level, profile);
+}
+
+/// Logs the modules in a profile in their declared order.
+///
+/// The prefix matches the profile logging used by the legacy Apple runtime:
+/// `+` denotes an active module and `-` an inactive one. Module descriptions
+/// follow the configured private-data policy used by `writef`.
+pub fn writeProfileModules(level: Level, profile: *const api.Profile) void {
+    write(level, "\tModules:");
+    for (profile.modules) |*module| {
+        const prefix: [:0]const u8 = if (api.isActiveProfileModule(
+            profile,
+            api.moduleId(module),
+        )) "+" else "-";
+        switch (module.*) {
+            .DNS => |*value| writeProfileModule(level, prefix, "DNSModule", value),
+            .HTTPProxy => |*value| writeProfileModule(level, prefix, "HTTPProxyModule", value),
+            .IP => |*value| writeProfileModule(level, prefix, "IPModule", value),
+            .OnDemand => |*value| writeProfileModule(level, prefix, "OnDemandModule", value),
+            .OpenVPN => |*value| writeProfileModule(level, prefix, "OpenVPNModule", value),
+            .WireGuard => |*value| writeProfileModule(level, prefix, "WireGuardModule", value),
+        }
+    }
+}
+
 pub fn writeAndFailDebug(message: [:0]const u8) void {
     write(.err, message);
     if (builtin.mode == .Debug) {
@@ -172,6 +205,15 @@ fn dispatchCString(
     message: [*:0]const u8,
 ) void {
     logger(level, message);
+}
+
+fn writeProfileModule(
+    level: Level,
+    prefix: [:0]const u8,
+    comptime name: [:0]const u8,
+    value: anytype,
+) void {
+    writef(level, "\t\t{s} " ++ name ++ ": {s}", .{ prefix, value });
 }
 
 /// Writes a duration in seconds using a compact `h`, `m`, and `s`

@@ -76,62 +76,6 @@ test "OpenVPN connection borrows the daemon looper" {
     looper_started = false;
 }
 
-test "active default IP modules add OpenVPN routing policies" {
-    const allocator = std.testing.allocator;
-    const ip_id: api.UUID = "11111111-1111-4111-8111-111111111111".*;
-    const openvpn_id: api.UUID = "22222222-2222-4222-8222-222222222222".*;
-    const included = [_]api.Route{.{}};
-    const modules = [_]api.TaggedModule{
-        .{ .IP = .{
-            .id = ip_id,
-            .ipv4 = .{
-                .subnets = &.{},
-                .included_routes = &included,
-                .excluded_routes = &.{},
-            },
-        } },
-        .{ .OpenVPN = .{
-            .id = openvpn_id,
-            .configuration = .{},
-        } },
-    };
-    const active_ids = [_]api.UUID{ ip_id, openvpn_id };
-    const profile = api.Profile{
-        .id = "33333333-3333-4333-8333-333333333333".*,
-        .name = "OpenVPN",
-        .modules = &modules,
-        .active_modules_ids = &active_ids,
-    };
-    var configured = try connection.testing.configurationWithActiveModules(
-        allocator,
-        &.{},
-        &profile,
-    );
-    defer configured.deinit(allocator);
-
-    const policies = configured.routing_policies orelse
-        return error.TestUnexpectedResult;
-    try std.testing.expectEqualSlices(
-        api.OpenVPNRoutingPolicy,
-        &.{.IPv4},
-        policies,
-    );
-}
-
-test "OpenVPN connection accepts only valid status transitions" {
-    const statusCanChange = connection.testing.statusCanChange;
-    try std.testing.expect(statusCanChange(.disconnected, .connecting));
-    try std.testing.expect(!statusCanChange(.disconnected, .connected));
-    try std.testing.expect(statusCanChange(.connecting, .connected));
-    try std.testing.expect(statusCanChange(.connecting, .disconnecting));
-    try std.testing.expect(statusCanChange(.connecting, .disconnected));
-    try std.testing.expect(statusCanChange(.connected, .disconnecting));
-    try std.testing.expect(statusCanChange(.connected, .disconnected));
-    try std.testing.expect(statusCanChange(.disconnecting, .disconnected));
-    try std.testing.expect(!statusCanChange(.connected, .connecting));
-    try std.testing.expect(!statusCanChange(.connected, .connected));
-}
-
 test "OpenVPN connection distinguishes recoverable session failures" {
     const isRecoverable = connection.testing.isRecoverableSessionError;
     try std.testing.expect(isRecoverable(error.Timeout));

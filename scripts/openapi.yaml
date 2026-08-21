@@ -1106,6 +1106,7 @@ components:
       properties:
         profile:
           $ref: "#/components/schemas/Profile"
+          description: The original profile whose active modules supply platform settings.
         originalModuleId:
           $ref: "#/components/schemas/UniqueID"
         address:
@@ -1113,6 +1114,7 @@ components:
         requiresVirtualDevice:
           type: boolean
         modules:
+          description: Connection-derived modules to inject immediately after the originating module. Omitted when the profile alone supplies settings.
           items:
             $ref: "#/components/schemas/TaggedModule"
           type: array

@@ -17,13 +17,13 @@ test "completion queue releases completions in FIFO order" {
     var second = Completion{};
 
     queue.append(&first, null);
-    queue.append(&second, error.Cancelled);
+    queue.append(&second, error.LooperUnavailable);
 
     try std.testing.expect(first.next == &second);
     try std.testing.expect(second.next == null);
     try std.testing.expect(!first.done);
     try std.testing.expect(!second.done);
-    try std.testing.expect(second.failure.? == error.Cancelled);
+    try std.testing.expect(second.failure.? == error.LooperUnavailable);
 
     queue.releaseAll();
 
@@ -33,10 +33,10 @@ test "completion queue releases completions in FIFO order" {
     try std.testing.expect(second.next == null);
 
     var third = Completion{};
-    queue.append(&third, error.OperationCancelled);
+    queue.append(&third, error.SideAlreadyAttached);
     queue.releaseAll();
     try std.testing.expect(third.done);
-    try std.testing.expect(third.failure.? == error.OperationCancelled);
+    try std.testing.expect(third.failure.? == error.SideAlreadyAttached);
 }
 
 test "command queue detaches ready commands in FIFO order" {

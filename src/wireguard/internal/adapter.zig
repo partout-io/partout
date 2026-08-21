@@ -118,7 +118,8 @@ pub const WireGuardAdapter = struct {
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
     ) ActivationError!void {
-        std.debug.assert(self.isStopped());
+        if (!self.isStopped())
+            @panic("WireGuardAdapter.start() requires a stopped adapter");
         errdefer self.shutdown(allocator);
 
         log.write(.info, "Start adapter");

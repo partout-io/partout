@@ -6,10 +6,12 @@ const std = @import("std");
 
 const c_mod = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
+const keys_mod = @import("internal/keys.zig");
 
 const api = core.api;
 const c_common = c_mod.common;
 const CryptoBackend = c_mod.CryptoBackend;
+const StaticKey = keys_mod.StaticKey;
 const util = core.util;
 
 pub fn importModule(
@@ -125,11 +127,11 @@ pub const Parser = struct {
         contents: []const u8,
         context: Context,
     ) ParseError!api.OpenVPNConfiguration {
-        var builder = Builder{
-            .context = context,
-            .decrypt_key_ctx = self.decrypt_key_ctx,
-            .decrypt_key = self.decrypt_key,
-        };
+        var builder = Builder.init(
+            context,
+            self.decrypt_key_ctx,
+            self.decrypt_key,
+        );
         defer builder.deinit(allocator);
 
         var lines = std.mem.splitScalar(u8, contents, '\n');
@@ -205,42 +207,76 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
 }
 
 const Builder = struct {
-    configuration: api.OpenVPNConfiguration = .{},
-    legacy_cipher: ?api.OpenVPNCipher = null,
-    data_ciphers_fallback: ?api.OpenVPNCipher = null,
-    data_ciphers: std.ArrayList(api.OpenVPNCipher) = .empty,
-    remotes: std.ArrayList(RemoteBuilder) = .empty,
-    routes4: std.ArrayList(api.Route) = .empty,
-    routes6: std.ArrayList(api.Route) = .empty,
-    dns_servers: std.ArrayList([]u8) = .empty,
-    search_domains: std.ArrayList([]u8) = .empty,
-    proxy_bypass_domains: std.ArrayList([]u8) = .empty,
-    routing_policies: std.ArrayList(api.OpenVPNRoutingPolicy) = .empty,
-    no_pull_mask: std.ArrayList(api.OpenVPNPullMask) = .empty,
-    current_block_name: ?[]const u8 = null,
-    current_block_lines: std.ArrayList([]const u8) = .empty,
-    tls_strategy: ?api.OpenVPNTLSWrapStrategy = null,
-    tls_key_lines: ?[][]const u8 = null,
-    tls_key_direction: ?api.OpenVPNStaticKeyDirection = null,
-    default_protocol: api.IPSocketType = .udp,
-    default_port: u16 = 1194,
-    topology: Topology = .net30,
-    ifconfig4: ?IfconfigArguments = null,
-    ifconfig6: ?IfconfigArguments = null,
-    route_gateway4_argument_count: ?usize = null,
-    found_option: bool = false,
-    context: Parser.Context = .{},
-    decrypt_key_ctx: ?*anyopaque = null,
-    decrypt_key: ?Parser.DecryptKey = null,
+    configuration: api.OpenVPNConfiguration,
+    legacy_cipher: ?api.OpenVPNCipher,
+    data_ciphers_fallback: ?api.OpenVPNCipher,
+    data_ciphers: std.ArrayList(api.OpenVPNCipher),
+    remotes: std.ArrayList(RemoteBuilder),
+    routes4: std.ArrayList(api.Route),
+    routes6: std.ArrayList(api.Route),
+    dns_servers: std.ArrayList([]u8),
+    search_domains: std.ArrayList([]u8),
+    proxy_bypass_domains: std.ArrayList([]u8),
+    routing_policies: std.ArrayList(api.OpenVPNRoutingPolicy),
+    no_pull_mask: std.ArrayList(api.OpenVPNPullMask),
+    current_block_name: ?[]const u8,
+    current_block_lines: std.ArrayList([]const u8),
+    tls_strategy: ?api.OpenVPNTLSWrapStrategy,
+    tls_key_lines: ?[][]const u8,
+    tls_key_direction: ?api.OpenVPNStaticKeyDirection,
+    default_protocol: api.IPSocketType,
+    default_port: u16,
+    topology: Topology,
+    ifconfig4: ?IfconfigArguments,
+    ifconfig6: ?IfconfigArguments,
+    route_gateway4_argument_count: ?usize,
+    found_option: bool,
+    context: Parser.Context,
+    decrypt_key_ctx: ?*anyopaque,
+    decrypt_key: ?Parser.DecryptKey,
+
+    fn init(
+        context: Parser.Context,
+        decrypt_key_ctx: ?*anyopaque,
+        decrypt_key: ?Parser.DecryptKey,
+    ) Builder {
+        return .{
+            .configuration = .{},
+            .legacy_cipher = null,
+            .data_ciphers_fallback = null,
+            .data_ciphers = .empty,
+            .remotes = .empty,
+            .routes4 = .empty,
+            .routes6 = .empty,
+            .dns_servers = .empty,
+            .search_domains = .empty,
+            .proxy_bypass_domains = .empty,
+            .routing_policies = .empty,
+            .no_pull_mask = .empty,
+            .current_block_name = null,
+            .current_block_lines = .empty,
+            .tls_strategy = null,
+            .tls_key_lines = null,
+            .tls_key_direction = null,
+            .default_protocol = .udp,
+            .default_port = 1194,
+            .topology = .net30,
+            .ifconfig4 = null,
+            .ifconfig6 = null,
+            .route_gateway4_argument_count = null,
+            .found_option = false,
+            .context = context,
+            .decrypt_key_ctx = decrypt_key_ctx,
+            .decrypt_key = decrypt_key,
+        };
+    }
 
     fn deinit(self: *Builder, allocator: std.mem.Allocator) void {
         self.configuration.deinit(allocator);
         self.data_ciphers.deinit(allocator);
         self.remotes.deinit(allocator);
-        for (self.routes4.items) |*route| route.deinit(allocator);
-        self.routes4.deinit(allocator);
-        for (self.routes6.items) |*route| route.deinit(allocator);
-        self.routes6.deinit(allocator);
+        util.deinitList(api.Route, allocator, &self.routes4);
+        util.deinitList(api.Route, allocator, &self.routes6);
         util.deinitListOfStrings(allocator, &self.dns_servers);
         util.deinitListOfStrings(allocator, &self.search_domains);
         util.deinitListOfStrings(allocator, &self.proxy_bypass_domains);
@@ -326,7 +362,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "cipher")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.legacy_cipher = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.legacy_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers") or std.ascii.eqlIgnoreCase(option, "ncp-ciphers")) {
@@ -336,7 +372,7 @@ const Builder = struct {
             while (ciphers.next()) |cipher| {
                 const is_optional = std.mem.startsWith(u8, cipher, "?");
                 const name = if (is_optional) cipher[1..] else cipher;
-                const parsed_cipher = parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
+                const parsed_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
                     if (is_optional) continue;
                     return error.UnsupportedConfiguration;
                 };
@@ -347,12 +383,12 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.data_ciphers_fallback = parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.data_ciphers_fallback = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "auth")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.configuration.digest = parseRawIgnoreCase(api.OpenVPNDigest, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.configuration.digest = util.parseRawIgnoreCase(api.OpenVPNDigest, components.items[1]) orelse return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "comp-lzo")) {
@@ -736,19 +772,19 @@ const Builder = struct {
             self.configuration.tls_wrap = switch (strategy) {
                 .auth => .{
                     .strategy = .auth,
-                    .key = .{
-                        .data = try parseStaticKeyData(allocator, lines),
-                        .dir = self.tls_key_direction,
-                    },
+                    .key = StaticKey.parseFileAlloc(
+                        allocator,
+                        lines,
+                        self.tls_key_direction,
+                    ) catch |err| return mapStaticKeyParseError(err),
                 },
                 .crypt => .{
                     .strategy = .crypt,
-                    .key = .{
-                        .data = try parseStaticKeyData(allocator, lines),
-                        .dir = .client,
-                    },
+                    .key = StaticKey.parseFileAlloc(allocator, lines, .client) catch |err|
+                        return mapStaticKeyParseError(err),
                 },
-                .cryptV2 => try parseCryptV2Key(allocator, lines),
+                .cryptV2 => StaticKey.parseCryptV2FileAlloc(allocator, lines) catch |err|
+                    return mapStaticKeyParseError(err),
             };
         }
 
@@ -933,14 +969,6 @@ fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
     return null;
 }
 
-fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
-    inline for (std.meta.fields(T)) |field| {
-        const candidate: T = @field(T, field.name);
-        if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
-    }
-    return null;
-}
-
 fn isCompleteClientConfiguration(configuration: *const api.OpenVPNConfiguration) bool {
     if (configuration.ca == null) return false;
     const remotes = configuration.remotes orelse return false;
@@ -983,71 +1011,10 @@ fn ipv4MaskPrefix(mask: []const u8) ?u8 {
     return prefix;
 }
 
-fn parseStaticKeyData(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.SecureData {
-    const hex = try parseStaticKeyHex(allocator, lines);
-    defer allocator.free(hex);
-    return (try api.SecureData.parseHexAlloc(allocator, hex)) orelse error.MalformedOption;
-}
-
-fn parseStaticKeyHex(allocator: std.mem.Allocator, lines: []const []const u8) ParseError![]u8 {
-    var hex: std.ArrayList(u8) = .empty;
-    defer hex.deinit(allocator);
-
-    var in_key = false;
-    for (lines) |line| {
-        if (line.len == 0 or line[0] == '#') continue;
-        if (std.ascii.eqlIgnoreCase(line, "-----BEGIN OpenVPN Static key V1-----")) {
-            in_key = true;
-            continue;
-        }
-        if (std.ascii.eqlIgnoreCase(line, "-----END OpenVPN Static key V1-----")) {
-            break;
-        }
-        if (!in_key) continue;
-        if (!util.containsOnly(line, "0123456789abcdefABCDEF")) return error.MalformedOption;
-        try hex.appendSlice(allocator, line);
-    }
-    if (hex.items.len != 512) return error.MalformedOption;
-    return try hex.toOwnedSlice(allocator);
-}
-
-fn parseCryptV2Key(allocator: std.mem.Allocator, lines: []const []const u8) ParseError!api.OpenVPNTLSWrap {
-    var base64: std.ArrayList(u8) = .empty;
-    defer base64.deinit(allocator);
-    var in_key = false;
-    for (lines) |line| {
-        if (line.len == 0) continue;
-        if (std.ascii.eqlIgnoreCase(line, "-----BEGIN OpenVPN tls-crypt-v2 client key-----")) {
-            in_key = true;
-            continue;
-        }
-        if (std.ascii.eqlIgnoreCase(line, "-----END OpenVPN tls-crypt-v2 client key-----")) {
-            break;
-        }
-        if (in_key) try base64.appendSlice(allocator, line);
-    }
-
-    var encoded = (try api.SecureData.parseRawAlloc(allocator, base64.items)) orelse return error.MalformedOption;
-    defer encoded.deinit(allocator);
-    const decoded = encoded.bytesAlloc(allocator) catch |err| return switch (err) {
+fn mapStaticKeyParseError(err: StaticKey.ParseError) ParseError {
+    return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
-        else => error.MalformedOption,
-    };
-    defer allocator.free(decoded);
-    if (decoded.len <= 256) return error.MalformedOption;
-
-    var static_key = try api.SecureData.initBytesAlloc(allocator, decoded[0..256]);
-    errdefer static_key.deinit(allocator);
-    var wrapped_key = try api.SecureData.initBytesAlloc(allocator, decoded[256..]);
-    errdefer wrapped_key.deinit(allocator);
-
-    return .{
-        .strategy = .cryptV2,
-        .key = .{
-            .data = static_key,
-            .dir = .client,
-        },
-        .wrapped_key = wrapped_key,
+        error.InvalidStaticKey => error.MalformedOption,
     };
 }
 
