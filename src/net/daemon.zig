@@ -112,6 +112,7 @@ pub const Daemon = struct {
     const State = enum {
         initial,
         started,
+        failed,
         stopping,
         stopped,
     };
@@ -502,7 +503,7 @@ pub const Daemon = struct {
                 return;
             },
             .stopped => return,
-            .initial, .started => {},
+            .initial, .started, .failed => {},
         }
         self.stop_mode = mode;
         self.state = .stopping;
@@ -684,7 +685,13 @@ pub const Daemon = struct {
     }
 
     fn handleConnectionCancel(self: *Daemon, code: ?api.PartoutErrorCode) void {
+        self.enterFailedState();
         self.controller.setReasserting(false);
+        if (!self.options.cancels_unrecoverable and
+            self.snapshot_publisher.environment.connection_status != .disconnected)
+        {
+            self.handleConnectionStatus(.disconnected);
+        }
         self.requestCancellation(code, false);
     }
 
@@ -697,13 +704,9 @@ pub const Daemon = struct {
         self: *Daemon,
         failure: ?Looper.Failure,
     ) void {
-        if (self.state == .stopping or self.state == .stopped) return;
+        if (self.state != .started) return;
 
         log.write(.fault, "Daemon-owned looper terminated");
-
-        // An earlier connection failure may already have requested provider
-        // cancellation before this actor message was consumed.
-        if (self.cancellation_requested) return;
 
         if (looperFailureCode(failure)) |code| {
             self.handleLastError(code);
@@ -728,10 +731,20 @@ pub const Daemon = struct {
         code: ?api.PartoutErrorCode,
         force: bool,
     ) void {
+        self.enterFailedState();
         if (self.cancellation_requested) return;
         if (!force and !self.options.cancels_unrecoverable) return;
         self.cancellation_requested = true;
         self.controller.cancelTunnelConnection(code);
+    }
+
+    fn enterFailedState(self: *Daemon) void {
+        if (self.state != .started) return;
+        self.state = .failed;
+        self.resume_gate_timer.cancel();
+        if (self.gate) |*gate| {
+            _ = gate.setEnabled(false);
+        }
     }
 
     fn actorDidFinish(self: *Daemon) void {
@@ -849,8 +862,7 @@ pub const Daemon = struct {
     }
 
     fn recoverConnectionRuntime(self: *Daemon) void {
-        if (self.state == .stopping or self.state == .stopped) return;
-        if (self.cancellation_requested) return;
+        if (self.state != .started) return;
 
         log.write(.notice, "Replace connection after terminal looper");
         self.deinitConnectionRuntime();

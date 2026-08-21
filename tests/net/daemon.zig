@@ -370,7 +370,7 @@ test "connection daemon resets data count when connection disconnects" {
     try std.testing.expectEqual(api.DataCount{}, events.data_count);
 }
 
-test "connection daemon honors disabled cancellation for connection requests" {
+test "connection daemon publishes terminal status when cancellation is disabled" {
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
@@ -399,6 +399,17 @@ test "connection daemon honors disabled cancellation for connection requests" {
     defer sut.stop();
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
     try std.testing.expect(!controller.reasserting);
+    try std.testing.expectEqual(api.ConnectionStatus.disconnected, events.connection_status.?);
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .disconnected,
+        .connecting,
+        .disconnected,
+    }, sut.testStatuses());
+
+    monitor.setReachable(false);
+    monitor.setReachable(true);
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(@as(usize, 1), capture.start_count);
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
@@ -927,6 +938,7 @@ const SandboxCapture = struct {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.start_count += 1;
         if (self.cancel_on_start) |code| {
+            events.status(events.ctx, .connecting);
             events.cancel(events.ctx, code);
         }
         if (self.disconnect_on_start) {
