@@ -42,12 +42,7 @@ public final class NETunnelController: TunnelController {
     }
 
     public func clearTunnelSettings(withKillSwitch: Bool) async {
-        do {
-            pp_log_id(profile.id, .os, .info, "Clear tunnel settings (kill switch = \(withKillSwitch))")
-            try await provider?.clearTunnelSettings(withKillSwitch: withKillSwitch)
-        } catch {
-            pp_log_id(profile.id, .os, .error, "Unable to clear tunnel settings: \(error)")
-        }
+        // Do nothing, retain the routes to avoid temporary leaks
     }
 
     public func setReasserting(_ reasserting: Bool) {
