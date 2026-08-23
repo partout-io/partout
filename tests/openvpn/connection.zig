@@ -76,10 +76,22 @@ test "OpenVPN connection borrows the daemon looper" {
     looper_started = false;
 }
 
-test "OpenVPN connection reconnects after link failure" {
+test "OpenVPN connection failure dispositions" {
     const isRecoverableError = connection.testing.isRecoverableError;
 
+    try std.testing.expect(!isRecoverableError(error.BadCredentials));
+    try std.testing.expect(!isRecoverableError(error.CompressionMismatch));
+    try std.testing.expect(!isRecoverableError(error.InvalidPushReply));
+    try std.testing.expect(!isRecoverableError(error.NoRouting));
+    try std.testing.expect(!isRecoverableError(error.TLSFailure));
+    try std.testing.expect(!isRecoverableError(error.UnsupportedAlgorithm));
+    try std.testing.expect(!isRecoverableError(error.UnsupportedCompression));
+    try std.testing.expect(!isRecoverableError(error.UnsupportedCryptoBackend));
+
+    try std.testing.expect(isRecoverableError(error.BadCredentialsWithLocalOptions));
     try std.testing.expect(isRecoverableError(error.LinkFailure));
     try std.testing.expect(isRecoverableError(error.NetworkChanged));
-    try std.testing.expect(!isRecoverableError(error.BadCredentials));
+    try std.testing.expect(isRecoverableError(error.OutOfMemory));
+    try std.testing.expect(isRecoverableError(error.ServerShutdown));
+    try std.testing.expect(isRecoverableError(error.TunNotAvailable));
 }
