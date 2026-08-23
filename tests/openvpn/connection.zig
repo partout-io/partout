@@ -95,3 +95,30 @@ test "OpenVPN connection failure dispositions" {
     try std.testing.expect(isRecoverableError(error.ServerShutdown));
     try std.testing.expect(isRecoverableError(error.TunNotAvailable));
 }
+
+test "OpenVPN connection errors map to legacy public codes" {
+    const codeForError = connection.testing.codeForError;
+    const cases = .{
+        .{ error.BadCredentials, api.PartoutErrorCode.authentication },
+        .{ error.BadCredentialsWithLocalOptions, api.PartoutErrorCode.openVPNRecoverableAuthentication },
+        .{ error.CompressionMismatch, api.PartoutErrorCode.openVPNCompressionMismatch },
+        .{ error.CryptoDerivation, api.PartoutErrorCode.openVPNUnsupportedAlgorithm },
+        .{ error.CryptoEncryption, api.PartoutErrorCode.crypto },
+        .{ error.InvalidEndpoint, api.PartoutErrorCode.invalidValue },
+        .{ error.InvalidPushReply, api.PartoutErrorCode.openVPNConnectionFailure },
+        .{ error.LinkFailure, api.PartoutErrorCode.openVPNConnectionFailure },
+        .{ error.ModulesAllocation, api.PartoutErrorCode.unhandled },
+        .{ error.MuxFailure, api.PartoutErrorCode.fdUnavailable },
+        .{ error.NetworkChanged, api.PartoutErrorCode.networkChanged },
+        .{ error.NoRouting, api.PartoutErrorCode.openVPNNoRouting },
+        .{ error.ServerShutdown, api.PartoutErrorCode.openVPNServerShutdown },
+        .{ error.TLSFailure, api.PartoutErrorCode.openVPNTLSFailure },
+        .{ error.Timeout, api.PartoutErrorCode.timeout },
+        .{ error.TunNotAvailable, api.PartoutErrorCode.tunNotAvailable },
+        .{ error.UnsupportedAlgorithm, api.PartoutErrorCode.openVPNUnsupportedAlgorithm },
+        .{ error.UnsupportedCompression, api.PartoutErrorCode.openVPNUnsupportedCompression },
+    };
+
+    inline for (cases) |entry|
+        try std.testing.expectEqual(entry[1], codeForError(entry[0]));
+}
