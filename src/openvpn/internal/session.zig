@@ -238,7 +238,8 @@ pub const Session = struct {
             self.configuration.xor_method,
             remote_endpoint.plainSocketType() == .tcp,
         );
-        errdefer processor.destroy();
+        var owns_processor = true;
+        errdefer if (owns_processor) processor.destroy();
         self.performOnQueue(
             void,
             processor,
@@ -248,6 +249,7 @@ pub const Session = struct {
             log.writef(.fault, "Unable to install link processor: {s}", .{@errorName(err)});
             return error.LinkFailure;
         };
+        owns_processor = false;
         errdefer self.performOnQueue(
             void,
             processor,
@@ -836,7 +838,8 @@ const SessionOnQueue = struct {
         self: *SessionOnQueue,
         result: NegotiationResult,
     ) !void {
-        errdefer result.data_channel.destroy();
+        var owns_data_channel = true;
+        errdefer if (owns_data_channel) result.data_channel.destroy();
         // Swift silently drops a negotiation completion after active state is
         // gone. Treat it as stale instead: the negotiated data has no context
         // to commit into, so propagate the recoverable reconnect signal.
@@ -844,12 +847,15 @@ const SessionOnQueue = struct {
         const context = active.context;
         log.writef(.info, "Negotiation succeeded, set key {d} as current", .{result.key});
         var reply = try result.push_reply.clone(self.session.allocator);
-        errdefer reply.deinit(self.session.allocator);
+        var owns_reply = true;
+        errdefer if (owns_reply) reply.deinit(self.session.allocator);
         log.writef(.info, "Replace key {d} with new data channel", .{
             result.data_channel.key,
         });
         try context.setDataChannel(result.data_channel, result.key);
+        owns_data_channel = false;
         context.setPushReply(reply);
+        owns_reply = false;
         context.removeOldNegotiators();
         const negotiator_keys = context.negotiatorKeys();
         log.writef(.info, "Negotiators: {any}", .{negotiator_keys.slice()});
