@@ -61,7 +61,6 @@ const ConnectionError = SessionError || error{
     ModulesAllocation,
     MuxFailure,
     NetworkChanged,
-    TunnelFailure,
     TunNotAvailable,
 };
 
