@@ -75,3 +75,11 @@ test "OpenVPN connection borrows the daemon looper" {
     try looper.stop();
     looper_started = false;
 }
+
+test "OpenVPN connection reconnects after link failure" {
+    const isRecoverableError = connection.testing.isRecoverableError;
+
+    try std.testing.expect(isRecoverableError(error.LinkFailure));
+    try std.testing.expect(isRecoverableError(error.NetworkChanged));
+    try std.testing.expect(!isRecoverableError(error.BadCredentials));
+}

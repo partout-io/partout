@@ -785,10 +785,20 @@ const SessionFinalizationFailure = struct {
         return switch (self.cause) {
             // FIXME: ###, Return .reconnect on recoverable errors
             error.BadCredentialsWithLocalOptions,
+            error.LinkFailure,
             error.NetworkChanged,
+            error.Timeout,
+            error.TunnelFailure,
+            error.ServerShutdown,
             => .reconnect,
             else => .cancel,
         };
+    }
+};
+
+pub const testing = struct {
+    pub fn isRecoverableError(cause: ConnectionError) bool {
+        return (SessionFinalizationFailure{ .cause = cause }).disposition() == .reconnect;
     }
 };
 
