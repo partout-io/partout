@@ -51,6 +51,7 @@ const conn_mod = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
+const looper_mod = @import("looper.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -58,7 +59,7 @@ const log = core.logging;
 const Connection = conn_mod.Connection;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const Looper = @import("looper.zig").Looper;
+const Looper = looper_mod.Looper;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
@@ -69,6 +70,9 @@ pub const Error = api.DecodeError || conn_mod.CreateError || error{
     InvalidProfile,
     LooperFailure,
 };
+
+const StartError = Error || conn_mod.StartError ||
+    sandbox.TunnelController.Error;
 
 pub const EventKey = enum {
     connection_status,
@@ -483,9 +487,9 @@ pub const Daemon = struct {
         }
     }
 
-    fn handleStartError(self: *Daemon, err: anyerror) void {
+    fn handleStartError(self: *Daemon, err: StartError) void {
         log.writef(.fault, "Unable to start daemon: {s}", .{@errorName(err)});
-        const code = api.codeForError(err);
+        const code = partoutCodeForDaemonStartError(err);
         self.handleLastError(code);
         self.controller.setReasserting(false);
         self.requestCancellation(code, false);
@@ -585,7 +589,7 @@ pub const Daemon = struct {
         log.write(.notice, "Start connection");
         const did_start = conn.start(self.events()) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
-            const code = api.codeForError(err);
+            const code = partoutCodeForDaemonStartError(err);
             self.handleLastError(code);
             self.controller.setReasserting(false);
             return;
@@ -708,7 +712,7 @@ pub const Daemon = struct {
 
         log.write(.fault, "Daemon-owned looper terminated");
 
-        if (looperFailureCode(failure)) |code| {
+        if (partoutCodeForLooperFailure(failure)) |code| {
             self.handleLastError(code);
         }
 
@@ -722,7 +726,7 @@ pub const Daemon = struct {
         self.actor.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
             self.controller.setReasserting(false);
-            self.requestCancellation(looperFailureCode(failure), true);
+            self.requestCancellation(partoutCodeForLooperFailure(failure), true);
         };
     }
 
@@ -868,7 +872,7 @@ pub const Daemon = struct {
         self.deinitConnectionRuntime();
         self.initConnectionRuntime() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
-            const code = api.codeForError(err);
+            const code = partoutCodeForDaemonStartError(err);
             self.handleLastError(code);
             self.controller.setReasserting(false);
             self.requestCancellation(code, true);
@@ -928,14 +932,6 @@ pub const Daemon = struct {
     // #endregion
 };
 
-fn looperFailureCode(failure: ?Looper.Failure) ?api.PartoutErrorCode {
-    const value = failure orelse return null;
-    return switch (value) {
-        .wait, .system, .io => .ioFailure,
-        .user => .unhandled,
-    };
-}
-
 fn buildSettingsOnlyTunnelInfo(
     allocator: std.mem.Allocator,
     profile: *const api.Profile,
@@ -954,4 +950,18 @@ fn buildSettingsOnlyTunnelInfo(
         .requires_virtual_device = false,
     };
     return try info.clone(allocator);
+}
+
+// MARK: - Error mapping
+
+fn partoutCodeForDaemonStartError(_: StartError) api.PartoutErrorCode {
+    // FIXME: ###, Map StartError to PartoutErrorCode
+    return .unhandled;
+}
+
+fn partoutCodeForLooperFailure(opt_failure: ?Looper.Failure) ?api.PartoutErrorCode {
+    const failure = opt_failure orelse return null;
+    // FIXME: ###, Map Looper.Failure to PartoutErrorCode
+    _ = failure;
+    return .unhandled;
 }

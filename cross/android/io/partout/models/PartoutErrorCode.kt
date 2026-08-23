@@ -31,64 +31,28 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * Values: cached,notFound,operationCancelled,releasedObject,scriptException,timeout,unhandled,incompatibleModules,incompleteModule,noActiveModules,nonFinalModules,requiredImplementation,unexpectedModuleType,unknownImportedModule,unknownModuleHandler,authentication,crypto,dnsFailure,exhaustedEndpoints,fdUnavailable,ioFailure,linkNotActive,networkChanged,networkUnreachable,socketConfiguration,tunNotActive,tunNotAvailable,decoding,encoding,invalidField,invalidValue,parsing,keychainAddItem,keychainItemNotFound,passphraseRequired,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,wireGuardEmptyPeers
+ * Values: authentication,cached,crypto,decoding,dnsFailure,encoding,exhaustedEndpoints,fdUnavailable,incompatibleModules,incompleteModule,invalidField,invalidValue,ioFailure,keychainAddItem,keychainItemNotFound,linkNotActive,networkChanged,networkUnreachable,noActiveModules,nonFinalModules,notFound,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,operationCancelled,outOfMemory,parsing,passphraseRequired,releasedObject,requiredImplementation,scriptException,socketConfiguration,timeout,tunNotActive,tunNotAvailable,unexpectedModuleType,unhandled,unknownImportedModule,unknownModuleHandler,wireGuardEmptyPeers
  */
 @Serializable
 enum class PartoutErrorCode(val value: kotlin.String) {
 
-    @SerialName(value = "cached")
-    cached("cached"),
-
-    @SerialName(value = "notFound")
-    notFound("notFound"),
-
-    @SerialName(value = "operationCancelled")
-    operationCancelled("operationCancelled"),
-
-    @SerialName(value = "releasedObject")
-    releasedObject("releasedObject"),
-
-    @SerialName(value = "scriptException")
-    scriptException("scriptException"),
-
-    @SerialName(value = "timeout")
-    timeout("timeout"),
-
-    @SerialName(value = "unhandled")
-    unhandled("unhandled"),
-
-    @SerialName(value = "incompatibleModules")
-    incompatibleModules("incompatibleModules"),
-
-    @SerialName(value = "incompleteModule")
-    incompleteModule("incompleteModule"),
-
-    @SerialName(value = "noActiveModules")
-    noActiveModules("noActiveModules"),
-
-    @SerialName(value = "nonFinalModules")
-    nonFinalModules("nonFinalModules"),
-
-    @SerialName(value = "requiredImplementation")
-    requiredImplementation("requiredImplementation"),
-
-    @SerialName(value = "unexpectedModuleType")
-    unexpectedModuleType("unexpectedModuleType"),
-
-    @SerialName(value = "unknownImportedModule")
-    unknownImportedModule("unknownImportedModule"),
-
-    @SerialName(value = "unknownModuleHandler")
-    unknownModuleHandler("unknownModuleHandler"),
-
     @SerialName(value = "authentication")
     authentication("authentication"),
+
+    @SerialName(value = "cached")
+    cached("cached"),
 
     @SerialName(value = "crypto")
     crypto("crypto"),
 
+    @SerialName(value = "decoding")
+    decoding("decoding"),
+
     @SerialName(value = "dnsFailure")
     dnsFailure("dnsFailure"),
+
+    @SerialName(value = "encoding")
+    encoding("encoding"),
 
     @SerialName(value = "exhaustedEndpoints")
     exhaustedEndpoints("exhaustedEndpoints"),
@@ -96,8 +60,26 @@ enum class PartoutErrorCode(val value: kotlin.String) {
     @SerialName(value = "fdUnavailable")
     fdUnavailable("fdUnavailable"),
 
+    @SerialName(value = "incompatibleModules")
+    incompatibleModules("incompatibleModules"),
+
+    @SerialName(value = "incompleteModule")
+    incompleteModule("incompleteModule"),
+
+    @SerialName(value = "invalidField")
+    invalidField("invalidField"),
+
+    @SerialName(value = "invalidValue")
+    invalidValue("invalidValue"),
+
     @SerialName(value = "ioFailure")
     ioFailure("ioFailure"),
+
+    @SerialName(value = "keychainAddItem")
+    keychainAddItem("keychainAddItem"),
+
+    @SerialName(value = "keychainItemNotFound")
+    keychainItemNotFound("keychainItemNotFound"),
 
     @SerialName(value = "linkNotActive")
     linkNotActive("linkNotActive"),
@@ -108,38 +90,14 @@ enum class PartoutErrorCode(val value: kotlin.String) {
     @SerialName(value = "networkUnreachable")
     networkUnreachable("networkUnreachable"),
 
-    @SerialName(value = "socketConfiguration")
-    socketConfiguration("socketConfiguration"),
+    @SerialName(value = "noActiveModules")
+    noActiveModules("noActiveModules"),
 
-    @SerialName(value = "tunNotActive")
-    tunNotActive("tunNotActive"),
+    @SerialName(value = "nonFinalModules")
+    nonFinalModules("nonFinalModules"),
 
-    @SerialName(value = "tunNotAvailable")
-    tunNotAvailable("tunNotAvailable"),
-
-    @SerialName(value = "decoding")
-    decoding("decoding"),
-
-    @SerialName(value = "encoding")
-    encoding("encoding"),
-
-    @SerialName(value = "invalidField")
-    invalidField("invalidField"),
-
-    @SerialName(value = "invalidValue")
-    invalidValue("invalidValue"),
-
-    @SerialName(value = "parsing")
-    parsing("parsing"),
-
-    @SerialName(value = "keychainAddItem")
-    keychainAddItem("keychainAddItem"),
-
-    @SerialName(value = "keychainItemNotFound")
-    keychainItemNotFound("keychainItemNotFound"),
-
-    @SerialName(value = "passphraseRequired")
-    passphraseRequired("passphraseRequired"),
+    @SerialName(value = "notFound")
+    notFound("notFound"),
 
     @SerialName(value = "OpenVPN.compressionMismatch")
     openVPNCompressionMismatch("OpenVPN.compressionMismatch"),
@@ -173,6 +131,51 @@ enum class PartoutErrorCode(val value: kotlin.String) {
 
     @SerialName(value = "OpenVPN.unsupportedOption")
     openVPNUnsupportedOption("OpenVPN.unsupportedOption"),
+
+    @SerialName(value = "operationCancelled")
+    operationCancelled("operationCancelled"),
+
+    @SerialName(value = "outOfMemory")
+    outOfMemory("outOfMemory"),
+
+    @SerialName(value = "parsing")
+    parsing("parsing"),
+
+    @SerialName(value = "passphraseRequired")
+    passphraseRequired("passphraseRequired"),
+
+    @SerialName(value = "releasedObject")
+    releasedObject("releasedObject"),
+
+    @SerialName(value = "requiredImplementation")
+    requiredImplementation("requiredImplementation"),
+
+    @SerialName(value = "scriptException")
+    scriptException("scriptException"),
+
+    @SerialName(value = "socketConfiguration")
+    socketConfiguration("socketConfiguration"),
+
+    @SerialName(value = "timeout")
+    timeout("timeout"),
+
+    @SerialName(value = "tunNotActive")
+    tunNotActive("tunNotActive"),
+
+    @SerialName(value = "tunNotAvailable")
+    tunNotAvailable("tunNotAvailable"),
+
+    @SerialName(value = "unexpectedModuleType")
+    unexpectedModuleType("unexpectedModuleType"),
+
+    @SerialName(value = "unhandled")
+    unhandled("unhandled"),
+
+    @SerialName(value = "unknownImportedModule")
+    unknownImportedModule("unknownImportedModule"),
+
+    @SerialName(value = "unknownModuleHandler")
+    unknownModuleHandler("unknownModuleHandler"),
 
     @SerialName(value = "WireGuard.emptyPeers")
     wireGuardEmptyPeers("WireGuard.emptyPeers");

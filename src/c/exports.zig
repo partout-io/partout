@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const builtin = @import("builtin");
+const std = @import("std");
 
 pub const common = @cImport({
     @cInclude("c/android_import_compat.h");
@@ -43,6 +44,7 @@ pub const CryptoBackend = enum {
     }
 };
 
+pub const CryptoError = error{ CryptoEncryption, CryptoHMAC };
 pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
 
 pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!crypto.pp_crypto_fnt {
@@ -63,5 +65,14 @@ pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!cryp
             crypto.pp_crypto_fnt_mock()
         else
             error.UnsupportedCryptoBackend,
+    };
+}
+
+pub fn errorForCryptoErrorCode(code: crypto.pp_crypto_error_code) CryptoError {
+    std.debug.assert(code != crypto.PPCryptoErrorNone);
+    return switch (code) {
+        crypto.PPCryptoErrorEncryption => error.CryptoEncryption,
+        crypto.PPCryptoErrorHMAC => error.CryptoHMAC,
+        else => error.CryptoEncryption,
     };
 }

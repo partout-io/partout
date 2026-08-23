@@ -6,7 +6,6 @@ const std = @import("std");
 const c_exports_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 
 const c = helpers_mod.c;
@@ -50,6 +49,14 @@ pub const PacketCode = enum(u8) {
 };
 
 pub const ControlPacket = struct {
+    pub const CreateError = error{
+        AckIdsTooLong,
+        InvalidAck,
+        InvalidKey,
+        InvalidPacketId,
+        InvalidSessionId,
+    };
+
     ptr: ?*c.openvpn_ctrl,
     code: PacketCode,
 
@@ -61,7 +68,7 @@ pub const ControlPacket = struct {
         payload_value: ?[]const u8,
         ack_ids_value: ?[]const u32,
         ack_remote_session_id_value: ?[]const u8,
-    ) !ControlPacket {
+    ) CreateError!ControlPacket {
         if (key_value > 0b111) return error.InvalidKey;
         if (session_id.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
         if (ack_ids_value) |ids| {
@@ -106,7 +113,7 @@ pub const ControlPacket = struct {
         session_id: []const u8,
         ack_ids_value: []const u32,
         ack_remote_session_id_value: []const u8,
-    ) !ControlPacket {
+    ) CreateError!ControlPacket {
         return init(
             .ackV1,
             key_value,
@@ -166,7 +173,7 @@ pub const ControlPacket = struct {
     pub fn serializedAlloc(
         self: *const ControlPacket,
         allocator: std.mem.Allocator,
-    ) ![]u8 {
+    ) error{OutOfMemory}![]u8 {
         const packet = self.native();
         const capacity = c.openvpn_ctrl_capacity(packet);
         const destination = try allocator.alloc(u8, capacity);
@@ -191,7 +198,7 @@ pub const ControlPacket = struct {
         replay_id: u32,
         timestamp: u32,
         function: SerializeWithCrypto,
-    ) ![]u8 {
+    ) (error{OutOfMemory} || c_exports_mod.CryptoError)![]u8 {
         const packet = self.native();
         var algorithm = c.openvpn_ctrl_alg{
             .crypto = @ptrCast(crypto),
@@ -201,15 +208,15 @@ pub const ControlPacket = struct {
         const capacity = c.openvpn_ctrl_capacity_alg(packet, &algorithm);
         var destination = try allocator.alloc(u8, capacity);
         errdefer allocator.free(destination);
-        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
         const written = function(
             destination.ptr,
             destination.len,
             packet,
             &algorithm,
-            @ptrCast(&native_error),
+            @ptrCast(&crypto_error_code),
         );
-        if (written == 0) return errors_mod.cryptoError(native_error);
+        if (written == 0) return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
         if (written < destination.len) destination = try allocator.realloc(destination, written);
         return destination;
     }
@@ -270,7 +277,7 @@ const PIAHardReset = struct {
         self: PIAHardReset,
         allocator: std.mem.Allocator,
         prng: PRNG,
-    ) ![]u8 {
+    ) error{ OutOfMemory, CryptoPRNG }![]u8 {
         if (!isASCII(self.ca_md5_digest)) {
             @panic("PIA hard-reset CA MD5 digest must contain only ASCII characters");
         }
@@ -304,7 +311,7 @@ const PIAHardReset = struct {
     fn lowerAlloc(
         allocator: std.mem.Allocator,
         value: []const u8,
-    ) ![]u8 {
+    ) error{OutOfMemory}![]u8 {
         const result = try allocator.alloc(u8, value.len);
         for (value, result) |source, *destination|
             destination.* = std.ascii.toLower(source);

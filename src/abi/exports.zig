@@ -10,5 +10,7 @@ pub const DaemonOptions = runtime.DaemonOptions;
 pub const DaemonRuntime = runtime.DaemonRuntime;
 pub const RuntimeError = runtime.RuntimeError;
 pub const Importer = helpers.Importer;
+pub const ImportAndEncodeError = helpers.ImportAndEncodeError;
 
 pub const errorPayloadAllocZ = helpers.errorPayloadAllocZ;
+pub const importErrorPayloadAllocZ = helpers.importErrorPayloadAllocZ;

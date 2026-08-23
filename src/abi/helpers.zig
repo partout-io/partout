@@ -11,7 +11,7 @@ const wireguard = @import("../wireguard/exports.zig");
 const api = core.api;
 const util = core.util;
 
-const ImportAndEncodeError = core.ImportError || api.EncodeError;
+pub const ImportAndEncodeError = core.ImportError || api.EncodeError;
 
 pub const c = @cImport({
     @cInclude("c/android_import_compat.h");
@@ -38,8 +38,9 @@ pub const Importer = struct {
         self: *const Importer,
         allocator: std.mem.Allocator,
         text: []const u8,
+        context: core.ImportContext,
     ) ImportAndEncodeError![:0]u8 {
-        var module = try self.registry.importModule(allocator, text, null);
+        var module = try self.registry.importModule(allocator, text, context);
         defer module.deinit(allocator);
         return api.encodeModuleZ(allocator, &module);
     }
@@ -49,8 +50,9 @@ pub const Importer = struct {
         allocator: std.mem.Allocator,
         text: []const u8,
         name: ?[]const u8,
+        context: core.ImportContext,
     ) ImportAndEncodeError![:0]u8 {
-        var profile = try self.registry.importProfile(allocator, text, name);
+        var profile = try self.registry.importProfile(allocator, text, name, context);
         defer profile.deinit(allocator);
         return api.encodeProfileZ(allocator, &profile);
     }
@@ -106,6 +108,53 @@ fn boundEventsBinding(ptr: *anyopaque) ?c.partout_daemon_events {
     return self.binding;
 }
 
+pub fn errorPayloadAllocZ(
+    allocator: std.mem.Allocator,
+    code: api.PartoutErrorCode,
+) ?[*:0]u8 {
+    return errorPayloadWithInfoAllocZ(
+        allocator,
+        code,
+        null,
+    );
+}
+
+pub fn importErrorPayloadAllocZ(
+    allocator: std.mem.Allocator,
+    err: ImportAndEncodeError,
+    context: core.ImportContext,
+) ?[*:0]u8 {
+    return errorPayloadWithInfoAllocZ(
+        allocator,
+        importErrorCode(err),
+        context.parse_error_info,
+    );
+}
+
+fn errorPayloadWithInfoAllocZ(
+    allocator: std.mem.Allocator,
+    code: api.PartoutErrorCode,
+    parse_error_info: ?*const api.ParseErrorInfo,
+) ?[*:0]u8 {
+    const user_info: ?api.JSONValue = if (parse_error_info) |info| user_info: {
+        if (info.name.len == 0 and info.details.len == 0) break :user_info null;
+        const bytes = util.encodeJsonValue(allocator, info.*) catch break :user_info null;
+        break :user_info .{
+            .bytes = bytes,
+            .owned = true,
+        };
+    } else null;
+    defer if (user_info) |value| value.deinit(allocator);
+
+    const payload: api.ABIErrorPayload = .{
+        .code = code,
+        .user_info = user_info,
+    };
+    return util.encodeJsonValueZ(allocator, payload) catch null;
+}
+
+// MARK: - Mappings
+
 fn eventKeyString(key: net.DaemonEventKey) [:0]const u8 {
     return switch (key) {
         .connection_status => "connectionStatus",
@@ -114,14 +163,14 @@ fn eventKeyString(key: net.DaemonEventKey) [:0]const u8 {
     };
 }
 
-pub fn errorPayloadAllocZ(
-    allocator: std.mem.Allocator,
-    err: anyerror,
-) ?[*:0]u8 {
-    const code = api.codeForError(err);
-    const payload: api.ABIErrorPayload = .{
-        .code = code,
-        .user_info = null,
+fn importErrorCode(err: ImportAndEncodeError) api.PartoutErrorCode {
+    return switch (err) {
+        error.OutOfMemory => .outOfMemory,
+        error.IdGeneration => .unhandled,
+        error.InvalidJson, error.InvalidProfile => .decoding,
+        error.InvalidModel, error.Stringify => .encoding,
+        error.Parsing => .parsing,
+        error.PassphraseRequired => .passphraseRequired,
+        error.UnknownImportedModule => .unknownImportedModule,
     };
-    return util.encodeJsonValueZ(allocator, payload) catch null;
 }

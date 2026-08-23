@@ -9,9 +9,15 @@ const logging = @import("logging.zig");
 const parser_mod = @import("../parser.zig");
 
 const api = core_mod.api;
+const log = core_mod.logging;
 
 const DataConstants = constants_mod.Data;
 const Parser = parser_mod.Parser;
+const ParseError = std.mem.Allocator.Error || error{
+    ContinuationPushReply,
+    InvalidPushReply,
+    UnsupportedCompression,
+};
 
 pub const PushReply = struct {
     original: []const u8,
@@ -23,7 +29,7 @@ pub const PushReply = struct {
     pub fn parse(
         allocator: std.mem.Allocator,
         message: []const u8,
-    ) !?PushReply {
+    ) ParseError!?PushReply {
         if (!std.mem.startsWith(u8, message, prefix)) return null;
         if (std.mem.indexOf(u8, message, "push-continuation 2") != null)
             return error.ContinuationPushReply;
@@ -35,7 +41,14 @@ pub const PushReply = struct {
             if (byte.* == ',') byte.* = '\n';
         }
 
-        var options = try Parser.parse(allocator, profile);
+        var options = Parser.parse(allocator, profile) catch |err| {
+            log.writef(.err, "Unable to parse PUSH_REPLY: {s}", .{@errorName(err)});
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                error.UnsupportedCompression => error.UnsupportedCompression,
+                else => error.InvalidPushReply,
+            };
+        };
         errdefer options.deinit(allocator);
         const original = try allocator.dupe(u8, message);
         return .{
@@ -44,12 +57,17 @@ pub const PushReply = struct {
         };
     }
 
-    pub fn clone(self: PushReply, allocator: std.mem.Allocator) !PushReply {
+    pub fn clone(self: PushReply, allocator: std.mem.Allocator) ParseError!PushReply {
         const original = try allocator.dupe(u8, self.original);
         errdefer allocator.free(original);
         return .{
             .original = original,
-            .options = try self.options.clone(allocator),
+            .options = self.options.clone(allocator) catch |err| {
+                return switch (err) {
+                    error.OutOfMemory => error.OutOfMemory,
+                    else => error.InvalidPushReply,
+                };
+            },
         };
     }
 

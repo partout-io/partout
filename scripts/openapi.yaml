@@ -757,41 +757,27 @@ components:
       description: A connection module providing an OpenVPN connection.
     PartoutErrorCode:
       enum:
-        - cached
-        - notFound
-        - operationCancelled
-        - releasedObject
-        - scriptException
-        - timeout
-        - unhandled
-        - incompatibleModules
-        - incompleteModule
-        - noActiveModules
-        - nonFinalModules
-        - requiredImplementation
-        - unexpectedModuleType
-        - unknownImportedModule
-        - unknownModuleHandler
         - authentication
+        - cached
         - crypto
+        - decoding
         - dnsFailure
+        - encoding
         - exhaustedEndpoints
         - fdUnavailable
+        - incompatibleModules
+        - incompleteModule
+        - invalidField
+        - invalidValue
         - ioFailure
+        - keychainAddItem
+        - keychainItemNotFound
         - linkNotActive
         - networkChanged
         - networkUnreachable
-        - socketConfiguration
-        - tunNotActive
-        - tunNotAvailable
-        - decoding
-        - encoding
-        - invalidField
-        - invalidValue
-        - parsing
-        - keychainAddItem
-        - keychainItemNotFound
-        - passphraseRequired
+        - noActiveModules
+        - nonFinalModules
+        - notFound
         - OpenVPN.compressionMismatch
         - OpenVPN.connectionFailure
         - OpenVPN.noRouting
@@ -803,44 +789,45 @@ components:
         - OpenVPN.unsupportedAlgorithm
         - OpenVPN.unsupportedCompression
         - OpenVPN.unsupportedOption
+        - operationCancelled
+        - outOfMemory
+        - parsing
+        - passphraseRequired
+        - releasedObject
+        - requiredImplementation
+        - scriptException
+        - socketConfiguration
+        - timeout
+        - tunNotActive
+        - tunNotAvailable
+        - unexpectedModuleType
+        - unhandled
+        - unknownImportedModule
+        - unknownModuleHandler
         - WireGuard.emptyPeers
       type: string
       x-enum-varnames:
-        - cached
-        - notFound
-        - operationCancelled
-        - releasedObject
-        - scriptException
-        - timeout
-        - unhandled
-        - incompatibleModules
-        - incompleteModule
-        - noActiveModules
-        - nonFinalModules
-        - requiredImplementation
-        - unexpectedModuleType
-        - unknownImportedModule
-        - unknownModuleHandler
         - authentication
+        - cached
         - crypto
+        - decoding
         - dnsFailure
+        - encoding
         - exhaustedEndpoints
         - fdUnavailable
+        - incompatibleModules
+        - incompleteModule
+        - invalidField
+        - invalidValue
         - ioFailure
+        - keychainAddItem
+        - keychainItemNotFound
         - linkNotActive
         - networkChanged
         - networkUnreachable
-        - socketConfiguration
-        - tunNotActive
-        - tunNotAvailable
-        - decoding
-        - encoding
-        - invalidField
-        - invalidValue
-        - parsing
-        - keychainAddItem
-        - keychainItemNotFound
-        - passphraseRequired
+        - noActiveModules
+        - nonFinalModules
+        - notFound
         - openVPNCompressionMismatch
         - openVPNConnectionFailure
         - openVPNNoRouting
@@ -852,42 +839,44 @@ components:
         - openVPNUnsupportedAlgorithm
         - openVPNUnsupportedCompression
         - openVPNUnsupportedOption
+        - operationCancelled
+        - outOfMemory
+        - parsing
+        - passphraseRequired
+        - releasedObject
+        - requiredImplementation
+        - scriptException
+        - socketConfiguration
+        - timeout
+        - tunNotActive
+        - tunNotAvailable
+        - unexpectedModuleType
+        - unhandled
+        - unknownImportedModule
+        - unknownModuleHandler
         - wireGuardEmptyPeers
       x-enum-descriptions:
-        - Response is cached.
-        - Entity not found.
-        - Operation cancelled or unauthorized.
-        - A required object was released prematurely.
-        - An exception was raised during a script execution.
-        - Operation timed out.
-        - Generic failure.
-        - Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
-        - A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
-        - The profile has no active modules.
-        - The profile has non-final modules that must be resolved to final modules first.
-        - Missing a required implementation.
-        - Module type is unexpected
-        - Module content is unknown for the importer.
-        - Module handler is unknown.
         - Authentication failure.
+        - Response is cached.
         - Crypto error.
+        - Decoding error.
         - DNS resolution failure.
+        - Encoding error.
         - No more endpoints available to try.
         - File descriptor is not available.
+        - Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
+        - A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
+        - Invalid field.
+        - Invalid value.
         - I/O failure.
+        - Unable to add keychain item.
+        - Keychain item not found.
         - Link device is not active.
         - Network changed.
         - Network is unreachable.
-        - Native sockets could not be configured.
-        - TUN device is not active.
-        - TUN device is not available for I/O.
-        - Decoding error.
-        - Encoding error.
-        - Invalid field.
-        - Invalid value.
-        - Parsing error.
-        - Unable to add keychain item.
-        - Keychain item not found.
+        - The profile has no active modules.
+        - The profile has non-final modules that must be resolved to final modules first.
+        - Entity not found.
         - Compression settings mismatch.
         - Connection failure.
         - No routing configuration.
@@ -899,6 +888,21 @@ components:
         - Algorithm is unsupported.
         - Compression setting is unsupported.
         - Option is unsupported.
+        - Operation cancelled or unauthorized.
+        - Memory allocation failed.
+        - Parsing error.
+        - A passphrase is required.
+        - A required object was released prematurely.
+        - Missing a required implementation.
+        - An exception was raised during a script execution.
+        - Native sockets could not be configured.
+        - Operation timed out.
+        - TUN device is not active.
+        - TUN device is not available for I/O.
+        - Module type is unexpected
+        - Generic failure.
+        - Module content is unknown for the importer.
+        - Module handler is unknown.
         - Configuration has no peers.
     Profile:
       additionalProperties: false

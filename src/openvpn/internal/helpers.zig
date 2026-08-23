@@ -2,10 +2,13 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+const std = @import("std");
+
 pub const c = @cImport({
     @cInclude("c/android_import_compat.h");
     @cInclude("openvpn/openvpn.h");
 });
+const c_exports_mod = @import("../../c/exports.zig");
 
 pub fn BidirectionalState(comptime T: type) type {
     return struct {
@@ -29,3 +32,8 @@ pub fn BidirectionalState(comptime T: type) type {
         }
     };
 }
+
+pub const c_data_path_error_empty = c.openvpn_dp_error{
+    .dp_code = c.OpenVPNDataPathErrorNone,
+    .crypto_code = c_exports_mod.crypto.PPCryptoErrorNone,
+};

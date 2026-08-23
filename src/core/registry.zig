@@ -240,12 +240,14 @@ pub const Registry = struct {
     ///
     /// Canonical profiles are returned directly. Tagged modules and raw modules
     /// accepted by registered importers are wrapped into a single-module profile
-    /// whose active module is the imported module.
+    /// whose active module is the imported module. `context` is forwarded when
+    /// raw input falls back to the registered module importers.
     pub fn importProfile(
         self: Registry,
         allocator: std.mem.Allocator,
         text: []const u8,
         name: ?[]const u8,
+        context: ?ImportContext,
     ) ImportError!api.Profile {
         // If the input is not a JSON, parse it as Module
         log.write(.debug, "Parse profile as JSON");
@@ -256,7 +258,7 @@ pub const Registry = struct {
                     log.writef(.debug, "Unable to parse JSON, parse profile from text: {s}", .{
                         @errorName(json_err),
                     });
-                    return self.importModuleAsProfile(allocator, text, name);
+                    return self.importModuleAsProfile(allocator, text, name, context);
                 },
             }
         };
@@ -299,9 +301,10 @@ pub const Registry = struct {
         allocator: std.mem.Allocator,
         text: []const u8,
         name: ?[]const u8,
+        context: ?ImportContext,
     ) ImportError!api.Profile {
         // Require a successful module import, otherwise the profile is invalid
-        var module = self.importModule(allocator, text, null) catch |module_err| {
+        var module = self.importModule(allocator, text, context) catch |module_err| {
             return switch (module_err) {
                 error.OutOfMemory => error.OutOfMemory,
                 else => error.InvalidProfile,

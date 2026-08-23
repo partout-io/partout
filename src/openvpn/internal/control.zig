@@ -15,9 +15,44 @@ const ControlPacket = packet_mod.ControlPacket;
 const PacketCode = packet_mod.PacketCode;
 const PRNG = crypto_mod.PRNG;
 
+pub const CreateError = std.mem.Allocator.Error;
+pub const ResetError = crypto_mod.PRNGError;
+pub const SetRemoteSessionIdError = error{InvalidSessionId};
+const SerializeError = std.mem.Allocator.Error || error{
+    CryptoEncryption,
+    CryptoHMAC,
+};
+const DeserializeError = SerializeError || ControlPacket.CreateError || error{
+    AckPacketWithoutIds,
+    AckPacketWithoutRemoteSessionId,
+    ControlChannelFailure,
+    InvalidRange,
+    MissingAckSize,
+    MissingAcks,
+    MissingOpcode,
+    MissingPacketId,
+    MissingRemoteSessionId,
+    UnknownCode,
+};
+const ReadAcksError = error{
+    MissingSessionId,
+    SessionMismatch,
+};
+pub const ReadInboundPacketError = DeserializeError || ReadAcksError;
+pub const EnqueueInboundPacketError = std.mem.Allocator.Error;
+pub const EnqueueOutboundPacketsError = std.mem.Allocator.Error ||
+    ControlPacket.CreateError ||
+    error{
+        ControlChannelFailure,
+        MissingSessionId,
+    };
+pub const WriteOutboundPacketsError = SerializeError;
+pub const WriteAcksError = SerializeError || ControlPacket.CreateError || error{MissingSessionId};
+
 pub fn ControlChannel(comptime Serializer: type) type {
     return struct {
         const Self = @This();
+
         allocator: std.mem.Allocator,
         prng: PRNG,
         serializer: Serializer,
@@ -35,7 +70,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             allocator: std.mem.Allocator,
             prng: PRNG,
             serializer: Serializer,
-        ) !*Self {
+        ) CreateError!*Self {
             var owned_serializer = serializer;
             errdefer owned_serializer.deinit(allocator);
             const self = try allocator.create(Self);
@@ -67,7 +102,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             allocator.destroy(self);
         }
 
-        pub fn reset(self: *Self, for_new_session: bool) !void {
+        pub fn reset(self: *Self, for_new_session: bool) ResetError!void {
             if (for_new_session) {
                 var local: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
                 try self.prng.fill(&local);
@@ -91,7 +126,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             return if (self.remote_session_id) |*value| value else null;
         }
 
-        pub fn setRemoteSessionId(self: *Self, value: []const u8) !void {
+        pub fn setRemoteSessionId(self: *Self, value: []const u8) SetRemoteSessionIdError!void {
             if (value.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
             var copy: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
             @memcpy(&copy, value);
@@ -103,7 +138,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             self: *Self,
             data: []const u8,
             offset: usize,
-        ) !ControlPacket {
+        ) ReadInboundPacketError!ControlPacket {
             var packet = self.serializer.deserialize(
                 self.allocator,
                 data,
@@ -134,7 +169,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
         pub fn enqueueInboundPacket(
             self: *Self,
             packet: ControlPacket,
-        ) ![]ControlPacket {
+        ) EnqueueInboundPacketError![]ControlPacket {
             var owned = packet;
             self.inbound_queue.append(self.allocator, owned) catch |err| {
                 owned.deinit();
@@ -173,7 +208,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             payload: []const u8,
             leading_payload_byte_limit: usize,
             trailing_payload_byte_limit: usize,
-        ) !void {
+        ) EnqueueOutboundPacketsError!void {
             const local_session_id = self.sessionId() orelse {
                 log.write(.fault, "Control: Missing sessionId, do reset(forNewSession: true) first");
                 return error.MissingSessionId;
@@ -222,7 +257,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
         pub fn writeOutboundPackets(
             self: *Self,
             resend_after_ms: i64,
-        ) ![][]u8 {
+        ) WriteOutboundPacketsError![][]u8 {
             var raw_packets: std.ArrayList([]u8) = .empty;
             errdefer core_mod.util.deinitListOfStrings(self.allocator, &raw_packets);
             const now = core_mod.concurrency.monotonicNs() / std.time.ns_per_ms;
@@ -256,7 +291,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             key: u8,
             ack_packet_ids: []const u32,
             ack_remote_session_id: []const u8,
-        ) ![]u8 {
+        ) WriteAcksError![]u8 {
             const local_session_id = self.sessionId() orelse return error.MissingSessionId;
             var packet = try ControlPacket.initAck(
                 key,
@@ -274,7 +309,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             self: *Self,
             packet_ids: []const u32,
             acks_remote_session_id: []const u8,
-        ) !void {
+        ) ReadAcksError!void {
             const local_session_id = self.sessionId() orelse return error.MissingSessionId;
             if (!std.mem.eql(u8, acks_remote_session_id, local_session_id)) {
                 log.writef(.fault, "Control: Ack session mismatch ({x} != {x}): SessionMismatch", .{

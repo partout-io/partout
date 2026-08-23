@@ -712,7 +712,7 @@ fn stopDaemon(sut: *Daemon) void {
 
 const DelayedConnection = struct {
     timer: core.RunAfter = .{},
-    serialized_executor: ?net.SerializedExecutor = null,
+    serialized_executor: ?core.SerializedExecutor = null,
     start_thread: ?std.Thread.Id = null,
     timer_thread: ?std.Thread.Id = null,
     ran_on_start_thread: bool = false,
@@ -880,7 +880,7 @@ const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
     looper: ?*net.Looper = null,
     looper_ready_during_create: bool = false,
-    serialized_executor: ?net.SerializedExecutor = null,
+    serialized_executor: ?core.SerializedExecutor = null,
     disconnect_on_start: bool = false,
     cancel_on_start: ?api.PartoutErrorCode = null,
     queue_work_on_stop: bool = false,

@@ -96,6 +96,7 @@ pub const CryptoKeysBridge = struct {
 };
 
 pub const PRNG = PRNGWith(SystemRandom);
+pub const PRNGError = std.mem.Allocator.Error || error{CryptoPRNG};
 
 pub fn PRNGWith(comptime Provider: type) type {
     return struct {
@@ -111,22 +112,22 @@ pub fn PRNGWith(comptime Provider: type) type {
             return init(.{});
         }
 
-        pub fn fill(self: Self, destination: []u8) !void {
-            if (!self.provider.fill(destination)) return error.CryptoFailure;
+        pub fn fill(self: Self, destination: []u8) PRNGError!void {
+            if (!self.provider.fill(destination)) return error.CryptoPRNG;
         }
 
         pub fn data(
             self: Self,
             allocator: std.mem.Allocator,
             length: usize,
-        ) ![]u8 {
+        ) PRNGError![]u8 {
             const bytes = try allocator.alloc(u8, length);
             errdefer allocator.free(bytes);
             try self.fill(bytes);
             return bytes;
         }
 
-        pub fn safeData(self: Self, length: usize) !ZeroingData {
+        pub fn safeData(self: Self, length: usize) PRNGError!ZeroingData {
             var result = ZeroingData.init(length);
             errdefer result.deinit();
             try self.fill(result.asMutableSlice());
@@ -143,6 +144,8 @@ const SystemRandom = struct {
 };
 
 pub const ZeroingData = struct {
+    pub const Error = error{OutOfBounds};
+
     ptr: *c_common.pp_zd,
 
     pub fn init(count: usize) ZeroingData {
@@ -224,13 +227,13 @@ pub const ZeroingData = struct {
         self: ZeroingData,
         offset: usize,
         count: usize,
-    ) !ZeroingData {
+    ) Error!ZeroingData {
         const total_length = self.length();
         if (offset > total_length or count > total_length - offset) return error.OutOfBounds;
         return fromC(c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse unreachable);
     }
 
-    pub fn networkU16(self: ZeroingData, offset: usize) !u16 {
+    pub fn networkU16(self: ZeroingData, offset: usize) Error!u16 {
         const data = self.asSlice();
         if (offset > data.len or data.len - offset < 2) return error.OutOfBounds;
         return std.mem.readInt(u16, data[offset..][0..2], .big);
@@ -247,7 +250,7 @@ pub const ZeroingData = struct {
     pub fn removePrefix(
         self: *ZeroingData,
         count: usize,
-    ) !void {
+    ) Error!void {
         if (count > self.length()) return error.OutOfBounds;
         c_common.pp_zd_remove_until(self.cPtr(), count);
     }

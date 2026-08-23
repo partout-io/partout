@@ -12,7 +12,6 @@ const control_mod = @import("control.zig");
 const control_serializers_mod = @import("control_serializers.zig");
 const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
@@ -36,6 +35,12 @@ const PRNG = crypto_mod.PRNG;
 const PushReply = push_mod.PushReply;
 const TLSWrapper = tls_mod.TLSWrapper;
 
+pub const NegotiationResult = struct {
+    key: u8,
+    data_channel: *DataChannel,
+    push_reply: *const PushReply,
+};
+
 pub const RenegotiationType = enum {
     client,
     server,
@@ -55,10 +60,6 @@ pub const NegotiatorState = enum(u8) {
 };
 
 /// Borrowed session settings and callbacks used by a negotiator.
-///
-/// `on_connected` transfers the `DataChannel` to the callback on success. The
-/// push reply remains borrowed from the negotiator and must be cloned by a
-/// recipient that needs to retain it.
 pub const NegotiatorOptions = struct {
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
@@ -71,13 +72,6 @@ pub const NegotiatorOptions = struct {
         ?*anyopaque,
         u64,
     ) net_mod.Looper.ScheduleTimerError!void,
-    on_connected: *const fn (
-        ?*anyopaque,
-        u8,
-        *DataChannel,
-        *const PushReply,
-    ) errors_mod.SessionError!void,
-    on_error: *const fn (?*anyopaque, u8, errors_mod.SessionError) void,
 };
 
 /// V3 control-channel state machine. All mutable methods run on `looper`.
@@ -250,8 +244,8 @@ pub const Negotiator = struct {
         std.debug.assert(self.looper.isOnQueue());
         const elapsed = self.elapsedMs();
         if (self.state == .idle and elapsed > self.options.session_options.hard_reset_timeout_ms) {
-            log.write(.notice, "OpenVPN hard reset timed out; reconnecting");
-            return error.Reconnect;
+            log.write(.notice, "OpenVPN hard reset timed out");
+            return error.Timeout;
         }
         if (self.state != .connected and elapsed > self.negotiation_timeout_ms)
             return error.Timeout;
@@ -266,19 +260,14 @@ pub const Negotiator = struct {
         }
     }
 
-    pub fn sendAck(self: *const Negotiator, packet: *const ControlPacket) void {
+    pub fn sendAck(self: *const Negotiator, packet: *const ControlPacket) !void {
         log.writef(.info, "Send ack for received packetId {d}", .{packet.packetId()});
         self.sendAckToLink(packet) catch |err| {
             log.writef(.err, "Failed LINK write during send ack for packetId {d}: {s}", .{
                 packet.packetId(),
                 @errorName(err),
             });
-            self.options.on_error(
-                self.options.callback_context,
-                self.key,
-                errors_mod.sessionError(err),
-            );
-            return;
+            return err;
         };
         log.writef(.info, "Ack successfully written to LINK for packetId {d}", .{
             packet.packetId(),
@@ -309,7 +298,7 @@ pub const Negotiator = struct {
         const tls = self.tls orelse
             @panic("Cannot send a push request without an owned TLS session");
         log.write(.info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)");
-        tls.putPlainText("PUSH_REQUEST\x00") catch {};
+        try tls.putPlainText("PUSH_REQUEST\x00");
         if (!try self.sendAvailableCipherText(tls)) return;
         self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
             core_mod.concurrency.monotonicNs(),
@@ -386,17 +375,17 @@ pub const Negotiator = struct {
     pub fn handleControlPacket(
         self: *Negotiator,
         packet: *ControlPacket,
-    ) !void {
+    ) !?NegotiationResult {
         if (packet.key() != self.key) {
             log.writef(.err, "Bad key in control packet ({d} != {d})", .{
                 packet.key(),
                 self.key,
             });
-            return;
+            return null;
         }
 
         if (self.state == .idle) {
-            if (packet.code != .hardResetServerV2 and packet.code != .softResetV1) return;
+            if (packet.code != .hardResetServerV2 and packet.code != .softResetV1) return null;
             if (packet.code == .hardResetServerV2) {
                 if (self.isRenegotiating())
                     log.write(.err, "Sent SOFT_RESET but received HARD_RESET?");
@@ -404,7 +393,7 @@ pub const Negotiator = struct {
                 self.should_resend_wrapped_key = self.usesTLSCryptV2() and
                     requestsWrappedKeyResend(packet.payload());
             }
-        } else if (packet.code != .controlV1) return;
+        } else if (packet.code != .controlV1) return null;
 
         const remote_session_id = self.channel.remoteSessionId() orelse {
             log.write(.fault, "No remote sessionId found in control channel: MissingSessionId");
@@ -430,6 +419,9 @@ pub const Negotiator = struct {
                         @errorName(err),
                     });
                     return err;
+                } orelse {
+                    log.write(.debug, "TLS.connect: No available ciphertext to pull");
+                    return null;
                 };
                 defer self.allocator.free(ciphertext);
                 log.write(.info, "TLS.connect: Pulled ciphertext");
@@ -438,14 +430,14 @@ pub const Negotiator = struct {
             .tls, .auth, .push, .connected => {
                 const payload = packet.payload() orelse {
                     log.write(.err, "TLS.connect: Control packet with empty payload?");
-                    return;
+                    return null;
                 };
                 const tls = self.tls orelse
                     @panic("Cannot process TLS control data without an owned TLS session");
                 log.writef(.info, "TLS.connect: Put received ciphertext [{d}]", .{
                     packet.packetId(),
                 });
-                tls.putCipherText(payload) catch {};
+                try tls.putCipherText(payload);
                 _ = try self.sendAvailableCipherText(tls);
 
                 if (self.state.before(.auth) and tls.isConnected()) {
@@ -454,16 +446,15 @@ pub const Negotiator = struct {
                     try self.onTLSConnect();
                 }
                 while (true) {
-                    // This mirrors the broad do/catch around
-                    // currentControlData(withTLS:) and handleControlData():
-                    // message handlers notify on_error where appropriate,
-                    // then this TLS-drain pass stops without failing LINK.
-                    const control_data = tls.pullPlainText(self.allocator) catch break;
+                    // A null pull means the TLS drain is complete; actual TLS
+                    // and control-message failures propagate to the Session.
+                    const control_data = try tls.pullPlainText(self.allocator) orelse break;
                     defer self.allocator.free(control_data);
-                    self.handleControlData(control_data) catch break;
+                    if (try self.handleControlData(control_data)) |result| return result;
                 }
             },
         }
+        return null;
     }
 
     fn onTLSConnect(self: *Negotiator) !void {
@@ -489,19 +480,18 @@ pub const Negotiator = struct {
         _ = try self.sendAvailableCipherText(tls);
     }
 
-    fn handleControlData(self: *Negotiator, data: []const u8) !void {
-        const authenticator = if (self.authenticator) |*value| value else return;
+    fn handleControlData(self: *Negotiator, data: []const u8) !?NegotiationResult {
+        const authenticator = if (self.authenticator) |*value| value else return null;
         log.write(.info, "Pulled plain control data");
         authenticator.appendControlData(data);
         if (self.state == .auth) {
-            if (!try authenticator.parseAuthReply()) return;
+            if (!try authenticator.parseAuthReply()) return null;
             if (self.isRenegotiating()) {
                 self.setState(.connected);
                 const history = if (self.history) |*value| value else {
                     @panic("Renegotiation completed without history from the original connection");
                 };
-                try self.completeConnection(history);
-                return;
+                return try self.completeConnection(history);
             }
             self.setState(.push);
             self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
@@ -514,18 +504,12 @@ pub const Negotiator = struct {
         defer core_mod.util.freeSliceOfStrings(self.allocator, messages);
         for (messages) |message| {
             log.write(.info, "Parsed control message");
-            self.handleControlMessage(message) catch |err| {
-                self.options.on_error(
-                    self.options.callback_context,
-                    self.key,
-                    errors_mod.sessionError(err),
-                );
-                return err;
-            };
+            if (try self.handleControlMessage(message)) |result| return result;
         }
+        return null;
     }
 
-    fn handleControlMessage(self: *Negotiator, message: []const u8) !void {
+    fn handleControlMessage(self: *Negotiator, message: []const u8) !?NegotiationResult {
         log.write(.info, "Received control message");
         if (std.mem.startsWith(u8, message, "AUTH_FAILED")) {
             const authenticator = self.authenticator orelse
@@ -540,7 +524,7 @@ pub const Negotiator = struct {
             log.write(.info, "Disconnect due to server shutdown");
             return error.ServerShutdown;
         }
-        if (self.state != .push) return;
+        if (self.state != .push) return null;
 
         const complete_message = if (self.continued_push_reply_message) |previous|
             try std.mem.concat(self.allocator, u8, &.{ previous, ",", message })
@@ -559,8 +543,8 @@ pub const Negotiator = struct {
             );
             if (self.continued_push_reply_message) |old| self.allocator.free(old);
             self.continued_push_reply_message = stripped;
-            return;
-        } orelse return;
+            return null;
+        } orelse return null;
         defer reply.deinit(self.allocator);
         if (self.continued_push_reply_message) |old| self.allocator.free(old);
         self.continued_push_reply_message = null;
@@ -586,13 +570,13 @@ pub const Negotiator = struct {
         if (reply.options.ipv4 == null and reply.options.ipv6 == null)
             return error.NoRouting;
         self.setState(.connected);
-        try self.completeConnection(&reply);
+        return try self.completeConnection(&reply);
     }
 
     fn completeConnection(
         self: *Negotiator,
         push_reply: *const PushReply,
-    ) !void {
+    ) !NegotiationResult {
         log.writef(.info, "Complete connection of key {d}", .{self.key});
         const data_channel = try self.newDataChannel(push_reply);
         errdefer data_channel.destroy();
@@ -600,12 +584,11 @@ pub const Negotiator = struct {
         if (self.history) |*old| old.deinit(self.allocator);
         self.history = history;
         if (self.authenticator) |*authenticator| authenticator.reset();
-        try self.options.on_connected(
-            self.options.callback_context,
-            self.key,
-            data_channel,
-            &self.history.?,
-        );
+        return .{
+            .key = self.key,
+            .data_channel = data_channel,
+            .push_reply = &self.history.?,
+        };
     }
 
     fn newDataChannel(
@@ -685,12 +668,11 @@ pub const Negotiator = struct {
         tls: *TLSWrapper,
     ) !bool {
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            if (err == error.TLSFailure) {
-                log.writef(.fault, "TLS: Failed pulling ciphertext: {s}", .{
-                    @errorName(err),
-                });
-                return err;
-            }
+            log.writef(.fault, "TLS: Failed pulling ciphertext: {s}", .{
+                @errorName(err),
+            });
+            return err;
+        } orelse {
             log.write(.debug, "TLS: No available ciphertext to pull");
             return false;
         };

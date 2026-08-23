@@ -10,8 +10,8 @@ const configuration_mod = @import("internal/configuration.zig");
 const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
 const endpoint_resolver_mod = @import("internal/endpoint_resolver.zig");
-const errors_mod = @import("internal/errors.zig");
 const logging_mod = @import("internal/logging.zig");
+const processing_mod = @import("internal/processing.zig");
 const session_mod = @import("internal/session.zig");
 const settings_mod = @import("internal/settings.zig");
 
@@ -19,12 +19,12 @@ const api = core.api;
 const log = core.logging;
 const openvpn_log = logging_mod;
 const EndpointResolver = endpoint_resolver_mod.EndpointResolver;
-const SessionOptions = configuration_mod.SessionOptions;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
+const SessionError = session_mod.SessionError;
 const SessionEvents = session_mod.SessionEvents;
-const SessionError = errors_mod.SessionError;
+const SessionOptions = configuration_mod.SessionOptions;
 const TLSConstants = constants_mod.TLS;
 
 const EnvironmentKeys = struct {
@@ -47,9 +47,21 @@ pub const ConnectionContext = struct {
     session_options: SessionOptions = .{},
 };
 
-pub const testing = struct {
-    pub const codeForTunnelError = tunnelErrorCode;
-    pub const isRecoverableSessionError = isRecoverable;
+const LinkSetupError = std.mem.Allocator.Error ||
+    net.Looper.AttachError ||
+    processing_mod.ProcessorError ||
+    error{
+        ExhaustedEndpoints,
+        LinkFailure,
+        LinkNotActive,
+    };
+
+const ConnectionError = SessionError || error{
+    InvalidEndpoint,
+    ModulesAllocation,
+    MuxFailure,
+    NetworkChanged,
+    TunNotAvailable,
 };
 
 const OpenVPNConnection = struct {
@@ -60,7 +72,7 @@ const OpenVPNConnection = struct {
     resolver: net.DNSResolver,
     factory: net.SocketFactory,
     looper: *net.Looper,
-    serialized_executor: net.SerializedExecutor,
+    serialized_executor: core.SerializedExecutor,
     connection_options: net.ConnectionOptions,
     session_options: SessionOptions,
     configuration: api.OpenVPNConfiguration,
@@ -71,6 +83,7 @@ const OpenVPNConnection = struct {
 
     status: api.ConnectionStatus,
     events: ?net.Connection.Events,
+    with_local_options: bool,
     current_session: ?*Session,
     current_endpoint: ?api.ExtendedEndpoint,
     tunnel: ?net.TunWrapper,
@@ -106,7 +119,7 @@ const OpenVPNConnection = struct {
             PRNG.system(),
         ) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.CryptoFailure => return error.IdGeneration,
+            error.CryptoPRNG => return error.IdGeneration,
         };
         const endpoints = maybe_endpoints orelse return error.IncompleteModule;
         errdefer core.util.freeSlice(api.ExtendedEndpoint, allocator, endpoints);
@@ -150,6 +163,7 @@ const OpenVPNConnection = struct {
             .cache_dir = cache_dir,
             .status = .disconnected,
             .events = null,
+            .with_local_options = true,
             .current_session = null,
             .current_endpoint = null,
             .tunnel = null,
@@ -216,6 +230,7 @@ const OpenVPNConnection = struct {
             .prng = PRNG.system(),
             .caches_directory = self.cache_dir,
             .ca_filename = ca_filename,
+            .with_local_options = self.with_local_options,
             .options = self.session_options,
         }) catch |err| {
             log.writef(.err, "Unable to create session: {s}", .{@errorName(err)});
@@ -229,7 +244,7 @@ const OpenVPNConnection = struct {
         const current_endpoint = self.setupLink(session) catch |err| {
             log.writef(.fault, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
-            session.shutdown(errors_mod.sessionError(err), null) catch {};
+            session.shutdown(false, null) catch {};
             self.events = null;
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -254,7 +269,7 @@ const OpenVPNConnection = struct {
         _ = self.sendStatus(.disconnecting, events);
         log.write(.info, "User requested disconnection");
         var graceful = true;
-        session.shutdown(null, timeout_ms) catch {
+        session.shutdown(true, timeout_ms) catch {
             graceful = false;
             log.write(.err, "Link shut down due to timeout");
         };
@@ -278,12 +293,11 @@ const OpenVPNConnection = struct {
         const session = self.current_session orelse return;
         if (self.status == .disconnected or self.status == .disconnecting) return;
         log.write(.notice, "Link has a better path, shut down session to reconnect");
-        session.shutdown(error.NetworkChanged, null) catch |err| {
+        session.shutdown(true, null) catch |err| {
             log.writef(.err, "Better-path shutdown failed: {s}", .{@errorName(err)});
         };
         self.finalizeSession(events, .{ .failure = .{
-            .cause = .networkChanged,
-            .disposition = .reconnect,
+            .cause = error.NetworkChanged,
         } });
     }
 
@@ -297,10 +311,7 @@ const OpenVPNConnection = struct {
 
     // MARK: - Link setup
 
-    fn setupLink(
-        self: *OpenVPNConnection,
-        session: *Session,
-    ) (std.mem.Allocator.Error || error{ ExhaustedEndpoints, LinkNotActive } || Session.Error)!api.ExtendedEndpoint {
+    fn setupLink(self: *OpenVPNConnection, session: *Session) LinkSetupError!api.ExtendedEndpoint {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
@@ -339,7 +350,8 @@ const OpenVPNConnection = struct {
         if (self.status != .connecting) return;
         log.write(.notice, "Session established");
         const address = api.Address.parseRaw(remote_endpoint.address) orelse {
-            self.failTunnelSetup(session, .invalidValue);
+            log.write(.fault, "Unable to parse remote endpoint");
+            self.failTunnelSetup(session, error.InvalidEndpoint);
             return;
         };
         log.writef(.info, "\tEndpoint: {s}", .{address});
@@ -360,7 +372,8 @@ const OpenVPNConnection = struct {
             remote_options,
         );
         const modules = builder.modules(self.allocator) catch |err| {
-            self.failTunnelSetup(session, tunnelErrorCode(err));
+            log.writef(.fault, "Unable to allocate settings modules: {s}", .{@errorName(err)});
+            self.failTunnelSetup(session, error.ModulesAllocation);
             return;
         };
         defer core.util.freeSlice(api.TaggedModule, self.allocator, modules);
@@ -373,15 +386,18 @@ const OpenVPNConnection = struct {
             .modules = modules,
         };
         self.tunnel = self.controller.setTunnelSettings(info) catch |err| {
-            self.failTunnelSetup(session, tunnelErrorCode(err));
+            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+            self.failTunnelSetup(session, error.TunNotAvailable);
             return;
         };
         const active_tunnel = if (self.tunnel) |*value| value else {
-            self.failTunnelSetup(session, .tunNotAvailable);
+            log.write(.fault, "Unable to get tun device");
+            self.failTunnelSetup(session, error.TunNotAvailable);
             return;
         };
         const fd = active_tunnel.muxDescriptor() orelse {
-            self.failTunnelSetup(session, .fdUnavailable);
+            log.write(.fault, "Unable to get mux descriptor");
+            self.failTunnelSetup(session, error.MuxFailure);
             return;
         };
         const descriptor = net.Looper.Descriptor{
@@ -389,7 +405,8 @@ const OpenVPNConnection = struct {
             .io = active_tunnel.nativeIO(),
         };
         session.setTunnel(descriptor) catch |err| {
-            self.failTunnelSetup(session, tunnelErrorCode(err));
+            log.writef(.fault, "Unable to set tunnel: {s}", .{@errorName(err)});
+            self.failTunnelSetup(session, error.TunnelFailure);
             return;
         };
         if (self.sendStatus(.connected, events)) {
@@ -400,16 +417,13 @@ const OpenVPNConnection = struct {
     fn failTunnelSetup(
         self: *OpenVPNConnection,
         session: *Session,
-        code: api.PartoutErrorCode,
+        err: ConnectionError,
     ) void {
-        log.writef(.err, "Unable to start tunnel: {s}", .{
-            code.raw(),
-        });
+        log.writef(.err, "Unable to start tunnel: {s}", .{@errorName(err)});
         const events = self.events orelse return;
-        session.shutdown(error.Reconnect, null) catch {};
+        session.shutdown(false, null) catch {};
         self.finalizeSession(events, .{ .failure = .{
-            .cause = code,
-            .disposition = .cancel,
+            .cause = err,
         } });
     }
 
@@ -422,21 +436,14 @@ const OpenVPNConnection = struct {
         const session = self.current_session orelse return;
         std.debug.assert(self.events != null);
         const events = self.events orelse return;
-        session.shutdown(cause, null) catch |err| {
+        if (cause == error.BadCredentialsWithLocalOptions)
+            self.with_local_options = false;
+        session.shutdown(false, null) catch |err| {
             log.writef(.err, "Session failure shutdown failed: {s}", .{@errorName(err)});
         };
         log.writef(.err, "Session failed: {s}", .{@errorName(cause)});
-        const disposition: SessionFailureDisposition = if (isRecoverable(cause))
-            .reconnect
-        else
-            .cancel;
-        if (disposition == .cancel) {
-            log.write(.err, "Disconnection is not recoverable");
-            log.writef(.info, "Report link failure: {s}", .{@errorName(cause)});
-        }
         self.finalizeSession(events, .{ .failure = .{
-            .cause = errors_mod.partoutCode(cause),
-            .disposition = disposition,
+            .cause = cause,
         } });
     }
 
@@ -457,20 +464,21 @@ const OpenVPNConnection = struct {
                 self.events = null;
             },
             .failure => |failure| {
-                if (failure.disposition == .cancel) {
+                const disp = failure.disposition();
+                if (disp == .cancel) {
+                    log.write(.err, "Disconnection is not recoverable");
                     self.prepareTerminalCancellation();
                 }
-                if (failure.cause) |cause| {
-                    events.last_error(events.ctx, cause);
-                }
-                switch (failure.disposition) {
+                const error_code = partoutCodeForError(failure.cause);
+                events.last_error(events.ctx, error_code);
+                switch (disp) {
                     .reconnect => {
                         // The .disconnected status will trigger a reconnection
                         // in the daemon.
                         _ = self.sendStatus(.disconnected, events);
                         self.events = null;
                     },
-                    .cancel => events.cancel(events.ctx, failure.cause),
+                    .cancel => events.cancel(events.ctx, error_code),
                 }
             },
         }
@@ -531,19 +539,6 @@ const OpenVPNConnection = struct {
         if (self.current_endpoint) |*endpoint| endpoint.deinit(self.allocator);
         self.current_endpoint = null;
     }
-};
-
-const SessionFinalization = union(enum) {
-    explicit_stop,
-    failure: struct {
-        cause: ?api.PartoutErrorCode,
-        disposition: SessionFailureDisposition,
-    },
-};
-
-const SessionFailureDisposition = enum {
-    reconnect,
-    cancel,
 };
 
 const SessionEvent = union(enum) {
@@ -714,32 +709,6 @@ fn sessionDataCount(
     } });
 }
 
-// MARK: - Errors
-
-fn isRecoverable(err: SessionError) bool {
-    return switch (err) {
-        error.Timeout,
-        error.ConnectionFailure,
-        error.BadCredentialsWithLocalOptions,
-        error.ServerShutdown,
-        error.NetworkChanged,
-        error.Reconnect,
-        => true,
-        else => false,
-    };
-}
-
-fn tunnelErrorCode(err: anyerror) api.PartoutErrorCode {
-    return switch (err) {
-        error.TunNotAvailable => .tunNotAvailable,
-        error.SocketConfiguration => .socketConfiguration,
-        error.NetworkChanged => .networkChanged,
-        error.Timeout => .timeout,
-        error.CryptoFailure => .crypto,
-        else => .unhandled,
-    };
-}
-
 // MARK: - Connection callbacks
 
 fn start(
@@ -796,3 +765,34 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .destroy = destroy,
     .looper_terminated = looperTerminated,
 };
+
+// MARK: - Finalization and error mapping
+
+const SessionFinalization = union(enum) {
+    explicit_stop,
+    failure: SessionFinalizationFailure,
+};
+
+const SessionFinalizationFailure = struct {
+    const Disposition = enum {
+        reconnect,
+        cancel,
+    };
+
+    cause: ConnectionError,
+
+    fn disposition(self: *const SessionFinalizationFailure) Disposition {
+        return switch (self.cause) {
+            // FIXME: ###, Return .reconnect on recoverable errors
+            error.BadCredentialsWithLocalOptions,
+            error.NetworkChanged,
+            => .reconnect,
+            else => .cancel,
+        };
+    }
+};
+
+fn partoutCodeForError(_: ConnectionError) api.PartoutErrorCode {
+    // FIXME: ###, Map ConnectionError to PartoutErrorCode
+    return .unhandled;
+}

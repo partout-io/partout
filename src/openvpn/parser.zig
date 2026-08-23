@@ -193,7 +193,7 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
             const function_table = c_mod.cryptoFunctionTable(backend) catch
                 return error.DecryptionFailed;
             const decrypt_function = function_table.key_decrypted_from_pem orelse
-                return error.DecryptionFailed;
+                @panic("OpenVPN crypto backend does not define key_decrypted_from_pem");
             const c_decrypted = decrypt_function(c_pem.ptr(), c_passphrase.ptr()) orelse
                 return error.DecryptionFailed;
             const decrypted = std.mem.span(@as([*:0]u8, @ptrCast(c_decrypted)));

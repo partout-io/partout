@@ -2332,41 +2332,27 @@ pub const OpenVPNModule = struct {
 };
 
 pub const PartoutErrorCode = enum {
-    cached,
-    notFound,
-    operationCancelled,
-    releasedObject,
-    scriptException,
-    timeout,
-    unhandled,
-    incompatibleModules,
-    incompleteModule,
-    noActiveModules,
-    nonFinalModules,
-    requiredImplementation,
-    unexpectedModuleType,
-    unknownImportedModule,
-    unknownModuleHandler,
     authentication,
+    cached,
     crypto,
+    decoding,
     dnsFailure,
+    encoding,
     exhaustedEndpoints,
     fdUnavailable,
+    incompatibleModules,
+    incompleteModule,
+    invalidField,
+    invalidValue,
     ioFailure,
+    keychainAddItem,
+    keychainItemNotFound,
     linkNotActive,
     networkChanged,
     networkUnreachable,
-    socketConfiguration,
-    tunNotActive,
-    tunNotAvailable,
-    decoding,
-    encoding,
-    invalidField,
-    invalidValue,
-    parsing,
-    keychainAddItem,
-    keychainItemNotFound,
-    passphraseRequired,
+    noActiveModules,
+    nonFinalModules,
+    notFound,
     openVPNCompressionMismatch,
     openVPNConnectionFailure,
     openVPNNoRouting,
@@ -2378,6 +2364,21 @@ pub const PartoutErrorCode = enum {
     openVPNUnsupportedAlgorithm,
     openVPNUnsupportedCompression,
     openVPNUnsupportedOption,
+    operationCancelled,
+    outOfMemory,
+    parsing,
+    passphraseRequired,
+    releasedObject,
+    requiredImplementation,
+    scriptException,
+    socketConfiguration,
+    timeout,
+    tunNotActive,
+    tunNotAvailable,
+    unexpectedModuleType,
+    unhandled,
+    unknownImportedModule,
+    unknownModuleHandler,
     wireGuardEmptyPeers,
 
     pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
@@ -2386,41 +2387,27 @@ pub const PartoutErrorCode = enum {
     }
 
     pub fn parseFromRaw(raw_value: []const u8) ?@This() {
-        if (std.mem.eql(u8, raw_value, "cached")) return .cached;
-        if (std.mem.eql(u8, raw_value, "notFound")) return .notFound;
-        if (std.mem.eql(u8, raw_value, "operationCancelled")) return .operationCancelled;
-        if (std.mem.eql(u8, raw_value, "releasedObject")) return .releasedObject;
-        if (std.mem.eql(u8, raw_value, "scriptException")) return .scriptException;
-        if (std.mem.eql(u8, raw_value, "timeout")) return .timeout;
-        if (std.mem.eql(u8, raw_value, "unhandled")) return .unhandled;
-        if (std.mem.eql(u8, raw_value, "incompatibleModules")) return .incompatibleModules;
-        if (std.mem.eql(u8, raw_value, "incompleteModule")) return .incompleteModule;
-        if (std.mem.eql(u8, raw_value, "noActiveModules")) return .noActiveModules;
-        if (std.mem.eql(u8, raw_value, "nonFinalModules")) return .nonFinalModules;
-        if (std.mem.eql(u8, raw_value, "requiredImplementation")) return .requiredImplementation;
-        if (std.mem.eql(u8, raw_value, "unexpectedModuleType")) return .unexpectedModuleType;
-        if (std.mem.eql(u8, raw_value, "unknownImportedModule")) return .unknownImportedModule;
-        if (std.mem.eql(u8, raw_value, "unknownModuleHandler")) return .unknownModuleHandler;
         if (std.mem.eql(u8, raw_value, "authentication")) return .authentication;
+        if (std.mem.eql(u8, raw_value, "cached")) return .cached;
         if (std.mem.eql(u8, raw_value, "crypto")) return .crypto;
+        if (std.mem.eql(u8, raw_value, "decoding")) return .decoding;
         if (std.mem.eql(u8, raw_value, "dnsFailure")) return .dnsFailure;
+        if (std.mem.eql(u8, raw_value, "encoding")) return .encoding;
         if (std.mem.eql(u8, raw_value, "exhaustedEndpoints")) return .exhaustedEndpoints;
         if (std.mem.eql(u8, raw_value, "fdUnavailable")) return .fdUnavailable;
+        if (std.mem.eql(u8, raw_value, "incompatibleModules")) return .incompatibleModules;
+        if (std.mem.eql(u8, raw_value, "incompleteModule")) return .incompleteModule;
+        if (std.mem.eql(u8, raw_value, "invalidField")) return .invalidField;
+        if (std.mem.eql(u8, raw_value, "invalidValue")) return .invalidValue;
         if (std.mem.eql(u8, raw_value, "ioFailure")) return .ioFailure;
+        if (std.mem.eql(u8, raw_value, "keychainAddItem")) return .keychainAddItem;
+        if (std.mem.eql(u8, raw_value, "keychainItemNotFound")) return .keychainItemNotFound;
         if (std.mem.eql(u8, raw_value, "linkNotActive")) return .linkNotActive;
         if (std.mem.eql(u8, raw_value, "networkChanged")) return .networkChanged;
         if (std.mem.eql(u8, raw_value, "networkUnreachable")) return .networkUnreachable;
-        if (std.mem.eql(u8, raw_value, "socketConfiguration")) return .socketConfiguration;
-        if (std.mem.eql(u8, raw_value, "tunNotActive")) return .tunNotActive;
-        if (std.mem.eql(u8, raw_value, "tunNotAvailable")) return .tunNotAvailable;
-        if (std.mem.eql(u8, raw_value, "decoding")) return .decoding;
-        if (std.mem.eql(u8, raw_value, "encoding")) return .encoding;
-        if (std.mem.eql(u8, raw_value, "invalidField")) return .invalidField;
-        if (std.mem.eql(u8, raw_value, "invalidValue")) return .invalidValue;
-        if (std.mem.eql(u8, raw_value, "parsing")) return .parsing;
-        if (std.mem.eql(u8, raw_value, "keychainAddItem")) return .keychainAddItem;
-        if (std.mem.eql(u8, raw_value, "keychainItemNotFound")) return .keychainItemNotFound;
-        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
+        if (std.mem.eql(u8, raw_value, "noActiveModules")) return .noActiveModules;
+        if (std.mem.eql(u8, raw_value, "nonFinalModules")) return .nonFinalModules;
+        if (std.mem.eql(u8, raw_value, "notFound")) return .notFound;
         if (std.mem.eql(u8, raw_value, "OpenVPN.compressionMismatch")) return .openVPNCompressionMismatch;
         if (std.mem.eql(u8, raw_value, "OpenVPN.connectionFailure")) return .openVPNConnectionFailure;
         if (std.mem.eql(u8, raw_value, "OpenVPN.noRouting")) return .openVPNNoRouting;
@@ -2432,47 +2419,48 @@ pub const PartoutErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedAlgorithm")) return .openVPNUnsupportedAlgorithm;
         if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedCompression")) return .openVPNUnsupportedCompression;
         if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedOption")) return .openVPNUnsupportedOption;
+        if (std.mem.eql(u8, raw_value, "operationCancelled")) return .operationCancelled;
+        if (std.mem.eql(u8, raw_value, "outOfMemory")) return .outOfMemory;
+        if (std.mem.eql(u8, raw_value, "parsing")) return .parsing;
+        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
+        if (std.mem.eql(u8, raw_value, "releasedObject")) return .releasedObject;
+        if (std.mem.eql(u8, raw_value, "requiredImplementation")) return .requiredImplementation;
+        if (std.mem.eql(u8, raw_value, "scriptException")) return .scriptException;
+        if (std.mem.eql(u8, raw_value, "socketConfiguration")) return .socketConfiguration;
+        if (std.mem.eql(u8, raw_value, "timeout")) return .timeout;
+        if (std.mem.eql(u8, raw_value, "tunNotActive")) return .tunNotActive;
+        if (std.mem.eql(u8, raw_value, "tunNotAvailable")) return .tunNotAvailable;
+        if (std.mem.eql(u8, raw_value, "unexpectedModuleType")) return .unexpectedModuleType;
+        if (std.mem.eql(u8, raw_value, "unhandled")) return .unhandled;
+        if (std.mem.eql(u8, raw_value, "unknownImportedModule")) return .unknownImportedModule;
+        if (std.mem.eql(u8, raw_value, "unknownModuleHandler")) return .unknownModuleHandler;
         if (std.mem.eql(u8, raw_value, "WireGuard.emptyPeers")) return .wireGuardEmptyPeers;
         return null;
     }
 
     pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
-            .cached => "cached",
-            .notFound => "notFound",
-            .operationCancelled => "operationCancelled",
-            .releasedObject => "releasedObject",
-            .scriptException => "scriptException",
-            .timeout => "timeout",
-            .unhandled => "unhandled",
-            .incompatibleModules => "incompatibleModules",
-            .incompleteModule => "incompleteModule",
-            .noActiveModules => "noActiveModules",
-            .nonFinalModules => "nonFinalModules",
-            .requiredImplementation => "requiredImplementation",
-            .unexpectedModuleType => "unexpectedModuleType",
-            .unknownImportedModule => "unknownImportedModule",
-            .unknownModuleHandler => "unknownModuleHandler",
             .authentication => "authentication",
+            .cached => "cached",
             .crypto => "crypto",
+            .decoding => "decoding",
             .dnsFailure => "dnsFailure",
+            .encoding => "encoding",
             .exhaustedEndpoints => "exhaustedEndpoints",
             .fdUnavailable => "fdUnavailable",
+            .incompatibleModules => "incompatibleModules",
+            .incompleteModule => "incompleteModule",
+            .invalidField => "invalidField",
+            .invalidValue => "invalidValue",
             .ioFailure => "ioFailure",
+            .keychainAddItem => "keychainAddItem",
+            .keychainItemNotFound => "keychainItemNotFound",
             .linkNotActive => "linkNotActive",
             .networkChanged => "networkChanged",
             .networkUnreachable => "networkUnreachable",
-            .socketConfiguration => "socketConfiguration",
-            .tunNotActive => "tunNotActive",
-            .tunNotAvailable => "tunNotAvailable",
-            .decoding => "decoding",
-            .encoding => "encoding",
-            .invalidField => "invalidField",
-            .invalidValue => "invalidValue",
-            .parsing => "parsing",
-            .keychainAddItem => "keychainAddItem",
-            .keychainItemNotFound => "keychainItemNotFound",
-            .passphraseRequired => "passphraseRequired",
+            .noActiveModules => "noActiveModules",
+            .nonFinalModules => "nonFinalModules",
+            .notFound => "notFound",
             .openVPNCompressionMismatch => "OpenVPN.compressionMismatch",
             .openVPNConnectionFailure => "OpenVPN.connectionFailure",
             .openVPNNoRouting => "OpenVPN.noRouting",
@@ -2484,6 +2472,21 @@ pub const PartoutErrorCode = enum {
             .openVPNUnsupportedAlgorithm => "OpenVPN.unsupportedAlgorithm",
             .openVPNUnsupportedCompression => "OpenVPN.unsupportedCompression",
             .openVPNUnsupportedOption => "OpenVPN.unsupportedOption",
+            .operationCancelled => "operationCancelled",
+            .outOfMemory => "outOfMemory",
+            .parsing => "parsing",
+            .passphraseRequired => "passphraseRequired",
+            .releasedObject => "releasedObject",
+            .requiredImplementation => "requiredImplementation",
+            .scriptException => "scriptException",
+            .socketConfiguration => "socketConfiguration",
+            .timeout => "timeout",
+            .tunNotActive => "tunNotActive",
+            .tunNotAvailable => "tunNotAvailable",
+            .unexpectedModuleType => "unexpectedModuleType",
+            .unhandled => "unhandled",
+            .unknownImportedModule => "unknownImportedModule",
+            .unknownModuleHandler => "unknownModuleHandler",
             .wireGuardEmptyPeers => "WireGuard.emptyPeers",
         };
     }

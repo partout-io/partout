@@ -104,8 +104,10 @@ pub const Looper = struct {
     pub const DetachError = Errors.LooperUnavailable || Errors.ReentrantCall;
     pub const ResumeReadingError = SubmissionError;
     pub const StopError = Errors.LooperUnavailable || Errors.ReentrantCall;
-    pub const WriteError = SubmissionError ||
+    pub const WriteError = SubmissionError || Errors.TransformFailure;
+    pub const WriteOOBError = SubmissionError ||
         io.Error ||
+        Errors.OOBOutsideQueue ||
         Errors.TransformFailure ||
         Errors.WriteIncomplete;
 
@@ -309,7 +311,7 @@ pub const Looper = struct {
         fd_set.resetReadable();
         var code: c_int = 0;
         if (c.pp_mux_wait(self.mux, &code) < 0) {
-            log.writef(.err, "Looper: pp_mux_wait() failed (code={})", .{code});
+            log.writef(.err, "Looper: pp_mux_wait() failed (code={d})", .{code});
             self.finish(.{ .wait = code });
             return false;
         }
@@ -667,14 +669,11 @@ pub const Looper = struct {
         self.wakeLocked();
     }
 
-    pub fn write(
+    pub fn writeQueued(
         self: *Looper,
         packets: Packets,
         side: io.Side,
-        out_of_band: bool,
     ) WriteError!void {
-        if (out_of_band) return self.writeOutOfBand(packets, side);
-
         self.lock.lock();
         if (self.state != .started) {
             self.lock.unlock();
@@ -726,14 +725,10 @@ pub const Looper = struct {
         self.wakeLocked();
     }
 
-    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
-        return self.write(packets, side, false);
-    }
-
-    fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
+    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteOOBError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
-            return;
+            return error.OOBOutsideQueue;
         }
 
         self.lock.lock();

@@ -229,7 +229,8 @@ pub const PRF = struct {
             .data = data.ptr,
             .data_len = data.len,
         };
-        const hmac_do = functions.hmac_do orelse return error.UnsupportedAlgorithm;
+        const hmac_do = functions.hmac_do orelse
+            @panic("OpenVPN crypto backend does not define hmac_do");
         const length = hmac_do(&context);
         if (length == 0 or length > buffer.length()) return error.UnsupportedAlgorithm;
         return buffer.sliceCopy(0, length);

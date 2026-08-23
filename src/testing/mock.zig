@@ -19,8 +19,8 @@ const util = core.util;
 pub const MockSerializedExecutor = struct {
     const Message = struct {
         ptr: *anyopaque,
-        block: net.SerializedExecutor.Block,
-        discard: ?net.SerializedExecutor.Block,
+        block: core.SerializedExecutor.Block,
+        discard: ?core.SerializedExecutor.Block,
     };
     const ExecutorActor = core.Actor(MockSerializedExecutor, Message, error{}, perform);
 
@@ -43,7 +43,7 @@ pub const MockSerializedExecutor = struct {
         allocator.destroy(self);
     }
 
-    pub fn interface(self: *MockSerializedExecutor) net.SerializedExecutor {
+    pub fn interface(self: *MockSerializedExecutor) core.SerializedExecutor {
         return .{
             .ptr = self,
             .run_block = run,
@@ -61,9 +61,9 @@ pub const MockSerializedExecutor = struct {
     fn run(
         ptr: *anyopaque,
         block_ptr: *anyopaque,
-        block: net.SerializedExecutor.Block,
-        discard: ?net.SerializedExecutor.Block,
-    ) net.SerializedExecutor.RunError!void {
+        block: core.SerializedExecutor.Block,
+        discard: ?core.SerializedExecutor.Block,
+    ) core.SerializedExecutor.RunError!void {
         const self: *MockSerializedExecutor = @ptrCast(@alignCast(ptr));
         try self.actor.schedule(.{
             .ptr = block_ptr,
@@ -104,7 +104,7 @@ pub const MockConnectionEnvironment = struct {
 
     pub fn serializedExecutor(
         self: *MockConnectionEnvironment,
-    ) net.SerializedExecutor {
+    ) core.SerializedExecutor {
         return self.executor.interface();
     }
 
