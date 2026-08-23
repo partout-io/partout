@@ -145,6 +145,7 @@ pub const Errors = struct {
     pub const AlreadyStarted = error{AlreadyStarted};
     pub const LooperUnavailable = error{LooperUnavailable};
     pub const MuxFailure = error{MuxFailure};
+    pub const OOBOutsideQueue = error{OOBOutsideQueue};
     pub const ReentrantCall = error{ReentrantCall};
     pub const SideAlreadyAttached = error{SideAlreadyAttached};
     pub const TransformFailure = error{TransformFailure};

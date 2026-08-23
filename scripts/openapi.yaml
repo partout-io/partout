@@ -768,6 +768,7 @@ components:
         - incompleteModule
         - noActiveModules
         - nonFinalModules
+        - outOfMemory
         - requiredImplementation
         - unexpectedModuleType
         - unknownImportedModule
@@ -817,6 +818,7 @@ components:
         - incompleteModule
         - noActiveModules
         - nonFinalModules
+        - outOfMemory
         - requiredImplementation
         - unexpectedModuleType
         - unknownImportedModule

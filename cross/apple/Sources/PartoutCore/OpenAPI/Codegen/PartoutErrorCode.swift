@@ -29,74 +29,75 @@ public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     /// The profile has non-final modules that must be resolved to final modules first.
     case nonFinalModules = "nonFinalModules"
     /// Missing a required implementation.
-    case requiredImplementation = "requiredImplementation"
+    case outOfMemory = "outOfMemory"
     /// Module type is unexpected
-    case unexpectedModuleType = "unexpectedModuleType"
+    case requiredImplementation = "requiredImplementation"
     /// Module content is unknown for the importer.
-    case unknownImportedModule = "unknownImportedModule"
+    case unexpectedModuleType = "unexpectedModuleType"
     /// Module handler is unknown.
-    case unknownModuleHandler = "unknownModuleHandler"
+    case unknownImportedModule = "unknownImportedModule"
     /// Authentication failure.
-    case authentication = "authentication"
+    case unknownModuleHandler = "unknownModuleHandler"
     /// Crypto error.
-    case crypto = "crypto"
+    case authentication = "authentication"
     /// DNS resolution failure.
-    case dnsFailure = "dnsFailure"
+    case crypto = "crypto"
     /// No more endpoints available to try.
-    case exhaustedEndpoints = "exhaustedEndpoints"
+    case dnsFailure = "dnsFailure"
     /// File descriptor is not available.
-    case fdUnavailable = "fdUnavailable"
+    case exhaustedEndpoints = "exhaustedEndpoints"
     /// I/O failure.
-    case ioFailure = "ioFailure"
+    case fdUnavailable = "fdUnavailable"
     /// Link device is not active.
-    case linkNotActive = "linkNotActive"
+    case ioFailure = "ioFailure"
     /// Network changed.
-    case networkChanged = "networkChanged"
+    case linkNotActive = "linkNotActive"
     /// Network is unreachable.
-    case networkUnreachable = "networkUnreachable"
+    case networkChanged = "networkChanged"
     /// Native sockets could not be configured.
-    case socketConfiguration = "socketConfiguration"
+    case networkUnreachable = "networkUnreachable"
     /// TUN device is not active.
-    case tunNotActive = "tunNotActive"
+    case socketConfiguration = "socketConfiguration"
     /// TUN device is not available for I/O.
-    case tunNotAvailable = "tunNotAvailable"
+    case tunNotActive = "tunNotActive"
     /// Decoding error.
-    case decoding = "decoding"
+    case tunNotAvailable = "tunNotAvailable"
     /// Encoding error.
-    case encoding = "encoding"
+    case decoding = "decoding"
     /// Invalid field.
-    case invalidField = "invalidField"
+    case encoding = "encoding"
     /// Invalid value.
-    case invalidValue = "invalidValue"
+    case invalidField = "invalidField"
     /// Parsing error.
-    case parsing = "parsing"
+    case invalidValue = "invalidValue"
     /// Unable to add keychain item.
-    case keychainAddItem = "keychainAddItem"
+    case parsing = "parsing"
     /// Keychain item not found.
-    case keychainItemNotFound = "keychainItemNotFound"
+    case keychainAddItem = "keychainAddItem"
     /// Compression settings mismatch.
-    case passphraseRequired = "passphraseRequired"
+    case keychainItemNotFound = "keychainItemNotFound"
     /// Connection failure.
-    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
+    case passphraseRequired = "passphraseRequired"
     /// No routing configuration.
-    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
+    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
     /// One-time password is required.
-    case openVPNNoRouting = "OpenVPN.noRouting"
+    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
     /// Passphrase is required.
-    case openVPNOTPRequired = "OpenVPN.otpRequired"
+    case openVPNNoRouting = "OpenVPN.noRouting"
     /// Authentication can be retried.
-    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
+    case openVPNOTPRequired = "OpenVPN.otpRequired"
     /// Server requested shutdown.
-    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
+    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
     /// TLS failure.
-    case openVPNServerShutdown = "OpenVPN.serverShutdown"
+    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
     /// Algorithm is unsupported.
-    case openVPNTLSFailure = "OpenVPN.tlsFailure"
+    case openVPNServerShutdown = "OpenVPN.serverShutdown"
     /// Compression setting is unsupported.
-    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
+    case openVPNTLSFailure = "OpenVPN.tlsFailure"
     /// Option is unsupported.
-    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
+    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
     /// Configuration has no peers.
+    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
     case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }

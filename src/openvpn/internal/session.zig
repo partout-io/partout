@@ -12,11 +12,9 @@ const control_mod = @import("control.zig");
 const control_serializers_mod = @import("control_serializers.zig");
 const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
-const push_mod = @import("push.zig");
 const session_context_mod = @import("session_context.zig");
 const session_negotiator_mod = @import("session_negotiator.zig");
 const tls_mod = @import("tls.zig");
@@ -34,15 +32,59 @@ const DataChannel = data_mod.DataChannel;
 const DataLink = data_mod.DataLink;
 const LinkProcessor = processing_mod.LinkProcessor;
 const Negotiator = session_negotiator_mod.Negotiator;
+const NegotiationResult = session_negotiator_mod.NegotiationResult;
 const OCCPacket = packet_mod.OCCPacket;
 const PacketCode = packet_mod.PacketCode;
 const PRNG = crypto_mod.PRNG;
-const PushReply = push_mod.PushReply;
 const RenegotiationType = session_negotiator_mod.RenegotiationType;
 const Serializer = control_serializers_mod.Serializer;
 const SessionState = session_context_mod.SessionState;
-const SessionError = errors_mod.SessionError;
 const TLSWrapper = tls_mod.TLSWrapper;
+
+pub const SessionError = error{
+    AckIdsTooLong,
+    Backpressure,
+    BadCredentials,
+    BadCredentialsWithLocalOptions,
+    CompressionMismatch,
+    ContinuationPushReply,
+    ControlChannelFailure,
+    CryptoDerivation,
+    CryptoEncryption,
+    CryptoHMAC,
+    CryptoPRNG,
+    DataPathFailure,
+    EndOfStream,
+    InvalidAck,
+    InvalidKey,
+    InvalidPacketId,
+    InvalidPushReply,
+    InvalidSessionId,
+    LibcFailure,
+    LinkFailure,
+    LooperTerminated,
+    LooperUnavailable,
+    MissingSessionId,
+    NoRouting,
+    OOBOutsideQueue,
+    OutOfBounds,
+    OutOfMemory,
+    Overflow,
+    PacketTooLarge,
+    PeerIdMismatch,
+    ServerShutdown,
+    SessionMismatch,
+    SessionStale,
+    TLSFailure,
+    Timeout,
+    TransformFailure,
+    TunnelFailure,
+    UnsupportedAlgorithm,
+    UnsupportedCryptoBackend,
+    WouldBlock,
+    WriteIncomplete,
+    WrongControlDataPrefix,
+};
 
 /// Immutable event sink for facts produced by the protocol engine.
 ///
@@ -62,6 +104,16 @@ pub const SessionEvents = struct {
     data_count: *const fn (?*anyopaque, *anyopaque, api.DataCount) void,
 };
 
+pub const CreateError = error{
+    OutOfMemory,
+    InvalidConfiguration,
+    OTPRequired,
+} || configuration_mod.ValidationError;
+
+pub const SetLinkError = processing_mod.ProcessorError || net.Looper.AttachError || error{LinkFailure};
+pub const SetTunnelError = net.Looper.AttachError;
+pub const ShutdownError = net.Looper.DetachError || error{UnableToShutdown};
+
 /// Default V3 OpenVPN session implementation.
 ///
 /// `Session` is heap-only: callbacks borrow this stable address until their
@@ -69,8 +121,6 @@ pub const SessionEvents = struct {
 /// same lifetime. Mutable protocol state is confined to `on_queue`; its owner
 /// retains lifecycle policy.
 pub const Session = struct {
-    pub const Error = errors_mod.SessionError;
-
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
@@ -91,17 +141,18 @@ pub const Session = struct {
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,
+        with_local_options: bool = true,
         options: SessionOptions,
     };
 
     // MARK: - Public API
 
-    pub fn create(allocator: std.mem.Allocator, init: Init) Error!*Session {
-        return createFallible(allocator, init) catch |err| errors_mod.sessionError(err);
-    }
-
-    fn createFallible(allocator: std.mem.Allocator, init: Init) !*Session {
-        var owned_configuration = try init.configuration.clone(allocator);
+    pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
+        var owned_configuration = init.configuration.clone(allocator) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            log.writef(.fault, "Unable to clone configuration: {s}", .{@errorName(err)});
+            return error.InvalidConfiguration;
+        };
         errdefer owned_configuration.deinit(allocator);
         var owned_credentials = if (init.credentials) |value|
             try configuration_mod.credentialsForAuthentication(allocator, value)
@@ -114,11 +165,15 @@ pub const Session = struct {
         errdefer allocator.free(owned_ca_filename);
         const self = try allocator.create(Session);
         errdefer allocator.destroy(self);
-        const serializer = try Serializer.forConfiguration(
+        const serializer = Serializer.forConfiguration(
             allocator,
             init.options.backend,
             &owned_configuration,
-        );
+        ) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            log.writef(.fault, "Unable to create serializer: {s}", .{@errorName(err)});
+            return error.InvalidConfiguration;
+        };
         const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
         self.* = .{
             .allocator = allocator,
@@ -130,7 +185,11 @@ pub const Session = struct {
             .options = init.options,
             .looper = init.looper,
             .events = init.events,
-            .on_queue = SessionOnQueue.init(self, control_channel),
+            .on_queue = SessionOnQueue.init(
+                self,
+                control_channel,
+                init.with_local_options,
+            ),
         };
         errdefer self.on_queue.deinit();
         return self;
@@ -144,7 +203,7 @@ pub const Session = struct {
             @panic("Session.destroy() must run outside looper callbacks");
 
         log.write(.debug, "Deinit OpenVPNSession");
-        self.shutdown(null, 0) catch |err| {
+        self.shutdown(true, 0) catch |err| {
             log.writef(.fault, "Unable to detach Session before destruction: {s}", .{
                 @errorName(err),
             });
@@ -163,28 +222,30 @@ pub const Session = struct {
         self: *Session,
         descriptor: net.Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
-    ) Error!void {
+    ) SetLinkError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
 
-        if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
+        if (self.looper.isOnQueue()) return error.ReentrantCall;
         if (self.looper.isLinkAttached()) {
             log.write(.err, "Link interface already set");
             return;
         }
 
-        const processor = LinkProcessor.create(
+        const processor = try LinkProcessor.create(
             self.allocator,
             self.configuration.xor_method,
             remote_endpoint.plainSocketType() == .tcp,
-        ) catch |err| return errors_mod.sessionError(err);
+        );
+        errdefer processor.destroy();
         self.performOnQueue(
             void,
             processor,
             SessionOnQueue.installLinkProcessor,
         ) catch |err| {
-            processor.destroy();
-            return errors_mod.sessionError(err);
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            log.writef(.fault, "Unable to install link processor: {s}", .{@errorName(err)});
+            return error.LinkFailure;
         };
         errdefer self.performOnQueue(
             void,
@@ -193,7 +254,7 @@ pub const Session = struct {
         ) catch {};
 
         log.write(.info, "Attach LINK");
-        self.looper.attach(.{
+        try self.looper.attach(.{
             .pair = .{
                 .link = descriptor,
             },
@@ -205,20 +266,26 @@ pub const Session = struct {
                 .context = self,
                 .callback = onLinkFailure,
             },
-        }) catch |err| return errors_mod.sessionError(err);
+        });
         descriptor_transferred = true;
         errdefer self.looper.detach(.link) catch {};
 
         // Initiate the session on the attached link.
-        self.performOnQueue(void, remote_endpoint, SessionOnQueue.setLink) catch |err|
-            return errors_mod.sessionError(err);
+        self.performOnQueue(void, remote_endpoint, SessionOnQueue.setLink) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            log.writef(.fault, "Unable to set link: {s}", .{@errorName(err)});
+            return error.LinkFailure;
+        };
     }
 
-    pub fn setTunnel(self: *Session, descriptor: net.Looper.Descriptor) Error!void {
+    pub fn setTunnel(
+        self: *Session,
+        descriptor: net.Looper.Descriptor,
+    ) SetTunnelError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
 
-        if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
+        if (self.looper.isOnQueue()) return error.ReentrantCall;
         if (!self.looper.isLinkAttached()) {
             log.write(.err, "Set link interface first");
             return;
@@ -228,7 +295,7 @@ pub const Session = struct {
             return;
         }
         log.write(.info, "Attach TUN");
-        self.looper.attach(.{
+        try self.looper.attach(.{
             .pair = .{
                 .tun = descriptor,
             },
@@ -238,22 +305,27 @@ pub const Session = struct {
             },
             .on_failure = .{
                 .context = self,
-                .callback = onSideFailure,
+                .callback = onTunnelFailure,
             },
-        }) catch |err| return errors_mod.sessionError(err);
+        });
         descriptor_transferred = true;
     }
 
     /// Prepares state on the looper, detaches from this external thread, then
     /// finishes state on the looper.
+    ///
+    /// Swift owns its looper and logs any perform failure here. Zig's
+    /// looper is externally owned: LooperUnavailable means OnFinish
+    /// through looperTerminated owns finalization, so do not shut down
+    /// twice (return early on that error).
     pub fn shutdown(
         self: *Session,
-        cause: ?SessionError,
+        gracefully: bool,
         timeout_ms: ?u64,
-    ) Error!void {
-        if (self.looper.isOnQueue()) return errors_mod.sessionError(error.ReentrantCall);
+    ) ShutdownError!void {
+        if (self.looper.isOnQueue()) return error.ReentrantCall;
         const request = ShutdownRequest{
-            .cause = cause,
+            .gracefully = gracefully,
             .timeout_ms = timeout_ms,
         };
         const should_shutdown = self.performOnQueue(
@@ -261,15 +333,11 @@ pub const Session = struct {
             request,
             SessionOnQueue.prepareShutdown,
         ) catch |err| {
-            // Swift owns its looper and logs any perform failure here. Zig's
-            // looper is externally owned: LooperUnavailable means OnFinish
-            // through looperTerminated owns finalization, so do not shut down
-            // twice.
             if (err == error.LooperUnavailable) return;
             log.writef(.err, "Unable to shut down session on looper queue: {s}", .{
                 @errorName(err),
             });
-            return errors_mod.sessionError(err);
+            return error.UnableToShutdown;
         };
         // Another shutdown request is already in progress.
         if (!should_shutdown) return;
@@ -278,15 +346,18 @@ pub const Session = struct {
         // its callbacks and borrowed native I/O.
         if (self.looper.isTunAttached()) self.looper.detach(.tun) catch |err| switch (err) {
             error.LooperUnavailable => return,
-            error.ReentrantCall => return errors_mod.sessionError(err),
+            error.ReentrantCall => return err,
         };
         if (self.looper.isLinkAttached()) self.looper.detach(.link) catch |err| switch (err) {
             error.LooperUnavailable => return,
-            error.ReentrantCall => return errors_mod.sessionError(err),
+            error.ReentrantCall => return err,
         };
-        self.performOnQueue(void, cause, SessionOnQueue.finishShutdown) catch |err| {
+        self.performOnQueue(void, gracefully, SessionOnQueue.finishShutdown) catch |err| {
             if (err == error.LooperUnavailable) return;
-            return errors_mod.sessionError(err);
+            log.writef(.err, "Unable to finish shutdown on looper queue: {s}", .{
+                @errorName(err),
+            });
+            return error.UnableToShutdown;
         };
     }
 
@@ -310,9 +381,7 @@ pub const Session = struct {
                 code,
             }),
         };
-        self.onQueue().finishShutdown(
-            if (failure) |value| failureError(value) else null,
-        );
+        self.onQueue().finishShutdown(failure == null);
     }
 
     fn reportFailure(self: *Session, cause: SessionError) void {
@@ -321,53 +390,36 @@ pub const Session = struct {
 
     // MARK: - Callback boundaries
 
-    fn onSideFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
+    fn onLinkRead(
+        raw: ?*anyopaque,
+        packets: net.Looper.Packets,
+    ) SessionError!net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.reportFailure(failureError(failure));
+        const on_queue = self.onQueue();
+        on_queue.receiveLink(packets) catch |err| {
+            on_queue.recordFailure(err);
+            return err;
+        };
+        return .keep;
     }
 
     fn onLinkFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        const cause = failureError(failure);
-        self.reportFailure(
-            // Swift wraps every link failure as an I/O failure, making even a
-            // crypto/data-path cause recoverable; tunnel failures stay unchanged.
-            // Preserve that link-only behavior with Zig's reconnect signal.
-            if (cause == error.CryptoFailure) error.Reconnect else cause,
-        );
-    }
-
-    fn onLinkRead(
-        raw: ?*anyopaque,
-        packets: net.Looper.Packets,
-    ) !net.Looper.ReadAction {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().receiveLink(packets);
-        return .keep;
+        self.reportFailure(sideFailureError(failure, error.LinkFailure));
     }
 
     fn onTunnelRead(
         raw: ?*anyopaque,
         packets: net.Looper.Packets,
-    ) !net.Looper.ReadAction {
+    ) SessionError!net.Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().receiveTunnel(packets);
         return .keep;
     }
 
-    fn didNegotiate(
-        raw: ?*anyopaque,
-        key: u8,
-        data_channel: *DataChannel,
-        push_reply: *const PushReply,
-    ) !void {
+    fn onTunnelFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.onQueue().didNegotiate(key, data_channel, push_reply);
-    }
-
-    fn onNegotiatorError(raw: ?*anyopaque, _: u8, cause: SessionError) void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        self.reportFailure(cause);
+        self.reportFailure(sideFailureError(failure, error.TunnelFailure));
     }
 
     fn onTLSVerificationFailure(raw: ?*anyopaque) void {
@@ -417,7 +469,7 @@ pub const Session = struct {
             }
         };
         var request = Request{ .session = self, .arguments = arguments };
-        return self.looper.perform(Result, &request, Request.run);
+        return try self.looper.perform(Result, &request, Request.run);
     }
 
     fn onQueue(self: *Session) *SessionOnQueue {
@@ -425,22 +477,8 @@ pub const Session = struct {
         return &self.on_queue;
     }
 
-    fn failureError(failure: net.Looper.Failure) SessionError {
-        return switch (failure) {
-            .user, .system => |cause| errors_mod.sessionError(cause),
-            .io => |details| errors_mod.sessionError(details.cause),
-            .wait => |code| {
-                log.writef(.err, "OpenVPN looper wait failed with native code: {}", .{code});
-                // Swift's private WaitError becomes a recoverable OpenVPN
-                // connection failure. Zig cannot carry its native code in an
-                // error value, so log it above and preserve the reconnect choice.
-                return error.Reconnect;
-            },
-        };
-    }
-
     const ShutdownRequest = struct {
-        cause: ?SessionError,
+        gracefully: bool,
         timeout_ms: ?u64,
     };
 };
@@ -461,6 +499,7 @@ const SessionOnQueue = struct {
     fn init(
         session: *Session,
         control_channel: *ControlChannel,
+        with_local_options: bool,
     ) SessionOnQueue {
         return .{
             .session = session,
@@ -469,7 +508,7 @@ const SessionOnQueue = struct {
             .ping_timer = .{},
             .state = .{
                 .stopped = .{
-                    .with_local_options = true,
+                    .with_local_options = with_local_options,
                 },
             },
             .link_processor = null,
@@ -574,22 +613,22 @@ const SessionOnQueue = struct {
             log.write(.debug, "Resume stop request already in progress");
             return true;
         }
-        if (request.cause) |cause| {
-            log.writef(.err, "Shut down with failure: {s}", .{@errorName(cause)});
-        } else {
-            log.write(.info, "Shut down on request");
-        }
         active.phase = .stopping;
 
-        if (shouldSendExitNotification(request.cause)) self.sendExitPacket(
-            request.timeout_ms orelse self.session.options.write_timeout_ms,
-        ) catch |err| {
-            log.writef(.err, "Unable to send exit packet: {s}", .{@errorName(err)});
-        };
+        if (request.gracefully) {
+            log.write(.info, "Shut down session gracefully");
+            self.sendExitPacket(
+                request.timeout_ms orelse self.session.options.write_timeout_ms,
+            ) catch |err| {
+                log.writef(.err, "Unable to send exit packet: {s}", .{@errorName(err)});
+            };
+        } else {
+            log.write(.err, "Shut down session due to failure");
+        }
         return true;
     }
 
-    fn finishShutdown(self: *SessionOnQueue, cause: ?SessionError) void {
+    fn finishShutdown(self: *SessionOnQueue, _: bool) void {
         const active = switch (self.state) {
             .stopped => {
                 self.clearLinkProcessor();
@@ -600,15 +639,18 @@ const SessionOnQueue = struct {
         // Terminal looper failures bypass prepareShutdown(), so cancel both
         // queue-owned timers here as well as in the normal shutdown path.
         self.cancelTimers();
-        const next_with_local_options = if (cause) |value|
-            active.context.with_local_options and value != error.BadCredentialsWithLocalOptions
-        else
-            active.context.with_local_options;
+        const with_local_options = active.context.with_local_options;
         active.context.destroy();
         self.state = .{ .stopped = .{
-            .with_local_options = next_with_local_options,
+            .with_local_options = with_local_options,
         } };
         self.clearLinkProcessor();
+    }
+
+    fn recordFailure(self: *SessionOnQueue, cause: SessionError) void {
+        if (cause != error.BadCredentialsWithLocalOptions) return;
+        const context = self.state.activeContext() orelse return;
+        context.with_local_options = false;
     }
 
     fn sendExitPacket(self: *SessionOnQueue, timeout_ms: u64) !void {
@@ -624,7 +666,7 @@ const SessionOnQueue = struct {
 
     // MARK: Packet I/O
 
-    fn receiveLink(self: *SessionOnQueue, packets: net.Looper.Packets) !void {
+    fn receiveLink(self: *SessionOnQueue, packets: net.Looper.Packets) SessionError!void {
         const processor = self.link_processor orelse return;
         var processed = try processor.processInbound(packets);
         defer processed.deinit();
@@ -678,10 +720,9 @@ const SessionOnQueue = struct {
                 .hardResetServerV2 => {
                     if (negotiator.isConnected()) {
                         log.write(.notice, "OpenVPN server requested a fresh session; reconnecting");
-                        // Swift reports recoverable(staleSession) here. Zig
-                        // collapses that wrapper to Reconnect: a connected session
-                        // cannot accept a fresh server session ID in place.
-                        return error.Reconnect;
+                        // Swift reports recoverable(staleSession) here. A connected
+                        // session cannot accept a fresh server session ID in place.
+                        return error.SessionStale;
                     }
                 },
                 .softResetV1 => {
@@ -689,7 +730,7 @@ const SessionOnQueue = struct {
                 },
                 else => {},
             }
-            negotiator.sendAck(&parsed);
+            try negotiator.sendAck(&parsed);
             const inbound = try self.control_channel.enqueueInboundPacket(parsed.move());
             defer {
                 for (inbound) |*owned| owned.deinit();
@@ -697,7 +738,8 @@ const SessionOnQueue = struct {
             }
             for (inbound) |*owned| {
                 log.writef(.debug, "Handle packet: {d}", .{owned.packetId()});
-                try negotiator.handleControlPacket(owned);
+                if (try negotiator.handleControlPacket(owned)) |result|
+                    try self.didNegotiate(result);
             }
         }
         try self.processDataPackets(context, &grouped);
@@ -718,7 +760,7 @@ const SessionOnQueue = struct {
         }
     }
 
-    fn receiveTunnel(self: *SessionOnQueue, packets: []const []const u8) !void {
+    fn receiveTunnel(self: *SessionOnQueue, packets: []const []const u8) SessionError!void {
         const context = self.state.activeContext() orelse return;
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeout(context);
@@ -758,8 +800,6 @@ const SessionOnQueue = struct {
                 .session_options = self.session.options,
                 .callback_context = self.session,
                 .schedule_negotiation_check = Session.scheduleNegotiationCheck,
-                .on_connected = Session.didNegotiate,
-                .on_error = Session.onNegotiatorError,
             },
         });
         tls_transferred = true;
@@ -793,24 +833,21 @@ const SessionOnQueue = struct {
 
     fn didNegotiate(
         self: *SessionOnQueue,
-        key: u8,
-        data_channel: *DataChannel,
-        push_reply: *const PushReply,
+        result: NegotiationResult,
     ) !void {
+        errdefer result.data_channel.destroy();
         // Swift silently drops a negotiation completion after active state is
         // gone. Treat it as stale instead: the negotiated data has no context
         // to commit into, so propagate the recoverable reconnect signal.
-        const active = self.state.activeState() orelse return error.Reconnect;
+        const active = self.state.activeState() orelse return error.SessionStale;
         const context = active.context;
-        log.writef(.info, "Negotiation succeeded, set key {d} as current", .{key});
-        var reply = push_reply.clone(self.session.allocator) catch |err|
-            return errors_mod.sessionError(err);
+        log.writef(.info, "Negotiation succeeded, set key {d} as current", .{result.key});
+        var reply = try result.push_reply.clone(self.session.allocator);
         errdefer reply.deinit(self.session.allocator);
         log.writef(.info, "Replace key {d} with new data channel", .{
-            data_channel.key,
+            result.data_channel.key,
         });
-        context.setDataChannel(data_channel, key) catch |err|
-            return errors_mod.sessionError(err);
+        try context.setDataChannel(result.data_channel, result.key);
         context.setPushReply(reply);
         context.removeOldNegotiators();
         const negotiator_keys = context.negotiatorKeys();
@@ -819,8 +856,7 @@ const SessionOnQueue = struct {
         log.writef(.info, "Data channels: {any}", .{data_keys.slice()});
         if (active.phase == .started) return;
         active.phase = .started;
-        self.scheduleNextPing(context) catch |err|
-            return errors_mod.sessionError(err);
+        try self.scheduleNextPing(context);
         self.session.events.established(
             self.session.events.context,
             self.session,
@@ -859,7 +895,7 @@ const SessionOnQueue = struct {
     fn onNegotiationTimer(raw: ?*anyopaque) void {
         const self: *SessionOnQueue = @ptrCast(@alignCast(raw.?));
         self.checkNegotiation() catch |err| {
-            self.session.reportFailure(errors_mod.sessionError(err));
+            self.session.reportFailure(err);
         };
     }
 
@@ -875,7 +911,7 @@ const SessionOnQueue = struct {
     fn onPingTimer(raw: ?*anyopaque) void {
         const self: *SessionOnQueue = @ptrCast(@alignCast(raw.?));
         self.ping() catch |err| {
-            self.session.reportFailure(errors_mod.sessionError(err));
+            self.session.reportFailure(err);
         };
     }
 
@@ -977,15 +1013,14 @@ const SessionOnQueue = struct {
     }
 };
 
-fn shouldSendExitNotification(cause: ?SessionError) bool {
-    // Mirror Swift's `error == nil || error == networkChanged` choice: notify
-    // only for an orderly stop or path change; other failures tear down at once.
-    return if (cause) |value| value == error.NetworkChanged else true;
+fn sideFailureError(failure: net.Looper.Failure, fallback: SessionError) SessionError {
+    return switch (failure) {
+        .user => |cause| @errorCast(cause),
+        .io, .system, .wait => fallback,
+    };
 }
 
 pub const testing = struct {
-    pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
-
     pub fn reportFailure(session: *Session, cause: SessionError) void {
         session.reportFailure(cause);
     }

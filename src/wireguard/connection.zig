@@ -13,6 +13,7 @@ const adapter_mod = @import("internal/adapter.zig");
 const impl = @import("internal/backend.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
+const ConnectionError = WireGuardAdapter.ActivationError || std.Thread.SpawnError;
 
 pub fn createConnection(
     ptr: ?*anyopaque,
@@ -50,7 +51,7 @@ const WireGuardConnection = struct {
     /// Daemon-owned sandbox capability captured once at creation. Timer threads
     /// use it to enqueue work without retaining or inspecting the unrelated
     /// connection event callbacks.
-    serialized_executor: net.SerializedExecutor,
+    serialized_executor: core.SerializedExecutor,
     data_count_timer: core.RunAfter,
     data_count_timer_active: bool,
     data_count_interval_ms: u32,
@@ -173,6 +174,7 @@ const WireGuardConnection = struct {
                     log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
                 },
             }
+            events.last_error(events.ctx, partoutCodeForError(err));
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
                 else => error.UnableToStart,
@@ -218,10 +220,13 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
-            // Temporary shutdown is invisible to the generic status machine,
-            // so resuming must not emit a duplicate `.connected` transition.
-            .resumed => {},
-            .retry => self.scheduleTemporaryShutdownRetry(events),
+            // Swift reports `.connected` whenever applying the resumed tunnel
+            // settings succeeds, even if the external status was still up.
+            .resumed => events.status(events.ctx, .connected),
+            .retry => |err| {
+                self.reportActivationFailure(events, err);
+                self.scheduleTemporaryShutdownRetry(events);
+            },
         }
     }
 
@@ -325,9 +330,21 @@ const WireGuardConnection = struct {
         self.adapter.stop(self.allocator);
         self.events = null;
 
-        const code = api.codeForError(err);
+        const code = partoutCodeForError(err);
         events.last_error(events.ctx, code);
         events.cancel(events.ctx, code);
+    }
+
+    fn reportActivationFailure(
+        self: *WireGuardConnection,
+        events: net.Connection.Events,
+        err: ConnectionError,
+    ) void {
+        const code = partoutCodeForError(err);
+        events.last_error(events.ctx, code);
+        if (self.adapter.isStopped()) {
+            events.status(events.ctx, .disconnected);
+        }
     }
 
     fn cancelTemporaryShutdownRetry(self: *WireGuardConnection) void {
@@ -347,9 +364,11 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
-            // See networkChange(): external status remained `.connected`.
-            .resumed => {},
-            .retry => self.scheduleTemporaryShutdownRetry(events),
+            .resumed => events.status(events.ctx, .connected),
+            .retry => |err| {
+                self.reportActivationFailure(events, err);
+                self.scheduleTemporaryShutdownRetry(events);
+            },
         }
     }
 };
@@ -560,3 +579,18 @@ pub const testing = struct {
         );
     }
 };
+
+// MARK: - Error mapping
+
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
+    return switch (err) {
+        error.CannotLocateTunnelFileDescriptor,
+        error.CouldNotStartBackend,
+        error.DNSResolutionFailure,
+        error.InvalidEndpoint,
+        => .linkNotActive,
+        error.SocketConfiguration => .socketConfiguration,
+        error.TunNotAvailable => .tunNotAvailable,
+        else => .unhandled,
+    };
+}

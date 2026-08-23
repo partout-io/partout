@@ -7,10 +7,12 @@
 
 public struct TunnelRemoteInfoWrapper: Sendable, Codable, Hashable {
 
+    /** The original profile whose active modules supply platform settings. */
     public var profile: TaggedProfile
     public var originalModuleId: UniqueID
     public var address: Address?
     public var requiresVirtualDevice: Bool
+    /** Connection-derived modules to inject immediately after the originating module. Omitted when the profile alone supplies settings. */
     public var modules: [TaggedModule]?
 
     public init(profile: TaggedProfile, originalModuleId: UniqueID, address: Address? = nil, requiresVirtualDevice: Bool, modules: [TaggedModule]? = nil) {

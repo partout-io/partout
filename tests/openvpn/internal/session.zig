@@ -8,8 +8,8 @@ const source = @import("source");
 const net = source.net;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
+const SessionError = source.openvpn_internal.session.SessionError;
 const session_testing = source.openvpn_internal.session.testing;
-const shouldSendExitNotification = source.openvpn_internal.session.testing.shouldSendExitNotification;
 
 test "Session declarations are semantically analyzed" {
     std.testing.refAllDecls(Session);
@@ -28,7 +28,7 @@ test "Session borrows an externally managed Looper" {
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
-        fn failed(_: ?*anyopaque, _: *anyopaque, _: Session.Error) void {}
+        fn failed(_: ?*anyopaque, _: *anyopaque, _: SessionError) void {}
 
         fn dataCount(_: ?*anyopaque, _: *anyopaque, _: source.core.api.DataCount) void {}
     };
@@ -71,7 +71,7 @@ test "Session reports protocol failures without owning shutdown policy" {
     const RecordingEvents = struct {
         const State = struct {
             count: usize = 0,
-            last: ?Session.Error = null,
+            last: ?SessionError = null,
         };
 
         fn established(
@@ -81,7 +81,7 @@ test "Session reports protocol failures without owning shutdown policy" {
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
-        fn failed(raw: ?*anyopaque, _: *anyopaque, cause: Session.Error) void {
+        fn failed(raw: ?*anyopaque, _: *anyopaque, cause: SessionError) void {
             const state: *State = @ptrCast(@alignCast(raw.?));
             state.count += 1;
             state.last = cause;
@@ -120,7 +120,7 @@ test "Session reports protocol failures without owning shutdown policy" {
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
 
-    session_testing.reportFailure(session, error.Reconnect);
+    session_testing.reportFailure(session, error.SessionStale);
     session_testing.reportFailure(session, error.TLSFailure);
     try std.testing.expectEqual(@as(usize, 2), event_state.count);
     try std.testing.expectEqual(error.TLSFailure, event_state.last.?);
@@ -129,26 +129,4 @@ test "Session reports protocol failures without owning shutdown policy" {
     session_destroyed = true;
     try looper.stop();
     looper_started = false;
-}
-
-test "session sends exit notification only for requested and network-change shutdowns" {
-    try std.testing.expect(shouldSendExitNotification(null));
-    try std.testing.expect(shouldSendExitNotification(error.NetworkChanged));
-
-    const other_causes = [_]Session.Error{
-        error.BadCredentials,
-        error.BadCredentialsWithLocalOptions,
-        error.CompressionMismatch,
-        error.ConnectionFailure,
-        error.CryptoFailure,
-        error.NoRouting,
-        error.ServerShutdown,
-        error.Timeout,
-        error.TLSFailure,
-        error.UnsupportedAlgorithm,
-        error.Reconnect,
-    };
-    for (other_causes) |cause| {
-        try std.testing.expect(!shouldSendExitNotification(cause));
-    }
 }

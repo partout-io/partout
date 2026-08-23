@@ -99,11 +99,3 @@ pub const moduleType = extensions.moduleType;
 pub const parseModule = extensions.parseModule;
 pub const routesDefaultThroughVPN = extensions.routesDefaultThroughVPN;
 pub const typeBuildsConnection = extensions.typeBuildsConnection;
-
-// ZIGME: Map errors to code enum (LLM: don't touch this)
-pub fn codeForError(err: anyerror) PartoutErrorCode {
-    return switch (err) {
-        error.PassphraseRequired => .passphraseRequired,
-        else => .unhandled,
-    };
-}

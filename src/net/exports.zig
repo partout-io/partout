@@ -40,7 +40,6 @@ pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Platform = platform.Platform;
 pub const ReachabilityInfo = io.ReachabilityInfo;
 pub const Sandbox = sandbox.Sandbox;
-pub const SerializedExecutor = sandbox.SerializedExecutor;
 pub const SocketDescriptor = io.SocketDescriptor;
 pub const SocketFactory = sandbox.SocketFactory;
 pub const TunnelController = sandbox.TunnelController;

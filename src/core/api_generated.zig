@@ -2343,6 +2343,7 @@ pub const PartoutErrorCode = enum {
     incompleteModule,
     noActiveModules,
     nonFinalModules,
+    outOfMemory,
     requiredImplementation,
     unexpectedModuleType,
     unknownImportedModule,
@@ -2397,6 +2398,7 @@ pub const PartoutErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "incompleteModule")) return .incompleteModule;
         if (std.mem.eql(u8, raw_value, "noActiveModules")) return .noActiveModules;
         if (std.mem.eql(u8, raw_value, "nonFinalModules")) return .nonFinalModules;
+        if (std.mem.eql(u8, raw_value, "outOfMemory")) return .outOfMemory;
         if (std.mem.eql(u8, raw_value, "requiredImplementation")) return .requiredImplementation;
         if (std.mem.eql(u8, raw_value, "unexpectedModuleType")) return .unexpectedModuleType;
         if (std.mem.eql(u8, raw_value, "unknownImportedModule")) return .unknownImportedModule;
@@ -2449,6 +2451,7 @@ pub const PartoutErrorCode = enum {
             .incompleteModule => "incompleteModule",
             .noActiveModules => "noActiveModules",
             .nonFinalModules => "nonFinalModules",
+            .outOfMemory => "outOfMemory",
             .requiredImplementation => "requiredImplementation",
             .unexpectedModuleType => "unexpectedModuleType",
             .unknownImportedModule => "unknownImportedModule",

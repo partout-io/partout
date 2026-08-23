@@ -91,14 +91,19 @@ pub export fn partout_import_profile(
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
 
-    var importer = abi.Importer.init(allocator) catch return abi.errorPayloadAllocZ(allocator, error.OutOfMemory);
+    var importer = abi.Importer.init(allocator) catch
+        return abi.errorPayloadAllocZ(allocator, .outOfMemory);
     defer importer.deinit(allocator);
+    var parse_error_info: api.ParseErrorInfo = .{};
+    defer parse_error_info.deinit(allocator);
+    const import_context = core.ImportContext.init(&parse_error_info, null, null);
 
     const profile_json = importer.importProfile(
         allocator,
         util.borrowedCString(text_ptr),
         if (c_name) |name| util.borrowedCString(name) else null,
-    ) catch |err| return abi.errorPayloadAllocZ(allocator, err);
+        import_context,
+    ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
     return profile_json.ptr;
 }
 
@@ -107,13 +112,18 @@ pub export fn partout_import_module(
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
 
-    var importer = abi.Importer.init(allocator) catch return abi.errorPayloadAllocZ(allocator, error.OutOfMemory);
+    var importer = abi.Importer.init(allocator) catch
+        return abi.errorPayloadAllocZ(allocator, .outOfMemory);
     defer importer.deinit(allocator);
+    var parse_error_info: api.ParseErrorInfo = .{};
+    defer parse_error_info.deinit(allocator);
+    const import_context = core.ImportContext.init(&parse_error_info, null, null);
 
     const module_json = importer.importModule(
         allocator,
         util.borrowedCString(text_ptr),
-    ) catch |err| return abi.errorPayloadAllocZ(allocator, err);
+        import_context,
+    ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
     return module_json.ptr;
 }
 

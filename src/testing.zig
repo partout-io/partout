@@ -41,7 +41,6 @@ pub const openvpn_internal = if (openvpn_enabled) struct {
     pub const control_serializers = @import("openvpn/internal/control_serializers.zig");
     pub const crypto = @import("openvpn/internal/crypto.zig");
     pub const data = @import("openvpn/internal/data.zig");
-    pub const errors = @import("openvpn/internal/errors.zig");
     pub const helpers = @import("openvpn/internal/helpers.zig");
     pub const keys = @import("openvpn/internal/keys.zig");
     pub const logging = @import("openvpn/internal/logging.zig");

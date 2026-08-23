@@ -34,12 +34,6 @@ const NetworkChangeBehavior = enum {
     }
 };
 
-const NetworkChangeResult = enum {
-    unchanged,
-    resumed,
-    retry,
-};
-
 pub const WireGuardAdapter = struct {
     module_id: api.UUID,
     backend: impl.Backend,
@@ -60,6 +54,12 @@ pub const WireGuardAdapter = struct {
         TunnelRemoteInfoBuilder.Error ||
         net.TunnelController.Error ||
         StartBackendError;
+
+    const NetworkChangeResult = union(enum) {
+        unchanged,
+        resumed,
+        retry: ActivationError,
+    };
 
     const BuildConfigurationError = resolver.ResolutionError || uapi.BuildConfigurationError;
     const ConfigureSocketsError = impl.Error || net.TunnelController.Error;
@@ -223,10 +223,10 @@ pub const WireGuardAdapter = struct {
             return err;
         };
         if (handle < 0) {
-            log.writef(.err, "Starting tunnel failed with wgTurnOn returning {}", .{handle});
+            log.writef(.err, "Starting tunnel failed with wgTurnOn returning {d}", .{handle});
             return error.CouldNotStartBackend;
         }
-        log.writef(.debug, "wg-go backend started with handle {}", .{handle});
+        log.writef(.debug, "wg-go backend started with handle {d}", .{handle});
         errdefer self.backend.turnOff(handle);
 
         if (builtin.os.tag == .ios) {
@@ -332,10 +332,11 @@ pub const WireGuardAdapter = struct {
     ) NetworkChangeResult {
         self.resumeBackend(allocator) catch |err| {
             // Restart failure is transient state-machine work, not a new
-            // connection error. Swift logs it and retries while the latest
-            // reachability state remains up.
+            // terminal connection error. Swift logs it and retries while the
+            // latest reachability state remains up. The error is also surfaced
+            // to the connection for last-error/status parity.
             log.writef(.err, "Failed to restart backend: {s}", .{@errorName(err)});
-            return .retry;
+            return .{ .retry = err };
         };
         return .resumed;
     }

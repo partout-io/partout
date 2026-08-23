@@ -399,6 +399,7 @@ test "registry imports tagged profiles directly" {
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"Existing","modules":[],"activeModulesIds":[]}
     ,
         null,
+        null,
     );
     defer imported.deinit(allocator);
 
@@ -418,6 +419,7 @@ test "registry migrates missing tagged profile versions" {
         \\{"id":"00000000-0000-4000-8000-000000000000","name":"Missing","modules":[],"activeModulesIds":[]}
     ,
         null,
+        null,
     );
     defer missing.deinit(allocator);
     try std.testing.expectEqual(@as(i32, api.profile_version), missing.version.?);
@@ -426,6 +428,7 @@ test "registry migrates missing tagged profile versions" {
         allocator,
         \\{"version":null,"id":"00000000-0000-4000-8000-000000000001","name":"Null","modules":[],"activeModulesIds":[]}
     ,
+        null,
         null,
     );
     defer null_version.deinit(allocator);
@@ -445,6 +448,7 @@ test "registry rejects invalid tagged profile versions" {
             \\{"version":999,"id":"00000000-0000-4000-8000-000000000000","name":"Future","modules":[],"activeModulesIds":[]}
         ,
             null,
+            null,
         ),
     );
     try std.testing.expectError(
@@ -453,6 +457,7 @@ test "registry rejects invalid tagged profile versions" {
             allocator,
             \\{"version":-1,"id":"00000000-0000-4000-8000-000000000000","name":"Negative","modules":[],"activeModulesIds":[]}
         ,
+            null,
             null,
         ),
     );
@@ -469,6 +474,7 @@ test "registry wraps tagged modules as active profiles" {
         \\{"type":"DNS","value":{"id":"11111111-1111-4111-8111-111111111111","protocolType":{"type":"cleartext"},"servers":["1.1.1.1"]}}
     ,
         "Imported DNS",
+        null,
     );
     defer imported.deinit(allocator);
 
@@ -486,7 +492,7 @@ test "registry rejects non-profile JSON" {
 
     try std.testing.expectError(
         error.InvalidProfile,
-        registry.importProfile(allocator, "[]", null),
+        registry.importProfile(allocator, "[]", null, null),
     );
 }
 
@@ -506,7 +512,7 @@ test "registry wraps encoded tagged modules as profiles" {
     var registry = try Registry.init(allocator, &.{});
     defer registry.deinit(allocator);
 
-    var imported = try registry.importProfile(allocator, module_json, "Imported DNS");
+    var imported = try registry.importProfile(allocator, module_json, "Imported DNS", null);
     defer imported.deinit(allocator);
 
     try std.testing.expectEqualStrings("Imported DNS", imported.name);
@@ -517,16 +523,20 @@ test "registry falls back to module importers for raw profiles" {
     const allocator = std.testing.allocator;
 
     const Mock = struct {
+        saw_context: bool = false,
+
         fn moduleType(_: ?*anyopaque) api.ModuleType {
             return .DNS;
         }
 
         fn importModule(
-            _: ?*anyopaque,
+            ptr: ?*anyopaque,
             module_allocator: std.mem.Allocator,
             contents: []const u8,
-            _: ?ImportContext,
+            context: ?ImportContext,
         ) ImportError!api.TaggedModule {
+            const self: *@This() = @ptrCast(@alignCast(ptr.?));
+            self.saw_context = context != null;
             _ = contents;
             return api.parseModule(module_allocator,
                 \\{"type":"DNS","value":{"id":"11111111-1111-4111-8111-111111111111","protocolType":{"type":"cleartext"},"servers":["1.1.1.1"]}}
@@ -544,17 +554,25 @@ test "registry falls back to module importers for raw profiles" {
         };
     };
 
+    var mock = Mock{};
     const implementations = [_]ModuleImplementation{
         .{
+            .ptr = &mock,
             .vtable = &Mock.implementation_vtable,
         },
     };
     var registry = try Registry.init(allocator, &implementations);
     defer registry.deinit(allocator);
 
-    var imported = try registry.importProfile(allocator, "raw profile", "Imported DNS");
+    var imported = try registry.importProfile(
+        allocator,
+        "raw profile",
+        "Imported DNS",
+        ImportContext.init(null, null, null),
+    );
     defer imported.deinit(allocator);
 
+    try std.testing.expect(mock.saw_context);
     try std.testing.expectEqualStrings("Imported DNS", imported.name);
     try std.testing.expectEqualStrings("11111111-1111-4111-8111-111111111111", imported.active_modules_ids[0][0..]);
 }

@@ -373,7 +373,7 @@ const FinishProbe = struct {
 
     fn onFinish(raw: ?*anyopaque, _: ?Looper.Failure) void {
         const self: *FinishProbe = @ptrCast(@alignCast(raw.?));
-        self.looper.write(&.{"discarded"}, .link, true) catch |err| {
+        self.looper.writeOutOfBand(&.{"discarded"}, .link) catch |err| {
             self.oob_got_looper_unavailable.store(err == error.LooperUnavailable, .release);
         };
     }
@@ -425,7 +425,7 @@ test "out-of-band write returns the underlying I/O error" {
     const WriteTask = struct {
         fn run(raw: ?*anyopaque) anyerror!void {
             const current: *Looper = @ptrCast(@alignCast(raw.?));
-            return current.write(&.{"packet"}, .link, true);
+            return current.writeOutOfBand(&.{"packet"}, .link);
         }
     };
     try std.testing.expectError(

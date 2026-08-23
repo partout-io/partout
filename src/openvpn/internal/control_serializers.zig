@@ -8,7 +8,6 @@ const core_mod = @import("../../core/exports.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const crypto_mod = @import("crypto.zig");
-const errors_mod = @import("errors.zig");
 const helpers_mod = @import("helpers.zig");
 const keys_mod = @import("keys.zig");
 const packet_mod = @import("packet.zig");
@@ -197,7 +196,10 @@ const AuthSerializer = struct {
         defer keys.deinit();
         var bridge = CryptoKeysBridge.init(&keys);
         defer bridge.deinit();
-        const cbc = functions.cbc_create.?(null, digest.raw().ptr, bridge.native()) orelse return error.UnsupportedAlgorithm;
+        const cbc_create = functions.cbc_create orelse
+            @panic("OpenVPN crypto backend does not define cbc_create");
+        const cbc = cbc_create(null, digest.raw().ptr, bridge.native()) orelse
+            return error.UnsupportedAlgorithm;
         const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
         const hmac_length = c_crypto.pp_crypto_meta_of(cbc).digest_len;
         const auth_length = hmac_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength;
@@ -225,7 +227,9 @@ const AuthSerializer = struct {
     }
 
     pub fn deinit(self: *AuthSerializer) void {
-        self.functions.cbc_free.?(self.cbc);
+        const cbc_free = self.functions.cbc_free orelse
+            @panic("OpenVPN crypto backend does not define cbc_free");
+        cbc_free(self.cbc);
     }
 
     pub fn reset(_: *AuthSerializer) void {}
@@ -272,9 +276,9 @@ const AuthSerializer = struct {
             self.prefix_length,
             self.auth_length,
         );
-        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
-        if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &native_error)) {
-            return errors_mod.cryptoError(native_error);
+        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &crypto_error_code)) {
+            return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
             log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
@@ -305,7 +309,9 @@ const CryptSerializer = struct {
         defer bridge.deinit();
         const cipher_name: [:0]const u8 = "AES-256-CTR";
         const digest_name: [:0]const u8 = "SHA256";
-        const ctr = functions.ctr_create.?(
+        const ctr_create = functions.ctr_create orelse
+            @panic("OpenVPN crypto backend does not define ctr_create");
+        const ctr = ctr_create(
             cipher_name.ptr,
             digest_name.ptr,
             ControlConstants.ctr_tag_length,
@@ -343,7 +349,9 @@ const CryptSerializer = struct {
     }
 
     pub fn deinit(self: *CryptSerializer) void {
-        self.functions.ctr_free.?(self.ctr);
+        const ctr_free = self.functions.ctr_free orelse
+            @panic("OpenVPN crypto backend does not define ctr_free");
+        ctr_free(self.ctr);
     }
 
     pub fn reset(_: *CryptSerializer) void {}
@@ -401,7 +409,7 @@ const CryptSerializer = struct {
             .ad_len = self.ad_length,
             .for_testing = 0,
         };
-        var native_error: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
         const decrypted_count = c_crypto.pp_crypto_decrypt(
             self.ctr,
             decrypted.ptr + self.header_length,
@@ -409,9 +417,9 @@ const CryptSerializer = struct {
             source.ptr + flags.ad_len,
             encrypted_count,
             &flags,
-            &native_error,
+            &crypto_error_code,
         );
-        if (decrypted_count == 0) return errors_mod.cryptoError(native_error);
+        if (decrypted_count == 0) return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
         if (total > decrypted.len)

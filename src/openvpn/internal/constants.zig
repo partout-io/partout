@@ -4,7 +4,6 @@
 
 const std = @import("std");
 const helpers_mod = @import("helpers.zig");
-
 const c = helpers_mod.c;
 
 pub const Control = struct {

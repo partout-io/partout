@@ -11,6 +11,15 @@ const api = core_mod.api;
 const c = helpers_mod.c;
 const c_common = c_exports_mod.common;
 
+pub const ProcessorError = error{
+    OutOfMemory,
+    InvalidObfuscationMask,
+};
+pub const PacketError = error{
+    OutOfMemory,
+    PacketTooLarge,
+};
+
 pub const PacketDirection = enum {
     outbound,
     inbound,
@@ -22,7 +31,7 @@ pub const PacketProcessor = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         method: ?api.OpenVPNObfuscationMethod,
-    ) !PacketProcessor {
+    ) ProcessorError!PacketProcessor {
         var native_method: c.openvpn_pkt_proc_method = c.OpenVPNPktProcMethodNone;
         var mask: ?[]u8 = null;
         defer if (mask) |bytes| allocator.free(bytes);
@@ -30,13 +39,13 @@ pub const PacketProcessor = struct {
         if (method) |value| switch (value) {
             .xormask => |parameters| {
                 native_method = c.OpenVPNPktProcMethodXORMask;
-                mask = try parameters.mask.bytesAlloc(allocator);
+                mask = try createMask(allocator, parameters.mask);
             },
             .xorptrpos => native_method = c.OpenVPNPktProcMethodXORPtrPos,
             .reverse => native_method = c.OpenVPNPktProcMethodReverse,
             .obfuscate => |parameters| {
                 native_method = c.OpenVPNPktProcMethodXORObfuscate;
-                mask = try parameters.mask.bytesAlloc(allocator);
+                mask = try createMask(allocator, parameters.mask);
             },
         };
 
@@ -48,6 +57,15 @@ pub const PacketProcessor = struct {
         return .{ .ptr = native };
     }
 
+    fn createMask(allocator: std.mem.Allocator, mask: api.SecureData) ProcessorError![]u8 {
+        return mask.bytesAlloc(allocator) catch |err| {
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => return error.InvalidObfuscationMask,
+            };
+        };
+    }
+
     pub fn deinit(self: *PacketProcessor) void {
         c.openvpn_pkt_proc_free(self.ptr);
     }
@@ -57,7 +75,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         packet: []const u8,
         direction: PacketDirection,
-    ) ![]u8 {
+    ) PacketError![]u8 {
         const destination = try allocator.alloc(u8, packet.len);
         switch (direction) {
             .inbound => c.openvpn_pkt_proc_recv(self.ptr, destination.ptr, packet.ptr, packet.len),
@@ -71,7 +89,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         packets: []const []const u8,
         direction: PacketDirection,
-    ) ![][]u8 {
+    ) PacketError![][]u8 {
         const result = try allocator.alloc([]u8, packets.len);
         var initialized: usize = 0;
         errdefer {
@@ -90,7 +108,7 @@ pub const PacketProcessor = struct {
         allocator: std.mem.Allocator,
         stream: []const u8,
         until: *usize,
-    ) ![][]u8 {
+    ) PacketError![][]u8 {
         var packets: std.ArrayList([]u8) = .empty;
         errdefer core_mod.util.deinitListOfStrings(allocator, &packets);
         until.* = 0;
@@ -117,7 +135,7 @@ pub const PacketProcessor = struct {
         self: *const PacketProcessor,
         allocator: std.mem.Allocator,
         packets: []const []const u8,
-    ) ![]u8 {
+    ) PacketError![]u8 {
         var payload_length: usize = 0;
         for (packets) |packet| {
             if (packet.len > std.math.maxInt(u16)) return error.PacketTooLarge;
@@ -155,11 +173,11 @@ pub const LinkProcessor = struct {
     const BeforeRead = *const fn (
         self: *Self,
         packets: []const []const u8,
-    ) error{OutOfMemory}![][]u8;
+    ) PacketError![][]u8;
     const BeforeWrite = *const fn (
         self: *const Self,
         packets: []const []const u8,
-    ) error{ OutOfMemory, PacketTooLarge }![][]u8;
+    ) PacketError![][]u8;
 
     allocator: std.mem.Allocator,
     processor: PacketProcessor,
@@ -184,7 +202,7 @@ pub const LinkProcessor = struct {
         allocator: std.mem.Allocator,
         method: ?api.OpenVPNObfuscationMethod,
         is_tcp: bool,
-    ) !*LinkProcessor {
+    ) ProcessorError!*LinkProcessor {
         const self = try allocator.create(LinkProcessor);
         errdefer allocator.destroy(self);
         var processor = try PacketProcessor.init(allocator, method);
@@ -209,7 +227,7 @@ pub const LinkProcessor = struct {
     pub fn processInbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) !Output {
+    ) PacketError!Output {
         return .{
             .allocator = self.allocator,
             .owned_packets = try self.before_read(self, packets),
@@ -219,7 +237,7 @@ pub const LinkProcessor = struct {
     pub fn processOutbound(
         self: *const LinkProcessor,
         packets: []const []const u8,
-    ) !Output {
+    ) PacketError!Output {
         return .{
             .allocator = self.allocator,
             .owned_packets = try self.before_write(self, packets),
@@ -229,7 +247,7 @@ pub const LinkProcessor = struct {
     fn processUDPInbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) error{OutOfMemory}![][]u8 {
+    ) PacketError![][]u8 {
         return self.processor.processPackets(
             self.allocator,
             packets,
@@ -240,7 +258,7 @@ pub const LinkProcessor = struct {
     fn processUDPOutbound(
         self: *const LinkProcessor,
         packets: []const []const u8,
-    ) error{ OutOfMemory, PacketTooLarge }![][]u8 {
+    ) PacketError![][]u8 {
         return self.processor.processPackets(
             self.allocator,
             packets,
@@ -251,7 +269,7 @@ pub const LinkProcessor = struct {
     fn processTCPOutbound(
         self: *const LinkProcessor,
         packets: []const []const u8,
-    ) error{ OutOfMemory, PacketTooLarge }![][]u8 {
+    ) PacketError![][]u8 {
         if (packets.len == 0) return self.allocator.alloc([]u8, 0);
         const stream = try self.processor.streamFromPackets(self.allocator, packets);
         errdefer self.allocator.free(stream);
@@ -263,7 +281,7 @@ pub const LinkProcessor = struct {
     fn processTCPInbound(
         self: *LinkProcessor,
         packets: []const []const u8,
-    ) ![][]u8 {
+    ) PacketError![][]u8 {
         var additional: usize = 0;
         for (packets) |packet| additional = std.math.add(usize, additional, packet.len) catch return error.OutOfMemory;
         try self.read_buffer.ensureUnusedCapacity(self.allocator, additional);

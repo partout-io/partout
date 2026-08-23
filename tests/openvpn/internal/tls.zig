@@ -115,10 +115,10 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
     try tls.putCipherText("encrypted");
     const plain = try tls.pullPlainText(allocator);
     defer allocator.free(plain);
-    try std.testing.expectEqualStrings("plain", plain);
+    try std.testing.expectEqualStrings("plain", plain.?);
     const cipher = try tls.pullCipherText(allocator);
     defer allocator.free(cipher);
-    try std.testing.expectEqualStrings("cipher", cipher);
+    try std.testing.expectEqualStrings("cipher", cipher.?);
     const md5 = try tls.caMD5(allocator);
     defer allocator.free(md5);
     try std.testing.expectEqualStrings("0123456789abcdef", md5);

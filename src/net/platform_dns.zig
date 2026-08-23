@@ -145,7 +145,7 @@ pub const PlatformDNS = struct {
             if (c.pp_dns_error_is_bad_flags(status)) {
                 log.write(.fault, "getaddrinfo() failed with EAI_BADFLAGS");
             } else {
-                log.writef(.fault, "getaddrinfo() failed with result {}", .{status});
+                log.writef(.fault, "getaddrinfo() failed with result {d}", .{status});
             }
             return error.ResolutionFailure;
         }
