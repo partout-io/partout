@@ -80,6 +80,7 @@ pub const SessionError = error{
     TransformFailure,
     TunnelFailure,
     UnsupportedAlgorithm,
+    UnsupportedCompression,
     UnsupportedCryptoBackend,
     WouldBlock,
     WriteIncomplete,

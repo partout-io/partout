@@ -16,6 +16,7 @@ const Parser = parser_mod.Parser;
 const ParseError = std.mem.Allocator.Error || error{
     ContinuationPushReply,
     InvalidPushReply,
+    UnsupportedCompression,
 };
 
 pub const PushReply = struct {
@@ -41,9 +42,12 @@ pub const PushReply = struct {
         }
 
         var options = Parser.parse(allocator, profile) catch |err| {
-            if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.err, "Unable to parse PUSH_REPLY: {s}", .{@errorName(err)});
-            return error.InvalidPushReply;
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                error.UnsupportedCompression => error.UnsupportedCompression,
+                else => error.InvalidPushReply,
+            };
         };
         errdefer options.deinit(allocator);
         const original = try allocator.dupe(u8, message);
