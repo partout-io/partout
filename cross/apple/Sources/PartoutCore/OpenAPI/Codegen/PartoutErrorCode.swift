@@ -6,98 +6,100 @@
 //
 
 public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
+    /// Authentication failure.
+    case authentication = "authentication"
     /// Response is cached.
     case cached = "cached"
-    /// Entity not found.
-    case notFound = "notFound"
-    /// Operation cancelled or unauthorized.
-    case operationCancelled = "operationCancelled"
-    /// A required object was released prematurely.
-    case releasedObject = "releasedObject"
-    /// An exception was raised during a script execution.
-    case scriptException = "scriptException"
-    /// Operation timed out.
-    case timeout = "timeout"
-    /// Generic failure.
-    case unhandled = "unhandled"
+    /// Crypto error.
+    case crypto = "crypto"
+    /// Decoding error.
+    case decoding = "decoding"
+    /// DNS resolution failure.
+    case dnsFailure = "dnsFailure"
+    /// Encoding error.
+    case encoding = "encoding"
+    /// No more endpoints available to try.
+    case exhaustedEndpoints = "exhaustedEndpoints"
+    /// File descriptor is not available.
+    case fdUnavailable = "fdUnavailable"
     /// Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
     case incompatibleModules = "incompatibleModules"
     /// A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
     case incompleteModule = "incompleteModule"
+    /// Invalid field.
+    case invalidField = "invalidField"
+    /// Invalid value.
+    case invalidValue = "invalidValue"
+    /// I/O failure.
+    case ioFailure = "ioFailure"
+    /// Unable to add keychain item.
+    case keychainAddItem = "keychainAddItem"
+    /// Keychain item not found.
+    case keychainItemNotFound = "keychainItemNotFound"
+    /// Link device is not active.
+    case linkNotActive = "linkNotActive"
+    /// Network changed.
+    case networkChanged = "networkChanged"
+    /// Network is unreachable.
+    case networkUnreachable = "networkUnreachable"
     /// The profile has no active modules.
     case noActiveModules = "noActiveModules"
     /// The profile has non-final modules that must be resolved to final modules first.
     case nonFinalModules = "nonFinalModules"
-    /// Missing a required implementation.
-    case outOfMemory = "outOfMemory"
-    /// Module type is unexpected
-    case requiredImplementation = "requiredImplementation"
-    /// Module content is unknown for the importer.
-    case unexpectedModuleType = "unexpectedModuleType"
-    /// Module handler is unknown.
-    case unknownImportedModule = "unknownImportedModule"
-    /// Authentication failure.
-    case unknownModuleHandler = "unknownModuleHandler"
-    /// Crypto error.
-    case authentication = "authentication"
-    /// DNS resolution failure.
-    case crypto = "crypto"
-    /// No more endpoints available to try.
-    case dnsFailure = "dnsFailure"
-    /// File descriptor is not available.
-    case exhaustedEndpoints = "exhaustedEndpoints"
-    /// I/O failure.
-    case fdUnavailable = "fdUnavailable"
-    /// Link device is not active.
-    case ioFailure = "ioFailure"
-    /// Network changed.
-    case linkNotActive = "linkNotActive"
-    /// Network is unreachable.
-    case networkChanged = "networkChanged"
-    /// Native sockets could not be configured.
-    case networkUnreachable = "networkUnreachable"
-    /// TUN device is not active.
-    case socketConfiguration = "socketConfiguration"
-    /// TUN device is not available for I/O.
-    case tunNotActive = "tunNotActive"
-    /// Decoding error.
-    case tunNotAvailable = "tunNotAvailable"
-    /// Encoding error.
-    case decoding = "decoding"
-    /// Invalid field.
-    case encoding = "encoding"
-    /// Invalid value.
-    case invalidField = "invalidField"
-    /// Parsing error.
-    case invalidValue = "invalidValue"
-    /// Unable to add keychain item.
-    case parsing = "parsing"
-    /// Keychain item not found.
-    case keychainAddItem = "keychainAddItem"
+    /// Entity not found.
+    case notFound = "notFound"
     /// Compression settings mismatch.
-    case keychainItemNotFound = "keychainItemNotFound"
-    /// Connection failure.
-    case passphraseRequired = "passphraseRequired"
-    /// No routing configuration.
     case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
-    /// One-time password is required.
+    /// Connection failure.
     case openVPNConnectionFailure = "OpenVPN.connectionFailure"
-    /// Passphrase is required.
+    /// No routing configuration.
     case openVPNNoRouting = "OpenVPN.noRouting"
-    /// Authentication can be retried.
+    /// One-time password is required.
     case openVPNOTPRequired = "OpenVPN.otpRequired"
-    /// Server requested shutdown.
+    /// Passphrase is required.
     case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
-    /// TLS failure.
+    /// Authentication can be retried.
     case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
-    /// Algorithm is unsupported.
+    /// Server requested shutdown.
     case openVPNServerShutdown = "OpenVPN.serverShutdown"
-    /// Compression setting is unsupported.
+    /// TLS failure.
     case openVPNTLSFailure = "OpenVPN.tlsFailure"
-    /// Option is unsupported.
+    /// Algorithm is unsupported.
     case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
-    /// Configuration has no peers.
+    /// Compression setting is unsupported.
     case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
+    /// Option is unsupported.
     case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
+    /// Operation cancelled or unauthorized.
+    case operationCancelled = "operationCancelled"
+    /// Memory allocation failed.
+    case outOfMemory = "outOfMemory"
+    /// Parsing error.
+    case parsing = "parsing"
+    /// A passphrase is required.
+    case passphraseRequired = "passphraseRequired"
+    /// A required object was released prematurely.
+    case releasedObject = "releasedObject"
+    /// Missing a required implementation.
+    case requiredImplementation = "requiredImplementation"
+    /// An exception was raised during a script execution.
+    case scriptException = "scriptException"
+    /// Native sockets could not be configured.
+    case socketConfiguration = "socketConfiguration"
+    /// Operation timed out.
+    case timeout = "timeout"
+    /// TUN device is not active.
+    case tunNotActive = "tunNotActive"
+    /// TUN device is not available for I/O.
+    case tunNotAvailable = "tunNotAvailable"
+    /// Module type is unexpected
+    case unexpectedModuleType = "unexpectedModuleType"
+    /// Generic failure.
+    case unhandled = "unhandled"
+    /// Module content is unknown for the importer.
+    case unknownImportedModule = "unknownImportedModule"
+    /// Module handler is unknown.
+    case unknownModuleHandler = "unknownModuleHandler"
+    /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
 }
