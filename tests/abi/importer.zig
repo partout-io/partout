@@ -10,6 +10,8 @@ const core = @import("source").core;
 const api = core.api;
 
 const Importer = @import("source").abi.Importer;
+const partout = @import("source").partout;
+
 test "ABI registry imports raw OpenVPN profile through parser implementation" {
     const allocator = std.testing.allocator;
 
@@ -162,3 +164,75 @@ test "ABI importer reports parse error info for raw profiles" {
     try std.testing.expectEqualStrings("PrivateKey", info.name);
     try std.testing.expectEqualStrings("PrivateKey = nope", info.details);
 }
+
+test "profile import export returns normalized success and failure payloads" {
+    try expectImportEnvelope(
+        partout.partout_import_profile(valid_wireguard_profile, "Imported WireGuard"),
+        0,
+        "name",
+        "Imported WireGuard",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_profile(invalid_wireguard_profile, null),
+        -1,
+        "code",
+        "decoding",
+    );
+}
+
+test "module import export returns normalized success and failure payloads" {
+    try expectImportEnvelope(
+        partout.partout_import_module(valid_wireguard_profile),
+        0,
+        "type",
+        "WireGuard",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_module(invalid_wireguard_profile),
+        -1,
+        "code",
+        "parsing",
+    );
+}
+
+fn expectImportEnvelope(
+    c_result: ?[*:0]u8,
+    expected_code: i32,
+    expected_payload_key: []const u8,
+    expected_payload_value: []const u8,
+) !void {
+    const result_ptr = c_result orelse return error.TestUnexpectedResult;
+    const result_json = std.mem.span(result_ptr);
+    defer std.heap.c_allocator.free(result_json);
+
+    var envelope = try api.ABIEnvelope.parse(std.testing.allocator, result_json);
+    defer envelope.deinit(std.testing.allocator);
+    try std.testing.expectEqual(expected_code, envelope.code);
+
+    var parsed_payload = try core.util.parseJsonValue(
+        std.testing.allocator,
+        envelope.payload.bytes,
+    );
+    defer parsed_payload.deinit();
+    const payload = parsed_payload.value.object;
+    try std.testing.expectEqualStrings(
+        expected_payload_value,
+        payload.get(expected_payload_key).?.string,
+    );
+}
+
+const valid_wireguard_profile =
+    \\[Interface]
+    \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+    \\Address = 10.0.0.2/32
+    \\
+    \\[Peer]
+    \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
+    \\AllowedIPs = 0.0.0.0/0
+    \\Endpoint = wg.example.com:51820
+;
+
+const invalid_wireguard_profile =
+    \\[Interface]
+    \\PrivateKey = nope
+;

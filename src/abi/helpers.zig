@@ -108,26 +108,32 @@ fn boundEventsBinding(ptr: *anyopaque) ?c.partout_daemon_events {
     return self.binding;
 }
 
+// MARK: - ABI JSON
+
+pub fn successPayloadAllocZ(
+    allocator: std.mem.Allocator,
+    json: [*:0]const u8,
+) ?[*:0]u8 {
+    return wrapOwnedImportPayload(
+        allocator,
+        c.PartoutCompletionCodeOK,
+        json,
+    );
+}
+
 pub fn errorPayloadAllocZ(
     allocator: std.mem.Allocator,
     code: api.PartoutErrorCode,
 ) ?[*:0]u8 {
-    return errorPayloadWithInfoAllocZ(
+    const payload = errorPayloadWithInfoAllocZ(
         allocator,
         code,
         null,
     );
-}
-
-pub fn importErrorPayloadAllocZ(
-    allocator: std.mem.Allocator,
-    err: ImportAndEncodeError,
-    context: core.ImportContext,
-) ?[*:0]u8 {
-    return errorPayloadWithInfoAllocZ(
+    return wrapOwnedImportPayload(
         allocator,
-        importErrorCode(err),
-        context.parse_error_info,
+        c.PartoutCompletionCodeFailure,
+        payload,
     );
 }
 
@@ -151,6 +157,39 @@ fn errorPayloadWithInfoAllocZ(
         .user_info = user_info,
     };
     return util.encodeJsonValueZ(allocator, payload) catch null;
+}
+
+pub fn importErrorPayloadAllocZ(
+    allocator: std.mem.Allocator,
+    err: ImportAndEncodeError,
+    context: core.ImportContext,
+) ?[*:0]u8 {
+    const payload = errorPayloadWithInfoAllocZ(
+        allocator,
+        importErrorCode(err),
+        context.parse_error_info,
+    );
+    return wrapOwnedImportPayload(
+        allocator,
+        c.PartoutCompletionCodeFailure,
+        payload,
+    );
+}
+
+fn wrapOwnedImportPayload(
+    allocator: std.mem.Allocator,
+    code: i32,
+    c_payload: ?[*:0]const u8,
+) ?[*:0]u8 {
+    const payload_ptr = c_payload orelse return null;
+    const payload_json = std.mem.span(payload_ptr);
+    defer allocator.free(payload_json);
+
+    const envelope: api.ABIEnvelope = .{
+        .code = code,
+        .payload = api.JSONValue{ .bytes = payload_json },
+    };
+    return util.encodeJsonValueZ(allocator, envelope) catch null;
 }
 
 // MARK: - Mappings

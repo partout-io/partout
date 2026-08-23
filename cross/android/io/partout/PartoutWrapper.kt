@@ -5,6 +5,7 @@
 package io.partout
 
 import io.partout.abi.PartoutResult
+import io.partout.models.ABIEnvelope
 import io.partout.models.TaggedProfile
 import kotlinx.serialization.json.Json
 
@@ -42,15 +43,19 @@ class PartoutWrapper(
         val result = runCatching {
             PartoutResult.await { completion ->
                 val json = partoutImportProfile(text, name)
-                val code = if (json != null) 0 else -1
-                completion.onComplete(code, json)
+                if (json != null) {
+                    val envelope = coder.decodeFromString<ABIEnvelope>(json)
+                    completion.onComplete(envelope.code, envelope.payload.toString())
+                } else {
+                    completion.onComplete(-1, null)
+                }
             }
         }.getOrThrow()
         val profileJSON = result.json
         if (profileJSON == null) {
             error("partoutImportProfile() succeeded without payload")
         }
-        return json.decodeFromString<TaggedProfile>(profileJSON)
+        return coder.decodeFromString<TaggedProfile>(profileJSON)
     }
     //endregion
 
@@ -71,7 +76,7 @@ class PartoutWrapper(
     //endregion
 
     companion object {
-        private val json = Json {
+        private val coder = Json {
             ignoreUnknownKeys = true
         }
     }
