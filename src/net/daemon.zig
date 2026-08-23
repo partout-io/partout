@@ -955,7 +955,7 @@ fn buildSettingsOnlyTunnelInfo(
 // MARK: - Error mapping
 
 fn partoutCodeForDaemonStartError(_: StartError) api.PartoutErrorCode {
-    // FIXME: ###, Map ??? to PartoutErrorCode
+    // FIXME: ###, Map StartError to PartoutErrorCode
     return .unhandled;
 }
 
