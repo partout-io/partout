@@ -783,16 +783,122 @@ const SessionFinalizationFailure = struct {
 
     fn disposition(self: *const SessionFinalizationFailure) Disposition {
         return switch (self.cause) {
-            // FIXME: ###, Return .reconnect on recoverable errors
+            error.BadCredentials,
+            error.CompressionMismatch,
+            error.InvalidPushReply,
+            error.NoRouting,
+            error.TLSFailure,
+            error.UnsupportedAlgorithm,
+            error.UnsupportedCompression,
+            error.UnsupportedCryptoBackend,
+            => .cancel,
+
+            error.AckIdsTooLong,
+            error.Backpressure,
             error.BadCredentialsWithLocalOptions,
+            error.ContinuationPushReply,
+            error.ControlChannelFailure,
+            error.CryptoDerivation,
+            error.CryptoEncryption,
+            error.CryptoHMAC,
+            error.CryptoPRNG,
+            error.DataPathFailure,
+            error.EndOfStream,
+            error.InvalidAck,
+            error.InvalidEndpoint,
+            error.InvalidKey,
+            error.InvalidPacketId,
+            error.InvalidSessionId,
+            error.LibcFailure,
+            error.LinkFailure,
+            error.LooperTerminated,
+            error.LooperUnavailable,
+            error.MissingSessionId,
+            error.ModulesAllocation,
+            error.MuxFailure,
             error.NetworkChanged,
+            error.OOBOutsideQueue,
+            error.OutOfBounds,
+            error.OutOfMemory,
+            error.Overflow,
+            error.PacketTooLarge,
+            error.PeerIdMismatch,
+            error.ServerShutdown,
+            error.SessionMismatch,
+            error.SessionStale,
+            error.Timeout,
+            error.TransformFailure,
+            error.TunnelFailure,
+            error.TunNotAvailable,
+            error.WouldBlock,
+            error.WriteIncomplete,
+            error.WrongControlDataPrefix,
             => .reconnect,
-            else => .cancel,
         };
     }
 };
 
-fn partoutCodeForError(_: ConnectionError) api.PartoutErrorCode {
-    // FIXME: ###, Map ConnectionError to PartoutErrorCode
-    return .unhandled;
+pub const testing = struct {
+    pub fn isRecoverableError(cause: ConnectionError) bool {
+        return (SessionFinalizationFailure{ .cause = cause }).disposition() == .reconnect;
+    }
+
+    pub const codeForError = partoutCodeForError;
+};
+
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
+    return switch (err) {
+        error.BadCredentials => .authentication,
+        error.BadCredentialsWithLocalOptions => .openVPNRecoverableAuthentication,
+        error.CompressionMismatch => .openVPNCompressionMismatch,
+        error.CryptoEncryption,
+        error.CryptoHMAC,
+        error.CryptoPRNG,
+        => .crypto,
+        error.InvalidEndpoint => .invalidValue,
+        error.ModulesAllocation => .unhandled,
+        error.MuxFailure => .fdUnavailable,
+        error.NetworkChanged => .networkChanged,
+        error.NoRouting => .openVPNNoRouting,
+        error.ServerShutdown => .openVPNServerShutdown,
+        error.TLSFailure => .openVPNTLSFailure,
+        error.Timeout => .timeout,
+        error.TunNotAvailable => .tunNotAvailable,
+        error.CryptoDerivation,
+        error.UnsupportedAlgorithm,
+        error.UnsupportedCryptoBackend,
+        => .openVPNUnsupportedAlgorithm,
+        error.UnsupportedCompression => .openVPNUnsupportedCompression,
+
+        error.AckIdsTooLong,
+        error.Backpressure,
+        error.ContinuationPushReply,
+        error.ControlChannelFailure,
+        error.DataPathFailure,
+        error.EndOfStream,
+        error.InvalidAck,
+        error.InvalidKey,
+        error.InvalidPacketId,
+        error.InvalidPushReply,
+        error.InvalidSessionId,
+        error.LibcFailure,
+        error.LinkFailure,
+        error.LooperTerminated,
+        error.LooperUnavailable,
+        error.MissingSessionId,
+        error.OOBOutsideQueue,
+        error.OutOfBounds,
+        error.OutOfMemory,
+        error.Overflow,
+        error.PacketTooLarge,
+        error.PeerIdMismatch,
+        error.SessionMismatch,
+        error.SessionStale,
+        error.TransformFailure,
+        error.TunnelFailure,
+        error.WouldBlock,
+        error.WriteIncomplete,
+        error.WrongControlDataPrefix,
+        => .openVPNConnectionFailure,
+    };
 }
