@@ -701,6 +701,8 @@ if [[ $full_build -eq 1 ]]; then
         xcframework_arguments+=(-framework "$framework")
         if [[ $build_mode == monolith ]]; then
             make_debug_symbols "$platform" "$framework"
+            xcframework_arguments+=(-debug-symbols \
+                "$work_dir/debug-symbols/$platform/$framework_name.framework.dSYM")
         fi
     done
     xcodebuild -create-xcframework \
@@ -750,11 +752,4 @@ else
     rm -rf "$output_path"
     mv "$generated_output" "$output_path"
     echo "Generated $output_path"
-fi
-
-if [[ $full_build -eq 1 && $build_mode == monolith ]]; then
-    debug_symbols_path="${output_path%.xcframework}.dSYMs"
-    rm -rf "$debug_symbols_path"
-    mv "$work_dir/debug-symbols" "$debug_symbols_path"
-    echo "Generated $debug_symbols_path"
 fi
