@@ -954,14 +954,36 @@ fn buildSettingsOnlyTunnelInfo(
 
 // MARK: - Error mapping
 
-fn partoutCodeForDaemonStartError(_: StartError) api.PartoutErrorCode {
-    // FIXME: ###, Map StartError to PartoutErrorCode
-    return .unhandled;
+fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
+    return switch (err) {
+        error.InvalidJson,
+        error.InvalidModel,
+        error.InvalidProfile,
+        error.UnsupportedModel,
+        => .decoding,
+        error.IncompleteModule => .incompleteModule,
+        error.MissingConnectionImplementation => .requiredImplementation,
+        error.OutOfMemory => .outOfMemory,
+        error.SocketConfiguration => .socketConfiguration,
+        error.TunNotAvailable => .tunNotAvailable,
+        error.AlreadyStarted,
+        error.Closed,
+        error.IdGeneration,
+        error.LooperFailure,
+        error.UnableToStart,
+        => .unhandled,
+    };
 }
 
 fn partoutCodeForLooperFailure(opt_failure: ?Looper.Failure) ?api.PartoutErrorCode {
     const failure = opt_failure orelse return null;
-    // FIXME: ###, Map Looper.Failure to PartoutErrorCode
-    _ = failure;
-    return .unhandled;
+    return switch (failure) {
+        .wait, .system, .io => .ioFailure,
+        .user => .unhandled,
+    };
 }
+
+pub const testing = struct {
+    pub const codeForDaemonStartError = partoutCodeForDaemonStartError;
+    pub const codeForLooperFailure = partoutCodeForLooperFailure;
+};

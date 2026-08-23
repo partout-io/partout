@@ -16,6 +16,47 @@ const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 const SnapshotPublisher = daemon_helpers.SnapshotPublisher;
 
+test "connection daemon start errors map to legacy public codes" {
+    const codeForError = daemon.testing.codeForDaemonStartError;
+    const cases = .{
+        .{ error.InvalidJson, api.PartoutErrorCode.decoding },
+        .{ error.InvalidModel, api.PartoutErrorCode.decoding },
+        .{ error.InvalidProfile, api.PartoutErrorCode.decoding },
+        .{ error.UnsupportedModel, api.PartoutErrorCode.decoding },
+        .{ error.IncompleteModule, api.PartoutErrorCode.incompleteModule },
+        .{ error.MissingConnectionImplementation, api.PartoutErrorCode.requiredImplementation },
+        .{ error.OutOfMemory, api.PartoutErrorCode.outOfMemory },
+        .{ error.SocketConfiguration, api.PartoutErrorCode.socketConfiguration },
+        .{ error.TunNotAvailable, api.PartoutErrorCode.tunNotAvailable },
+        .{ error.AlreadyStarted, api.PartoutErrorCode.unhandled },
+        .{ error.Closed, api.PartoutErrorCode.unhandled },
+        .{ error.IdGeneration, api.PartoutErrorCode.unhandled },
+        .{ error.LooperFailure, api.PartoutErrorCode.unhandled },
+        .{ error.UnableToStart, api.PartoutErrorCode.unhandled },
+    };
+
+    inline for (cases) |entry|
+        try std.testing.expectEqual(entry[1], codeForError(entry[0]));
+}
+
+test "connection daemon looper failures map to legacy public codes" {
+    const codeForFailure = daemon.testing.codeForLooperFailure;
+
+    try std.testing.expectEqual(@as(?api.PartoutErrorCode, null), codeForFailure(null));
+    try std.testing.expectEqual(api.PartoutErrorCode.ioFailure, codeForFailure(.{ .wait = 1 }));
+    try std.testing.expectEqual(api.PartoutErrorCode.ioFailure, codeForFailure(.{
+        .system = error.LibcFailure,
+    }));
+    try std.testing.expectEqual(api.PartoutErrorCode.ioFailure, codeForFailure(.{ .io = .{
+        .side = .link,
+        .cause = error.EndOfStream,
+        .code = null,
+    } }));
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, codeForFailure(.{
+        .user = error.TestUnexpectedResult,
+    }));
+}
+
 fn reachabilityBlock(monitor: *const mock_mod.MockNetworkMonitor) ConnectionGate.ReachabilityBlock {
     return .{
         .ptr = monitor,
