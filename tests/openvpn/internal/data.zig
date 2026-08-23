@@ -7,6 +7,7 @@ const source = @import("source");
 
 const core = source.core;
 const data = source.openvpn_internal.data;
+const helpers = source.openvpn_internal.helpers;
 const api = core.api;
 
 test "DataPath mock round-trips compound and bulk packets" {
@@ -82,6 +83,32 @@ test "DataPath compress-v2 mock preserves framing magic payloads" {
 
 test "DataLink declarations are semantically analyzed" {
     std.testing.refAllDecls(data.DataLink);
+}
+
+test "DataPath preserves native failure categories" {
+    const c = helpers.c;
+    const errorFromNative = data.testing.errorFromNative;
+
+    try std.testing.expectEqual(error.DataPathFailure, errorFromNative(.{
+        .dp_code = c.OpenVPNDataPathErrorNone,
+        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+    }));
+    try std.testing.expectEqual(error.PeerIdMismatch, errorFromNative(.{
+        .dp_code = c.OpenVPNDataPathErrorPeerIdMismatch,
+        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+    }));
+    try std.testing.expectEqual(error.CompressionMismatch, errorFromNative(.{
+        .dp_code = c.OpenVPNDataPathErrorCompression,
+        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+    }));
+    try std.testing.expectEqual(error.CryptoEncryption, errorFromNative(.{
+        .dp_code = c.OpenVPNDataPathErrorCrypto,
+        .crypto_code = source.c_crypto.PPCryptoErrorEncryption,
+    }));
+    try std.testing.expectEqual(error.CryptoHMAC, errorFromNative(.{
+        .dp_code = c.OpenVPNDataPathErrorCrypto,
+        .crypto_code = source.c_crypto.PPCryptoErrorHMAC,
+    }));
 }
 
 fn expectMockDataPathRoundTrip(

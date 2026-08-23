@@ -538,6 +538,8 @@ pub const DataLinkPair = struct {
 };
 
 pub const testing = struct {
+    pub const errorFromNative = loggingDataPathErrorFromNative;
+
     pub fn createMockDataPath(
         allocator: std.mem.Allocator,
         peer_id: u32,

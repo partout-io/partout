@@ -618,7 +618,7 @@ const SessionOnQueue = struct {
         }
         active.phase = .stopping;
 
-        if (request.gracefully) {
+        if (shouldSendExitNotification(request.gracefully)) {
             log.write(.info, "Shut down session gracefully");
             self.sendExitPacket(
                 request.timeout_ms orelse self.session.options.write_timeout_ms,
@@ -1027,7 +1027,14 @@ fn sideFailureError(failure: net.Looper.Failure, fallback: SessionError) Session
     };
 }
 
+fn shouldSendExitNotification(gracefully: bool) bool {
+    return gracefully;
+}
+
 pub const testing = struct {
+    pub const sideFailureError = session_mod.sideFailureError;
+    pub const shouldSendExitNotification = session_mod.shouldSendExitNotification;
+
     pub fn reportFailure(session: *Session, cause: SessionError) void {
         session.reportFailure(cause);
     }
