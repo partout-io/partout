@@ -7,7 +7,7 @@
 # - Update Package.swift's remote version and checksum.
 # - Create a signed commit, then create a signed tag that points to it.
 # - Atomically push the commit to master and push the matching tag.
-# - Publish the XCFramework archive, checksum, and prebuilts version.
+# - Publish the XCFramework archive, separate dSYMs, checksum, and prebuilts version.
 #
 # Consequently, both master and the version tag contain a Package.swift that
 # references the matching release.
@@ -73,14 +73,20 @@ jobs:
           xcframework="$GITHUB_WORKSPACE/PartoutNative.xcframework"
           artifacts_dir="$RUNNER_TEMP/prebuilts-artifacts"
           archive="$RUNNER_TEMP/PartoutNative.xcframework.zip"
+          debug_symbols="$GITHUB_WORKSPACE/PartoutNative.dSYMs"
+          debug_symbols_archive="$RUNNER_TEMP/PartoutNative.dSYMs.zip"
           checksum_file="$archive.checksum"
           prebuilts_version_file="$artifacts_dir/prebuilts-version.txt"
 
           scripts/build-xcframework.sh "$xcframework" "$artifacts_dir" --full
+          test "$(find "$debug_symbols" -name '*.dSYM' -type d | wc -l)" -eq 5
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
+          ditto -c -k --sequesterRsrc --keepParent \
+            "$debug_symbols" "$debug_symbols_archive"
           swift package compute-checksum "$archive" > "$checksum_file"
 
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "debug_symbols_archive=$debug_symbols_archive" >> "$GITHUB_OUTPUT"
           echo "checksum_file=$checksum_file" >> "$GITHUB_OUTPUT"
           echo "prebuilts_version_file=$prebuilts_version_file" >> "$GITHUB_OUTPUT"
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
@@ -117,11 +123,13 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.parse_version.outputs.version }}
           ARCHIVE: ${{ steps.build_xcframework.outputs.archive }}
+          DEBUG_SYMBOLS_ARCHIVE: ${{ steps.build_xcframework.outputs.debug_symbols_archive }}
           CHECKSUM_FILE: ${{ steps.build_xcframework.outputs.checksum_file }}
           PREBUILTS_VERSION_FILE: ${{ steps.build_xcframework.outputs.prebuilts_version_file }}
         run: |
           gh release create "$VERSION" \
             "$ARCHIVE" \
+            "$DEBUG_SYMBOLS_ARCHIVE" \
             "$CHECKSUM_FILE" \
             "$PREBUILTS_VERSION_FILE" \
             --verify-tag \

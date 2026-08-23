@@ -81,6 +81,7 @@ const Vendors = struct {
 const BuildConfig = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
+    strip: ?bool,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
     embed_c: bool,
@@ -105,6 +106,7 @@ const default_api_excluded_schemas =
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
+    const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
     const legacy_build = b.option(
         bool,
@@ -157,6 +159,7 @@ pub fn build(b: *std.Build) void {
     const config = BuildConfig{
         .target = target,
         .optimize = optimize,
+        .strip = strip,
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .embed_c = embed_c,
@@ -343,6 +346,7 @@ fn createPartoutModule(
         .root_source_file = b.path(root_source_file),
         .target = config.target,
         .optimize = config.optimize,
+        .strip = config.strip,
         .link_libc = true,
         .sanitize_c = .off,
     });

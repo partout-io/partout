@@ -489,6 +489,11 @@ build_slice() {
         -Dwg-go-include="$wg_go_include"
         -Dwg-go-lib="$wg_go_lib"
     )
+    if [[ $full_build -eq 1 && $build_mode == monolith ]]; then
+        # ReleaseSmall strips by default. Keep DWARF in the intermediate object
+        # files so dsymutil can collect it before the framework binary is stripped.
+        build_options+=(-Dstrip=false)
+    fi
     if [[ $build_mode == legacy ]]; then
         build_options+=(-Dlegacy-build=true)
     fi
@@ -584,7 +589,11 @@ else
     build_configured_slice "$active_platform" "$active_arch"
 fi
 
-rm -rf "$work_dir/universal" "$work_dir/frameworks" "$work_dir/$framework_name.xcframework"
+rm -rf \
+    "$work_dir/universal" \
+    "$work_dir/frameworks" \
+    "$work_dir/debug-symbols" \
+    "$work_dir/$framework_name.xcframework"
 mkdir -p "$work_dir/universal"
 if [[ $full_build -eq 1 ]]; then
     for platform in macos ios-simulator tvos-simulator; do
@@ -668,6 +677,18 @@ make_framework() {
     printf '%s\n' "$framework"
 }
 
+make_debug_symbols() {
+    local platform=$1
+    local framework=$2
+    local binary
+    local dsym="$work_dir/debug-symbols/$platform/$framework_name.framework.dSYM"
+
+    binary=$(framework_binary "$framework" "$platform")
+    mkdir -p "$(dirname "$dsym")"
+    xcrun dsymutil "$binary" -o "$dsym"
+    xcrun strip -S -x "$binary"
+}
+
 generated_output="$work_dir/$framework_name.xcframework"
 if [[ $full_build -eq 1 ]]; then
     xcframework_arguments=()
@@ -678,6 +699,9 @@ if [[ $full_build -eq 1 ]]; then
         esac
         framework=$(make_framework "$platform" "$binary")
         xcframework_arguments+=(-framework "$framework")
+        if [[ $build_mode == monolith ]]; then
+            make_debug_symbols "$platform" "$framework"
+        fi
     done
     xcodebuild -create-xcframework \
         "${xcframework_arguments[@]}" \
@@ -726,4 +750,11 @@ else
     rm -rf "$output_path"
     mv "$generated_output" "$output_path"
     echo "Generated $output_path"
+fi
+
+if [[ $full_build -eq 1 && $build_mode == monolith ]]; then
+    debug_symbols_path="${output_path%.xcframework}.dSYMs"
+    rm -rf "$debug_symbols_path"
+    mv "$work_dir/debug-symbols" "$debug_symbols_path"
+    echo "Generated $debug_symbols_path"
 fi

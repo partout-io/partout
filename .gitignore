@@ -11,6 +11,7 @@ Package.resolved
 bin
 cross-models
 PartoutNative.xcframework
+PartoutNative.dSYMs
 
 # Zig
 /.zig-cache/
