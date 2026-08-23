@@ -60,7 +60,8 @@ public final class PartoutProviderRuntime: Sendable {
         partout_init(&init_args)
 
         let profileJSON = try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
-        pp_log(ctx, .runtime, .debug, "Profile JSON: \(profileJSON)")
+        let loggedProfileJSON = profileJSON.debugDescription(withSensitiveData: logsPrivateData)
+        pp_log(ctx, .runtime, .debug, "Profile JSON: \(loggedProfileJSON)")
 
         let retainedController = Unmanaged.passRetained(controller)
         let retainedEnvironment = Unmanaged.passRetained(environment)
