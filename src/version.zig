@@ -1,2 +1,2 @@
 pub const identifier = "io.partout";
-pub const number = "0.161.0";
+pub const number = "0.161.1";
