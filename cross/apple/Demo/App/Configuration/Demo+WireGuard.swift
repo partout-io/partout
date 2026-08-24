@@ -9,10 +9,9 @@ extension WireGuard {
     static var demoModule: WireGuardModule? {
         do {
             guard let url = Constants.demoURL else { return nil }
-            return try PartoutImporter().importModule(
-                WireGuardModule.self,
-                url: url
-            )
+            guard let module = try PartoutImporter()
+                .importModule(from: url) as? WireGuardModule else { return nil }
+            return module
         } catch {
             fatalError("Unable to build: \(error)")
         }

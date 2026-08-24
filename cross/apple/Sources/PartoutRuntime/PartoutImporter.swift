@@ -5,7 +5,7 @@
 public final class PartoutImporter: Sendable {
     public init() {}
 
-    public func importModule<M>(_ type: M.Type, url: URL) throws -> M? where M: Decodable {
+    public func importModule(from url: URL) throws -> Module? {
         let text = try String(contentsOf: url, encoding: .utf8)
         guard let cJSON = partout_import_module(text) else { return nil }
         defer { free(cJSON) }
@@ -21,6 +21,6 @@ public final class PartoutImporter: Sendable {
             throw PartoutError(payload.code)
         }
         let tagged = try JSONDecoder.shared().decode(TaggedModule.self, from: payloadData)
-        return tagged.containedModule as? M
+        return tagged.containedModule
     }
 }
