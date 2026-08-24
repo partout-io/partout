@@ -207,19 +207,26 @@ pub fn pushReply(
     allocator: std.mem.Allocator,
     value: anytype,
 ) ![]const u8 {
+    return pushReplyString(allocator, value.original);
+}
+
+pub fn pushReplyString(
+    allocator: std.mem.Allocator,
+    string: []const u8,
+) ![]const u8 {
     const marker = "auth-token ";
-    const start = std.mem.indexOf(u8, value.original, marker) orelse
-        return allocator.dupe(u8, value.original);
-    const value_start = start + marker.len;
-    const value_end = std.mem.indexOfScalarPos(
+    const start = std.mem.indexOf(u8, string, marker) orelse
+        return allocator.dupe(u8, string);
+    const string_start = start + marker.len;
+    const string_end = std.mem.indexOfScalarPos(
         u8,
-        value.original,
-        value_start,
+        string,
+        string_start,
         ',',
-    ) orelse value.original.len;
+    ) orelse string.len;
     return std.mem.concat(allocator, u8, &.{
-        value.original[0..start],
+        string[0..start],
         "auth-token",
-        value.original[value_end..],
+        string[string_end..],
     });
 }

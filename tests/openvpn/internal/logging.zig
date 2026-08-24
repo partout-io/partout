@@ -24,6 +24,17 @@ const CapturingLogger = struct {
     }
 };
 
+test "pushReplyString strips auth tokens" {
+    const allocator = std.testing.allocator;
+    const message = "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM";
+    const loggable = try openvpn_logging.pushReplyString(allocator, message);
+    defer allocator.free(loggable);
+    try std.testing.expectEqualStrings(
+        "PUSH_REPLY,ping 10,auth-token,cipher AES-256-GCM",
+        loggable,
+    );
+}
+
 test "logConfiguration accepts empty sensitive strings" {
     const configuration = api.OpenVPNConfiguration{
         .checks_san_host = true,

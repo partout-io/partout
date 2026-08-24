@@ -93,13 +93,23 @@ test "OpenVPNParser parses cipher and digest values case-insensitively" {
     defer fallback.deinit(allocator);
     try std.testing.expectEqual(api.OpenVPNCipher.aes192cbc, fallback.cipher.?);
 
-    try std.testing.expectError(
-        error.UnsupportedConfiguration,
-        OpenVPNParser.parse(
-            allocator,
-            "data-ciphers CHACHA20-POLY1305:aes-256-gcm",
-        ),
+    var with_unsupported = try OpenVPNParser.parse(
+        allocator,
+        "data-ciphers CHACHA20-POLY1305:aes-256-gcm",
     );
+    defer with_unsupported.deinit(allocator);
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &.{.aes256gcm},
+        with_unsupported.data_ciphers.?,
+    );
+
+    var unknown = try OpenVPNParser.parse(allocator,
+        \\cipher UNKNOWN
+        \\data-ciphers-fallback UNKNOWN
+    );
+    defer unknown.deinit(allocator);
+    try std.testing.expect(unknown.cipher == null);
 }
 
 test "OpenVPNParser follows OpenVPN optional data cipher semantics" {
@@ -127,14 +137,23 @@ test "OpenVPNParser follows OpenVPN optional data cipher semantics" {
         legacy_alias.data_ciphers.?,
     );
 
-    try std.testing.expectError(
-        error.UnsupportedConfiguration,
-        OpenVPNParser.parse(allocator, "data-ciphers CHACHA20-POLY1305:AES-256-GCM"),
+    var required_unknown = try OpenVPNParser.parse(
+        allocator,
+        "data-ciphers CHACHA20-POLY1305:AES-256-GCM",
     );
-    try std.testing.expectError(
-        error.UnsupportedConfiguration,
-        OpenVPNParser.parse(allocator, "data-ciphers ?CHACHA20-POLY1305:?BF-CBC"),
+    defer required_unknown.deinit(allocator);
+    try std.testing.expectEqualSlices(
+        api.OpenVPNCipher,
+        &.{.aes256gcm},
+        required_unknown.data_ciphers.?,
     );
+
+    var all_unknown = try OpenVPNParser.parse(
+        allocator,
+        "data-ciphers ?CHACHA20-POLY1305:?BF-CBC",
+    );
+    defer all_unknown.deinit(allocator);
+    try std.testing.expect(all_unknown.data_ciphers == null);
 }
 
 test "OpenVPNParser gives explicit data cipher fallback order-independent precedence" {
@@ -396,6 +415,39 @@ test "OpenVPNParser ignores incomplete route and gateway directives" {
     try std.testing.expect(configuration.routes6 == null);
     try std.testing.expect(configuration.route_gateway4 == null);
     try std.testing.expect(configuration.route_gateway6 == null);
+}
+
+test "OpenVPNParser ignores optional values Swift cannot convert" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(allocator,
+        \\compress stub trailing
+        \\key-direction 2
+        \\port 99999
+        \\remote vpn.example.com
+        \\tun-mtu 999999999999999999999
+        \\peer-id 999999999999999999999
+        \\route 192.0.2.0 255.255.255.0 net_gateway
+        \\route-ipv6 2001:db8::/64 net_gateway
+        \\route-gateway dhcp trailing
+        \\route-ipv6-gateway net_gateway
+        \\dhcp-option PROXY_HTTP proxy.example 99999
+    );
+    defer configuration.deinit(allocator);
+
+    try std.testing.expectEqual(
+        api.OpenVPNCompressionAlgorithm.disabled,
+        configuration.compression_algorithm.?,
+    );
+    try std.testing.expectEqual(@as(u16, 1194), configuration.remotes.?[0].proto.port);
+    try std.testing.expect(configuration.mtu == null);
+    try std.testing.expect(configuration.peer_id == null);
+    try std.testing.expect(configuration.route_gateway4 == null);
+    try std.testing.expect(configuration.route_gateway6 == null);
+    try std.testing.expect(configuration.http_proxy == null);
+    try std.testing.expectEqual(@as(usize, 1), configuration.routes4.?.len);
+    try std.testing.expect(configuration.routes4.?[0].gateway == null);
+    try std.testing.expectEqual(@as(usize, 1), configuration.routes6.?.len);
+    try std.testing.expect(configuration.routes6.?[0].gateway == null);
 }
 
 test "OpenVPNParser builds subnet IPv4 and IPv6 settings from push directives" {
