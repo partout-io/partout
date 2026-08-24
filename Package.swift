@@ -48,12 +48,14 @@ let package = Package(
         ),
         .testTarget(
             name: "PartoutTests",
-            dependencies: [
-                "PartoutCore",
-                "PartoutRuntime"
-            ],
+            dependencies: ["PartoutCore"],
             path: "cross/apple/Tests/PartoutTests"
         )
+//        .testTarget(
+//            name: "PartoutRuntimeTests",
+//            dependencies: ["PartoutRuntime"],
+//            path: "cross/apple/Tests/PartoutRuntimeTests"
+//        )
     ],
     swiftLanguageModes: [.v6]
 )
