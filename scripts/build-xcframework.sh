@@ -191,7 +191,7 @@ active_slice() {
         *) fail "unsupported platform: $platform" ;;
     esac
     case "$arch" in
-        arm64|aarch64) arch=arm64 ;;
+        arm64|arm64e|aarch64) arch=arm64 ;;
         x86_64) ;;
         *) fail "unsupported architecture: $arch" ;;
     esac
