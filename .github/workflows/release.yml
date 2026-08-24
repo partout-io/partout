@@ -41,6 +41,7 @@ jobs:
       - name: Resolve release
         id: release
         run: ci/resolve-release.sh
+        # Outputs: mode, version, native_version
 
       - name: Import GPG key
         if: steps.release.outputs.mode != 'none'
