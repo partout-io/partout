@@ -9,6 +9,7 @@ on:
       - master
     paths:
       - src/version.zig
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}
