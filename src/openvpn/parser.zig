@@ -362,7 +362,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "cipher")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.legacy_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.legacy_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]);
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers") or std.ascii.eqlIgnoreCase(option, "ncp-ciphers")) {
@@ -372,18 +372,14 @@ const Builder = struct {
             while (ciphers.next()) |cipher| {
                 const is_optional = std.mem.startsWith(u8, cipher, "?");
                 const name = if (is_optional) cipher[1..] else cipher;
-                const parsed_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, name) orelse {
-                    if (is_optional) continue;
-                    return error.UnsupportedConfiguration;
-                };
+                const parsed_cipher = util.parseRawIgnoreCase(api.OpenVPNCipher, name) orelse continue;
                 try self.data_ciphers.append(allocator, parsed_cipher);
             }
-            if (self.data_ciphers.items.len == 0) return error.UnsupportedConfiguration;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "data-ciphers-fallback")) {
             if (components.items.len < 2) return error.MalformedOption;
-            self.data_ciphers_fallback = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]) orelse return error.UnsupportedConfiguration;
+            self.data_ciphers_fallback = util.parseRawIgnoreCase(api.OpenVPNCipher, components.items[1]);
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "auth")) {
@@ -402,7 +398,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "compress")) {
             self.configuration.compression_framing = .compress;
-            if (components.items.len == 1) {
+            if (components.items.len != 2) {
                 self.configuration.compression_algorithm = .disabled;
             } else if (std.ascii.eqlIgnoreCase(components.items[1], "stub")) {
                 self.configuration.compression_algorithm = .disabled;
@@ -418,7 +414,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "key-direction")) {
             if (components.items.len == 2) {
-                self.tls_key_direction = parseDirection(components.items[1]) orelse return error.MalformedOption;
+                self.tls_key_direction = parseDirection(components.items[1]);
             }
             return;
         }
@@ -447,7 +443,8 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "port")) {
             if (components.items.len != 2) return error.MalformedOption;
-            self.default_port = std.fmt.parseInt(u16, components.items[1], 10) catch return error.MalformedOption;
+            if (std.fmt.parseInt(u16, components.items[1], 10) catch null) |port|
+                self.default_port = port;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "remote")) {
@@ -478,7 +475,7 @@ const Builder = struct {
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "tun-mtu")) {
-            if (components.items.len == 2) self.configuration.mtu = std.fmt.parseInt(i32, components.items[1], 10) catch return error.MalformedOption;
+            if (components.items.len == 2) self.configuration.mtu = std.fmt.parseInt(i32, components.items[1], 10) catch null;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "static-challenge")) {
@@ -490,7 +487,7 @@ const Builder = struct {
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "peer-id")) {
-            if (components.items.len == 2) self.configuration.peer_id = std.fmt.parseInt(u32, components.items[1], 10) catch return error.MalformedOption;
+            if (components.items.len == 2) self.configuration.peer_id = std.fmt.parseInt(u32, components.items[1], 10) catch null;
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "topology")) {
@@ -520,13 +517,21 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "route-gateway")) {
             if (components.items.len > 1) {
-                self.route_gateway4_argument_count = components.items.len - 1;
-                try replaceAddress(allocator, &self.configuration.route_gateway4, components.items[1]);
+                replaceAddress(allocator, &self.configuration.route_gateway4, components.items[1]) catch |err| switch (err) {
+                    error.MalformedOption => return,
+                    else => return err,
+                };
+                self.route_gateway4_argument_count = 1;
             }
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "route-ipv6-gateway")) {
-            if (components.items.len > 1) try replaceAddress(allocator, &self.configuration.route_gateway6, components.items[1]);
+            if (components.items.len > 1) {
+                replaceAddress(allocator, &self.configuration.route_gateway6, components.items[1]) catch |err| switch (err) {
+                    error.MalformedOption => return,
+                    else => return err,
+                };
+            }
             return;
         }
         if (std.ascii.eqlIgnoreCase(option, "dhcp-option")) {
@@ -619,7 +624,7 @@ const Builder = struct {
         var parsed_destination = (try api.Subnet.parseRawAlloc(allocator, destination)) orelse return error.MalformedOption;
         errdefer parsed_destination.deinit(allocator);
         var gateway = if (components.len > 3 and !std.ascii.eqlIgnoreCase(components[3], "vpn_gateway"))
-            (try api.Address.parseRawAlloc(allocator, components[3])) orelse return error.MalformedOption
+            try api.Address.parseRawAlloc(allocator, components[3])
         else
             null;
         errdefer if (gateway) |*value| value.deinit(allocator);
@@ -640,7 +645,7 @@ const Builder = struct {
         var destination = (try api.Subnet.parseRawAlloc(allocator, components[1])) orelse return error.MalformedOption;
         errdefer destination.deinit(allocator);
         var gateway = if (components.len > 2 and !std.ascii.eqlIgnoreCase(components[2], "vpn_gateway"))
-            (try api.Address.parseRawAlloc(allocator, components[2])) orelse return error.MalformedOption
+            try api.Address.parseRawAlloc(allocator, components[2])
         else
             null;
         errdefer if (gateway) |*value| value.deinit(allocator);
@@ -666,9 +671,10 @@ const Builder = struct {
             try util.appendOwned(allocator, &self.search_domains, components[2]);
         } else if (std.ascii.eqlIgnoreCase(key, "PROXY_HTTP") or std.ascii.eqlIgnoreCase(key, "PROXY_HTTPS")) {
             if (components.len != 4) return error.MalformedOption;
+            const port = std.fmt.parseInt(u16, components[3], 10) catch return;
             const endpoint = api.Endpoint{
                 .address = try allocator.dupe(u8, components[2]),
-                .port = std.fmt.parseInt(u16, components[3], 10) catch return error.MalformedOption,
+                .port = port,
                 .owned = true,
             };
             if (std.ascii.eqlIgnoreCase(key, "PROXY_HTTP")) {
