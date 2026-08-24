@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import PartoutNative
-
 public final class PartoutImporter: Sendable {
     public init() {}
 
