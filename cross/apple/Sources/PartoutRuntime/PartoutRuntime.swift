@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 @_exported import PartoutCore
-import PartoutNative
+@_exported import PartoutNative_C
 
 public enum PartoutRuntime {
     /// The library version.

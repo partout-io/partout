@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
-import PartoutNative
 
 public final class PartoutProviderRuntime: Sendable {
     private let ctx: PartoutLoggerContext
