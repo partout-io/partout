@@ -56,13 +56,16 @@ jobs:
         run: |
           xcframework="$RUNNER_TEMP/PartoutNative.xcframework"
           prebuilts="$RUNNER_TEMP/prebuilts"
+          prebuilts_version_file="$prebuilts/prebuilts-version.txt"
           archive="$xcframework.zip"
 
           scripts/build-xcframework.sh "$xcframework" "$prebuilts" --full
           test "$(find "$xcframework" -name '*.dSYM' -type d | wc -l)" -eq 5
+          test -s "$prebuilts_version_file"
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
 
           echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "prebuilts_version_file=$prebuilts_version_file" >> "$GITHUB_OUTPUT"
 
       - name: Sign and push tag
         env:
@@ -78,8 +81,9 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.version.outputs.value }}
           ARCHIVE: ${{ steps.xcframework.outputs.archive }}
+          PREBUILTS_VERSION_FILE: ${{ steps.xcframework.outputs.prebuilts_version_file }}
         run: |
-          gh release create "$VERSION" "$ARCHIVE" \
+          gh release create "$VERSION" "$ARCHIVE" "$PREBUILTS_VERSION_FILE" \
             --verify-tag \
             --title "$VERSION" \
             --generate-notes
