@@ -517,7 +517,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "route-gateway")) {
             if (components.items.len > 1) {
-                replaceAddress(allocator, &self.configuration.route_gateway4, components.items[1]) catch |err| switch (err) {
+                replaceIPAddress(allocator, &self.configuration.route_gateway4, components.items[1], .v4) catch |err| switch (err) {
                     error.MalformedOption => return,
                     else => return err,
                 };
@@ -527,7 +527,7 @@ const Builder = struct {
         }
         if (std.ascii.eqlIgnoreCase(option, "route-ipv6-gateway")) {
             if (components.items.len > 1) {
-                replaceAddress(allocator, &self.configuration.route_gateway6, components.items[1]) catch |err| switch (err) {
+                replaceIPAddress(allocator, &self.configuration.route_gateway6, components.items[1], .v6) catch |err| switch (err) {
                     error.MalformedOption => return,
                     else => return err,
                 };
@@ -623,10 +623,17 @@ const Builder = struct {
         defer allocator.free(destination);
         var parsed_destination = (try api.Subnet.parseRawAlloc(allocator, destination)) orelse return error.MalformedOption;
         errdefer parsed_destination.deinit(allocator);
-        var gateway = if (components.len > 3 and !std.ascii.eqlIgnoreCase(components[3], "vpn_gateway"))
-            try api.Address.parseRawAlloc(allocator, components[3])
-        else
-            null;
+        var gateway: ?api.Address = null;
+        if (components.len > 3 and !std.ascii.eqlIgnoreCase(components[3], "vpn_gateway")) {
+            var candidate = (try api.Address.parseRawAlloc(allocator, components[3])) orelse null;
+            if (candidate) |*value| {
+                if (value.family == .v4) {
+                    gateway = value.*;
+                } else {
+                    value.deinit(allocator);
+                }
+            }
+        }
         errdefer if (gateway) |*value| value.deinit(allocator);
         const route = api.Route{
             .destination = parsed_destination,
@@ -644,10 +651,17 @@ const Builder = struct {
         if (std.mem.indexOfScalar(u8, components[1], '/') == null) return error.MalformedOption;
         var destination = (try api.Subnet.parseRawAlloc(allocator, components[1])) orelse return error.MalformedOption;
         errdefer destination.deinit(allocator);
-        var gateway = if (components.len > 2 and !std.ascii.eqlIgnoreCase(components[2], "vpn_gateway"))
-            try api.Address.parseRawAlloc(allocator, components[2])
-        else
-            null;
+        var gateway: ?api.Address = null;
+        if (components.len > 2 and !std.ascii.eqlIgnoreCase(components[2], "vpn_gateway")) {
+            var candidate = (try api.Address.parseRawAlloc(allocator, components[2])) orelse null;
+            if (candidate) |*value| {
+                if (value.family == .v6) {
+                    gateway = value.*;
+                } else {
+                    value.deinit(allocator);
+                }
+            }
+        }
         errdefer if (gateway) |*value| value.deinit(allocator);
         const route = api.Route{
             .destination = destination,
