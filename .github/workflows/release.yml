@@ -1,16 +1,14 @@
 # Release flow:
-# - Trigger on a version change in master, or by manual dispatch.
-# - Read the version from src/version.zig and reject an existing tag.
-# - Download all vendor prebuilts and build the full monolithic XCFramework.
-# - Run Zig tests with all vendors: OpenSSL, MbedTLS, etc.
-# - Verify the built XCFramework is selected locally and run both Swift test suites.
-# - Update Package.swift's remote version and checksum.
-# - Create a signed commit, then create a signed tag that points to it.
-# - Atomically push the commit to master and push the matching tag.
-# - Publish the XCFramework archive with dSYMs, checksum, and prebuilts version.
+# - Trigger on a Swift or native version change in master, or by manual dispatch.
+# - Use the Swift version for the Git tag and GitHub release.
+# - Compare the native version with Package.swift's published artifact version.
+# - For a native release, build and test the XCFramework, then update
+#   Package.swift with its version and checksum.
+# - For a Swift-only release, test against the existing published XCFramework.
+# - Create a signed tag and atomically push the release commit and tag.
+# - Publish XCFramework assets only for native releases.
 #
-# Consequently, both master and the version tag contain a Package.swift that
-# references the matching release.
+# Consequently, Swift-only releases may reference an older native release.
 # Assumption: master is kept unchanged while this workflow is running. If it
 # advances, the non-forcing atomic push fails without updating either ref.
 
@@ -22,6 +20,7 @@ on:
       - master
     paths:
       - src/version.zig
+      - cross/apple/Sources/PartoutCore/Version.swift
   workflow_dispatch:
 
 concurrency:
@@ -38,7 +37,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+
+      - name: Resolve release
+        id: release
+        run: ci/resolve-release.sh
+        # Outputs: mode, version, native_version
+
       - name: Import GPG key
+        if: steps.release.outputs.mode != 'none'
         uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg_private_key: ${{ secrets.GPG_KEY }}
@@ -46,29 +52,14 @@ jobs:
           git_user_signingkey: true
           git_commit_gpgsign: true
           git_tag_gpgsign: true
-      - name: Set up Zig
-        uses: mlugg/setup-zig@v2
-      - name: Parse version
-        id: parse_version
-        env:
-          VERSION_SOURCE: src/version.zig
-        run: |
-          if [[ "$GITHUB_REF_TYPE" != "branch" || "$GITHUB_REF_NAME" != "master" ]]; then
-            echo "::error::Releases must run from master"
-            exit 1
-          fi
 
-          version=$(sed -nE 's/^pub const number = "([^"]+)";$/\1/p' "$VERSION_SOURCE")
-          test -n "$version"
-          [[ "$version" =~ ^[0-9A-Za-z.+-]+$ ]]
-          if git ls-remote --exit-code --tags \
-            origin "refs/tags/$version" >/dev/null 2>&1; then
-            echo "::error::Tag $version already exists"
-            exit 1
-          fi
-          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Set up Zig
+        if: steps.release.outputs.mode == 'native'
+        uses: mlugg/setup-zig@v2
+
       - name: Build XCFramework
-        id: build_xcframework
+        if: steps.release.outputs.mode == 'native'
+        id: xcframework
         run: |
           xcframework="$GITHUB_WORKSPACE/PartoutNative.xcframework"
           artifacts_dir="$RUNNER_TEMP/prebuilts-artifacts"
@@ -85,27 +76,43 @@ jobs:
           echo "checksum_file=$checksum_file" >> "$GITHUB_OUTPUT"
           echo "prebuilts_version_file=$prebuilts_version_file" >> "$GITHUB_OUTPUT"
           echo "artifacts_dir=$artifacts_dir" >> "$GITHUB_OUTPUT"
-      - name: Run Zig tests with all vendors
-        env:
-          ARTIFACTS_DIR: ${{ steps.build_xcframework.outputs.artifacts_dir }}
-        run: ci/run-tests.sh --apple-vendors "$ARTIFACTS_DIR"
-      - name: Run Swift tests with built XCFramework
-        run: |
-          test -d PartoutNative.xcframework
-          swift package dump-package |
-            grep -F '"path" : "PartoutNative.xcframework"'
 
-          ci/run-swift-tests.sh
-      - name: Update Swift package reference
+      - name: Run Zig tests with all vendors
+        if: steps.release.outputs.mode == 'native'
         env:
-          VERSION: ${{ steps.parse_version.outputs.version }}
-          CHECKSUM_FILE: ${{ steps.build_xcframework.outputs.checksum_file }}
+          ARTIFACTS_DIR: ${{ steps.xcframework.outputs.artifacts_dir }}
+        run: ci/run-tests.sh --apple-vendors "$ARTIFACTS_DIR"
+
+      - name: Run Swift tests
+        if: steps.release.outputs.mode != 'none'
+        env:
+          MODE: ${{ steps.release.outputs.mode }}
+          NATIVE_VERSION: ${{ steps.release.outputs.native_version }}
+        run: |
+          if [[ "$MODE" == native ]]; then
+            test -d PartoutNative.xcframework
+            swift package dump-package |
+              grep -F '"path" : "PartoutNative.xcframework"'
+          else
+            test ! -d PartoutNative.xcframework
+            swift package dump-package |
+              grep -F "releases/download/$NATIVE_VERSION/PartoutNative.xcframework.zip"
+          fi
+          ci/run-swift-tests.sh
+
+      - name: Update Swift package reference
+        if: steps.release.outputs.mode == 'native'
+        env:
+          VERSION: ${{ steps.release.outputs.native_version }}
+          CHECKSUM_FILE: ${{ steps.xcframework.outputs.checksum_file }}
         run: |
           ci/update-swift-package.sh "$VERSION" "$CHECKSUM_FILE"
           git verify-commit HEAD
-      - name: Sign and push release commit and tag
+
+      - name: Sign and push release tag
+        if: steps.release.outputs.mode != 'none'
         env:
-          VERSION: ${{ steps.parse_version.outputs.version }}
+          VERSION: ${{ steps.release.outputs.version }}
         run: |
           git tag -s "$VERSION" HEAD -m "$VERSION"
           test "$(git rev-list -n 1 "$VERSION")" = "$(git rev-parse HEAD)"
@@ -113,18 +120,23 @@ jobs:
           git push --atomic origin \
             "HEAD:refs/heads/master" \
             "refs/tags/$VERSION"
+
       - name: Publish release
+        if: steps.release.outputs.mode != 'none'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.parse_version.outputs.version }}
-          ARCHIVE: ${{ steps.build_xcframework.outputs.archive }}
-          CHECKSUM_FILE: ${{ steps.build_xcframework.outputs.checksum_file }}
-          PREBUILTS_VERSION_FILE: ${{ steps.build_xcframework.outputs.prebuilts_version_file }}
+          MODE: ${{ steps.release.outputs.mode }}
+          VERSION: ${{ steps.release.outputs.version }}
+          ARCHIVE: ${{ steps.xcframework.outputs.archive }}
+          CHECKSUM_FILE: ${{ steps.xcframework.outputs.checksum_file }}
+          PREBUILTS_VERSION_FILE: ${{ steps.xcframework.outputs.prebuilts_version_file }}
         run: |
-          gh release create "$VERSION" \
-            "$ARCHIVE" \
-            "$CHECKSUM_FILE" \
-            "$PREBUILTS_VERSION_FILE" \
+          assets=()
+          if [[ "$MODE" == native ]]; then
+            assets=("$ARCHIVE" "$CHECKSUM_FILE" "$PREBUILTS_VERSION_FILE")
+          fi
+
+          gh release create "$VERSION" "${assets[@]}" \
             --verify-tag \
             --title "$VERSION" \
             --generate-notes
