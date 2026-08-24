@@ -13,7 +13,7 @@ let package = Package(
     products: [
         .library(
             name: "partout",
-            targets: ["PartoutRuntime"]
+            targets: ["PartoutCore"]
         ),
         .library(
             name: "PartoutCore",
@@ -22,6 +22,10 @@ let package = Package(
         .library(
             name: "PartoutCore_C",
             targets: ["PartoutCore_C"]
+        ),
+        .library(
+            name: "PartoutRuntime",
+            targets: ["PartoutRuntime"]
         )
     ],
     targets: [
