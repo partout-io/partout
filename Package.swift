@@ -12,7 +12,7 @@ let nativeTarget: PartoutNativeTarget
 if FileManager.default.fileExists(atPath: localNativeURL.path) {
     nativeTarget = .local
 } else {
-    nativeTarget = .remote("0.161.2", checksum: "95d43289d30238bfcdcfaaeb98bb668c1562b0d4e20394deb186d4062eefba35")
+    nativeTarget = .remote("0.161.3", checksum: "dea8ebbc13999059afd1401e4efdefdc0b17f6529411d0904accc051664f486f")
 }
 
 let partoutNative: Target = .partoutNative(nativeTarget)
