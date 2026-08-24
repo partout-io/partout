@@ -13,6 +13,7 @@ const control_serializers_mod = @import("control_serializers.zig");
 const crypto_mod = @import("crypto.zig");
 const data_mod = @import("data.zig");
 const helpers_mod = @import("helpers.zig");
+const logging_mod = @import("logging.zig");
 const packet_mod = @import("packet.zig");
 const processing_mod = @import("processing.zig");
 const push_mod = @import("push.zig");
@@ -531,6 +532,15 @@ pub const Negotiator = struct {
         else
             try self.allocator.dupe(u8, message);
         defer self.allocator.free(complete_message);
+
+        const loggable_message = logging_mod.pushReplyString(
+            self.allocator,
+            complete_message,
+        ) catch null;
+        if (loggable_message) |value| {
+            defer self.allocator.free(value);
+            log.writef(.info, "Attempt to parse PUSH_REPLY: \"{s}\"", .{value});
+        }
 
         var reply = PushReply.parse(self.allocator, complete_message) catch |err| {
             if (err != error.ContinuationPushReply) return err;
