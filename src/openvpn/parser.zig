@@ -609,6 +609,9 @@ const Builder = struct {
         components: []const []const u8,
     ) ParseError!void {
         if (components.len < 2) return;
+        if (components.len > 3 and
+            std.ascii.eqlIgnoreCase(components[1], "remote_host") and
+            std.ascii.eqlIgnoreCase(components[3], "net_gateway")) return;
         const mask = if (components.len > 2) components[2] else "255.255.255.255";
         const prefix = ipv4MaskPrefix(mask) orelse return error.MalformedOption;
         const destination = try std.fmt.allocPrint(allocator, "{s}/{d}", .{ components[1], prefix });

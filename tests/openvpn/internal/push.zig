@@ -122,6 +122,38 @@ test "PUSH_REPLY parses routes and IPv6 DNS" {
     );
 }
 
+test "PUSH_REPLY ignores the remote host net gateway bypass route" {
+    const allocator = std.testing.allocator;
+    var reply = (try push.PushReply.parse(
+        allocator,
+        "PUSH_REPLY,route-gateway 10.242.0.1,sndbuf 0,rcvbuf 0,ping 45,ping-restart 180,route 192.168.138.0 255.255.255.0,route 192.168.20.0 255.255.255.0,route 192.168.10.0 255.255.255.0,route 10.100.11.0 255.255.255.0,topology subnet,route remote_host 255.255.255.255 net_gateway,dhcp-option DNS 192.168.138.253,dhcp-option DOMAIN sos.lan,ifconfig 10.242.128.101 255.255.0.0,peer-id 1,cipher AES-256-GCM",
+    )).?;
+    defer reply.deinit(allocator);
+
+    try std.testing.expectEqual(@as(?f64, 45), reply.options.keep_alive_interval);
+    try std.testing.expectEqual(@as(?f64, 180), reply.options.keep_alive_timeout);
+    try std.testing.expectEqualStrings("10.242.0.1", reply.options.route_gateway4.?.raw);
+    try std.testing.expectEqualStrings(
+        "10.242.128.101",
+        reply.options.ipv4.?.subnets[0].address.raw,
+    );
+    try std.testing.expectEqual(@as(u8, 16), reply.options.ipv4.?.subnets[0].prefix_length);
+    const expected_routes = [_][]const u8{
+        "192.168.138.0",
+        "192.168.20.0",
+        "192.168.10.0",
+        "10.100.11.0",
+    };
+    try std.testing.expectEqual(expected_routes.len, reply.options.routes4.?.len);
+    for (expected_routes, reply.options.routes4.?) |expected, route| {
+        try std.testing.expectEqualStrings(expected, route.destination.?.address.raw);
+    }
+    try std.testing.expectEqualStrings("192.168.138.253", reply.options.dns_servers.?[0]);
+    try std.testing.expectEqualStrings("sos.lan", reply.options.dns_domain.?);
+    try std.testing.expectEqual(@as(?u32, 1), reply.options.peer_id);
+    try std.testing.expectEqual(api.OpenVPNCipher.aes256gcm, reply.options.cipher.?);
+}
+
 test "PUSH_REPLY validates compression framing and algorithms" {
     const allocator = std.testing.allocator;
     var lzo = (try push.PushReply.parse(
