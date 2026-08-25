@@ -51,7 +51,7 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
         .recognized_type = .WireGuard,
-        .sub_code = .wireGuardPeerHasNoPublicKey,
+        .sub_code = api.WireGuardErrorCode.peerHasNoPublicKey.raw(),
         .line = "AllowedIPs = 0.0.0.0/0",
     };
     const context = core.ImportContext.init(&info, null);
@@ -66,12 +66,12 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
 
     var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
     defer envelope.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.wireGuardPeerHasNoPublicKey, envelope.code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.decoding, envelope.code.?);
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
     try std.testing.expectEqual(api.ModuleType.WireGuard, parsed_info.recognized_type.?);
-    try std.testing.expectEqual(api.PartoutErrorCode.wireGuardPeerHasNoPublicKey, parsed_info.sub_code.?);
+    try std.testing.expectEqualStrings(api.WireGuardErrorCode.peerHasNoPublicKey.raw(), parsed_info.sub_code.?);
     try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"recognizedType\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"subCode\"") != null);
 }

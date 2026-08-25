@@ -30,12 +30,12 @@ pub fn importModule(
             error.InvalidFormat => error.UnknownImportedModule,
             error.EmptyPassphrase => {
                 setRecognizedType(context);
-                setImportErrorCode(context, err);
+                setImportErrorCode(allocator, context, err);
                 return error.PassphraseRequired;
             },
             else => {
                 setRecognizedType(context);
-                setImportErrorCode(context, err);
+                setImportErrorCode(allocator, context, err);
                 return error.Parsing;
             },
         };
@@ -43,12 +43,10 @@ pub fn importModule(
     setRecognizedType(context);
     if (!isCompleteClientConfiguration(&configuration)) {
         configuration.deinit(allocator);
-        setErrorCode(context, .parsing);
         return error.Parsing;
     }
     const module_id = core.newId() catch {
         configuration.deinit(allocator);
-        setErrorCode(context, .unhandled);
         return error.Parsing;
     };
     const module = api.TaggedModule{ .OpenVPN = .{
@@ -1169,24 +1167,30 @@ fn setRecognizedType(context: ?core.ImportContext) void {
     import_context.setRecognizedType(.OpenVPN);
 }
 
-fn setErrorCode(context: ?core.ImportContext, code: api.PartoutErrorCode) void {
+fn setErrorCode(
+    allocator: std.mem.Allocator,
+    context: ?core.ImportContext,
+    code: api.OpenVPNErrorCode,
+) void {
     const import_context = context orelse return;
     const error_info = import_context.parse_error_info orelse return;
-    if (error_info.sub_code == null) error_info.sub_code = code;
+    if (error_info.sub_code == null) {
+        error_info.sub_code = allocator.dupe(u8, code.raw()) catch return;
+    }
 }
 
-fn setImportErrorCode(context: ?core.ImportContext, err: ParseError) void {
-    const code: api.PartoutErrorCode = switch (err) {
-        error.OutOfMemory => .outOfMemory,
-        error.ContinuationPushReply, error.MalformedOption => .parsing,
-        error.DecrypterRequired => .requiredImplementation,
-        error.EmptyPassphrase => .openVPNPassphraseRequired,
-        error.InvalidFormat => .unknownImportedModule,
-        error.UnableToDecrypt => .crypto,
-        error.UnsupportedCompression => .openVPNUnsupportedCompression,
-        error.UnsupportedConfiguration => .openVPNUnsupportedOption,
+fn setImportErrorCode(
+    allocator: std.mem.Allocator,
+    context: ?core.ImportContext,
+    err: ParseError,
+) void {
+    const code: ?api.OpenVPNErrorCode = switch (err) {
+        error.EmptyPassphrase => .passphraseRequired,
+        error.UnsupportedCompression => .unsupportedCompression,
+        error.UnsupportedConfiguration => .unsupportedOption,
+        else => null,
     };
-    setErrorCode(context, code);
+    if (code) |value| setErrorCode(allocator, context, value);
 }
 
 const known_openvpn_options = [_][]const u8{

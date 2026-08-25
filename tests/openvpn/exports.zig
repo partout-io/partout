@@ -101,8 +101,8 @@ test "OpenVPN module importer reports public parse error code and info" {
     try std.testing.expectEqualStrings("compress", info.name.?);
     try std.testing.expectEqualStrings("compress lzo", info.line.?);
     try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
         info.sub_code.?,
     );
 }
@@ -111,8 +111,8 @@ test "OpenVPN module importer maps parser errors to public codes" {
     const allocator = std.testing.allocator;
     const module_implementation = exports.impl.module;
     const cases = .{
-        .{ "cipher", api.PartoutErrorCode.parsing },
-        .{ "proto sctp", api.PartoutErrorCode.openVPNUnsupportedOption },
+        .{ "cipher", @as(?[]const u8, null) },
+        .{ "proto sctp", @as(?[]const u8, api.OpenVPNErrorCode.unsupportedOption.raw()) },
     };
 
     inline for (cases) |entry| {
@@ -126,7 +126,11 @@ test "OpenVPN module importer maps parser errors to public codes" {
                 core.ImportContext.init(&info, null),
             ),
         );
-        try std.testing.expectEqual(entry[1], info.sub_code.?);
+        if (entry[1]) |expected| {
+            try std.testing.expectEqualStrings(expected, info.sub_code.?);
+        } else {
+            try std.testing.expect(info.sub_code == null);
+        }
     }
 }
 
@@ -176,7 +180,7 @@ test "OpenVPN module importer reports passphrase requirement" {
     );
 
     try std.testing.expectEqual(api.ModuleType.OpenVPN, info.recognized_type.?);
-    try std.testing.expectEqual(api.PartoutErrorCode.openVPNPassphraseRequired, info.sub_code.?);
+    try std.testing.expectEqualStrings(api.OpenVPNErrorCode.passphraseRequired.raw(), info.sub_code.?);
 }
 
 test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {

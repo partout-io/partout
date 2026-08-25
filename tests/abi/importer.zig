@@ -142,8 +142,8 @@ test "ABI importer reports parse error info for raw modules" {
     try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
     try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.interfaceHasInvalidPrivateKey.raw(),
         info.sub_code.?,
     );
 }
@@ -171,8 +171,8 @@ test "ABI importer reports parse error info for raw profiles" {
     try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
     try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.interfaceHasInvalidPrivateKey.raw(),
         info.sub_code.?,
     );
 }
@@ -192,8 +192,8 @@ test "ABI importer preserves OpenVPN parse error codes" {
             core.ImportContext.init(&module_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
         module_info.sub_code.?,
     );
 
@@ -208,8 +208,8 @@ test "ABI importer preserves OpenVPN parse error codes" {
             core.ImportContext.init(&profile_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
         profile_info.sub_code.?,
     );
 
@@ -223,8 +223,8 @@ test "ABI importer preserves OpenVPN parse error codes" {
             core.ImportContext.init(&passphrase_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNPassphraseRequired,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.passphraseRequired.raw(),
         passphrase_info.sub_code.?,
     );
     try std.testing.expect(passphrase_info.name == null);
@@ -241,19 +241,19 @@ test "profile import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_wireguard_profile, null),
-        .wireGuardPeerHasNoPublicKey,
+        .decoding,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_openvpn_profile, null),
-        .openVPNUnsupportedCompression,
+        .decoding,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(encrypted_openvpn_profile, null),
-        .openVPNPassphraseRequired,
+        .decoding,
         null,
         null,
     );
@@ -268,19 +268,19 @@ test "module import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_wireguard_profile),
-        .wireGuardPeerHasNoPublicKey,
+        .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_openvpn_profile),
-        .openVPNUnsupportedCompression,
+        .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(encrypted_openvpn_profile),
-        .openVPNPassphraseRequired,
+        .passphraseRequired,
         null,
         null,
     );

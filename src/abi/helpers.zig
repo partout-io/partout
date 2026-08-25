@@ -146,10 +146,7 @@ pub fn importErrorPayloadAllocZ(
     err: ImportAndEncodeError,
     context: core.ImportContext,
 ) ?[*:0]u8 {
-    const code = if (context.parse_error_info) |error_info|
-        error_info.sub_code orelse importErrorCode(err)
-    else
-        importErrorCode(err);
+    const code = importErrorCode(err);
     const user_info = errorUserInfoAllocZ(allocator, context.parse_error_info);
     return wrapOwnedImportPayload(
         allocator,

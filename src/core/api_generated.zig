@@ -314,7 +314,7 @@ pub const ABIEnvelope = struct {
 
 pub const ParseErrorInfo = struct {
     recognized_type: ?ModuleType = null,
-    sub_code: ?PartoutErrorCode = null,
+    sub_code: ?[]const u8 = null,
     name: ?[]const u8 = null,
     line: ?[]const u8 = null,
     arguments: []const []const u8 = &.{},
@@ -340,7 +340,7 @@ pub const ParseErrorInfo = struct {
         var result = ParseErrorInfo{};
         errdefer result.deinit(allocator);
         result.recognized_type = try parseOptionalJsonField(ModuleType, allocator, object, "recognizedType", error_info);
-        result.sub_code = try parseOptionalJsonField(PartoutErrorCode, allocator, object, "subCode", error_info);
+        result.sub_code = try parseOptionalJsonField([]const u8, allocator, object, "subCode", error_info);
         result.name = try parseOptionalJsonField([]const u8, allocator, object, "name", error_info);
         result.line = try parseOptionalJsonField([]const u8, allocator, object, "line", error_info);
         result.arguments = try parseJsonField([]const []const u8, allocator, object, "arguments", error_info);
@@ -355,7 +355,7 @@ pub const ParseErrorInfo = struct {
 
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         if (self.recognized_type) |*value| deinitJson(ModuleType, allocator, value);
-        if (self.sub_code) |*value| deinitJson(PartoutErrorCode, allocator, value);
+        if (self.sub_code) |*value| deinitJson([]const u8, allocator, value);
         if (self.name) |*value| deinitJson([]const u8, allocator, value);
         if (self.line) |*value| deinitJson([]const u8, allocator, value);
         deinitJson([]const []const u8, allocator, &self.arguments);

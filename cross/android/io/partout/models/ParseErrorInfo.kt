@@ -24,7 +24,6 @@
 package io.partout.models
 
 import io.partout.models.ModuleType
-import io.partout.models.PartoutErrorCode
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -49,8 +48,8 @@ data class ParseErrorInfo (
     @Contextual @SerialName(value = "recognizedType")
     val recognizedType: ModuleType? = null,
 
-    @Contextual @SerialName(value = "subCode")
-    val subCode: PartoutErrorCode? = null,
+    @SerialName(value = "subCode")
+    val subCode: kotlin.String? = null,
 
     @SerialName(value = "name")
     val name: kotlin.String? = null,
