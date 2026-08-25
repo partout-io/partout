@@ -368,7 +368,7 @@ test "registry stops after a concrete importer error" {
         };
     };
 
-    var failed = Mock{ .module_type = .OpenVPN, .err = error.PassphraseRequired };
+    var failed = Mock{ .module_type = .OpenVPN, .err = error.InvalidProfile };
     var ignored = Mock{ .module_type = .WireGuard, .err = error.UnknownImportedModule };
     const implementations = [_]ModuleImplementation{
         failed.implementation(),
@@ -381,7 +381,7 @@ test "registry stops after a concrete importer error" {
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
     try std.testing.expectError(
-        error.PassphraseRequired,
+        error.InvalidProfile,
         registry.importModule(
             allocator,
             "contents",

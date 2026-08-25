@@ -16,7 +16,6 @@ pub const ImportError = error{
     InvalidProfile,
     OutOfMemory,
     Parsing,
-    PassphraseRequired,
     UnknownImportedModule,
 };
 

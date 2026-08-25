@@ -87,7 +87,6 @@ test "ABI import errors map to stable public codes" {
         .{ error.InvalidModel, api.PartoutErrorCode.encoding },
         .{ error.Stringify, api.PartoutErrorCode.encoding },
         .{ error.Parsing, api.PartoutErrorCode.parsing },
-        .{ error.PassphraseRequired, api.PartoutErrorCode.passphraseRequired },
         .{ error.UnknownImportedModule, api.PartoutErrorCode.unknownImportedModule },
     };
 

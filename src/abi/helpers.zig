@@ -187,7 +187,6 @@ fn importErrorCode(err: ImportAndEncodeError) api.PartoutErrorCode {
         error.InvalidJson, error.InvalidProfile => .decoding,
         error.InvalidModel, error.Stringify => .encoding,
         error.Parsing => .parsing,
-        error.PassphraseRequired => .passphraseRequired,
         error.UnknownImportedModule => .unknownImportedModule,
     };
 }

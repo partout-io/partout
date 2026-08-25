@@ -31,7 +31,7 @@ pub fn importModule(
             error.EmptyPassphrase => {
                 setRecognizedType(context);
                 setImportErrorCode(allocator, context, err);
-                return if (hasParseErrorInfo(context)) error.Parsing else error.PassphraseRequired;
+                return error.Parsing;
             },
             else => {
                 setRecognizedType(context);
@@ -1165,11 +1165,6 @@ fn importParserContext(context: ?core.ImportContext) Parser.Context {
 fn setRecognizedType(context: ?core.ImportContext) void {
     const import_context = context orelse return;
     import_context.setRecognizedType(.OpenVPN);
-}
-
-fn hasParseErrorInfo(context: ?core.ImportContext) bool {
-    const import_context = context orelse return false;
-    return import_context.parse_error_info != null;
 }
 
 fn setErrorCode(
