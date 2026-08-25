@@ -22,7 +22,7 @@ pub fn importModule(
             error.InvalidLine => error.UnknownImportedModule,
             else => {
                 setRecognizedType(context);
-                setImportErrorCode(context, err);
+                setImportErrorCode(allocator, context, err);
                 return error.Parsing;
             },
         };
@@ -30,7 +30,6 @@ pub fn importModule(
     setRecognizedType(context);
     const module_id = core.newId() catch {
         configuration.deinit(allocator);
-        setErrorCode(context, .unhandled);
         return error.Parsing;
     };
     const module = api.TaggedModule{ .WireGuard = .{
@@ -564,35 +563,43 @@ fn setRecognizedType(context: ?core.ImportContext) void {
     import_context.setRecognizedType(.WireGuard);
 }
 
-fn setErrorCode(context: ?core.ImportContext, code: api.PartoutErrorCode) void {
+fn setErrorCode(
+    allocator: std.mem.Allocator,
+    context: ?core.ImportContext,
+    code: api.WireGuardErrorCode,
+) void {
     const import_context = context orelse return;
     const error_info = import_context.parse_error_info orelse return;
-    if (error_info.error_code == null) error_info.error_code = code;
+    if (error_info.sub_code == null) {
+        error_info.sub_code = allocator.dupe(u8, code.raw()) catch return;
+    }
 }
 
-fn setImportErrorCode(context: ?core.ImportContext, err: ParseError) void {
-    const code: api.PartoutErrorCode = switch (err) {
-        error.OutOfMemory => .outOfMemory,
-        error.InvalidLine => .parsing,
-        error.NoInterface => .wireGuardNoInterface,
-        error.MultipleInterfaces => .wireGuardMultipleInterfaces,
-        error.InterfaceHasNoPrivateKey => .wireGuardInterfaceHasNoPrivateKey,
-        error.InterfaceHasInvalidPrivateKey => .wireGuardInterfaceHasInvalidPrivateKey,
-        error.InterfaceHasInvalidListenPort => .wireGuardInterfaceHasInvalidListenPort,
-        error.InterfaceHasInvalidAddress => .wireGuardInterfaceHasInvalidAddress,
-        error.InterfaceHasInvalidDNS => .wireGuardInterfaceHasInvalidDNS,
-        error.InterfaceHasInvalidMTU => .wireGuardInterfaceHasInvalidMTU,
-        error.InterfaceHasUnrecognizedKey => .wireGuardInterfaceHasUnrecognizedKey,
-        error.PeerHasNoPublicKey => .wireGuardPeerHasNoPublicKey,
-        error.PeerHasInvalidPublicKey => .wireGuardPeerHasInvalidPublicKey,
-        error.PeerHasInvalidPreSharedKey => .wireGuardPeerHasInvalidPreSharedKey,
-        error.PeerHasInvalidAllowedIP => .wireGuardPeerHasInvalidAllowedIP,
-        error.PeerHasInvalidEndpoint => .wireGuardPeerHasInvalidEndpoint,
-        error.PeerHasInvalidPersistentKeepAlive => .wireGuardPeerHasInvalidPersistentKeepAlive,
-        error.PeerHasUnrecognizedKey => .wireGuardPeerHasUnrecognizedKey,
-        error.MultiplePeersWithSamePublicKey => .wireGuardMultiplePeersWithSamePublicKey,
-        error.MultipleEntriesForKey => .wireGuardMultipleEntriesForKey,
-        error.IdGeneration => .unhandled,
+fn setImportErrorCode(
+    allocator: std.mem.Allocator,
+    context: ?core.ImportContext,
+    err: ParseError,
+) void {
+    const code: ?api.WireGuardErrorCode = switch (err) {
+        error.NoInterface => .noInterface,
+        error.MultipleInterfaces => .multipleInterfaces,
+        error.InterfaceHasNoPrivateKey => .interfaceHasNoPrivateKey,
+        error.InterfaceHasInvalidPrivateKey => .interfaceHasInvalidPrivateKey,
+        error.InterfaceHasInvalidListenPort => .interfaceHasInvalidListenPort,
+        error.InterfaceHasInvalidAddress => .interfaceHasInvalidAddress,
+        error.InterfaceHasInvalidDNS => .interfaceHasInvalidDNS,
+        error.InterfaceHasInvalidMTU => .interfaceHasInvalidMTU,
+        error.InterfaceHasUnrecognizedKey => .interfaceHasUnrecognizedKey,
+        error.PeerHasNoPublicKey => .peerHasNoPublicKey,
+        error.PeerHasInvalidPublicKey => .peerHasInvalidPublicKey,
+        error.PeerHasInvalidPreSharedKey => .peerHasInvalidPreSharedKey,
+        error.PeerHasInvalidAllowedIP => .peerHasInvalidAllowedIP,
+        error.PeerHasInvalidEndpoint => .peerHasInvalidEndpoint,
+        error.PeerHasInvalidPersistentKeepAlive => .peerHasInvalidPersistentKeepAlive,
+        error.PeerHasUnrecognizedKey => .peerHasUnrecognizedKey,
+        error.MultiplePeersWithSamePublicKey => .multiplePeersWithSamePublicKey,
+        error.MultipleEntriesForKey => .multipleEntriesForKey,
+        else => null,
     };
-    setErrorCode(context, code);
+    if (code) |value| setErrorCode(allocator, context, value);
 }

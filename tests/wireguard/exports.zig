@@ -62,7 +62,7 @@ test "WireGuard module importer reports public parse error code and info" {
             \\[Interface]
             \\PrivateKey = nope
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 
@@ -70,9 +70,9 @@ test "WireGuard module importer reports public parse error code and info" {
     try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
     try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
-        info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.interfaceHasInvalidPrivateKey.raw(),
+        info.sub_code.?,
     );
 }
 
@@ -92,12 +92,12 @@ test "WireGuard module importer preserves PeerHasNoPublicKey" {
             \\[Peer]
             \\AllowedIPs = 0.0.0.0/0
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardPeerHasNoPublicKey,
-        info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.peerHasNoPublicKey.raw(),
+        info.sub_code.?,
     );
 }

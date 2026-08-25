@@ -26,19 +26,19 @@ public func ~= (pattern: PartoutError.Code, value: String?) -> Bool {
     value == pattern
 }
 
-extension ABIErrorPayload {
+extension ABIEnvelope {
     public init(_ error: Error) {
         guard let partoutError = error as? PartoutError else {
             self.init(
                 code: .unhandled,
-                userInfo: try? JSON(["localizedDescription": error.localizedDescription])
+                payload: try? JSON(["localizedDescription": error.localizedDescription])
             )
             return
         }
         guard let userInfo = partoutError.userInfo as? Encodable else {
-            self.init(code: partoutError.code, userInfo: nil)
+            self.init(code: partoutError.code)
             return
         }
-        self.init(code: partoutError.code, userInfo: try? JSON(encodable: userInfo))
+        self.init(code: partoutError.code, payload: try? JSON(encodable: userInfo))
     }
 }

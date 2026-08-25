@@ -16,32 +16,28 @@ pub const ImportError = error{
     InvalidProfile,
     OutOfMemory,
     Parsing,
-    PassphraseRequired,
     UnknownImportedModule,
 };
 
 /// Caller-provided context for module importers.
 ///
 /// The registry probes multiple importers for raw input before it knows the
-/// module type. `parse_error_info` is generic metadata for every importer,
-/// `recognized_type` receives the type of a recognized import outcome, while
-/// `ptr` is optional importer-specific context guarded by `module_type`.
+/// module type. `parse_error_info` receives generic metadata for every importer,
+/// including the type of a recognized import outcome, while `ptr` is optional
+/// importer-specific context guarded by `module_type`.
 /// The module implementation stamps `module_type` on a copy for the duration of
 /// each importer callback.
 pub const ImportContext = struct {
     module_type: ?api.ModuleType = null,
     parse_error_info: ?*api.ParseErrorInfo = null,
-    recognized_type: ?*api.ModuleType = null,
     ptr: ?*const anyopaque = null,
 
     pub fn init(
         parse_error_info: ?*api.ParseErrorInfo,
-        recognized_type: ?*api.ModuleType,
         ptr: ?*const anyopaque,
     ) ImportContext {
         return .{
             .parse_error_info = parse_error_info,
-            .recognized_type = recognized_type,
             .ptr = ptr,
         };
     }
@@ -70,8 +66,8 @@ pub const ImportContext = struct {
         self: ImportContext,
         module_type: api.ModuleType,
     ) void {
-        const recognized_type = self.recognized_type orelse return;
-        recognized_type.* = module_type;
+        const info = self.parse_error_info orelse return;
+        info.recognized_type = module_type;
     }
 };
 
@@ -300,6 +296,7 @@ pub const Registry = struct {
         var module = self.importModule(allocator, text, context) catch |module_err| {
             return switch (module_err) {
                 error.OutOfMemory => error.OutOfMemory,
+                error.Parsing => error.Parsing,
                 else => error.InvalidProfile,
             };
         };

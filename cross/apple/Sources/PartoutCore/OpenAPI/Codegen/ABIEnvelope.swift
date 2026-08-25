@@ -7,10 +7,10 @@
 
 public struct ABIEnvelope: Sendable, Codable, Hashable {
 
-    public var code: Int
-    public var payload: JSON
+    public var code: PartoutErrorCode?
+    public var payload: JSON?
 
-    public init(code: Int, payload: JSON) {
+    public init(code: PartoutErrorCode? = nil, payload: JSON? = nil) {
         self.code = code
         self.payload = payload
     }

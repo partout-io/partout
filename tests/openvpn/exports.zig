@@ -94,16 +94,16 @@ test "OpenVPN module importer reports public parse error code and info" {
         module_implementation.importModule(
             allocator,
             "compress lzo",
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 
     try std.testing.expectEqualStrings("compress", info.name.?);
     try std.testing.expectEqualStrings("compress lzo", info.line.?);
     try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
-        info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
+        info.sub_code.?,
     );
 }
 
@@ -111,8 +111,8 @@ test "OpenVPN module importer maps parser errors to public codes" {
     const allocator = std.testing.allocator;
     const module_implementation = exports.impl.module;
     const cases = .{
-        .{ "cipher", api.PartoutErrorCode.parsing },
-        .{ "proto sctp", api.PartoutErrorCode.openVPNUnsupportedOption },
+        .{ "cipher", @as(?[]const u8, null) },
+        .{ "proto sctp", @as(?[]const u8, api.OpenVPNErrorCode.unsupportedOption.raw()) },
     };
 
     inline for (cases) |entry| {
@@ -123,10 +123,14 @@ test "OpenVPN module importer maps parser errors to public codes" {
             module_implementation.importModule(
                 allocator,
                 entry[0],
-                core.ImportContext.init(&info, null, null),
+                core.ImportContext.init(&info, null),
             ),
         );
-        try std.testing.expectEqual(entry[1], info.error_code.?);
+        if (entry[1]) |expected| {
+            try std.testing.expectEqualStrings(expected, info.sub_code.?);
+        } else {
+            try std.testing.expect(info.sub_code == null);
+        }
     }
 }
 
@@ -135,7 +139,7 @@ test "OpenVPN module importer accepts protocol context pointer" {
 
     const module_implementation = exports.impl.module;
     var context = parser.Parser.Context{ .passphrase = "secret" };
-    const import_context = core.ImportContext.init(null, null, @ptrCast(&context));
+    const import_context = core.ImportContext.init(null, @ptrCast(&context));
     try std.testing.expect(import_context.cast(parser.Parser.Context, .OpenVPN) == null);
     try std.testing.expectEqualStrings(
         "secret",
@@ -163,21 +167,20 @@ test "OpenVPN module importer reports passphrase requirement" {
     const allocator = std.testing.allocator;
 
     const module_implementation = exports.impl.module;
-    var recognized_type: api.ModuleType = undefined;
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
 
     try std.testing.expectError(
-        error.PassphraseRequired,
+        error.Parsing,
         module_implementation.importModule(
             allocator,
             encrypted_key_configuration,
-            core.ImportContext.init(&info, &recognized_type, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 
-    try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
-    try std.testing.expectEqual(api.PartoutErrorCode.openVPNPassphraseRequired, info.error_code.?);
+    try std.testing.expectEqual(api.ModuleType.OpenVPN, info.recognized_type.?);
+    try std.testing.expectEqualStrings(api.OpenVPNErrorCode.passphraseRequired.raw(), info.sub_code.?);
 }
 
 test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {
@@ -205,7 +208,6 @@ test "OpenVPN module importer rejects a wrong encrypted-key passphrase" {
         tunnelbear_aes256_pkcs8,
         core.ImportContext.init(
             null,
-            null,
             @ptrCast(&parser_context),
         ).withModuleType(.OpenVPN),
     )) |imported| {
@@ -223,7 +225,6 @@ fn expectDefaultImporterDecrypts(contents: []const u8) !void {
         allocator,
         contents,
         core.ImportContext.init(
-            null,
             null,
             @ptrCast(&parser_context),
         ).withModuleType(.OpenVPN),

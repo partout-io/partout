@@ -14,14 +14,14 @@ public final class PartoutImporter: Sendable {
         let json = String(cString: cJSON)
         guard let jsonData = json.data(using: .utf8) else { return nil }
         let envelope = try decoder.decode(ABIEnvelope.self, from: jsonData)
-        let payloadData = try encoder.encode(envelope.payload)
-        guard envelope.code == 0 else {
-            let payload = try decoder.decode(ABIErrorPayload.self, from: payloadData)
-            if let userInfo = payload.userInfo {
-                throw PartoutError(payload.code, userInfo)
+        if let code = envelope.code {
+            if let payload = envelope.payload {
+                throw PartoutError(code, payload)
             }
-            throw PartoutError(payload.code)
+            throw PartoutError(code)
         }
+        guard let payload = envelope.payload else { throw PartoutError(.decoding) }
+        let payloadData = try encoder.encode(payload)
         let tagged = try decoder.decode(TaggedModule.self, from: payloadData)
         return tagged.containedModule
     }

@@ -4,28 +4,17 @@ components:
       additionalProperties: false
       properties:
         code:
-          $ref: "#/components/schemas/Int32"
+          $ref: "#/components/schemas/PartoutErrorCode"
         payload:
           $ref: "#/components/schemas/JSONValue"
-      required:
-        - code
-        - payload
-      type: object
-    ABIErrorPayload:
-      additionalProperties: false
-      properties:
-        code:
-          $ref: "#/components/schemas/PartoutErrorCode"
-        userInfo:
-          type: object
-      required:
-        - code
       type: object
     ParseErrorInfo:
       additionalProperties: false
       properties:
-        errorCode:
-          $ref: "#/components/schemas/PartoutErrorCode"
+        recognizedType:
+          $ref: "#/components/schemas/ModuleType"
+        subCode:
+          type: string
         name:
           type: string
         line:
@@ -756,6 +745,45 @@ components:
         - Authenticates payload (--tls-auth).
         - Encrypts payload (--tls-crypt).
         - "Encrypts payload with a client-specific key (--tls-crypt-v2)."
+    OpenVPNErrorCode:
+      enum:
+        - compressionMismatch
+        - connectionFailure
+        - noRouting
+        - otpRequired
+        - passphraseRequired
+        - recoverableAuthentication
+        - serverShutdown
+        - tlsFailure
+        - unsupportedAlgorithm
+        - unsupportedCompression
+        - unsupportedOption
+      type: string
+      x-enum-varnames:
+        - compressionMismatch
+        - connectionFailure
+        - noRouting
+        - otpRequired
+        - passphraseRequired
+        - recoverableAuthentication
+        - serverShutdown
+        - tlsFailure
+        - unsupportedAlgorithm
+        - unsupportedCompression
+        - unsupportedOption
+      x-enum-descriptions:
+        - Compression settings mismatch.
+        - Connection failure.
+        - No routing configuration.
+        - One-time password is required.
+        - Passphrase is required.
+        - Authentication can be retried.
+        - Server requested shutdown.
+        - TLS failure.
+        - Algorithm is unsupported.
+        - Compression setting is unsupported.
+        - Option is unsupported.
+      description: An OpenVPN-specific error code.
     OpenVPNModule:
       additionalProperties: false
       properties:
@@ -1325,6 +1353,69 @@ components:
         - allowedIPs
       type: object
       description: The parameters of the remote interface.
+    WireGuardErrorCode:
+      enum:
+        - emptyPeers
+        - interfaceHasInvalidAddress
+        - interfaceHasInvalidDNS
+        - interfaceHasInvalidListenPort
+        - interfaceHasInvalidMTU
+        - interfaceHasInvalidPrivateKey
+        - interfaceHasNoPrivateKey
+        - interfaceHasUnrecognizedKey
+        - multipleEntriesForKey
+        - multipleInterfaces
+        - multiplePeersWithSamePublicKey
+        - noInterface
+        - peerHasInvalidAllowedIP
+        - peerHasInvalidEndpoint
+        - peerHasInvalidPersistentKeepAlive
+        - peerHasInvalidPreSharedKey
+        - peerHasInvalidPublicKey
+        - peerHasNoPublicKey
+        - peerHasUnrecognizedKey
+      type: string
+      x-enum-varnames:
+        - emptyPeers
+        - interfaceHasInvalidAddress
+        - interfaceHasInvalidDNS
+        - interfaceHasInvalidListenPort
+        - interfaceHasInvalidMTU
+        - interfaceHasInvalidPrivateKey
+        - interfaceHasNoPrivateKey
+        - interfaceHasUnrecognizedKey
+        - multipleEntriesForKey
+        - multipleInterfaces
+        - multiplePeersWithSamePublicKey
+        - noInterface
+        - peerHasInvalidAllowedIP
+        - peerHasInvalidEndpoint
+        - peerHasInvalidPersistentKeepAlive
+        - peerHasInvalidPreSharedKey
+        - peerHasInvalidPublicKey
+        - peerHasNoPublicKey
+        - peerHasUnrecognizedKey
+      x-enum-descriptions:
+        - Configuration has no peers.
+        - WireGuard interface address is invalid.
+        - WireGuard interface DNS entry is invalid.
+        - WireGuard interface listen port is invalid.
+        - WireGuard interface MTU is invalid.
+        - WireGuard interface private key is invalid.
+        - WireGuard interface has no private key.
+        - WireGuard interface key is unrecognized.
+        - WireGuard key occurs more than once.
+        - WireGuard configuration has multiple interface sections.
+        - WireGuard configuration has multiple peers with the same public key.
+        - WireGuard configuration has no interface section.
+        - WireGuard peer allowed IP is invalid.
+        - WireGuard peer endpoint is invalid.
+        - WireGuard peer persistent keepalive is invalid.
+        - WireGuard peer pre-shared key is invalid.
+        - WireGuard peer public key is invalid.
+        - WireGuard peer has no public key.
+        - WireGuard peer key is unrecognized.
+      description: A WireGuard-specific error code.
     WireGuardModule:
       additionalProperties: false
       properties:

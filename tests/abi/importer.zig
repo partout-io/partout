@@ -29,7 +29,7 @@ test "ABI registry imports raw OpenVPN profile through parser implementation" {
         \\</ca>
     ,
         "Imported OpenVPN",
-        core.ImportContext.init(null, null, null),
+        core.ImportContext.init(null, null),
     );
     defer allocator.free(imported);
 
@@ -62,7 +62,7 @@ test "ABI registry imports raw WireGuard profile through parser implementation" 
         \\Endpoint = wg.example.com:51820
     ,
         "Imported WireGuard",
-        core.ImportContext.init(null, null, null),
+        core.ImportContext.init(null, null),
     );
     defer allocator.free(imported);
 
@@ -90,7 +90,7 @@ test "ABI registry imports raw OpenVPN module through parser implementation" {
         \\abc
         \\-----END CERTIFICATE-----
         \\</ca>
-    , core.ImportContext.init(null, null, null));
+    , core.ImportContext.init(null, null));
     defer allocator.free(imported);
 
     try std.testing.expectEqual(@as(u8, 0), imported[imported.len]);
@@ -113,7 +113,7 @@ test "ABI registry imports raw WireGuard module through parser implementation" {
         \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
         \\AllowedIPs = 0.0.0.0/0
         \\Endpoint = wg.example.com:51820
-    , core.ImportContext.init(null, null, null));
+    , core.ImportContext.init(null, null));
     defer allocator.free(imported);
 
     try std.testing.expect(std.mem.indexOf(u8, imported, "\"type\":\"WireGuard\"") != null);
@@ -135,16 +135,16 @@ test "ABI importer reports parse error info for raw modules" {
             \\[Interface]
             \\PrivateKey = nope
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
     try std.testing.expectEqualStrings("PrivateKey", info.name.?);
     try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
     try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
-        info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.interfaceHasInvalidPrivateKey.raw(),
+        info.sub_code.?,
     );
 }
 
@@ -157,23 +157,23 @@ test "ABI importer reports parse error info for raw profiles" {
     defer info.deinit(allocator);
 
     try std.testing.expectError(
-        error.InvalidProfile,
+        error.Parsing,
         importer.importProfile(
             allocator,
             \\[Interface]
             \\PrivateKey = nope
         ,
             null,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
     try std.testing.expectEqualStrings("PrivateKey", info.name.?);
     try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
     try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
-        info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.WireGuardErrorCode.interfaceHasInvalidPrivateKey.raw(),
+        info.sub_code.?,
     );
 }
 
@@ -189,108 +189,128 @@ test "ABI importer preserves OpenVPN parse error codes" {
         importer.importModule(
             allocator,
             invalid_openvpn_profile,
-            core.ImportContext.init(&module_info, null, null),
+            core.ImportContext.init(&module_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
-        module_info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
+        module_info.sub_code.?,
     );
 
     var profile_info: api.ParseErrorInfo = .{};
     defer profile_info.deinit(allocator);
     try std.testing.expectError(
-        error.InvalidProfile,
+        error.Parsing,
         importer.importProfile(
             allocator,
             invalid_openvpn_profile,
             null,
-            core.ImportContext.init(&profile_info, null, null),
+            core.ImportContext.init(&profile_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNUnsupportedCompression,
-        profile_info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unsupportedCompression.raw(),
+        profile_info.sub_code.?,
     );
 
     var passphrase_info: api.ParseErrorInfo = .{};
     defer passphrase_info.deinit(allocator);
     try std.testing.expectError(
-        error.PassphraseRequired,
+        error.Parsing,
         importer.importModule(
             allocator,
             encrypted_openvpn_profile,
-            core.ImportContext.init(&passphrase_info, null, null),
+            core.ImportContext.init(&passphrase_info, null),
         ),
     );
-    try std.testing.expectEqual(
-        api.PartoutErrorCode.openVPNPassphraseRequired,
-        passphrase_info.error_code.?,
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.passphraseRequired.raw(),
+        passphrase_info.sub_code.?,
     );
     try std.testing.expect(passphrase_info.name == null);
     try std.testing.expect(passphrase_info.line == null);
     try std.testing.expectEqual(@as(usize, 0), passphrase_info.arguments.len);
 }
 
+test "ABI importer preserves parsing without a sub-code" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
+
+    try std.testing.expectError(
+        error.Parsing,
+        importer.importProfile(
+            allocator,
+            "cipher",
+            null,
+            core.ImportContext.init(&info, null),
+        ),
+    );
+    try std.testing.expect(info.sub_code == null);
+}
+
 test "profile import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_profile(valid_wireguard_profile, "Imported WireGuard"),
-        0,
+        null,
         "name",
         "Imported WireGuard",
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_wireguard_profile, null),
-        -1,
-        "code",
-        "WireGuard.peerHasNoPublicKey",
+        .parsing,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_openvpn_profile, null),
-        -1,
-        "code",
-        "OpenVPN.unsupportedCompression",
+        .parsing,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(encrypted_openvpn_profile, null),
-        -1,
-        "code",
-        "OpenVPN.passphraseRequired",
+        .parsing,
+        null,
+        null,
     );
 }
 
 test "module import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_module(valid_wireguard_profile),
-        0,
+        null,
         "type",
         "WireGuard",
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_wireguard_profile),
-        -1,
-        "code",
-        "WireGuard.peerHasNoPublicKey",
+        .parsing,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_openvpn_profile),
-        -1,
-        "code",
-        "OpenVPN.unsupportedCompression",
+        .parsing,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(encrypted_openvpn_profile),
-        -1,
-        "code",
-        "OpenVPN.passphraseRequired",
+        .parsing,
+        null,
+        null,
     );
 }
 
 fn expectImportEnvelope(
     c_result: ?[*:0]u8,
-    expected_code: i32,
-    expected_payload_key: []const u8,
-    expected_payload_value: []const u8,
+    expected_code: ?api.PartoutErrorCode,
+    expected_payload_key: ?[]const u8,
+    expected_payload_value: ?[]const u8,
 ) !void {
     const result_ptr = c_result orelse return error.TestUnexpectedResult;
     const result_json = std.mem.span(result_ptr);
@@ -300,15 +320,17 @@ fn expectImportEnvelope(
     defer envelope.deinit(std.testing.allocator);
     try std.testing.expectEqual(expected_code, envelope.code);
 
+    const expected_key = expected_payload_key orelse return;
+    const expected_value = expected_payload_value orelse return error.TestUnexpectedResult;
     var parsed_payload = try core.util.parseJsonValue(
         std.testing.allocator,
-        envelope.payload.bytes,
+        envelope.payload.?.bytes,
     );
     defer parsed_payload.deinit();
     const payload = parsed_payload.value.object;
     try std.testing.expectEqualStrings(
-        expected_payload_value,
-        payload.get(expected_payload_key).?.string,
+        expected_value,
+        payload.get(expected_key).?.string,
     );
 }
 

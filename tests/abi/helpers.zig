@@ -18,14 +18,14 @@ test "ABI structs stay C-sized" {
     try std.testing.expect(@sizeOf(CompletionCode) == @sizeOf(c_int));
 }
 
-test "ABI import error payload includes parse error info" {
+test "ABI import error envelope includes parse error info" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
         .name = "PrivateKey",
         .line = "PrivateKey = nope",
         .arguments = &.{"nope"},
     };
-    const context = core.ImportContext.init(&info, null, null);
+    const context = core.ImportContext.init(&info, null);
 
     const c_payload = helpers.importErrorPayloadAllocZ(
         allocator,
@@ -35,11 +35,11 @@ test "ABI import error payload includes parse error info" {
     const payload_json = std.mem.span(c_payload);
     defer allocator.free(payload_json);
 
-    var payload = try parseErrorEnvelope(allocator, payload_json);
-    defer payload.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.parsing, payload.code);
+    var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
+    defer envelope.deinit(allocator);
+    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
 
-    var parsed_info = try api.ParseErrorInfo.parse(allocator, payload.user_info.?.bytes);
+    var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
     try std.testing.expectEqualStrings("PrivateKey", parsed_info.name.?);
     try std.testing.expectEqualStrings("PrivateKey = nope", parsed_info.line.?);
@@ -47,35 +47,38 @@ test "ABI import error payload includes parse error info" {
     try std.testing.expectEqualStrings("nope", parsed_info.arguments[0]);
 }
 
-test "ABI import error payload moves parse error code to top level" {
+test "ABI import error envelope preserves parse error sub-code in payload" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
-        .error_code = .wireGuardPeerHasNoPublicKey,
+        .recognized_type = .WireGuard,
+        .sub_code = api.WireGuardErrorCode.peerHasNoPublicKey.raw(),
         .line = "AllowedIPs = 0.0.0.0/0",
     };
-    const context = core.ImportContext.init(&info, null, null);
+    const context = core.ImportContext.init(&info, null);
 
     const c_payload = helpers.importErrorPayloadAllocZ(
         allocator,
-        error.InvalidProfile,
+        error.Parsing,
         context,
     ) orelse return error.TestUnexpectedResult;
     const payload_json = std.mem.span(c_payload);
     defer allocator.free(payload_json);
 
-    var payload = try parseErrorEnvelope(allocator, payload_json);
-    defer payload.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.wireGuardPeerHasNoPublicKey, payload.code);
+    var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
+    defer envelope.deinit(allocator);
+    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
 
-    var parsed_info = try api.ParseErrorInfo.parse(allocator, payload.user_info.?.bytes);
+    var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
-    try std.testing.expect(parsed_info.error_code == null);
-    try std.testing.expect(std.mem.indexOf(u8, payload.user_info.?.bytes, "\"errorCode\"") == null);
+    try std.testing.expectEqual(api.ModuleType.WireGuard, parsed_info.recognized_type.?);
+    try std.testing.expectEqualStrings(api.WireGuardErrorCode.peerHasNoPublicKey.raw(), parsed_info.sub_code.?);
+    try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"recognizedType\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"subCode\"") != null);
 }
 
 test "ABI import errors map to stable public codes" {
     const allocator = std.testing.allocator;
-    const context = core.ImportContext.init(null, null, null);
+    const context = core.ImportContext.init(null, null);
     const cases = .{
         .{ error.OutOfMemory, api.PartoutErrorCode.outOfMemory },
         .{ error.IdGeneration, api.PartoutErrorCode.unhandled },
@@ -84,7 +87,6 @@ test "ABI import errors map to stable public codes" {
         .{ error.InvalidModel, api.PartoutErrorCode.encoding },
         .{ error.Stringify, api.PartoutErrorCode.encoding },
         .{ error.Parsing, api.PartoutErrorCode.parsing },
-        .{ error.PassphraseRequired, api.PartoutErrorCode.passphraseRequired },
         .{ error.UnknownImportedModule, api.PartoutErrorCode.unknownImportedModule },
     };
 
@@ -97,19 +99,9 @@ test "ABI import errors map to stable public codes" {
         const payload_json = std.mem.span(c_payload);
         defer allocator.free(payload_json);
 
-        var payload = try parseErrorEnvelope(allocator, payload_json);
-        defer payload.deinit(allocator);
-        try std.testing.expectEqual(entry[1], payload.code);
+        var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
+        defer envelope.deinit(allocator);
+        try std.testing.expectEqual(entry[1], envelope.code.?);
+        try std.testing.expect(envelope.payload == null);
     }
-}
-
-fn parseErrorEnvelope(
-    allocator: std.mem.Allocator,
-    envelope_json: []const u8,
-) !api.ABIErrorPayload {
-    var envelope = try api.ABIEnvelope.parse(allocator, envelope_json);
-    defer envelope.deinit(allocator);
-
-    try std.testing.expectEqual(@as(i32, -1), envelope.code);
-    return api.ABIErrorPayload.parse(allocator, envelope.payload.bytes);
 }

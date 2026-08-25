@@ -116,7 +116,7 @@ pub fn successPayloadAllocZ(
 ) ?[*:0]u8 {
     return wrapOwnedImportPayload(
         allocator,
-        c.PartoutCompletionCodeOK,
+        null,
         json,
     );
 }
@@ -125,45 +125,20 @@ pub fn errorPayloadAllocZ(
     allocator: std.mem.Allocator,
     code: api.PartoutErrorCode,
 ) ?[*:0]u8 {
-    const payload = errorPayloadWithInfoAllocZ(
+    return wrapOwnedImportPayload(
         allocator,
         code,
         null,
     );
-    return wrapOwnedImportPayload(
-        allocator,
-        c.PartoutCompletionCodeFailure,
-        payload,
-    );
 }
 
-fn errorPayloadWithInfoAllocZ(
+fn errorUserInfoAllocZ(
     allocator: std.mem.Allocator,
-    code: api.PartoutErrorCode,
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
-    const user_info: ?api.JSONValue = if (parse_error_info) |info| user_info: {
-        if (info.name == null and info.line == null and info.arguments.len == 0) break :user_info null;
-        // `error_code` is an internal handoff to ABIErrorPayload.code. Do not
-        // duplicate it inside ABIErrorPayload.userInfo.
-        const public_info: api.ParseErrorInfo = .{
-            .name = info.name,
-            .line = info.line,
-            .arguments = info.arguments,
-        };
-        const bytes = util.encodeJsonValue(allocator, public_info) catch break :user_info null;
-        break :user_info .{
-            .bytes = bytes,
-            .owned = true,
-        };
-    } else null;
-    defer if (user_info) |value| value.deinit(allocator);
-
-    const payload: api.ABIErrorPayload = .{
-        .code = code,
-        .user_info = user_info,
-    };
-    return util.encodeJsonValueZ(allocator, payload) catch null;
+    const info = parse_error_info orelse return null;
+    if (info.recognized_type == null and info.sub_code == null and info.name == null and info.line == null and info.arguments.len == 0) return null;
+    return util.encodeJsonValueZ(allocator, info.*) catch null;
 }
 
 pub fn importErrorPayloadAllocZ(
@@ -171,33 +146,26 @@ pub fn importErrorPayloadAllocZ(
     err: ImportAndEncodeError,
     context: core.ImportContext,
 ) ?[*:0]u8 {
-    const payload = errorPayloadWithInfoAllocZ(
-        allocator,
-        if (context.parse_error_info) |error_info|
-            error_info.error_code orelse importErrorCode(err)
-        else
-            importErrorCode(err),
-        context.parse_error_info,
-    );
+    const code = importErrorCode(err);
+    const user_info = errorUserInfoAllocZ(allocator, context.parse_error_info);
     return wrapOwnedImportPayload(
         allocator,
-        c.PartoutCompletionCodeFailure,
-        payload,
+        code,
+        user_info,
     );
 }
 
 fn wrapOwnedImportPayload(
     allocator: std.mem.Allocator,
-    code: i32,
+    code: ?api.PartoutErrorCode,
     c_payload: ?[*:0]const u8,
 ) ?[*:0]u8 {
-    const payload_ptr = c_payload orelse return null;
-    const payload_json = std.mem.span(payload_ptr);
-    defer allocator.free(payload_json);
+    const payload_json = if (c_payload) |payload_ptr| std.mem.span(payload_ptr) else null;
+    defer if (payload_json) |bytes| allocator.free(bytes);
 
     const envelope: api.ABIEnvelope = .{
         .code = code,
-        .payload = api.JSONValue{ .bytes = payload_json },
+        .payload = if (payload_json) |bytes| api.JSONValue{ .bytes = bytes } else null,
     };
     return util.encodeJsonValueZ(allocator, envelope) catch null;
 }
@@ -219,7 +187,6 @@ fn importErrorCode(err: ImportAndEncodeError) api.PartoutErrorCode {
         error.InvalidJson, error.InvalidProfile => .decoding,
         error.InvalidModel, error.Stringify => .encoding,
         error.Parsing => .parsing,
-        error.PassphraseRequired => .passphraseRequired,
         error.UnknownImportedModule => .unknownImportedModule,
     };
 }

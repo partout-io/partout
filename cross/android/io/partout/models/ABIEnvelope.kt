@@ -23,6 +23,7 @@
 
 package io.partout.models
 
+import io.partout.models.PartoutErrorCode
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -38,11 +39,11 @@ import kotlinx.serialization.Contextual
 
 data class ABIEnvelope (
 
-    @SerialName(value = "code")
-    val code: kotlin.Int,
+    @Contextual @SerialName(value = "code")
+    val code: PartoutErrorCode? = null,
 
     @Contextual @SerialName(value = "payload")
-    val payload: kotlinx.serialization.json.JsonElement
+    val payload: kotlinx.serialization.json.JsonElement? = null
 
 ) {
 

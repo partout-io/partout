@@ -6,6 +6,7 @@ package io.partout
 
 import io.partout.abi.PartoutResult
 import io.partout.models.ABIEnvelope
+import io.partout.models.PartoutErrorCode
 import io.partout.models.TaggedProfile
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.decodeFromJsonElement
@@ -48,7 +49,7 @@ class PartoutWrapper(
                     val envelope = coder.decodeFromString<ABIEnvelope>(json)
                     completion.onComplete(envelope.code, envelope.payload)
                 } else {
-                    completion.onComplete(-1, null)
+                    completion.onComplete(PartoutErrorCode.unhandled, null)
                 }
             }
         }.getOrThrow()

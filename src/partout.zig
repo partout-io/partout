@@ -96,7 +96,7 @@ pub export fn partout_import_profile(
     defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
-    const import_context = core.ImportContext.init(&parse_error_info, null, null);
+    const import_context = core.ImportContext.init(&parse_error_info, null);
 
     const profile_json = importer.importProfile(
         allocator,
@@ -119,7 +119,7 @@ pub export fn partout_import_module(
     defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
-    const import_context = core.ImportContext.init(&parse_error_info, null, null);
+    const import_context = core.ImportContext.init(&parse_error_info, null);
 
     const module_json = importer.importModule(
         allocator,

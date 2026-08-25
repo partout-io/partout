@@ -259,8 +259,8 @@ fn isNullValue(value: std.json.Value) bool {
 }
 
 pub const ABIEnvelope = struct {
-    code: i32 = 0,
-    payload: JSONValue = .{},
+    code: ?PartoutErrorCode = null,
+    payload: ?JSONValue = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIEnvelope {
         return parseWithErrorInfo(allocator, text, null);
@@ -282,8 +282,8 @@ pub const ABIEnvelope = struct {
         const object = objectValue(value) orelse return error.InvalidModel;
         var result = ABIEnvelope{};
         errdefer result.deinit(allocator);
-        result.code = try parseJsonField(i32, allocator, object, "code", error_info);
-        result.payload = try parseJsonField(JSONValue, allocator, object, "payload", error_info);
+        result.code = try parseOptionalJsonField(PartoutErrorCode, allocator, object, "code", error_info);
+        result.payload = try parseOptionalJsonField(JSONValue, allocator, object, "payload", error_info);
         return result;
     }
 
@@ -294,71 +294,18 @@ pub const ABIEnvelope = struct {
     }
 
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        deinitJson(i32, allocator, &self.code);
-        deinitJson(JSONValue, allocator, &self.payload);
+        if (self.code) |*value| deinitJson(PartoutErrorCode, allocator, value);
+        if (self.payload) |*value| deinitJson(JSONValue, allocator, value);
     }
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        try jw.objectField("code");
-        try writeJson(jw, self.code);
-        try jw.objectField("payload");
-        try writeJson(jw, self.payload);
-        try jw.endObject();
-    }
-};
-
-pub const ABIErrorPayload = struct {
-    code: PartoutErrorCode,
-    user_info: ?RawJsonValue = null,
-
-    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIErrorPayload {
-        return parseWithErrorInfo(allocator, text, null);
-    }
-
-    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ABIErrorPayload {
-        resetJsonErrorInfo(error_info);
-        var parsed = try util.parseJsonValue(allocator, text);
-        defer parsed.deinit();
-        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
-    }
-
-    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ABIErrorPayload {
-        return parseValueWithErrorInfo(allocator, value, null);
-    }
-
-    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ABIErrorPayload {
-        resetJsonErrorInfo(error_info);
-        const object = objectValue(value) orelse return error.InvalidModel;
-        const explicit_0 = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
-        var owns_explicit_0 = true;
-        errdefer if (owns_explicit_0) deinitJson(PartoutErrorCode, allocator, &explicit_0);
-        var result = ABIErrorPayload{
-            .code = explicit_0,
-        };
-        owns_explicit_0 = false;
-        errdefer result.deinit(allocator);
-        result.user_info = try parseOptionalJsonField(RawJsonValue, allocator, object, "userInfo", error_info);
-        return result;
-    }
-
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
-        const encoded = try util.encodeJsonValue(allocator, self);
-        defer allocator.free(encoded);
-        return parse(allocator, encoded);
-    }
-
-    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        deinitJson(PartoutErrorCode, allocator, &self.code);
-        if (self.user_info) |*value| deinitJson(RawJsonValue, allocator, value);
-    }
-
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        try jw.beginObject();
-        try jw.objectField("code");
-        try writeJson(jw, self.code);
-        if (self.user_info) |value| {
-            try jw.objectField("userInfo");
+        if (self.code) |value| {
+            try jw.objectField("code");
+            try writeJson(jw, value);
+        }
+        if (self.payload) |value| {
+            try jw.objectField("payload");
             try writeJson(jw, value);
         }
         try jw.endObject();
@@ -366,7 +313,8 @@ pub const ABIErrorPayload = struct {
 };
 
 pub const ParseErrorInfo = struct {
-    error_code: ?PartoutErrorCode = null,
+    recognized_type: ?ModuleType = null,
+    sub_code: ?[]const u8 = null,
     name: ?[]const u8 = null,
     line: ?[]const u8 = null,
     arguments: []const []const u8 = &.{},
@@ -391,7 +339,8 @@ pub const ParseErrorInfo = struct {
         const object = objectValue(value) orelse return error.InvalidModel;
         var result = ParseErrorInfo{};
         errdefer result.deinit(allocator);
-        result.error_code = try parseOptionalJsonField(PartoutErrorCode, allocator, object, "errorCode", error_info);
+        result.recognized_type = try parseOptionalJsonField(ModuleType, allocator, object, "recognizedType", error_info);
+        result.sub_code = try parseOptionalJsonField([]const u8, allocator, object, "subCode", error_info);
         result.name = try parseOptionalJsonField([]const u8, allocator, object, "name", error_info);
         result.line = try parseOptionalJsonField([]const u8, allocator, object, "line", error_info);
         result.arguments = try parseJsonField([]const []const u8, allocator, object, "arguments", error_info);
@@ -405,7 +354,8 @@ pub const ParseErrorInfo = struct {
     }
 
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        if (self.error_code) |*value| deinitJson(PartoutErrorCode, allocator, value);
+        if (self.recognized_type) |*value| deinitJson(ModuleType, allocator, value);
+        if (self.sub_code) |*value| deinitJson([]const u8, allocator, value);
         if (self.name) |*value| deinitJson([]const u8, allocator, value);
         if (self.line) |*value| deinitJson([]const u8, allocator, value);
         deinitJson([]const []const u8, allocator, &self.arguments);
@@ -413,8 +363,12 @@ pub const ParseErrorInfo = struct {
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        if (self.error_code) |value| {
-            try jw.objectField("errorCode");
+        if (self.recognized_type) |value| {
+            try jw.objectField("recognizedType");
+            try writeJson(jw, value);
+        }
+        if (self.sub_code) |value| {
+            try jw.objectField("subCode");
             try writeJson(jw, value);
         }
         if (self.name) |value| {
@@ -2331,6 +2285,60 @@ pub const OpenVPNTLSWrapStrategy = enum {
     }
 };
 
+pub const OpenVPNErrorCode = enum {
+    compressionMismatch,
+    connectionFailure,
+    noRouting,
+    otpRequired,
+    passphraseRequired,
+    recoverableAuthentication,
+    serverShutdown,
+    tlsFailure,
+    unsupportedAlgorithm,
+    unsupportedCompression,
+    unsupportedOption,
+
+    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
+        const raw_value = stringValue(value) orelse return error.InvalidModel;
+        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
+    }
+
+    pub fn parseFromRaw(raw_value: []const u8) ?@This() {
+        if (std.mem.eql(u8, raw_value, "compressionMismatch")) return .compressionMismatch;
+        if (std.mem.eql(u8, raw_value, "connectionFailure")) return .connectionFailure;
+        if (std.mem.eql(u8, raw_value, "noRouting")) return .noRouting;
+        if (std.mem.eql(u8, raw_value, "otpRequired")) return .otpRequired;
+        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
+        if (std.mem.eql(u8, raw_value, "recoverableAuthentication")) return .recoverableAuthentication;
+        if (std.mem.eql(u8, raw_value, "serverShutdown")) return .serverShutdown;
+        if (std.mem.eql(u8, raw_value, "tlsFailure")) return .tlsFailure;
+        if (std.mem.eql(u8, raw_value, "unsupportedAlgorithm")) return .unsupportedAlgorithm;
+        if (std.mem.eql(u8, raw_value, "unsupportedCompression")) return .unsupportedCompression;
+        if (std.mem.eql(u8, raw_value, "unsupportedOption")) return .unsupportedOption;
+        return null;
+    }
+
+    pub fn raw(self: @This()) [:0]const u8 {
+        return switch (self) {
+            .compressionMismatch => "compressionMismatch",
+            .connectionFailure => "connectionFailure",
+            .noRouting => "noRouting",
+            .otpRequired => "otpRequired",
+            .passphraseRequired => "passphraseRequired",
+            .recoverableAuthentication => "recoverableAuthentication",
+            .serverShutdown => "serverShutdown",
+            .tlsFailure => "tlsFailure",
+            .unsupportedAlgorithm => "unsupportedAlgorithm",
+            .unsupportedCompression => "unsupportedCompression",
+            .unsupportedOption => "unsupportedOption",
+        };
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.write(self.raw());
+    }
+};
+
 pub const OpenVPNModule = struct {
     id: uuid.UUID = uuid.zero_id,
     configuration: ?OpenVPNConfiguration = null,
@@ -3422,6 +3430,84 @@ pub const WireGuardRemoteInterface = struct {
             try writeJson(jw, value);
         }
         try jw.endObject();
+    }
+};
+
+pub const WireGuardErrorCode = enum {
+    emptyPeers,
+    interfaceHasInvalidAddress,
+    interfaceHasInvalidDNS,
+    interfaceHasInvalidListenPort,
+    interfaceHasInvalidMTU,
+    interfaceHasInvalidPrivateKey,
+    interfaceHasNoPrivateKey,
+    interfaceHasUnrecognizedKey,
+    multipleEntriesForKey,
+    multipleInterfaces,
+    multiplePeersWithSamePublicKey,
+    noInterface,
+    peerHasInvalidAllowedIP,
+    peerHasInvalidEndpoint,
+    peerHasInvalidPersistentKeepAlive,
+    peerHasInvalidPreSharedKey,
+    peerHasInvalidPublicKey,
+    peerHasNoPublicKey,
+    peerHasUnrecognizedKey,
+
+    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
+        const raw_value = stringValue(value) orelse return error.InvalidModel;
+        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
+    }
+
+    pub fn parseFromRaw(raw_value: []const u8) ?@This() {
+        if (std.mem.eql(u8, raw_value, "emptyPeers")) return .emptyPeers;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidAddress")) return .interfaceHasInvalidAddress;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidDNS")) return .interfaceHasInvalidDNS;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidListenPort")) return .interfaceHasInvalidListenPort;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidMTU")) return .interfaceHasInvalidMTU;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidPrivateKey")) return .interfaceHasInvalidPrivateKey;
+        if (std.mem.eql(u8, raw_value, "interfaceHasNoPrivateKey")) return .interfaceHasNoPrivateKey;
+        if (std.mem.eql(u8, raw_value, "interfaceHasUnrecognizedKey")) return .interfaceHasUnrecognizedKey;
+        if (std.mem.eql(u8, raw_value, "multipleEntriesForKey")) return .multipleEntriesForKey;
+        if (std.mem.eql(u8, raw_value, "multipleInterfaces")) return .multipleInterfaces;
+        if (std.mem.eql(u8, raw_value, "multiplePeersWithSamePublicKey")) return .multiplePeersWithSamePublicKey;
+        if (std.mem.eql(u8, raw_value, "noInterface")) return .noInterface;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidAllowedIP")) return .peerHasInvalidAllowedIP;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidEndpoint")) return .peerHasInvalidEndpoint;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPersistentKeepAlive")) return .peerHasInvalidPersistentKeepAlive;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPreSharedKey")) return .peerHasInvalidPreSharedKey;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPublicKey")) return .peerHasInvalidPublicKey;
+        if (std.mem.eql(u8, raw_value, "peerHasNoPublicKey")) return .peerHasNoPublicKey;
+        if (std.mem.eql(u8, raw_value, "peerHasUnrecognizedKey")) return .peerHasUnrecognizedKey;
+        return null;
+    }
+
+    pub fn raw(self: @This()) [:0]const u8 {
+        return switch (self) {
+            .emptyPeers => "emptyPeers",
+            .interfaceHasInvalidAddress => "interfaceHasInvalidAddress",
+            .interfaceHasInvalidDNS => "interfaceHasInvalidDNS",
+            .interfaceHasInvalidListenPort => "interfaceHasInvalidListenPort",
+            .interfaceHasInvalidMTU => "interfaceHasInvalidMTU",
+            .interfaceHasInvalidPrivateKey => "interfaceHasInvalidPrivateKey",
+            .interfaceHasNoPrivateKey => "interfaceHasNoPrivateKey",
+            .interfaceHasUnrecognizedKey => "interfaceHasUnrecognizedKey",
+            .multipleEntriesForKey => "multipleEntriesForKey",
+            .multipleInterfaces => "multipleInterfaces",
+            .multiplePeersWithSamePublicKey => "multiplePeersWithSamePublicKey",
+            .noInterface => "noInterface",
+            .peerHasInvalidAllowedIP => "peerHasInvalidAllowedIP",
+            .peerHasInvalidEndpoint => "peerHasInvalidEndpoint",
+            .peerHasInvalidPersistentKeepAlive => "peerHasInvalidPersistentKeepAlive",
+            .peerHasInvalidPreSharedKey => "peerHasInvalidPreSharedKey",
+            .peerHasInvalidPublicKey => "peerHasInvalidPublicKey",
+            .peerHasNoPublicKey => "peerHasNoPublicKey",
+            .peerHasUnrecognizedKey => "peerHasUnrecognizedKey",
+        };
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.write(self.raw());
     }
 };
 
