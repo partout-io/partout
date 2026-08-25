@@ -2351,6 +2351,60 @@ pub const OpenVPNModule = struct {
     }
 };
 
+pub const OpenVPNErrorCode = enum {
+    compressionMismatch,
+    connectionFailure,
+    noRouting,
+    otpRequired,
+    passphraseRequired,
+    recoverableAuthentication,
+    serverShutdown,
+    tlsFailure,
+    unsupportedAlgorithm,
+    unsupportedCompression,
+    unsupportedOption,
+
+    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
+        const raw_value = stringValue(value) orelse return error.InvalidModel;
+        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
+    }
+
+    pub fn parseFromRaw(raw_value: []const u8) ?@This() {
+        if (std.mem.eql(u8, raw_value, "compressionMismatch")) return .compressionMismatch;
+        if (std.mem.eql(u8, raw_value, "connectionFailure")) return .connectionFailure;
+        if (std.mem.eql(u8, raw_value, "noRouting")) return .noRouting;
+        if (std.mem.eql(u8, raw_value, "otpRequired")) return .otpRequired;
+        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
+        if (std.mem.eql(u8, raw_value, "recoverableAuthentication")) return .recoverableAuthentication;
+        if (std.mem.eql(u8, raw_value, "serverShutdown")) return .serverShutdown;
+        if (std.mem.eql(u8, raw_value, "tlsFailure")) return .tlsFailure;
+        if (std.mem.eql(u8, raw_value, "unsupportedAlgorithm")) return .unsupportedAlgorithm;
+        if (std.mem.eql(u8, raw_value, "unsupportedCompression")) return .unsupportedCompression;
+        if (std.mem.eql(u8, raw_value, "unsupportedOption")) return .unsupportedOption;
+        return null;
+    }
+
+    pub fn raw(self: @This()) [:0]const u8 {
+        return switch (self) {
+            .compressionMismatch => "compressionMismatch",
+            .connectionFailure => "connectionFailure",
+            .noRouting => "noRouting",
+            .otpRequired => "otpRequired",
+            .passphraseRequired => "passphraseRequired",
+            .recoverableAuthentication => "recoverableAuthentication",
+            .serverShutdown => "serverShutdown",
+            .tlsFailure => "tlsFailure",
+            .unsupportedAlgorithm => "unsupportedAlgorithm",
+            .unsupportedCompression => "unsupportedCompression",
+            .unsupportedOption => "unsupportedOption",
+        };
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.write(self.raw());
+    }
+};
+
 pub const PartoutErrorCode = enum {
     authentication,
     cached,
@@ -2562,6 +2616,84 @@ pub const PartoutErrorCode = enum {
             .wireGuardPeerHasInvalidPublicKey => "WireGuard.peerHasInvalidPublicKey",
             .wireGuardPeerHasNoPublicKey => "WireGuard.peerHasNoPublicKey",
             .wireGuardPeerHasUnrecognizedKey => "WireGuard.peerHasUnrecognizedKey",
+        };
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.write(self.raw());
+    }
+};
+
+pub const WireGuardErrorCode = enum {
+    emptyPeers,
+    interfaceHasInvalidAddress,
+    interfaceHasInvalidDNS,
+    interfaceHasInvalidListenPort,
+    interfaceHasInvalidMTU,
+    interfaceHasInvalidPrivateKey,
+    interfaceHasNoPrivateKey,
+    interfaceHasUnrecognizedKey,
+    multipleEntriesForKey,
+    multipleInterfaces,
+    multiplePeersWithSamePublicKey,
+    noInterface,
+    peerHasInvalidAllowedIP,
+    peerHasInvalidEndpoint,
+    peerHasInvalidPersistentKeepAlive,
+    peerHasInvalidPreSharedKey,
+    peerHasInvalidPublicKey,
+    peerHasNoPublicKey,
+    peerHasUnrecognizedKey,
+
+    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
+        const raw_value = stringValue(value) orelse return error.InvalidModel;
+        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
+    }
+
+    pub fn parseFromRaw(raw_value: []const u8) ?@This() {
+        if (std.mem.eql(u8, raw_value, "emptyPeers")) return .emptyPeers;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidAddress")) return .interfaceHasInvalidAddress;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidDNS")) return .interfaceHasInvalidDNS;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidListenPort")) return .interfaceHasInvalidListenPort;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidMTU")) return .interfaceHasInvalidMTU;
+        if (std.mem.eql(u8, raw_value, "interfaceHasInvalidPrivateKey")) return .interfaceHasInvalidPrivateKey;
+        if (std.mem.eql(u8, raw_value, "interfaceHasNoPrivateKey")) return .interfaceHasNoPrivateKey;
+        if (std.mem.eql(u8, raw_value, "interfaceHasUnrecognizedKey")) return .interfaceHasUnrecognizedKey;
+        if (std.mem.eql(u8, raw_value, "multipleEntriesForKey")) return .multipleEntriesForKey;
+        if (std.mem.eql(u8, raw_value, "multipleInterfaces")) return .multipleInterfaces;
+        if (std.mem.eql(u8, raw_value, "multiplePeersWithSamePublicKey")) return .multiplePeersWithSamePublicKey;
+        if (std.mem.eql(u8, raw_value, "noInterface")) return .noInterface;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidAllowedIP")) return .peerHasInvalidAllowedIP;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidEndpoint")) return .peerHasInvalidEndpoint;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPersistentKeepAlive")) return .peerHasInvalidPersistentKeepAlive;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPreSharedKey")) return .peerHasInvalidPreSharedKey;
+        if (std.mem.eql(u8, raw_value, "peerHasInvalidPublicKey")) return .peerHasInvalidPublicKey;
+        if (std.mem.eql(u8, raw_value, "peerHasNoPublicKey")) return .peerHasNoPublicKey;
+        if (std.mem.eql(u8, raw_value, "peerHasUnrecognizedKey")) return .peerHasUnrecognizedKey;
+        return null;
+    }
+
+    pub fn raw(self: @This()) [:0]const u8 {
+        return switch (self) {
+            .emptyPeers => "emptyPeers",
+            .interfaceHasInvalidAddress => "interfaceHasInvalidAddress",
+            .interfaceHasInvalidDNS => "interfaceHasInvalidDNS",
+            .interfaceHasInvalidListenPort => "interfaceHasInvalidListenPort",
+            .interfaceHasInvalidMTU => "interfaceHasInvalidMTU",
+            .interfaceHasInvalidPrivateKey => "interfaceHasInvalidPrivateKey",
+            .interfaceHasNoPrivateKey => "interfaceHasNoPrivateKey",
+            .interfaceHasUnrecognizedKey => "interfaceHasUnrecognizedKey",
+            .multipleEntriesForKey => "multipleEntriesForKey",
+            .multipleInterfaces => "multipleInterfaces",
+            .multiplePeersWithSamePublicKey => "multiplePeersWithSamePublicKey",
+            .noInterface => "noInterface",
+            .peerHasInvalidAllowedIP => "peerHasInvalidAllowedIP",
+            .peerHasInvalidEndpoint => "peerHasInvalidEndpoint",
+            .peerHasInvalidPersistentKeepAlive => "peerHasInvalidPersistentKeepAlive",
+            .peerHasInvalidPreSharedKey => "peerHasInvalidPreSharedKey",
+            .peerHasInvalidPublicKey => "peerHasInvalidPublicKey",
+            .peerHasNoPublicKey => "peerHasNoPublicKey",
+            .peerHasUnrecognizedKey => "peerHasUnrecognizedKey",
         };
     }
 
