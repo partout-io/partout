@@ -259,8 +259,8 @@ fn isNullValue(value: std.json.Value) bool {
 }
 
 pub const ABIEnvelope = struct {
-    code: i32 = 0,
-    payload: JSONValue = .{},
+    code: ?PartoutErrorCode = null,
+    payload: ?JSONValue = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIEnvelope {
         return parseWithErrorInfo(allocator, text, null);
@@ -282,8 +282,8 @@ pub const ABIEnvelope = struct {
         const object = objectValue(value) orelse return error.InvalidModel;
         var result = ABIEnvelope{};
         errdefer result.deinit(allocator);
-        result.code = try parseJsonField(i32, allocator, object, "code", error_info);
-        result.payload = try parseJsonField(JSONValue, allocator, object, "payload", error_info);
+        result.code = try parseOptionalJsonField(PartoutErrorCode, allocator, object, "code", error_info);
+        result.payload = try parseOptionalJsonField(JSONValue, allocator, object, "payload", error_info);
         return result;
     }
 
@@ -294,71 +294,18 @@ pub const ABIEnvelope = struct {
     }
 
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        deinitJson(i32, allocator, &self.code);
-        deinitJson(JSONValue, allocator, &self.payload);
+        if (self.code) |*value| deinitJson(PartoutErrorCode, allocator, value);
+        if (self.payload) |*value| deinitJson(JSONValue, allocator, value);
     }
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        try jw.objectField("code");
-        try writeJson(jw, self.code);
-        try jw.objectField("payload");
-        try writeJson(jw, self.payload);
-        try jw.endObject();
-    }
-};
-
-pub const ABIErrorPayload = struct {
-    code: PartoutErrorCode,
-    user_info: ?RawJsonValue = null,
-
-    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIErrorPayload {
-        return parseWithErrorInfo(allocator, text, null);
-    }
-
-    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ABIErrorPayload {
-        resetJsonErrorInfo(error_info);
-        var parsed = try util.parseJsonValue(allocator, text);
-        defer parsed.deinit();
-        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
-    }
-
-    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ABIErrorPayload {
-        return parseValueWithErrorInfo(allocator, value, null);
-    }
-
-    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ABIErrorPayload {
-        resetJsonErrorInfo(error_info);
-        const object = objectValue(value) orelse return error.InvalidModel;
-        const explicit_0 = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
-        var owns_explicit_0 = true;
-        errdefer if (owns_explicit_0) deinitJson(PartoutErrorCode, allocator, &explicit_0);
-        var result = ABIErrorPayload{
-            .code = explicit_0,
-        };
-        owns_explicit_0 = false;
-        errdefer result.deinit(allocator);
-        result.user_info = try parseOptionalJsonField(RawJsonValue, allocator, object, "userInfo", error_info);
-        return result;
-    }
-
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
-        const encoded = try util.encodeJsonValue(allocator, self);
-        defer allocator.free(encoded);
-        return parse(allocator, encoded);
-    }
-
-    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        deinitJson(PartoutErrorCode, allocator, &self.code);
-        if (self.user_info) |*value| deinitJson(RawJsonValue, allocator, value);
-    }
-
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        try jw.beginObject();
-        try jw.objectField("code");
-        try writeJson(jw, self.code);
-        if (self.user_info) |value| {
-            try jw.objectField("userInfo");
+        if (self.code) |value| {
+            try jw.objectField("code");
+            try writeJson(jw, value);
+        }
+        if (self.payload) |value| {
+            try jw.objectField("payload");
             try writeJson(jw, value);
         }
         try jw.endObject();

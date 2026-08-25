@@ -4,22 +4,9 @@ components:
       additionalProperties: false
       properties:
         code:
-          $ref: "#/components/schemas/Int32"
+          $ref: "#/components/schemas/PartoutErrorCode"
         payload:
           $ref: "#/components/schemas/JSONValue"
-      required:
-        - code
-        - payload
-      type: object
-    ABIErrorPayload:
-      additionalProperties: false
-      properties:
-        code:
-          $ref: "#/components/schemas/PartoutErrorCode"
-        userInfo:
-          type: object
-      required:
-        - code
       type: object
     ParseErrorInfo:
       additionalProperties: false

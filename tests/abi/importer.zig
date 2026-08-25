@@ -235,62 +235,62 @@ test "ABI importer preserves OpenVPN parse error codes" {
 test "profile import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_profile(valid_wireguard_profile, "Imported WireGuard"),
-        0,
+        null,
         "name",
         "Imported WireGuard",
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_wireguard_profile, null),
-        -1,
-        "code",
-        "WireGuard.peerHasNoPublicKey",
+        .wireGuardPeerHasNoPublicKey,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_openvpn_profile, null),
-        -1,
-        "code",
-        "OpenVPN.unsupportedCompression",
+        .openVPNUnsupportedCompression,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(encrypted_openvpn_profile, null),
-        -1,
-        "code",
-        "OpenVPN.passphraseRequired",
+        .openVPNPassphraseRequired,
+        null,
+        null,
     );
 }
 
 test "module import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_module(valid_wireguard_profile),
-        0,
+        null,
         "type",
         "WireGuard",
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_wireguard_profile),
-        -1,
-        "code",
-        "WireGuard.peerHasNoPublicKey",
+        .wireGuardPeerHasNoPublicKey,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_openvpn_profile),
-        -1,
-        "code",
-        "OpenVPN.unsupportedCompression",
+        .openVPNUnsupportedCompression,
+        null,
+        null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(encrypted_openvpn_profile),
-        -1,
-        "code",
-        "OpenVPN.passphraseRequired",
+        .openVPNPassphraseRequired,
+        null,
+        null,
     );
 }
 
 fn expectImportEnvelope(
     c_result: ?[*:0]u8,
-    expected_code: i32,
-    expected_payload_key: []const u8,
-    expected_payload_value: []const u8,
+    expected_code: ?api.PartoutErrorCode,
+    expected_payload_key: ?[]const u8,
+    expected_payload_value: ?[]const u8,
 ) !void {
     const result_ptr = c_result orelse return error.TestUnexpectedResult;
     const result_json = std.mem.span(result_ptr);
@@ -300,15 +300,17 @@ fn expectImportEnvelope(
     defer envelope.deinit(std.testing.allocator);
     try std.testing.expectEqual(expected_code, envelope.code);
 
+    const expected_key = expected_payload_key orelse return;
+    const expected_value = expected_payload_value orelse return error.TestUnexpectedResult;
     var parsed_payload = try core.util.parseJsonValue(
         std.testing.allocator,
-        envelope.payload.bytes,
+        envelope.payload.?.bytes,
     );
     defer parsed_payload.deinit();
     const payload = parsed_payload.value.object;
     try std.testing.expectEqualStrings(
-        expected_payload_value,
-        payload.get(expected_payload_key).?.string,
+        expected_value,
+        payload.get(expected_key).?.string,
     );
 }
 
