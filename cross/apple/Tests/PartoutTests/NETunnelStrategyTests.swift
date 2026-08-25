@@ -161,6 +161,32 @@ struct NETunnelStrategySnapshotTests {
     }
 }
 
+struct NETunnelStrategyStatusTests {
+    @Test
+    func snapshotPreservesObservedStatus() {
+        let profileId = Profile.ID()
+        let deactivating = NETunnelManagerSnapshot(
+            status: .disconnecting,
+            isEnabled: true,
+            isOnDemandEnabled: false,
+            rank: .max,
+            profileId: profileId,
+        )
+        let inactive = NETunnelManagerSnapshot(
+            status: .disconnected,
+            isEnabled: false,
+            isOnDemandEnabled: false,
+            rank: .min,
+            profileId: profileId
+        )
+
+        #expect(deactivating.snapshot.status == .deactivating)
+        #expect(deactivating.snapshot.isEnabled)
+        #expect(inactive.snapshot.status == .inactive)
+        #expect(!inactive.snapshot.isEnabled)
+    }
+}
+
 // MARK: - Strategy factories
 
 private let bundleIdentifier = "com.example.MyTunnel"
