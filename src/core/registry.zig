@@ -205,9 +205,9 @@ pub const Registry = struct {
     /// Imports a tagged module by probing registered importers in order.
     ///
     /// `error.UnknownImportedModule` means an importer declined the input and
-    /// probing should continue. If no importer succeeds, the first concrete
-    /// importer error is returned; if every importer only declined, parsing
-    /// fails with `error.Parsing`.
+    /// probing should continue. Any other error means the importer recognized
+    /// the input, so it is returned immediately. If every importer declines,
+    /// parsing fails with `error.Parsing`.
     pub fn importModule(
         self: Registry,
         allocator: std.mem.Allocator,
@@ -215,23 +215,16 @@ pub const Registry = struct {
         context: ?ImportContext,
     ) ImportError!api.TaggedModule {
         var was_handled = false;
-        var first_error: ?ImportError = null;
 
         for (self.all_implementations) |impl| {
             if (impl.vtable.import_module == null) continue;
             was_handled = true;
             return impl.importModule(allocator, contents, context) catch |err| {
-                switch (err) {
-                    error.UnknownImportedModule => {},
-                    else => if (first_error == null) {
-                        first_error = err;
-                    },
-                }
+                if (err != error.UnknownImportedModule) return err;
                 continue;
             };
         }
 
-        if (first_error) |err| return err;
         if (!was_handled) return error.UnknownImportedModule;
         return error.Parsing;
     }

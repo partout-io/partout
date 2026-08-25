@@ -102,4 +102,40 @@ public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     case unknownModuleHandler = "unknownModuleHandler"
     /// Configuration has no peers.
     case wireGuardEmptyPeers = "WireGuard.emptyPeers"
+    /// WireGuard interface address is invalid.
+    case wireGuardInterfaceHasInvalidAddress = "WireGuard.interfaceHasInvalidAddress"
+    /// WireGuard interface DNS entry is invalid.
+    case wireGuardInterfaceHasInvalidDNS = "WireGuard.interfaceHasInvalidDNS"
+    /// WireGuard interface listen port is invalid.
+    case wireGuardInterfaceHasInvalidListenPort = "WireGuard.interfaceHasInvalidListenPort"
+    /// WireGuard interface MTU is invalid.
+    case wireGuardInterfaceHasInvalidMTU = "WireGuard.interfaceHasInvalidMTU"
+    /// WireGuard interface private key is invalid.
+    case wireGuardInterfaceHasInvalidPrivateKey = "WireGuard.interfaceHasInvalidPrivateKey"
+    /// WireGuard interface has no private key.
+    case wireGuardInterfaceHasNoPrivateKey = "WireGuard.interfaceHasNoPrivateKey"
+    /// WireGuard interface key is unrecognized.
+    case wireGuardInterfaceHasUnrecognizedKey = "WireGuard.interfaceHasUnrecognizedKey"
+    /// WireGuard key occurs more than once.
+    case wireGuardMultipleEntriesForKey = "WireGuard.multipleEntriesForKey"
+    /// WireGuard configuration has multiple interface sections.
+    case wireGuardMultipleInterfaces = "WireGuard.multipleInterfaces"
+    /// WireGuard configuration has multiple peers with the same public key.
+    case wireGuardMultiplePeersWithSamePublicKey = "WireGuard.multiplePeersWithSamePublicKey"
+    /// WireGuard configuration has no interface section.
+    case wireGuardNoInterface = "WireGuard.noInterface"
+    /// WireGuard peer allowed IP is invalid.
+    case wireGuardPeerHasInvalidAllowedIP = "WireGuard.peerHasInvalidAllowedIP"
+    /// WireGuard peer endpoint is invalid.
+    case wireGuardPeerHasInvalidEndpoint = "WireGuard.peerHasInvalidEndpoint"
+    /// WireGuard peer persistent keepalive is invalid.
+    case wireGuardPeerHasInvalidPersistentKeepAlive = "WireGuard.peerHasInvalidPersistentKeepAlive"
+    /// WireGuard peer pre-shared key is invalid.
+    case wireGuardPeerHasInvalidPreSharedKey = "WireGuard.peerHasInvalidPreSharedKey"
+    /// WireGuard peer public key is invalid.
+    case wireGuardPeerHasInvalidPublicKey = "WireGuard.peerHasInvalidPublicKey"
+    /// WireGuard peer has no public key.
+    case wireGuardPeerHasNoPublicKey = "WireGuard.peerHasNoPublicKey"
+    /// WireGuard peer key is unrecognized.
+    case wireGuardPeerHasUnrecognizedKey = "WireGuard.peerHasUnrecognizedKey"
 }

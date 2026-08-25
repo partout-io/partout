@@ -22,6 +22,7 @@ pub fn importModule(
             error.InvalidLine => error.UnknownImportedModule,
             else => {
                 setRecognizedType(context);
+                setImportErrorCode(context, err);
                 return error.Parsing;
             },
         };
@@ -29,6 +30,7 @@ pub fn importModule(
     setRecognizedType(context);
     const module_id = core.newId() catch {
         configuration.deinit(allocator);
+        setErrorCode(context, .unhandled);
         return error.Parsing;
     };
     const module = api.TaggedModule{ .WireGuard = .{
@@ -46,18 +48,36 @@ pub const Parser = struct {
             self: Context,
             allocator: std.mem.Allocator,
             name: []const u8,
-            details: []const u8,
+            line: []const u8,
+            arguments: []const []const u8,
         ) void {
             const info = self.parse_error_info orelse return;
-            if (info.name.len != 0 or info.details.len != 0) return;
-            const owned_name = allocator.dupe(u8, name) catch return;
-            const owned_details = allocator.dupe(u8, details) catch {
-                allocator.free(owned_name);
+            if (info.name != null or info.line != null or info.arguments.len != 0) return;
+            const owned_name = if (name.len > 0) allocator.dupe(u8, name) catch return else null;
+            const owned_line = if (line.len > 0) allocator.dupe(u8, line) catch {
+                if (owned_name) |value| allocator.free(value);
+                return;
+            } else null;
+            const owned_arguments = allocator.alloc([]const u8, arguments.len) catch {
+                if (owned_line) |value| allocator.free(value);
+                if (owned_name) |value| allocator.free(value);
                 return;
             };
+            var initialized: usize = 0;
+            for (arguments, 0..) |argument, index| {
+                owned_arguments[index] = allocator.dupe(u8, argument) catch {
+                    for (owned_arguments[0..initialized]) |owned_argument| allocator.free(owned_argument);
+                    allocator.free(owned_arguments);
+                    if (owned_line) |owned| allocator.free(owned);
+                    if (owned_name) |owned| allocator.free(owned);
+                    return;
+                };
+                initialized += 1;
+            }
             info.* = .{
                 .name = owned_name,
-                .details = owned_details,
+                .line = owned_line,
+                .arguments = owned_arguments,
             };
         }
     };
@@ -88,7 +108,13 @@ pub const Parser = struct {
 
         var error_name: []const u8 = "";
         var error_line: []const u8 = "";
-        errdefer context.setParseErrorInfo(allocator, error_name, error_line);
+        var error_argument: ?[]const u8 = null;
+        errdefer context.setParseErrorInfo(
+            allocator,
+            error_name,
+            error_line,
+            if (error_argument) |argument| &.{argument} else &.{},
+        );
 
         var lines = std.mem.splitScalar(u8, contents, '\n');
         while (lines.next()) |raw_line| {
@@ -101,6 +127,7 @@ pub const Parser = struct {
 
             error_name = "";
             error_line = line;
+            error_argument = null;
 
             if (std.ascii.eqlIgnoreCase(line, "[interface]")) {
                 if (section == .peer) {
@@ -129,8 +156,14 @@ pub const Parser = struct {
 
             switch (section) {
                 .none => return error.InvalidLine,
-                .interface => try interface_builder.put(allocator, key, value),
-                .peer => try peer_builder.?.put(allocator, key, value),
+                .interface => interface_builder.put(allocator, key, value) catch |err| {
+                    error_argument = associatedArgument(err, key, value);
+                    return err;
+                },
+                .peer => peer_builder.?.put(allocator, key, value) catch |err| {
+                    error_argument = associatedArgument(err, key, value);
+                    return err;
+                },
             }
         }
 
@@ -162,6 +195,27 @@ pub const Parser = struct {
         try peers.append(allocator, peer);
     }
 };
+
+fn associatedArgument(err: ParseError, key: []const u8, value: []const u8) ?[]const u8 {
+    return switch (err) {
+        error.InterfaceHasUnrecognizedKey,
+        error.PeerHasUnrecognizedKey,
+        error.MultipleEntriesForKey,
+        => key,
+        error.InterfaceHasInvalidPrivateKey,
+        error.InterfaceHasInvalidListenPort,
+        error.InterfaceHasInvalidAddress,
+        error.InterfaceHasInvalidDNS,
+        error.InterfaceHasInvalidMTU,
+        error.PeerHasInvalidPublicKey,
+        error.PeerHasInvalidPreSharedKey,
+        error.PeerHasInvalidAllowedIP,
+        error.PeerHasInvalidEndpoint,
+        error.PeerHasInvalidPersistentKeepAlive,
+        => value,
+        else => null,
+    };
+}
 
 pub const ParseError = std.mem.Allocator.Error || error{
     InvalidLine,
@@ -508,4 +562,37 @@ fn importParserContext(context: ?core.ImportContext) Parser.Context {
 fn setRecognizedType(context: ?core.ImportContext) void {
     const import_context = context orelse return;
     import_context.setRecognizedType(.WireGuard);
+}
+
+fn setErrorCode(context: ?core.ImportContext, code: api.PartoutErrorCode) void {
+    const import_context = context orelse return;
+    const error_info = import_context.parse_error_info orelse return;
+    if (error_info.error_code == null) error_info.error_code = code;
+}
+
+fn setImportErrorCode(context: ?core.ImportContext, err: ParseError) void {
+    const code: api.PartoutErrorCode = switch (err) {
+        error.OutOfMemory => .outOfMemory,
+        error.InvalidLine => .parsing,
+        error.NoInterface => .wireGuardNoInterface,
+        error.MultipleInterfaces => .wireGuardMultipleInterfaces,
+        error.InterfaceHasNoPrivateKey => .wireGuardInterfaceHasNoPrivateKey,
+        error.InterfaceHasInvalidPrivateKey => .wireGuardInterfaceHasInvalidPrivateKey,
+        error.InterfaceHasInvalidListenPort => .wireGuardInterfaceHasInvalidListenPort,
+        error.InterfaceHasInvalidAddress => .wireGuardInterfaceHasInvalidAddress,
+        error.InterfaceHasInvalidDNS => .wireGuardInterfaceHasInvalidDNS,
+        error.InterfaceHasInvalidMTU => .wireGuardInterfaceHasInvalidMTU,
+        error.InterfaceHasUnrecognizedKey => .wireGuardInterfaceHasUnrecognizedKey,
+        error.PeerHasNoPublicKey => .wireGuardPeerHasNoPublicKey,
+        error.PeerHasInvalidPublicKey => .wireGuardPeerHasInvalidPublicKey,
+        error.PeerHasInvalidPreSharedKey => .wireGuardPeerHasInvalidPreSharedKey,
+        error.PeerHasInvalidAllowedIP => .wireGuardPeerHasInvalidAllowedIP,
+        error.PeerHasInvalidEndpoint => .wireGuardPeerHasInvalidEndpoint,
+        error.PeerHasInvalidPersistentKeepAlive => .wireGuardPeerHasInvalidPersistentKeepAlive,
+        error.PeerHasUnrecognizedKey => .wireGuardPeerHasUnrecognizedKey,
+        error.MultiplePeersWithSamePublicKey => .wireGuardMultiplePeersWithSamePublicKey,
+        error.MultipleEntriesForKey => .wireGuardMultipleEntriesForKey,
+        error.IdGeneration => .unhandled,
+    };
+    setErrorCode(context, code);
 }

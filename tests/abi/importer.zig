@@ -138,8 +138,14 @@ test "ABI importer reports parse error info for raw modules" {
             core.ImportContext.init(&info, null, null),
         ),
     );
-    try std.testing.expectEqualStrings("PrivateKey", info.name);
-    try std.testing.expectEqualStrings("PrivateKey = nope", info.details);
+    try std.testing.expectEqualStrings("PrivateKey", info.name.?);
+    try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
+    try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
+    try std.testing.expectEqualStrings("nope", info.arguments[0]);
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
+        info.error_code.?,
+    );
 }
 
 test "ABI importer reports parse error info for raw profiles" {
@@ -161,8 +167,69 @@ test "ABI importer reports parse error info for raw profiles" {
             core.ImportContext.init(&info, null, null),
         ),
     );
-    try std.testing.expectEqualStrings("PrivateKey", info.name);
-    try std.testing.expectEqualStrings("PrivateKey = nope", info.details);
+    try std.testing.expectEqualStrings("PrivateKey", info.name.?);
+    try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
+    try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
+    try std.testing.expectEqualStrings("nope", info.arguments[0]);
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
+        info.error_code.?,
+    );
+}
+
+test "ABI importer preserves OpenVPN parse error codes" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    var module_info: api.ParseErrorInfo = .{};
+    defer module_info.deinit(allocator);
+    try std.testing.expectError(
+        error.Parsing,
+        importer.importModule(
+            allocator,
+            invalid_openvpn_profile,
+            core.ImportContext.init(&module_info, null, null),
+        ),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.openVPNUnsupportedCompression,
+        module_info.error_code.?,
+    );
+
+    var profile_info: api.ParseErrorInfo = .{};
+    defer profile_info.deinit(allocator);
+    try std.testing.expectError(
+        error.InvalidProfile,
+        importer.importProfile(
+            allocator,
+            invalid_openvpn_profile,
+            null,
+            core.ImportContext.init(&profile_info, null, null),
+        ),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.openVPNUnsupportedCompression,
+        profile_info.error_code.?,
+    );
+
+    var passphrase_info: api.ParseErrorInfo = .{};
+    defer passphrase_info.deinit(allocator);
+    try std.testing.expectError(
+        error.PassphraseRequired,
+        importer.importModule(
+            allocator,
+            encrypted_openvpn_profile,
+            core.ImportContext.init(&passphrase_info, null, null),
+        ),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.openVPNPassphraseRequired,
+        passphrase_info.error_code.?,
+    );
+    try std.testing.expect(passphrase_info.name == null);
+    try std.testing.expect(passphrase_info.line == null);
+    try std.testing.expectEqual(@as(usize, 0), passphrase_info.arguments.len);
 }
 
 test "profile import export returns normalized success and failure payloads" {
@@ -176,7 +243,19 @@ test "profile import export returns normalized success and failure payloads" {
         partout.partout_import_profile(invalid_wireguard_profile, null),
         -1,
         "code",
-        "decoding",
+        "WireGuard.peerHasNoPublicKey",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_profile(invalid_openvpn_profile, null),
+        -1,
+        "code",
+        "OpenVPN.unsupportedCompression",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_profile(encrypted_openvpn_profile, null),
+        -1,
+        "code",
+        "OpenVPN.passphraseRequired",
     );
 }
 
@@ -191,7 +270,19 @@ test "module import export returns normalized success and failure payloads" {
         partout.partout_import_module(invalid_wireguard_profile),
         -1,
         "code",
-        "parsing",
+        "WireGuard.peerHasNoPublicKey",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_module(invalid_openvpn_profile),
+        -1,
+        "code",
+        "OpenVPN.unsupportedCompression",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_module(encrypted_openvpn_profile),
+        -1,
+        "code",
+        "OpenVPN.passphraseRequired",
     );
 }
 
@@ -234,5 +325,20 @@ const valid_wireguard_profile =
 
 const invalid_wireguard_profile =
     \\[Interface]
-    \\PrivateKey = nope
+    \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+    \\[Peer]
+    \\AllowedIPs = 0.0.0.0/0
+;
+
+const invalid_openvpn_profile = "compress lzo";
+
+const encrypted_openvpn_profile =
+    \\client
+    \\<key>
+    \\-----BEGIN PRIVATE KEY-----
+    \\Proc-Type: 4,ENCRYPTED
+    \\DEK-Info: AES-256-CBC,0123456789ABCDEF
+    \\ciphertext
+    \\-----END PRIVATE KEY-----
+    \\</key>
 ;

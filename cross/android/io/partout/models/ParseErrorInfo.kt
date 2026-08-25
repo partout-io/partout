@@ -23,6 +23,7 @@
 
 package io.partout.models
 
+import io.partout.models.PartoutErrorCode
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerialName
@@ -31,21 +32,28 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param name 
- * @param details 
+ * @param arguments
+ * @param errorCode
+ * @param name
+ * @param line
  */
 @Serializable
 
 data class ParseErrorInfo (
 
-    @SerialName(value = "name")
-    val name: kotlin.String,
+    @SerialName(value = "arguments")
+    val arguments: kotlin.collections.List<kotlin.String>,
 
-    @SerialName(value = "details")
-    val details: kotlin.String
+    @Contextual @SerialName(value = "errorCode")
+    val errorCode: PartoutErrorCode? = null,
+
+    @SerialName(value = "name")
+    val name: kotlin.String? = null,
+
+    @SerialName(value = "line")
+    val line: kotlin.String? = null
 
 ) {
 
 
 }
-

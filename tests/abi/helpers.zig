@@ -22,7 +22,8 @@ test "ABI import error payload includes parse error info" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
         .name = "PrivateKey",
-        .details = "PrivateKey = nope",
+        .line = "PrivateKey = nope",
+        .arguments = &.{"nope"},
     };
     const context = core.ImportContext.init(&info, null, null);
 
@@ -40,8 +41,36 @@ test "ABI import error payload includes parse error info" {
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, payload.user_info.?.bytes);
     defer parsed_info.deinit(allocator);
-    try std.testing.expectEqualStrings("PrivateKey", parsed_info.name);
-    try std.testing.expectEqualStrings("PrivateKey = nope", parsed_info.details);
+    try std.testing.expectEqualStrings("PrivateKey", parsed_info.name.?);
+    try std.testing.expectEqualStrings("PrivateKey = nope", parsed_info.line.?);
+    try std.testing.expectEqual(@as(usize, 1), parsed_info.arguments.len);
+    try std.testing.expectEqualStrings("nope", parsed_info.arguments[0]);
+}
+
+test "ABI import error payload moves parse error code to top level" {
+    const allocator = std.testing.allocator;
+    var info: api.ParseErrorInfo = .{
+        .error_code = .wireGuardPeerHasNoPublicKey,
+        .line = "AllowedIPs = 0.0.0.0/0",
+    };
+    const context = core.ImportContext.init(&info, null, null);
+
+    const c_payload = helpers.importErrorPayloadAllocZ(
+        allocator,
+        error.InvalidProfile,
+        context,
+    ) orelse return error.TestUnexpectedResult;
+    const payload_json = std.mem.span(c_payload);
+    defer allocator.free(payload_json);
+
+    var payload = try parseErrorEnvelope(allocator, payload_json);
+    defer payload.deinit(allocator);
+    try std.testing.expectEqual(api.PartoutErrorCode.wireGuardPeerHasNoPublicKey, payload.code);
+
+    var parsed_info = try api.ParseErrorInfo.parse(allocator, payload.user_info.?.bytes);
+    defer parsed_info.deinit(allocator);
+    try std.testing.expect(parsed_info.error_code == null);
+    try std.testing.expect(std.mem.indexOf(u8, payload.user_info.?.bytes, "\"errorCode\"") == null);
 }
 
 test "ABI import errors map to stable public codes" {

@@ -366,8 +366,10 @@ pub const ABIErrorPayload = struct {
 };
 
 pub const ParseErrorInfo = struct {
-    name: []const u8 = "",
-    details: []const u8 = "",
+    error_code: ?PartoutErrorCode = null,
+    name: ?[]const u8 = null,
+    line: ?[]const u8 = null,
+    arguments: []const []const u8 = &.{},
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ParseErrorInfo {
         return parseWithErrorInfo(allocator, text, null);
@@ -389,8 +391,10 @@ pub const ParseErrorInfo = struct {
         const object = objectValue(value) orelse return error.InvalidModel;
         var result = ParseErrorInfo{};
         errdefer result.deinit(allocator);
-        result.name = try parseJsonField([]const u8, allocator, object, "name", error_info);
-        result.details = try parseJsonField([]const u8, allocator, object, "details", error_info);
+        result.error_code = try parseOptionalJsonField(PartoutErrorCode, allocator, object, "errorCode", error_info);
+        result.name = try parseOptionalJsonField([]const u8, allocator, object, "name", error_info);
+        result.line = try parseOptionalJsonField([]const u8, allocator, object, "line", error_info);
+        result.arguments = try parseJsonField([]const []const u8, allocator, object, "arguments", error_info);
         return result;
     }
 
@@ -401,16 +405,28 @@ pub const ParseErrorInfo = struct {
     }
 
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        deinitJson([]const u8, allocator, &self.name);
-        deinitJson([]const u8, allocator, &self.details);
+        if (self.error_code) |*value| deinitJson(PartoutErrorCode, allocator, value);
+        if (self.name) |*value| deinitJson([]const u8, allocator, value);
+        if (self.line) |*value| deinitJson([]const u8, allocator, value);
+        deinitJson([]const []const u8, allocator, &self.arguments);
     }
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
         try jw.beginObject();
-        try jw.objectField("name");
-        try writeJson(jw, self.name);
-        try jw.objectField("details");
-        try writeJson(jw, self.details);
+        if (self.error_code) |value| {
+            try jw.objectField("errorCode");
+            try writeJson(jw, value);
+        }
+        if (self.name) |value| {
+            try jw.objectField("name");
+            try writeJson(jw, value);
+        }
+        if (self.line) |value| {
+            try jw.objectField("line");
+            try writeJson(jw, value);
+        }
+        try jw.objectField("arguments");
+        try writeJson(jw, self.arguments);
         try jw.endObject();
     }
 };
@@ -2430,6 +2446,24 @@ pub const PartoutErrorCode = enum {
     unknownImportedModule,
     unknownModuleHandler,
     wireGuardEmptyPeers,
+    wireGuardInterfaceHasInvalidAddress,
+    wireGuardInterfaceHasInvalidDNS,
+    wireGuardInterfaceHasInvalidListenPort,
+    wireGuardInterfaceHasInvalidMTU,
+    wireGuardInterfaceHasInvalidPrivateKey,
+    wireGuardInterfaceHasNoPrivateKey,
+    wireGuardInterfaceHasUnrecognizedKey,
+    wireGuardMultipleEntriesForKey,
+    wireGuardMultipleInterfaces,
+    wireGuardMultiplePeersWithSamePublicKey,
+    wireGuardNoInterface,
+    wireGuardPeerHasInvalidAllowedIP,
+    wireGuardPeerHasInvalidEndpoint,
+    wireGuardPeerHasInvalidPersistentKeepAlive,
+    wireGuardPeerHasInvalidPreSharedKey,
+    wireGuardPeerHasInvalidPublicKey,
+    wireGuardPeerHasNoPublicKey,
+    wireGuardPeerHasUnrecognizedKey,
 
     pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
         const raw_value = stringValue(value) orelse return error.InvalidModel;
@@ -2485,6 +2519,24 @@ pub const PartoutErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "unknownImportedModule")) return .unknownImportedModule;
         if (std.mem.eql(u8, raw_value, "unknownModuleHandler")) return .unknownModuleHandler;
         if (std.mem.eql(u8, raw_value, "WireGuard.emptyPeers")) return .wireGuardEmptyPeers;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidAddress")) return .wireGuardInterfaceHasInvalidAddress;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidDNS")) return .wireGuardInterfaceHasInvalidDNS;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidListenPort")) return .wireGuardInterfaceHasInvalidListenPort;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidMTU")) return .wireGuardInterfaceHasInvalidMTU;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidPrivateKey")) return .wireGuardInterfaceHasInvalidPrivateKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasNoPrivateKey")) return .wireGuardInterfaceHasNoPrivateKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasUnrecognizedKey")) return .wireGuardInterfaceHasUnrecognizedKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.multipleEntriesForKey")) return .wireGuardMultipleEntriesForKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.multipleInterfaces")) return .wireGuardMultipleInterfaces;
+        if (std.mem.eql(u8, raw_value, "WireGuard.multiplePeersWithSamePublicKey")) return .wireGuardMultiplePeersWithSamePublicKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.noInterface")) return .wireGuardNoInterface;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidAllowedIP")) return .wireGuardPeerHasInvalidAllowedIP;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidEndpoint")) return .wireGuardPeerHasInvalidEndpoint;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPersistentKeepAlive")) return .wireGuardPeerHasInvalidPersistentKeepAlive;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPreSharedKey")) return .wireGuardPeerHasInvalidPreSharedKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPublicKey")) return .wireGuardPeerHasInvalidPublicKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasNoPublicKey")) return .wireGuardPeerHasNoPublicKey;
+        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasUnrecognizedKey")) return .wireGuardPeerHasUnrecognizedKey;
         return null;
     }
 
@@ -2538,6 +2590,24 @@ pub const PartoutErrorCode = enum {
             .unknownImportedModule => "unknownImportedModule",
             .unknownModuleHandler => "unknownModuleHandler",
             .wireGuardEmptyPeers => "WireGuard.emptyPeers",
+            .wireGuardInterfaceHasInvalidAddress => "WireGuard.interfaceHasInvalidAddress",
+            .wireGuardInterfaceHasInvalidDNS => "WireGuard.interfaceHasInvalidDNS",
+            .wireGuardInterfaceHasInvalidListenPort => "WireGuard.interfaceHasInvalidListenPort",
+            .wireGuardInterfaceHasInvalidMTU => "WireGuard.interfaceHasInvalidMTU",
+            .wireGuardInterfaceHasInvalidPrivateKey => "WireGuard.interfaceHasInvalidPrivateKey",
+            .wireGuardInterfaceHasNoPrivateKey => "WireGuard.interfaceHasNoPrivateKey",
+            .wireGuardInterfaceHasUnrecognizedKey => "WireGuard.interfaceHasUnrecognizedKey",
+            .wireGuardMultipleEntriesForKey => "WireGuard.multipleEntriesForKey",
+            .wireGuardMultipleInterfaces => "WireGuard.multipleInterfaces",
+            .wireGuardMultiplePeersWithSamePublicKey => "WireGuard.multiplePeersWithSamePublicKey",
+            .wireGuardNoInterface => "WireGuard.noInterface",
+            .wireGuardPeerHasInvalidAllowedIP => "WireGuard.peerHasInvalidAllowedIP",
+            .wireGuardPeerHasInvalidEndpoint => "WireGuard.peerHasInvalidEndpoint",
+            .wireGuardPeerHasInvalidPersistentKeepAlive => "WireGuard.peerHasInvalidPersistentKeepAlive",
+            .wireGuardPeerHasInvalidPreSharedKey => "WireGuard.peerHasInvalidPreSharedKey",
+            .wireGuardPeerHasInvalidPublicKey => "WireGuard.peerHasInvalidPublicKey",
+            .wireGuardPeerHasNoPublicKey => "WireGuard.peerHasNoPublicKey",
+            .wireGuardPeerHasUnrecognizedKey => "WireGuard.peerHasUnrecognizedKey",
         };
     }
 

@@ -48,7 +48,7 @@ test "WireGuard module exports import tagged module" {
     try std.testing.expect(std.mem.indexOf(u8, encoded, "\"searchDomains\":[\"example.com\"]") != null);
 }
 
-test "WireGuard module importer reports generic parse error info" {
+test "WireGuard module importer reports public parse error code and info" {
     const allocator = std.testing.allocator;
 
     const module_implementation = exports.impl.module;
@@ -66,6 +66,38 @@ test "WireGuard module importer reports generic parse error info" {
         ),
     );
 
-    try std.testing.expectEqualStrings("PrivateKey", info.name);
-    try std.testing.expectEqualStrings("PrivateKey = nope", info.details);
+    try std.testing.expectEqualStrings("PrivateKey", info.name.?);
+    try std.testing.expectEqualStrings("PrivateKey = nope", info.line.?);
+    try std.testing.expectEqual(@as(usize, 1), info.arguments.len);
+    try std.testing.expectEqualStrings("nope", info.arguments[0]);
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
+        info.error_code.?,
+    );
+}
+
+test "WireGuard module importer preserves PeerHasNoPublicKey" {
+    const allocator = std.testing.allocator;
+
+    const module_implementation = exports.impl.module;
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
+
+    try std.testing.expectError(
+        error.Parsing,
+        module_implementation.importModule(
+            allocator,
+            \\[Interface]
+            \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+            \\[Peer]
+            \\AllowedIPs = 0.0.0.0/0
+        ,
+            core.ImportContext.init(&info, null, null),
+        ),
+    );
+
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.wireGuardPeerHasNoPublicKey,
+        info.error_code.?,
+    );
 }

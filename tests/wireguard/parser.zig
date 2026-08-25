@@ -42,8 +42,9 @@ test "WireGuardParser reports parse error info" {
     try expectParseErrorInfo(
         error.InvalidLine,
         "this is not wg",
-        "",
+        null,
         "this is not wg",
+        &.{},
     );
     try expectParseErrorInfo(
         error.InterfaceHasInvalidPrivateKey,
@@ -52,6 +53,7 @@ test "WireGuardParser reports parse error info" {
     ,
         "PrivateKey",
         "PrivateKey = nope",
+        &.{"nope"},
     );
     try expectParseErrorInfo(
         error.InterfaceHasInvalidListenPort,
@@ -61,6 +63,7 @@ test "WireGuardParser reports parse error info" {
     ,
         "ListenPort",
         "ListenPort = nope",
+        &.{"nope"},
     );
     try expectParseErrorInfo(
         error.PeerHasInvalidAllowedIP,
@@ -73,6 +76,7 @@ test "WireGuardParser reports parse error info" {
     ,
         "AllowedIPs",
         "AllowedIPs = nope",
+        &.{"nope"},
     );
     try expectParseErrorInfo(
         error.PeerHasUnrecognizedKey,
@@ -85,6 +89,18 @@ test "WireGuardParser reports parse error info" {
     ,
         "Bogus",
         "Bogus = yep",
+        &.{"Bogus"},
+    );
+    try expectParseErrorInfo(
+        error.MultipleEntriesForKey,
+        \\[Interface]
+        \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+        \\ListenPort = 51820
+        \\ListenPort = 12345
+    ,
+        "ListenPort",
+        "ListenPort = 12345",
+        &.{"ListenPort"},
     );
     try expectParseErrorInfo(
         error.MultipleInterfaces,
@@ -92,8 +108,9 @@ test "WireGuardParser reports parse error info" {
         \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
         \\[Interface]
     ,
-        "",
+        null,
         "[Interface]",
+        &.{},
     );
     try expectParseErrorInfo(
         error.PeerHasNoPublicKey,
@@ -104,6 +121,7 @@ test "WireGuardParser reports parse error info" {
     ,
         "AllowedIPs",
         "AllowedIPs = 0.0.0.0/0",
+        &.{},
     );
 }
 
@@ -218,8 +236,9 @@ test "WireGuardParser matches sections and keys case-insensitively" {
 fn expectParseErrorInfo(
     expected_err: anyerror,
     contents: []const u8,
-    expected_name: []const u8,
-    expected_line: []const u8,
+    expected_name: ?[]const u8,
+    expected_line: ?[]const u8,
+    expected_arguments: []const []const u8,
 ) !void {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{};
@@ -231,6 +250,18 @@ fn expectParseErrorInfo(
             .parse_error_info = &info,
         }),
     );
-    try std.testing.expectEqualStrings(expected_name, info.name);
-    try std.testing.expectEqualStrings(expected_line, info.details);
+    if (expected_name) |expected| {
+        try std.testing.expectEqualStrings(expected, info.name.?);
+    } else {
+        try std.testing.expect(info.name == null);
+    }
+    if (expected_line) |expected| {
+        try std.testing.expectEqualStrings(expected, info.line.?);
+    } else {
+        try std.testing.expect(info.line == null);
+    }
+    try std.testing.expectEqual(expected_arguments.len, info.arguments.len);
+    for (expected_arguments, info.arguments) |expected, actual| {
+        try std.testing.expectEqualStrings(expected, actual);
+    }
 }

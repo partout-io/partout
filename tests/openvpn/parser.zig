@@ -668,7 +668,7 @@ fn expectParseErrorInfo(
     expected_err: anytype,
     contents: []const u8,
     expected_name: []const u8,
-    expected_details: []const u8,
+    expected_line: []const u8,
 ) !void {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{};
@@ -680,8 +680,9 @@ fn expectParseErrorInfo(
             .parse_error_info = &info,
         }),
     );
-    try std.testing.expectEqualStrings(expected_name, info.name);
-    try std.testing.expectEqualStrings(expected_details, info.details);
+    try std.testing.expectEqualStrings(expected_name, info.name.?);
+    try std.testing.expectEqualStrings(expected_line, info.line.?);
+    try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
 }
 
 fn failDecryptKey(

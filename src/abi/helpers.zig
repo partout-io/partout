@@ -143,8 +143,15 @@ fn errorPayloadWithInfoAllocZ(
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
     const user_info: ?api.JSONValue = if (parse_error_info) |info| user_info: {
-        if (info.name.len == 0 and info.details.len == 0) break :user_info null;
-        const bytes = util.encodeJsonValue(allocator, info.*) catch break :user_info null;
+        if (info.name == null and info.line == null and info.arguments.len == 0) break :user_info null;
+        // `error_code` is an internal handoff to ABIErrorPayload.code. Do not
+        // duplicate it inside ABIErrorPayload.userInfo.
+        const public_info: api.ParseErrorInfo = .{
+            .name = info.name,
+            .line = info.line,
+            .arguments = info.arguments,
+        };
+        const bytes = util.encodeJsonValue(allocator, public_info) catch break :user_info null;
         break :user_info .{
             .bytes = bytes,
             .owned = true,
@@ -166,7 +173,10 @@ pub fn importErrorPayloadAllocZ(
 ) ?[*:0]u8 {
     const payload = errorPayloadWithInfoAllocZ(
         allocator,
-        importErrorCode(err),
+        if (context.parse_error_info) |error_info|
+            error_info.error_code orelse importErrorCode(err)
+        else
+            importErrorCode(err),
         context.parse_error_info,
     );
     return wrapOwnedImportPayload(
