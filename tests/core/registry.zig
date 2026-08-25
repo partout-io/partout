@@ -328,12 +328,13 @@ test "registry preserves the first importer error" {
     try std.testing.expectError(error.Parsing, registry.importModule(allocator, "contents", null));
 }
 
-test "registry preserves recognized type from first concrete importer error" {
+test "registry stops after a concrete importer error" {
     const allocator = std.testing.allocator;
 
     const Mock = struct {
         module_type: api.ModuleType,
         err: ImportError,
+        called: bool = false,
 
         fn moduleType(ptr: ?*anyopaque) api.ModuleType {
             const self: *@This() = @ptrCast(@alignCast(ptr.?));
@@ -347,6 +348,7 @@ test "registry preserves recognized type from first concrete importer error" {
             context: ?ImportContext,
         ) ImportError!api.TaggedModule {
             const self: *@This() = @ptrCast(@alignCast(ptr.?));
+            self.called = true;
             if (self.err != error.UnknownImportedModule) {
                 if (context) |import_context| import_context.setRecognizedType(self.module_type);
             }
@@ -386,6 +388,8 @@ test "registry preserves recognized type from first concrete importer error" {
         ),
     );
     try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
+    try std.testing.expect(failed.called);
+    try std.testing.expect(!ignored.called);
 }
 
 test "registry imports tagged profiles directly" {

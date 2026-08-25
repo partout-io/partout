@@ -212,6 +212,24 @@ test "ABI importer preserves OpenVPN parse error codes" {
         api.PartoutErrorCode.openVPNUnsupportedCompression,
         profile_info.error_code.?,
     );
+
+    var passphrase_info: api.ParseErrorInfo = .{};
+    defer passphrase_info.deinit(allocator);
+    try std.testing.expectError(
+        error.PassphraseRequired,
+        importer.importModule(
+            allocator,
+            encrypted_openvpn_profile,
+            core.ImportContext.init(&passphrase_info, null, null),
+        ),
+    );
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.openVPNPassphraseRequired,
+        passphrase_info.error_code.?,
+    );
+    try std.testing.expect(passphrase_info.name == null);
+    try std.testing.expect(passphrase_info.line == null);
+    try std.testing.expectEqual(@as(usize, 0), passphrase_info.arguments.len);
 }
 
 test "profile import export returns normalized success and failure payloads" {
@@ -233,6 +251,12 @@ test "profile import export returns normalized success and failure payloads" {
         "code",
         "OpenVPN.unsupportedCompression",
     );
+    try expectImportEnvelope(
+        partout.partout_import_profile(encrypted_openvpn_profile, null),
+        -1,
+        "code",
+        "OpenVPN.passphraseRequired",
+    );
 }
 
 test "module import export returns normalized success and failure payloads" {
@@ -253,6 +277,12 @@ test "module import export returns normalized success and failure payloads" {
         -1,
         "code",
         "OpenVPN.unsupportedCompression",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_module(encrypted_openvpn_profile),
+        -1,
+        "code",
+        "OpenVPN.passphraseRequired",
     );
 }
 
@@ -301,3 +331,14 @@ const invalid_wireguard_profile =
 ;
 
 const invalid_openvpn_profile = "compress lzo";
+
+const encrypted_openvpn_profile =
+    \\client
+    \\<key>
+    \\-----BEGIN PRIVATE KEY-----
+    \\Proc-Type: 4,ENCRYPTED
+    \\DEK-Info: AES-256-CBC,0123456789ABCDEF
+    \\ciphertext
+    \\-----END PRIVATE KEY-----
+    \\</key>
+;
