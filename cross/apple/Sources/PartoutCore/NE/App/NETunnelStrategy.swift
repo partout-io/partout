@@ -24,11 +24,11 @@ public actor NETunnelStrategy {
 
     private let fingerprint: @Sendable (Profile) -> String?
 
-    private nonisolated let managersSubject: CurrentValueStream<[Profile.ID: NETunnelProviderManager]>
+    private nonisolated let managerSnapshotsSubject: CurrentValueStream<[Profile.ID: NETunnelManagerSnapshot]>
 
     private var allManagers: [Profile.ID: NETunnelProviderManager] {
         didSet {
-            managersSubject.send(allManagers)
+            publishManagerSnapshots()
         }
     }
 
@@ -72,7 +72,7 @@ public actor NETunnelStrategy {
 //        self.options = options
         self.fingerprint = fingerprint
         options = []
-        managersSubject = CurrentValueStream([:])
+        managerSnapshotsSubject = CurrentValueStream([:])
         allManagers = [:]
 
         NotificationCenter.default.addObserver(
@@ -360,11 +360,9 @@ private extension NETunnelStrategy {
         }
 //        pp_log(ctx, .os, .debug, "NEVPNStatusDidChange: \(notification)")
         pp_log(ctx, .os, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
+        let snapshot = NETunnelManagerSnapshot(manager: manager, profileId: profileId)
         Task { [weak self] in
-            guard let self else { return }
-            try? await self.withMutation { strategy in
-                strategy.updateCurrentManagersIfNeeded(with: manager, profileId: profileId)
-            }
+            await self?.updateCurrentManagersIfNeeded(with: manager, snapshot: snapshot)
         }
     }
 }
@@ -472,7 +470,7 @@ private struct SendableProviderSession: @unchecked Sendable {
 
 private extension NETunnelStrategy {
     nonisolated var activeProfilesStream: AsyncStream<[Profile.ID: TunnelSnapshot]> {
-        let stream = managersSubject.subscribe()
+        let stream = managerSnapshotsSubject.subscribe()
         let mappedStream: AsyncStream<[Profile.ID: TunnelSnapshot]>
 
         if options.contains(.multiple) {
@@ -482,7 +480,7 @@ private extension NETunnelStrategy {
                     $0.filter {
                         $0.value.rank > 0
                     }
-                    .compactMapValues(\.asSnapshot)
+                    .mapValues(\.snapshot)
                 }
         } else {
             mappedStream = stream
@@ -505,11 +503,19 @@ private extension NETunnelStrategy {
                     // time, e.g., while switching from one to another one. We should
                     // tolerate this scenario.
                     assert(filtered.count <= 2, "Max ranked manager must be at most two")
-                    return filtered.compactMapValues(\.asSnapshot)
+                    return filtered.mapValues(\.snapshot)
                 }
         }
 
         return mappedStream.removeDuplicates()
+    }
+
+    func publishManagerSnapshots(overriding override: NETunnelManagerSnapshot? = nil) {
+        var snapshots = allManagers.compactMapValues(\.managerSnapshot)
+        if let override {
+            snapshots[override.snapshot.id] = override
+        }
+        managerSnapshotsSubject.send(snapshots)
     }
 
     func reloadAllManagers() async throws -> [Profile.ID: NETunnelProviderManager] {
@@ -540,17 +546,20 @@ private extension NETunnelStrategy {
         return managers
     }
 
-    func updateCurrentManagersIfNeeded(with manager: NETunnelProviderManager, profileId: Profile.ID) {
+    func updateCurrentManagersIfNeeded(
+        with manager: NETunnelProviderManager,
+        snapshot: NETunnelManagerSnapshot
+    ) {
+        let profileId = snapshot.snapshot.id
+
         // IMPORTANT: It must be a tracked manager. We might receive notifications
         // from a manager with the same profile ID but owned by a different user.
         guard manager === allManagers[profileId] else { return }
-        // Deletion
-        if manager.connection.status == .invalid {
+
+        if snapshot.isInvalid {
             allManagers.removeValue(forKey: profileId)
-        }
-        // Update
-        else {
-            allManagers[profileId] = manager
+        } else {
+            publishManagerSnapshots(overriding: snapshot)
         }
     }
 
@@ -664,19 +673,48 @@ private extension NEVPNConnection {
     }
 }
 
-private extension NETunnelProviderManager {
-    var asSnapshot: TunnelSnapshot? {
-        guard let profileId else {
-            return nil
-        }
-        let status = connection.status.asTunnelStatus
-        let isEnabled = isEnabled && (isOnDemandEnabled || status != .inactive)
-        return TunnelSnapshot(
+struct NETunnelManagerSnapshot: Sendable {
+    let status: NEVPNStatus
+    let rank: Int
+    let isInvalid: Bool
+    let snapshot: TunnelSnapshot
+
+    init(manager: NETunnelProviderManager, profileId: Profile.ID) {
+        self.init(
+            status: manager.connection.status,
+            isEnabled: manager.isEnabled,
+            isOnDemandEnabled: manager.isOnDemandEnabled,
+            rank: manager.rank,
+            profileId: profileId
+        )
+    }
+
+    init(
+        status: NEVPNStatus,
+        isEnabled: Bool,
+        isOnDemandEnabled: Bool,
+        rank: Int,
+        profileId: Profile.ID
+    ) {
+        self.status = status
+        self.rank = rank
+        isInvalid = status == .invalid
+
+        let tunnelStatus = status.asTunnelStatus
+        let isEnabled = isEnabled && (isOnDemandEnabled || tunnelStatus != .inactive)
+        snapshot = TunnelSnapshot(
             id: profileId,
             isEnabled: isEnabled,
-            status: status,
+            status: tunnelStatus,
             onDemand: isEnabled && isOnDemandEnabled
         )
+    }
+}
+
+private extension NETunnelProviderManager {
+    var managerSnapshot: NETunnelManagerSnapshot? {
+        guard let profileId else { return nil }
+        return NETunnelManagerSnapshot(manager: self, profileId: profileId)
     }
 }
 
