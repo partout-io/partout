@@ -11,6 +11,8 @@ components:
     ParseErrorInfo:
       additionalProperties: false
       properties:
+        recognizedType:
+          $ref: "#/components/schemas/ModuleType"
         subCode:
           $ref: "#/components/schemas/PartoutErrorCode"
         name:

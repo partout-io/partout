@@ -190,7 +190,7 @@ test "registry passes generic import context to probed implementations" {
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
     var raw_context: u8 = 0;
-    const import_context = ImportContext.init(&info, null, @ptrCast(&raw_context));
+    const import_context = ImportContext.init(&info, @ptrCast(&raw_context));
     try std.testing.expect(import_context.module_type == null);
 
     var module = try registry.importModule(
@@ -378,16 +378,17 @@ test "registry stops after a concrete importer error" {
     var registry = try Registry.init(allocator, &implementations);
     defer registry.deinit(allocator);
 
-    var recognized_type: api.ModuleType = undefined;
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
     try std.testing.expectError(
         error.PassphraseRequired,
         registry.importModule(
             allocator,
             "contents",
-            ImportContext.init(null, &recognized_type, null),
+            ImportContext.init(&info, null),
         ),
     );
-    try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
+    try std.testing.expectEqual(api.ModuleType.OpenVPN, info.recognized_type.?);
     try std.testing.expect(failed.called);
     try std.testing.expect(!ignored.called);
 }
@@ -572,7 +573,7 @@ test "registry falls back to module importers for raw profiles" {
         allocator,
         "raw profile",
         "Imported DNS",
-        ImportContext.init(null, null, null),
+        ImportContext.init(null, null),
     );
     defer imported.deinit(allocator);
 

@@ -62,7 +62,7 @@ test "WireGuard module importer reports public parse error code and info" {
             \\[Interface]
             \\PrivateKey = nope
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 
@@ -92,7 +92,7 @@ test "WireGuard module importer preserves PeerHasNoPublicKey" {
             \\[Peer]
             \\AllowedIPs = 0.0.0.0/0
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
 

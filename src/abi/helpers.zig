@@ -137,7 +137,7 @@ fn errorUserInfoAllocZ(
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
     const info = parse_error_info orelse return null;
-    if (info.sub_code == null and info.name == null and info.line == null and info.arguments.len == 0) return null;
+    if (info.recognized_type == null and info.sub_code == null and info.name == null and info.line == null and info.arguments.len == 0) return null;
     return util.encodeJsonValueZ(allocator, info.*) catch null;
 }
 

@@ -29,7 +29,7 @@ test "ABI registry imports raw OpenVPN profile through parser implementation" {
         \\</ca>
     ,
         "Imported OpenVPN",
-        core.ImportContext.init(null, null, null),
+        core.ImportContext.init(null, null),
     );
     defer allocator.free(imported);
 
@@ -62,7 +62,7 @@ test "ABI registry imports raw WireGuard profile through parser implementation" 
         \\Endpoint = wg.example.com:51820
     ,
         "Imported WireGuard",
-        core.ImportContext.init(null, null, null),
+        core.ImportContext.init(null, null),
     );
     defer allocator.free(imported);
 
@@ -90,7 +90,7 @@ test "ABI registry imports raw OpenVPN module through parser implementation" {
         \\abc
         \\-----END CERTIFICATE-----
         \\</ca>
-    , core.ImportContext.init(null, null, null));
+    , core.ImportContext.init(null, null));
     defer allocator.free(imported);
 
     try std.testing.expectEqual(@as(u8, 0), imported[imported.len]);
@@ -113,7 +113,7 @@ test "ABI registry imports raw WireGuard module through parser implementation" {
         \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
         \\AllowedIPs = 0.0.0.0/0
         \\Endpoint = wg.example.com:51820
-    , core.ImportContext.init(null, null, null));
+    , core.ImportContext.init(null, null));
     defer allocator.free(imported);
 
     try std.testing.expect(std.mem.indexOf(u8, imported, "\"type\":\"WireGuard\"") != null);
@@ -135,7 +135,7 @@ test "ABI importer reports parse error info for raw modules" {
             \\[Interface]
             \\PrivateKey = nope
         ,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
     try std.testing.expectEqualStrings("PrivateKey", info.name.?);
@@ -164,7 +164,7 @@ test "ABI importer reports parse error info for raw profiles" {
             \\PrivateKey = nope
         ,
             null,
-            core.ImportContext.init(&info, null, null),
+            core.ImportContext.init(&info, null),
         ),
     );
     try std.testing.expectEqualStrings("PrivateKey", info.name.?);
@@ -189,7 +189,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
         importer.importModule(
             allocator,
             invalid_openvpn_profile,
-            core.ImportContext.init(&module_info, null, null),
+            core.ImportContext.init(&module_info, null),
         ),
     );
     try std.testing.expectEqual(
@@ -205,7 +205,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
             allocator,
             invalid_openvpn_profile,
             null,
-            core.ImportContext.init(&profile_info, null, null),
+            core.ImportContext.init(&profile_info, null),
         ),
     );
     try std.testing.expectEqual(
@@ -220,7 +220,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
         importer.importModule(
             allocator,
             encrypted_openvpn_profile,
-            core.ImportContext.init(&passphrase_info, null, null),
+            core.ImportContext.init(&passphrase_info, null),
         ),
     );
     try std.testing.expectEqual(
