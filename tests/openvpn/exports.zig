@@ -82,7 +82,7 @@ test "OpenVPN module importer requires CA and at least one remote" {
     );
 }
 
-test "OpenVPN module importer reports generic parse error info" {
+test "OpenVPN module importer reports public parse error code and info" {
     const allocator = std.testing.allocator;
 
     const module_implementation = exports.impl.module;
@@ -98,8 +98,36 @@ test "OpenVPN module importer reports generic parse error info" {
         ),
     );
 
-    try std.testing.expectEqualStrings("compress", info.name);
-    try std.testing.expectEqualStrings("compress lzo", info.details);
+    try std.testing.expectEqualStrings("compress", info.name.?);
+    try std.testing.expectEqualStrings("compress lzo", info.line.?);
+    try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
+    try std.testing.expectEqual(
+        api.PartoutErrorCode.openVPNUnsupportedCompression,
+        info.error_code.?,
+    );
+}
+
+test "OpenVPN module importer maps parser errors to public codes" {
+    const allocator = std.testing.allocator;
+    const module_implementation = exports.impl.module;
+    const cases = .{
+        .{ "cipher", api.PartoutErrorCode.parsing },
+        .{ "proto sctp", api.PartoutErrorCode.openVPNUnsupportedOption },
+    };
+
+    inline for (cases) |entry| {
+        var info: api.ParseErrorInfo = .{};
+        defer info.deinit(allocator);
+        try std.testing.expectError(
+            error.Parsing,
+            module_implementation.importModule(
+                allocator,
+                entry[0],
+                core.ImportContext.init(&info, null, null),
+            ),
+        );
+        try std.testing.expectEqual(entry[1], info.error_code.?);
+    }
 }
 
 test "OpenVPN module importer accepts protocol context pointer" {
@@ -136,17 +164,20 @@ test "OpenVPN module importer reports passphrase requirement" {
 
     const module_implementation = exports.impl.module;
     var recognized_type: api.ModuleType = undefined;
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
 
     try std.testing.expectError(
         error.PassphraseRequired,
         module_implementation.importModule(
             allocator,
             encrypted_key_configuration,
-            core.ImportContext.init(null, &recognized_type, null),
+            core.ImportContext.init(&info, &recognized_type, null),
         ),
     );
 
     try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
+    try std.testing.expectEqual(api.PartoutErrorCode.openVPNPassphraseRequired, info.error_code.?);
 }
 
 test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {

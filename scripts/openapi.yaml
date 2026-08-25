@@ -24,13 +24,18 @@ components:
     ParseErrorInfo:
       additionalProperties: false
       properties:
+        errorCode:
+          $ref: "#/components/schemas/PartoutErrorCode"
         name:
           type: string
-        details:
+        line:
           type: string
+        arguments:
+          items:
+            type: string
+          type: array
       required:
-        - name
-        - details
+        - arguments
       type: object
     Address:
       type: string
@@ -816,6 +821,24 @@ components:
         - unknownImportedModule
         - unknownModuleHandler
         - WireGuard.emptyPeers
+        - WireGuard.interfaceHasInvalidAddress
+        - WireGuard.interfaceHasInvalidDNS
+        - WireGuard.interfaceHasInvalidListenPort
+        - WireGuard.interfaceHasInvalidMTU
+        - WireGuard.interfaceHasInvalidPrivateKey
+        - WireGuard.interfaceHasNoPrivateKey
+        - WireGuard.interfaceHasUnrecognizedKey
+        - WireGuard.multipleEntriesForKey
+        - WireGuard.multipleInterfaces
+        - WireGuard.multiplePeersWithSamePublicKey
+        - WireGuard.noInterface
+        - WireGuard.peerHasInvalidAllowedIP
+        - WireGuard.peerHasInvalidEndpoint
+        - WireGuard.peerHasInvalidPersistentKeepAlive
+        - WireGuard.peerHasInvalidPreSharedKey
+        - WireGuard.peerHasInvalidPublicKey
+        - WireGuard.peerHasNoPublicKey
+        - WireGuard.peerHasUnrecognizedKey
       type: string
       x-enum-varnames:
         - authentication
@@ -866,6 +889,24 @@ components:
         - unknownImportedModule
         - unknownModuleHandler
         - wireGuardEmptyPeers
+        - wireGuardInterfaceHasInvalidAddress
+        - wireGuardInterfaceHasInvalidDNS
+        - wireGuardInterfaceHasInvalidListenPort
+        - wireGuardInterfaceHasInvalidMTU
+        - wireGuardInterfaceHasInvalidPrivateKey
+        - wireGuardInterfaceHasNoPrivateKey
+        - wireGuardInterfaceHasUnrecognizedKey
+        - wireGuardMultipleEntriesForKey
+        - wireGuardMultipleInterfaces
+        - wireGuardMultiplePeersWithSamePublicKey
+        - wireGuardNoInterface
+        - wireGuardPeerHasInvalidAllowedIP
+        - wireGuardPeerHasInvalidEndpoint
+        - wireGuardPeerHasInvalidPersistentKeepAlive
+        - wireGuardPeerHasInvalidPreSharedKey
+        - wireGuardPeerHasInvalidPublicKey
+        - wireGuardPeerHasNoPublicKey
+        - wireGuardPeerHasUnrecognizedKey
       x-enum-descriptions:
         - Authentication failure.
         - Response is cached.
@@ -915,6 +956,24 @@ components:
         - Module content is unknown for the importer.
         - Module handler is unknown.
         - Configuration has no peers.
+        - WireGuard interface address is invalid.
+        - WireGuard interface DNS entry is invalid.
+        - WireGuard interface listen port is invalid.
+        - WireGuard interface MTU is invalid.
+        - WireGuard interface private key is invalid.
+        - WireGuard interface has no private key.
+        - WireGuard interface key is unrecognized.
+        - WireGuard key occurs more than once.
+        - WireGuard configuration has multiple interface sections.
+        - WireGuard configuration has multiple peers with the same public key.
+        - WireGuard configuration has no interface section.
+        - WireGuard peer allowed IP is invalid.
+        - WireGuard peer endpoint is invalid.
+        - WireGuard peer persistent keepalive is invalid.
+        - WireGuard peer pre-shared key is invalid.
+        - WireGuard peer public key is invalid.
+        - WireGuard peer has no public key.
+        - WireGuard peer key is unrecognized.
     Profile:
       additionalProperties: false
       properties:

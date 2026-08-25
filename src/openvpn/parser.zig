@@ -30,10 +30,12 @@ pub fn importModule(
             error.InvalidFormat => error.UnknownImportedModule,
             error.EmptyPassphrase => {
                 setRecognizedType(context);
+                setImportErrorCode(context, err);
                 return error.PassphraseRequired;
             },
             else => {
                 setRecognizedType(context);
+                setImportErrorCode(context, err);
                 return error.Parsing;
             },
         };
@@ -41,10 +43,12 @@ pub fn importModule(
     setRecognizedType(context);
     if (!isCompleteClientConfiguration(&configuration)) {
         configuration.deinit(allocator);
+        setErrorCode(context, .parsing);
         return error.Parsing;
     }
     const module_id = core.newId() catch {
         configuration.deinit(allocator);
+        setErrorCode(context, .unhandled);
         return error.Parsing;
     };
     const module = api.TaggedModule{ .OpenVPN = .{
@@ -89,18 +93,18 @@ pub const Parser = struct {
             self: Context,
             allocator: std.mem.Allocator,
             name: []const u8,
-            details: []const u8,
+            line: []const u8,
         ) void {
             const info = self.parse_error_info orelse return;
-            if (info.name.len != 0 or info.details.len != 0) return;
-            const owned_name = allocator.dupe(u8, name) catch return;
-            const owned_details = allocator.dupe(u8, details) catch {
-                allocator.free(owned_name);
+            if (info.name != null or info.line != null or info.arguments.len != 0) return;
+            const owned_name = if (name.len > 0) allocator.dupe(u8, name) catch return else null;
+            const owned_line = if (line.len > 0) allocator.dupe(u8, line) catch {
+                if (owned_name) |value| allocator.free(value);
                 return;
-            };
+            } else null;
             info.* = .{
                 .name = owned_name,
-                .details = owned_details,
+                .line = owned_line,
             };
         }
     };
@@ -1163,6 +1167,26 @@ fn importParserContext(context: ?core.ImportContext) Parser.Context {
 fn setRecognizedType(context: ?core.ImportContext) void {
     const import_context = context orelse return;
     import_context.setRecognizedType(.OpenVPN);
+}
+
+fn setErrorCode(context: ?core.ImportContext, code: api.PartoutErrorCode) void {
+    const import_context = context orelse return;
+    const error_info = import_context.parse_error_info orelse return;
+    if (error_info.error_code == null) error_info.error_code = code;
+}
+
+fn setImportErrorCode(context: ?core.ImportContext, err: ParseError) void {
+    const code: api.PartoutErrorCode = switch (err) {
+        error.OutOfMemory => .outOfMemory,
+        error.ContinuationPushReply, error.MalformedOption => .parsing,
+        error.DecrypterRequired => .requiredImplementation,
+        error.EmptyPassphrase => .openVPNPassphraseRequired,
+        error.InvalidFormat => .unknownImportedModule,
+        error.UnableToDecrypt => .crypto,
+        error.UnsupportedCompression => .openVPNUnsupportedCompression,
+        error.UnsupportedConfiguration => .openVPNUnsupportedOption,
+    };
+    setErrorCode(context, code);
 }
 
 const known_openvpn_options = [_][]const u8{
