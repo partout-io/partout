@@ -12,6 +12,7 @@ const uuid = @import("uuid.zig");
 
 pub const profile_version: i32 = 3;
 
+pub const ABIEnvelope = gen.ABIEnvelope;
 pub const ABIErrorPayload = gen.ABIErrorPayload;
 pub const Address = manual.Address;
 pub const ConnectionStatus = gen.ConnectionStatus;

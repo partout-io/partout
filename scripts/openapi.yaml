@@ -1,5 +1,16 @@
 components:
   schemas:
+    ABIEnvelope:
+      additionalProperties: false
+      properties:
+        code:
+          $ref: "#/components/schemas/Int32"
+        payload:
+          $ref: "#/components/schemas/JSONValue"
+      required:
+        - code
+        - payload
+      type: object
     ABIErrorPayload:
       additionalProperties: false
       properties:

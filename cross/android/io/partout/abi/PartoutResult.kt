@@ -7,11 +7,12 @@ package io.partout.abi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.JsonElement
 import kotlin.coroutines.resume
 
 data class PartoutResult(
     val code: Int,
-    val json: String?
+    val json: JsonElement?
 ) {
     companion object {
         suspend fun await(

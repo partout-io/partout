@@ -258,6 +258,56 @@ fn isNullValue(value: std.json.Value) bool {
     };
 }
 
+pub const ABIEnvelope = struct {
+    code: i32 = 0,
+    payload: JSONValue = .{},
+
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ABIEnvelope {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ABIEnvelope {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ABIEnvelope {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ABIEnvelope {
+        resetJsonErrorInfo(error_info);
+        const object = objectValue(value) orelse return error.InvalidModel;
+        var result = ABIEnvelope{};
+        errdefer result.deinit(allocator);
+        result.code = try parseJsonField(i32, allocator, object, "code", error_info);
+        result.payload = try parseJsonField(JSONValue, allocator, object, "payload", error_info);
+        return result;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        deinitJson(i32, allocator, &self.code);
+        deinitJson(JSONValue, allocator, &self.payload);
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.beginObject();
+        try jw.objectField("code");
+        try writeJson(jw, self.code);
+        try jw.objectField("payload");
+        try writeJson(jw, self.payload);
+        try jw.endObject();
+    }
+};
+
 pub const ABIErrorPayload = struct {
     code: PartoutErrorCode,
     user_info: ?RawJsonValue = null,

@@ -4,6 +4,8 @@
 
 package io.partout.abi
 
+import kotlinx.serialization.json.JsonElement
+
 fun interface PartoutCompletionCallback {
-    fun onComplete(code: Int, json: String?)
+    fun onComplete(code: Int, json: JsonElement?)
 }

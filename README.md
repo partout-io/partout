@@ -128,7 +128,6 @@ Libraries:
 - [GenericJSON][credits-genericjson]
 - [MbedTLS][credits-mbedtls]
 - [OpenSSL][credits-openssl]
-- [SwiftSyntax][credits-swift-syntax]
 - [url.c][credits-url.c]
 - [Wintun][credits-wintun]
 - [WireGuard (Go)][credits-wireguard-go]
@@ -170,7 +169,6 @@ Website: [partout.io][partout]
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
-[credits-swift-syntax]: https://github.com/swiftlang/swift-syntax
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
 [credits-url.c]: https://github.com/cozis/url.c

@@ -14,3 +14,4 @@ pub const ImportAndEncodeError = helpers.ImportAndEncodeError;
 
 pub const errorPayloadAllocZ = helpers.errorPayloadAllocZ;
 pub const importErrorPayloadAllocZ = helpers.importErrorPayloadAllocZ;
+pub const successPayloadAllocZ = helpers.successPayloadAllocZ;

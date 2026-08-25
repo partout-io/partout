@@ -34,7 +34,7 @@ test "ABI import error payload includes parse error info" {
     const payload_json = std.mem.span(c_payload);
     defer allocator.free(payload_json);
 
-    var payload = try api.ABIErrorPayload.parse(allocator, payload_json);
+    var payload = try parseErrorEnvelope(allocator, payload_json);
     defer payload.deinit(allocator);
     try std.testing.expectEqual(api.PartoutErrorCode.parsing, payload.code);
 
@@ -68,8 +68,19 @@ test "ABI import errors map to stable public codes" {
         const payload_json = std.mem.span(c_payload);
         defer allocator.free(payload_json);
 
-        var payload = try api.ABIErrorPayload.parse(allocator, payload_json);
+        var payload = try parseErrorEnvelope(allocator, payload_json);
         defer payload.deinit(allocator);
         try std.testing.expectEqual(entry[1], payload.code);
     }
+}
+
+fn parseErrorEnvelope(
+    allocator: std.mem.Allocator,
+    envelope_json: []const u8,
+) !api.ABIErrorPayload {
+    var envelope = try api.ABIEnvelope.parse(allocator, envelope_json);
+    defer envelope.deinit(allocator);
+
+    try std.testing.expectEqual(@as(i32, -1), envelope.code);
+    return api.ABIErrorPayload.parse(allocator, envelope.payload.bytes);
 }

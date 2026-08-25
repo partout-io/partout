@@ -103,8 +103,10 @@ pub export fn partout_import_profile(
         util.borrowedCString(text_ptr),
         if (c_name) |name| util.borrowedCString(name) else null,
         import_context,
-    ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
-    return profile_json.ptr;
+    ) catch |err|
+        return abi.importErrorPayloadAllocZ(allocator, err, import_context);
+
+    return abi.successPayloadAllocZ(allocator, profile_json.ptr);
 }
 
 pub export fn partout_import_module(
@@ -123,8 +125,10 @@ pub export fn partout_import_module(
         allocator,
         util.borrowedCString(text_ptr),
         import_context,
-    ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
-    return module_json.ptr;
+    ) catch |err|
+        return abi.importErrorPayloadAllocZ(allocator, err, import_context);
+
+    return abi.successPayloadAllocZ(allocator, module_json.ptr);
 }
 
 pub export fn partout_daemon_start(
