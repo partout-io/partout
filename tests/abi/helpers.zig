@@ -47,10 +47,10 @@ test "ABI import error envelope includes parse error info" {
     try std.testing.expectEqualStrings("nope", parsed_info.arguments[0]);
 }
 
-test "ABI import error envelope moves parse error code to top level" {
+test "ABI import error envelope preserves parse error sub-code in payload" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
-        .error_code = .wireGuardPeerHasNoPublicKey,
+        .sub_code = .wireGuardPeerHasNoPublicKey,
         .line = "AllowedIPs = 0.0.0.0/0",
     };
     const context = core.ImportContext.init(&info, null, null);
@@ -69,8 +69,8 @@ test "ABI import error envelope moves parse error code to top level" {
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
-    try std.testing.expect(parsed_info.error_code == null);
-    try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"errorCode\"") == null);
+    try std.testing.expectEqual(api.PartoutErrorCode.wireGuardPeerHasNoPublicKey, parsed_info.sub_code.?);
+    try std.testing.expect(std.mem.indexOf(u8, envelope.payload.?.bytes, "\"subCode\"") != null);
 }
 
 test "ABI import errors map to stable public codes" {

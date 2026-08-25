@@ -7,13 +7,13 @@
 
 public struct ParseErrorInfo: Sendable, Codable, Hashable {
 
-    public var errorCode: PartoutErrorCode?
+    public var subCode: PartoutErrorCode?
     public var name: String?
     public var line: String?
     public var arguments: [String]
 
-    public init(errorCode: PartoutErrorCode? = nil, name: String? = nil, line: String? = nil, arguments: [String]) {
-        self.errorCode = errorCode
+    public init(subCode: PartoutErrorCode? = nil, name: String? = nil, line: String? = nil, arguments: [String]) {
+        self.subCode = subCode
         self.name = name
         self.line = line
         self.arguments = arguments

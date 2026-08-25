@@ -137,16 +137,8 @@ fn errorUserInfoAllocZ(
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
     const info = parse_error_info orelse return null;
-    if (info.name == null and info.line == null and info.arguments.len == 0) return null;
-
-    // `error_code` is an internal handoff to ABIEnvelope.code. Do not
-    // duplicate it inside ABIEnvelope.payload.
-    const public_info: api.ParseErrorInfo = .{
-        .name = info.name,
-        .line = info.line,
-        .arguments = info.arguments,
-    };
-    return util.encodeJsonValueZ(allocator, public_info) catch null;
+    if (info.sub_code == null and info.name == null and info.line == null and info.arguments.len == 0) return null;
+    return util.encodeJsonValueZ(allocator, info.*) catch null;
 }
 
 pub fn importErrorPayloadAllocZ(
@@ -155,7 +147,7 @@ pub fn importErrorPayloadAllocZ(
     context: core.ImportContext,
 ) ?[*:0]u8 {
     const code = if (context.parse_error_info) |error_info|
-        error_info.error_code orelse importErrorCode(err)
+        error_info.sub_code orelse importErrorCode(err)
     else
         importErrorCode(err);
     const user_info = errorUserInfoAllocZ(allocator, context.parse_error_info);

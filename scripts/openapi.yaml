@@ -11,7 +11,7 @@ components:
     ParseErrorInfo:
       additionalProperties: false
       properties:
-        errorCode:
+        subCode:
           $ref: "#/components/schemas/PartoutErrorCode"
         name:
           type: string

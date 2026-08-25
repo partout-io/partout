@@ -144,7 +144,7 @@ test "ABI importer reports parse error info for raw modules" {
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
     try std.testing.expectEqual(
         api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
-        info.error_code.?,
+        info.sub_code.?,
     );
 }
 
@@ -173,7 +173,7 @@ test "ABI importer reports parse error info for raw profiles" {
     try std.testing.expectEqualStrings("nope", info.arguments[0]);
     try std.testing.expectEqual(
         api.PartoutErrorCode.wireGuardInterfaceHasInvalidPrivateKey,
-        info.error_code.?,
+        info.sub_code.?,
     );
 }
 
@@ -194,7 +194,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
     );
     try std.testing.expectEqual(
         api.PartoutErrorCode.openVPNUnsupportedCompression,
-        module_info.error_code.?,
+        module_info.sub_code.?,
     );
 
     var profile_info: api.ParseErrorInfo = .{};
@@ -210,7 +210,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
     );
     try std.testing.expectEqual(
         api.PartoutErrorCode.openVPNUnsupportedCompression,
-        profile_info.error_code.?,
+        profile_info.sub_code.?,
     );
 
     var passphrase_info: api.ParseErrorInfo = .{};
@@ -225,7 +225,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
     );
     try std.testing.expectEqual(
         api.PartoutErrorCode.openVPNPassphraseRequired,
-        passphrase_info.error_code.?,
+        passphrase_info.sub_code.?,
     );
     try std.testing.expect(passphrase_info.name == null);
     try std.testing.expect(passphrase_info.line == null);

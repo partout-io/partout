@@ -103,7 +103,7 @@ test "OpenVPN module importer reports public parse error code and info" {
     try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
     try std.testing.expectEqual(
         api.PartoutErrorCode.openVPNUnsupportedCompression,
-        info.error_code.?,
+        info.sub_code.?,
     );
 }
 
@@ -126,7 +126,7 @@ test "OpenVPN module importer maps parser errors to public codes" {
                 core.ImportContext.init(&info, null, null),
             ),
         );
-        try std.testing.expectEqual(entry[1], info.error_code.?);
+        try std.testing.expectEqual(entry[1], info.sub_code.?);
     }
 }
 
@@ -177,7 +177,7 @@ test "OpenVPN module importer reports passphrase requirement" {
     );
 
     try std.testing.expectEqual(api.ModuleType.OpenVPN, recognized_type);
-    try std.testing.expectEqual(api.PartoutErrorCode.openVPNPassphraseRequired, info.error_code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.openVPNPassphraseRequired, info.sub_code.?);
 }
 
 test "OpenVPN module importer decrypts legacy PKCS#1 client keys" {

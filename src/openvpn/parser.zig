@@ -1172,7 +1172,7 @@ fn setRecognizedType(context: ?core.ImportContext) void {
 fn setErrorCode(context: ?core.ImportContext, code: api.PartoutErrorCode) void {
     const import_context = context orelse return;
     const error_info = import_context.parse_error_info orelse return;
-    if (error_info.error_code == null) error_info.error_code = code;
+    if (error_info.sub_code == null) error_info.sub_code = code;
 }
 
 fn setImportErrorCode(context: ?core.ImportContext, err: ParseError) void {

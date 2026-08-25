@@ -33,7 +33,7 @@ import kotlinx.serialization.Contextual
  * 
  *
  * @param arguments
- * @param errorCode
+ * @param subCode
  * @param name
  * @param line
  */
@@ -44,8 +44,8 @@ data class ParseErrorInfo (
     @SerialName(value = "arguments")
     val arguments: kotlin.collections.List<kotlin.String>,
 
-    @Contextual @SerialName(value = "errorCode")
-    val errorCode: PartoutErrorCode? = null,
+    @Contextual @SerialName(value = "subCode")
+    val subCode: PartoutErrorCode? = null,
 
     @SerialName(value = "name")
     val name: kotlin.String? = null,
