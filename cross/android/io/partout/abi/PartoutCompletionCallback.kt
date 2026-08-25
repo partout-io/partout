@@ -4,8 +4,9 @@
 
 package io.partout.abi
 
+import io.partout.models.PartoutErrorCode
 import kotlinx.serialization.json.JsonElement
 
 fun interface PartoutCompletionCallback {
-    fun onComplete(code: Int, json: JsonElement?)
+    fun onComplete(code: PartoutErrorCode?, json: JsonElement?)
 }

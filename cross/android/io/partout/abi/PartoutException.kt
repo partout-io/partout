@@ -4,7 +4,6 @@
 
 package io.partout.abi
 
-import io.partout.models.ABIErrorPayload
 import io.partout.models.ParseErrorInfo
 import io.partout.models.PartoutErrorCode
 import kotlinx.serialization.json.Json
@@ -12,26 +11,18 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.decodeFromJsonElement
 
 class PartoutException(
-    val code: Int,
-    json: JsonElement?
-) : RuntimeException("ABI call failed (code=$code): $json") {
-    val errorCode: PartoutErrorCode
-    val userInfo: JsonElement?
+    val result: Int? = null,
+    val code: PartoutErrorCode,
+    val payload: JsonElement?
+) : RuntimeException("ABI call failed (result=$result, code=$code): $payload") {
     val arguments: List<String>
 
     init {
-        val payload = json?.let {
-            runCatching {
-                Json.decodeFromJsonElement<ABIErrorPayload>(json)
-            }.getOrNull()
-        }
-        errorCode = payload?.code ?: PartoutErrorCode.unhandled
-        userInfo = payload?.userInfo
-
         // Best effort (should only succeed with import errors though)
-        arguments = userInfo?.let {
+//        if (code == PartoutErrorCode.parsing)
+        arguments = payload?.let {
             runCatching {
-                val info = Json.decodeFromJsonElement<ParseErrorInfo>(payload.userInfo)
+                val info = Json.decodeFromJsonElement<ParseErrorInfo>(it)
                 info.arguments
             }.getOrNull()
         } ?: emptyList()

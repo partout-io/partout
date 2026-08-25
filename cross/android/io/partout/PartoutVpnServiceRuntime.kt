@@ -15,6 +15,7 @@ import android.os.Message
 import android.os.Messenger
 import android.util.Log
 import io.partout.abi.PartoutException
+import io.partout.models.PartoutErrorCode
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelControllerOptions
 import io.partout.models.TunnelSnapshot
@@ -151,7 +152,7 @@ class PartoutVpnServiceRuntime(
                 )
             }
             if (code != 0) {
-                throw PartoutException(code, null)
+                throw PartoutException(code, PartoutErrorCode.unhandled, null)
             }
             // Does not throw from now
             Log.i(logTag, "Started VPN daemon")
