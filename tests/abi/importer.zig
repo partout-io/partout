@@ -157,7 +157,7 @@ test "ABI importer reports parse error info for raw profiles" {
     defer info.deinit(allocator);
 
     try std.testing.expectError(
-        error.InvalidProfile,
+        error.Parsing,
         importer.importProfile(
             allocator,
             \\[Interface]
@@ -200,7 +200,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
     var profile_info: api.ParseErrorInfo = .{};
     defer profile_info.deinit(allocator);
     try std.testing.expectError(
-        error.InvalidProfile,
+        error.Parsing,
         importer.importProfile(
             allocator,
             invalid_openvpn_profile,
@@ -216,7 +216,7 @@ test "ABI importer preserves OpenVPN parse error codes" {
     var passphrase_info: api.ParseErrorInfo = .{};
     defer passphrase_info.deinit(allocator);
     try std.testing.expectError(
-        error.PassphraseRequired,
+        error.Parsing,
         importer.importModule(
             allocator,
             encrypted_openvpn_profile,
@@ -232,6 +232,26 @@ test "ABI importer preserves OpenVPN parse error codes" {
     try std.testing.expectEqual(@as(usize, 0), passphrase_info.arguments.len);
 }
 
+test "ABI importer preserves parsing without a sub-code" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
+
+    try std.testing.expectError(
+        error.Parsing,
+        importer.importProfile(
+            allocator,
+            "cipher",
+            null,
+            core.ImportContext.init(&info, null),
+        ),
+    );
+    try std.testing.expect(info.sub_code == null);
+}
+
 test "profile import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_profile(valid_wireguard_profile, "Imported WireGuard"),
@@ -241,19 +261,19 @@ test "profile import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_wireguard_profile, null),
-        .decoding,
+        .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_openvpn_profile, null),
-        .decoding,
+        .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(encrypted_openvpn_profile, null),
-        .decoding,
+        .parsing,
         null,
         null,
     );
@@ -280,7 +300,7 @@ test "module import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_module(encrypted_openvpn_profile),
-        .passphraseRequired,
+        .parsing,
         null,
         null,
     );

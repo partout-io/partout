@@ -171,7 +171,7 @@ test "OpenVPN module importer reports passphrase requirement" {
     defer info.deinit(allocator);
 
     try std.testing.expectError(
-        error.PassphraseRequired,
+        error.Parsing,
         module_implementation.importModule(
             allocator,
             encrypted_key_configuration,

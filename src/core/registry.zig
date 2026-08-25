@@ -297,6 +297,7 @@ pub const Registry = struct {
         var module = self.importModule(allocator, text, context) catch |module_err| {
             return switch (module_err) {
                 error.OutOfMemory => error.OutOfMemory,
+                error.Parsing => error.Parsing,
                 else => error.InvalidProfile,
             };
         };

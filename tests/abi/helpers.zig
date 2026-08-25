@@ -58,7 +58,7 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
 
     const c_payload = helpers.importErrorPayloadAllocZ(
         allocator,
-        error.InvalidProfile,
+        error.Parsing,
         context,
     ) orelse return error.TestUnexpectedResult;
     const payload_json = std.mem.span(c_payload);
@@ -66,7 +66,7 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
 
     var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
     defer envelope.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.decoding, envelope.code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
