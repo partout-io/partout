@@ -32,11 +32,11 @@ import kotlinx.serialization.Contextual
 /**
  * 
  *
- * @param arguments
- * @param recognizedType
- * @param subCode
- * @param name
- * @param line
+ * @param arguments 
+ * @param recognizedType 
+ * @param subCode 
+ * @param name 
+ * @param line 
  */
 @Serializable
 
@@ -61,3 +61,4 @@ data class ParseErrorInfo (
 
 
 }
+
