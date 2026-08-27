@@ -92,8 +92,8 @@ pub const DaemonOptions = struct {
     fn validateSupportedImplementations(profile: *const api.Profile) RuntimeError!void {
         const module = api.findActiveConnectionModule(profile) orelse return;
         switch (api.moduleType(module)) {
-            .OpenVPN => if (openvpn.impl.connection == null) return error.MissingConnectionImplementation,
-            .WireGuard => if (wireguard.impl.connection == null) return error.MissingConnectionImplementation,
+            .OpenVPN => if (!build_options.openvpn) return error.MissingConnectionImplementation,
+            .WireGuard => if (!build_options.wireguard) return error.MissingConnectionImplementation,
             else => {},
         }
     }
