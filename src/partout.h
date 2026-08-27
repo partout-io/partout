@@ -68,9 +68,10 @@ typedef struct __partout_daemon_bindings {
 
 /* Crypto backends. */
 typedef enum {
-    PartoutCryptoOpenSSL = 1,
+    PartoutCryptoDefault,
+    PartoutCryptoOpenSSL,
     PartoutCryptoMbedTLS,
-    PartoutCryptoNative,
+    PartoutCryptoNative
 } partout_crypto;
 
 /* Daemon options. */
