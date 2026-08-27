@@ -130,7 +130,7 @@ test "OpenVPN module export serializes module configuration" {
     defer configuration.deinit(allocator);
 
     const module = api.TaggedModule{ .OpenVPN = .{ .configuration = configuration } };
-    const serialized = try source.openvpn_exports.impl.module.serializeModule(allocator, &module, null);
+    const serialized = try source.openvpn_exports.module_implementation.serializeModule(allocator, &module, null);
     defer allocator.free(serialized);
 
     try std.testing.expect(std.mem.startsWith(u8, serialized, "client\ndev tun\nnobind\npersist-key\npersist-tun\n"));

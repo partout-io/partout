@@ -20,7 +20,7 @@ const has_real_default_crypto_backend =
 test "OpenVPN module exports import tagged module" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
 
     try std.testing.expectEqual(
         api.ModuleType.OpenVPN,
@@ -56,7 +56,7 @@ test "OpenVPN module exports import tagged module" {
 
 test "OpenVPN module importer requires CA and at least one remote" {
     const allocator = std.testing.allocator;
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
 
     try std.testing.expectError(
         error.Parsing,
@@ -85,7 +85,7 @@ test "OpenVPN module importer requires CA and at least one remote" {
 test "OpenVPN module importer reports public parse error code and info" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
 
@@ -109,7 +109,7 @@ test "OpenVPN module importer reports public parse error code and info" {
 
 test "OpenVPN module importer maps parser errors to public codes" {
     const allocator = std.testing.allocator;
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     const cases = .{
         .{ "cipher", @as(?[]const u8, null) },
         .{ "proto sctp", @as(?[]const u8, api.OpenVPNErrorCode.unsupportedOption.raw()) },
@@ -137,7 +137,7 @@ test "OpenVPN module importer maps parser errors to public codes" {
 test "OpenVPN module importer accepts protocol context pointer" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var context = parser.Parser.Context{ .passphrase = "secret" };
     const import_context = core.ImportContext.init(null, @ptrCast(&context));
     try std.testing.expect(import_context.cast(parser.Parser.Context, .OpenVPN) == null);
@@ -166,7 +166,7 @@ test "OpenVPN module importer accepts protocol context pointer" {
 test "OpenVPN module importer reports passphrase requirement" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
 
