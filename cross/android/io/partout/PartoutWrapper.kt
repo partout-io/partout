@@ -6,6 +6,7 @@ package io.partout
 
 import io.partout.abi.PartoutResult
 import io.partout.models.ABIEnvelope
+import io.partout.models.CryptoBackend
 import io.partout.models.PartoutErrorCode
 import io.partout.models.TaggedProfile
 import kotlinx.serialization.json.Json
@@ -22,7 +23,8 @@ interface PartoutWrapperProtocol {
         profile: String,
         cacheDir: String,
         controller: NativeTunnelControllerJNI,
-        minDataCountDelta: Long
+        minDataCountDelta: Long,
+        cryptoBackend: Int
     ): Int
     fun partoutDaemonStop()
 }
@@ -72,7 +74,8 @@ class PartoutWrapper(
         profile: String,
         cacheDir: String,
         controller: NativeTunnelControllerJNI,
-        minDataCountDelta: Long
+        minDataCountDelta: Long,
+        cryptoBackend: Int
     ): Int
     override external fun partoutDaemonStop()
     //endregion

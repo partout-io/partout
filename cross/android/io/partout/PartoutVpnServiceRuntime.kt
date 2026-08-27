@@ -15,6 +15,7 @@ import android.os.Message
 import android.os.Messenger
 import android.util.Log
 import io.partout.abi.PartoutException
+import io.partout.models.CryptoBackend
 import io.partout.models.PartoutErrorCode
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelControllerOptions
@@ -148,7 +149,8 @@ class PartoutVpnServiceRuntime(
                     profileJSON,
                     service.cacheDir.absolutePath,
                     newController,
-                    startOptions.minDataCountDelta
+                    startOptions.minDataCountDelta,
+                    startOptions.cryptoBackend?.value ?: 0
                 )
             }
             if (code != 0) {
@@ -420,6 +422,7 @@ class PartoutVpnServiceRuntime(
     data class StartOptions(
         val logsPrivateData: Boolean,
         val minDataCountDelta: Long,
+        val cryptoBackend: CryptoBackend?,
         val controllerOptions: TunnelControllerOptions
     )
 
