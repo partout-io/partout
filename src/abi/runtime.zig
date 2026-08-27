@@ -139,27 +139,27 @@ pub const DaemonRuntime = struct {
         errdefer allocator.destroy(self);
 
         // Register the known connection implementations
-        var contexts: std.EnumMap(api.ModuleType, Context) = .{};
+        self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and c_mod.has_default_crypto_backend) {
-            const ctx: openvpn.ConnectionContext = .{ .session_options = .{
+            self.contexts.put(.OpenVPN, .{ .OpenVPN = .{ .session_options = .{
                 .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
-            } };
-            contexts.put(.OpenVPN, .{ .OpenVPN = ctx });
+            } } });
+            const ctx = self.contexts.getPtr(.OpenVPN).?;
             const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx),
+                .ptr = @constCast(&ctx.OpenVPN),
                 .vtable = &openvpn.connection_vtable,
             };
             try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            const ctx: wireguard.ConnectionContext = .{
+            self.contexts.put(.WireGuard, .{ .WireGuard = .{
                 .backend = wireguard.go_backend,
-            };
-            contexts.put(.WireGuard, .{ .WireGuard = ctx });
+            } });
+            const ctx = self.contexts.getPtr(.WireGuard).?;
             const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx),
+                .ptr = @constCast(&ctx.WireGuard),
                 .vtable = &wireguard.connection_vtable,
             };
             try impls.append(allocator, impl);
@@ -200,7 +200,6 @@ pub const DaemonRuntime = struct {
 
         self.options = options;
         self.bindings = if (bindings) |b| b.* else null;
-        self.contexts = contexts;
         return self;
     }
 
