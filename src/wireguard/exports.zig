@@ -39,15 +39,18 @@ const ModuleType = core.api.ModuleType;
 //     };
 // };
 
-pub const ConnectionContext = connection.ConnectionContext;
-pub const go_backend = backend.goBackend();
-
-pub const module_vtable: core.ModuleImplementation.VTable = .{
+pub const module_implementation: core.ModuleImplementation = .{
+    .ptr = null,
+    .vtable = &module_vtable,
+};
+const module_vtable: core.ModuleImplementation.VTable = .{
     .module_type = moduleType,
     .import_module = parser.importModule,
     .serialize_module = serializer.serializeModule,
 };
 
+pub const ConnectionContext = connection.ConnectionContext;
+pub const go_backend = backend.goBackend();
 pub const connection_vtable: net.ConnectionImplementation.VTable = .{
     .module_type = moduleType,
     .create_connection = connection.createConnection,
