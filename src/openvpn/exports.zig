@@ -66,21 +66,6 @@ const serializer = @import("serializer.zig");
 
 const ModuleType = core.api.ModuleType;
 
-// pub const impl: proto.ModuleExports = .{
-//     .module = .{
-//         .ptr = null,
-//         .vtable = &module_vtable,
-//     },
-//     .connection = if (build_options.openvpn and c_mod.has_default_crypto_backend) .{
-//         .ptr = &Default.connection_context,
-//         .vtable = &connection_vtable,
-//     } else null,
-// };
-
-// const Default = struct {
-//     var connection_context: connection.ConnectionContext = .{};
-// };
-
 pub const module_implementation: core.ModuleImplementation = .{
     .ptr = null,
     .vtable = &module_vtable,
