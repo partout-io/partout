@@ -67,28 +67,30 @@ const serializer = @import("serializer.zig");
 
 const ModuleType = core.api.ModuleType;
 
-pub const impl: proto.ModuleExports = .{
-    .module = .{
-        .ptr = null,
-        .vtable = &module_vtable,
-    },
-    .connection = if (build_options.openvpn and c_mod.has_default_crypto_backend) .{
-        .ptr = &Default.connection_context,
-        .vtable = &connection_vtable,
-    } else null,
-};
+// pub const impl: proto.ModuleExports = .{
+//     .module = .{
+//         .ptr = null,
+//         .vtable = &module_vtable,
+//     },
+//     .connection = if (build_options.openvpn and c_mod.has_default_crypto_backend) .{
+//         .ptr = &Default.connection_context,
+//         .vtable = &connection_vtable,
+//     } else null,
+// };
 
-const Default = struct {
-    var connection_context: connection.ConnectionContext = .{};
-};
+// const Default = struct {
+//     var connection_context: connection.ConnectionContext = .{};
+// };
 
-const module_vtable: core.ModuleImplementation.VTable = .{
+pub const ConnectionContext = connection.ConnectionContext;
+
+pub const module_vtable: core.ModuleImplementation.VTable = .{
     .module_type = moduleType,
     .import_module = parser.importModule,
     .serialize_module = serializer.serializeModule,
 };
 
-const connection_vtable: net.ConnectionImplementation.VTable = .{
+pub const connection_vtable: net.ConnectionImplementation.VTable = .{
     .module_type = moduleType,
     .create_connection = connection.createConnection,
 };

@@ -123,15 +123,27 @@ pub const DaemonRuntime = struct {
         // Register the known connection implementations
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
-        if (build_options.openvpn) {
-            if (openvpn.impl.connection) |impl| {
-                try impls.append(allocator, impl);
-            }
+        if (build_options.openvpn and c_mod.has_default_crypto_backend) {
+            // FIXME: Heap alloc
+            const ctx: openvpn.ConnectionContext = .{ .session_options = .{
+                .backend = .native,
+            } };
+            const impl: net.ConnectionImplementation = .{
+                .ptr = ctx,
+                .vtable = openvpn.connection_vtable,
+            };
+            try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            if (wireguard.impl.connection) |impl| {
-                try impls.append(allocator, impl);
-            }
+            // FIXME: Heap alloc
+            const ctx: wireguard.ConnectionContext = .{
+                .backend = wireguard.go_backend,
+            };
+            const impl: net.ConnectionImplementation = .{
+                .ptr = ctx,
+                .vtable = wireguard.connection_vtable,
+            };
+            try impls.append(allocator, impl);
         }
         self.registry = try net.ConnectionRegistry.init(allocator, impls.items);
         errdefer self.registry.deinit(allocator);
