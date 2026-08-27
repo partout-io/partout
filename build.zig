@@ -199,6 +199,7 @@ pub fn build(b: *std.Build) void {
         .root_module = test_module,
     });
     unit_tests.step.dependOn(api_codegen_step);
+    check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
 
     const test_step = b.step("test", "Run Zig tests");
