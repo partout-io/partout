@@ -92,9 +92,13 @@ pub const WireGuardRemoteInterface = gen.WireGuardRemoteInterface;
 
 pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
 
+const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.tag.isDarwin();
+
 pub fn defaultCryptoBackend() CryptoBackend {
     if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
-    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS")) return .native;
+    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
+        return if (supports_native_crypto_backend) .native else .mbedtls;
+    }
     if (builtin.is_test) return .mock;
     @compileError("no default crypto backend is available");
 }
@@ -109,7 +113,9 @@ pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!c.cr
             c.crypto.pp_crypto_fnt_mbedtls()
         else
             error.UnsupportedCryptoBackend,
-        .native => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+        .native => if (!supports_native_crypto_backend)
+            @panic("native crypto backend requires Windows or Darwin")
+        else if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
             c.crypto.pp_crypto_fnt_native()
         else
             error.UnsupportedCryptoBackend,

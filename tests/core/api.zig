@@ -3,18 +3,24 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const source = @import("source");
 const api = source.core_api;
 const c_crypto = source.c_exports.crypto;
 const util = source.core.util;
 
+const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.tag.isDarwin();
+
 test "default crypto backend follows compiled backends" {
     const expected: api.CryptoBackend =
         if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
             .openssl
         else if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
-            .native
+            if (supports_native_crypto_backend)
+                .native
+            else
+                .mbedtls
         else
             .mock;
     try std.testing.expectEqual(expected, api.defaultCryptoBackend());
@@ -36,17 +42,21 @@ test "crypto function table follows the selected backend" {
     if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
         const mbedtls = try api.cryptoFunctionTable(.mbedtls);
         try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
-        const native = try api.cryptoFunctionTable(.native);
-        try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+        if (supports_native_crypto_backend) {
+            const native = try api.cryptoFunctionTable(.native);
+            try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+        }
     } else {
         try std.testing.expectError(
             error.UnsupportedCryptoBackend,
             api.cryptoFunctionTable(.mbedtls),
         );
-        try std.testing.expectError(
-            error.UnsupportedCryptoBackend,
-            api.cryptoFunctionTable(.native),
-        );
+        if (supports_native_crypto_backend) {
+            try std.testing.expectError(
+                error.UnsupportedCryptoBackend,
+                api.cryptoFunctionTable(.native),
+            );
+        }
     }
 }
 
