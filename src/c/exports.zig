@@ -30,11 +30,11 @@ pub const has_default_crypto_backend = builtin.is_test or
     @hasDecl(crypto, "PARTOUT_CRYPTO_OPENSSL") or
     @hasDecl(crypto, "PARTOUT_CRYPTO_MBEDTLS");
 
-pub const CryptoBackend = enum {
-    openssl,
-    mbedtls,
-    native,
-    mock,
+pub const CryptoBackend = enum(u8) {
+    openssl = 1,
+    mbedtls = 2,
+    native = 3,
+    mock = 4,
 
     pub fn default() CryptoBackend {
         if (@hasDecl(crypto, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;

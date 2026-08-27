@@ -30,6 +30,7 @@ pub const DaemonOptions = struct {
     starts_immediately: bool,
     cancels_unrecoverable: bool,
     min_data_count_delta: u64,
+    crypto_backend: ?c_mod.CryptoBackend,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -74,6 +75,9 @@ pub const DaemonOptions = struct {
         );
         errdefer allocator.free(cache_dir);
 
+        // Fall back to default crypto backend.
+        const crypto_backend = std.enums.fromInt(c_mod.CryptoBackend, args.options.crypto);
+
         return .{
             .profile = profile,
             .cache_dir = cache_dir,
@@ -81,6 +85,7 @@ pub const DaemonOptions = struct {
             .starts_immediately = args.options.starts_immediately,
             .cancels_unrecoverable = args.options.cancels_unrecoverable,
             .min_data_count_delta = args.options.min_data_count_delta,
+            .crypto_backend = crypto_backend,
         };
     }
 
@@ -139,7 +144,7 @@ pub const DaemonRuntime = struct {
         defer impls.deinit(allocator);
         if (build_options.openvpn and c_mod.has_default_crypto_backend) {
             const ctx: openvpn.ConnectionContext = .{ .session_options = .{
-                .backend = .native,
+                .backend = options.crypto_backend orelse .default(),
             } };
             contexts.put(.OpenVPN, .{ .OpenVPN = ctx });
             const impl: net.ConnectionImplementation = .{
