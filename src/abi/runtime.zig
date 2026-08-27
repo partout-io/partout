@@ -138,21 +138,23 @@ pub const DaemonRuntime = struct {
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and c_mod.has_default_crypto_backend) {
-            contexts[.OpenVPN] = .{ .session_options = .{
+            const ctx: openvpn.ConnectionContext = .{ .session_options = .{
                 .backend = .native,
             } };
+            contexts[.OpenVPN] = ctx;
             const impl: net.ConnectionImplementation = .{
-                .ptr = contexts[.OpenVPN],
+                .ptr = ctx,
                 .vtable = openvpn.connection_vtable,
             };
             try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            contexts[.WireGuard] = .{
+            const ctx: wireguard.ConnectionContext = .{
                 .backend = wireguard.go_backend,
             };
+            contexts[.WireGuard] = ctx;
             const impl: net.ConnectionImplementation = .{
-                .ptr = contexts[.WireGuard],
+                .ptr = ctx,
                 .vtable = wireguard.connection_vtable,
             };
             try impls.append(allocator, impl);
