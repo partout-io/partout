@@ -4,12 +4,11 @@
 
 const std = @import("std");
 
-const c_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 
 const api = core_mod.api;
-const CryptoBackend = c_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const PRNG = crypto_mod.PRNG;
 
 pub const SessionOptions = struct {

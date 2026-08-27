@@ -21,7 +21,7 @@ const log = core_mod.logging;
 const BidirectionalState = helpers_mod.BidirectionalState;
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
-const CryptoBackend = c_exports_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
@@ -191,7 +191,7 @@ const AuthSerializer = struct {
         digest: api.OpenVPNDigest,
         key: api.OpenVPNStaticKey,
     ) !AuthSerializer {
-        const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
+        const functions = (try api.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit();
         var bridge = CryptoKeysBridge.init(&keys);
@@ -302,7 +302,7 @@ const CryptSerializer = struct {
         backend: CryptoBackend,
         key: api.OpenVPNStaticKey,
     ) !CryptSerializer {
-        const functions = (try c_exports_mod.cryptoFunctionTable(backend)).enc;
+        const functions = (try api.cryptoFunctionTable(backend)).enc;
         var keys = try deriveKeys(allocator, key);
         defer keys.deinit();
         var bridge = CryptoKeysBridge.init(&keys);

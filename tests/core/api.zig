@@ -6,7 +6,49 @@ const std = @import("std");
 
 const source = @import("source");
 const api = source.core_api;
+const c_crypto = source.c_exports.crypto;
 const util = source.core.util;
+
+test "default crypto backend follows compiled backends" {
+    const expected: api.CryptoBackend =
+        if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
+            .openssl
+        else if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+            .native
+        else
+            .mock;
+    try std.testing.expectEqual(expected, api.defaultCryptoBackend());
+}
+
+test "crypto function table follows the selected backend" {
+    const mock = try api.cryptoFunctionTable(.mock);
+    try std.testing.expectEqualStrings("mock", std.mem.span(mock.name));
+
+    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL")) {
+        const openssl = try api.cryptoFunctionTable(.openssl);
+        try std.testing.expectEqualStrings("openssl", std.mem.span(openssl.name));
+    } else {
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            api.cryptoFunctionTable(.openssl),
+        );
+    }
+    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
+        const mbedtls = try api.cryptoFunctionTable(.mbedtls);
+        try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
+        const native = try api.cryptoFunctionTable(.native);
+        try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+    } else {
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            api.cryptoFunctionTable(.mbedtls),
+        );
+        try std.testing.expectError(
+            error.UnsupportedCryptoBackend,
+            api.cryptoFunctionTable(.native),
+        );
+    }
+}
 
 test "parses IPv4 addresses" {
     try expectAddress("1.2.3.4", .v4);

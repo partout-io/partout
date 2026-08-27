@@ -13,7 +13,7 @@ const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
-const CryptoBackend = c_exports_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const TLSConstants = constants_mod.TLS;
 
 /// Borrowed arguments used to create a TLS engine.
@@ -39,7 +39,7 @@ pub const TLSParameters = struct {
 pub const TLSError = std.mem.Allocator.Error || error{TLSFailure};
 pub const TLSCreateError =
     TLSError ||
-    c_exports_mod.CryptoFunctionTableError ||
+    api.CryptoFunctionTableError ||
     error{MissingCA};
 
 /// C-backed TLS implementation.
@@ -62,7 +62,7 @@ pub const TLSWrapper = struct {
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
     ) TLSCreateError!*TLSWrapper {
-        const functions = (try c_exports_mod.cryptoFunctionTable(parameters.backend)).tls;
+        const functions = (try api.cryptoFunctionTable(parameters.backend)).tls;
         return createWithFunctions(
             allocator,
             parameters,

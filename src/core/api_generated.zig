@@ -312,79 +312,6 @@ pub const ABIEnvelope = struct {
     }
 };
 
-pub const ParseErrorInfo = struct {
-    recognized_type: ?ModuleType = null,
-    sub_code: ?[]const u8 = null,
-    name: ?[]const u8 = null,
-    line: ?[]const u8 = null,
-    arguments: []const []const u8 = &.{},
-
-    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ParseErrorInfo {
-        return parseWithErrorInfo(allocator, text, null);
-    }
-
-    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ParseErrorInfo {
-        resetJsonErrorInfo(error_info);
-        var parsed = try util.parseJsonValue(allocator, text);
-        defer parsed.deinit();
-        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
-    }
-
-    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ParseErrorInfo {
-        return parseValueWithErrorInfo(allocator, value, null);
-    }
-
-    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ParseErrorInfo {
-        resetJsonErrorInfo(error_info);
-        const object = objectValue(value) orelse return error.InvalidModel;
-        var result = ParseErrorInfo{};
-        errdefer result.deinit(allocator);
-        result.recognized_type = try parseOptionalJsonField(ModuleType, allocator, object, "recognizedType", error_info);
-        result.sub_code = try parseOptionalJsonField([]const u8, allocator, object, "subCode", error_info);
-        result.name = try parseOptionalJsonField([]const u8, allocator, object, "name", error_info);
-        result.line = try parseOptionalJsonField([]const u8, allocator, object, "line", error_info);
-        result.arguments = try parseJsonField([]const []const u8, allocator, object, "arguments", error_info);
-        return result;
-    }
-
-    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
-        const encoded = try util.encodeJsonValue(allocator, self);
-        defer allocator.free(encoded);
-        return parse(allocator, encoded);
-    }
-
-    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
-        if (self.recognized_type) |*value| deinitJson(ModuleType, allocator, value);
-        if (self.sub_code) |*value| deinitJson([]const u8, allocator, value);
-        if (self.name) |*value| deinitJson([]const u8, allocator, value);
-        if (self.line) |*value| deinitJson([]const u8, allocator, value);
-        deinitJson([]const []const u8, allocator, &self.arguments);
-    }
-
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        try jw.beginObject();
-        if (self.recognized_type) |value| {
-            try jw.objectField("recognizedType");
-            try writeJson(jw, value);
-        }
-        if (self.sub_code) |value| {
-            try jw.objectField("subCode");
-            try writeJson(jw, value);
-        }
-        if (self.name) |value| {
-            try jw.objectField("name");
-            try writeJson(jw, value);
-        }
-        if (self.line) |value| {
-            try jw.objectField("line");
-            try writeJson(jw, value);
-        }
-        try jw.objectField("arguments");
-        try writeJson(jw, self.arguments);
-        try jw.endObject();
-    }
-};
-
 pub const ConnectionStatus = enum {
     disconnected,
     connecting,
@@ -410,6 +337,41 @@ pub const ConnectionStatus = enum {
             .connecting => "connecting",
             .connected => "connected",
             .disconnecting => "disconnecting",
+        };
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.write(self.raw());
+    }
+};
+
+pub const CryptoBackend = enum(i32) {
+    openssl = 1,
+    mbedtls = 2,
+    native = 3,
+    mock = 4,
+
+    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
+        const raw_value = try parseInteger(i32, value);
+        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
+    }
+
+    pub fn parseFromRaw(raw_value: i32) ?@This() {
+        return switch (raw_value) {
+            1 => .openssl,
+            2 => .mbedtls,
+            3 => .native,
+            4 => .mock,
+            else => null,
+        };
+    }
+
+    pub fn raw(self: @This()) i32 {
+        return switch (self) {
+            .openssl => 1,
+            .mbedtls => 2,
+            .native => 3,
+            .mock => 4,
         };
     }
 
@@ -2401,6 +2363,79 @@ pub const OpenVPNModule = struct {
             try jw.objectField("requiresInteractiveCredentials");
             try writeJson(jw, value);
         }
+        try jw.endObject();
+    }
+};
+
+pub const ParseErrorInfo = struct {
+    recognized_type: ?ModuleType = null,
+    sub_code: ?[]const u8 = null,
+    name: ?[]const u8 = null,
+    line: ?[]const u8 = null,
+    arguments: []const []const u8 = &.{},
+
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ParseErrorInfo {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ParseErrorInfo {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ParseErrorInfo {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ParseErrorInfo {
+        resetJsonErrorInfo(error_info);
+        const object = objectValue(value) orelse return error.InvalidModel;
+        var result = ParseErrorInfo{};
+        errdefer result.deinit(allocator);
+        result.recognized_type = try parseOptionalJsonField(ModuleType, allocator, object, "recognizedType", error_info);
+        result.sub_code = try parseOptionalJsonField([]const u8, allocator, object, "subCode", error_info);
+        result.name = try parseOptionalJsonField([]const u8, allocator, object, "name", error_info);
+        result.line = try parseOptionalJsonField([]const u8, allocator, object, "line", error_info);
+        result.arguments = try parseJsonField([]const []const u8, allocator, object, "arguments", error_info);
+        return result;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        if (self.recognized_type) |*value| deinitJson(ModuleType, allocator, value);
+        if (self.sub_code) |*value| deinitJson([]const u8, allocator, value);
+        if (self.name) |*value| deinitJson([]const u8, allocator, value);
+        if (self.line) |*value| deinitJson([]const u8, allocator, value);
+        deinitJson([]const []const u8, allocator, &self.arguments);
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.beginObject();
+        if (self.recognized_type) |value| {
+            try jw.objectField("recognizedType");
+            try writeJson(jw, value);
+        }
+        if (self.sub_code) |value| {
+            try jw.objectField("subCode");
+            try writeJson(jw, value);
+        }
+        if (self.name) |value| {
+            try jw.objectField("name");
+            try writeJson(jw, value);
+        }
+        if (self.line) |value| {
+            try jw.objectField("line");
+            try writeJson(jw, value);
+        }
+        try jw.objectField("arguments");
+        try writeJson(jw, self.arguments);
         try jw.endObject();
     }
 };

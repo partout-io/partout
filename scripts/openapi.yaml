@@ -8,24 +8,6 @@ components:
         payload:
           $ref: "#/components/schemas/JSONValue"
       type: object
-    ParseErrorInfo:
-      additionalProperties: false
-      properties:
-        recognizedType:
-          $ref: "#/components/schemas/ModuleType"
-        subCode:
-          type: string
-        name:
-          type: string
-        line:
-          type: string
-        arguments:
-          items:
-            type: string
-          type: array
-      required:
-        - arguments
-      type: object
     Address:
       type: string
       description: A hostname or IP address.
@@ -42,6 +24,19 @@ components:
         - connected
         - disconnecting
       description: The status of a ``Connection``.
+    CryptoBackend:
+      enum:
+        - 1
+        - 2
+        - 3
+        - 4
+      type: integer
+      x-enum-varnames:
+        - openssl
+        - mbedtls
+        - native
+        - mock
+      description: A cryptographic backend.
     CustomModule:
       additionalProperties: false
       properties:
@@ -799,6 +794,24 @@ components:
         - id
       type: object
       description: A connection module providing an OpenVPN connection.
+    ParseErrorInfo:
+      additionalProperties: false
+      properties:
+        recognizedType:
+          $ref: "#/components/schemas/ModuleType"
+        subCode:
+          type: string
+        name:
+          type: string
+        line:
+          type: string
+        arguments:
+          items:
+            type: string
+          type: array
+      required:
+        - arguments
+      type: object
     PartoutErrorCode:
       enum:
         - authentication

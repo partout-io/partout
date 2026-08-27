@@ -2,8 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+const builtin = @import("builtin");
 const std = @import("std");
 
+const c = @import("../c/exports.zig");
 const gen = @import("api_generated.zig");
 const extensions = @import("api_extensions.zig");
 const manual = @import("api_manual.zig");
@@ -15,6 +17,7 @@ pub const profile_version: i32 = 3;
 pub const ABIEnvelope = gen.ABIEnvelope;
 pub const Address = manual.Address;
 pub const ConnectionStatus = gen.ConnectionStatus;
+pub const CryptoBackend = gen.CryptoBackend;
 pub const DataCount = gen.DataCount;
 pub const DNSModule = gen.DNSModule;
 pub const DNSModuleDomainPolicy = gen.DNSModuleDomainPolicy;
@@ -86,6 +89,36 @@ pub const WireGuardKey = manual.WireGuardKey;
 pub const WireGuardLocalInterface = gen.WireGuardLocalInterface;
 pub const WireGuardModule = gen.WireGuardModule;
 pub const WireGuardRemoteInterface = gen.WireGuardRemoteInterface;
+
+pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
+
+pub fn defaultCryptoBackend() CryptoBackend {
+    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
+    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS")) return .native;
+    if (builtin.is_test) return .mock;
+    @compileError("no default crypto backend is available");
+}
+
+pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!c.crypto.pp_crypto_fnt {
+    return switch (backend) {
+        .openssl => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL"))
+            c.crypto.pp_crypto_fnt_openssl()
+        else
+            error.UnsupportedCryptoBackend,
+        .mbedtls => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+            c.crypto.pp_crypto_fnt_mbedtls()
+        else
+            error.UnsupportedCryptoBackend,
+        .native => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+            c.crypto.pp_crypto_fnt_native()
+        else
+            error.UnsupportedCryptoBackend,
+        .mock => if (builtin.is_test)
+            c.crypto.pp_crypto_fnt_mock()
+        else
+            error.UnsupportedCryptoBackend,
+    };
+}
 
 pub const containsDefaultRoute = extensions.containsDefaultRoute;
 pub const encodeModule = extensions.encodeModule;
