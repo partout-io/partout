@@ -100,6 +100,18 @@ pub const DaemonOptions = struct {
 };
 
 pub const DaemonRuntime = struct {
+    const Context = union(api.ModuleType) {
+        Custom: void,
+        DNS: void,
+        HTTPProxy: void,
+        IP: void,
+        OnDemand: void,
+        OpenVPN: *openvpn.ConnectionContext,
+        Provider: void,
+        WireGuard: *wireguard.ConnectionContext,
+        Undefined: void,
+    };
+
     registry: net.ConnectionRegistry,
     daemon: *net.Daemon,
     platform: net.Platform,
@@ -108,6 +120,7 @@ pub const DaemonRuntime = struct {
 
     // Copy these for release() on deinit
     bindings: ?c.partout_daemon_bindings,
+    contexts: std.EnumMap(api.ModuleType, Context),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -121,26 +134,25 @@ pub const DaemonRuntime = struct {
         errdefer allocator.destroy(self);
 
         // Register the known connection implementations
+        var contexts: std.EnumMap(api.ModuleType, Context) = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and c_mod.has_default_crypto_backend) {
-            // FIXME: Heap alloc
-            const ctx: openvpn.ConnectionContext = .{ .session_options = .{
+            contexts[.OpenVPN] = .{ .session_options = .{
                 .backend = .native,
             } };
             const impl: net.ConnectionImplementation = .{
-                .ptr = ctx,
+                .ptr = contexts[.OpenVPN],
                 .vtable = openvpn.connection_vtable,
             };
             try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            // FIXME: Heap alloc
-            const ctx: wireguard.ConnectionContext = .{
+            contexts[.WireGuard] = .{
                 .backend = wireguard.go_backend,
             };
             const impl: net.ConnectionImplementation = .{
-                .ptr = ctx,
+                .ptr = contexts[.WireGuard],
                 .vtable = wireguard.connection_vtable,
             };
             try impls.append(allocator, impl);
@@ -181,6 +193,7 @@ pub const DaemonRuntime = struct {
 
         self.options = options;
         self.bindings = if (bindings) |b| b.* else null;
+        self.contexts = contexts;
         return self;
     }
 
