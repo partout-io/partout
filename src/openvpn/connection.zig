@@ -44,7 +44,7 @@ pub fn createConnection(
 
 /// Inputs selected by the OpenVPN module implementation.
 pub const ConnectionContext = struct {
-    session_options: SessionOptions = .{},
+    session_options: SessionOptions,
 };
 
 const LinkSetupError = std.mem.Allocator.Error ||
