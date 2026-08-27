@@ -17,7 +17,7 @@ const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
 const ControlConstants = constants_mod.Control;
-const CryptoBackend = c_exports_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeyPair = CryptoKeys.KeyPair;
 const KeysConstants = constants_mod.Keys;
@@ -69,7 +69,7 @@ pub const PRF = struct {
         session_id: []const u8,
         remote_session_id: []const u8,
     ) !PRF {
-        const functions = try c_exports_mod.cryptoFunctionTable(backend);
+        const functions = try api.cryptoFunctionTable(backend);
         return initWithFunctions(
             allocator,
             functions,

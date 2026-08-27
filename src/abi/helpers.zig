@@ -24,8 +24,8 @@ pub const Importer = struct {
     pub fn init(allocator: std.mem.Allocator) error{OutOfMemory}!Importer {
         return .{
             .registry = try core.Registry.init(allocator, &.{
-                openvpn.impl.module,
-                wireguard.impl.module,
+                openvpn.module_implementation,
+                wireguard.module_implementation,
             }),
         };
     }

@@ -10,7 +10,7 @@ const keys_mod = @import("internal/keys.zig");
 
 const api = core.api;
 const c_common = c_mod.common;
-const CryptoBackend = c_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const StaticKey = keys_mod.StaticKey;
 const util = core.util;
 
@@ -112,7 +112,7 @@ pub const Parser = struct {
 
     pub fn init(backend: ?CryptoBackend) Parser {
         return .{
-            .decrypt_key = decryptKey(backend orelse CryptoBackend.default()),
+            .decrypt_key = decryptKey(backend orelse api.defaultCryptoBackend()),
         };
     }
 
@@ -192,7 +192,7 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
                 c_passphrase.deinit();
             }
 
-            const function_table = c_mod.cryptoFunctionTable(backend) catch
+            const function_table = api.cryptoFunctionTable(backend) catch
                 return error.DecryptionFailed;
             const decrypt_function = function_table.key_decrypted_from_pem orelse
                 @panic("OpenVPN crypto backend does not define key_decrypted_from_pem");

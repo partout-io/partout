@@ -14,6 +14,7 @@ public final class PartoutProviderRuntime: Sendable {
     private let logsPrivateData: Bool
     private let cacheDir: String?
     private let minDataCountDelta: Int64?
+    private let cryptoBackend: CryptoBackend?
     private let logger: partout_logger_cb?
 
     public init(
@@ -24,6 +25,7 @@ public final class PartoutProviderRuntime: Sendable {
         logsPrivateData: Bool,
         cacheDir: String? = nil,
         minDataCountDelta: Int64? = nil,
+        cryptoBackend: CryptoBackend? = nil,
         logger: partout_logger_cb?
     ) throws {
         ctx = PartoutLoggerContext(profile.id)
@@ -41,6 +43,7 @@ public final class PartoutProviderRuntime: Sendable {
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
         self.minDataCountDelta = minDataCountDelta
+        self.cryptoBackend = cryptoBackend
         self.logger = logger
     }
 
@@ -88,7 +91,10 @@ public final class PartoutProviderRuntime: Sendable {
                 starts_immediately: false,
                 cancels_unrecoverable: false,
                 cache_dir: cCacheDir,
-                min_data_count_delta: UInt64(minDataCountDelta ?? .zero)
+                min_data_count_delta: UInt64(minDataCountDelta ?? .zero),
+                crypto: cryptoBackend.map {
+                    partout_crypto(UInt32($0.rawValue))
+                } ?? PartoutCryptoDefault
             )
             return withUnsafePointer(to: &bindings) { bindingsPtr in
                 var start_args = partout_daemon_start_args(

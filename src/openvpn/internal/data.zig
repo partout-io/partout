@@ -19,7 +19,7 @@ const c_common = c_exports_mod.common;
 const c_crypto = c_exports_mod.crypto;
 const log = core_mod.logging;
 
-const CryptoBackend = c_exports_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
@@ -64,7 +64,7 @@ pub const DataPath = struct {
     };
 
     pub const CreateError = std.mem.Allocator.Error || error{UnsupportedAlgorithm};
-    pub const CreateWithSeedError = CreateError || c_exports_mod.CryptoFunctionTableError || error{CryptoDerivation};
+    pub const CreateWithSeedError = CreateError || api.CryptoFunctionTableError || error{CryptoDerivation};
     pub const CreateWithPRFError = CreateWithSeedError || error{CryptoPRNG};
     pub const ProcessingError = std.mem.Allocator.Error || c_exports_mod.CryptoError || error{
         CompressionMismatch,
@@ -118,7 +118,7 @@ pub const DataPath = struct {
         prf: *const PRF,
         seed: ZeroingData,
     ) CreateWithSeedError!*DataPath {
-        const functions = (try c_exports_mod.cryptoFunctionTable(parameters.backend)).enc;
+        const functions = (try api.cryptoFunctionTable(parameters.backend)).enc;
         const init_seed = functions.init_seed orelse
             @panic("OpenVPN crypto backend does not define init_seed");
         if (!init_seed(seed.bytes(), seed.length())) return error.CryptoDerivation;

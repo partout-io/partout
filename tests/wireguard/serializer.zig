@@ -63,7 +63,7 @@ test "WireGuard module export serializes module configuration" {
     defer configuration.deinit(allocator);
 
     const module = api.TaggedModule{ .WireGuard = .{ .configuration = configuration } };
-    const serialized = try source.wireguard_exports.impl.module.serializeModule(allocator, &module, null);
+    const serialized = try source.wireguard_exports.module_implementation.serializeModule(allocator, &module, null);
     defer allocator.free(serialized);
 
     try std.testing.expectEqualStrings(

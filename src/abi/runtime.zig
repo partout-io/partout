@@ -30,6 +30,7 @@ pub const DaemonOptions = struct {
     starts_immediately: bool,
     cancels_unrecoverable: bool,
     min_data_count_delta: u64,
+    crypto_backend: ?api.CryptoBackend,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -74,6 +75,9 @@ pub const DaemonOptions = struct {
         );
         errdefer allocator.free(cache_dir);
 
+        // Fall back to default crypto backend.
+        const crypto_backend = std.enums.fromInt(api.CryptoBackend, args.options.crypto);
+
         return .{
             .profile = profile,
             .cache_dir = cache_dir,
@@ -81,6 +85,7 @@ pub const DaemonOptions = struct {
             .starts_immediately = args.options.starts_immediately,
             .cancels_unrecoverable = args.options.cancels_unrecoverable,
             .min_data_count_delta = args.options.min_data_count_delta,
+            .crypto_backend = crypto_backend,
         };
     }
 
@@ -92,14 +97,26 @@ pub const DaemonOptions = struct {
     fn validateSupportedImplementations(profile: *const api.Profile) RuntimeError!void {
         const module = api.findActiveConnectionModule(profile) orelse return;
         switch (api.moduleType(module)) {
-            .OpenVPN => if (openvpn.impl.connection == null) return error.MissingConnectionImplementation,
-            .WireGuard => if (wireguard.impl.connection == null) return error.MissingConnectionImplementation,
+            .OpenVPN => if (!build_options.openvpn) return error.MissingConnectionImplementation,
+            .WireGuard => if (!build_options.wireguard) return error.MissingConnectionImplementation,
             else => {},
         }
     }
 };
 
 pub const DaemonRuntime = struct {
+    const Context = union(api.ModuleType) {
+        Custom: void,
+        DNS: void,
+        HTTPProxy: void,
+        IP: void,
+        OnDemand: void,
+        OpenVPN: openvpn.ConnectionContext,
+        Provider: void,
+        WireGuard: wireguard.ConnectionContext,
+        Undefined: void,
+    };
+
     registry: net.ConnectionRegistry,
     daemon: *net.Daemon,
     platform: net.Platform,
@@ -108,6 +125,7 @@ pub const DaemonRuntime = struct {
 
     // Copy these for release() on deinit
     bindings: ?c.partout_daemon_bindings,
+    contexts: std.EnumMap(api.ModuleType, Context),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -121,17 +139,32 @@ pub const DaemonRuntime = struct {
         errdefer allocator.destroy(self);
 
         // Register the known connection implementations
+        self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
-        if (build_options.openvpn) {
-            if (openvpn.impl.connection) |impl| {
-                try impls.append(allocator, impl);
-            }
+        if (build_options.openvpn and c_mod.has_default_crypto_backend) {
+            const ctx = self.contexts.putUninitialized(.OpenVPN);
+            ctx.* = .{ .OpenVPN = .{
+                .session_options = .{
+                    .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
+                },
+            } };
+            const impl: net.ConnectionImplementation = .{
+                .ptr = @constCast(&ctx.OpenVPN),
+                .vtable = &openvpn.connection_vtable,
+            };
+            try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            if (wireguard.impl.connection) |impl| {
-                try impls.append(allocator, impl);
-            }
+            const ctx = self.contexts.putUninitialized(.WireGuard);
+            ctx.* = .{ .WireGuard = .{
+                .backend = wireguard.go_backend,
+            } };
+            const impl: net.ConnectionImplementation = .{
+                .ptr = @constCast(&ctx.WireGuard),
+                .vtable = &wireguard.connection_vtable,
+            };
+            try impls.append(allocator, impl);
         }
         self.registry = try net.ConnectionRegistry.init(allocator, impls.items);
         errdefer self.registry.deinit(allocator);

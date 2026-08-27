@@ -66,6 +66,14 @@ typedef struct __partout_daemon_bindings {
     void (*release)(struct __partout_daemon_bindings *);
 } partout_daemon_bindings;
 
+/* Crypto backends. */
+typedef enum {
+    PartoutCryptoDefault,
+    PartoutCryptoOpenSSL,
+    PartoutCryptoMbedTLS,
+    PartoutCryptoNative
+} partout_crypto;
+
 /* Daemon options. */
 typedef struct {
     bool is_daemon;
@@ -74,6 +82,7 @@ typedef struct {
     /* Cache root. Defaults to the system temporary directory if NULL. */
     const char *cache_dir;
     uint64_t min_data_count_delta;
+    partout_crypto crypto;
 } partout_daemon_options;
 
 /* Daemon initialization. */

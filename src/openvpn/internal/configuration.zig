@@ -4,16 +4,15 @@
 
 const std = @import("std");
 
-const c_mod = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 
 const api = core_mod.api;
-const CryptoBackend = c_mod.CryptoBackend;
+const CryptoBackend = api.CryptoBackend;
 const PRNG = crypto_mod.PRNG;
 
 pub const SessionOptions = struct {
-    backend: CryptoBackend = .default(),
+    backend: CryptoBackend,
     max_packets: usize = 100,
     write_timeout_ms: u64 = 5_000,
     hard_reset_timeout_ms: u64 = 10_000,

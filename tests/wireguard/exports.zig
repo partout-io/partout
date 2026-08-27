@@ -12,7 +12,7 @@ const api = core.api;
 test "WireGuard module exports import tagged module" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
 
     try std.testing.expectEqual(
         api.ModuleType.WireGuard,
@@ -51,7 +51,7 @@ test "WireGuard module exports import tagged module" {
 test "WireGuard module importer reports public parse error code and info" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
 
@@ -79,7 +79,7 @@ test "WireGuard module importer reports public parse error code and info" {
 test "WireGuard module importer preserves PeerHasNoPublicKey" {
     const allocator = std.testing.allocator;
 
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var info: api.ParseErrorInfo = .{};
     defer info.deinit(allocator);
 
