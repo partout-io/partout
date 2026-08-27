@@ -168,7 +168,11 @@ const OpenVPNConnection = struct {
             .current_endpoint = null,
             .tunnel = null,
         };
-        log.write(.notice, "Using v3 connection");
+        log.writef(
+            .notice,
+            "Using v3 connection (crypto = {s})",
+            .{@tagName(session_options.backend)},
+        );
         return created.asConnection();
     }
 
