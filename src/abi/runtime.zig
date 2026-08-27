@@ -143,10 +143,12 @@ pub const DaemonRuntime = struct {
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and c_mod.has_default_crypto_backend) {
-            self.contexts.put(.OpenVPN, .{ .OpenVPN = .{ .session_options = .{
-                .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
-            } } });
-            const ctx = self.contexts.getPtr(.OpenVPN).?;
+            const ctx = self.contexts.putUninitialized(.OpenVPN);
+            ctx.* = .{ .OpenVPN = .{
+                .session_options = .{
+                    .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
+                },
+            } };
             const impl: net.ConnectionImplementation = .{
                 .ptr = @constCast(&ctx.OpenVPN),
                 .vtable = &openvpn.connection_vtable,
@@ -154,10 +156,10 @@ pub const DaemonRuntime = struct {
             try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
-            self.contexts.put(.WireGuard, .{ .WireGuard = .{
+            const ctx = self.contexts.putUninitialized(.WireGuard);
+            ctx.* = .{ .WireGuard = .{
                 .backend = wireguard.go_backend,
-            } });
-            const ctx = self.contexts.getPtr(.WireGuard).?;
+            } };
             const impl: net.ConnectionImplementation = .{
                 .ptr = @constCast(&ctx.WireGuard),
                 .vtable = &wireguard.connection_vtable,
