@@ -106,9 +106,9 @@ pub const DaemonRuntime = struct {
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: *openvpn.ConnectionContext,
+        OpenVPN: openvpn.ConnectionContext,
         Provider: void,
-        WireGuard: *wireguard.ConnectionContext,
+        WireGuard: wireguard.ConnectionContext,
         Undefined: void,
     };
 
@@ -141,10 +141,10 @@ pub const DaemonRuntime = struct {
             const ctx: openvpn.ConnectionContext = .{ .session_options = .{
                 .backend = .native,
             } };
-            contexts[.OpenVPN] = ctx;
+            contexts.put(.OpenVPN, .{ .OpenVPN = ctx });
             const impl: net.ConnectionImplementation = .{
-                .ptr = ctx,
-                .vtable = openvpn.connection_vtable,
+                .ptr = @constCast(&ctx),
+                .vtable = &openvpn.connection_vtable,
             };
             try impls.append(allocator, impl);
         }
@@ -152,10 +152,10 @@ pub const DaemonRuntime = struct {
             const ctx: wireguard.ConnectionContext = .{
                 .backend = wireguard.go_backend,
             };
-            contexts[.WireGuard] = ctx;
+            contexts.put(.WireGuard, .{ .WireGuard = ctx });
             const impl: net.ConnectionImplementation = .{
-                .ptr = ctx,
-                .vtable = wireguard.connection_vtable,
+                .ptr = @constCast(&ctx),
+                .vtable = &wireguard.connection_vtable,
             };
             try impls.append(allocator, impl);
         }
