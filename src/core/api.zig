@@ -8,6 +8,7 @@ const std = @import("std");
 const c = @import("../c/exports.zig");
 const gen = @import("api_generated.zig");
 const extensions = @import("api_extensions.zig");
+const log = @import("logging.zig");
 const manual = @import("api_manual.zig");
 const util = @import("util.zig");
 const uuid = @import("uuid.zig");
@@ -104,25 +105,35 @@ pub fn defaultCryptoBackend() CryptoBackend {
 }
 
 pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!c.crypto.pp_crypto_fnt {
+    if (cryptoFunctionTableIfAvailable(backend)) |functions| return functions;
+
+    const fallback = defaultCryptoBackend();
+    log.writef(
+        .notice,
+        "Crypto backend {s} is unavailable, falling back to {s}",
+        .{ @tagName(backend), @tagName(fallback) },
+    );
+    return cryptoFunctionTableIfAvailable(fallback) orelse error.UnsupportedCryptoBackend;
+}
+
+fn cryptoFunctionTableIfAvailable(backend: CryptoBackend) ?c.crypto.pp_crypto_fnt {
     return switch (backend) {
         .openssl => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL"))
             c.crypto.pp_crypto_fnt_openssl()
         else
-            error.UnsupportedCryptoBackend,
+            null,
         .mbedtls => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
             c.crypto.pp_crypto_fnt_mbedtls()
         else
-            error.UnsupportedCryptoBackend,
-        .native => if (!supports_native_crypto_backend)
-            @panic("native crypto backend requires Windows or Darwin")
-        else if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+            null,
+        .native => if (supports_native_crypto_backend and @hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
             c.crypto.pp_crypto_fnt_native()
         else
-            error.UnsupportedCryptoBackend,
+            null,
         .mock => if (builtin.is_test)
             c.crypto.pp_crypto_fnt_mock()
         else
-            error.UnsupportedCryptoBackend,
+            null,
     };
 }
 

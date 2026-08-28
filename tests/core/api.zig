@@ -8,9 +8,27 @@ const builtin = @import("builtin");
 const source = @import("source");
 const api = source.core_api;
 const c_crypto = source.c_exports.crypto;
+const logging = source.core_logging;
 const util = source.core.util;
 
 const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.tag.isDarwin();
+
+const CapturingLogger = struct {
+    var level: c_int = undefined;
+    var message: [256]u8 = undefined;
+    var message_len: usize = 0;
+
+    fn log(new_level: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+        const value = std.mem.span(raw_message);
+        level = new_level;
+        message_len = @min(value.len, message.len);
+        @memcpy(message[0..message_len], value[0..message_len]);
+    }
+
+    fn lastMessage() []const u8 {
+        return message[0..message_len];
+    }
+};
 
 test "default crypto backend follows compiled backends" {
     const expected: api.CryptoBackend =
@@ -33,11 +51,6 @@ test "crypto function table follows the selected backend" {
     if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL")) {
         const openssl = try api.cryptoFunctionTable(.openssl);
         try std.testing.expectEqualStrings("openssl", std.mem.span(openssl.name));
-    } else {
-        try std.testing.expectError(
-            error.UnsupportedCryptoBackend,
-            api.cryptoFunctionTable(.openssl),
-        );
     }
     if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
         const mbedtls = try api.cryptoFunctionTable(.mbedtls);
@@ -46,18 +59,39 @@ test "crypto function table follows the selected backend" {
             const native = try api.cryptoFunctionTable(.native);
             try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
         }
-    } else {
-        try std.testing.expectError(
-            error.UnsupportedCryptoBackend,
-            api.cryptoFunctionTable(.mbedtls),
-        );
-        if (supports_native_crypto_backend) {
-            try std.testing.expectError(
-                error.UnsupportedCryptoBackend,
-                api.cryptoFunctionTable(.native),
-            );
-        }
     }
+}
+
+test "unavailable crypto backend logs and falls back to default" {
+    const unavailable: ?api.CryptoBackend =
+        if (!@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
+            .openssl
+        else if (!@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+            .mbedtls
+        else if (!supports_native_crypto_backend)
+            .native
+        else
+            null;
+    const requested = unavailable orelse return error.SkipZigTest;
+    const fallback = api.defaultCryptoBackend();
+    const expected = try api.cryptoFunctionTable(fallback);
+
+    logging.init(false, CapturingLogger.log);
+    defer logging.deinit();
+    const actual = try api.cryptoFunctionTable(requested);
+
+    try std.testing.expectEqualStrings(std.mem.span(expected.name), std.mem.span(actual.name));
+    try std.testing.expectEqual(
+        @intFromEnum(logging.Level.notice),
+        CapturingLogger.level,
+    );
+    var expected_message_buffer: [128]u8 = undefined;
+    const expected_message = try std.fmt.bufPrint(
+        &expected_message_buffer,
+        "Crypto backend {s} is unavailable, falling back to {s}",
+        .{ @tagName(requested), @tagName(fallback) },
+    );
+    try std.testing.expectEqualStrings(expected_message, CapturingLogger.lastMessage());
 }
 
 test "parses IPv4 addresses" {
