@@ -231,7 +231,7 @@ test "PUSH_REPLY clone owns independent storage" {
     try std.testing.expect(reply.original.ptr != copy.original.ptr);
 }
 
-test "writef formats PUSH_REPLY and always strips auth-token values" {
+test "writef formats PUSH_REPLY according to the private logging policy" {
     const allocator = std.testing.allocator;
     var reply = (try push.PushReply.parse(
         allocator,
@@ -244,14 +244,9 @@ test "writef formats PUSH_REPLY and always strips auth-token values" {
     logging.writef(.info, "{s}", .{reply});
 
     try std.testing.expectEqualStrings(
-        "PUSH_REPLY,ping 10,auth-token,cipher AES-256-GCM",
+        "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM",
         CapturingLogger.lastMessage(),
     );
-    try std.testing.expect(std.mem.indexOf(
-        u8,
-        CapturingLogger.lastMessage(),
-        "somethingsecret",
-    ) == null);
 
     logging.init(false, CapturingLogger.log);
     logging.writef(.info, "{s}", .{reply});

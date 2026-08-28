@@ -214,6 +214,8 @@ pub fn pushReplyString(
     allocator: std.mem.Allocator,
     string: []const u8,
 ) ![]const u8 {
+    if (log.logsPrivateData()) return allocator.dupe(u8, string);
+
     const marker = "auth-token ";
     const start = std.mem.indexOf(u8, string, marker) orelse
         return allocator.dupe(u8, string);
@@ -225,8 +227,8 @@ pub fn pushReplyString(
         ',',
     ) orelse string.len;
     return std.mem.concat(allocator, u8, &.{
-        string[0..start],
-        "auth-token",
+        string[0..string_start],
+        log.redacted_value,
         string[string_end..],
     });
 }

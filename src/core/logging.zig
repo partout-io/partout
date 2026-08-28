@@ -262,7 +262,7 @@ fn logTimeTicks(
     }
 }
 
-const redacted_value = "<redacted>";
+pub const redacted_value = "<redacted>";
 
 fn SensitiveValue(comptime T: type) type {
     return struct {

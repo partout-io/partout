@@ -24,15 +24,23 @@ const CapturingLogger = struct {
     }
 };
 
-test "pushReplyString strips auth tokens" {
+test "pushReplyString redacts auth tokens unless private logging is enabled" {
     const allocator = std.testing.allocator;
     const message = "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM";
+    logging.init(false, null);
+    defer logging.deinit();
+
     const loggable = try openvpn_logging.pushReplyString(allocator, message);
     defer allocator.free(loggable);
     try std.testing.expectEqualStrings(
-        "PUSH_REPLY,ping 10,auth-token,cipher AES-256-GCM",
+        "PUSH_REPLY,ping 10,auth-token <redacted>,cipher AES-256-GCM",
         loggable,
     );
+
+    logging.init(true, null);
+    const private_loggable = try openvpn_logging.pushReplyString(allocator, message);
+    defer allocator.free(private_loggable);
+    try std.testing.expectEqualStrings(message, private_loggable);
 }
 
 test "logConfiguration accepts empty sensitive strings" {
