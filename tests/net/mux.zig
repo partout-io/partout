@@ -4,9 +4,7 @@
 
 const std = @import("std");
 
-const mux_c = @cImport({
-    @cInclude("portable/mux.h");
-});
+const mux_c = @import("source").ffi.io;
 
 test "mux wait observes explicit wake" {
     const mux = mux_c.pp_mux_create(1) orelse return error.MuxCreationFailed;

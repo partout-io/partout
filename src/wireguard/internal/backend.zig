@@ -11,9 +11,7 @@ const log = core.logging;
 const portable_c = ffi.portable;
 const util = core.util;
 
-const wireguard_c = @cImport({
-    @cInclude("wireguard/wireguard.h");
-});
+const wireguard_c = @import("wireguard_c");
 
 pub const Error = std.mem.Allocator.Error || error{
     BackendUnavailable,

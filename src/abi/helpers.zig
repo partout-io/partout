@@ -13,10 +13,7 @@ const util = core.util;
 
 pub const ImportAndEncodeError = core.ImportError || api.EncodeError;
 
-pub const partout_c = @cImport({
-    @cInclude("portable/conditionals.h");
-    @cInclude("partout.h");
-});
+pub const partout_c = @import("partout_c");
 
 pub const Importer = struct {
     registry: core.Registry,

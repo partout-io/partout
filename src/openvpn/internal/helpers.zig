@@ -4,9 +4,7 @@
 
 const std = @import("std");
 
-pub const openvpn_c = @cImport({
-    @cInclude("openvpn/openvpn.h");
-});
+pub const openvpn_c = @import("openvpn_c");
 const ffi = @import("../../c/exports.zig");
 const crypto_c = ffi.crypto;
 
