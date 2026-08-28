@@ -7,7 +7,7 @@ const source = @import("source");
 
 const logging = source.core_logging;
 const platform_dns = source.net_platform_dns;
-const c = platform_dns.testing.C;
+const io_c = source.net_io.io_c;
 const PlatformDNS = platform_dns.PlatformDNS;
 const ReachabilityInfo = source.net_io.ReachabilityInfo;
 
@@ -34,7 +34,7 @@ test "DNS resolver times out and caps abandoned queries" {
             _: [:0]const u8,
             _: bool,
             _: ?*const ReachabilityInfo,
-            _: *c.pp_dns_result,
+            _: *io_c.pp_dns_result,
         ) c_int {
             while (!release.load(.acquire)) std.Thread.yield() catch {};
             return -1;

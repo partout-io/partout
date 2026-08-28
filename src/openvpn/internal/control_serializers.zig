@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
@@ -13,9 +13,9 @@ const keys_mod = @import("keys.zig");
 const packet_mod = @import("packet.zig");
 
 const api = core_mod.api;
-const c = helpers_mod.c;
-const c_common = c_exports_mod.common;
-const c_crypto = c_exports_mod.crypto;
+const openvpn_c = helpers_mod.openvpn_c;
+const portable_c = ffi.portable;
+const crypto_c = ffi.crypto;
 const log = core_mod.logging;
 
 const BidirectionalState = helpers_mod.BidirectionalState;
@@ -126,38 +126,38 @@ const PlainSerializer = struct {
         if (start > end or end > data.len) return error.InvalidRange;
         var offset = start;
 
-        if (end - offset < c.OpenVPNPacketOpcodeLength) return error.MissingOpcode;
+        if (end - offset < openvpn_c.OpenVPNPacketOpcodeLength) return error.MissingOpcode;
         const code = PacketCode.fromRaw(data[offset] >> 3) orelse return error.UnknownCode;
         const key = data[offset] & 0b111;
-        offset += c.OpenVPNPacketOpcodeLength;
+        offset += openvpn_c.OpenVPNPacketOpcodeLength;
         log.writef(.info, "Control: Try read packet with code {s} and key {d}", .{
             @tagName(code),
             key,
         });
 
-        if (end - offset < c.OpenVPNPacketSessionIdLength) return error.MissingSessionId;
-        const session_id = data[offset .. offset + c.OpenVPNPacketSessionIdLength];
-        offset += c.OpenVPNPacketSessionIdLength;
+        if (end - offset < openvpn_c.OpenVPNPacketSessionIdLength) return error.MissingSessionId;
+        const session_id = data[offset .. offset + openvpn_c.OpenVPNPacketSessionIdLength];
+        offset += openvpn_c.OpenVPNPacketSessionIdLength;
 
-        if (end - offset < c.OpenVPNPacketAckLengthLength) return error.MissingAckSize;
+        if (end - offset < openvpn_c.OpenVPNPacketAckLengthLength) return error.MissingAckSize;
         const ack_count: usize = data[offset];
-        offset += c.OpenVPNPacketAckLengthLength;
+        offset += openvpn_c.OpenVPNPacketAckLengthLength;
 
         var ack_storage: [std.math.maxInt(u8)]u32 = undefined;
         var ack_ids: ?[]const u32 = null;
         var remote_session_id: ?[]const u8 = null;
         if (ack_count > 0) {
-            const ack_bytes = ack_count * c.OpenVPNPacketIdLength;
+            const ack_bytes = ack_count * openvpn_c.OpenVPNPacketIdLength;
             if (end - offset < ack_bytes) return error.MissingAcks;
             for (ack_storage[0..ack_count]) |*ack_id| {
                 ack_id.* = std.mem.readInt(u32, data[offset..][0..4], .big);
-                offset += c.OpenVPNPacketIdLength;
+                offset += openvpn_c.OpenVPNPacketIdLength;
             }
             ack_ids = ack_storage[0..ack_count];
 
-            if (end - offset < c.OpenVPNPacketSessionIdLength) return error.MissingRemoteSessionId;
-            remote_session_id = data[offset .. offset + c.OpenVPNPacketSessionIdLength];
-            offset += c.OpenVPNPacketSessionIdLength;
+            if (end - offset < openvpn_c.OpenVPNPacketSessionIdLength) return error.MissingRemoteSessionId;
+            remote_session_id = data[offset .. offset + openvpn_c.OpenVPNPacketSessionIdLength];
+            offset += openvpn_c.OpenVPNPacketSessionIdLength;
         }
 
         if (code == .ackV1) {
@@ -166,17 +166,17 @@ const PlainSerializer = struct {
             return ControlPacket.initAck(key, session_id, ids, remote);
         }
 
-        if (end - offset < c.OpenVPNPacketIdLength) return error.MissingPacketId;
+        if (end - offset < openvpn_c.OpenVPNPacketIdLength) return error.MissingPacketId;
         const packet_id = std.mem.readInt(u32, data[offset..][0..4], .big);
-        offset += c.OpenVPNPacketIdLength;
+        offset += openvpn_c.OpenVPNPacketIdLength;
         const payload: ?[]const u8 = if (offset < end) data[offset..end] else null;
         return ControlPacket.init(code, key, session_id, packet_id, payload, ack_ids, remote_session_id);
     }
 };
 
 const AuthSerializer = struct {
-    functions: c_crypto.pp_crypto_enc_fnt,
-    cbc: c_crypto.pp_crypto_ctx,
+    functions: crypto_c.pp_crypto_enc_fnt,
+    cbc: crypto_c.pp_crypto_ctx,
     prefix_length: usize,
     hmac_length: usize,
     auth_length: usize,
@@ -200,9 +200,9 @@ const AuthSerializer = struct {
             @panic("OpenVPN crypto backend does not define cbc_create");
         const cbc = cbc_create(null, digest.raw().ptr, bridge.native()) orelse
             return error.UnsupportedAlgorithm;
-        const prefix_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
-        const hmac_length = c_crypto.pp_crypto_meta_of(cbc).digest_len;
-        const auth_length = hmac_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength;
+        const prefix_length = openvpn_c.OpenVPNPacketOpcodeLength + openvpn_c.OpenVPNPacketSessionIdLength;
+        const hmac_length = crypto_c.pp_crypto_meta_of(cbc).digest_len;
+        const auth_length = hmac_length + openvpn_c.OpenVPNPacketReplayIdLength + openvpn_c.OpenVPNPacketReplayTimestampLength;
         return .{
             .functions = functions,
             .cbc = cbc,
@@ -253,7 +253,7 @@ const AuthSerializer = struct {
             self.cbc,
             self.current_replay_id.outbound,
             timestamp,
-            c.openvpn_ctrl_serialize_auth,
+            openvpn_c.openvpn_ctrl_serialize_auth,
         );
         self.current_replay_id.outbound +%= 1;
         return data;
@@ -269,16 +269,16 @@ const AuthSerializer = struct {
         if (packet.len < self.preamble_length) return error.ControlChannelFailure;
         const swapped = try allocator.alloc(u8, packet.len);
         defer allocator.free(swapped);
-        c.openvpn_data_swap_copy(
+        openvpn_c.openvpn_data_swap_copy(
             swapped.ptr,
             packet.ptr,
             packet.len,
             self.prefix_length,
             self.auth_length,
         );
-        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
-        if (!c_crypto.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &crypto_error_code)) {
-            return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
+        var crypto_error_code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
+        if (!crypto_c.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &crypto_error_code)) {
+            return ffi.errorForCryptoErrorCode(crypto_error_code);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
             log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
@@ -288,8 +288,8 @@ const AuthSerializer = struct {
 };
 
 const CryptSerializer = struct {
-    functions: c_crypto.pp_crypto_enc_fnt,
-    ctr: c_crypto.pp_crypto_ctx,
+    functions: crypto_c.pp_crypto_enc_fnt,
+    ctr: crypto_c.pp_crypto_ctx,
     header_length: usize,
     ad_length: usize,
     tag_length: usize,
@@ -318,13 +318,13 @@ const CryptSerializer = struct {
             ControlConstants.ctr_payload_length,
             bridge.native(),
         ) orelse return error.UnsupportedAlgorithm;
-        const header_length = c.OpenVPNPacketOpcodeLength + c.OpenVPNPacketSessionIdLength;
+        const header_length = openvpn_c.OpenVPNPacketOpcodeLength + openvpn_c.OpenVPNPacketSessionIdLength;
         return .{
             .functions = functions,
             .ctr = ctr,
             .header_length = header_length,
-            .ad_length = header_length + c.OpenVPNPacketReplayIdLength + c.OpenVPNPacketReplayTimestampLength,
-            .tag_length = c_crypto.pp_crypto_meta_of(ctr).tag_len,
+            .ad_length = header_length + openvpn_c.OpenVPNPacketReplayIdLength + openvpn_c.OpenVPNPacketReplayTimestampLength,
+            .tag_length = crypto_c.pp_crypto_meta_of(ctr).tag_len,
             .current_replay_id = BidirectionalState(u32).init(1),
             .timestamp = unixSeconds(),
         };
@@ -375,7 +375,7 @@ const CryptSerializer = struct {
             self.ctr,
             self.current_replay_id.outbound,
             timestamp,
-            c.openvpn_ctrl_serialize_crypt,
+            openvpn_c.openvpn_ctrl_serialize_crypt,
         );
         self.current_replay_id.outbound +%= 1;
         return data;
@@ -397,20 +397,20 @@ const CryptSerializer = struct {
         // Swift allocation relies on cipher/tag headroom being at least the
         // header length; making that requirement explicit is safe for exact-
         // capacity backends too.
-        const crypto_capacity = c_crypto.pp_crypto_encryption_capacity(self.ctr, encrypted_count);
+        const crypto_capacity = crypto_c.pp_crypto_encryption_capacity(self.ctr, encrypted_count);
         const decrypted_capacity = std.math.add(usize, self.header_length, crypto_capacity) catch
             return error.OutOfMemory;
         var decrypted = try allocator.alloc(u8, decrypted_capacity);
         errdefer allocator.free(decrypted);
-        var flags = c_crypto.pp_crypto_flags{
+        var flags = crypto_c.pp_crypto_flags{
             .iv = null,
             .iv_len = 0,
             .ad = source.ptr,
             .ad_len = self.ad_length,
             .for_testing = 0,
         };
-        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
-        const decrypted_count = c_crypto.pp_crypto_decrypt(
+        var crypto_error_code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
+        const decrypted_count = crypto_c.pp_crypto_decrypt(
             self.ctr,
             decrypted.ptr + self.header_length,
             decrypted.len - self.header_length,
@@ -419,7 +419,7 @@ const CryptSerializer = struct {
             &flags,
             &crypto_error_code,
         );
-        if (decrypted_count == 0) return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
+        if (decrypted_count == 0) return ffi.errorForCryptoErrorCode(crypto_error_code);
         @memcpy(decrypted[0..self.header_length], source[0..self.header_length]);
         const total = self.header_length + decrypted_count;
         if (total > decrypted.len)
@@ -494,7 +494,7 @@ const CryptV2Serializer = struct {
 };
 
 fn unixSeconds() u32 {
-    return c_common.pp_time_unix_seconds();
+    return portable_c.pp_time_unix_seconds();
 }
 
 pub const testing = struct {

@@ -5,7 +5,7 @@
 const std = @import("std");
 
 const helpers = @import("helpers.zig");
-const c = helpers.c;
+const crypto_c = helpers.crypto_c;
 
 const plain = helpers.hex("00112233ffddaa");
 const plain_hmac = helpers.hex("8dd324c81ca32f52e4aa1aa35139deba799a68460e80b0e5ac8bceb043edf6e500112233ffddaa");
@@ -61,7 +61,7 @@ fn expectEncryption(
     var hmac_key_bytes: [32]u8 = @splat(0);
     var cipher_key = helpers.zeroingData(&cipher_key_bytes);
     var hmac_key = helpers.zeroingData(&hmac_key_bytes);
-    c.pp_crypto_configure_encrypt(
+    crypto_c.pp_crypto_configure_encrypt(
         context,
         if (cipher_name != null) &cipher_key else null,
         &hmac_key,
@@ -90,7 +90,7 @@ fn expectDecryption(
     var hmac_key_bytes: [32]u8 = @splat(0);
     var cipher_key = helpers.zeroingData(&cipher_key_bytes);
     var hmac_key = helpers.zeroingData(&hmac_key_bytes);
-    c.pp_crypto_configure_decrypt(
+    crypto_c.pp_crypto_configure_decrypt(
         context,
         if (cipher_name != null) &cipher_key else null,
         &hmac_key,
@@ -113,7 +113,7 @@ fn expectVerification(backend: helpers.Backend, authenticated: []const u8) !void
 
     var hmac_key_bytes: [32]u8 = @splat(0);
     var hmac_key = helpers.zeroingData(&hmac_key_bytes);
-    c.pp_crypto_configure_decrypt(context, null, &hmac_key);
+    crypto_c.pp_crypto_configure_decrypt(context, null, &hmac_key);
 
     try helpers.verify(context, authenticated);
 }

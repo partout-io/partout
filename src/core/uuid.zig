@@ -4,8 +4,8 @@
 
 const std = @import("std");
 
-const c_mod = @import("../c/exports.zig");
-const c = c_mod.common;
+const ffi = @import("../c/exports.zig");
+const portable_c = ffi.portable;
 
 /// Errors reported while generating UUIDs.
 const Error = error{
@@ -27,7 +27,7 @@ pub fn newId() error{IdGeneration}!UUID {
 /// Generates a random RFC 4122 version 4 UUID.
 fn v4() Error!UUID {
     var bytes: [16]u8 = undefined;
-    if (!c.pp_prng_do(bytes[0..].ptr, bytes.len)) return error.RandomFailure;
+    if (!portable_c.pp_prng_do(bytes[0..].ptr, bytes.len)) return error.RandomFailure;
     bytes[6] = (bytes[6] & 0x0f) | 0x40;
     bytes[8] = (bytes[8] & 0x3f) | 0x80;
     return encode(bytes);

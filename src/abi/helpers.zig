@@ -13,7 +13,7 @@ const util = core.util;
 
 pub const ImportAndEncodeError = core.ImportError || api.EncodeError;
 
-pub const c = @cImport({
+pub const partout_c = @cImport({
     @cInclude("c/android_import_compat.h");
     @cInclude("partout.h");
 });
@@ -59,9 +59,9 @@ pub const Importer = struct {
 };
 
 pub const BoundDaemonEvents = struct {
-    binding: ?c.partout_daemon_events,
+    binding: ?partout_c.partout_daemon_events,
 
-    pub fn init(bindings: ?*const c.partout_daemon_bindings) BoundDaemonEvents {
+    pub fn init(bindings: ?*const partout_c.partout_daemon_bindings) BoundDaemonEvents {
         return .{
             .binding = if (bindings) |value| value.*.events else null,
         };
@@ -103,7 +103,7 @@ fn boundEventRemoveKey(ptr: *anyopaque, key: net.DaemonEventKey) void {
     util.withCString(eventKeyString(key), remove, binding.ctx);
 }
 
-fn boundEventsBinding(ptr: *anyopaque) ?c.partout_daemon_events {
+fn boundEventsBinding(ptr: *anyopaque) ?partout_c.partout_daemon_events {
     const self: *BoundDaemonEvents = @ptrCast(@alignCast(ptr));
     return self.binding;
 }

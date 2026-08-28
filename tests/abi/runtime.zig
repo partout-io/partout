@@ -6,7 +6,7 @@ const std = @import("std");
 const source = @import("source");
 
 const core = source.core;
-const c_common = source.c_common;
+const portable_c = source.ffi.portable;
 const conn = source.net_connection;
 const net_daemon = source.net_daemon;
 const helpers = source.abi_helpers;
@@ -14,7 +14,7 @@ const abi_runtime = source.abi_runtime;
 const mock = source.mock;
 
 const api = core.api;
-const c = helpers.c;
+const partout_c = helpers.partout_c;
 const MockDaemonRuntime = mock.MockDaemonRuntime;
 
 const profile_cache_directory = "partout-00000000-0000-4000-8000-000000000000";
@@ -29,7 +29,7 @@ fn createDaemonWithJson(
     return net_daemon.Daemon.create(allocator, &profile, context);
 }
 
-fn daemonStartArgs(profile: ?[*:0]const u8) c.partout_daemon_start_args {
+fn daemonStartArgs(profile: ?[*:0]const u8) partout_c.partout_daemon_start_args {
     return .{
         .profile = profile,
         .options = .{
@@ -132,7 +132,7 @@ test "daemon runtime owns options during lifecycle" {
         std.fs.path.basename(options.cache_dir),
     );
     const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
-    try std.testing.expect(c_common.pp_file_is_directory(runtime.options.cache_dir.ptr));
+    try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
 
     try runtime.start();
     runtime.stop();

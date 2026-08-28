@@ -3,17 +3,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const crypto_mod = @import("crypto.zig");
 const helpers_mod = @import("helpers.zig");
 
-const c = helpers_mod.c;
-const c_crypto = c_exports_mod.crypto;
+const openvpn_c = helpers_mod.openvpn_c;
+const crypto_c = ffi.crypto;
 const log = core_mod.logging;
 
 const PRNG = crypto_mod.PRNG;
-const SerializeWithCrypto = @TypeOf(&c.openvpn_ctrl_serialize_auth);
+const SerializeWithCrypto = @TypeOf(&openvpn_c.openvpn_ctrl_serialize_auth);
 
 pub const PacketCode = enum(u8) {
     softResetV1 = 0x03,
@@ -43,7 +43,7 @@ pub const PacketCode = enum(u8) {
         };
     }
 
-    pub fn native(self: PacketCode) c.openvpn_packet_code {
+    pub fn native(self: PacketCode) openvpn_c.openvpn_packet_code {
         return @intFromEnum(self);
     }
 };
@@ -57,7 +57,7 @@ pub const ControlPacket = struct {
         InvalidSessionId,
     };
 
-    ptr: ?*c.openvpn_ctrl,
+    ptr: ?*openvpn_c.openvpn_ctrl,
     code: PacketCode,
 
     pub fn init(
@@ -70,11 +70,11 @@ pub const ControlPacket = struct {
         ack_remote_session_id_value: ?[]const u8,
     ) CreateError!ControlPacket {
         if (key_value > 0b111) return error.InvalidKey;
-        if (session_id.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
+        if (session_id.len != openvpn_c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
         if (ack_ids_value) |ids| {
             if (ids.len == 0 or ids.len > std.math.maxInt(u8)) return error.AckIdsTooLong;
             const remote = ack_remote_session_id_value orelse return error.InvalidAck;
-            if (remote.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
+            if (remote.len != openvpn_c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
         } else if (ack_remote_session_id_value != null) {
             return error.InvalidAck;
         }
@@ -94,7 +94,7 @@ pub const ControlPacket = struct {
             null;
         const ack_ids_ptr = if (ack_ids_value) |ids| ids.ptr else null;
         const ack_remote_ptr = if (ack_remote_session_id_value) |remote| remote.ptr else null;
-        const native_packet = c.openvpn_ctrl_create(
+        const native_packet = openvpn_c.openvpn_ctrl_create(
             code.native(),
             key_value,
             packet_id,
@@ -126,7 +126,7 @@ pub const ControlPacket = struct {
     }
 
     pub fn deinit(self: *ControlPacket) void {
-        if (self.ptr) |ptr| c.openvpn_ctrl_free(ptr);
+        if (self.ptr) |ptr| openvpn_c.openvpn_ctrl_free(ptr);
         self.ptr = null;
     }
 
@@ -137,7 +137,7 @@ pub const ControlPacket = struct {
         return result;
     }
 
-    pub fn native(self: *const ControlPacket) *c.openvpn_ctrl {
+    pub fn native(self: *const ControlPacket) *openvpn_c.openvpn_ctrl {
         return self.ptr orelse @panic("use of moved ControlPacket");
     }
 
@@ -146,7 +146,7 @@ pub const ControlPacket = struct {
     }
 
     pub fn sessionId(self: *const ControlPacket) []const u8 {
-        return self.native().session_id[0..c.OpenVPNPacketSessionIdLength];
+        return self.native().session_id[0..openvpn_c.OpenVPNPacketSessionIdLength];
     }
 
     pub fn packetId(self: *const ControlPacket) u32 {
@@ -167,7 +167,7 @@ pub const ControlPacket = struct {
 
     pub fn ackRemoteSessionId(self: *const ControlPacket) ?[]const u8 {
         const bytes = self.native().ack_remote_session_id orelse return null;
-        return bytes[0..c.OpenVPNPacketSessionIdLength];
+        return bytes[0..openvpn_c.OpenVPNPacketSessionIdLength];
     }
 
     pub fn serializedAlloc(
@@ -175,16 +175,16 @@ pub const ControlPacket = struct {
         allocator: std.mem.Allocator,
     ) error{OutOfMemory}![]u8 {
         const packet = self.native();
-        const capacity = c.openvpn_ctrl_capacity(packet);
+        const capacity = openvpn_c.openvpn_ctrl_capacity(packet);
         const destination = try allocator.alloc(u8, capacity);
         errdefer allocator.free(destination);
-        const header_length = c.openvpn_packet_header_set(
+        const header_length = openvpn_c.openvpn_packet_header_set(
             destination.ptr,
             packet.code,
             packet.key,
             packet.session_id,
         );
-        const serialized_length = c.openvpn_ctrl_serialize(destination.ptr + header_length, packet);
+        const serialized_length = openvpn_c.openvpn_ctrl_serialize(destination.ptr + header_length, packet);
         const written = header_length + serialized_length;
         if (written != capacity)
             @panic("OpenVPN control serializer wrote a length different from its advertised capacity");
@@ -194,21 +194,21 @@ pub const ControlPacket = struct {
     pub fn serializedWithCryptoAlloc(
         self: *const ControlPacket,
         allocator: std.mem.Allocator,
-        crypto: c_crypto.pp_crypto_ctx,
+        crypto: crypto_c.pp_crypto_ctx,
         replay_id: u32,
         timestamp: u32,
         function: SerializeWithCrypto,
-    ) (error{OutOfMemory} || c_exports_mod.CryptoError)![]u8 {
+    ) (error{OutOfMemory} || ffi.CryptoError)![]u8 {
         const packet = self.native();
-        var algorithm = c.openvpn_ctrl_alg{
+        var algorithm = openvpn_c.openvpn_ctrl_alg{
             .crypto = @ptrCast(crypto),
             .replay_id = replay_id,
             .timestamp = timestamp,
         };
-        const capacity = c.openvpn_ctrl_capacity_alg(packet, &algorithm);
+        const capacity = openvpn_c.openvpn_ctrl_capacity_alg(packet, &algorithm);
         var destination = try allocator.alloc(u8, capacity);
         errdefer allocator.free(destination);
-        var crypto_error_code: c_crypto.pp_crypto_error_code = c_crypto.PPCryptoErrorNone;
+        var crypto_error_code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
         const written = function(
             destination.ptr,
             destination.len,
@@ -216,7 +216,7 @@ pub const ControlPacket = struct {
             &algorithm,
             @ptrCast(&crypto_error_code),
         );
-        if (written == 0) return c_exports_mod.errorForCryptoErrorCode(crypto_error_code);
+        if (written == 0) return ffi.errorForCryptoErrorCode(crypto_error_code);
         if (written < destination.len) destination = try allocator.realloc(destination, written);
         return destination;
     }

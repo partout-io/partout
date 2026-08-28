@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 
-const c_common = c_exports_mod.common;
-const c_crypto = c_exports_mod.crypto;
+const portable_c = ffi.portable;
+const crypto_c = ffi.crypto;
 
 pub const CryptoKeys = struct {
     pub const KeyPair = struct {
@@ -40,11 +40,11 @@ pub const CryptoKeys = struct {
 };
 
 pub const CryptoKeysBridge = struct {
-    cipher_encryption_key: *c_common.pp_zd,
-    cipher_decryption_key: *c_common.pp_zd,
-    hmac_encryption_key: *c_common.pp_zd,
-    hmac_decryption_key: *c_common.pp_zd,
-    c_keys: c_crypto.pp_crypto_keys,
+    cipher_encryption_key: *portable_c.pp_zd,
+    cipher_decryption_key: *portable_c.pp_zd,
+    hmac_encryption_key: *portable_c.pp_zd,
+    hmac_decryption_key: *portable_c.pp_zd,
+    c_keys: crypto_c.pp_crypto_keys,
 
     pub fn init(keys: *const CryptoKeys) CryptoKeysBridge {
         const cipher_encryption_key = copyOptional(
@@ -79,19 +79,19 @@ pub const CryptoKeysBridge = struct {
     }
 
     pub fn deinit(self: *CryptoKeysBridge) void {
-        c_common.pp_zd_free(self.cipher_encryption_key);
-        c_common.pp_zd_free(self.cipher_decryption_key);
-        c_common.pp_zd_free(self.hmac_encryption_key);
-        c_common.pp_zd_free(self.hmac_decryption_key);
+        portable_c.pp_zd_free(self.cipher_encryption_key);
+        portable_c.pp_zd_free(self.cipher_decryption_key);
+        portable_c.pp_zd_free(self.hmac_encryption_key);
+        portable_c.pp_zd_free(self.hmac_decryption_key);
     }
 
     /// Borrowed pointer valid while the bridge remains alive and unmoved.
-    pub fn native(self: *const CryptoKeysBridge) *const c_crypto.pp_crypto_keys {
+    pub fn native(self: *const CryptoKeysBridge) *const crypto_c.pp_crypto_keys {
         return &self.c_keys;
     }
 
-    fn copyOptional(value: ?ZeroingData) *c_common.pp_zd {
-        return if (value) |data| data.cCopy() else c_common.pp_zd_create(0);
+    fn copyOptional(value: ?ZeroingData) *portable_c.pp_zd {
+        return if (value) |data| data.cCopy() else portable_c.pp_zd_create(0);
     }
 };
 
@@ -139,21 +139,21 @@ pub fn PRNGWith(comptime Provider: type) type {
 const SystemRandom = struct {
     fn fill(_: SystemRandom, destination: []u8) bool {
         if (destination.len == 0) return true;
-        return c_common.pp_prng_do(destination.ptr, destination.len);
+        return portable_c.pp_prng_do(destination.ptr, destination.len);
     }
 };
 
 pub const ZeroingData = struct {
     pub const Error = error{OutOfBounds};
 
-    ptr: *c_common.pp_zd,
+    ptr: *portable_c.pp_zd,
 
     pub fn init(count: usize) ZeroingData {
-        return fromC(c_common.pp_zd_create(count));
+        return fromC(portable_c.pp_zd_create(count));
     }
 
     pub fn initCopy(source: []const u8) ZeroingData {
-        return fromC(c_common.pp_zd_create_from_data(source.ptr, source.len));
+        return fromC(portable_c.pp_zd_create_from_data(source.ptr, source.len));
     }
 
     pub fn initString(source: []const u8, null_terminated: bool) ZeroingData {
@@ -165,24 +165,24 @@ pub const ZeroingData = struct {
         return result;
     }
 
-    fn fromC(ptr: *c_common.pp_zd) ZeroingData {
+    fn fromC(ptr: *portable_c.pp_zd) ZeroingData {
         return .{ .ptr = ptr };
     }
 
     pub fn clone(self: ZeroingData) ZeroingData {
-        return fromC(c_common.pp_zd_make_copy(self.cPtr()));
+        return fromC(portable_c.pp_zd_make_copy(self.cPtr()));
     }
 
     pub fn deinit(self: *ZeroingData) void {
-        c_common.pp_zd_free(self.ptr);
+        portable_c.pp_zd_free(self.ptr);
     }
 
-    fn cPtr(self: ZeroingData) *c_common.pp_zd {
+    fn cPtr(self: ZeroingData) *portable_c.pp_zd {
         return self.ptr;
     }
 
-    fn cCopy(self: ZeroingData) *c_common.pp_zd {
-        return c_common.pp_zd_make_copy(self.cPtr());
+    fn cCopy(self: ZeroingData) *portable_c.pp_zd {
+        return portable_c.pp_zd_make_copy(self.cPtr());
     }
 
     /// Borrowed view valid until the next mutation or deinitialization.
@@ -196,31 +196,31 @@ pub const ZeroingData = struct {
     }
 
     pub fn bytes(self: ZeroingData) [*c]const u8 {
-        return c_common.pp_zd_bytes(self.cPtr());
+        return portable_c.pp_zd_bytes(self.cPtr());
     }
 
     pub fn mutableBytes(self: *ZeroingData) [*c]u8 {
-        return c_common.pp_zd_mutable_bytes(self.cPtr());
+        return portable_c.pp_zd_mutable_bytes(self.cPtr());
     }
 
     pub fn length(self: ZeroingData) usize {
-        return c_common.pp_zd_length(self.cPtr());
+        return portable_c.pp_zd_length(self.cPtr());
     }
 
     pub fn zero(self: *ZeroingData) void {
-        c_common.pp_zd_zero(self.cPtr());
+        portable_c.pp_zd_zero(self.cPtr());
     }
 
     pub fn clear(self: *ZeroingData) void {
-        c_common.pp_zd_resize(self.cPtr(), 0);
+        portable_c.pp_zd_resize(self.cPtr(), 0);
     }
 
     pub fn append(self: *ZeroingData, suffix: []const u8) void {
-        c_common.pp_zd_append_data(self.cPtr(), suffix.ptr, suffix.len);
+        portable_c.pp_zd_append_data(self.cPtr(), suffix.ptr, suffix.len);
     }
 
     pub fn appendData(self: *ZeroingData, other: ZeroingData) void {
-        c_common.pp_zd_append(self.cPtr(), other.cPtr());
+        portable_c.pp_zd_append(self.cPtr(), other.cPtr());
     }
 
     pub fn sliceCopy(
@@ -230,7 +230,7 @@ pub const ZeroingData = struct {
     ) Error!ZeroingData {
         const total_length = self.length();
         if (offset > total_length or count > total_length - offset) return error.OutOfBounds;
-        return fromC(c_common.pp_zd_make_slice(self.cPtr(), offset, count) orelse unreachable);
+        return fromC(portable_c.pp_zd_make_slice(self.cPtr(), offset, count) orelse unreachable);
     }
 
     pub fn networkU16(self: ZeroingData, offset: usize) Error!u16 {
@@ -252,6 +252,6 @@ pub const ZeroingData = struct {
         count: usize,
     ) Error!void {
         if (count > self.length()) return error.OutOfBounds;
-        c_common.pp_zd_remove_until(self.cPtr(), count);
+        portable_c.pp_zd_remove_until(self.cPtr(), count);
     }
 };

@@ -5,7 +5,7 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub const common = @cImport({
+pub const portable = @cImport({
     @cInclude("c/android_import_compat.h");
     @cInclude("portable/common.h");
     @cInclude("portable/lib.h");

@@ -5,7 +5,8 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-const c = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
+const crypto_c = ffi.crypto;
 const gen = @import("api_generated.zig");
 const extensions = @import("api_extensions.zig");
 const log = @import("logging.zig");
@@ -96,15 +97,15 @@ pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
 const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.tag.isDarwin();
 
 pub fn defaultCryptoBackend() CryptoBackend {
-    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
-    if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
+    if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
+    if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS")) {
         return if (supports_native_crypto_backend) .native else .mbedtls;
     }
     if (builtin.is_test) return .mock;
     @compileError("no default crypto backend is available");
 }
 
-pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!c.crypto.pp_crypto_fnt {
+pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!crypto_c.pp_crypto_fnt {
     if (cryptoFunctionTableIfAvailable(backend)) |functions| return functions;
 
     const fallback = defaultCryptoBackend();
@@ -116,22 +117,22 @@ pub fn cryptoFunctionTable(backend: CryptoBackend) CryptoFunctionTableError!c.cr
     return cryptoFunctionTableIfAvailable(fallback) orelse error.UnsupportedCryptoBackend;
 }
 
-fn cryptoFunctionTableIfAvailable(backend: CryptoBackend) ?c.crypto.pp_crypto_fnt {
+fn cryptoFunctionTableIfAvailable(backend: CryptoBackend) ?crypto_c.pp_crypto_fnt {
     return switch (backend) {
-        .openssl => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_OPENSSL"))
-            c.crypto.pp_crypto_fnt_openssl()
+        .openssl => if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL"))
+            crypto_c.pp_crypto_fnt_openssl()
         else
             null,
-        .mbedtls => if (@hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
-            c.crypto.pp_crypto_fnt_mbedtls()
+        .mbedtls => if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
+            crypto_c.pp_crypto_fnt_mbedtls()
         else
             null,
-        .native => if (supports_native_crypto_backend and @hasDecl(c.crypto, "PARTOUT_CRYPTO_MBEDTLS"))
-            c.crypto.pp_crypto_fnt_native()
+        .native => if (supports_native_crypto_backend and @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
+            crypto_c.pp_crypto_fnt_native()
         else
             null,
         .mock => if (builtin.is_test)
-            c.crypto.pp_crypto_fnt_mock()
+            crypto_c.pp_crypto_fnt_mock()
         else
             null,
     };

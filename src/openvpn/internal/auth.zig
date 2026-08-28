@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const version = @import("../../version.zig");
 const configuration_mod = @import("configuration.zig");
@@ -13,7 +13,7 @@ const push_mod = @import("push.zig");
 const tls_mod = @import("tls.zig");
 
 const api = core_mod.api;
-const c_crypto = c_exports_mod.crypto;
+const crypto_c = ffi.crypto;
 const log = core_mod.logging;
 
 const ControlConstants = constants_mod.Control;
@@ -55,7 +55,7 @@ pub const Handshake = struct {
 
 /// Parameters for deriving the four OpenVPN key-method 2 keys.
 pub const PRF = struct {
-    functions: c_crypto.pp_crypto_fnt,
+    functions: crypto_c.pp_crypto_fnt,
     handshake: Handshake,
     session_id: []u8,
     remote_session_id: []u8,
@@ -81,7 +81,7 @@ pub const PRF = struct {
 
     fn initWithFunctions(
         allocator: std.mem.Allocator,
-        functions: c_crypto.pp_crypto_fnt,
+        functions: crypto_c.pp_crypto_fnt,
         handshake: *const Handshake,
         session_id: []const u8,
         remote_session_id: []const u8,
@@ -181,7 +181,7 @@ pub const PRF = struct {
     }
 
     fn keysHash(
-        functions: c_crypto.pp_crypto_fnt,
+        functions: crypto_c.pp_crypto_fnt,
         digest_name: [:0]const u8,
         secret: []const u8,
         seed: []const u8,
@@ -212,7 +212,7 @@ pub const PRF = struct {
     }
 
     fn hmac(
-        functions: c_crypto.pp_crypto_fnt,
+        functions: crypto_c.pp_crypto_fnt,
         digest_name: [:0]const u8,
         secret: []const u8,
         data: []const u8,
@@ -220,7 +220,7 @@ pub const PRF = struct {
         const hmac_max_length = 128;
         var buffer = ZeroingData.init(hmac_max_length);
         defer buffer.deinit();
-        var context = c_crypto.pp_hmac_ctx{
+        var context = crypto_c.pp_hmac_ctx{
             .dst = buffer.mutableBytes(),
             .dst_len = buffer.length(),
             .digest_name = digest_name.ptr,
@@ -479,7 +479,7 @@ pub const testing = struct {
 };
 
 const PRFInput = struct {
-    functions: c_crypto.pp_crypto_fnt,
+    functions: crypto_c.pp_crypto_fnt,
     label: []const u8,
     secret: []const u8,
     client_seed: []const u8,

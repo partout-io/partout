@@ -4,10 +4,10 @@
 
 const std = @import("std");
 
-pub const c = @import("source").c_crypto;
+pub const crypto_c = @import("source").ffi.crypto;
 
-const has_openssl = @hasDecl(c, "PARTOUT_CRYPTO_OPENSSL");
-const has_mbedtls = @hasDecl(c, "PARTOUT_CRYPTO_MBEDTLS");
+const has_openssl = @hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL");
+const has_mbedtls = @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS");
 const backend_count: usize =
     @intFromBool(has_openssl) + 2 * @as(usize, @intFromBool(has_mbedtls));
 
@@ -17,7 +17,7 @@ pub const Backend = struct {
         mbedtls,
         native,
     },
-    functions: c.pp_crypto_fnt,
+    functions: crypto_c.pp_crypto_fnt,
 
     pub fn name(self: Backend) []const u8 {
         return @tagName(self.kind);
@@ -30,19 +30,19 @@ pub fn backends() [backend_count]Backend {
     if (has_openssl) {
         result[index] = .{
             .kind = .openssl,
-            .functions = c.pp_crypto_fnt_openssl(),
+            .functions = crypto_c.pp_crypto_fnt_openssl(),
         };
         index += 1;
     }
     if (has_mbedtls) {
         result[index] = .{
             .kind = .mbedtls,
-            .functions = c.pp_crypto_fnt_mbedtls(),
+            .functions = crypto_c.pp_crypto_fnt_mbedtls(),
         };
         index += 1;
         result[index] = .{
             .kind = .native,
-            .functions = c.pp_crypto_fnt_native(),
+            .functions = crypto_c.pp_crypto_fnt_native(),
         };
     }
     return result;
@@ -54,14 +54,14 @@ pub fn hex(comptime encoded: []const u8) [encoded.len / 2]u8 {
     return decoded;
 }
 
-pub fn zeroingData(bytes: []u8) c.pp_zd {
+pub fn zeroingData(bytes: []u8) crypto_c.pp_zd {
     return .{
         .bytes = bytes.ptr,
         .length = bytes.len,
     };
 }
 
-pub fn flags(iv: []const u8, ad: []const u8) c.pp_crypto_flags {
+pub fn flags(iv: []const u8, ad: []const u8) crypto_c.pp_crypto_flags {
     return .{
         .iv = if (iv.len > 0) iv.ptr else null,
         .iv_len = iv.len,
@@ -72,13 +72,13 @@ pub fn flags(iv: []const u8, ad: []const u8) c.pp_crypto_flags {
 }
 
 pub fn encrypt(
-    context: c.pp_crypto_ctx,
+    context: crypto_c.pp_crypto_ctx,
     input: []const u8,
-    crypto_flags: *const c.pp_crypto_flags,
+    crypto_flags: *const crypto_c.pp_crypto_flags,
     output: []u8,
 ) ![]u8 {
-    var code: c.pp_crypto_error_code = c.PPCryptoErrorNone;
-    const count = c.pp_crypto_encrypt(
+    var code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
+    const count = crypto_c.pp_crypto_encrypt(
         context,
         output.ptr,
         output.len,
@@ -89,20 +89,20 @@ pub fn encrypt(
     );
     if (count == 0) return error.EncryptionFailed;
     try std.testing.expectEqual(
-        @as(c.pp_crypto_error_code, c.PPCryptoErrorNone),
+        @as(crypto_c.pp_crypto_error_code, crypto_c.PPCryptoErrorNone),
         code,
     );
     return output[0..count];
 }
 
 pub fn decrypt(
-    context: c.pp_crypto_ctx,
+    context: crypto_c.pp_crypto_ctx,
     input: []const u8,
-    crypto_flags: *const c.pp_crypto_flags,
+    crypto_flags: *const crypto_c.pp_crypto_flags,
     output: []u8,
 ) ![]u8 {
-    var code: c.pp_crypto_error_code = c.PPCryptoErrorNone;
-    const count = c.pp_crypto_decrypt(
+    var code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
+    const count = crypto_c.pp_crypto_decrypt(
         context,
         output.ptr,
         output.len,
@@ -113,19 +113,19 @@ pub fn decrypt(
     );
     if (count == 0) return error.DecryptionFailed;
     try std.testing.expectEqual(
-        @as(c.pp_crypto_error_code, c.PPCryptoErrorNone),
+        @as(crypto_c.pp_crypto_error_code, crypto_c.PPCryptoErrorNone),
         code,
     );
     return output[0..count];
 }
 
-pub fn verify(context: c.pp_crypto_ctx, input: []const u8) !void {
-    var code: c.pp_crypto_error_code = c.PPCryptoErrorNone;
-    if (!c.pp_crypto_verify(context, input.ptr, input.len, &code)) {
+pub fn verify(context: crypto_c.pp_crypto_ctx, input: []const u8) !void {
+    var code: crypto_c.pp_crypto_error_code = crypto_c.PPCryptoErrorNone;
+    if (!crypto_c.pp_crypto_verify(context, input.ptr, input.len, &code)) {
         return error.VerificationFailed;
     }
     try std.testing.expectEqual(
-        @as(c.pp_crypto_error_code, c.PPCryptoErrorNone),
+        @as(crypto_c.pp_crypto_error_code, crypto_c.PPCryptoErrorNone),
         code,
     );
 }

@@ -6,7 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const platform_mod = @This();
-const c_mod = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const looper = @import("looper.zig");
@@ -14,7 +14,7 @@ const platform_dns = @import("platform_dns.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
-const c = c_mod.io;
+const io_c = ffi.io;
 const log = core.logging;
 const util = core.util;
 
@@ -30,7 +30,7 @@ const TunnelController = sandbox.TunnelController;
 const TunWrapper = io.TunWrapper;
 
 pub const Platform = struct {
-    pub const FunctionTable = c.pp_tun_ctrl_fnt;
+    pub const FunctionTable = io_c.pp_tun_ctrl_fnt;
 
     fn validateFunctionTable(fnt: FunctionTable) void {
         inline for (@typeInfo(FunctionTable).@"struct".fields) |field| {
@@ -70,17 +70,17 @@ pub const Platform = struct {
     current_reachability: ?ReachabilityInfo,
     monitor_event_handler: ?NetworkMonitor.EventHandler,
     better_path_count: usize,
-    delegate: c.pp_tun_ctrl_delegate,
+    delegate: io_c.pp_tun_ctrl_delegate,
     delegate_attached: bool,
 
     //#endregion
 
     pub fn init(options: Options) error{OutOfMemory}!Platform {
-        const functions = options.fnt orelse c.pp_tun_ctrl_fnt_current();
+        const functions = options.fnt orelse io_c.pp_tun_ctrl_fnt_current();
         validateFunctionTable(functions);
         var ref_copy: ?*anyopaque = null;
-        if (builtin.abi.isAndroid() and @hasDecl(c, "pp_jni_new_global_ref")) {
-            ref_copy = c.pp_jni_new_global_ref(options.ref);
+        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_new_global_ref")) {
+            ref_copy = io_c.pp_jni_new_global_ref(options.ref);
             if (ref_copy == null) {
                 log.write(.fault, "Unable to retain platform JNI ref");
                 return error.OutOfMemory;
@@ -126,8 +126,8 @@ pub const Platform = struct {
             set_delegate(self.ref, null);
             self.delegate_attached = false;
         }
-        if (builtin.abi.isAndroid() and @hasDecl(c, "pp_jni_delete_global_ref")) {
-            c.pp_jni_delete_global_ref(self.ref);
+        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_delete_global_ref")) {
+            io_c.pp_jni_delete_global_ref(self.ref);
         }
         log.write(.debug, "Deinit Platform");
         self.monitor_drainer.deinit();
@@ -325,7 +325,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
         if (maybe_tun) |tun| {
             // Android retains the descriptor in the VPN service. Other
             // platforms return an independently owned tunnel handle here.
-            c.pp_tun_free_and_close(tun, !builtin.abi.isAndroid());
+            io_c.pp_tun_free_and_close(tun, !builtin.abi.isAndroid());
         }
         return null;
     }

@@ -4,7 +4,7 @@
 
 const helpers = @import("helpers.zig");
 const runtime = @import("runtime.zig");
-pub const c = helpers.c;
+pub const partout_c = helpers.partout_c;
 
 pub const DaemonOptions = runtime.DaemonOptions;
 pub const DaemonRuntime = runtime.DaemonRuntime;

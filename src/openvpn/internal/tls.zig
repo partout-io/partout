@@ -3,14 +3,14 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const constants_mod = @import("constants.zig");
 const helpers_mod = @import("helpers.zig");
 
 const api = core_mod.api;
-const c_common = c_exports_mod.common;
-const c_crypto = c_exports_mod.crypto;
+const portable_c = ffi.portable;
+const crypto_c = ffi.crypto;
 const log = core_mod.logging;
 
 const CryptoBackend = api.CryptoBackend;
@@ -49,8 +49,8 @@ pub const TLSCreateError =
 /// the TLS object itself.
 pub const TLSWrapper = struct {
     allocator: std.mem.Allocator,
-    functions: c_crypto.pp_crypto_tls_fnt,
-    tls: c_crypto.pp_tls,
+    functions: crypto_c.pp_crypto_tls_fnt,
+    tls: crypto_c.pp_tls,
     ca_path: [:0]u8,
     verification_context: *VerificationContext,
 
@@ -73,7 +73,7 @@ pub const TLSWrapper = struct {
     fn createWithFunctions(
         allocator: std.mem.Allocator,
         parameters: TLSParameters,
-        functions: c_crypto.pp_crypto_tls_fnt,
+        functions: crypto_c.pp_crypto_tls_fnt,
     ) TLSCreateError!*TLSWrapper {
         const configuration = parameters.configuration.*;
         const ca = configuration.ca orelse return error.MissingCA;
@@ -94,7 +94,7 @@ pub const TLSWrapper = struct {
         );
         errdefer allocator.free(ca_path);
         try writeCA(ca_path, ca.pem);
-        errdefer _ = c_common.remove(ca_path.ptr);
+        errdefer _ = portable_c.remove(ca_path.ptr);
 
         const cert_pem = if (configuration.client_certificate) |value|
             try allocator.dupeZ(u8, value.pem)
@@ -116,7 +116,7 @@ pub const TLSWrapper = struct {
         errdefer allocator.destroy(verification_context);
         verification_context.* = .{ .verification = parameters.verification };
 
-        const options = c_crypto.pp_tls_options_create(
+        const options = crypto_c.pp_tls_options_create(
             configuration.tls_security_level orelse TLSConstants.default_security_level,
             TLSConstants.buffer_length,
             configuration.checks_eku orelse false,
@@ -128,9 +128,9 @@ pub const TLSWrapper = struct {
             verificationFailed,
             verification_context,
         );
-        var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
+        var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const tls = create_tls(options, &code) orelse {
-            c_crypto.pp_tls_options_free(options);
+            crypto_c.pp_tls_options_free(options);
             log.writef(.fault, "Unable to create TLS: {d}", .{code});
             return error.TLSFailure;
         };
@@ -153,7 +153,7 @@ pub const TLSWrapper = struct {
             @panic("OpenVPN TLS backend does not define free");
         free_tls(self.tls);
         allocator.destroy(self.verification_context);
-        _ = c_common.remove(self.ca_path.ptr);
+        _ = portable_c.remove(self.ca_path.ptr);
         allocator.free(self.ca_path);
         allocator.destroy(self);
     }
@@ -179,7 +179,7 @@ pub const TLSWrapper = struct {
     }
 
     pub fn putCipherText(self: *const TLSWrapper, data: []const u8) TLSError!void {
-        var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
+        var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const put_cipher = self.functions.put_cipher orelse
             @panic("OpenVPN TLS backend does not define put_cipher");
         if (!put_cipher(self.tls, data.ptr, data.len, &code))
@@ -190,14 +190,14 @@ pub const TLSWrapper = struct {
         self: *const TLSWrapper,
         allocator: std.mem.Allocator,
     ) TLSError!?[]u8 {
-        var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
+        var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const pull_plain = self.functions.pull_plain orelse
             @panic("OpenVPN TLS backend does not define pull_plain");
         const data = pull_plain(self.tls, &code) orelse {
-            if (code == c_crypto.PPTLSErrorNone) return null;
+            if (code == crypto_c.PPTLSErrorNone) return null;
             return loggingTLSErrorFromCode(code);
         };
-        defer c_crypto.pp_zd_free(data);
+        defer crypto_c.pp_zd_free(data);
         return try allocator.dupe(u8, data.*.bytes[0..data.*.length]);
     }
 
@@ -205,14 +205,14 @@ pub const TLSWrapper = struct {
         self: *const TLSWrapper,
         allocator: std.mem.Allocator,
     ) TLSError!?[]u8 {
-        var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
+        var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const pull_cipher = self.functions.pull_cipher orelse
             @panic("OpenVPN TLS backend does not define pull_cipher");
         const data = pull_cipher(self.tls, &code) orelse {
-            if (code == c_crypto.PPTLSErrorNone) return null;
+            if (code == crypto_c.PPTLSErrorNone) return null;
             return loggingTLSErrorFromCode(code);
         };
-        defer c_crypto.pp_zd_free(data);
+        defer crypto_c.pp_zd_free(data);
         return try allocator.dupe(u8, data.*.bytes[0..data.*.length]);
     }
 
@@ -223,12 +223,12 @@ pub const TLSWrapper = struct {
         const ca_md5 = self.functions.ca_md5 orelse
             @panic("OpenVPN TLS backend does not define ca_md5");
         const value = ca_md5(self.tls) orelse return error.CryptoEncryption;
-        defer c_common.pp_free(value);
+        defer portable_c.pp_free(value);
         return allocator.dupe(u8, std.mem.span(@as([*:0]u8, @ptrCast(value))));
     }
 
     fn putPlain(self: *const TLSWrapper, data: []const u8) !void {
-        var code: c_crypto.pp_tls_error_code = c_crypto.PPTLSErrorNone;
+        var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const put_plain = self.functions.put_plain orelse
             @panic("OpenVPN TLS backend does not define put_plain");
         if (!put_plain(self.tls, data.ptr, data.len, &code))
@@ -241,17 +241,17 @@ pub const TLSWrapper = struct {
     }
 
     fn writeCA(path: [:0]const u8, pem: []const u8) !void {
-        const file = c_common.fopen(path.ptr, "wb") orelse return error.MissingCA;
-        defer _ = c_common.fclose(file);
+        const file = portable_c.fopen(path.ptr, "wb") orelse return error.MissingCA;
+        defer _ = portable_c.fclose(file);
         if (pem.len == 0) return;
-        if (c_common.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.MissingCA;
+        if (portable_c.fwrite(pem.ptr, 1, pem.len, file) != pem.len) return error.MissingCA;
     }
 
     pub const testing = struct {
         pub fn createWithFunctions(
             allocator: std.mem.Allocator,
             parameters: TLSParameters,
-            functions: c_crypto.pp_crypto_tls_fnt,
+            functions: crypto_c.pp_crypto_tls_fnt,
         ) !*TLSWrapper {
             return TLSWrapper.createWithFunctions(
                 allocator,
@@ -262,7 +262,7 @@ pub const TLSWrapper = struct {
     };
 };
 
-fn loggingTLSErrorFromCode(code: c_crypto.pp_tls_error_code) TLSError {
+fn loggingTLSErrorFromCode(code: crypto_c.pp_tls_error_code) TLSError {
     log.writef(.fault, "Unable to execute TLS operation: {d}", .{code});
     return error.TLSFailure;
 }

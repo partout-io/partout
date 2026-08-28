@@ -4,13 +4,14 @@
 
 const std = @import("std");
 
-const c_common = @import("../../c/exports.zig").common;
+const ffi = @import("../../c/exports.zig");
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const log = core.logging;
+const portable_c = ffi.portable;
 const util = core.util;
 
-const c = @cImport({
+const wireguard_c = @cImport({
     @cInclude("c/android_import_compat.h");
     @cInclude("wireguard/wireguard.h");
 });
@@ -111,8 +112,8 @@ fn cTurnOn(
     settings: [:0]const u8,
     tunnel: StartTunnel,
 ) Error!i32 {
-    if (c.pp_wg_init() != 0) return error.BackendUnavailable;
-    c.pp_wg_set_logger(cLog, null);
+    if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
+    wireguard_c.pp_wg_set_logger(cLog, null);
 
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
@@ -121,11 +122,11 @@ fn cTurnOn(
         var c_ifname: util.TemporaryCString = .{};
         try c_ifname.init(allocator, ifname);
         defer c_ifname.deinit();
-        return c.pp_wg_turn_on(settings.ptr, c_ifname.ptr());
+        return wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr());
     }
 
     const fd = tunnel.descriptor() orelse return error.CannotLocateTunnelFileDescriptor;
-    return c.pp_wg_turn_on(settings.ptr, fd);
+    return wireguard_c.pp_wg_turn_on(settings.ptr, fd);
 }
 
 fn cLog(
@@ -139,7 +140,7 @@ fn cLog(
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {
-    c.pp_wg_turn_off(handle);
+    wireguard_c.pp_wg_turn_off(handle);
 }
 
 fn cGetConfig(
@@ -147,8 +148,8 @@ fn cGetConfig(
     allocator: std.mem.Allocator,
     handle: i32,
 ) Error!?[]u8 {
-    const c_config = c.pp_wg_get_config(handle) orelse return null;
-    defer c_common.pp_free(c_config);
+    const c_config = wireguard_c.pp_wg_get_config(handle) orelse return null;
+    defer portable_c.pp_free(c_config);
     return try allocator.dupe(u8, std.mem.span(c_config));
 }
 
@@ -158,7 +159,7 @@ fn cSetConfig(
     handle: i32,
     settings: [:0]const u8,
 ) Error!i64 {
-    return c.pp_wg_set_config(handle, settings.ptr);
+    return wireguard_c.pp_wg_set_config(handle, settings.ptr);
 }
 
 fn cSocketDescriptors(
@@ -166,14 +167,14 @@ fn cSocketDescriptors(
     allocator: std.mem.Allocator,
     handle: i32,
 ) Error![]net.SocketDescriptor {
-    if (@hasDecl(c, "pp_wg_get_socket_v4") and @hasDecl(c, "pp_wg_get_socket_v6")) {
+    if (@hasDecl(wireguard_c, "pp_wg_get_socket_v4") and @hasDecl(wireguard_c, "pp_wg_get_socket_v6")) {
         // These accessors exist on Android only. The host must protect both
         // UDP sockets from being routed back into the VPN.
         var descriptors: std.ArrayList(net.SocketDescriptor) = .empty;
         errdefer descriptors.deinit(allocator);
-        const v4 = c.pp_wg_get_socket_v4(handle);
+        const v4 = wireguard_c.pp_wg_get_socket_v4(handle);
         if (v4 >= 0) try descriptors.append(allocator, v4);
-        const v6 = c.pp_wg_get_socket_v6(handle);
+        const v6 = wireguard_c.pp_wg_get_socket_v6(handle);
         if (v6 >= 0) try descriptors.append(allocator, v6);
         return try descriptors.toOwnedSlice(allocator);
     }
@@ -181,9 +182,9 @@ fn cSocketDescriptors(
 }
 
 fn cBumpSockets(_: ?*anyopaque, handle: i32, sync: bool) void {
-    c.pp_wg_bump_sockets(handle, sync);
+    wireguard_c.pp_wg_bump_sockets(handle, sync);
 }
 
 fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
-    c.pp_wg_tweak_mobile_roaming(handle);
+    wireguard_c.pp_wg_tweak_mobile_roaming(handle);
 }

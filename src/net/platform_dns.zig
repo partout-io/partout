@@ -5,17 +5,17 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const c_mod = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const sandbox = @import("sandbox.zig");
-const c = c_mod.io;
+const io_c = ffi.io;
 const log = core.logging;
 
 const DNSRecord = sandbox.DNSRecord;
 const DNSResolver = sandbox.DNSResolver;
 const ReachabilityInfo = io.ReachabilityInfo;
-const ResolveFn = *const fn ([:0]const u8, bool, ?*const ReachabilityInfo, *c.pp_dns_result) c_int;
+const ResolveFn = *const fn ([:0]const u8, bool, ?*const ReachabilityInfo, *io_c.pp_dns_result) c_int;
 
 // Timed-out slots remain occupied until their uncancellable query returns.
 const max_pending_queries = 3;
@@ -118,7 +118,7 @@ pub const PlatformDNS = struct {
         while (!query.worker_done and !query.timed_out) query_pool.cond.wait(&query_pool.mutex);
         const timed_out = query.timed_out;
         const status = query.status;
-        var result: c.pp_dns_result = null;
+        var result: io_c.pp_dns_result = null;
         if (!timed_out) {
             result = query.result;
             query.result = null;
@@ -140,9 +140,9 @@ pub const PlatformDNS = struct {
         }
         thread.join();
 
-        defer if (result) |info| c.pp_dns_result_free(info);
+        defer if (result) |info| io_c.pp_dns_result_free(info);
         if (status != 0) {
-            if (c.pp_dns_error_is_bad_flags(status)) {
+            if (io_c.pp_dns_error_is_bad_flags(status)) {
                 log.write(.fault, "getaddrinfo() failed with EAI_BADFLAGS");
             } else {
                 log.writef(.fault, "getaddrinfo() failed with result {d}", .{status});
@@ -156,13 +156,13 @@ pub const PlatformDNS = struct {
             for (records.items) |record| record.deinit(allocator);
             records.deinit(allocator);
         }
-        const address_buffer = try allocator.alloc(u8, c.pp_dns_address_string_max());
+        const address_buffer = try allocator.alloc(u8, io_c.pp_dns_address_string_max());
         defer allocator.free(address_buffer);
         var item = result;
-        while (item) |info| : (item = c.pp_dns_result_next(info)) {
+        while (item) |info| : (item = io_c.pp_dns_result_next(info)) {
             @memset(address_buffer, 0);
             var is_ipv6 = false;
-            if (!c.pp_dns_address_string(
+            if (!io_c.pp_dns_address_string(
                 info,
                 address_buffer.ptr,
                 address_buffer.len,
@@ -191,7 +191,6 @@ pub const PlatformDNS = struct {
 };
 
 pub const testing = struct {
-    pub const C = c;
     pub const maxPendingQueries = max_pending_queries;
 
     pub fn pendingCount() usize {
@@ -279,7 +278,7 @@ const Query = struct {
     reachability: ?ReachabilityInfo = null,
     resolve_fn: ResolveFn = resolveNative,
     status: c_int = 0,
-    result: c.pp_dns_result = null,
+    result: io_c.pp_dns_result = null,
 
     fn timeout(ctx: ?*anyopaque) void {
         const self: *Query = @ptrCast(@alignCast(ctx.?));
@@ -291,7 +290,7 @@ const Query = struct {
     }
 
     fn run(self: *Query) void {
-        var result: c.pp_dns_result = null;
+        var result: io_c.pp_dns_result = null;
         var reachability = self.reachability;
         const hostname = self.hostname orelse
             @panic("Active DNS query has no hostname");
@@ -315,7 +314,7 @@ const Query = struct {
         if (!self.caller_done or !self.worker_done) return;
         const hostname = self.hostname orelse
             @panic("Recyclable DNS query has no hostname");
-        if (self.result) |result| c.pp_dns_result_free(result);
+        if (self.result) |result| io_c.pp_dns_result_free(result);
         std.heap.c_allocator.free(hostname);
         self.* = .{};
     }
@@ -325,9 +324,9 @@ fn resolveNative(
     hostname: [:0]const u8,
     all_addresses: bool,
     reachability: ?*const ReachabilityInfo,
-    result: *c.pp_dns_result,
+    result: *io_c.pp_dns_result,
 ) c_int {
-    return c.pp_dns_resolve(hostname.ptr, null, all_addresses, reachability, result);
+    return io_c.pp_dns_resolve(hostname.ptr, null, all_addresses, reachability, result);
 }
 
 fn resolveBlock(

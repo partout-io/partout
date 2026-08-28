@@ -4,21 +4,21 @@
 
 const std = @import("std");
 const helpers_mod = @import("helpers.zig");
-const c = helpers_mod.c;
+const openvpn_c = helpers_mod.openvpn_c;
 
 pub const Control = struct {
     pub const max_payload_bytes_per_packet: usize = 1000;
-    pub const session_id_length: usize = c.OpenVPNPacketSessionIdLength;
+    pub const session_id_length: usize = openvpn_c.OpenVPNPacketSessionIdLength;
     pub const early_negotiation_flags_type: u16 = 0x0001;
     pub const early_negotiation_resend_wrapped_key: u16 = 0x0001;
     pub const tls_prefix = [_]u8{ 0, 0, 0, 0, 2 };
     pub const number_of_keys: u8 = 8;
     pub const ctr_tag_length: usize = 32;
     pub const ctr_payload_length: usize =
-        c.OpenVPNPacketOpcodeLength +
-        c.OpenVPNPacketSessionIdLength +
-        c.OpenVPNPacketReplayIdLength +
-        c.OpenVPNPacketReplayTimestampLength;
+        openvpn_c.OpenVPNPacketOpcodeLength +
+        openvpn_c.OpenVPNPacketSessionIdLength +
+        openvpn_c.OpenVPNPacketReplayIdLength +
+        openvpn_c.OpenVPNPacketReplayTimestampLength;
 
     pub fn nextKey(current_key: u8) u8 {
         return @max(1, (current_key +% 1) % number_of_keys);
@@ -28,7 +28,7 @@ pub const Control = struct {
 pub const Data = struct {
     pub const prng_seed_length: usize = 64;
     pub const aead_tag_length: usize = 16;
-    pub const aead_id_length: usize = c.OpenVPNPacketIdLength;
+    pub const aead_id_length: usize = openvpn_c.OpenVPNPacketIdLength;
     /// Maximum pushed TUN MTU supported by the client. This matches the
     /// OpenVPN 2.6 default advertised through IV_MTU.
     pub const tun_max_mtu: u16 = 1600;

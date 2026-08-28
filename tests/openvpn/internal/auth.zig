@@ -7,7 +7,7 @@ const source = @import("source");
 
 const core = source.core;
 const api = core.api;
-const c_crypto = source.c_crypto;
+const crypto_c = source.ffi.crypto;
 const auth = source.openvpn_internal.auth;
 const constants = source.openvpn_internal.constants;
 const crypto = source.openvpn_internal.crypto;
@@ -22,7 +22,7 @@ const ZeroingData = crypto.ZeroingData;
 
 test "PRF owns retained inputs and derives four key-method-2 buffers" {
     const Fake = struct {
-        fn hmac(context_pointer: [*c]c_crypto.pp_hmac_ctx) callconv(.c) usize {
+        fn hmac(context_pointer: [*c]crypto_c.pp_hmac_ctx) callconv(.c) usize {
             const context = &context_pointer[0];
             const length: usize = 16;
             const destination = context.*.dst[0..length];
@@ -55,7 +55,7 @@ test "PRF owns retained inputs and derives four key-method-2 buffers" {
         .server_random1 = server_random1,
         .server_random2 = server_random2,
     };
-    var functions = c_crypto.pp_crypto_fnt_mock();
+    var functions = crypto_c.pp_crypto_fnt_mock();
     functions.hmac_do = Fake.hmac;
     const session_id = try allocator.dupe(u8, "12345678");
     const remote_session_id = try allocator.dupe(u8, "ABCDEFGH");

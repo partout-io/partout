@@ -3,14 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const build_options = @import("build_options");
-const c_mod = @import("c/exports.zig");
-
 pub const abi = @import("abi/exports.zig");
 pub const abi_helpers = @import("abi/helpers.zig");
 pub const abi_runtime = @import("abi/runtime.zig");
-pub const c_exports = c_mod;
-pub const c_common = c_mod.common;
-pub const c_crypto = c_mod.crypto;
+pub const ffi = @import("c/exports.zig");
 pub const core = @import("core/exports.zig");
 pub const core_logging = @import("core/logging.zig");
 pub const core_api = @import("core/api.zig");

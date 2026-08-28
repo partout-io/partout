@@ -6,6 +6,7 @@ const std = @import("std");
 const source = @import("source");
 
 const core = source.core;
+const crypto_c = source.ffi.crypto;
 const data = source.openvpn_internal.data;
 const helpers = source.openvpn_internal.helpers;
 const api = core.api;
@@ -86,28 +87,28 @@ test "DataLink declarations are semantically analyzed" {
 }
 
 test "DataPath preserves native failure categories" {
-    const c = helpers.c;
+    const openvpn_c = helpers.openvpn_c;
     const errorFromNative = data.testing.errorFromNative;
 
     try std.testing.expectEqual(error.DataPathFailure, errorFromNative(.{
-        .dp_code = c.OpenVPNDataPathErrorNone,
-        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+        .dp_code = openvpn_c.OpenVPNDataPathErrorNone,
+        .crypto_code = crypto_c.PPCryptoErrorNone,
     }));
     try std.testing.expectEqual(error.PeerIdMismatch, errorFromNative(.{
-        .dp_code = c.OpenVPNDataPathErrorPeerIdMismatch,
-        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+        .dp_code = openvpn_c.OpenVPNDataPathErrorPeerIdMismatch,
+        .crypto_code = crypto_c.PPCryptoErrorNone,
     }));
     try std.testing.expectEqual(error.CompressionMismatch, errorFromNative(.{
-        .dp_code = c.OpenVPNDataPathErrorCompression,
-        .crypto_code = source.c_crypto.PPCryptoErrorNone,
+        .dp_code = openvpn_c.OpenVPNDataPathErrorCompression,
+        .crypto_code = crypto_c.PPCryptoErrorNone,
     }));
     try std.testing.expectEqual(error.CryptoEncryption, errorFromNative(.{
-        .dp_code = c.OpenVPNDataPathErrorCrypto,
-        .crypto_code = source.c_crypto.PPCryptoErrorEncryption,
+        .dp_code = openvpn_c.OpenVPNDataPathErrorCrypto,
+        .crypto_code = crypto_c.PPCryptoErrorEncryption,
     }));
     try std.testing.expectEqual(error.CryptoHMAC, errorFromNative(.{
-        .dp_code = c.OpenVPNDataPathErrorCrypto,
-        .crypto_code = source.c_crypto.PPCryptoErrorHMAC,
+        .dp_code = openvpn_c.OpenVPNDataPathErrorCrypto,
+        .crypto_code = crypto_c.PPCryptoErrorHMAC,
     }));
 }
 

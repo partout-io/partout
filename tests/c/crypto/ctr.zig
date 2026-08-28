@@ -5,7 +5,7 @@
 const std = @import("std");
 
 const helpers = @import("helpers.zig");
-const c = helpers.c;
+const crypto_c = helpers.crypto_c;
 
 const plain = helpers.hex("00112233ffddaa");
 const expected_encrypted = helpers.hex("2743c16b105670b350b6a5062224a0b691fb184c6d14dc0f39eed86aa04a1ca06b79108c65ed66");
@@ -29,8 +29,8 @@ test "CTR encryption matches the vector and decrypts" {
         var hmac_key_bytes: [32]u8 = @splat(0);
         var cipher_key = helpers.zeroingData(&cipher_key_bytes);
         var hmac_key = helpers.zeroingData(&hmac_key_bytes);
-        c.pp_crypto_configure_encrypt(context, &cipher_key, &hmac_key);
-        c.pp_crypto_configure_decrypt(context, &cipher_key, &hmac_key);
+        crypto_c.pp_crypto_configure_encrypt(context, &cipher_key, &hmac_key);
+        crypto_c.pp_crypto_configure_decrypt(context, &cipher_key, &hmac_key);
 
         var crypto_flags = helpers.flags(&.{}, &ad);
         var encrypted_buffer: [plain.len + 256]u8 = @splat(0);
