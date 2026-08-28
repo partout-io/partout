@@ -6,10 +6,6 @@
 
 /// A tunnel strategy based on `NETunnelProviderManager`.
 public actor NETunnelStrategy {
-    public enum Option: Sendable {
-        case multiple
-    }
-
     private let ctx: PartoutLoggerContext
 
     private let bundleIdentifier: String
@@ -19,8 +15,6 @@ public actor NETunnelStrategy {
     private let coder: NEProtocolCoder
 
     private let preferences: NETunnelPreferences
-
-    private let options: Set<Option>
 
     private let fingerprint: @Sendable (Profile) -> String?
 
@@ -36,13 +30,11 @@ public actor NETunnelStrategy {
 
     private var mutationTail: Task<Void, Never>?
 
-    // TODO: #218/passepartout, support .multiple option after implementing in PTP
     public init(
         _ ctx: PartoutLoggerContext,
         bundleIdentifier: String,
         source: AsyncStream<ProfilesEvent>,
         coder: NEProtocolCoder,
-//        options: Set<Option> = []
         fingerprint: @escaping @Sendable (Profile) -> String?
     ) {
         self.init(
@@ -69,9 +61,7 @@ public actor NETunnelStrategy {
         self.source = source
         self.coder = coder
         self.preferences = preferences
-//        self.options = options
         self.fingerprint = fingerprint
-        options = []
         managerSnapshotsSubject = CurrentValueStream([:])
         allManagers = [:]
 
@@ -107,7 +97,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
 
     public func install(_ profile: Profile, connect: Bool, options: Sendable?) async throws {
         try await withMutation { strategy in
-            if connect, !strategy.options.contains(.multiple) {
+            if connect {
                 await strategy.disconnectCurrentManagers()
             }
             let nsOptions = options as? [String: NSObject]
@@ -473,16 +463,16 @@ private extension NETunnelStrategy {
         let stream = managerSnapshotsSubject.subscribe()
         let mappedStream: AsyncStream<[Profile.ID: TunnelSnapshot]>
 
-        if options.contains(.multiple) {
-            mappedStream = stream
-                .map {
-                    // Active managers are those ranked > 0
-                    $0.filter {
-                        $0.value.rank > 0
-                    }
-                    .mapValues(\.snapshot)
-                }
-        } else {
+//        if options.contains(.multiple) {
+//            mappedStream = stream
+//                .map {
+//                    // Active managers are those ranked > 0
+//                    $0.filter {
+//                        $0.value.rank > 0
+//                    }
+//                    .mapValues(\.snapshot)
+//                }
+//        } else {
             mappedStream = stream
                 .map {
                     // Active manager is the max ranked
@@ -505,7 +495,7 @@ private extension NETunnelStrategy {
                     assert(filtered.count <= 2, "Max ranked manager must be at most two")
                     return filtered.mapValues(\.snapshot)
                 }
-        }
+//        }
 
         return mappedStream.removeDuplicates()
     }

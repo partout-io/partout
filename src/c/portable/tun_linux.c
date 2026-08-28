@@ -7,8 +7,6 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #188, Implement Linux tun_ctrl
-
 #if PARTOUT_LINUX
 
 #include "portable/io_posix.h"

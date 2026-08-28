@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-// FIXME: #171, Use compile-time Regex after Swift 6
-
 extension OpenVPN {
 
     /// The supported options of an OpenVPN configuration file.

@@ -90,7 +90,6 @@ final class TunnelRemoteInfoGenerator: Sendable {
 
         var wgSettings = ""
         wgSettings.append("private_key=\(privateKey)\n")
-        // TODO: #93, listenPort not implemented
 //        if let listenPort = tunnelConfiguration.interface.listenPort {
 //            wgSettings.append("listen_port=\(listenPort)\n")
 //        }

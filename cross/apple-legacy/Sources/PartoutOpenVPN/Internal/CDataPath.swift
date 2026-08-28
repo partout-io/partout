@@ -4,8 +4,6 @@
 
 internal import _PartoutOpenVPN_C
 
-// TODO: #155, move more logic to C (replay protection, byte-aligned enc/dec zd)
-
 final class CDataPath {
     private let mode: UnsafeMutablePointer<openvpn_dp_mode>
 

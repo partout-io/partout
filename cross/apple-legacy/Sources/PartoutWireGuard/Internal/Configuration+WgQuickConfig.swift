@@ -99,7 +99,6 @@ extension WireGuard.Configuration {
     func asWgQuickConfig() -> String {
         var output = "[Interface]\n"
         output.append("PrivateKey = \(interface.privateKey.rawValue)\n")
-        // TODO: #93, listenPort not implemented
 //        if let listenPort = interface.listenPort {
 //            output.append("ListenPort = \(listenPort)\n")
 //        }
@@ -147,7 +146,6 @@ extension WireGuard.Configuration {
             throw WireGuardParseError.interfaceHasInvalidPrivateKey(privateKeyString)
         }
         var interface = WireGuard.LocalInterface.Builder(privateKey: privateKey.base64Key)
-        // TODO: #93, listenPort not implemented
 //        if let listenPortString = attributes["listenport"] {
 //            guard let listenPort = UInt16(listenPortString) else {
 //                throw WireGuardParseError.interfaceHasInvalidListenPort(listenPortString)

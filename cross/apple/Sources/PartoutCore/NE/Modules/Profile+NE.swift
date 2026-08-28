@@ -18,7 +18,6 @@ extension Profile {
         }
     }
 
-    // TODO: #518, Make internal after migrating to Zig
     public func networkSettings(
         with info: TunnelRemoteInfo?,
         options: TunnelControllerOptions = .init()

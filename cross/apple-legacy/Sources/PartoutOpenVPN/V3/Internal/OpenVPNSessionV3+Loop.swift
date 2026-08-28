@@ -47,7 +47,6 @@ extension OpenVPNSessionV3 {
                     continue
                 }
 
-                // TODO: #140/notes, make more efficient with array reference
                 var dataPackets = dataPacketsByKey[key] ?? [Data]()
                 dataPackets.append(packet)
                 dataPacketsByKey[key] = dataPackets

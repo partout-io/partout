@@ -12,7 +12,6 @@ struct LinkProcessor: @unchecked Sendable {
         if isTCP {
             nonisolated(unsafe) var buffer = Data()
             beforeRead = {
-                // FIXME: #214, TCP is very slow
                 buffer.reserveCapacity(buffer.count + $0.flatCount)
                 for p in $0 {
                     buffer.append(p)

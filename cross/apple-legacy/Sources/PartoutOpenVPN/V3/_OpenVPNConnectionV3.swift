@@ -460,7 +460,6 @@ private extension _OpenVPNConnectionV3 {
                     pp_log(ctx, .openvpn, .debug, "Cancelled CyclingConnection.pathSubscription")
                     return
                 }
-                // TODO: #143/notes, may improve this with floating (establish the new socket FIRST, then shut down the old one, and FINALLY move work to the new one. this should be seamless with UDP)
                 pp_log(ctx, .openvpn, .notice, "Link has a better path, shut down session to reconnect")
                 await currentSession?.shutdown(PartoutError(.networkChanged))
             }

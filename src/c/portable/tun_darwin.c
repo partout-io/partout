@@ -7,8 +7,6 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #188, Implement macOS controller/strategy
-
 #if PARTOUT_APPLE
 
 #include "portable/io_posix.h"

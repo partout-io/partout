@@ -30,7 +30,7 @@ extension OnDemandModule {
 
     public static var supportsEthernet: Bool {
 #if os(iOS)
-        // TODO: #1119/passepartout, iPad Pro supports Ethernet via USB-C, but NE offers no way to match it
+        // FIXME: #568, iPad Pro supports Ethernet via USB-C, but NE offers no way to match it
         false
 #else
         true // macOS, tvOS

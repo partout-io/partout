@@ -109,7 +109,7 @@ final class NegotiatorV3: @unchecked Sendable {
         renegotiation: RenegotiationType?,
         looper: FdLooper,
         remoteEndpoint: ExtendedEndpoint,
-        channel: ControlChannelV3, // TODO: #29, abstract this for testing
+        channel: ControlChannelV3,
         prng: PRNGProtocol,
         tls: TLSProtocol,
         dpFactory: @escaping DataPathFactory,

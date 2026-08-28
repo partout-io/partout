@@ -12,8 +12,6 @@
 
 // WARNING: assume dst to be able to hold src_len
 
-// TODO: #154, make more efficient by XOR-ing 4-8 bytes per loop
-
 static inline
 void openvpn_obf_xor_mask(uint8_t *dst,
                           size_t dst_len,

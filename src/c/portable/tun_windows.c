@@ -15,11 +15,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-// FIXME: #188, Implement Windows tun_ctrl
-
 #if PARTOUT_WINDOWS
-
-// FIXME: #188, convert debug messages to logs
 
 struct __pp_tun_struct {
     const char *name;

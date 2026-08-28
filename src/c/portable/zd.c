@@ -9,8 +9,6 @@
 #include "portable/common.h"
 #include "portable/zd.h"
 
-// TODO: #155, make zd inline
-
 // MARK: Creation
 
 pp_zd *pp_zd_create(size_t length) {
@@ -127,7 +125,6 @@ void pp_zd_resize(pp_zd *zd, size_t new_length) {
     pp_assert(zd);
     if (new_length == zd->length) return;
 
-    // TODO: #178/notes, Do not reallocate if new length is shorter, track allocated length though
     uint8_t *new_bytes = pp_alloc(new_length);
     if (new_length < zd->length) {
         memcpy(new_bytes, zd->bytes, new_length);
