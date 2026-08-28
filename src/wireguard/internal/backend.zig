@@ -12,7 +12,6 @@ const portable_c = ffi.portable;
 const util = core.util;
 
 const wireguard_c = @cImport({
-    @cInclude("c/android_import_compat.h");
     @cInclude("wireguard/wireguard.h");
 });
 

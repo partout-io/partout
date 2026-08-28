@@ -14,7 +14,7 @@ const util = core.util;
 pub const ImportAndEncodeError = core.ImportError || api.EncodeError;
 
 pub const partout_c = @cImport({
-    @cInclude("c/android_import_compat.h");
+    @cInclude("portable/conditionals.h");
     @cInclude("partout.h");
 });
 

@@ -6,7 +6,6 @@ const builtin = @import("builtin");
 const std = @import("std");
 
 pub const portable = @cImport({
-    @cInclude("c/android_import_compat.h");
     @cInclude("portable/common.h");
     @cInclude("portable/lib.h");
     @cInclude("portable/prng.h");
@@ -14,7 +13,6 @@ pub const portable = @cImport({
 });
 
 pub const io = @cImport({
-    @cInclude("c/android_import_compat.h");
     @cInclude("portable/dns.h");
     @cInclude("portable/mux.h");
     @cInclude("portable/socket.h");
@@ -22,7 +20,6 @@ pub const io = @cImport({
 });
 
 pub const crypto = @cImport({
-    @cInclude("c/android_import_compat.h");
     @cInclude("crypto/crypto.h");
 });
 

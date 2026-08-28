@@ -5,7 +5,6 @@
 const std = @import("std");
 
 pub const openvpn_c = @cImport({
-    @cInclude("c/android_import_compat.h");
     @cInclude("openvpn/openvpn.h");
 });
 const ffi = @import("../../c/exports.zig");
