@@ -149,11 +149,35 @@ endif()
 
 if(PP_BUILD_LIBRARY)
     find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
+    if(PP_BUILD_STATIC)
+        set(PARTOUT_LINK_LIBRARY
+            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}")
+        set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
+    elseif(WIN32)
+        set(PARTOUT_LINK_LIBRARY "${PP_BUILD_OUTPUT}/partout/lib/partout.lib")
+        set(PARTOUT_ZIG_BYPRODUCTS
+            "${PARTOUT_LINK_LIBRARY}"
+            "${PP_BUILD_OUTPUT}/partout/bin/partout.dll"
+        )
+    else()
+        set(PARTOUT_LINK_LIBRARY
+            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
+        set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
+    endif()
+
     add_custom_target(partout ALL
         COMMAND "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
+        BYPRODUCTS ${PARTOUT_ZIG_BYPRODUCTS}
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL
         COMMAND_EXPAND_LISTS
         VERBATIM
     )
+
+    add_library(partout_library INTERFACE)
+    add_library(Partout::Partout ALIAS partout_library)
+    add_dependencies(partout_library partout)
+    target_include_directories(partout_library INTERFACE
+        "${PP_BUILD_OUTPUT}/partout/include")
+    target_link_libraries(partout_library INTERFACE "${PARTOUT_LINK_LIBRARY}")
 endif()
