@@ -16,11 +16,15 @@ fail() {
 }
 
 repo_dir=$(cd "$(dirname "$0")/.." && pwd -P)
-output=${1:-"$repo_dir/$name.xcframework"}
-prebuilts=${2:-"$repo_dir/prebuilts"}
-mode=${3:-}
+[[ $# -ge 1 && $# -le 4 ]] ||
+    fail "usage: $0 <prebuilts-version> [output.xcframework] [prebuilts-directory] [--full]"
+prebuilts_version=$1
+output=${2:-"$repo_dir/$name.xcframework"}
+prebuilts=${3:-"$repo_dir/prebuilts"}
+mode=${4:-}
 
-[[ $# -le 3 ]] || fail "usage: $0 [output.xcframework] [prebuilts-directory] [--full]"
+[[ $prebuilts_version =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*$ ]] ||
+    fail "invalid prebuilts version: $prebuilts_version"
 [[ -z $mode || $mode == --full ]] || fail "unknown option: $mode"
 [[ $output == *.xcframework ]] || fail "output must have an .xcframework extension"
 
@@ -36,17 +40,13 @@ version=$(sed -nE 's/^pub const number = "([0-9A-Za-z.+-]+)";$/\1/p' "$repo_dir/
 
 download_prebuilts() {
     local repository=https://github.com/partout-io/prebuilts
-    local resolved tag base temp vendor archive checksum expected actual
+    local base temp vendor archive checksum expected actual
 
-    resolved=$(curl -fsSLI --retry 3 -o /dev/null -w '%{url_effective}' "$repository/releases/latest")
-    tag=${resolved##*/}
-    tag=${tag%%\?*}
-    [[ $resolved == */releases/tag/* ]] || fail "unable to resolve the latest prebuilts release"
-    base="$repository/releases/download/$tag"
+    base="$repository/releases/download/$prebuilts_version"
     temp=$(mktemp -d "${TMPDIR:-/tmp}/partout-prebuilts.XXXXXX")
     trap 'rm -rf "$temp"' EXIT
 
-    echo "Using prebuilts $tag"
+    echo "Using prebuilts $prebuilts_version"
     for vendor in openssl mbedtls wg-go; do
         archive="$vendor.xcframework.zip"
         checksum="$archive.checksum"
@@ -71,7 +71,7 @@ download_prebuilts() {
         mv "$temp/$checksum" "$prebuilts/$checksum"
     done
 
-    echo "$tag" > "$prebuilts/prebuilts-version.txt"
+    echo "$prebuilts_version" > "$prebuilts/prebuilts-version.txt"
     rm -rf "$temp"
     trap - EXIT
 }

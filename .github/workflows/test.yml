@@ -13,6 +13,9 @@ concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
+env:
+  PREBUILTS_VERSION: "0.6.0"
+
 jobs:
   run_tests:
     name: ${{ matrix.job_name }}
@@ -44,7 +47,7 @@ jobs:
         run: ci/run-tests.sh
       - name: Build active XCFramework slice
         if: matrix.suite == 'apple'
-        run: scripts/build-xcframework.sh
+        run: scripts/build-xcframework.sh "$PREBUILTS_VERSION"
       - name: Run Swift tests
         if: matrix.suite == 'apple'
         run: ci/run-swift-tests.sh

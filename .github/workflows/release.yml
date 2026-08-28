@@ -18,6 +18,9 @@ concurrency:
 permissions:
   contents: write
 
+env:
+  PREBUILTS_VERSION: "0.6.0"
+
 jobs:
   publish_release:
     name: Publish Release
@@ -59,7 +62,7 @@ jobs:
           prebuilts_version_file="$prebuilts/prebuilts-version.txt"
           archive="$xcframework.zip"
 
-          scripts/build-xcframework.sh "$xcframework" "$prebuilts" --full
+          scripts/build-xcframework.sh "$PREBUILTS_VERSION" "$xcframework" "$prebuilts" --full
           test "$(find "$xcframework" -name '*.dSYM' -type d | wc -l)" -eq 5
           test -s "$prebuilts_version_file"
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
