@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const helpers_mod = @import("helpers.zig");
 
 const api = core_mod.api;
-const c = helpers_mod.c;
-const c_common = c_exports_mod.common;
+const openvpn_c = helpers_mod.openvpn_c;
+const portable_c = ffi.portable;
 
 pub const ProcessorError = error{
     OutOfMemory,
@@ -26,30 +26,30 @@ pub const PacketDirection = enum {
 };
 
 pub const PacketProcessor = struct {
-    ptr: *c.openvpn_pkt_proc,
+    ptr: *openvpn_c.openvpn_pkt_proc,
 
     pub fn init(
         allocator: std.mem.Allocator,
         method: ?api.OpenVPNObfuscationMethod,
     ) ProcessorError!PacketProcessor {
-        var native_method: c.openvpn_pkt_proc_method = c.OpenVPNPktProcMethodNone;
+        var native_method: openvpn_c.openvpn_pkt_proc_method = openvpn_c.OpenVPNPktProcMethodNone;
         var mask: ?[]u8 = null;
         defer if (mask) |bytes| allocator.free(bytes);
 
         if (method) |value| switch (value) {
             .xormask => |parameters| {
-                native_method = c.OpenVPNPktProcMethodXORMask;
+                native_method = openvpn_c.OpenVPNPktProcMethodXORMask;
                 mask = try createMask(allocator, parameters.mask);
             },
-            .xorptrpos => native_method = c.OpenVPNPktProcMethodXORPtrPos,
-            .reverse => native_method = c.OpenVPNPktProcMethodReverse,
+            .xorptrpos => native_method = openvpn_c.OpenVPNPktProcMethodXORPtrPos,
+            .reverse => native_method = openvpn_c.OpenVPNPktProcMethodReverse,
             .obfuscate => |parameters| {
-                native_method = c.OpenVPNPktProcMethodXORObfuscate;
+                native_method = openvpn_c.OpenVPNPktProcMethodXORObfuscate;
                 mask = try createMask(allocator, parameters.mask);
             },
         };
 
-        const native = c.openvpn_pkt_proc_create(
+        const native = openvpn_c.openvpn_pkt_proc_create(
             native_method,
             if (mask) |bytes| bytes.ptr else null,
             if (mask) |bytes| bytes.len else 0,
@@ -67,7 +67,7 @@ pub const PacketProcessor = struct {
     }
 
     pub fn deinit(self: *PacketProcessor) void {
-        c.openvpn_pkt_proc_free(self.ptr);
+        openvpn_c.openvpn_pkt_proc_free(self.ptr);
     }
 
     pub fn processPacket(
@@ -78,8 +78,8 @@ pub const PacketProcessor = struct {
     ) PacketError![]u8 {
         const destination = try allocator.alloc(u8, packet.len);
         switch (direction) {
-            .inbound => c.openvpn_pkt_proc_recv(self.ptr, destination.ptr, packet.ptr, packet.len),
-            .outbound => c.openvpn_pkt_proc_send(self.ptr, destination.ptr, packet.ptr, packet.len),
+            .inbound => openvpn_c.openvpn_pkt_proc_recv(self.ptr, destination.ptr, packet.ptr, packet.len),
+            .outbound => openvpn_c.openvpn_pkt_proc_send(self.ptr, destination.ptr, packet.ptr, packet.len),
         }
         return destination;
     }
@@ -114,13 +114,13 @@ pub const PacketProcessor = struct {
         until.* = 0;
         while (until.* < stream.len) {
             var received: usize = 0;
-            const zeroing: *c_common.pp_zd = @ptrCast(c.openvpn_pkt_proc_stream_recv(
+            const zeroing: *portable_c.pp_zd = @ptrCast(openvpn_c.openvpn_pkt_proc_stream_recv(
                 self.ptr,
                 stream[until.*..].ptr,
                 stream.len - until.*,
                 &received,
             ) orelse break);
-            defer c_common.pp_zd_free(zeroing);
+            defer portable_c.pp_zd_free(zeroing);
             try core_mod.util.appendOwned(
                 allocator,
                 &packets,
@@ -141,12 +141,12 @@ pub const PacketProcessor = struct {
             if (packet.len > std.math.maxInt(u16)) return error.PacketTooLarge;
             payload_length = std.math.add(usize, payload_length, packet.len) catch return error.PacketTooLarge;
         }
-        const capacity = c.openvpn_pkt_proc_stream_send_bufsize(@intCast(packets.len), payload_length);
-        const zeroing = c_common.pp_zd_create(capacity);
-        defer c_common.pp_zd_free(zeroing);
+        const capacity = openvpn_c.openvpn_pkt_proc_stream_send_bufsize(@intCast(packets.len), payload_length);
+        const zeroing = portable_c.pp_zd_create(capacity);
+        defer portable_c.pp_zd_free(zeroing);
         var offset: usize = 0;
         for (packets) |packet| {
-            offset = c.openvpn_pkt_proc_stream_send(
+            offset = openvpn_c.openvpn_pkt_proc_stream_send(
                 self.ptr,
                 @ptrCast(zeroing),
                 offset,

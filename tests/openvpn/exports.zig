@@ -7,15 +7,16 @@ const std = @import("std");
 const source = @import("source");
 
 const core = source.core;
+const crypto_c = source.ffi.crypto;
 const exports = source.openvpn_exports;
 const parser = source.openvpn_parser;
 
 const api = core.api;
 const has_openssl_backend =
-    @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_OPENSSL");
+    @hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL");
 const has_real_default_crypto_backend =
     has_openssl_backend or
-    @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_MBEDTLS");
+    @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS");
 
 test "OpenVPN module exports import tagged module" {
     const allocator = std.testing.allocator;

@@ -17,7 +17,7 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const queue_mod = @import("looper_queue.zig");
-const c = io.c;
+const io_c = io.io_c;
 const log = core.logging;
 
 pub const Looper = struct {
@@ -132,7 +132,7 @@ pub const Looper = struct {
     next_timer_id: u64,
 
     // Mux-owned resources.
-    mux: c.pp_mux,
+    mux: io_c.pp_mux,
     fd_set: ?DescriptorSet,
 
     // Attached sides and their scheduled retries.
@@ -151,7 +151,7 @@ pub const Looper = struct {
     threadlocal var borrowed_callback_depth: usize = 0;
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
-        const mux = c.pp_mux_create(number_of_descriptors) orelse {
+        const mux = io_c.pp_mux_create(number_of_descriptors) orelse {
             log.writef(.err, "Unable to create mux", .{});
             return error.MuxFailure;
         };
@@ -250,8 +250,8 @@ pub const Looper = struct {
 
         self.lock.lock();
         self.fd_set = fd_set;
-        c.pp_mux_set_on_readable(self.mux, onMuxReadable, &self.fd_set.?);
-        c.pp_mux_set_on_writable(self.mux, onMuxWritable, &self.fd_set.?);
+        io_c.pp_mux_set_on_readable(self.mux, onMuxReadable, &self.fd_set.?);
+        io_c.pp_mux_set_on_writable(self.mux, onMuxWritable, &self.fd_set.?);
         self.lock.unlock();
 
         self.scheduler.start() catch |err| {
@@ -310,7 +310,7 @@ pub const Looper = struct {
 
         fd_set.resetReadable();
         var code: c_int = 0;
-        if (c.pp_mux_wait(self.mux, &code) < 0) {
+        if (io_c.pp_mux_wait(self.mux, &code) < 0) {
             log.writef(.err, "Looper: pp_mux_wait() failed (code={d})", .{code});
             self.finish(.{ .wait = code });
             return false;
@@ -875,7 +875,7 @@ pub const Looper = struct {
             .link => |value| value,
             .tun => |value| value,
         };
-        if (!c.pp_mux_add(self.mux, descriptor.fd)) {
+        if (!io_c.pp_mux_add(self.mux, descriptor.fd)) {
             log.writef(.err, "Unable to attach {} (fd={any})", .{ side, descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
@@ -892,13 +892,13 @@ pub const Looper = struct {
             self.readBufferSize(side),
             arguments,
         ) catch |err| {
-            _ = c.pp_mux_delete(self.mux, descriptor.fd);
+            _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
             self.queueCompletionLocked(completion, err);
             return;
         };
         side_io.syncEventMask() catch {
             log.writef(.err, "Unable to retain {}", .{side});
-            _ = c.pp_mux_delete(self.mux, descriptor.fd);
+            _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
             side_io.destroyStorage(self.allocator);
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
@@ -1232,7 +1232,7 @@ pub const Looper = struct {
     }
 
     fn wakeLocked(self: *const Looper) void {
-        _ = c.pp_mux_wake(self.mux);
+        _ = io_c.pp_mux_wake(self.mux);
     }
 
     fn isReentrantLifecycleCall(self: *Looper) bool {
@@ -1291,7 +1291,7 @@ pub const Looper = struct {
             fd_set.deinit();
             self.fd_set = null;
         }
-        c.pp_mux_free(self.mux);
+        io_c.pp_mux_free(self.mux);
     }
 
     /// Caller must hold `lock`, and the worker must be the only thread still
@@ -1546,14 +1546,14 @@ pub const Looper = struct {
             return self.native_io.resetEvents();
         }
 
-        fn setRead(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_read(mux, self.fd, enabled);
+        fn setRead(self: *SideIO, mux: io_c.pp_mux, enabled: bool) io.Error!void {
+            _ = io_c.pp_mux_set_read(mux, self.fd, enabled);
             self.is_reading = enabled;
             try self.syncEventMask();
         }
 
-        fn setWrite(self: *SideIO, mux: c.pp_mux, enabled: bool) io.Error!void {
-            _ = c.pp_mux_set_write(mux, self.fd, enabled);
+        fn setWrite(self: *SideIO, mux: io_c.pp_mux, enabled: bool) io.Error!void {
+            _ = io_c.pp_mux_set_write(mux, self.fd, enabled);
             self.is_writing = enabled;
             try self.syncEventMask();
         }
@@ -1562,10 +1562,10 @@ pub const Looper = struct {
             return self.native_io.setEventMask(self.is_reading, self.is_writing);
         }
 
-        fn detachFromMux(self: *SideIO, mux: c.pp_mux) bool {
+        fn detachFromMux(self: *SideIO, mux: io_c.pp_mux) bool {
             if (self.did_cleanup) return false;
             self.did_cleanup = true;
-            _ = c.pp_mux_delete(mux, self.fd);
+            _ = io_c.pp_mux_delete(mux, self.fd);
             return true;
         }
 

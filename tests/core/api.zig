@@ -7,7 +7,7 @@ const builtin = @import("builtin");
 
 const source = @import("source");
 const api = source.core_api;
-const c_crypto = source.c_exports.crypto;
+const crypto_c = source.ffi.crypto;
 const logging = source.core_logging;
 const util = source.core.util;
 
@@ -32,9 +32,9 @@ const CapturingLogger = struct {
 
 test "default crypto backend follows compiled backends" {
     const expected: api.CryptoBackend =
-        if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
+        if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL"))
             .openssl
-        else if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+        else if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
             if (supports_native_crypto_backend)
                 .native
             else
@@ -48,11 +48,11 @@ test "crypto function table follows the selected backend" {
     const mock = try api.cryptoFunctionTable(.mock);
     try std.testing.expectEqualStrings("mock", std.mem.span(mock.name));
 
-    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL")) {
+    if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL")) {
         const openssl = try api.cryptoFunctionTable(.openssl);
         try std.testing.expectEqualStrings("openssl", std.mem.span(openssl.name));
     }
-    if (@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS")) {
+    if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS")) {
         const mbedtls = try api.cryptoFunctionTable(.mbedtls);
         try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
         if (supports_native_crypto_backend) {
@@ -64,9 +64,9 @@ test "crypto function table follows the selected backend" {
 
 test "unavailable crypto backend logs and falls back to default" {
     const unavailable: ?api.CryptoBackend =
-        if (!@hasDecl(c_crypto, "PARTOUT_CRYPTO_OPENSSL"))
+        if (!@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL"))
             .openssl
-        else if (!@hasDecl(c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+        else if (!@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
             .mbedtls
         else if (!supports_native_crypto_backend)
             .native

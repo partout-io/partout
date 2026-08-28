@@ -5,7 +5,7 @@
 const std = @import("std");
 const build_options = @import("build_options");
 
-const c_mod = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("helpers.zig");
 const net = @import("../net/exports.zig");
@@ -13,8 +13,8 @@ const openvpn = @import("../openvpn/exports.zig");
 const wireguard = @import("../wireguard/exports.zig");
 
 const api = core.api;
-const c = helpers.c;
-const c_common = c_mod.common;
+const partout_c = helpers.partout_c;
+const portable_c = ffi.portable;
 const util = core.util;
 
 pub const RuntimeError = net.DaemonError || error{
@@ -34,7 +34,7 @@ pub const DaemonOptions = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        args: c.partout_daemon_start_args,
+        args: partout_c.partout_daemon_start_args,
         error_info: ?*api.JsonErrorInfo,
     ) RuntimeError!DaemonOptions {
         const c_profile = args.profile orelse return error.InvalidArgs;
@@ -124,15 +124,15 @@ pub const DaemonRuntime = struct {
     events: helpers.BoundDaemonEvents,
 
     // Copy these for release() on deinit
-    bindings: ?c.partout_daemon_bindings,
+    bindings: ?partout_c.partout_daemon_bindings,
     contexts: std.EnumMap(api.ModuleType, Context),
 
     pub fn init(
         allocator: std.mem.Allocator,
         options: DaemonOptions,
-        bindings: ?*const c.partout_daemon_bindings,
+        bindings: ?*const partout_c.partout_daemon_bindings,
     ) RuntimeError!*DaemonRuntime {
-        if (!c_common.pp_file_create_directory(options.cache_dir.ptr))
+        if (!portable_c.pp_file_create_directory(options.cache_dir.ptr))
             return error.CacheDirectory;
 
         const self = try allocator.create(DaemonRuntime);
@@ -142,7 +142,7 @@ pub const DaemonRuntime = struct {
         self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
-        if (build_options.openvpn and c_mod.has_default_crypto_backend) {
+        if (build_options.openvpn and ffi.has_default_crypto_backend) {
             const ctx = self.contexts.putUninitialized(.OpenVPN);
             ctx.* = .{ .OpenVPN = .{
                 .session_options = .{

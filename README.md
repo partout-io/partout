@@ -41,7 +41,7 @@ then invokes `zig build install` with their include and library paths.
 
 #### Requirements
 
-- Zig 0.16+
+- Zig 0.16
 - C build tools
 - CMake
 - ninja

@@ -18,17 +18,17 @@
 const std = @import("std");
 
 const io_mod = @This();
-const c_mod = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 
 const api = core.api;
-pub const c = c_mod.io;
+pub const io_c = ffi.io;
 const log = core.logging;
 const util = core.util;
 
-pub const FileDescriptor = c.pp_fd;
-pub const ReachabilityInfo = c.pp_reachability;
-pub const SocketDescriptor = c.pp_socket_fd;
+pub const FileDescriptor = io_c.pp_fd;
+pub const ReachabilityInfo = io_c.pp_reachability;
+pub const SocketDescriptor = io_c.pp_socket_fd;
 
 pub const Side = enum {
     link,
@@ -85,8 +85,8 @@ pub const SocketOptions = struct {
     endpoint: api.ExtendedEndpoint,
     timeout_ms: c_int,
     buf_size: c_int,
-    reachability: ?c.pp_reachability = null,
-    configure: c.pp_socket_configure = null,
+    reachability: ?io_c.pp_reachability = null,
+    configure: io_c.pp_socket_configure = null,
     configure_ctx: ?*anyopaque = null,
 
     pub fn closesOnEmptyRead(self: *const SocketOptions) bool {
@@ -95,7 +95,7 @@ pub const SocketOptions = struct {
 };
 
 pub const SocketWrapper = struct {
-    socket: c.pp_socket,
+    socket: io_c.pp_socket,
     options: SocketOptions,
     closes_on_empty_read: bool,
     is_closed: bool = false,
@@ -135,13 +135,13 @@ pub const SocketWrapper = struct {
     fn open(
         allocator: std.mem.Allocator,
         options: SocketOptions,
-    ) error{OutOfMemory}!?c.pp_socket {
+    ) error{OutOfMemory}!?io_c.pp_socket {
         var c_address: util.TemporaryCString = .{};
         try c_address.init(allocator, options.endpoint.address);
         defer c_address.deinit();
 
         const reachability = options.reachability orelse reachabilityNone();
-        const socket = c.pp_socket_open(
+        const socket = io_c.pp_socket_open(
             c_address.ptr(),
             socketProto(options.endpoint),
             options.endpoint.proto.port,
@@ -152,7 +152,7 @@ pub const SocketWrapper = struct {
             options.configure_ctx,
         ) orelse return null;
 
-        _ = c.pp_socket_set_buffers(socket, options.buf_size, options.buf_size);
+        _ = io_c.pp_socket_set_buffers(socket, options.buf_size, options.buf_size);
         return socket;
     }
 
@@ -164,42 +164,42 @@ pub const SocketWrapper = struct {
     }
 
     pub fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) Error!void {
-        if (!c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
+        if (!io_c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
     }
 
     pub fn resetEvents(self: *const SocketWrapper) Error!void {
-        if (!c.pp_socket_reset_events(self.socket)) return error.LibcFailure;
+        if (!io_c.pp_socket_reset_events(self.socket)) return error.LibcFailure;
     }
 
     pub fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
-        const read_count = c.pp_socket_read(self.socket, buf.ptr, buf.len);
+        const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
     pub fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
-        const written = c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
+        const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
         return mapWriteResult(.link, written, false);
     }
 
     pub fn cleanup(self: *SocketWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
-        c.pp_socket_free_and_close(self.socket, true);
+        io_c.pp_socket_free_and_close(self.socket, true);
     }
 
     pub fn close(self: *const SocketWrapper) void {
         if (self.is_closed) return;
-        c.pp_socket_close(self.socket);
+        io_c.pp_socket_close(self.socket);
     }
 
     pub fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
-        const fd = c.pp_socket_get_watch_fd(self.socket);
-        return if (c.pp_fd_is_valid(fd)) fd else null;
+        const fd = io_c.pp_socket_get_watch_fd(self.socket);
+        return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
 
     pub fn socketDescriptor(self: SocketWrapper) SocketDescriptor {
-        return c.pp_socket_get_fd(self.socket);
+        return io_c.pp_socket_get_fd(self.socket);
     }
 
     pub fn remoteAddress(self: SocketWrapper) ?api.Address {
@@ -215,15 +215,15 @@ pub const SocketWrapper = struct {
     }
 
     pub fn lastErrorCode(_: SocketWrapper) c_int {
-        return c.pp_socket_last_error_binding();
+        return io_c.pp_socket_last_error_binding();
     }
 };
 
 pub const TunWrapper = struct {
-    tun: c.pp_tun,
+    tun: io_c.pp_tun,
     is_closed: bool = false,
 
-    pub fn init(tun: c.pp_tun) TunWrapper {
+    pub fn init(tun: io_c.pp_tun) TunWrapper {
         return .{ .tun = tun };
     }
 
@@ -235,12 +235,12 @@ pub const TunWrapper = struct {
     fn open(
         allocator: std.mem.Allocator,
         uuid: []const u8,
-    ) error{OutOfMemory}!?c.pp_tun {
-        if (!@hasDecl(c, "pp_tun_open")) return null;
+    ) error{OutOfMemory}!?io_c.pp_tun {
+        if (!@hasDecl(io_c, "pp_tun_open")) return null;
         var c_uuid: util.TemporaryCString = .{};
         try c_uuid.init(allocator, uuid);
         defer c_uuid.deinit();
-        return c.pp_tun_open(c_uuid.ptr());
+        return io_c.pp_tun_open(c_uuid.ptr());
     }
 
     pub fn nativeIO(self: *TunWrapper) IOInterface {
@@ -255,41 +255,41 @@ pub const TunWrapper = struct {
     pub fn resetEvents(_: *TunWrapper) Error!void {}
 
     pub fn read(self: *const TunWrapper, buf: []u8) Error!?usize {
-        const read_count = c.pp_tun_read(self.tun, buf.ptr, buf.len);
+        const read_count = io_c.pp_tun_read(self.tun, buf.ptr, buf.len);
         return mapReadResult(.tun, read_count, false);
     }
 
     pub fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
-        const written = c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
+        const written = io_c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
         return mapWriteResult(.tun, written, true);
     }
 
     pub fn cleanup(self: *TunWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
-        c.pp_tun_free_and_close(self.tun, true);
+        io_c.pp_tun_free_and_close(self.tun, true);
     }
 
-    pub fn muxDescriptor(self: TunWrapper) ?c.pp_fd {
-        const fd = c.pp_tun_get_watch_fd(self.tun);
-        return if (c.pp_fd_is_valid(fd)) fd else null;
+    pub fn muxDescriptor(self: TunWrapper) ?io_c.pp_fd {
+        const fd = io_c.pp_tun_get_watch_fd(self.tun);
+        return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
 
     pub fn name(self: TunWrapper) ?[]const u8 {
-        const c_name = c.pp_tun_name(self.tun) orelse return null;
+        const c_name = io_c.pp_tun_name(self.tun) orelse return null;
         return std.mem.span(c_name);
     }
 
     pub fn lastErrorCode(_: TunWrapper) c_int {
-        return c.pp_io_last_error_binding();
+        return io_c.pp_io_last_error_binding();
     }
 };
 
-fn socketProto(endpoint: api.ExtendedEndpoint) c.pp_socket_proto {
+fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
     return switch (endpoint.plainSocketType()) {
-        .udp => c.PPSocketProtoUDP,
-        .tcp => c.PPSocketProtoTCP,
+        .udp => io_c.PPSocketProtoUDP,
+        .tcp => io_c.PPSocketProtoTCP,
     };
 }
 
@@ -393,14 +393,14 @@ fn tunLastErrorCode(ptr: *anyopaque) c_int {
 
 // Shared functions
 
-fn reachabilityNone() c.pp_reachability {
-    var reachability = std.mem.zeroes(c.pp_reachability);
+fn reachabilityNone() io_c.pp_reachability {
+    var reachability = std.mem.zeroes(io_c.pp_reachability);
     reachability.reachable = false;
     return reachability;
 }
 
 fn mapReadResult(_: Side, result: c_int, closes_on_empty_read: bool) Error!?usize {
-    if (result == c.PPIOErrorWouldBlock) return error.WouldBlock;
+    if (result == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
     if (result < 0) return error.LibcFailure;
     if (result == 0) {
         if (closes_on_empty_read) return error.EndOfStream;
@@ -410,9 +410,9 @@ fn mapReadResult(_: Side, result: c_int, closes_on_empty_read: bool) Error!?usiz
 }
 
 fn mapWriteResult(_: Side, result: c_int, comptime maps_no_space: bool) Error!usize {
-    if (result == c.PPIOErrorWouldBlock) return error.WouldBlock;
-    if (result == c.PPIOErrorNoBufs) return error.Backpressure;
-    if (maps_no_space and result == c.PPIOErrorNoSpace) return error.Backpressure;
+    if (result == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
+    if (result == io_c.PPIOErrorNoBufs) return error.Backpressure;
+    if (maps_no_space and result == io_c.PPIOErrorNoSpace) return error.Backpressure;
     if (result < 0) return error.LibcFailure;
     return @intCast(result);
 }

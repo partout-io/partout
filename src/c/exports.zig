@@ -5,26 +5,9 @@
 const builtin = @import("builtin");
 const std = @import("std");
 
-pub const common = @cImport({
-    @cInclude("c/android_import_compat.h");
-    @cInclude("portable/common.h");
-    @cInclude("portable/lib.h");
-    @cInclude("portable/prng.h");
-    @cInclude("portable/zd.h");
-});
-
-pub const io = @cImport({
-    @cInclude("c/android_import_compat.h");
-    @cInclude("portable/dns.h");
-    @cInclude("portable/mux.h");
-    @cInclude("portable/socket.h");
-    @cInclude("portable/tun.h");
-});
-
-pub const crypto = @cImport({
-    @cInclude("c/android_import_compat.h");
-    @cInclude("crypto/crypto.h");
-});
+pub const portable = @import("portable_c");
+pub const io = @import("io_c");
+pub const crypto = @import("crypto_c");
 
 pub const has_default_crypto_backend = builtin.is_test or
     @hasDecl(crypto, "PARTOUT_CRYPTO_OPENSSL") or

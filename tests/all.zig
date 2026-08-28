@@ -3,14 +3,15 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const source = @import("source");
+const crypto_c = source.ffi.crypto;
 
 comptime {
     _ = @import("abi/helpers.zig");
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
     _ = @import("c/exports.zig");
-    if (@hasDecl(source.c_crypto, "PARTOUT_CRYPTO_OPENSSL") or
-        @hasDecl(source.c_crypto, "PARTOUT_CRYPTO_MBEDTLS"))
+    if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL") or
+        @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
     {
         _ = @import("c/crypto/aead.zig");
         _ = @import("c/crypto/cbc.zig");

@@ -13,12 +13,12 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const abi = @import("abi/exports.zig");
-const c_mod = @import("c/exports.zig");
+const ffi = @import("c/exports.zig");
 const core = @import("core/exports.zig");
 const version = @import("version.zig");
 const api = core.api;
-const c = abi.c;
-const c_common = c_mod.common;
+const partout_c = abi.partout_c;
+const portable_c = ffi.portable;
 const log = core.logging;
 const util = core.util;
 
@@ -64,7 +64,7 @@ fn panicHandler(message: []const u8, _: ?usize) noreturn {
     const message_length = @min(message.len, buffer.len - 1);
     @memcpy(buffer[0..message_length], message[0..message_length]);
     buffer[message_length] = 0;
-    c_common.pp_panic(buffer[0..message_length :0].ptr);
+    portable_c.pp_panic(buffer[0..message_length :0].ptr);
     @trap();
 }
 
@@ -72,7 +72,7 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
     return version.number.ptr;
 }
 
-pub export fn partout_init(args_pointer: ?*const c.partout_init_args) callconv(.c) void {
+pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) callconv(.c) void {
     const args = args_pointer orelse return;
     log.init(args.logs_private_data, args.logger);
 }
@@ -82,7 +82,7 @@ pub export fn partout_readfile(
     parent: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const path = rel_path orelse return null;
-    return c_common.pp_file_read(path, parent);
+    return portable_c.pp_file_read(path, parent);
 }
 
 pub export fn partout_import_profile(
@@ -132,9 +132,9 @@ pub export fn partout_import_module(
 }
 
 pub export fn partout_daemon_start(
-    args_pointer: ?*const c.partout_daemon_start_args,
+    args_pointer: ?*const partout_c.partout_daemon_start_args,
 ) callconv(.c) c_int {
-    const args = args_pointer orelse return c.PartoutCompletionCodeArgs;
+    const args = args_pointer orelse return partout_c.PartoutCompletionCodeArgs;
     var releases_bindings = true;
     defer if (releases_bindings) releaseDaemonBindings(args.bindings);
     if (daemon_runtime != null) return mapErrorToCode(error.AlreadyStarted);
@@ -146,7 +146,7 @@ pub export fn partout_daemon_start(
         } else {
             log.writef(.fault, "Unable to parse profile: {s}", .{@errorName(err)});
         }
-        return c.PartoutCompletionCodeArgs;
+        return partout_c.PartoutCompletionCodeArgs;
     };
 
     const runtime = abi.DaemonRuntime.init(allocator, options, args.bindings) catch |err| {
@@ -166,10 +166,10 @@ pub export fn partout_daemon_start(
     if (is_daemon) daemon_process_lock.prepare();
     daemon_runtime = runtime;
     if (is_daemon) daemon_process_lock.wait();
-    return c.PartoutCompletionCodeOK;
+    return partout_c.PartoutCompletionCodeOK;
 }
 
-fn releaseDaemonBindings(bindings: ?*const c.partout_daemon_bindings) void {
+fn releaseDaemonBindings(bindings: ?*const partout_c.partout_daemon_bindings) void {
     const value = bindings orelse return;
     const release = value.release orelse return;
     release(@constCast(value));
@@ -192,8 +192,8 @@ pub export fn partout_daemon_stop() callconv(.c) void {
 fn mapErrorToCode(err: abi.RuntimeError) c_int {
     log.writef(.err, "Unable to start daemon: {s}", .{@errorName(err)});
     return switch (err) {
-        error.InvalidArgs => c.PartoutCompletionCodeArgs,
-        else => c.PartoutCompletionCodeFailure,
+        error.InvalidArgs => partout_c.PartoutCompletionCodeArgs,
+        else => partout_c.PartoutCompletionCodeFailure,
     };
 }
 

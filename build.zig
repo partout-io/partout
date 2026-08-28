@@ -82,12 +82,35 @@ const BuildConfig = struct {
     target: std.Build.ResolvedTarget,
     optimize: std.builtin.OptimizeMode,
     strip: ?bool,
+    libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
     embed_c: bool,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
+};
+
+const CBindings = struct {
+    portable: *std.Build.Module,
+    io: *std.Build.Module,
+    crypto: *std.Build.Module,
+    partout: *std.Build.Module,
+    openvpn: ?*std.Build.Module,
+    wireguard: ?*std.Build.Module,
+
+    fn addImports(bindings: CBindings, module: *std.Build.Module) void {
+        module.addImport("portable_c", bindings.portable);
+        module.addImport("io_c", bindings.io);
+        module.addImport("crypto_c", bindings.crypto);
+        module.addImport("partout_c", bindings.partout);
+        if (bindings.openvpn) |openvpn| {
+            module.addImport("openvpn_c", openvpn);
+        }
+        if (bindings.wireguard) |wireguard| {
+            module.addImport("wireguard_c", wireguard);
+        }
+    }
 };
 
 const default_api_excluded_schemas =
@@ -160,6 +183,7 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
         .strip = strip,
+        .libc_installation = parseLibCInstallation(b, target),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .embed_c = embed_c,
@@ -167,8 +191,9 @@ pub fn build(b: *std.Build) void {
         .wireguard = use_wireguard,
         .options = build_options,
     };
+    const c_bindings = createCBindings(b, config);
 
-    const module = createPartoutModule(b, config, "src/partout.zig", true);
+    const module = createPartoutModule(b, config, c_bindings, "src/partout.zig", true);
     if (shared) {
         linkVendorLibraries(module, b, config, false);
         addRuntimeOrigin(module, target);
@@ -190,8 +215,8 @@ pub fn build(b: *std.Build) void {
     check.dependOn(&lib.step);
     b.default_step = check;
 
-    const test_source_module = createPartoutModule(b, config, "src/testing.zig", false);
-    const test_module = createPartoutModule(b, config, "tests/all.zig", true);
+    const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
+    const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     linkVendorLibraries(test_module, b, config, true);
     test_module.addImport("source", test_source_module);
 
@@ -233,6 +258,22 @@ pub fn build(b: *std.Build) void {
     });
     const docs_step = b.step("docs", "Install docs into zig-out/docs");
     docs_step.dependOn(&install_docs.step);
+}
+
+fn parseLibCInstallation(
+    b: *std.Build,
+    target: std.Build.ResolvedTarget,
+) ?std.zig.LibCInstallation {
+    const libc_file = b.libc_file orelse return null;
+    return std.zig.LibCInstallation.parse(
+        b.allocator,
+        b.graph.io,
+        libc_file,
+        &target.result,
+    ) catch |err| std.debug.panic("unable to parse --libc file '{s}': {s}", .{
+        libc_file,
+        @errorName(err),
+    });
 }
 
 fn pathOption(
@@ -340,6 +381,7 @@ fn addCoverageRunStep(
 fn createPartoutModule(
     b: *std.Build,
     config: BuildConfig,
+    c_bindings: CBindings,
     root_source_file: []const u8,
     add_c_sources: bool,
 ) *std.Build.Module {
@@ -352,6 +394,7 @@ fn createPartoutModule(
         .sanitize_c = .off,
     });
     configurePartoutModule(module, b, config);
+    c_bindings.addImports(module);
 
     if (add_c_sources and config.embed_c) {
         addCSources(module, config.openvpn, config.wireguard);
@@ -360,35 +403,53 @@ fn createPartoutModule(
     return module;
 }
 
+fn createCBindings(b: *std.Build, config: BuildConfig) CBindings {
+    return .{
+        .portable = createCBinding(b, config, "src/c/imports/portable.h"),
+        .io = createCBinding(b, config, "src/c/imports/io.h"),
+        .crypto = createCBinding(b, config, "src/c/imports/crypto.h"),
+        .partout = createCBinding(b, config, "src/c/imports/partout.h"),
+        .openvpn = if (config.openvpn)
+            createCBinding(b, config, "src/c/imports/openvpn.h")
+        else
+            null,
+        .wireguard = if (config.wireguard)
+            createCBinding(b, config, "src/c/imports/wireguard.h")
+        else
+            null,
+    };
+}
+
+fn createCBinding(
+    b: *std.Build,
+    config: BuildConfig,
+    root_source_file: []const u8,
+) *std.Build.Module {
+    const translate_c = b.addTranslateC(.{
+        .root_source_file = b.path(root_source_file),
+        .target = config.target,
+        .optimize = config.optimize,
+    });
+    configureCTranslation(translate_c, b, config);
+    return translate_c.createModule();
+}
+
+fn configureCTranslation(
+    translate_c: *std.Build.Step.TranslateC,
+    b: *std.Build,
+    config: BuildConfig,
+) void {
+    configureCHeadersAndMacros(translate_c, b, config);
+}
+
 fn configurePartoutModule(
     module: *std.Build.Module,
     b: *std.Build,
     config: BuildConfig,
 ) void {
     module.addOptions("build_options", config.options);
-    module.addIncludePath(b.path("src"));
-    module.addIncludePath(b.path("src/c/portable/include"));
-    module.addIncludePath(b.path("src/c/crypto/include"));
-    if (config.openvpn) {
-        module.addIncludePath(b.path("src/openvpn/c/include"));
-    }
-    if (config.wireguard) {
-        module.addIncludePath(b.path("src/wireguard/c/include"));
-    }
-    addVendorIncludePaths(module, b, config);
-    addAppleSDKPaths(module, b, config.apple_sdk_path);
-    if (config.vendors.openssl.enabled()) {
-        module.addCMacro("PARTOUT_CRYPTO_OPENSSL", "1");
-    }
-    if (config.vendors.mbedtls.enabled()) {
-        module.addCMacro("PARTOUT_CRYPTO_MBEDTLS", "1");
-    }
-    module.addCMacro("PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    module.addCMacro("PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
-    module.addCMacro(
-        "PARTOUT_HAS_WIREGUARD_BACKEND",
-        if (config.vendors.hasWireGuardBackend()) "1" else "0",
-    );
+    configureCHeadersAndMacros(module, b, config);
+    addAppleSDKLibraryPath(module, b, config.apple_sdk_path);
     if (config.target.result.os.tag.isDarwin()) {
         module.linkFramework("CoreFoundation", .{});
         module.linkFramework("Security", .{});
@@ -400,8 +461,62 @@ fn configurePartoutModule(
     }
 }
 
+fn configureCHeadersAndMacros(
+    consumer: anytype,
+    b: *std.Build,
+    config: BuildConfig,
+) void {
+    consumer.addIncludePath(b.path("src"));
+    consumer.addIncludePath(b.path("src/c/portable/include"));
+    consumer.addIncludePath(b.path("src/c/crypto/include"));
+    if (config.openvpn) {
+        consumer.addIncludePath(b.path("src/openvpn/c/include"));
+    }
+    if (config.wireguard) {
+        consumer.addIncludePath(b.path("src/wireguard/c/include"));
+    }
+    addVendorIncludePaths(consumer, b, config);
+    addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);
+    addLibCHeaderPaths(consumer, config.libc_installation);
+    if (config.vendors.openssl.enabled()) {
+        addCMacro(consumer, "PARTOUT_CRYPTO_OPENSSL", "1");
+    }
+    if (config.vendors.mbedtls.enabled()) {
+        addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
+    }
+    addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
+    addCMacro(
+        consumer,
+        "PARTOUT_HAS_WIREGUARD_BACKEND",
+        if (config.vendors.hasWireGuardBackend()) "1" else "0",
+    );
+}
+
+fn addLibCHeaderPaths(
+    consumer: anytype,
+    libc_installation: ?std.zig.LibCInstallation,
+) void {
+    const libc = libc_installation orelse return;
+    consumer.addSystemIncludePath(.{ .cwd_relative = libc.include_dir orelse unreachable });
+    const sys_include_dir = libc.sys_include_dir orelse unreachable;
+    if (!std.mem.eql(u8, libc.include_dir.?, sys_include_dir)) {
+        consumer.addSystemIncludePath(.{ .cwd_relative = sys_include_dir });
+    }
+}
+
+fn addCMacro(consumer: anytype, name: []const u8, value: []const u8) void {
+    if (comptime @TypeOf(consumer) == *std.Build.Module) {
+        consumer.addCMacro(name, value);
+    } else if (comptime @TypeOf(consumer) == *std.Build.Step.TranslateC) {
+        consumer.defineCMacro(name, value);
+    } else {
+        @compileError("unsupported C build consumer");
+    }
+}
+
 fn addVendorIncludePaths(
-    module: *std.Build.Module,
+    consumer: anytype,
     b: *std.Build,
     config: BuildConfig,
 ) void {
@@ -411,19 +526,19 @@ fn addVendorIncludePaths(
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ include_path, framework_name });
             std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-                module.addSystemIncludePath(.{ .cwd_relative = include_path });
+                consumer.addSystemIncludePath(.{ .cwd_relative = include_path });
                 continue;
             };
-            module.addSystemFrameworkPath(.{ .cwd_relative = include_path });
+            consumer.addSystemFrameworkPath(.{ .cwd_relative = include_path });
         } else {
-            module.addSystemIncludePath(.{ .cwd_relative = include_path });
+            consumer.addSystemIncludePath(.{ .cwd_relative = include_path });
         }
     }
     for ([_]?[]const u8{
         config.vendors.openssl_config_include,
         config.vendors.wintun_include,
     }) |include_path| {
-        module.addSystemIncludePath(.{ .cwd_relative = include_path orelse continue });
+        consumer.addSystemIncludePath(.{ .cwd_relative = include_path orelse continue });
     }
 }
 
@@ -549,15 +664,25 @@ fn addDarwinStaticArchiveRepackStep(
     return output;
 }
 
-fn addAppleSDKPaths(
+fn addAppleSDKHeaderPaths(
+    consumer: anytype,
+    b: *std.Build,
+    sdk_path: ?[]const u8,
+) void {
+    const sdk = sdk_path orelse return;
+    consumer.addSystemIncludePath(.{ .cwd_relative = b.fmt("{s}/usr/include", .{sdk}) });
+    consumer.addSystemFrameworkPath(.{
+        .cwd_relative = b.fmt("{s}/System/Library/Frameworks", .{sdk}),
+    });
+}
+
+fn addAppleSDKLibraryPath(
     module: *std.Build.Module,
     b: *std.Build,
     sdk_path: ?[]const u8,
 ) void {
     const sdk = sdk_path orelse return;
-    module.addSystemIncludePath(.{ .cwd_relative = b.fmt("{s}/usr/include", .{sdk}) });
     module.addLibraryPath(.{ .cwd_relative = b.fmt("{s}/usr/lib", .{sdk}) });
-    module.addSystemFrameworkPath(.{ .cwd_relative = b.fmt("{s}/System/Library/Frameworks", .{sdk}) });
 }
 
 fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool) void {

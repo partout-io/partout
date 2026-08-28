@@ -7,7 +7,7 @@ const std = @import("std");
 const core = @import("source").core;
 const io = @import("source").net_io;
 const platform_source = @import("source").net_platform;
-const c = @import("source").c_exports.io;
+const io_c = @import("source").ffi.io;
 
 const Platform = platform_source.Platform;
 const ReachabilityInfo = io.ReachabilityInfo;
@@ -31,7 +31,7 @@ fn recordSetTunnel(
     ref: ?*anyopaque,
     _: [*c]const u8,
     info_json: [*c]const u8,
-) callconv(.c) c.pp_tun {
+) callconv(.c) io_c.pp_tun {
     const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return null));
     if (info_json == null) return null;
     const json = std.mem.span(info_json);
@@ -65,7 +65,7 @@ fn recordEnvironmentValue(
 }
 
 fn platformOptions(recorder: *TunnelCommitRecorder) Platform.Options {
-    var functions = c.pp_tun_ctrl_fnt_current();
+    var functions = io_c.pp_tun_ctrl_fnt_current();
     functions.set_tunnel = recordSetTunnel;
     functions.set_environment_value = recordEnvironmentValue;
     return .{ .ref = recorder, .fnt = functions };

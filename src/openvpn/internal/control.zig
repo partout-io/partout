@@ -8,7 +8,7 @@ const crypto_mod = @import("crypto.zig");
 const helpers_mod = @import("helpers.zig");
 const packet_mod = @import("packet.zig");
 
-const c = helpers_mod.c;
+const openvpn_c = helpers_mod.openvpn_c;
 const log = core_mod.logging;
 
 const ControlPacket = packet_mod.ControlPacket;
@@ -56,8 +56,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
         allocator: std.mem.Allocator,
         prng: PRNG,
         serializer: Serializer,
-        session_id: ?[c.OpenVPNPacketSessionIdLength]u8,
-        remote_session_id: ?[c.OpenVPNPacketSessionIdLength]u8,
+        session_id: ?[openvpn_c.OpenVPNPacketSessionIdLength]u8,
+        remote_session_id: ?[openvpn_c.OpenVPNPacketSessionIdLength]u8,
         inbound_queue: std.ArrayList(ControlPacket),
         outbound_queue: std.ArrayList(ControlPacket),
         current_inbound_id: u32,
@@ -104,7 +104,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
 
         pub fn reset(self: *Self, for_new_session: bool) ResetError!void {
             if (for_new_session) {
-                var local: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
+                var local: [openvpn_c.OpenVPNPacketSessionIdLength]u8 = undefined;
                 try self.prng.fill(&local);
                 self.session_id = local;
                 self.remote_session_id = null;
@@ -127,8 +127,8 @@ pub fn ControlChannel(comptime Serializer: type) type {
         }
 
         pub fn setRemoteSessionId(self: *Self, value: []const u8) SetRemoteSessionIdError!void {
-            if (value.len != c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
-            var copy: [c.OpenVPNPacketSessionIdLength]u8 = undefined;
+            if (value.len != openvpn_c.OpenVPNPacketSessionIdLength) return error.InvalidSessionId;
+            var copy: [openvpn_c.OpenVPNPacketSessionIdLength]u8 = undefined;
             @memcpy(&copy, value);
             self.remote_session_id = copy;
             log.writef(.info, "Control: Remote sessionId is {x}", .{value});

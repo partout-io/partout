@@ -5,8 +5,8 @@
 const std = @import("std");
 const source = @import("source");
 
-const c_exports = source.c_exports;
-const c_common = c_exports.common;
+const ffi = source.ffi;
+const portable_c = ffi.portable;
 
 test "portable filesystem creates nested directories" {
     const allocator = std.testing.allocator;
@@ -20,11 +20,11 @@ test "portable filesystem creates nested directories" {
     );
     defer allocator.free(nested);
 
-    try std.testing.expect(c_common.pp_file_create_directory(nested.ptr));
-    try std.testing.expect(c_common.pp_file_is_directory(nested.ptr));
-    try std.testing.expect(c_common.pp_file_create_directory(nested.ptr));
+    try std.testing.expect(portable_c.pp_file_create_directory(nested.ptr));
+    try std.testing.expect(portable_c.pp_file_is_directory(nested.ptr));
+    try std.testing.expect(portable_c.pp_file_create_directory(nested.ptr));
 }
 
 test "portable clock returns Unix time" {
-    try std.testing.expect(c_common.pp_time_unix_seconds() > 0);
+    try std.testing.expect(portable_c.pp_time_unix_seconds() > 0);
 }

@@ -6,60 +6,60 @@ const std = @import("std");
 const source = @import("source");
 
 const api = source.core.api;
-const c_common = source.c_common;
-const c_crypto = source.c_crypto;
+const portable_c = source.ffi.portable;
+const crypto_c = source.ffi.crypto;
 const TLSWrapper = source.openvpn_internal.tls.TLSWrapper;
 
 test "TLSWrapper delegates its complete TLS surface to the C table" {
     const Fake = struct {
-        fn options(tls: c_crypto.pp_tls) [*c]c_crypto.pp_tls_options {
+        fn options(tls: crypto_c.pp_tls) [*c]crypto_c.pp_tls_options {
             return @ptrCast(@alignCast(tls.?));
         }
 
         fn create(
-            opt: [*c]const c_crypto.pp_tls_options,
-            code: [*c]c_crypto.pp_tls_error_code,
-        ) callconv(.c) c_crypto.pp_tls {
-            code[0] = c_crypto.PPTLSErrorNone;
+            opt: [*c]const crypto_c.pp_tls_options,
+            code: [*c]crypto_c.pp_tls_error_code,
+        ) callconv(.c) crypto_c.pp_tls {
+            code[0] = crypto_c.PPTLSErrorNone;
             return @ptrCast(@alignCast(@constCast(opt)));
         }
 
-        fn free(tls: c_crypto.pp_tls) callconv(.c) void {
-            c_crypto.pp_tls_options_free(options(tls));
+        fn free(tls: crypto_c.pp_tls) callconv(.c) void {
+            crypto_c.pp_tls_options_free(options(tls));
         }
 
-        fn start(tls: c_crypto.pp_tls) callconv(.c) bool {
+        fn start(tls: crypto_c.pp_tls) callconv(.c) bool {
             const opt = options(tls);
             opt.*.on_verify_failure.?(opt.*.ctx);
             return true;
         }
 
-        fn isConnected(_: c_crypto.pp_tls) callconv(.c) bool {
+        fn isConnected(_: crypto_c.pp_tls) callconv(.c) bool {
             return true;
         }
 
-        fn pullPlain(_: c_crypto.pp_tls, code: [*c]c_crypto.pp_tls_error_code) callconv(.c) [*c]c_crypto.pp_zd {
-            code[0] = c_crypto.PPTLSErrorNone;
-            return c_crypto.pp_zd_create_from_data("plain".ptr, "plain".len);
+        fn pullPlain(_: crypto_c.pp_tls, code: [*c]crypto_c.pp_tls_error_code) callconv(.c) [*c]crypto_c.pp_zd {
+            code[0] = crypto_c.PPTLSErrorNone;
+            return crypto_c.pp_zd_create_from_data("plain".ptr, "plain".len);
         }
 
-        fn pullCipher(_: c_crypto.pp_tls, code: [*c]c_crypto.pp_tls_error_code) callconv(.c) [*c]c_crypto.pp_zd {
-            code[0] = c_crypto.PPTLSErrorNone;
-            return c_crypto.pp_zd_create_from_data("cipher".ptr, "cipher".len);
+        fn pullCipher(_: crypto_c.pp_tls, code: [*c]crypto_c.pp_tls_error_code) callconv(.c) [*c]crypto_c.pp_zd {
+            code[0] = crypto_c.PPTLSErrorNone;
+            return crypto_c.pp_zd_create_from_data("cipher".ptr, "cipher".len);
         }
 
         fn put(
-            _: c_crypto.pp_tls,
+            _: crypto_c.pp_tls,
             _: [*c]const u8,
             _: usize,
-            code: [*c]c_crypto.pp_tls_error_code,
+            code: [*c]crypto_c.pp_tls_error_code,
         ) callconv(.c) bool {
-            code[0] = c_crypto.PPTLSErrorNone;
+            code[0] = crypto_c.PPTLSErrorNone;
             return true;
         }
 
-        fn caMD5(_: c_crypto.pp_tls) callconv(.c) [*c]u8 {
-            return c_common.pp_dup("0123456789abcdef");
+        fn caMD5(_: crypto_c.pp_tls) callconv(.c) [*c]u8 {
+            return portable_c.pp_dup("0123456789abcdef");
         }
 
         fn verificationFailed(context: ?*anyopaque) void {
@@ -78,7 +78,7 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
     const configuration = api.OpenVPNConfiguration{
         .ca = .{ .pem = "-----BEGIN CERTIFICATE-----\nmock\n-----END CERTIFICATE-----\n" },
     };
-    var functions = c_crypto.pp_crypto_fnt_mock().tls;
+    var functions = crypto_c.pp_crypto_fnt_mock().tls;
     functions.create = Fake.create;
     functions.free = Fake.free;
     functions.start = Fake.start;

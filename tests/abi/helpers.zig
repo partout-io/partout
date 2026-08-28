@@ -8,9 +8,9 @@ const core = @import("source").core;
 const helpers = @import("source").abi_helpers;
 
 const api = core.api;
-const c = helpers.c;
-const CompletionCode = c.partout_completion_code;
-const InitArgs = c.partout_init_args;
+const partout_c = helpers.partout_c;
+const CompletionCode = partout_c.partout_completion_code;
+const InitArgs = partout_c.partout_init_args;
 
 test "ABI structs stay C-sized" {
     try std.testing.expect(@offsetOf(InitArgs, "logs_private_data") == 0);

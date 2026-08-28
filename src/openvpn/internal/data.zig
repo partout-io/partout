@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const c_exports_mod = @import("../../c/exports.zig");
+const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
 const auth_mod = @import("auth.zig");
@@ -14,9 +14,9 @@ const helpers_mod = @import("helpers.zig");
 const processing_mod = @import("processing.zig");
 
 const api = core_mod.api;
-const c = helpers_mod.c;
-const c_common = c_exports_mod.common;
-const c_crypto = c_exports_mod.crypto;
+const openvpn_c = helpers_mod.openvpn_c;
+const portable_c = ffi.portable;
+const crypto_c = ffi.crypto;
 const log = core_mod.logging;
 
 const CryptoBackend = api.CryptoBackend;
@@ -66,7 +66,7 @@ pub const DataPath = struct {
     pub const CreateError = std.mem.Allocator.Error || error{UnsupportedAlgorithm};
     pub const CreateWithSeedError = CreateError || api.CryptoFunctionTableError || error{CryptoDerivation};
     pub const CreateWithPRFError = CreateWithSeedError || error{CryptoPRNG};
-    pub const ProcessingError = std.mem.Allocator.Error || c_exports_mod.CryptoError || error{
+    pub const ProcessingError = std.mem.Allocator.Error || ffi.CryptoError || error{
         CompressionMismatch,
         DataPathFailure,
         Overflow,
@@ -74,10 +74,10 @@ pub const DataPath = struct {
     };
 
     allocator: std.mem.Allocator,
-    mode: *c.openvpn_dp_mode,
-    enc_buffer: *c_common.pp_zd,
-    dec_buffer: *c_common.pp_zd,
-    replay: *c.openvpn_replay,
+    mode: *openvpn_c.openvpn_dp_mode,
+    enc_buffer: *portable_c.pp_zd,
+    dec_buffer: *portable_c.pp_zd,
+    replay: *openvpn_c.openvpn_replay,
     out_packet_id: u32 = 0,
 
     const resize_step: usize = 1024;
@@ -86,17 +86,17 @@ pub const DataPath = struct {
 
     fn createWithMode(
         allocator: std.mem.Allocator,
-        mode: *c.openvpn_dp_mode,
+        mode: *openvpn_c.openvpn_dp_mode,
         peer_id: u32,
     ) CreateError!*DataPath {
         const self = try allocator.create(DataPath);
-        c.openvpn_dp_mode_set_peer_id(mode, peer_id);
+        openvpn_c.openvpn_dp_mode_set_peer_id(mode, peer_id);
         self.* = .{
             .allocator = allocator,
             .mode = mode,
-            .enc_buffer = c_common.pp_zd_create(initial_buffer_size),
-            .dec_buffer = c_common.pp_zd_create(initial_buffer_size),
-            .replay = c.openvpn_replay_create(),
+            .enc_buffer = portable_c.pp_zd_create(initial_buffer_size),
+            .dec_buffer = portable_c.pp_zd_create(initial_buffer_size),
+            .replay = openvpn_c.openvpn_replay_create(),
         };
         return self;
     }
@@ -130,7 +130,7 @@ pub const DataPath = struct {
     fn createWithKeys(
         allocator: std.mem.Allocator,
         parameters: Parameters,
-        functions: c_crypto.pp_crypto_enc_fnt,
+        functions: crypto_c.pp_crypto_enc_fnt,
         keys: *const CryptoKeys,
     ) CreateError!*DataPath {
         var bridge = CryptoKeysBridge.init(keys);
@@ -142,13 +142,13 @@ pub const DataPath = struct {
             configuration_mod.cipherEmbedsDigest(cipher)
         else
             false;
-        const mode: *c.openvpn_dp_mode = if (is_aead) blk: {
+        const mode: *openvpn_c.openvpn_dp_mode = if (is_aead) blk: {
             _ = functions.aead_create orelse
                 @panic("OpenVPN crypto backend does not define aead_create");
             _ = functions.aead_free orelse
                 @panic("OpenVPN crypto backend does not define aead_free");
             const name = cipher_name orelse return error.UnsupportedAlgorithm;
-            break :blk c.openvpn_dp_mode_ad_create_aead(
+            break :blk openvpn_c.openvpn_dp_mode_ad_create_aead(
                 @ptrCast(&functions),
                 name.ptr,
                 DataConstants.aead_tag_length,
@@ -162,7 +162,7 @@ pub const DataPath = struct {
             _ = functions.cbc_free orelse
                 @panic("OpenVPN crypto backend does not define cbc_free");
             const digest = parameters.digest orelse return error.UnsupportedAlgorithm;
-            break :blk c.openvpn_dp_mode_hmac_create_cbc(
+            break :blk openvpn_c.openvpn_dp_mode_hmac_create_cbc(
                 @ptrCast(&functions),
                 if (cipher_name) |value| value.ptr else null,
                 digest.raw().ptr,
@@ -170,20 +170,20 @@ pub const DataPath = struct {
                 framing,
             ) orelse return error.UnsupportedAlgorithm;
         };
-        errdefer c.openvpn_dp_mode_free(mode);
+        errdefer openvpn_c.openvpn_dp_mode_free(mode);
         return createWithMode(
             allocator,
             mode,
-            parameters.peer_id orelse c.OpenVPNPacketPeerIdDisabled,
+            parameters.peer_id orelse openvpn_c.OpenVPNPacketPeerIdDisabled,
         );
     }
 
     pub fn destroy(self: *const DataPath) void {
         const allocator = self.allocator;
-        c.openvpn_replay_free(self.replay);
-        c.openvpn_dp_mode_free(self.mode);
-        c_common.pp_zd_free(self.enc_buffer);
-        c_common.pp_zd_free(self.dec_buffer);
+        openvpn_c.openvpn_replay_free(self.replay);
+        openvpn_c.openvpn_dp_mode_free(self.mode);
+        portable_c.pp_zd_free(self.enc_buffer);
+        portable_c.pp_zd_free(self.dec_buffer);
         allocator.destroy(self);
     }
 
@@ -228,7 +228,7 @@ pub const DataPath = struct {
                 log.write(.notice, "OpenVPN peer data packet counter exhausted");
                 return error.Overflow;
             }
-            if (c.openvpn_replay_is_replayed(self.replay, tuple.packet_id)) {
+            if (openvpn_c.openvpn_replay_is_replayed(self.replay, tuple.packet_id)) {
                 tuple.deinit(allocator);
                 continue;
             }
@@ -252,10 +252,10 @@ pub const DataPath = struct {
         key: u8,
         packet_id: u32,
     ) ProcessingError![]u8 {
-        const capacity = c.openvpn_dp_mode_assemble_and_encrypt_capacity(self.mode, packet.len);
+        const capacity = openvpn_c.openvpn_dp_mode_assemble_and_encrypt_capacity(self.mode, packet.len);
         ensureCapacity(self.enc_buffer, capacity);
         var dp_error = helpers_mod.c_data_path_error_empty;
-        const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_assemble_and_encrypt(
+        const data: *portable_c.pp_zd = @ptrCast(openvpn_c.openvpn_dp_mode_assemble_and_encrypt(
             self.mode,
             key,
             packet_id,
@@ -264,7 +264,7 @@ pub const DataPath = struct {
             packet.len,
             &dp_error,
         ) orelse return loggingDataPathErrorFromNative(dp_error));
-        defer c_common.pp_zd_free(data);
+        defer portable_c.pp_zd_free(data);
         return allocator.dupe(u8, data.*.bytes[0..data.*.length]);
     }
 
@@ -278,7 +278,7 @@ pub const DataPath = struct {
         var ignored_header: u8 = 0;
         var keep_alive = false;
         var dp_error = helpers_mod.c_data_path_error_empty;
-        const data: *c_common.pp_zd = @ptrCast(c.openvpn_dp_mode_decrypt_and_parse(
+        const data: *portable_c.pp_zd = @ptrCast(openvpn_c.openvpn_dp_mode_decrypt_and_parse(
             self.mode,
             @ptrCast(self.dec_buffer),
             &packet_id,
@@ -288,7 +288,7 @@ pub const DataPath = struct {
             packet.len,
             &dp_error,
         ) orelse return loggingDataPathErrorFromNative(dp_error));
-        defer c_common.pp_zd_free(data);
+        defer portable_c.pp_zd_free(data);
         return .{
             .packet_id = packet_id,
             .is_keep_alive = keep_alive,
@@ -296,18 +296,18 @@ pub const DataPath = struct {
         };
     }
 
-    fn ensureCapacity(buffer: *c_common.pp_zd, count: usize) void {
+    fn ensureCapacity(buffer: *portable_c.pp_zd, count: usize) void {
         if (buffer.*.length >= count) return;
         const new_count = std.mem.alignForward(usize, count, resize_step);
-        c_common.pp_zd_resize(buffer, new_count);
+        portable_c.pp_zd_resize(buffer, new_count);
     }
 
-    fn nativeFraming(value: api.OpenVPNCompressionFraming) c.openvpn_compression_framing {
+    fn nativeFraming(value: api.OpenVPNCompressionFraming) openvpn_c.openvpn_compression_framing {
         return switch (value) {
-            .disabled => c.OpenVPNCompressionFramingDisabled,
-            .compLZO => c.OpenVPNCompressionFramingCompLZO,
-            .compress => c.OpenVPNCompressionFramingCompress,
-            .compressV2 => c.OpenVPNCompressionFramingCompressV2,
+            .disabled => openvpn_c.OpenVPNCompressionFramingDisabled,
+            .compLZO => openvpn_c.OpenVPNCompressionFramingCompLZO,
+            .compress => openvpn_c.OpenVPNCompressionFramingCompress,
+            .compressV2 => openvpn_c.OpenVPNCompressionFramingCompressV2,
         };
     }
 };
@@ -560,22 +560,22 @@ pub const testing = struct {
     ) !*DataPath {
         const native_framing = DataPath.nativeFraming(framing);
         const mode = if (authenticated)
-            c.openvpn_dp_mode_hmac_create_mock(native_framing)
+            openvpn_c.openvpn_dp_mode_hmac_create_mock(native_framing)
         else
-            c.openvpn_dp_mode_ad_create_mock(native_framing);
+            openvpn_c.openvpn_dp_mode_ad_create_mock(native_framing);
         return DataPath.createWithMode(allocator, mode, peer_id);
     }
 };
 
-fn loggingDataPathErrorFromNative(native: c.openvpn_dp_error) DataPath.ProcessingError {
+fn loggingDataPathErrorFromNative(native: openvpn_c.openvpn_dp_error) DataPath.ProcessingError {
     return switch (native.dp_code) {
-        c.OpenVPNDataPathErrorPeerIdMismatch => error.PeerIdMismatch,
-        c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
-        c.OpenVPNDataPathErrorCrypto => {
+        openvpn_c.OpenVPNDataPathErrorPeerIdMismatch => error.PeerIdMismatch,
+        openvpn_c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
+        openvpn_c.OpenVPNDataPathErrorCrypto => {
             log.writef(.fault, "Unable to process packet (crypto): {d}", .{native.crypto_code});
-            return c_exports_mod.errorForCryptoErrorCode(native.crypto_code);
+            return ffi.errorForCryptoErrorCode(native.crypto_code);
         },
-        c.OpenVPNDataPathErrorNone => error.DataPathFailure,
+        openvpn_c.OpenVPNDataPathErrorNone => error.DataPathFailure,
         else => {
             log.writef(.fault, "Unable to process packet (data path): {d}", .{native.dp_code});
             return error.DataPathFailure;

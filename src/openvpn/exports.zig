@@ -57,7 +57,6 @@
 const std = @import("std");
 const build_options = @import("build_options");
 
-const c_mod = @import("../c/exports.zig");
 const connection = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");

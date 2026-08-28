@@ -21,7 +21,7 @@ const tls_mod = @import("tls.zig");
 
 const session_mod = @This();
 const api = core.api;
-const c = helpers_mod.c;
+const openvpn_c = helpers_mod.openvpn_c;
 const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
@@ -697,7 +697,7 @@ const SessionOnQueue = struct {
                 });
                 continue;
             };
-            if (code == .dataV2 and packet.len <= c.OpenVPNPacketPeerIdLength) {
+            if (code == .dataV2 and packet.len <= openvpn_c.OpenVPNPacketPeerIdLength) {
                 log.write(.err, "Dropped malformed packet (missing peerId)");
                 continue;
             }

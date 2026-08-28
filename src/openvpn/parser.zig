@@ -4,12 +4,12 @@
 
 const std = @import("std");
 
-const c_mod = @import("../c/exports.zig");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const keys_mod = @import("internal/keys.zig");
 
 const api = core.api;
-const c_common = c_mod.common;
+const portable_c = ffi.portable;
 const CryptoBackend = api.CryptoBackend;
 const StaticKey = keys_mod.StaticKey;
 const util = core.util;
@@ -20,7 +20,7 @@ pub fn importModule(
     contents: []const u8,
     context: ?core.ImportContext,
 ) core.ImportError!api.TaggedModule {
-    const parser = if (c_mod.has_default_crypto_backend)
+    const parser = if (ffi.has_default_crypto_backend)
         Parser.init(null)
     else
         Parser{};
@@ -200,8 +200,8 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
                 return error.DecryptionFailed;
             const decrypted = std.mem.span(@as([*:0]u8, @ptrCast(c_decrypted)));
             defer {
-                c_common.pp_zero(c_decrypted, decrypted.len);
-                c_common.pp_free(c_decrypted);
+                portable_c.pp_zero(c_decrypted, decrypted.len);
+                portable_c.pp_free(c_decrypted);
             }
             return try allocator.dupe(u8, decrypted);
         }
