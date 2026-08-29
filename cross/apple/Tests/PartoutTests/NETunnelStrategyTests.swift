@@ -30,6 +30,84 @@ struct NETunnelStrategyContractTests {
     }
 
     @Test
+    func saveEnablesOnDemandForRunningManager() async throws {
+        for status in [NEVPNStatus.connecting, .connected, .reasserting] {
+            let profile = try makeOnDemandProfile(isActive: true)
+            let store = MockTunnelPreferences(
+                managers: [makeManager(
+                    profileId: profile.id,
+                    fingerprint: profile.name,
+                    status: status
+                )]
+            )
+            let strategy = try await makePreparedStrategy(profile: profile, store: store)
+
+            try await strategy.save(profile, forConnecting: false, options: nil)
+
+            let manager = try #require(await store.savedManagers.last)
+            #expect(manager.isOnDemandEnabled, "status: \(status.rawValue)")
+        }
+    }
+
+    @Test
+    func saveDoesNotEnableOnDemandForNonRunningManager() async throws {
+        for status in [NEVPNStatus.invalid, .disconnected, .disconnecting] {
+            let profile = try makeOnDemandProfile(isActive: true)
+            let store = MockTunnelPreferences(
+                managers: [makeManager(
+                    profileId: profile.id,
+                    fingerprint: profile.name,
+                    status: status
+                )]
+            )
+            let strategy = try await makePreparedStrategy(profile: profile, store: store)
+
+            try await strategy.save(profile, forConnecting: false, options: nil)
+
+            let manager = try #require(await store.savedManagers.last)
+            #expect(!manager.isOnDemandEnabled, "status: \(status.rawValue)")
+        }
+    }
+
+    @Test
+    func savePreservesOnDemandForDisconnectedManager() async throws {
+        let profile = try makeOnDemandProfile(isActive: true)
+        let store = MockTunnelPreferences(
+            managers: [makeManager(
+                profileId: profile.id,
+                fingerprint: profile.name,
+                status: .disconnected,
+                isOnDemandEnabled: true
+            )]
+        )
+        let strategy = try await makePreparedStrategy(profile: profile, store: store)
+
+        try await strategy.save(profile, forConnecting: false, options: nil)
+
+        let manager = try #require(await store.savedManagers.last)
+        #expect(manager.isOnDemandEnabled)
+    }
+
+    @Test
+    func saveDisablesOnDemandForRunningManager() async throws {
+        let profile = try makeOnDemandProfile(isActive: false)
+        let store = MockTunnelPreferences(
+            managers: [makeManager(
+                profileId: profile.id,
+                fingerprint: profile.name,
+                status: .connected,
+                isOnDemandEnabled: true
+            )]
+        )
+        let strategy = try await makePreparedStrategy(profile: profile, store: store)
+
+        try await strategy.save(profile, forConnecting: false, options: nil)
+
+        let manager = try #require(await store.savedManagers.last)
+        #expect(!manager.isOnDemandEnabled)
+    }
+
+    @Test
     func unknownProfileOperationsAreNoOps() async throws {
         let store = MockTunnelPreferences()
         let strategy = makeStrategy(preferences: store.preferences)
@@ -233,6 +311,14 @@ private func makePreparedStrategy(
     return strategy
 }
 
+private func makeOnDemandProfile(isActive: Bool) throws -> Profile {
+    let onDemand = OnDemandModule.Builder().build()
+    return try Profile.Builder(
+        modules: [onDemand],
+        activeModulesIds: isActive ? [onDemand.id] : []
+    ).build()
+}
+
 // MARK: - Preferences mock
 
 private enum PreferenceFailure: Error {
@@ -404,15 +490,47 @@ private actor PreferenceGate {
 private let profileIdKey = "CustomProviderKey.profileId"
 private let fingerprintKey = "CustomProviderKey.fingerprint"
 
-private func makeManager(profileId: Profile.ID, fingerprint: String?) -> NETunnelProviderManager {
+private func makeManager(
+    profileId: Profile.ID,
+    fingerprint: String?,
+    status: NEVPNStatus? = nil,
+    isOnDemandEnabled: Bool = false
+) -> NETunnelProviderManager {
     let proto = NETunnelProviderProtocol()
     proto.providerBundleIdentifier = bundleIdentifier
     var providerConfiguration: [String: Any] = [profileIdKey: profileId.uuidString]
     providerConfiguration[fingerprintKey] = fingerprint
     proto.providerConfiguration = providerConfiguration
-    let manager = NETunnelProviderManager()
+    let manager = status.map(TestTunnelProviderManager.init) ?? NETunnelProviderManager()
     manager.protocolConfiguration = proto
+    manager.isOnDemandEnabled = isOnDemandEnabled
     return manager
+}
+
+private final class TestTunnelProviderManager: NETunnelProviderManager {
+    private let testConnection: NEVPNConnection
+
+    init(status: NEVPNStatus) {
+        testConnection = TestVPNConnection(status: status)
+        super.init()
+    }
+
+    override var connection: NEVPNConnection {
+        testConnection
+    }
+}
+
+private final class TestVPNConnection: NEVPNConnection {
+    private let testStatus: NEVPNStatus
+
+    init(status: NEVPNStatus) {
+        testStatus = status
+        super.init()
+    }
+
+    override var status: NEVPNStatus {
+        testStatus
+    }
 }
 
 private extension NETunnelProviderManager {
