@@ -70,6 +70,25 @@ struct NETunnelStrategyContractTests {
     }
 
     @Test
+    func savePreservesOnDemandForDisconnectedManager() async throws {
+        let profile = try makeOnDemandProfile(isActive: true)
+        let store = MockTunnelPreferences(
+            managers: [makeManager(
+                profileId: profile.id,
+                fingerprint: profile.name,
+                status: .disconnected,
+                isOnDemandEnabled: true
+            )]
+        )
+        let strategy = try await makePreparedStrategy(profile: profile, store: store)
+
+        try await strategy.save(profile, forConnecting: false, options: nil)
+
+        let manager = try #require(await store.savedManagers.last)
+        #expect(manager.isOnDemandEnabled)
+    }
+
+    @Test
     func saveDisablesOnDemandForRunningManager() async throws {
         let profile = try makeOnDemandProfile(isActive: false)
         let store = MockTunnelPreferences(
