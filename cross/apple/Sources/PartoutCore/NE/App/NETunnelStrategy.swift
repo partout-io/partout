@@ -215,9 +215,13 @@ private extension NETunnelStrategy {
                 shouldEnableOnDemand = false
             }
 
-            // Do not alter these two flags unless connecting explicitly
+            // Do not enable an inactive manager unless connecting explicitly.
+            // A running manager can adopt on-demand changes without reconnecting.
+            let tunnelStatus = $0.connection.status.asTunnelStatus
+            let isRunning = [.active, .activating].contains(tunnelStatus)
+            let canEnableOnDemand = forConnecting || isRunning || $0.isOnDemandEnabled
             $0.isEnabled = forConnecting || $0.isEnabled
-            $0.isOnDemandEnabled = (forConnecting || $0.isOnDemandEnabled) && shouldEnableOnDemand
+            $0.isOnDemandEnabled = canEnableOnDemand && shouldEnableOnDemand
         }
 
         // Track the new/updated manager
