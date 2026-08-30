@@ -655,7 +655,11 @@ pub const Daemon = struct {
     fn handleConnectionStatus(self: *Daemon, status: api.ConnectionStatus) void {
         self.snapshot_publisher.setConnectionStatus(status);
         switch (status) {
-            .connected => self.controller.setReasserting(false),
+            .connected => {
+                self.emitRemove(.last_error_code);
+                self.snapshot_publisher.setLastError(null);
+                self.controller.setReasserting(false);
+            },
             .connecting => {
                 self.emitRemove(.last_error_code);
                 self.snapshot_publisher.setLastError(null);

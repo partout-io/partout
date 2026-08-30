@@ -242,11 +242,11 @@ test "connection daemon starts connection and publishes lifecycle status" {
         .connecting,
         .connected,
     }, sut.testStatuses());
-    try std.testing.expectEqual(@as(usize, 5), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 6), events.remove_count);
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expect(!events.has_data_count);
     try std.testing.expectEqual(api.DataCount{}, events.data_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.authentication, events.last_error_code.?);
+    try std.testing.expect(events.last_error_code == null);
     try std.testing.expectEqual(@as(usize, 1), monitor.start_count);
 
     sut.stop();
@@ -258,11 +258,60 @@ test "connection daemon starts connection and publishes lifecycle status" {
         .disconnected,
     }, sut.testStatuses());
     try std.testing.expectEqual(@as(usize, 1), monitor.stop_count);
-    try std.testing.expectEqual(@as(usize, 9), events.remove_count);
+    try std.testing.expectEqual(@as(usize, 10), events.remove_count);
     try std.testing.expect(events.connection_status == null);
     try std.testing.expect(!events.has_data_count);
     try std.testing.expectEqual(api.DataCount{}, events.data_count);
     try std.testing.expect(events.last_error_code == null);
+}
+
+test "connection daemon clears last error when connected recovery repeats the status" {
+    const allocator = std.testing.allocator;
+    const mock = mock_mod;
+
+    var implementations = [_]net.ConnectionImplementation{mock.mockConnectionImplementation()};
+    var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var events = mock.DaemonEventRecorder{};
+    var monitor = mock.MockNetworkMonitor{};
+    var sut = try newDaemon(
+        allocator,
+        mock.connectionProfileJson(),
+        &registry,
+        &controller,
+        &events,
+        &monitor,
+        .{},
+    );
+    defer sut.destroy();
+
+    try sut.start();
+    defer sut.stop();
+
+    // A transient restart failure leaves the public status connected.
+    try sut.actor.perform(.{ .onConnectionLastError = .socketConfiguration });
+    try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
+    const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
+    try std.testing.expectEqualStrings("socketConfiguration", failed_snapshot.environment.?.last_error_code.?);
+    const snapshot_count = controller.report_snapshot_count;
+
+    // Recovery emits connected again, without an intervening connecting event.
+    try sut.actor.perform(.{ .onConnectionStatus = .connected });
+    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
+        .disconnected,
+        .connecting,
+        .connected,
+        .connected,
+    }, events.statusHistory());
+    try std.testing.expect(events.last_error_code == null);
+    try std.testing.expectEqual(snapshot_count + 1, controller.report_snapshot_count);
+    const recovered_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
+    try std.testing.expectEqual(api.TunnelStatus.active, recovered_snapshot.status);
+    try std.testing.expectEqual(api.ConnectionStatus.connected, recovered_snapshot.environment.?.connection_status);
+    try std.testing.expect(recovered_snapshot.environment.?.last_error_code == null);
+    try std.testing.expect(!controller.reasserting);
 }
 
 test "connection daemon hold preserves published environment" {
@@ -287,6 +336,7 @@ test "connection daemon hold preserves published environment" {
     defer sut.destroy();
 
     try sut.start();
+    try sut.actor.perform(.{ .onConnectionLastError = .authentication });
     const remove_count_before_hold = events.remove_count;
 
     sut.hold();
