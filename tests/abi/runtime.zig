@@ -229,7 +229,7 @@ test "starts and stops connection profile through injected dependencies" {
         .connected,
     }, daemon.testStatuses());
     try std.testing.expectEqual(.connected, runtime.events.connection_status.?);
-    try std.testing.expectEqual(.authentication, runtime.events.last_error_code.?);
+    try std.testing.expect(runtime.events.last_error_code == null);
     try std.testing.expect(!runtime.events.has_data_count);
     try std.testing.expectEqual(api.DataCount{}, runtime.events.data_count);
     try std.testing.expect(!runtime.controller.reasserting);
