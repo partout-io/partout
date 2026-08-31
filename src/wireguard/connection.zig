@@ -585,14 +585,16 @@ pub const testing = struct {
 
 fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
     return switch (err) {
-        error.CannotLocateTunnelFileDescriptor,
-        error.CouldNotStartBackend,
         error.InvalidEndpoint,
         => .linkNotActive,
         error.DNSResolutionFailure,
         => .dnsFailure,
-        error.SocketConfiguration => .socketConfiguration,
-        error.TunNotAvailable => .tunNotAvailable,
+        error.SocketConfiguration,
+        => .socketConfiguration,
+        error.CannotLocateTunnelFileDescriptor,
+        error.CouldNotStartBackend,
+        error.TunNotAvailable,
+        => .tunNotAvailable,
         else => .unhandled,
     };
 }
