@@ -592,7 +592,7 @@ pub const Daemon = struct {
         log.write(.notice, "Start connection");
         const did_start = conn.start(self.events()) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
-            _ = handleStartError(self, err);
+            _ = self.handleStartError(err);
             return;
         };
         if (!did_start) {
@@ -877,7 +877,7 @@ pub const Daemon = struct {
         self.deinitConnectionRuntime();
         self.initConnectionRuntime() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
-            const code = handleStartError(self, err);
+            const code = self.handleStartError(err);
             self.requestCancellation(code, true);
             return;
         };
