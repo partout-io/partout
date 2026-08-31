@@ -592,9 +592,10 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         error.SocketConfiguration,
         => .socketConfiguration,
         error.CannotLocateTunnelFileDescriptor,
-        error.CouldNotStartBackend,
+        => .fdUnavailable,
         error.TunNotAvailable,
         => .tunNotAvailable,
+        // error.CouldNotStartBackend,
         else => .unhandled,
     };
 }
