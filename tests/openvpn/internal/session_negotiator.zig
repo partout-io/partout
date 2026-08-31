@@ -47,7 +47,7 @@ test "new negotiations reuse session tokens without applying OTP formatting" {
             .otp = "123456",
         });
         defer credentials.deinit(allocator);
-        var token = AuthToken{ .allocator = allocator };
+        var token = AuthToken.init(allocator);
         defer token.deinit();
         const options = session_negotiator.NegotiatorOptions{
             .configuration = &.{},
