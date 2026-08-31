@@ -20,6 +20,8 @@ pub const CreateError = std.mem.Allocator.Error || error{
 };
 
 pub const StartError = std.mem.Allocator.Error || error{
+    DNSResolutionFailure,
+    Timeout,
     UnableToStart,
 };
 

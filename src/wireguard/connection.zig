@@ -177,6 +177,7 @@ const WireGuardConnection = struct {
             events.last_error(events.ctx, partoutCodeForError(err));
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
+                error.DNSResolutionFailure => error.DNSResolutionFailure,
                 else => error.UnableToStart,
             };
         };
@@ -584,13 +585,17 @@ pub const testing = struct {
 
 fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
     return switch (err) {
-        error.CannotLocateTunnelFileDescriptor,
-        error.CouldNotStartBackend,
-        error.DNSResolutionFailure,
         error.InvalidEndpoint,
         => .linkNotActive,
-        error.SocketConfiguration => .socketConfiguration,
-        error.TunNotAvailable => .tunNotAvailable,
+        error.DNSResolutionFailure,
+        => .dnsFailure,
+        error.SocketConfiguration,
+        => .socketConfiguration,
+        error.CannotLocateTunnelFileDescriptor,
+        => .fdUnavailable,
+        error.TunNotAvailable,
+        => .tunNotAvailable,
+        // error.CouldNotStartBackend,
         else => .unhandled,
     };
 }

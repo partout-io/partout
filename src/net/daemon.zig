@@ -435,13 +435,17 @@ pub const Daemon = struct {
         // Establish settings-only tunnel if no connection
         if (self.isSettingsOnly()) {
             var maybe_info = buildSettingsOnlyTunnelInfo(self.allocator, &self.profile) catch |err| {
-                self.handleStartError(err);
+                log.writef(.fault, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
+                const code = self.handleStartError(err);
+                self.requestCancellation(code, false);
                 return;
             };
             if (maybe_info) |*info| {
                 defer info.deinit(self.allocator);
                 _ = self.controller.setTunnelSettings(info.*) catch |err| {
-                    self.handleStartError(err);
+                    log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
+                    const code = self.handleStartError(err);
+                    self.requestCancellation(code, false);
                     return;
                 };
             }
@@ -487,12 +491,11 @@ pub const Daemon = struct {
         }
     }
 
-    fn handleStartError(self: *Daemon, err: StartError) void {
-        log.writef(.fault, "Unable to start daemon: {s}", .{@errorName(err)});
+    fn handleStartError(self: *Daemon, err: StartError) api.PartoutErrorCode {
         const code = partoutCodeForDaemonStartError(err);
         self.handleLastError(code);
         self.controller.setReasserting(false);
-        self.requestCancellation(code, false);
+        return code;
     }
 
     fn doHold(self: *Daemon) void {
@@ -589,9 +592,7 @@ pub const Daemon = struct {
         log.write(.notice, "Start connection");
         const did_start = conn.start(self.events()) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
-            const code = partoutCodeForDaemonStartError(err);
-            self.handleLastError(code);
-            self.controller.setReasserting(false);
+            _ = self.handleStartError(err);
             return;
         };
         if (!did_start) {
@@ -876,9 +877,7 @@ pub const Daemon = struct {
         self.deinitConnectionRuntime();
         self.initConnectionRuntime() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
-            const code = partoutCodeForDaemonStartError(err);
-            self.handleLastError(code);
-            self.controller.setReasserting(false);
+            const code = self.handleStartError(err);
             self.requestCancellation(code, true);
             return;
         };
@@ -965,6 +964,10 @@ fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
         error.InvalidProfile,
         error.UnsupportedModel,
         => .decoding,
+        error.DNSResolutionFailure,
+        => .dnsFailure,
+        error.Timeout,
+        => .timeout,
         error.IncompleteModule => .incompleteModule,
         error.MissingConnectionImplementation => .requiredImplementation,
         error.OutOfMemory => .outOfMemory,

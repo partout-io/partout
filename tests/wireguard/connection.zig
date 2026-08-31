@@ -210,7 +210,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
         .connecting,
         .disconnected,
     }, recorder.statuses[0..recorder.status_count]);
-    try std.testing.expectEqual(api.PartoutErrorCode.linkNotActive, recorder.last_error.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
@@ -581,7 +581,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
     try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.linkNotActive, recorder.last_error.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .connecting,
         .connected,
