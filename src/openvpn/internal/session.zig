@@ -6,7 +6,7 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
-const AuthToken = @import("auth.zig").AuthToken;
+const auth_mod = @import("auth.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
@@ -26,6 +26,7 @@ const openvpn_c = helpers_mod.openvpn_c;
 const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
+const AuthToken = auth_mod.AuthToken;
 const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
@@ -862,8 +863,6 @@ const SessionOnQueue = struct {
         owns_data_channel = false;
         context.setPushReply(reply);
         owns_reply = false;
-        if (self.session.auth_token) |token|
-            try token.update(context.push_reply.?.options.auth_token);
         context.removeOldNegotiators();
         const negotiator_keys = context.negotiatorKeys();
         log.writef(.info, "Negotiators: {any}", .{negotiator_keys.slice()});

@@ -29,51 +29,33 @@ const library_version = std.fmt.comptimePrint("{s} {s}", .{ version.identifier, 
 /// In-memory authentication state shared by a connection's session attempts.
 /// Access crosses the connection executor and the session looper.
 pub const AuthToken = struct {
-    allocator: std.mem.Allocator,
-    mutex: core_mod.Mutex,
-    value: ?[]u8,
-
-    pub fn init(allocator: std.mem.Allocator) AuthToken {
-        return .{
-            .allocator = allocator,
-            .mutex = .{},
-            .value = null,
-        };
-    }
+    mutex: core_mod.Mutex = .{},
+    value: ?ZeroingData = null,
 
     pub fn deinit(self: *AuthToken) void {
         self.clear();
         self.mutex.deinit();
     }
 
-    pub fn copy(self: *AuthToken, allocator: std.mem.Allocator) !?[]u8 {
+    pub fn copy(self: *AuthToken) ?ZeroingData {
         self.mutex.lock();
         defer self.mutex.unlock();
-        return if (self.value) |value| try allocator.dupe(u8, value) else null;
+        return if (self.value) |value| value.clone() else null;
     }
 
-    /// Replies without a token do not revoke a previously issued token.
-    pub fn update(self: *AuthToken, token: ?[]const u8) !void {
-        const value = token orelse return;
+    pub fn update(self: *AuthToken, value: []const u8) void {
         if (value.len == 0) return;
-        const owned = try self.allocator.dupe(u8, value);
+        const owned = ZeroingData.initCopy(value);
         self.mutex.lock();
         defer self.mutex.unlock();
-        self.clearLocked();
+        if (self.value) |*old| old.deinit();
         self.value = owned;
     }
 
     pub fn clear(self: *AuthToken) void {
         self.mutex.lock();
         defer self.mutex.unlock();
-        self.clearLocked();
-    }
-
-    fn clearLocked(self: *AuthToken) void {
-        if (self.value) |value| {
-            std.crypto.secureZero(u8, value);
-            self.allocator.free(value);
-        }
+        if (self.value) |*value| value.deinit();
         self.value = null;
     }
 };
