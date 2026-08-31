@@ -64,6 +64,7 @@ pub const NegotiatorState = enum(u8) {
 pub const NegotiatorOptions = struct {
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
+    auth_token: ?*auth_mod.AuthToken = null,
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
@@ -73,6 +74,25 @@ pub const NegotiatorOptions = struct {
         ?*anyopaque,
         u64,
     ) net_mod.Looper.ScheduleTimerError!void,
+
+    pub fn newAuthenticator(
+        self: NegotiatorOptions,
+        allocator: std.mem.Allocator,
+        prng: PRNG,
+        history: ?*const PushReply,
+    ) !Authenticator {
+        const username = if (self.credentials) |value| value.username else null;
+        const configured_password = if (self.credentials) |value| value.password else null;
+        var token = if (self.auth_token) |value| value.copy() else null;
+        defer if (token) |*value| value.deinit();
+        const password = if (token) |value| value.asSlice() else if (history) |value|
+            value.options.auth_token orelse configured_password
+        else
+            configured_password;
+        var authenticator = try Authenticator.init(allocator, prng, username, password);
+        authenticator.with_local_options = self.with_local_options;
+        return authenticator;
+    }
 };
 
 /// V3 control-channel state machine. All mutable methods run on `looper`.
@@ -459,22 +479,14 @@ pub const Negotiator = struct {
     }
 
     fn onTLSConnect(self: *Negotiator) !void {
-        const credentials = self.options.credentials;
-        const username = if (credentials) |value| value.username else null;
-        const configured_password = if (credentials) |value| value.password else null;
-        const password = if (self.history) |*history|
-            history.options.auth_token orelse configured_password
-        else
-            configured_password;
         if (self.authenticator) |*old| old.deinit();
-        self.authenticator = try Authenticator.init(
+        self.authenticator = null;
+        self.authenticator = try self.options.newAuthenticator(
             self.allocator,
             self.prng,
-            username,
-            password,
+            if (self.history) |*history| history else null,
         );
         const authenticator = &self.authenticator.?;
-        authenticator.with_local_options = self.options.with_local_options;
         const tls = self.tls orelse
             @panic("Cannot authenticate without an owned TLS session");
         try authenticator.putAuth(tls, self.options.configuration);
@@ -485,20 +497,21 @@ pub const Negotiator = struct {
         const authenticator = if (self.authenticator) |*value| value else return null;
         log.write(.info, "Pulled plain control data");
         authenticator.appendControlData(data);
+        var renegotiation_history: ?*const PushReply = null;
         if (self.state == .auth) {
             if (!try authenticator.parseAuthReply()) return null;
             if (self.isRenegotiating()) {
                 self.setState(.connected);
-                const history = if (self.history) |*value| value else {
+                renegotiation_history = if (self.history) |*value| value else {
                     @panic("Renegotiation completed without history from the original connection");
                 };
-                return try self.completeConnection(history);
+            } else {
+                self.setState(.push);
+                self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
+                    core_mod.concurrency.monotonicNs(),
+                    self.options.session_options.retransmission_interval_ms,
+                );
             }
-            self.setState(.push);
-            self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
-                core_mod.concurrency.monotonicNs(),
-                self.options.session_options.retransmission_interval_ms,
-            );
         }
 
         const messages = try authenticator.parseMessages(self.allocator);
@@ -507,6 +520,7 @@ pub const Negotiator = struct {
             log.write(.info, "Parsed control message");
             if (try self.handleControlMessage(message)) |result| return result;
         }
+        if (renegotiation_history) |history| return try self.completeConnection(history);
         return null;
     }
 
@@ -525,7 +539,9 @@ pub const Negotiator = struct {
             log.write(.info, "Disconnect due to server shutdown");
             return error.ServerShutdown;
         }
-        if (self.state != .push) return null;
+        if (self.state != .push and self.state != .connected) return null;
+        if (self.state == .connected and !std.mem.startsWith(u8, message, PushReply.prefix))
+            return null;
 
         const complete_message = if (self.continued_push_reply_message) |previous|
             try std.mem.concat(self.allocator, u8, &.{ previous, ",", message })
@@ -560,6 +576,13 @@ pub const Negotiator = struct {
         self.continued_push_reply_message = null;
 
         log.writef(.info, "Received PUSH_REPLY: \"{s}\"", .{reply});
+        if (reply.options.auth_token) |value| {
+            if (self.options.auth_token) |auth_token| {
+                auth_token.update(value);
+                log.write(.info, "Updated authentication token");
+            }
+        }
+        if (self.state == .connected) return null;
 
         if (reply.options.compression_framing) |framing| {
             const algorithm = reply.options.compression_algorithm orelse .disabled;

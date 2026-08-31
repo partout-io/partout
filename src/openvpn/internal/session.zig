@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
+const auth_mod = @import("auth.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
@@ -25,6 +26,7 @@ const openvpn_c = helpers_mod.openvpn_c;
 const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
+const AuthToken = auth_mod.AuthToken;
 const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
@@ -125,6 +127,7 @@ pub const Session = struct {
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
+    auth_token: ?*AuthToken,
     prng: PRNG,
     caches_directory: []u8,
     ca_filename: []u8,
@@ -139,6 +142,8 @@ pub const Session = struct {
         events: SessionEvents,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
+        /// Borrowed connection state; must outlive this session.
+        auth_token: ?*AuthToken = null,
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,
@@ -180,6 +185,7 @@ pub const Session = struct {
             .allocator = allocator,
             .configuration = owned_configuration,
             .credentials = owned_credentials,
+            .auth_token = init.auth_token,
             .prng = init.prng,
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
@@ -799,6 +805,7 @@ const SessionOnQueue = struct {
             .options = .{
                 .configuration = &self.session.configuration,
                 .credentials = if (self.session.credentials) |*value| value else null,
+                .auth_token = self.session.auth_token,
                 .with_local_options = context.with_local_options,
                 .session_options = self.session.options,
                 .callback_context = self.session,

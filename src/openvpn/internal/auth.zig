@@ -26,6 +26,40 @@ const TLSWrapper = tls_mod.TLSWrapper;
 const ZeroingData = crypto_mod.ZeroingData;
 const library_version = std.fmt.comptimePrint("{s} {s}", .{ version.identifier, version.number });
 
+/// In-memory authentication state shared by a connection's session attempts.
+/// Access crosses the connection executor and the session looper.
+pub const AuthToken = struct {
+    mutex: core_mod.Mutex = .{},
+    value: ?ZeroingData = null,
+
+    pub fn deinit(self: *AuthToken) void {
+        self.clear();
+        self.mutex.deinit();
+    }
+
+    pub fn copy(self: *AuthToken) ?ZeroingData {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        return if (self.value) |value| value.clone() else null;
+    }
+
+    pub fn update(self: *AuthToken, value: []const u8) void {
+        if (value.len == 0) return;
+        const owned = ZeroingData.initCopy(value);
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        if (self.value) |*old| old.deinit();
+        self.value = owned;
+    }
+
+    pub fn clear(self: *AuthToken) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        if (self.value) |*value| value.deinit();
+        self.value = null;
+    }
+};
+
 /// Key-method 2 client/server random material.
 pub const Handshake = struct {
     pre_master: ZeroingData,

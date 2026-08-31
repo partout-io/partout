@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
+const auth_mod = @import("internal/auth.zig");
 const configuration_mod = @import("internal/configuration.zig");
 const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
@@ -18,6 +19,7 @@ const settings_mod = @import("internal/settings.zig");
 const api = core.api;
 const log = core.logging;
 const openvpn_log = logging_mod;
+const AuthToken = auth_mod.AuthToken;
 const EndpointResolver = endpoint_resolver_mod.EndpointResolver;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
@@ -77,6 +79,7 @@ const OpenVPNConnection = struct {
     session_options: SessionOptions,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
+    auth_token: AuthToken,
     endpoints: []api.ExtendedEndpoint,
     endpoint_resolver: EndpointResolver,
     cache_dir: []u8,
@@ -158,6 +161,7 @@ const OpenVPNConnection = struct {
             .session_options = session_options,
             .configuration = configuration,
             .credentials = credentials,
+            .auth_token = .{},
             .endpoints = endpoints,
             .endpoint_resolver = EndpointResolver.init(endpoints),
             .cache_dir = cache_dir,
@@ -179,6 +183,7 @@ const OpenVPNConnection = struct {
     fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit _OpenVPNConnectionV3");
         self.destroyCurrentSession();
+        self.auth_token.deinit();
         self.clearLink();
         self.endpoint_resolver.deinit(self.allocator);
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
@@ -231,6 +236,7 @@ const OpenVPNConnection = struct {
             .events = session_events,
             .configuration = self.configuration,
             .credentials = self.credentials,
+            .auth_token = &self.auth_token,
             .prng = PRNG.system(),
             .caches_directory = self.cache_dir,
             .ca_filename = ca_filename,
@@ -264,8 +270,12 @@ const OpenVPNConnection = struct {
         timeout_ms: u32,
         events: net.Connection.Events,
     ) void {
-        const session = self.current_session orelse return;
+        const session = self.current_session orelse {
+            self.auth_token.clear();
+            return;
+        };
         if (self.status == .disconnected) {
+            self.auth_token.clear();
             log.write(.err, "Ignore stop, connection not started");
             return;
         }
@@ -464,6 +474,7 @@ const OpenVPNConnection = struct {
 
         switch (finalization) {
             .explicit_stop => {
+                self.auth_token.clear();
                 _ = self.sendStatus(.disconnected, events);
                 self.events = null;
             },
@@ -489,6 +500,7 @@ const OpenVPNConnection = struct {
     }
 
     fn prepareTerminalCancellation(self: *OpenVPNConnection) void {
+        self.auth_token.clear();
         self.status = .disconnected;
         self.events = null;
         self.clearServerConfiguration();
