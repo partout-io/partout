@@ -64,6 +64,7 @@ pub const NegotiatorState = enum(u8) {
 pub const NegotiatorOptions = struct {
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
+    auth_token: ?*auth_mod.AuthToken = null,
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
@@ -73,6 +74,28 @@ pub const NegotiatorOptions = struct {
         ?*anyopaque,
         u64,
     ) net_mod.Looper.ScheduleTimerError!void,
+
+    pub fn newAuthenticator(
+        self: NegotiatorOptions,
+        allocator: std.mem.Allocator,
+        prng: PRNG,
+        history: ?*const PushReply,
+    ) !Authenticator {
+        const username = if (self.credentials) |value| value.username else null;
+        const configured_password = if (self.credentials) |value| value.password else null;
+        const token = if (self.auth_token) |value| try value.copy(allocator) else null;
+        defer if (token) |value| {
+            std.crypto.secureZero(u8, value);
+            allocator.free(value);
+        };
+        const password = token orelse if (history) |value|
+            value.options.auth_token orelse configured_password
+        else
+            configured_password;
+        var authenticator = try Authenticator.init(allocator, prng, username, password);
+        authenticator.with_local_options = self.with_local_options;
+        return authenticator;
+    }
 };
 
 /// V3 control-channel state machine. All mutable methods run on `looper`.
@@ -459,22 +482,14 @@ pub const Negotiator = struct {
     }
 
     fn onTLSConnect(self: *Negotiator) !void {
-        const credentials = self.options.credentials;
-        const username = if (credentials) |value| value.username else null;
-        const configured_password = if (credentials) |value| value.password else null;
-        const password = if (self.history) |*history|
-            history.options.auth_token orelse configured_password
-        else
-            configured_password;
         if (self.authenticator) |*old| old.deinit();
-        self.authenticator = try Authenticator.init(
+        self.authenticator = null;
+        self.authenticator = try self.options.newAuthenticator(
             self.allocator,
             self.prng,
-            username,
-            password,
+            if (self.history) |*history| history else null,
         );
         const authenticator = &self.authenticator.?;
-        authenticator.with_local_options = self.options.with_local_options;
         const tls = self.tls orelse
             @panic("Cannot authenticate without an owned TLS session");
         try authenticator.putAuth(tls, self.options.configuration);

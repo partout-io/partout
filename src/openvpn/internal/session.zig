@@ -6,6 +6,7 @@ const std = @import("std");
 
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
+const AuthToken = @import("auth.zig").AuthToken;
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
 const control_mod = @import("control.zig");
@@ -125,6 +126,7 @@ pub const Session = struct {
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
+    auth_token: ?*AuthToken,
     prng: PRNG,
     caches_directory: []u8,
     ca_filename: []u8,
@@ -139,6 +141,8 @@ pub const Session = struct {
         events: SessionEvents,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
+        /// Borrowed connection state; must outlive this session.
+        auth_token: ?*AuthToken = null,
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,
@@ -180,6 +184,7 @@ pub const Session = struct {
             .allocator = allocator,
             .configuration = owned_configuration,
             .credentials = owned_credentials,
+            .auth_token = init.auth_token,
             .prng = init.prng,
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
@@ -799,6 +804,7 @@ const SessionOnQueue = struct {
             .options = .{
                 .configuration = &self.session.configuration,
                 .credentials = if (self.session.credentials) |*value| value else null,
+                .auth_token = self.session.auth_token,
                 .with_local_options = context.with_local_options,
                 .session_options = self.session.options,
                 .callback_context = self.session,
@@ -856,6 +862,8 @@ const SessionOnQueue = struct {
         owns_data_channel = false;
         context.setPushReply(reply);
         owns_reply = false;
+        if (self.session.auth_token) |token|
+            try token.update(context.push_reply.?.options.auth_token);
         context.removeOldNegotiators();
         const negotiator_keys = context.negotiatorKeys();
         log.writef(.info, "Negotiators: {any}", .{negotiator_keys.slice()});
