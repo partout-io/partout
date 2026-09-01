@@ -65,22 +65,23 @@ const WireGuardConnection = struct {
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
         // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
-        const base_configuration = switch (module.module.*) {
+        const wg_module = switch (module.module.*) {
             .WireGuard => |*wireguard| blk: {
-                const configuration = if (wireguard.configuration) |*value|
-                    value
-                else
-                    return error.IncompleteModule;
-                break :blk configuration;
+                break :blk wireguard;
             },
             else => return error.MissingConnectionImplementation,
         };
+
+        const base_configuration = if (wg_module.configuration) |*value|
+            value
+        else
+            return error.IncompleteModule;
+        const prefers_ipv6 = wg_module.prefers_ipv6 orelse false;
 
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);
 
         const module_id = module.id();
-        const prefers_ipv6 = false;
         var configuration = try configurationApplyingActiveModules(
             allocator,
             base_configuration,
