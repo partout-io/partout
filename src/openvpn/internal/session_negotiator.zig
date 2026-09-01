@@ -64,7 +64,7 @@ pub const NegotiatorState = enum(u8) {
 pub const NegotiatorOptions = struct {
     configuration: *const api.OpenVPNConfiguration,
     credentials: ?*const api.OpenVPNCredentials,
-    auth_token: ?*auth_mod.AuthToken = null,
+    auth_token: *auth_mod.AuthToken,
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
@@ -79,16 +79,13 @@ pub const NegotiatorOptions = struct {
         self: NegotiatorOptions,
         allocator: std.mem.Allocator,
         prng: PRNG,
-        history: ?*const PushReply,
     ) !Authenticator {
         const username = if (self.credentials) |value| value.username else null;
         const configured_password = if (self.credentials) |value| value.password else null;
-        var token = if (self.auth_token) |value| value.copy() else null;
-        defer if (token) |*value| value.deinit();
-        const password = if (token) |value| value.asSlice() else if (history) |value|
-            value.options.auth_token orelse configured_password
-        else
-            configured_password;
+        var cached_token = self.auth_token.copy();
+        defer if (cached_token) |*value| value.deinit();
+        const password = if (cached_token) |value| value.asSlice() else configured_password;
+
         var authenticator = try Authenticator.init(allocator, prng, username, password);
         authenticator.with_local_options = self.with_local_options;
         return authenticator;
@@ -481,11 +478,7 @@ pub const Negotiator = struct {
     fn onTLSConnect(self: *Negotiator) !void {
         if (self.authenticator) |*old| old.deinit();
         self.authenticator = null;
-        self.authenticator = try self.options.newAuthenticator(
-            self.allocator,
-            self.prng,
-            if (self.history) |*history| history else null,
-        );
+        self.authenticator = try self.options.newAuthenticator(self.allocator, self.prng);
         const authenticator = &self.authenticator.?;
         const tls = self.tls orelse
             @panic("Cannot authenticate without an owned TLS session");
@@ -577,10 +570,8 @@ pub const Negotiator = struct {
 
         log.writef(.info, "Received PUSH_REPLY: \"{s}\"", .{reply});
         if (reply.options.auth_token) |value| {
-            if (self.options.auth_token) |auth_token| {
-                auth_token.update(value);
-                log.write(.info, "Updated authentication token");
-            }
+            self.options.auth_token.update(value);
+            log.write(.info, "Updated authentication token");
         }
         if (self.state == .connected) return null;
 

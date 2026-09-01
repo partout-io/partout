@@ -127,7 +127,7 @@ pub const Session = struct {
     allocator: std.mem.Allocator,
     configuration: api.OpenVPNConfiguration,
     credentials: ?api.OpenVPNCredentials,
-    auth_token: ?*AuthToken,
+    auth_token: *AuthToken,
     prng: PRNG,
     caches_directory: []u8,
     ca_filename: []u8,
@@ -143,7 +143,7 @@ pub const Session = struct {
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
         /// Borrowed connection state; must outlive this session.
-        auth_token: ?*AuthToken = null,
+        auth_token: *AuthToken,
         prng: PRNG,
         caches_directory: []const u8,
         ca_filename: []const u8,

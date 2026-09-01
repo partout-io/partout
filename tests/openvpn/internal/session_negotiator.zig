@@ -65,12 +65,12 @@ test "cached session tokens replace OTP credentials" {
     const options = negotiatorOptions(&credentials, &token);
 
     token.update("session-token");
-    var reconnect = try options.newAuthenticator(allocator, .system(), null);
+    var reconnect = try options.newAuthenticator(allocator, .system());
     defer reconnect.deinit();
     try std.testing.expectEqualStrings("session-token", reconnect.password.?.asSlice());
 
     token.update("renewed-token");
-    var renewed = try options.newAuthenticator(allocator, .system(), null);
+    var renewed = try options.newAuthenticator(allocator, .system());
     defer renewed.deinit();
     try std.testing.expectEqualStrings("renewed-token", renewed.password.?.asSlice());
 }

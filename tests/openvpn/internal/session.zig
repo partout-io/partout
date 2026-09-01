@@ -7,6 +7,7 @@ const source = @import("source");
 
 const io = source.net_io;
 const net = source.net;
+const AuthToken = source.openvpn_internal.auth.AuthToken;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
 const SessionError = source.openvpn_internal.session.SessionError;
@@ -76,6 +77,8 @@ test "Session borrows an externally managed Looper" {
     var looper_started = true;
     defer if (looper_started) looper.stop() catch {};
 
+    var auth_token = AuthToken{};
+    defer auth_token.deinit();
     const session = try Session.create(allocator, .{
         .looper = &looper,
         .events = .{
@@ -85,6 +88,7 @@ test "Session borrows an externally managed Looper" {
         },
         .configuration = .{},
         .credentials = null,
+        .auth_token = &auth_token,
         .prng = PRNG.system(),
         .caches_directory = "",
         .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
@@ -136,6 +140,8 @@ test "Session reports protocol failures without owning shutdown policy" {
     var looper_started = true;
     defer if (looper_started) looper.stop() catch {};
 
+    var auth_token = AuthToken{};
+    defer auth_token.deinit();
     const session = try Session.create(allocator, .{
         .events = .{
             .context = &event_state,
@@ -146,6 +152,7 @@ test "Session reports protocol failures without owning shutdown policy" {
         .looper = &looper,
         .configuration = .{},
         .credentials = null,
+        .auth_token = &auth_token,
         .prng = PRNG.system(),
         .caches_directory = "",
         .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
@@ -189,6 +196,8 @@ test "Session releases a link processor once when attach fails" {
     var looper_started = true;
     defer if (looper_started) looper.stop() catch {};
 
+    var auth_token = AuthToken{};
+    defer auth_token.deinit();
     const session = try Session.create(allocator, .{
         .events = .{
             .established = Callbacks.established,
@@ -198,6 +207,7 @@ test "Session releases a link processor once when attach fails" {
         .looper = &looper,
         .configuration = .{},
         .credentials = null,
+        .auth_token = &auth_token,
         .prng = PRNG.system(),
         .caches_directory = "",
         .ca_filename = "11111111-1111-4111-8111-111111111111-ca.pem",
