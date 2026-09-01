@@ -80,7 +80,7 @@ const WireGuardConnection = struct {
         errdefer allocator.destroy(created);
 
         const module_id = module.id();
-        const prefers_ipv4 = false;
+        const prefers_ipv4 = true;
         var configuration = try configurationApplyingActiveModules(
             allocator,
             base_configuration,

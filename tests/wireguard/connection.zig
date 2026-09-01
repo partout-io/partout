@@ -348,9 +348,9 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     try std.testing.expectEqual(@as(usize, 1), resolver.resolve_count);
     try std.testing.expect(resolver.last_flags.contains(.allAddresses));
     try std.testing.expectEqual(@as(u32, 1234), resolver.last_timeout_ms);
-    try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_settings.?, "endpoint=[fd00::1]:51820\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_settings.?, "endpoint=198.51.100.10:51820\n") != null);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.set_config_count);
-    try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_set_config.?, "endpoint=[fd00::1]:51820\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_set_config.?, "endpoint=198.51.100.10:51820\n") != null);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 }
 
