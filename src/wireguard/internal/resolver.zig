@@ -32,7 +32,7 @@ pub const PeerEndpointResolver = struct {
     peers: []const api.WireGuardRemoteInterface,
     resolver: net.DNSResolver,
     factory: ?net.SocketFactory,
-    prefers_ipv4: bool,
+    prefers_ipv6: bool,
     timeout_ms: u32,
     cache: Cache,
 
@@ -101,14 +101,14 @@ pub const PeerEndpointResolver = struct {
         peers: []const api.WireGuardRemoteInterface,
         resolver: net.DNSResolver,
         factory: ?net.SocketFactory,
-        prefers_ipv4: bool,
+        prefers_ipv6: bool,
         timeout_ms: u32,
     ) PeerEndpointResolver {
         return .{
             .peers = peers,
             .resolver = resolver,
             .factory = factory,
-            .prefers_ipv4 = prefers_ipv4,
+            .prefers_ipv6 = prefers_ipv6,
             .timeout_ms = timeout_ms,
             .cache = Cache.init(),
         };
@@ -287,7 +287,7 @@ pub const PeerEndpointResolver = struct {
 
         const target_address = preferredAddress(
             records,
-            self.prefers_ipv4,
+            self.prefers_ipv6,
         ) orelse return error.DNSResolutionFailure;
         const target = api.Address.parseRaw(target_address) orelse return error.InvalidEndpoint;
         log.writef(.debug, "DNS64: mapped {s} to {s}", .{ address, target });
@@ -298,12 +298,11 @@ pub const PeerEndpointResolver = struct {
     }
 };
 
-fn preferredAddress(records: []const net.DNSRecord, prefers_ipv4: bool) ?[]const u8 {
+fn preferredAddress(records: []const net.DNSRecord, prefers_ipv6: bool) ?[]const u8 {
     const first = if (records.len > 0) records[0] else return null;
-    const preferred_is_ipv6 = !prefers_ipv4;
 
     for (records) |record| {
-        if (record.is_ipv6 == preferred_is_ipv6) return record.address;
+        if (record.is_ipv6 == prefers_ipv6) return record.address;
     }
     return first.address;
 }

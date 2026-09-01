@@ -373,7 +373,7 @@ test "WireGuard DNS resolution stably prioritizes the preferred address family" 
         allocator,
         &configuration,
         resolver.resolver(),
-        false,
+        true,
     );
     defer allocator.free(preferring_ipv6);
     try std.testing.expect(std.mem.indexOf(
@@ -386,7 +386,7 @@ test "WireGuard DNS resolution stably prioritizes the preferred address family" 
         allocator,
         &configuration,
         resolver.resolver(),
-        true,
+        false,
     );
     defer allocator.free(preferring_ipv4);
     try std.testing.expect(std.mem.indexOf(

@@ -80,7 +80,7 @@ const WireGuardConnection = struct {
         errdefer allocator.destroy(created);
 
         const module_id = module.id();
-        const prefers_ipv4 = true;
+        const prefers_ipv6 = false;
         var configuration = try configurationApplyingActiveModules(
             allocator,
             base_configuration,
@@ -108,7 +108,7 @@ const WireGuardConnection = struct {
             sandbox.factory,
             sandbox.profile,
             &created.configuration,
-            prefers_ipv4,
+            prefers_ipv6,
             sandbox.options.dns_timeout,
         );
         log.write(.notice, "Using v2 connection");
