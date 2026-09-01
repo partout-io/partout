@@ -30,7 +30,8 @@ extension CodingRegistry: ProfileCoder {
     public func profile(fromString string: String) throws -> Profile {
         let decoders: [DecoderPair] = [
             DecoderPair(version: 3, decoder: rawProfileV3),
-            DecoderPair(version: 2, decoder: rawProfileLegacyV2)
+            DecoderPair(version: 2, decoder: rawProfileLegacyV2),
+            DecoderPair(version: 1, decoder: rawProfileLegacyV1)
         ]
         var errors: [String] = []
         for pair in decoders {
@@ -91,6 +92,13 @@ extension CodingRegistry {
     }
 }
 
+// Base64-encoded profile containing Base64-encoded JSON modules (decoding only)
+extension CodingRegistry {
+    func rawProfileLegacyV1(fromString string: String) throws -> Profile {
+        try LegacyDecoderV1().decode(string)
+    }
+}
+
 private extension CodingRegistry {
     struct DecoderPair {
         let version: Int
@@ -147,4 +155,80 @@ extension CodingRegistry: ModuleRegistry {
     public func implementation(for moduleType: ModuleType) -> (any ModuleImplementation)? {
         registry.implementation(for: moduleType)
     }
+}
+
+// MARK: - Legacy V1
+
+private struct LegacyDecoderV1 {
+    func decode(_ base64Encoded: String) throws -> Profile {
+        guard let data = Data(base64Encoded: base64Encoded) else {
+            throw PartoutError(.decoding)
+        }
+        let encoded = try JSONDecoder.shared().decode(LegacyCodableProfileV1.self, from: data)
+        let userInfoMap = try encoded.userInfo.map {
+            try JSONSerialization.jsonObject(with: $0)
+        }
+        let userInfo = try userInfoMap.map {
+            try JSON($0)
+        }
+        let modules = encoded.modules.compactMap { wrapper in
+            do {
+                return try decodedModule(wrapper)
+            } catch {
+                pp_log_id(encoded.id, .core, .error, "Unable to decode module: \(error)")
+                return nil
+            }
+        }
+        return try Profile.Builder(
+            version: encoded.version,
+            id: encoded.id,
+            name: encoded.name,
+            modules: modules,
+            activeModulesIds: encoded.activeModulesIds,
+            behavior: encoded.behavior,
+            userInfo: userInfo
+        ).build()
+    }
+
+    private func decodedModule(_ wrapper: LegacyModuleWrapperV1) throws -> Module {
+        let decoder = JSONDecoder.shared()
+        switch wrapper.id {
+        case .DNS:
+            return try decoder.decode(DNSModule.self, from: wrapper.data)
+        case .HTTPProxy:
+            return try decoder.decode(HTTPProxyModule.self, from: wrapper.data)
+        case .IP:
+            return try decoder.decode(IPModule.self, from: wrapper.data)
+        case .OnDemand:
+            return try decoder.decode(OnDemandModule.self, from: wrapper.data)
+        case .OpenVPN:
+            return try decoder.decode(OpenVPNModule.self, from: wrapper.data)
+        case .WireGuard:
+            return try decoder.decode(WireGuardModule.self, from: wrapper.data)
+        case .Custom, .Provider, .Undefined:
+            throw PartoutError.unknownModuleHandler(moduleType: wrapper.id)
+        }
+    }
+}
+
+private struct LegacyModuleWrapperV1: Decodable {
+    let id: ModuleType
+
+    let data: Data
+}
+
+private struct LegacyCodableProfileV1: Decodable {
+    let version: Int?
+
+    let id: UniqueID
+
+    let name: String
+
+    let modules: [LegacyModuleWrapperV1]
+
+    let activeModulesIds: Set<UniqueID>
+
+    let behavior: ProfileBehavior?
+
+    let userInfo: Data?
 }
