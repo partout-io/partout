@@ -34,6 +34,7 @@ import kotlinx.serialization.Contextual
  *
  * @param id 
  * @param configuration 
+ * @param prefersIPv6 
  */
 @Serializable
 
@@ -43,7 +44,10 @@ data class WireGuardModule (
     val id: kotlin.String,
 
     @SerialName(value = "configuration")
-    val configuration: WireGuardConfiguration? = null
+    val configuration: WireGuardConfiguration? = null,
+
+    @SerialName(value = "prefersIPv6")
+    val prefersIPv6: kotlin.Boolean? = null
 
 ) {
 

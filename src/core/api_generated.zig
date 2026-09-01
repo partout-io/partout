@@ -3549,6 +3549,7 @@ pub const WireGuardErrorCode = enum {
 pub const WireGuardModule = struct {
     id: uuid.UUID = uuid.zero_id,
     configuration: ?WireGuardConfiguration = null,
+    prefers_ipv6: ?bool = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!WireGuardModule {
         return parseWithErrorInfo(allocator, text, null);
@@ -3572,6 +3573,7 @@ pub const WireGuardModule = struct {
         errdefer result.deinit(allocator);
         result.id = try parseJsonField(uuid.UUID, allocator, object, "id", error_info);
         result.configuration = try parseOptionalJsonField(WireGuardConfiguration, allocator, object, "configuration", error_info);
+        result.prefers_ipv6 = try parseOptionalJsonField(bool, allocator, object, "prefersIPv6", error_info);
         return result;
     }
 
@@ -3584,6 +3586,7 @@ pub const WireGuardModule = struct {
     pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
         deinitJson(uuid.UUID, allocator, &self.id);
         if (self.configuration) |*value| deinitJson(WireGuardConfiguration, allocator, value);
+        if (self.prefers_ipv6) |*value| deinitJson(bool, allocator, value);
     }
 
     pub fn jsonStringify(self: *const @This(), jw: anytype) JsonStringifyError!void {
@@ -3592,6 +3595,10 @@ pub const WireGuardModule = struct {
         try writeJson(jw, self.id);
         if (self.configuration) |*value| {
             try jw.objectField("configuration");
+            try writeJson(jw, value);
+        }
+        if (self.prefers_ipv6) |*value| {
+            try jw.objectField("prefersIPv6");
             try writeJson(jw, value);
         }
         try jw.endObject();

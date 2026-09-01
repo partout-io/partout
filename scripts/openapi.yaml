@@ -1436,6 +1436,8 @@ components:
           $ref: "#/components/schemas/UniqueID"
         configuration:
           $ref: "#/components/schemas/WireGuard.Configuration"
+        prefersIPv6:
+          type: boolean
       required:
         - id
       type: object
