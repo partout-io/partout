@@ -76,7 +76,7 @@ const WireGuardConnection = struct {
             value
         else
             return error.IncompleteModule;
-        const prefers_ipv6 = wg_module.prefers_ipv6 orelse false;
+        const prefers_ipv6 = base_configuration.interface.prefers_ipv6 orelse false;
 
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);

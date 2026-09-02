@@ -10,12 +10,10 @@ public struct WireGuardModule: Sendable, Codable, Hashable {
 
     public var id: UniqueID
     public var configuration: WireGuardConfiguration?
-    public var prefersIPv6: Bool?
 
-    public init(id: UniqueID, configuration: WireGuardConfiguration? = nil, prefersIPv6: Bool? = nil) {
+    public init(id: UniqueID, configuration: WireGuardConfiguration? = nil) {
         self.id = id
         self.configuration = configuration
-        self.prefersIPv6 = prefersIPv6
     }
 }
 

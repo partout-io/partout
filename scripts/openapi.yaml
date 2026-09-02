@@ -1333,6 +1333,9 @@ components:
         dns:
           $ref: "#/components/schemas/DNSModule"
           description: The optional DNS settings.
+        prefersIPv6:
+          type: boolean
+          description: Prefer resolved IPv6 addresses over IPv4.
         mtu:
           $ref: "#/components/schemas/UInt16"
           description: The optional MTU.
@@ -1436,8 +1439,6 @@ components:
           $ref: "#/components/schemas/UniqueID"
         configuration:
           $ref: "#/components/schemas/WireGuard.Configuration"
-        prefersIPv6:
-          type: boolean
       required:
         - id
       type: object

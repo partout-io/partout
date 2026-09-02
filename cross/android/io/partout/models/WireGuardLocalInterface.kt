@@ -36,6 +36,7 @@ import kotlinx.serialization.Contextual
  * @param addresses The local addresses.
  * @param listenPort The optional UDP port to listen on.
  * @param dns The optional DNS settings.
+ * @param prefersIPv6 Prefer resolved IPv6 addresses over IPv4.
  * @param mtu The optional MTU.
  */
 @Serializable
@@ -57,6 +58,10 @@ data class WireGuardLocalInterface (
     /* The optional DNS settings. */
     @SerialName(value = "dns")
     val dns: DNSModule? = null,
+
+    /* Prefer resolved IPv6 addresses over IPv4. */
+    @SerialName(value = "prefersIPv6")
+    val prefersIPv6: kotlin.Boolean? = null,
 
     /* The optional MTU. */
     @SerialName(value = "mtu")
