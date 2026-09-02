@@ -64,7 +64,6 @@ const WireGuardConnection = struct {
         module: net.ConnectionModule,
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
-        // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
         const wg_module = switch (module.module.*) {
             .WireGuard => |*wireguard| blk: {
                 break :blk wireguard;
@@ -72,6 +71,7 @@ const WireGuardConnection = struct {
             else => return error.MissingConnectionImplementation,
         };
 
+        // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
         const base_configuration = if (wg_module.configuration) |*value|
             value
         else
