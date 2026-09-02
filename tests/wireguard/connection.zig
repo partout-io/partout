@@ -38,6 +38,7 @@ test "WireGuard connection builds UAPI configuration" {
         allocator,
         &configuration,
         mock.noopDNSResolver(),
+        false,
     );
     defer allocator.free(configuration_text);
 
@@ -353,6 +354,48 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 }
 
+test "WireGuard DNS resolution stably prioritizes the preferred address family" {
+    const allocator = std.testing.allocator;
+    var resolver = FakeResolver{ .records = &.{
+        .{ .address = "198.51.100.10", .is_ipv6 = false },
+        .{ .address = "fd00::1", .is_ipv6 = true },
+        .{ .address = "fd00::2", .is_ipv6 = true },
+        .{ .address = "198.51.100.11", .is_ipv6 = false },
+    } };
+    var configuration = try api.WireGuardConfiguration.parse(allocator,
+        \\{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":[]},"peers":[
+        \\{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"example.com:51820","allowedIPs":[]}
+        \\]}
+    );
+    defer configuration.deinit(allocator);
+
+    const preferring_ipv6 = try adapter.testing.buildUapiConfiguration(
+        allocator,
+        &configuration,
+        resolver.resolver(),
+        true,
+    );
+    defer allocator.free(preferring_ipv6);
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        preferring_ipv6,
+        "endpoint=[fd00::1]:51820\n",
+    ) != null);
+
+    const preferring_ipv4 = try adapter.testing.buildUapiConfiguration(
+        allocator,
+        &configuration,
+        resolver.resolver(),
+        false,
+    );
+    defer allocator.free(preferring_ipv4);
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        preferring_ipv4,
+        "endpoint=198.51.100.10:51820\n",
+    ) != null);
+}
+
 test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{
@@ -370,6 +413,7 @@ test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
         allocator,
         &configuration,
         resolver.resolver(),
+        false,
     );
     defer allocator.free(uapi_configuration);
 
@@ -392,6 +436,7 @@ test "WireGuard DNS resolution accepts peers without endpoints" {
         allocator,
         &configuration,
         resolver.resolver(),
+        false,
     );
     defer allocator.free(uapi_configuration);
 
@@ -419,6 +464,7 @@ test "WireGuard resolves every peer hostname" {
         allocator,
         &configuration,
         resolver.resolver(),
+        false,
     );
     defer allocator.free(uapi_configuration);
 
@@ -445,6 +491,7 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
         allocator,
         &configuration,
         resolver.resolver(),
+        false,
     );
     defer allocator.free(configuration_text);
 

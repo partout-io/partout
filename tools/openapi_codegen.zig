@@ -1385,7 +1385,10 @@ fn zigFieldName(name: []const u8) []const u8 {
             const prev_is_lower = index > 0 and std.ascii.isLower(name[index - 1]);
             const next_is_lower = index + 1 < name.len and std.ascii.isLower(name[index + 1]);
             const prev_is_upper = index > 0 and std.ascii.isUpper(name[index - 1]);
-            if (len > 0 and (prev_is_lower or (prev_is_upper and next_is_lower))) {
+            const continues_ipv = byte == 'P' and
+                index > 0 and name[index - 1] == 'I' and
+                index + 1 < name.len and name[index + 1] == 'v';
+            if (len > 0 and !continues_ipv and (prev_is_lower or (prev_is_upper and next_is_lower))) {
                 buffer[len] = '_';
                 len += 1;
             }
@@ -1398,6 +1401,12 @@ fn zigFieldName(name: []const u8) []const u8 {
     }
     if (isZigKeyword(buffer[0..len])) return quotedIdentifier(buffer[0..len]);
     return buffer[0..len];
+}
+
+test "Zig field names keep IP version initialisms together" {
+    try std.testing.expectEqualStrings("parse_ipv6", zigFieldName("parseIPv6"));
+    try std.testing.expectEqualStrings("prefers_ipv6", zigFieldName("prefersIPv6"));
+    try std.testing.expectEqualStrings("blocks_ipv4", zigFieldName("blocksIPv4"));
 }
 
 fn quotedIdentifier(name: []const u8) []const u8 {

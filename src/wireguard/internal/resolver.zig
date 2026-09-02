@@ -32,6 +32,7 @@ pub const PeerEndpointResolver = struct {
     peers: []const api.WireGuardRemoteInterface,
     resolver: net.DNSResolver,
     factory: ?net.SocketFactory,
+    prefers_ipv6: bool,
     timeout_ms: u32,
     cache: Cache,
 
@@ -100,12 +101,14 @@ pub const PeerEndpointResolver = struct {
         peers: []const api.WireGuardRemoteInterface,
         resolver: net.DNSResolver,
         factory: ?net.SocketFactory,
+        prefers_ipv6: bool,
         timeout_ms: u32,
     ) PeerEndpointResolver {
         return .{
             .peers = peers,
             .resolver = resolver,
             .factory = factory,
+            .prefers_ipv6 = prefers_ipv6,
             .timeout_ms = timeout_ms,
             .cache = Cache.init(),
         };
@@ -282,7 +285,10 @@ pub const PeerEndpointResolver = struct {
         };
         defer util.freeSlice(net.DNSRecord, allocator, records);
 
-        const target_address = preferredAddress(records) orelse return error.DNSResolutionFailure;
+        const target_address = preferredAddress(
+            records,
+            self.prefers_ipv6,
+        ) orelse return error.DNSResolutionFailure;
         const target = api.Address.parseRaw(target_address) orelse return error.InvalidEndpoint;
         log.writef(.debug, "DNS64: mapped {s} to {s}", .{ address, target });
         return (api.Endpoint{
@@ -292,15 +298,11 @@ pub const PeerEndpointResolver = struct {
     }
 };
 
-fn preferredAddress(records: []const net.DNSRecord) ?[]const u8 {
-    // Match WireGuardKit: prefer the first IPv4 record even when DNS64 put a
-    // synthesized IPv6 record first, otherwise use the first numeric result.
-    var first: ?[]const u8 = null;
+fn preferredAddress(records: []const net.DNSRecord, prefers_ipv6: bool) ?[]const u8 {
+    const first = if (records.len > 0) records[0] else return null;
+
     for (records) |record| {
-        const address = api.Address.parseRaw(record.address) orelse continue;
-        if (!address.isIPAddress()) continue;
-        if (first == null) first = address.raw;
-        if (address.family == .v4) return address.raw;
+        if (record.is_ipv6 == prefers_ipv6) return record.address;
     }
-    return first;
+    return first.address;
 }

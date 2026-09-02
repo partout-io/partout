@@ -1336,6 +1336,9 @@ components:
         mtu:
           $ref: "#/components/schemas/UInt16"
           description: The optional MTU.
+        prefersIPv6:
+          type: boolean
+          description: Prefer resolved IPv6 addresses over IPv4.
       required:
         - privateKey
         - addresses
@@ -1410,24 +1413,24 @@ components:
         - peerHasUnrecognizedKey
       x-enum-descriptions:
         - Configuration has no peers.
-        - WireGuard interface address is invalid.
-        - WireGuard interface DNS entry is invalid.
-        - WireGuard interface listen port is invalid.
-        - WireGuard interface MTU is invalid.
-        - WireGuard interface private key is invalid.
-        - WireGuard interface has no private key.
-        - WireGuard interface key is unrecognized.
-        - WireGuard key occurs more than once.
-        - WireGuard configuration has multiple interface sections.
-        - WireGuard configuration has multiple peers with the same public key.
-        - WireGuard configuration has no interface section.
-        - WireGuard peer allowed IP is invalid.
-        - WireGuard peer endpoint is invalid.
-        - WireGuard peer persistent keepalive is invalid.
-        - WireGuard peer pre-shared key is invalid.
-        - WireGuard peer public key is invalid.
-        - WireGuard peer has no public key.
-        - WireGuard peer key is unrecognized.
+        - Interface address is invalid.
+        - Interface DNS entry is invalid.
+        - Interface listen port is invalid.
+        - Interface MTU is invalid.
+        - Interface private key is invalid.
+        - Interface has no private key.
+        - Interface key is unrecognized.
+        - Key occurs more than once.
+        - Configuration has multiple interface sections.
+        - Configuration has multiple peers with the same public key.
+        - Configuration has no interface section.
+        - Peer allowed IP is invalid.
+        - Peer endpoint is invalid.
+        - Peer persistent keepalive is invalid.
+        - Peer pre-shared key is invalid.
+        - Peer public key is invalid.
+        - Peer has no public key.
+        - Peer key is unrecognized.
       description: A WireGuard-specific error code.
     WireGuardModule:
       additionalProperties: false

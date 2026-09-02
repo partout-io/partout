@@ -90,6 +90,7 @@ pub const WireGuardAdapter = struct {
         factory: net.SocketFactory,
         profile: *const api.Profile,
         configuration: *const api.WireGuardConfiguration,
+        prefers_ipv6: bool,
         dns_timeout_ms: u32,
     ) WireGuardAdapter {
         return .{
@@ -102,6 +103,7 @@ pub const WireGuardAdapter = struct {
                 configuration.peers,
                 dns_resolver,
                 factory,
+                prefers_ipv6,
                 dns_timeout_ms,
             ),
             .network_change_behavior = .current(),
@@ -433,11 +435,13 @@ pub const testing = struct {
         allocator: std.mem.Allocator,
         configuration: *const api.WireGuardConfiguration,
         dns_resolver: net.DNSResolver,
+        prefers_ipv6: bool,
     ) WireGuardAdapter.BuildConfigurationError![:0]u8 {
         var endpoint_resolver = PeerEndpointResolver.init(
             configuration.peers,
             dns_resolver,
             null,
+            prefers_ipv6,
             (net.ConnectionOptions{}).dns_timeout,
         );
         defer endpoint_resolver.deinit(allocator);

@@ -18,13 +18,16 @@ public struct WireGuardLocalInterface: Sendable, Codable, Hashable {
     public var dns: DNSModule?
     /** The optional MTU. */
     public var mtu: ModelUInt16?
+    /** Prefer resolved IPv6 addresses over IPv4. */
+    public var prefersIPv6: Bool?
 
-    public init(privateKey: WireGuardKey, addresses: [Subnet], listenPort: ModelUInt16? = nil, dns: DNSModule? = nil, mtu: ModelUInt16? = nil) {
+    public init(privateKey: WireGuardKey, addresses: [Subnet], listenPort: ModelUInt16? = nil, dns: DNSModule? = nil, mtu: ModelUInt16? = nil, prefersIPv6: Bool? = nil) {
         self.privateKey = privateKey
         self.addresses = addresses
         self.listenPort = listenPort
         self.dns = dns
         self.mtu = mtu
+        self.prefersIPv6 = prefersIPv6
     }
 }
 
