@@ -4,5 +4,5 @@
 
 extension PartoutCore {
     /// The version of the Swift package. It may differ from the native runtime version.
-    public static let version = "0.162.0"
+    public static let version = "0.162.1"
 }
