@@ -12,6 +12,7 @@ struct WireGuardConfigurationTests {
         let pubkey = "BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw="
 
         var configurationBuilder = WireGuard.Configuration.Builder(privateKey: pvtkey)
+        configurationBuilder.interface.prefersIPv6 = true
         var peerBuilder = WireGuard.RemoteInterface.Builder(publicKey: pubkey)
         peerBuilder.allowedIPs = ["192.168.0.0/16"]
         configurationBuilder.peers = [peerBuilder]
@@ -31,6 +32,7 @@ struct WireGuardConfigurationTests {
         let cfg = try configurationBuilder.build()
         let mergedConfiguration = try cfg.withModules(from: profile)
         let allowedIPs = mergedConfiguration.peers[0].allowedIPs.map(\.rawValue)
+        #expect(mergedConfiguration.interface.prefersIPv6 == true)
 
         let expectedAllowedIPs = [
             "192.168.0.0/16",

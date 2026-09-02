@@ -8,6 +8,7 @@ extension WireGuard.LocalInterface: BuildableType {
         copy.addresses = addresses.map(\.rawValue)
         copy.dns = dns?.builder()
         copy.mtu = mtu
+        copy.prefersIPv6 = prefersIPv6
         return copy
     }
 }
@@ -18,6 +19,7 @@ extension WireGuard.LocalInterface {
         public var addresses: [String]
         public var dns: DNSModule.Builder?
         public var mtu: UInt16?
+        public var prefersIPv6: Bool?
 
         public init(privateKey: String) {
             self.privateKey = privateKey
@@ -39,7 +41,8 @@ extension WireGuard.LocalInterface {
                 privateKey: validPrivateKey,
                 addresses: validAddresses,
                 dns: try dns?.build(),
-                mtu: mtu
+                mtu: mtu,
+                prefersIPv6: prefersIPv6
             )
         }
     }
