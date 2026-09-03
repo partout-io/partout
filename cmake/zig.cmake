@@ -1,6 +1,7 @@
 set(PARTOUT_ZIG_ARGS build install
     --prefix "${PP_BUILD_OUTPUT}/partout"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
+    "-Dstrip=$<IF:$<CONFIG:Debug,RelWithDebInfo>,false,true>"
     "-Dshared=$<IF:$<BOOL:${PP_BUILD_STATIC}>,false,true>"
 )
 
