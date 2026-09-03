@@ -69,7 +69,10 @@ class PartoutTunnel(
                         val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
                         if (snapshotJSON == null) {
                             _state.update {
-                                it.copy(emptyMap())
+                                it.copy(
+                                    snapshots = emptyMap(),
+                                    revision = it.revision + 1
+                                )
                             }
                             return
                         }
@@ -230,7 +233,10 @@ class PartoutTunnel(
     private fun onServiceDead() {
         failPendingRequests()
         _state.update {
-            it.copy(emptyMap())
+            it.copy(
+                snapshots = emptyMap(),
+                revision = it.revision + 1
+            )
         }
     }
 
@@ -276,7 +282,10 @@ class PartoutTunnel(
                 Log.d(logTag, "Snapshot received: $snapshot")
             }
             _state.update {
-                it.copy(mapOf(snapshot.id to snapshot))
+                it.copy(
+                    snapshots = mapOf(snapshot.id to snapshot),
+                    revision = it.revision + 1
+                )
             }
         }.onFailure {
             Log.e(logTag, "Unable to decode snapshot", it)
@@ -294,7 +303,8 @@ class PartoutTunnel(
     }
 
     data class State(
-        val snapshots: Map<String, TunnelSnapshot> = emptyMap()
+        val snapshots: Map<String, TunnelSnapshot> = emptyMap(),
+        val revision: Long = 0L
     )
 
     private data class PendingPermission(

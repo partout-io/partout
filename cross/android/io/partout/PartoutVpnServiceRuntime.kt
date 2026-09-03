@@ -122,6 +122,7 @@ class PartoutVpnServiceRuntime(
         }.getOrElse {
             it.throwIfCancellation()
             Log.e(logTag, "Unable to prepare VPN daemon", it)
+            snapshotEmitter.emitInactive(profileId)
             stopService()
             return@launchCommand
         }
@@ -275,14 +276,6 @@ class PartoutVpnServiceRuntime(
             }
         }
 
-        fun shutdown() {
-            synchronized(lock) {
-                isAccepting = false
-                logsSnapshots = false
-                activeProfileId = null
-            }
-        }
-
         fun emit(snapshot: TunnelSnapshot): Boolean = synchronized(lock) {
             if (!isAccepting) { return@synchronized false }
             if (snapshot.id != activeProfileId) {
@@ -304,8 +297,8 @@ class PartoutVpnServiceRuntime(
             activeProfileId = null
         }
 
-        fun emitInactive(profileId: String) {
-            emit(
+        fun emitInactive(profileId: String) = synchronized(lock) {
+            broadcast(
                 TunnelSnapshot(
                     id = profileId,
                     isEnabled = false,
@@ -313,7 +306,9 @@ class PartoutVpnServiceRuntime(
                     status = TunnelStatus.inactive
                 )
             )
-            shutdown()
+            isAccepting = false
+            logsSnapshots = false
+            activeProfileId = null
         }
 
         fun latest(): TunnelSnapshot? = synchronized(lock) {
