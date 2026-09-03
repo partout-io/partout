@@ -13,23 +13,6 @@ function(partout_install_runtime_file file)
     )
 endfunction()
 
-function(partout_install_runtime_directory directory)
-    if(WIN32)
-        set(runtime_patterns PATTERN "*.dll")
-    elseif(APPLE)
-        set(runtime_patterns PATTERN "*.dylib")
-    else()
-        set(runtime_patterns PATTERN "*.so" PATTERN "*.so.*")
-    endif()
-    install(DIRECTORY "${directory}/"
-        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
-        OPTIONAL
-        USE_SOURCE_PERMISSIONS
-        FILES_MATCHING
-        ${runtime_patterns}
-    )
-endfunction()
-
 function(partout_install_link_file file)
     install(FILES "${file}"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -58,38 +41,28 @@ if(WIN32 AND WINTUN_DIR)
     partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
 endif()
 
-if(PP_BUILD_STATIC)
-    partout_install_link_file(
-        "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}"
-    )
-else()
-    if(WIN32)
-        set(PARTOUT_RUNTIME_LIBRARY "${PP_BUILD_OUTPUT}/partout/bin/partout.dll")
+set(PARTOUT_INSTALL_RUNTIME_TARGETS ${PARTOUT_RUNTIME_LIBRARIES})
+if(PP_BUILD_LIBRARY)
+    if(PP_BUILD_STATIC)
+        partout_install_link_file(
+            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}"
+        )
     else()
-        set(PARTOUT_RUNTIME_LIBRARY
-            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    endif()
-    partout_install_runtime_file("${PARTOUT_RUNTIME_LIBRARY}")
-endif()
-if(PP_BUILD_USE_WIREGUARD)
-    if(NOT WGGO_RUNTIME_LIBRARY MATCHES "\\.(a|lib)$")
-        partout_install_runtime_file("${WGGO_RUNTIME_LIBRARY}")
-    endif()
-    if(PP_BUILD_STATIC AND WGGO_DIR)
-        partout_install_link_directory("${WGGO_DIR}/lib")
+        list(PREPEND PARTOUT_INSTALL_RUNTIME_TARGETS Partout::Partout)
     endif()
 endif()
-if(PARTOUT_OPENSSL_IS_PREBUILT)
-    partout_install_runtime_directory("${OPENSSL_DIR}/bin")
-    partout_install_runtime_directory("${OPENSSL_DIR}/lib")
-    if(PP_BUILD_STATIC)
-        partout_install_link_directory("${OPENSSL_DIR}/lib")
-    endif()
+if(PARTOUT_INSTALL_RUNTIME_TARGETS)
+    install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_INSTALL_RUNTIME_TARGETS}
+        LIBRARY DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+        RUNTIME DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+    )
 endif()
-if(PARTOUT_MBEDTLS_IS_PREBUILT)
-    partout_install_runtime_directory("${MBEDTLS_DIR}/bin")
-    partout_install_runtime_directory("${MBEDTLS_DIR}/lib")
-    if(PP_BUILD_STATIC)
-        partout_install_link_directory("${MBEDTLS_DIR}/lib")
-    endif()
+if(PP_BUILD_STATIC AND WGGO_DIR)
+    partout_install_link_directory("${WGGO_DIR}/lib")
+endif()
+if(PP_BUILD_STATIC AND PARTOUT_OPENSSL_IS_PREBUILT)
+    partout_install_link_directory("${OPENSSL_DIR}/lib")
+endif()
+if(PP_BUILD_STATIC AND PARTOUT_MBEDTLS_IS_PREBUILT)
+    partout_install_link_directory("${MBEDTLS_DIR}/lib")
 endif()

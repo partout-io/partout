@@ -26,6 +26,13 @@ if(PP_BUILD_USE_OPENSSL)
         set(PARTOUT_OPENSSL_IS_PREBUILT ON)
         set(PARTOUT_OPENSSL_INCLUDE_DIR "${OPENSSL_DIR}/include")
         set(PARTOUT_OPENSSL_LIBRARY_DIR "${OPENSSL_DIR}/lib")
+        if(NOT APPLE)
+            include("${OPENSSL_DIR}/lib/cmake/OpenSSL/OpenSSLConfig.cmake")
+            set_property(TARGET OpenSSL::SSL PROPERTY IMPORTED_GLOBAL TRUE)
+            set_property(TARGET OpenSSL::Crypto PROPERTY IMPORTED_GLOBAL TRUE)
+            list(APPEND PARTOUT_RUNTIME_LIBRARIES
+                OpenSSL::SSL OpenSSL::Crypto)
+        endif()
     endif()
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dopenssl-include=${PARTOUT_OPENSSL_INCLUDE_DIR}"
@@ -58,6 +65,14 @@ if(PP_BUILD_USE_MBEDTLS)
         set(PARTOUT_MBEDTLS_IS_PREBUILT ON)
         set(PARTOUT_MBEDTLS_INCLUDE_DIR "${MBEDTLS_DIR}/include")
         set(PARTOUT_MBEDTLS_LIBRARY_DIR "${MBEDTLS_DIR}/lib")
+        if(NOT APPLE)
+            include("${MBEDTLS_DIR}/lib/cmake/MbedTLS/MbedTLSConfig.cmake")
+            foreach(target mbedtls mbedx509 tfpsacrypto)
+                set_property(TARGET MbedTLS::${target}
+                    PROPERTY IMPORTED_GLOBAL TRUE)
+            endforeach()
+            list(APPEND PARTOUT_STATIC_LIBRARIES MbedTLS::mbedtls)
+        endif()
     endif()
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dmbedtls-include=${PARTOUT_MBEDTLS_INCLUDE_DIR}"
@@ -78,18 +93,21 @@ if(PP_BUILD_USE_WIREGUARD)
        PARTOUT_WGGO_LIBRARY)
         get_filename_component(PARTOUT_WGGO_LIBRARY_DIR
             "${PARTOUT_WGGO_LIBRARY}" DIRECTORY)
-        set(WGGO_RUNTIME_LIBRARY "${PARTOUT_WGGO_LIBRARY}")
         message(STATUS "Using system wg-go")
+        if(NOT PARTOUT_WGGO_LIBRARY MATCHES "\\.(a|lib)$")
+            add_library(partout_wg_go SHARED IMPORTED GLOBAL)
+            set_target_properties(partout_wg_go PROPERTIES
+                IMPORTED_LOCATION "${PARTOUT_WGGO_LIBRARY}")
+            list(APPEND PARTOUT_RUNTIME_LIBRARIES partout_wg_go)
+        endif()
     else()
         partout_use_prebuilt_vendor(wg-go WGGO_DIR)
         set(PARTOUT_WGGO_INCLUDE_DIR "${WGGO_DIR}/include")
         set(PARTOUT_WGGO_LIBRARY_DIR "${WGGO_DIR}/lib")
-        if(WIN32)
-            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/wg-go.dll")
-        elseif(APPLE)
-            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/libwg-go.a")
-        else()
-            set(WGGO_RUNTIME_LIBRARY "${WGGO_DIR}/lib/libwg-go.so")
+        if(NOT APPLE)
+            include("${WGGO_DIR}/lib/cmake/WgGo/WgGoConfig.cmake")
+            set_property(TARGET WgGo::wg-go PROPERTY IMPORTED_GLOBAL TRUE)
+            list(APPEND PARTOUT_RUNTIME_LIBRARIES WgGo::wg-go)
         endif()
     endif()
     list(APPEND PARTOUT_ZIG_ARGS
@@ -175,10 +193,31 @@ if(PP_BUILD_LIBRARY)
         VERBATIM
     )
 
-    add_library(partout_library INTERFACE)
-    add_library(Partout::Partout ALIAS partout_library)
-    add_dependencies(partout_library partout)
-    target_include_directories(partout_library INTERFACE
-        "${PP_BUILD_OUTPUT}/partout/include")
-    target_link_libraries(partout_library INTERFACE "${PARTOUT_LINK_LIBRARY}")
+    file(MAKE_DIRECTORY "${PP_BUILD_OUTPUT}/partout/include")
+    if(PP_BUILD_STATIC)
+        add_library(Partout::Partout STATIC IMPORTED GLOBAL)
+        set_target_properties(Partout::Partout PROPERTIES
+            IMPORTED_LOCATION "${PARTOUT_LINK_LIBRARY}")
+    elseif(WIN32)
+        add_library(Partout::Partout SHARED IMPORTED GLOBAL)
+        set_target_properties(Partout::Partout PROPERTIES
+            IMPORTED_IMPLIB "${PARTOUT_LINK_LIBRARY}"
+            IMPORTED_LOCATION "${PP_BUILD_OUTPUT}/partout/bin/partout.dll"
+        )
+    else()
+        add_library(Partout::Partout SHARED IMPORTED GLOBAL)
+        set_target_properties(Partout::Partout PROPERTIES
+            IMPORTED_LOCATION "${PARTOUT_LINK_LIBRARY}"
+            IMPORTED_SONAME "${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}"
+        )
+    endif()
+    add_dependencies(Partout::Partout partout)
+    set(PARTOUT_INTERFACE_LIBRARIES ${PARTOUT_RUNTIME_LIBRARIES})
+    if(PP_BUILD_STATIC)
+        list(APPEND PARTOUT_INTERFACE_LIBRARIES ${PARTOUT_STATIC_LIBRARIES})
+    endif()
+    set_target_properties(Partout::Partout PROPERTIES
+        INTERFACE_INCLUDE_DIRECTORIES "${PP_BUILD_OUTPUT}/partout/include"
+        INTERFACE_LINK_LIBRARIES "${PARTOUT_INTERFACE_LIBRARIES}"
+    )
 endif()
