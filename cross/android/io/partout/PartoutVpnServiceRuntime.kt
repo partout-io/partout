@@ -144,7 +144,8 @@ class PartoutVpnServiceRuntime(
                 service,
                 serviceScope,
                 this,
-                startOptions.controllerOptions
+                startOptions.controllerOptions,
+                startOptions.logsPrivateData
             )
             val code = withContext(Dispatchers.IO) {
                 wrapper.partoutDaemonStart(

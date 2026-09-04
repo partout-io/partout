@@ -13,7 +13,7 @@ internal class OnDemandModuleApplying(
     module: OnDemandModule
 ): VpnServiceApplying {
     @Suppress("UNUSED_PARAMETER")
-    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+    override fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean {
         Log.i(
             logTag,
             "OnDemand: Android VpnService.Builder does not expose on-demand rules, skipping"

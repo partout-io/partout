@@ -16,7 +16,7 @@ import io.partout.models.HTTPProxyModule
 internal class HTTPProxyModuleApplying(
     private val module: HTTPProxyModule
 ): VpnServiceApplying {
-    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+    override fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean {
         val endpoint = module.proxyEndpoint
         if (endpoint == null) {
             if (module.pacURL != null) {
@@ -39,11 +39,13 @@ internal class HTTPProxyModuleApplying(
             return false
         }
         val proxyInfo = ProxyInfo.buildDirectProxy(host, port, module.bypassDomains.toMutableList())
-        Log.i(logTag, "HTTP Proxy: proxy=$host:$port bypass=${module.bypassDomains.joinToString()}")
+        val proxy = "$host:$port".sensitiveDescription(logsPrivateData)
+        val bypass = module.bypassDomains.joinToString().sensitiveDescription(logsPrivateData)
+        Log.i(logTag, "HTTP Proxy: proxy=$proxy bypass=$bypass")
         builder.setHttpProxy(proxyInfo)
 
         module.pacURL?.let {
-            Log.i(logTag, "HTTP Proxy: PAC URL is ignored on Android VPNs: $it")
+            Log.i(logTag, "HTTP Proxy: PAC URL is ignored on Android VPNs: ${it.sensitiveDescription(logsPrivateData)}")
         }
         return true
     }

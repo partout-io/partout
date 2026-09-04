@@ -44,7 +44,8 @@ internal class PartoutTunnelController(
     private val service: VpnService,
     private val scope: CoroutineScope,
     private val delegate: TunnelControllerDelegate,
-    private val options: TunnelControllerOptions
+    private val options: TunnelControllerOptions,
+    private val logsPrivateData: Boolean
 ) : TunnelController {
     //region State
     // All accesses must be synchronized against the lock
@@ -117,33 +118,28 @@ internal class PartoutTunnelController(
         info.modulesForTunnelSettings.forEach {
             when (it) {
                 is TaggedModuleDNS -> {
-                    Log.i(logTag, "DNS: ${it.value}")
-                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder)
+                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
                             || appliedDnsSettings
                 }
 
                 is TaggedModuleIP -> {
-                    Log.i(logTag, "IP: ${it.value}")
-                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder)
+                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
                             || appliedAddressSettings
                 }
 
                 is TaggedModuleHTTPProxy -> {
-                    Log.i(logTag, "HTTP Proxy: ${it.value}")
-                    HTTPProxyModuleApplying(it.value).apply(logTag, builder)
+                    HTTPProxyModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
                 }
 
                 is TaggedModuleOnDemand -> {
-                    Log.i(logTag, "OnDemand: ${it.value}")
-                    OnDemandModuleApplying(it.value).apply(logTag, builder)
+                    OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
                 }
 
                 else -> {}
             }
         }
         if (!appliedDnsSettings && options.dnsFallbackServers.isNotEmpty()) {
-            Log.i(logTag, "DNS: Apply fallback servers: ${options.dnsFallbackServers}")
-            options.dnsFallbackServers.addDNSServers(logTag, builder)
+            options.dnsFallbackServers.addDNSServers(logTag, builder, logsPrivateData)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")
