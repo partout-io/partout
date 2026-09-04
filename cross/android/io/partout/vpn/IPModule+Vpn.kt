@@ -17,19 +17,10 @@ import io.partout.models.Route
 internal class IPModuleApplying(
     private val module: IPModule
 ): VpnServiceApplying {
+    @Suppress("UNUSED_PARAMETER")
     override fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean {
-        val addedIPv4Address = module.ipv4?.apply(
-            logTag,
-            builder,
-            family = VpnAddressFamily.IPv4,
-            logsPrivateData = logsPrivateData
-        ) == true
-        val addedIPv6Address = module.ipv6?.apply(
-            logTag,
-            builder,
-            family = VpnAddressFamily.IPv6,
-            logsPrivateData = logsPrivateData
-        ) == true
+        val addedIPv4Address = module.ipv4?.apply(logTag, builder, family = VpnAddressFamily.IPv4) == true
+        val addedIPv6Address = module.ipv6?.apply(logTag, builder, family = VpnAddressFamily.IPv6) == true
         module.mtu?.takeIf { it > 0 }?.let {
             Log.i(logTag, "IP: MTU = $it")
             builder.setMtu(it)
@@ -41,34 +32,16 @@ internal class IPModuleApplying(
 private fun IPSettings.apply(
     logTag: String,
     builder: VpnService.Builder,
-    family: VpnAddressFamily,
-    logsPrivateData: Boolean
+    family: VpnAddressFamily
 ): Boolean {
     val addedAddress = subnets.fold(false) { addedAddress, rawSubnet ->
-        rawSubnet.addAddress(
-            logTag,
-            builder,
-            family = family,
-            logsPrivateData = logsPrivateData
-        ) || addedAddress
+        rawSubnet.addAddress(logTag, builder, family = family) || addedAddress
     }
     includedRoutes.forEach { route ->
-        route.apply(
-            logTag,
-            builder,
-            isExcluded = false,
-            family = family,
-            logsPrivateData = logsPrivateData
-        )
+        route.apply(logTag, builder, isExcluded = false, family = family)
     }
     excludedRoutes.forEach { route ->
-        route.apply(
-            logTag,
-            builder,
-            isExcluded = true,
-            family = family,
-            logsPrivateData = logsPrivateData
-        )
+        route.apply(logTag, builder, isExcluded = true, family = family)
     }
     return addedAddress
 }
@@ -76,20 +49,18 @@ private fun IPSettings.apply(
 private fun String.addAddress(
     logTag: String,
     builder: VpnService.Builder,
-    family: VpnAddressFamily,
-    logsPrivateData: Boolean
+    family: VpnAddressFamily
 ): Boolean {
     val subnet = VpnSubnet.parse(this, family = family, isInterfaceAddress = true)
     if (subnet == null) {
-        Log.w(logTag, "IP: Ignoring invalid subnet '${sensitiveDescription(logsPrivateData)}'")
+        Log.w(logTag, "IP: Ignoring invalid subnet '$this'")
         return false
     }
-    Log.i(logTag, "IP: Address = ${subnet.cidr.sensitiveDescription(logsPrivateData)}")
+    Log.i(logTag, "IP: Address = ${subnet.cidr}")
     return runCatching {
         builder.addAddress(subnet)
     }.onFailure {
-        val message = "IP: Unable to add address '${sensitiveDescription(logsPrivateData)}'"
-        if (logsPrivateData) Log.w(logTag, message, it) else Log.w(logTag, message)
+        Log.w(logTag, "IP: Unable to add address '$this'", it)
     }.isSuccess
 }
 
@@ -97,52 +68,47 @@ private fun Route.apply(
     logTag: String,
     builder: VpnService.Builder,
     isExcluded: Boolean,
-    family: VpnAddressFamily,
-    logsPrivateData: Boolean
+    family: VpnAddressFamily
 ) {
     val routeType = if (isExcluded) "excluded" else "included"
     val prefix = destinationPrefix(family) ?: run {
-        Log.w(logTag, "IP: Ignoring invalid $routeType route '${sensitiveDescription(logsPrivateData)}'")
+        Log.w(logTag, "IP: Ignoring invalid $routeType route '$this'")
         return
     }
     gateway?.let {
-        Log.i(logTag, "IP: Route gateway is ignored on Android VPNs: ${it.sensitiveDescription(logsPrivateData)}")
+        Log.i(logTag, "IP: Route gateway is ignored on Android VPNs: $it")
     }
     if (isExcluded) {
-        prefix.excludeRoute(logTag, builder, route = this, logsPrivateData = logsPrivateData)
+        prefix.excludeRoute(logTag, builder, route = this)
     } else {
-        prefix.includeRoute(logTag, builder, route = this, logsPrivateData = logsPrivateData)
+        prefix.includeRoute(logTag, builder, route = this)
     }
 }
 
 private fun VpnSubnet.includeRoute(
     logTag: String,
     builder: VpnService.Builder,
-    route: Route,
-    logsPrivateData: Boolean
+    route: Route
 ) {
-    Log.i(logTag, "IP: Include route ${cidr.sensitiveDescription(logsPrivateData)}")
+    Log.i(logTag, "IP: Include route $cidr")
     runCatching {
         builder.addRoute(this)
     }.onFailure {
-        val message = "IP: Unable to add route '${route.sensitiveDescription(logsPrivateData)}'"
-        if (logsPrivateData) Log.w(logTag, message, it) else Log.w(logTag, message)
+        Log.w(logTag, "IP: Unable to add route '$route'", it)
     }
 }
 
 private fun VpnSubnet.excludeRoute(
     logTag: String,
     builder: VpnService.Builder,
-    route: Route,
-    logsPrivateData: Boolean
+    route: Route
 ) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
-        Log.i(logTag, "IP: Cannot exclude route before API 33: ${cidr.sensitiveDescription(logsPrivateData)}")
+        Log.i(logTag, "IP: Cannot exclude route before API 33: $cidr")
         return
     }
-    Log.i(logTag, "IP: Exclude route ${cidr.sensitiveDescription(logsPrivateData)}")
+    Log.i(logTag, "IP: Exclude route $cidr")
     builder.tryExcludeRoute(this)?.let {
-        val message = "IP: Unable to exclude route '${route.sensitiveDescription(logsPrivateData)}'"
-        if (logsPrivateData) Log.w(logTag, message, it) else Log.w(logTag, message)
+        Log.w(logTag, "IP: Unable to exclude route '$route'", it)
     }
 }
