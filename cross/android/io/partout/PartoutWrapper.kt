@@ -6,7 +6,6 @@ package io.partout
 
 import io.partout.abi.PartoutResult
 import io.partout.models.ABIEnvelope
-import io.partout.models.CryptoBackend
 import io.partout.models.PartoutErrorCode
 import io.partout.models.TaggedProfile
 import kotlinx.serialization.json.Json
@@ -64,7 +63,10 @@ class PartoutWrapper(
     //endregion
 
     //region ABI
-    override external fun partoutInit(tag: String, logsPrivateData: Boolean)
+    override external fun partoutInit(
+        tag: String,
+        logsPrivateData: Boolean
+    )
     override external fun partoutVersion(): String
     override external fun partoutImportProfile(
         text: String,

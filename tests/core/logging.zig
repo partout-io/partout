@@ -15,7 +15,7 @@ const CapturingLogger = struct {
         message_len = 0;
     }
 
-    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const value = std.mem.span(raw_message);
         message_len = @min(value.len, message.len);
         @memcpy(message[0..message_len], value[0..message_len]);
@@ -33,7 +33,7 @@ const ReplacementLogger = struct {
         called = false;
     }
 
-    fn log(_: c_int, _: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: c_int, _: [*:0]const u8) callconv(.c) void {
         called = true;
     }
 };
@@ -53,7 +53,7 @@ const ProfileLogger = struct {
         saw_active_on_demand = false;
     }
 
-    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const message = std.mem.span(raw_message);
         saw_id = saw_id or std.mem.eql(
             u8,
@@ -80,50 +80,54 @@ const ReconfiguringValue = struct {
         allocator: std.mem.Allocator,
         _: ReconfiguringValue,
     ) ![]const u8 {
-        logging.init(false, ReplacementLogger.log);
+        logging.init(false, null, ReplacementLogger.log);
         return allocator.dupe(u8, "secret");
     }
 };
 
 test "private data flag round-trips" {
-    logging.init(true, null);
+    logging.init(true, null, null);
     defer logging.deinit();
     try std.testing.expect(logging.logsPrivateData());
 }
 
 test "logging is disabled without callback" {
-    logging.init(false, null);
+    logging.init(false, null, null);
     defer logging.deinit();
     try std.testing.expect(!logging.hasLogger());
     logging.write(.notice, "ignored");
 }
 
-test "external logger callback receives log messages" {
+test "external logger callback receives context and log messages" {
     const TestLogger = struct {
         var called = false;
         var saw_level = false;
         var saw_message = false;
 
-        fn log(level: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(ctx: ?*anyopaque, level: c_int, message: [*:0]const u8) callconv(.c) void {
             called = true;
+            const saw_context: *bool = @ptrCast(@alignCast(ctx.?));
+            saw_context.* = true;
             saw_level = level == @intFromEnum(logging.Level.notice);
             saw_message = std.mem.eql(u8, std.mem.span(message), "hello");
         }
     };
 
-    logging.init(false, TestLogger.log);
+    var saw_context = false;
+    logging.init(false, &saw_context, TestLogger.log);
     defer logging.deinit();
 
     logging.write(.notice, "hello");
 
     try std.testing.expect(TestLogger.called);
+    try std.testing.expect(saw_context);
     try std.testing.expect(TestLogger.saw_level);
     try std.testing.expect(TestLogger.saw_message);
 }
 
 test "profile modules log active and inactive prefixes" {
     ProfileLogger.reset();
-    logging.init(false, ProfileLogger.log);
+    logging.init(false, null, ProfileLogger.log);
     defer logging.deinit();
 
     const wireguard_id = api.UUID{
@@ -162,13 +166,13 @@ test "sentinel log messages cross the C callback without copying" {
     const TestLogger = struct {
         var message_address: usize = 0;
 
-        fn log(_: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(_: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
             message_address = @intFromPtr(message);
         }
     };
 
     const message: [:0]const u8 = "borrowed";
-    logging.init(false, TestLogger.log);
+    logging.init(false, null, TestLogger.log);
     defer logging.deinit();
 
     logging.write(.notice, message);
@@ -180,13 +184,13 @@ test "C log messages are forwarded without scanning or copying" {
     const TestLogger = struct {
         var message_address: usize = 0;
 
-        fn log(_: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(_: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
             message_address = @intFromPtr(message);
         }
     };
 
     const message: [:0]const u8 = "borrowed";
-    logging.init(false, TestLogger.log);
+    logging.init(false, null, TestLogger.log);
     defer logging.deinit();
 
     logging.writeCString(.notice, message.ptr);
@@ -196,7 +200,7 @@ test "C log messages are forwarded without scanning or copying" {
 
 test "duration helpers log compact time representations" {
     CapturingLogger.reset();
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     defer logging.deinit();
 
     logging.logTimeSeconds(.debug, "Elapsed: ", 3661);
@@ -214,7 +218,7 @@ test "duration helpers log compact time representations" {
 
 test "writef automatically redacts registered argument types" {
     CapturingLogger.reset();
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     defer logging.deinit();
 
     const endpoint = api.Endpoint{
@@ -253,7 +257,7 @@ test "writef automatically redacts registered argument types" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     logging.writef(.notice, "Public: {d}, endpoint: {s}", .{
         42,
         endpoint,
@@ -282,11 +286,11 @@ test "writef automatically redacts registered argument types" {
 
 test "sensitive values use the policy captured by writef" {
     CapturingLogger.reset();
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     defer logging.deinit();
 
     const marked_while_private = logging.sensitive("example.com");
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     logging.writef(.debug, "DNS resolved {s}", .{marked_while_private});
     try std.testing.expectEqualStrings(
         "DNS resolved <redacted>",
@@ -294,7 +298,7 @@ test "sensitive values use the policy captured by writef" {
     );
 
     const marked_while_redacted = logging.sensitive("example.com");
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     logging.writef(.debug, "DNS resolved {s}", .{marked_while_redacted});
     try std.testing.expectEqualStrings(
         "DNS resolved example.com",
@@ -305,7 +309,7 @@ test "sensitive values use the policy captured by writef" {
 test "writef dispatches with the same state used to prepare arguments" {
     CapturingLogger.reset();
     ReplacementLogger.reset();
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     defer logging.deinit();
 
     logging.writef(.debug, "{s}", .{ReconfiguringValue{}});
@@ -319,7 +323,7 @@ test "writef dispatches with the same state used to prepare arguments" {
 
 test "writef infers array and dictionary debug representations" {
     CapturingLogger.reset();
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     defer logging.deinit();
 
     const endpoints = [_]api.Endpoint{
@@ -351,7 +355,7 @@ test "writef infers array and dictionary debug representations" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     logging.writef(.notice, "Array: {s}", .{&endpoints});
     try std.testing.expectEqualStrings(
         "Array: <redacted>",
@@ -361,7 +365,7 @@ test "writef infers array and dictionary debug representations" {
 
 test "writef recognizes generated sensitive models without generated methods" {
     CapturingLogger.reset();
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     defer logging.deinit();
 
     const subnets = [_]api.Subnet{api.Subnet.parseRaw("10.0.0.2/24").?};
@@ -372,7 +376,7 @@ test "writef recognizes generated sensitive models without generated methods" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     logging.writef(.notice, "Settings: {s}", .{settings});
     try std.testing.expectEqualStrings(
         "Settings: <redacted>",
@@ -390,7 +394,7 @@ test "writef recognizes generated sensitive models without generated methods" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     logging.writef(.notice, "Credentials: {s}", .{credentials});
     try std.testing.expect(std.mem.indexOf(
         u8,

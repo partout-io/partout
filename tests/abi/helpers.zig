@@ -14,7 +14,8 @@ const InitArgs = partout_c.partout_init_args;
 
 test "ABI structs stay C-sized" {
     try std.testing.expect(@offsetOf(InitArgs, "logs_private_data") == 0);
-    try std.testing.expect(@offsetOf(InitArgs, "logger") == @sizeOf(?*anyopaque));
+    try std.testing.expect(@offsetOf(InitArgs, "logger_ctx") == @sizeOf(?*anyopaque));
+    try std.testing.expect(@offsetOf(InitArgs, "logger") == 2 * @sizeOf(?*anyopaque));
     try std.testing.expect(@sizeOf(CompletionCode) == @sizeOf(c_int));
 }
 

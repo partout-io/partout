@@ -15,7 +15,8 @@
 #define PARTOUT_JNI_CB(e, c) PARTOUT_CB(abi_completion_proxy, abi_handler_create(e, c))
 static void daemon_bindings_free(partout_daemon_bindings *b);
 
-static void android_logger(int level, const char *message) {
+static void android_logger(void *ctx, int level, const char *message) {
+    const char *tag = ctx ? (const char *)ctx : "Partout";
     int android_level = 0;
     switch (level) {
         case PartoutLogLevelDebug:
@@ -34,7 +35,7 @@ static void android_logger(int level, const char *message) {
             android_level = ANDROID_LOG_FATAL;
             break;
     }
-    __android_log_print(android_level, "Partout", "%s", message);
+    __android_log_print(android_level, tag, "%s", message);
 }
 
 JNIEXPORT void JNICALL
@@ -46,11 +47,18 @@ Java_io_partout_PartoutWrapper_partoutInit(
 ) {
     (void)thiz;
     partout_init_args args = { 0 };
-    const char *cTag = (*env)->GetStringUTFChars(env, tag, NULL);
+    const char *jni_tag = (*env)->GetStringUTFChars(env, tag, NULL);
+    char *c_tag = jni_tag ? strdup(jni_tag) : NULL;
     args.logs_private_data = logs_private_data;
+    args.logger_ctx = (void *)c_tag;
     args.logger = android_logger;
     partout_init(&args);
-    (*env)->ReleaseStringUTFChars(env, tag, cTag);
+    if (jni_tag) (*env)->ReleaseStringUTFChars(env, tag, jni_tag);
+    // XXX: The tag must outlive the call, so we agree on leaking
+    // this tiny allocation once. It's acceptable compared to
+    // ensuring a more complex lifetime, because there's no clear
+    // partout_deinit() counterpart to deallocate the tag.
+    // free(c_tag);
 }
 
 JNIEXPORT jstring JNICALL
@@ -68,15 +76,15 @@ Java_io_partout_PartoutWrapper_partoutImportProfile(
         jstring name
 ) {
     (void)thiz;
-    const char *cText = (*env)->GetStringUTFChars(env, text, NULL);
-    const char *cName = name ? (*env)->GetStringUTFChars(env, name, NULL) : NULL;
-    char *json = partout_import_profile(cText, cName);
-    (*env)->ReleaseStringUTFChars(env, text, cText);
-    if (cName) (*env)->ReleaseStringUTFChars(env, name, cName);
+    const char *jni_text = (*env)->GetStringUTFChars(env, text, NULL);
+    const char *jni_name = name ? (*env)->GetStringUTFChars(env, name, NULL) : NULL;
+    char *json = partout_import_profile(jni_text, jni_name);
+    (*env)->ReleaseStringUTFChars(env, text, jni_text);
+    if (jni_name) (*env)->ReleaseStringUTFChars(env, name, jni_name);
 
-    jstring jJSON = json ? (*env)->NewStringUTF(env, json) : NULL;
+    jstring j_json = json ? (*env)->NewStringUTF(env, json) : NULL;
     free(json);
-    return jJSON;
+    return j_json;
 }
 
 JNIEXPORT jint JNICALL
@@ -90,25 +98,25 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
         jint cryptoBackend
 ) {
     (void) thiz;
-    const char *cProfile = (*env)->GetStringUTFChars(env, profile, NULL);
-    const char *cCacheDir = (*env)->GetStringUTFChars(env, cacheDir, NULL);
+    const char *jni_profile = (*env)->GetStringUTFChars(env, profile, NULL);
+    const char *jni_cache_dir = (*env)->GetStringUTFChars(env, cacheDir, NULL);
 
     partout_daemon_bindings bindings = {0};
     bindings.controller = (*env)->NewGlobalRef(env, controller);
     bindings.release = daemon_bindings_free;
 
     partout_daemon_start_args args = {0};
-    args.profile = cProfile;
+    args.profile = jni_profile;
     args.options.is_daemon = false;
     args.options.cancels_unrecoverable = true;
-    args.options.cache_dir = cCacheDir;
+    args.options.cache_dir = jni_cache_dir;
     args.options.min_data_count_delta = minDataCountDelta;
     args.options.crypto = cryptoBackend;
     args.bindings = &bindings;
     const jint result = partout_daemon_start(&args);
 
-    (*env)->ReleaseStringUTFChars(env, profile, cProfile);
-    (*env)->ReleaseStringUTFChars(env, cacheDir, cCacheDir);
+    (*env)->ReleaseStringUTFChars(env, profile, jni_profile);
+    (*env)->ReleaseStringUTFChars(env, cacheDir, jni_cache_dir);
     return result;
 }
 

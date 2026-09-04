@@ -20,6 +20,7 @@ pub const Level = enum(c_int) {
 };
 
 const Logger = *const fn (
+    ctx: ?*anyopaque,
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void;
@@ -31,6 +32,7 @@ pub const Callback = ?Logger;
 
 var mutex: concurrency.Mutex = .{};
 var logs_private_data: bool = false;
+var external_logger_ctx: ?*anyopaque = null;
 var external_logger: Callback = null;
 
 /// C ABI entry point used by foreign callers to forward a log message.
@@ -43,8 +45,9 @@ fn partoutLog(
         mutex.unlock();
         return;
     };
+    const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchCString(logger, level, message);
+    dispatchCString(logger, logger_ctx, level, message);
 }
 
 comptime {
@@ -59,11 +62,13 @@ comptime {
 /// Passing a null `logger` disables logging.
 pub fn init(
     private_data: bool,
+    logger_ctx: ?*anyopaque,
     logger: Callback,
 ) void {
     mutex.lock();
     defer mutex.unlock();
     logs_private_data = private_data;
+    external_logger_ctx = logger_ctx;
     external_logger = logger;
 }
 
@@ -72,6 +77,7 @@ pub fn deinit() void {
     mutex.lock();
     defer mutex.unlock();
     logs_private_data = false;
+    external_logger_ctx = null;
     external_logger = null;
 }
 
@@ -103,8 +109,9 @@ pub fn write(level: Level, message: [:0]const u8) void {
         mutex.unlock();
         return;
     };
+    const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchSlice(logger, @intFromEnum(level), message);
+    dispatchSlice(logger, logger_ctx, @intFromEnum(level), message);
 }
 
 /// Formats and writes a core log message.
@@ -120,6 +127,7 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
         mutex.unlock();
         return;
     };
+    const logger_ctx = external_logger_ctx;
     mutex.unlock();
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
@@ -130,7 +138,7 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
         private_data,
     ) catch return;
     const message = std.fmt.allocPrintSentinel(allocator, fmt, prepared, 0) catch return;
-    dispatchSlice(logger, @intFromEnum(level), message);
+    dispatchSlice(logger, logger_ctx, @intFromEnum(level), message);
 }
 
 /// Forwards a borrowed C string directly to the configured C logger.
@@ -140,8 +148,9 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
         mutex.unlock();
         return;
     };
+    const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchCString(logger, @intFromEnum(level), message);
+    dispatchCString(logger, logger_ctx, @intFromEnum(level), message);
 }
 
 /// Logs a profile using the structured layout of the legacy Apple runtime.
@@ -193,18 +202,20 @@ pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
 
 fn dispatchSlice(
     logger: Logger,
+    logger_ctx: ?*anyopaque,
     level: c_int,
     message: [:0]const u8,
 ) void {
-    dispatchCString(logger, level, message.ptr);
+    dispatchCString(logger, logger_ctx, level, message.ptr);
 }
 
 fn dispatchCString(
     logger: Logger,
+    logger_ctx: ?*anyopaque,
     level: c_int,
     message: [*:0]const u8,
 ) void {
-    logger(level, message);
+    logger(logger_ctx, level, message);
 }
 
 fn writeProfileModule(
