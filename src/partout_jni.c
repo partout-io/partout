@@ -16,7 +16,7 @@
 static void daemon_bindings_free(partout_daemon_bindings *b);
 
 static void android_logger(void *ctx, int level, const char *message) {
-    (void)ctx;
+    const char *tag = ctx ? (const char *)ctx : "Partout";
     int android_level = 0;
     switch (level) {
         case PartoutLogLevelDebug:
@@ -35,7 +35,7 @@ static void android_logger(void *ctx, int level, const char *message) {
             android_level = ANDROID_LOG_FATAL;
             break;
     }
-    __android_log_print(android_level, "Partout", "%s", message);
+    __android_log_print(android_level, tag, "%s", message);
 }
 
 JNIEXPORT void JNICALL
@@ -49,9 +49,14 @@ Java_io_partout_PartoutWrapper_partoutInit(
     partout_init_args args = { 0 };
     const char *cTag = (*env)->GetStringUTFChars(env, tag, NULL);
     args.logs_private_data = logs_private_data;
+    args.logger_ctx = (void *)cTag;
     args.logger = android_logger;
     partout_init(&args);
-    (*env)->ReleaseStringUTFChars(env, tag, cTag);
+    // XXX: The tag must outlive the call, so we agree on leaking
+    // this tiny allocation once. It's acceptable compared to
+    // ensuring a more complex lifetime, because there's no clear
+    // partout_deinit() counterpart to deallocate the tag.
+    // (*env)->ReleaseStringUTFChars(env, tag, cTag);
 }
 
 JNIEXPORT jstring JNICALL

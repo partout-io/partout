@@ -63,7 +63,10 @@ class PartoutWrapper(
     //endregion
 
     //region ABI
-    override external fun partoutInit(tag: String, logsPrivateData: Boolean)
+    override external fun partoutInit(
+        tag: String,
+        logsPrivateData: Boolean
+    )
     override external fun partoutVersion(): String
     override external fun partoutImportProfile(
         text: String,
