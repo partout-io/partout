@@ -11,4 +11,4 @@ class PartoutException(
     val result: Int? = null,
     val code: PartoutErrorCode,
     val payload: JsonElement?
-) : RuntimeException("ABI call failed (result=$result, code=$code): $payload")
+) : RuntimeException("ABI call failed (result=$result, code=$code)")

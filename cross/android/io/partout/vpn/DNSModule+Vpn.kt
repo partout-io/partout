@@ -9,6 +9,7 @@ import android.util.Log
 import io.partout.extensions.VpnSubnet
 import io.partout.extensions.unsupportedProtocolName
 import io.partout.models.DNSModule
+import io.partout.sensitiveDescription
 
 internal class DNSModuleApplying(
     private val module: DNSModule

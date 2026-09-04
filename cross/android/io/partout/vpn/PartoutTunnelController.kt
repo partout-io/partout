@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.NativeTunnelControllerJNI
 import io.partout.extensions.modulesForTunnelSettings
+import io.partout.logSensitiveError
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
 import io.partout.models.TaggedModuleIP
@@ -108,7 +109,7 @@ internal class PartoutTunnelController(
         val info = runCatching {
             json.decodeFromString<TunnelRemoteInfoWrapper>(infoJSON)
         }.getOrElse {
-            Log.e(logTag, "Unable to decode tunnel info JSON", it)
+            logSensitiveError(logTag, "Unable to decode tunnel info JSON", it, logsPrivateData)
             return@synchronized INVALID_TUN_FD
         }
 
@@ -150,7 +151,7 @@ internal class PartoutTunnelController(
         val newDescriptor = runCatching {
             builder.establish()
         }.getOrElse {
-            Log.e(logTag, "Unable to establish tunnel", it)
+            logSensitiveError(logTag, "Unable to establish tunnel", it, logsPrivateData)
             null
         }
         if (newDescriptor == null) {

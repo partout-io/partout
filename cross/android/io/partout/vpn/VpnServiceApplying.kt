@@ -14,11 +14,6 @@ internal interface VpnServiceApplying {
 //endregion
 
 //region Shared helpers
-internal const val REDACTED_VALUE = "<redacted>"
-
-internal fun Any?.sensitiveDescription(logsPrivateData: Boolean): String =
-    if (logsPrivateData) toString() else REDACTED_VALUE
-
 internal fun VpnService.Builder.addDnsServer(subnet: VpnSubnet) {
     addDnsServer(subnet.address)
 }

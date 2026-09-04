@@ -12,6 +12,7 @@ import io.partout.extensions.asHostPort
 import io.partout.extensions.hasProxyConflict
 import io.partout.extensions.proxyEndpoint
 import io.partout.models.HTTPProxyModule
+import io.partout.sensitiveDescription
 
 internal class HTTPProxyModuleApplying(
     private val module: HTTPProxyModule
