@@ -139,7 +139,7 @@ internal class PartoutTunnelController(
             }
         }
         if (!appliedDnsSettings && options.dnsFallbackServers.isNotEmpty()) {
-            options.dnsFallbackServers.addDNSServers(logTag, builder, logsPrivateData)
+            options.dnsFallbackServers.addDNSServers(logTag, builder)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")

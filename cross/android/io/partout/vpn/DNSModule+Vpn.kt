@@ -97,16 +97,15 @@ internal fun DNSModule.addServers(
 
 internal fun List<String>.addDNSServers(
     logTag: String,
-    builder: VpnService.Builder,
-    logsPrivateData: Boolean
+    builder: VpnService.Builder
 ) {
     forEach { server ->
         val route = VpnSubnet.parse(server)
         if (route == null) {
-            Log.w(logTag, "DNS: Ignoring invalid fallback server '${server.sensitiveDescription(logsPrivateData)}'")
+            Log.w(logTag, "DNS: Ignoring invalid fallback server '$server'")
             return@forEach
         }
-        Log.i(logTag, "DNS: Fallback server: ${route.cidr.sensitiveDescription(logsPrivateData)}")
+        Log.i(logTag, "DNS: Fallback server: ${route.cidr}")
         builder.addDnsServer(route)
     }
 }
