@@ -15,7 +15,8 @@
 #define PARTOUT_JNI_CB(e, c) PARTOUT_CB(abi_completion_proxy, abi_handler_create(e, c))
 static void daemon_bindings_free(partout_daemon_bindings *b);
 
-static void android_logger(int level, const char *message) {
+static void android_logger(void *ctx, int level, const char *message) {
+    (void)ctx;
     int android_level = 0;
     switch (level) {
         case PartoutLogLevelDebug:

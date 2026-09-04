@@ -26,9 +26,10 @@ typedef enum {
     PartoutLogLevelInfo,
     PartoutLogLevelDebug
 } partout_log_level;
-typedef void (*partout_logger_cb)(int level, const char *message);
+typedef void (*partout_logger_cb)(void *ctx, int level, const char *message);
 typedef struct {
     bool logs_private_data;
+    void *logger_ctx;
     partout_logger_cb logger;
 } partout_init_args;
 void partout_init(const partout_init_args *args);

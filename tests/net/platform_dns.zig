@@ -15,7 +15,7 @@ const CapturingLogger = struct {
     var message: [256]u8 = undefined;
     var message_len: usize = 0;
 
-    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const value = std.mem.span(raw_message);
         message_len = @min(value.len, message.len);
         @memcpy(message[0..message_len], value[0..message_len]);
@@ -44,7 +44,7 @@ test "DNS resolver times out and caps abandoned queries" {
     const allocator = std.testing.allocator;
     const max_pending_queries = platform_dns.testing.maxPendingQueries;
     var dns = PlatformDNS.init();
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     defer logging.deinit();
     HangingResolver.release.store(false, .release);
     defer {

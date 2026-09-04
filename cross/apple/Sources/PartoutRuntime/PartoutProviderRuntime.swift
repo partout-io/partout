@@ -56,6 +56,7 @@ public final class PartoutProviderRuntime: Sendable {
 
         var init_args = partout_init_args(
             logs_private_data: logsPrivateData,
+            logger_ctx: nil,
             logger: logger
         )
         pp_log(ctx, .runtime, .info, "Initialize Partout library")

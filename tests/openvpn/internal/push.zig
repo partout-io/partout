@@ -13,7 +13,7 @@ const CapturingLogger = struct {
     var message: [512]u8 = undefined;
     var message_len: usize = 0;
 
-    fn log(_: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const value = std.mem.span(raw_message);
         message_len = @min(value.len, message.len);
         @memcpy(message[0..message_len], value[0..message_len]);
@@ -238,7 +238,7 @@ test "writef formats PUSH_REPLY according to the private logging policy" {
         "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM",
     )).?;
     defer reply.deinit(allocator);
-    logging.init(true, CapturingLogger.log);
+    logging.init(true, null, CapturingLogger.log);
     defer logging.deinit();
 
     logging.writef(.info, "{s}", .{reply});
@@ -248,7 +248,7 @@ test "writef formats PUSH_REPLY according to the private logging policy" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     logging.writef(.info, "{s}", .{reply});
     try std.testing.expectEqualStrings(
         "<redacted>",

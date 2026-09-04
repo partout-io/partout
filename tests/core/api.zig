@@ -18,7 +18,7 @@ const CapturingLogger = struct {
     var message: [256]u8 = undefined;
     var message_len: usize = 0;
 
-    fn log(new_level: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, new_level: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const value = std.mem.span(raw_message);
         level = new_level;
         message_len = @min(value.len, message.len);
@@ -76,7 +76,7 @@ test "unavailable crypto backend logs and falls back to default" {
     const fallback = api.defaultCryptoBackend();
     const expected = try api.cryptoFunctionTable(fallback);
 
-    logging.init(false, CapturingLogger.log);
+    logging.init(false, null, CapturingLogger.log);
     defer logging.deinit();
     const actual = try api.cryptoFunctionTable(requested);
 

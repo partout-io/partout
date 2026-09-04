@@ -90,9 +90,11 @@ private extension PacketTunnelProvider {
 }
 
 private nonisolated func logger(
+    _ ctx: UnsafeMutableRawPointer?,
     _ level: Int32,
     _ message: UnsafePointer<CChar>?
 ) {
+    _ = ctx
     guard let level = DebugLog.Level(rawValue: Int(level)),
           let message else { return }
     pp_log_g(.abi, level, String(cString: message))
