@@ -17,7 +17,8 @@ import io.partout.models.Route
 internal class IPModuleApplying(
     private val module: IPModule
 ): VpnServiceApplying {
-    override fun apply(logTag: String, builder: VpnService.Builder): Boolean {
+    @Suppress("UNUSED_PARAMETER")
+    override fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean {
         val addedIPv4Address = module.ipv4?.apply(logTag, builder, family = VpnAddressFamily.IPv4) == true
         val addedIPv6Address = module.ipv6?.apply(logTag, builder, family = VpnAddressFamily.IPv6) == true
         module.mtu?.takeIf { it > 0 }?.let {
@@ -28,7 +29,11 @@ internal class IPModuleApplying(
     }
 }
 
-private fun IPSettings.apply(logTag: String, builder: VpnService.Builder, family: VpnAddressFamily): Boolean {
+private fun IPSettings.apply(
+    logTag: String,
+    builder: VpnService.Builder,
+    family: VpnAddressFamily
+): Boolean {
     val addedAddress = subnets.fold(false) { addedAddress, rawSubnet ->
         rawSubnet.addAddress(logTag, builder, family = family) || addedAddress
     }
@@ -41,7 +46,11 @@ private fun IPSettings.apply(logTag: String, builder: VpnService.Builder, family
     return addedAddress
 }
 
-private fun String.addAddress(logTag: String, builder: VpnService.Builder, family: VpnAddressFamily): Boolean {
+private fun String.addAddress(
+    logTag: String,
+    builder: VpnService.Builder,
+    family: VpnAddressFamily
+): Boolean {
     val subnet = VpnSubnet.parse(this, family = family, isInterfaceAddress = true)
     if (subnet == null) {
         Log.w(logTag, "IP: Ignoring invalid subnet '$this'")
@@ -55,7 +64,12 @@ private fun String.addAddress(logTag: String, builder: VpnService.Builder, famil
     }.isSuccess
 }
 
-private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded: Boolean, family: VpnAddressFamily) {
+private fun Route.apply(
+    logTag: String,
+    builder: VpnService.Builder,
+    isExcluded: Boolean,
+    family: VpnAddressFamily
+) {
     val routeType = if (isExcluded) "excluded" else "included"
     val prefix = destinationPrefix(family) ?: run {
         Log.w(logTag, "IP: Ignoring invalid $routeType route '$this'")
@@ -71,7 +85,11 @@ private fun Route.apply(logTag: String, builder: VpnService.Builder, isExcluded:
     }
 }
 
-private fun VpnSubnet.includeRoute(logTag: String, builder: VpnService.Builder, route: Route) {
+private fun VpnSubnet.includeRoute(
+    logTag: String,
+    builder: VpnService.Builder,
+    route: Route
+) {
     Log.i(logTag, "IP: Include route $cidr")
     runCatching {
         builder.addRoute(this)
@@ -80,7 +98,11 @@ private fun VpnSubnet.includeRoute(logTag: String, builder: VpnService.Builder, 
     }
 }
 
-private fun VpnSubnet.excludeRoute(logTag: String, builder: VpnService.Builder, route: Route) {
+private fun VpnSubnet.excludeRoute(
+    logTag: String,
+    builder: VpnService.Builder,
+    route: Route
+) {
     if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
         Log.i(logTag, "IP: Cannot exclude route before API 33: $cidr")
         return

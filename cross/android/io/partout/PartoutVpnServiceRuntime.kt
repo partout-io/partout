@@ -47,6 +47,7 @@ class PartoutVpnServiceRuntime(
     private var isPartoutInitialized = false
     private var isRunning = false
     private var activeProfileId: String? = null
+    private var logsPrivateData = false
 
     // C/JNI controller
     private var controller: PartoutTunnelController? = null
@@ -61,7 +62,7 @@ class PartoutVpnServiceRuntime(
                     action()
                 }.onFailure {
                     it.throwIfCancellation()
-                    Log.e(logTag, "Unhandled VPN command failure", it)
+                    logSensitiveError(logTag, "Unhandled VPN command failure", it, logsPrivateData)
                     stopService()
                 }
             }
@@ -98,6 +99,7 @@ class PartoutVpnServiceRuntime(
 
     //region Actions (Service)
     private fun connect(intent: Intent?) = launchCommand {
+        logsPrivateData = false
         val profileJSON = runCatching {
             loadOrPersistProfile(intent)
         }.getOrElse {
@@ -110,7 +112,7 @@ class PartoutVpnServiceRuntime(
             decodeProfileId(profileJSON)
         }.getOrElse {
             it.throwIfCancellation()
-            Log.e(logTag, "Unable to decode profile JSON", it)
+            logSensitiveError(logTag, "Unable to decode profile JSON", it, logsPrivateData)
             stopService()
             return@launchCommand
         }
@@ -122,12 +124,13 @@ class PartoutVpnServiceRuntime(
             engine.prepareStart(wrapper.partoutVersion(), intent, profileJSON)
         }.getOrElse {
             it.throwIfCancellation()
-            Log.e(logTag, "Unable to prepare VPN daemon", it)
+            logSensitiveError(logTag, "Unable to prepare VPN daemon", it, logsPrivateData)
             snapshotEmitter.emitInactive(profileId)
             stopService()
             return@launchCommand
         }
-        initializePartoutIfNeeded(startOptions.logsPrivateData)
+        logsPrivateData = startOptions.logsPrivateData
+        initializePartoutIfNeeded(logsPrivateData)
 
         // Observe snapshots during start attempt
         snapshotEmitter.accept(
@@ -144,7 +147,8 @@ class PartoutVpnServiceRuntime(
                 service,
                 serviceScope,
                 this,
-                startOptions.controllerOptions
+                startOptions.controllerOptions,
+                logsPrivateData
             )
             val code = withContext(Dispatchers.IO) {
                 wrapper.partoutDaemonStart(
@@ -404,7 +408,8 @@ class PartoutVpnServiceRuntime(
 
     private fun replyEnvironmentValue(client: Messenger, reqId: Int, name: String) {
         val value = controller?.getEnvironmentValue(name)
-        Log.i(logTag, "Reply with environment: $name = $value")
+        val loggedValue = value?.sensitiveDescription(logsPrivateData)
+        Log.i(logTag, "Reply with environment: $name = $loggedValue")
         val msg = Message.obtain(null, MSG_GET_ENVIRONMENT).apply {
             arg1 = reqId
             data = Bundle().apply {

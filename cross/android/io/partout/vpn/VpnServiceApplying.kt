@@ -9,7 +9,7 @@ import io.partout.extensions.VpnSubnet
 
 //region Interface
 internal interface VpnServiceApplying {
-    fun apply(logTag: String, builder: VpnService.Builder): Boolean
+    fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean
 }
 //endregion
 
