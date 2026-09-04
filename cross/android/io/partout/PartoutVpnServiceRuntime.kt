@@ -44,6 +44,7 @@ class PartoutVpnServiceRuntime(
     // Execute actions in serial queue
     private val serviceScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val commandQueue = Channel<suspend () -> Unit>(Channel.UNLIMITED)
+    private var isPartoutInitialized = false
     private var isRunning = false
     private var activeProfileId: String? = null
 
@@ -126,6 +127,7 @@ class PartoutVpnServiceRuntime(
             stopService()
             return@launchCommand
         }
+        initializePartoutIfNeeded(startOptions.logsPrivateData)
 
         // Observe snapshots during start attempt
         snapshotEmitter.accept(
@@ -145,7 +147,6 @@ class PartoutVpnServiceRuntime(
                 startOptions.controllerOptions
             )
             val code = withContext(Dispatchers.IO) {
-                wrapper.partoutInit(logTag, startOptions.logsPrivateData)
                 wrapper.partoutDaemonStart(
                     profileJSON,
                     service.cacheDir.absolutePath,
@@ -205,6 +206,12 @@ class PartoutVpnServiceRuntime(
 
     private fun decodeProfileId(profileJSON: String): String {
         return json.decodeFromString<TaggedProfile>(profileJSON).id
+    }
+
+    private fun initializePartoutIfNeeded(logsPrivateData: Boolean) {
+        if (isPartoutInitialized) return
+        wrapper.partoutInit(logTag, logsPrivateData)
+        isPartoutInitialized = true
     }
 
     private suspend fun stopTunnel() {
