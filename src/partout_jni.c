@@ -48,7 +48,7 @@ Java_io_partout_PartoutWrapper_partoutInit(
     (void)thiz;
     partout_init_args args = { 0 };
     const char *jni_tag = (*env)->GetStringUTFChars(env, tag, NULL);
-    char *c_tag = jni_tag ? strdup(jni_tag) : NULL;
+    char *c_tag = jni_tag ? pp_dup(jni_tag) : NULL;
     args.logs_private_data = logs_private_data;
     args.logger_ctx = (void *)c_tag;
     args.logger = android_logger;
@@ -58,7 +58,7 @@ Java_io_partout_PartoutWrapper_partoutInit(
     // this tiny allocation once. It's acceptable compared to
     // ensuring a more complex lifetime, because there's no clear
     // partout_deinit() counterpart to deallocate the tag.
-    // free(c_tag);
+    // pp_free(c_tag);
 }
 
 JNIEXPORT jstring JNICALL

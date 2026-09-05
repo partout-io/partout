@@ -82,10 +82,10 @@ public final class PartoutProviderRuntime: Sendable {
         )
         let result = profileJSON.withCString { profile in
             let cCacheDir = cacheDir?.withCString {
-                strdup($0)
+                pp_dup($0)
             }
             defer {
-                free(cCacheDir)
+                pp_free(cCacheDir)
             }
             let daemonOptions = partout_daemon_options(
                 is_daemon: false,
