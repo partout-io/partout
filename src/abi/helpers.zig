@@ -42,6 +42,36 @@ pub const Importer = struct {
         return api.encodeModuleZ(allocator, &module);
     }
 
+    pub fn importModuleWithContext(
+        self: *const Importer,
+        allocator: std.mem.Allocator,
+        text: []const u8,
+        context: *const api.ModuleImportContext,
+        parse_error_info: ?*api.ParseErrorInfo,
+    ) ImportAndEncodeError![:0]u8 {
+        var module = switch (context.*) {
+            .OpenVPN => |options| openvpn: {
+                var parser_context: openvpn.ImportContext = .{
+                    .passphrase = options.passphrase,
+                };
+                break :openvpn try self.registry.importModuleOfType(
+                    allocator,
+                    text,
+                    .OpenVPN,
+                    core.ImportContext.init(parse_error_info, &parser_context),
+                );
+            },
+            .WireGuard => try self.registry.importModuleOfType(
+                allocator,
+                text,
+                .WireGuard,
+                core.ImportContext.init(parse_error_info, null),
+            ),
+        };
+        defer module.deinit(allocator);
+        return api.encodeModuleZ(allocator, &module);
+    }
+
     pub fn importProfile(
         self: *const Importer,
         allocator: std.mem.Allocator,

@@ -69,6 +69,7 @@ pub const module_implementation: core.ModuleImplementation = .{
     .ptr = null,
     .vtable = &module_vtable,
 };
+pub const ImportContext = parser.Parser.Context;
 const module_vtable: core.ModuleImplementation.VTable = .{
     .module_type = moduleType,
     .import_module = parser.importModule,

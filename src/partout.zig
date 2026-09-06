@@ -111,6 +111,7 @@ pub export fn partout_import_profile(
 
 pub export fn partout_import_module(
     c_text: ?[*:0]const u8,
+    c_context: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
 
@@ -119,14 +120,38 @@ pub export fn partout_import_module(
     defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
-    const import_context = core.ImportContext.init(&parse_error_info, null);
 
-    const module_json = importer.importModule(
-        allocator,
-        util.borrowedCString(text_ptr),
-        import_context,
-    ) catch |err|
-        return abi.importErrorPayloadAllocZ(allocator, err, import_context);
+    var module_context: ?api.ModuleImportContext = null;
+    defer if (module_context) |*context| context.deinit(allocator);
+    if (c_context) |context_ptr| {
+        module_context = api.ModuleImportContext.parse(
+            allocator,
+            util.borrowedCString(context_ptr),
+        ) catch |err| return switch (err) {
+            error.OutOfMemory => abi.errorPayloadAllocZ(allocator, .outOfMemory),
+            else => abi.errorPayloadAllocZ(allocator, .decoding),
+        };
+    }
+
+    const module_json = if (module_context) |*context|
+        importer.importModuleWithContext(
+            allocator,
+            util.borrowedCString(text_ptr),
+            context,
+            &parse_error_info,
+        ) catch |err| return abi.importErrorPayloadAllocZ(
+            allocator,
+            err,
+            core.ImportContext.init(&parse_error_info, null),
+        )
+    else blk: {
+        const import_context = core.ImportContext.init(&parse_error_info, null);
+        break :blk importer.importModule(
+            allocator,
+            util.borrowedCString(text_ptr),
+            import_context,
+        ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
+    };
 
     return abi.successPayloadAllocZ(allocator, module_json.ptr);
 }

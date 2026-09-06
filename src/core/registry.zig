@@ -225,6 +225,19 @@ pub const Registry = struct {
         return error.Parsing;
     }
 
+    /// Imports a tagged module using only the implementation registered for
+    /// `module_type`.
+    pub fn importModuleOfType(
+        self: Registry,
+        allocator: std.mem.Allocator,
+        contents: []const u8,
+        module_type: api.ModuleType,
+        context: ?ImportContext,
+    ) ImportError!api.TaggedModule {
+        const impl = self.implementation(module_type) orelse return error.UnknownImportedModule;
+        return impl.importModule(allocator, contents, context);
+    }
+
     /// Imports a profile from canonical JSON, tagged-module JSON, or raw input.
     ///
     /// Canonical profiles are returned directly. Tagged modules and raw modules

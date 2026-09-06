@@ -18,13 +18,20 @@ public final class PartoutImporter: Sendable {
         return try tagged.asProfile()
     }
 
-    public func importModule(from url: URL) throws -> Module {
+    public func importModule(
+        from url: URL,
+        context: ModuleImportContext? = nil
+    ) throws -> Module {
         let text = try String(contentsOf: url, encoding: .utf8)
-        return try importModule(from: text)
+        return try importModule(from: text, context: context)
     }
 
-    public func importModule(from text: String) throws -> Module {
-        guard let cJSON = partout_import_module(text) else {
+    public func importModule(
+        from text: String,
+        context: ModuleImportContext? = nil
+    ) throws -> Module {
+        let contextJSON = try context.map { try JSONEncoder.shared().encodeJSON($0) }
+        guard let cJSON = partout_import_module(text, contextJSON) else {
             throw PartoutABIError(.decoding)
         }
         defer { free(cJSON) }
