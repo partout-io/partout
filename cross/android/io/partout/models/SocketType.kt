@@ -36,9 +36,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class SocketType(val value: kotlin.String) {
 
+    /**
+     * UDP socket type.
+     */
     @SerialName(value = "UDP")
     udp("UDP"),
 
+    /**
+     * TCP socket type.
+     */
     @SerialName(value = "TCP")
     tcp("TCP");
 

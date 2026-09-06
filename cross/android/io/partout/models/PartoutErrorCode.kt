@@ -36,201 +36,399 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class PartoutErrorCode(val value: kotlin.String) {
 
+    /**
+     * Authentication failure.
+     */
     @SerialName(value = "authentication")
     authentication("authentication"),
 
+    /**
+     * Response is cached.
+     */
     @SerialName(value = "cached")
     cached("cached"),
 
+    /**
+     * Crypto error.
+     */
     @SerialName(value = "crypto")
     crypto("crypto"),
 
+    /**
+     * Decoding error.
+     */
     @SerialName(value = "decoding")
     decoding("decoding"),
 
+    /**
+     * DNS resolution failure.
+     */
     @SerialName(value = "dnsFailure")
     dnsFailure("dnsFailure"),
 
+    /**
+     * Encoding error.
+     */
     @SerialName(value = "encoding")
     encoding("encoding"),
 
+    /**
+     * No more endpoints available to try.
+     */
     @SerialName(value = "exhaustedEndpoints")
     exhaustedEndpoints("exhaustedEndpoints"),
 
+    /**
+     * File descriptor is not available.
+     */
     @SerialName(value = "fdUnavailable")
     fdUnavailable("fdUnavailable"),
 
+    /**
+     * Some modules are incompatible (&#x60;userInfo&#x60; is an array of incompatible &#x60;&#x60;Module&#x60;&#x60;).
+     */
     @SerialName(value = "incompatibleModules")
     incompatibleModules("incompatibleModules"),
 
+    /**
+     * A module is incomplete (&#x60;userInfo&#x60; is the incomplete &#x60;&#x60;ModuleBuilder&#x60;&#x60; ID).
+     */
     @SerialName(value = "incompleteModule")
     incompleteModule("incompleteModule"),
 
+    /**
+     * Invalid field.
+     */
     @SerialName(value = "invalidField")
     invalidField("invalidField"),
 
+    /**
+     * Invalid value.
+     */
     @SerialName(value = "invalidValue")
     invalidValue("invalidValue"),
 
+    /**
+     * I/O failure.
+     */
     @SerialName(value = "ioFailure")
     ioFailure("ioFailure"),
 
+    /**
+     * Unable to add keychain item.
+     */
     @SerialName(value = "keychainAddItem")
     keychainAddItem("keychainAddItem"),
 
+    /**
+     * Keychain item not found.
+     */
     @SerialName(value = "keychainItemNotFound")
     keychainItemNotFound("keychainItemNotFound"),
 
+    /**
+     * Link device is not active.
+     */
     @SerialName(value = "linkNotActive")
     linkNotActive("linkNotActive"),
 
+    /**
+     * Network changed.
+     */
     @SerialName(value = "networkChanged")
     networkChanged("networkChanged"),
 
+    /**
+     * Network is unreachable.
+     */
     @SerialName(value = "networkUnreachable")
     networkUnreachable("networkUnreachable"),
 
+    /**
+     * The profile has no active modules.
+     */
     @SerialName(value = "noActiveModules")
     noActiveModules("noActiveModules"),
 
+    /**
+     * The profile has non-final modules that must be resolved to final modules first.
+     */
     @SerialName(value = "nonFinalModules")
     nonFinalModules("nonFinalModules"),
 
+    /**
+     * Entity not found.
+     */
     @SerialName(value = "notFound")
     notFound("notFound"),
 
+    /**
+     * Compression settings mismatch.
+     */
     @SerialName(value = "OpenVPN.compressionMismatch")
     openVPNCompressionMismatch("OpenVPN.compressionMismatch"),
 
+    /**
+     * Connection failure.
+     */
     @SerialName(value = "OpenVPN.connectionFailure")
     openVPNConnectionFailure("OpenVPN.connectionFailure"),
 
+    /**
+     * No routing configuration.
+     */
     @SerialName(value = "OpenVPN.noRouting")
     openVPNNoRouting("OpenVPN.noRouting"),
 
+    /**
+     * One-time password is required.
+     */
     @SerialName(value = "OpenVPN.otpRequired")
     openVPNOTPRequired("OpenVPN.otpRequired"),
 
+    /**
+     * Passphrase is required.
+     */
     @SerialName(value = "OpenVPN.passphraseRequired")
     openVPNPassphraseRequired("OpenVPN.passphraseRequired"),
 
+    /**
+     * Authentication can be retried.
+     */
     @SerialName(value = "OpenVPN.recoverableAuthentication")
     openVPNRecoverableAuthentication("OpenVPN.recoverableAuthentication"),
 
+    /**
+     * Server requested shutdown.
+     */
     @SerialName(value = "OpenVPN.serverShutdown")
     openVPNServerShutdown("OpenVPN.serverShutdown"),
 
+    /**
+     * TLS failure.
+     */
     @SerialName(value = "OpenVPN.tlsFailure")
     openVPNTLSFailure("OpenVPN.tlsFailure"),
 
+    /**
+     * Algorithm is unsupported.
+     */
     @SerialName(value = "OpenVPN.unsupportedAlgorithm")
     openVPNUnsupportedAlgorithm("OpenVPN.unsupportedAlgorithm"),
 
+    /**
+     * Compression setting is unsupported.
+     */
     @SerialName(value = "OpenVPN.unsupportedCompression")
     openVPNUnsupportedCompression("OpenVPN.unsupportedCompression"),
 
+    /**
+     * Option is unsupported.
+     */
     @SerialName(value = "OpenVPN.unsupportedOption")
     openVPNUnsupportedOption("OpenVPN.unsupportedOption"),
 
+    /**
+     * Operation cancelled or unauthorized.
+     */
     @SerialName(value = "operationCancelled")
     operationCancelled("operationCancelled"),
 
+    /**
+     * Memory allocation failed.
+     */
     @SerialName(value = "outOfMemory")
     outOfMemory("outOfMemory"),
 
+    /**
+     * Parsing error.
+     */
     @SerialName(value = "parsing")
     parsing("parsing"),
 
+    /**
+     * A passphrase is required.
+     */
     @SerialName(value = "passphraseRequired")
     passphraseRequired("passphraseRequired"),
 
+    /**
+     * A required object was released prematurely.
+     */
     @SerialName(value = "releasedObject")
     releasedObject("releasedObject"),
 
+    /**
+     * Missing a required implementation.
+     */
     @SerialName(value = "requiredImplementation")
     requiredImplementation("requiredImplementation"),
 
+    /**
+     * An exception was raised during a script execution.
+     */
     @SerialName(value = "scriptException")
     scriptException("scriptException"),
 
+    /**
+     * Native sockets could not be configured.
+     */
     @SerialName(value = "socketConfiguration")
     socketConfiguration("socketConfiguration"),
 
+    /**
+     * Operation timed out.
+     */
     @SerialName(value = "timeout")
     timeout("timeout"),
 
+    /**
+     * TUN device is not active.
+     */
     @SerialName(value = "tunNotActive")
     tunNotActive("tunNotActive"),
 
+    /**
+     * TUN device is not available for I/O.
+     */
     @SerialName(value = "tunNotAvailable")
     tunNotAvailable("tunNotAvailable"),
 
+    /**
+     * Module type is unexpected
+     */
     @SerialName(value = "unexpectedModuleType")
     unexpectedModuleType("unexpectedModuleType"),
 
+    /**
+     * Generic failure.
+     */
     @SerialName(value = "unhandled")
     unhandled("unhandled"),
 
+    /**
+     * Module content is unknown for the importer.
+     */
     @SerialName(value = "unknownImportedModule")
     unknownImportedModule("unknownImportedModule"),
 
+    /**
+     * Module handler is unknown.
+     */
     @SerialName(value = "unknownModuleHandler")
     unknownModuleHandler("unknownModuleHandler"),
 
+    /**
+     * Configuration has no peers.
+     */
     @SerialName(value = "WireGuard.emptyPeers")
     wireGuardEmptyPeers("WireGuard.emptyPeers"),
 
+    /**
+     * WireGuard interface address is invalid.
+     */
     @SerialName(value = "WireGuard.interfaceHasInvalidAddress")
     wireGuardInterfaceHasInvalidAddress("WireGuard.interfaceHasInvalidAddress"),
 
+    /**
+     * WireGuard interface DNS entry is invalid.
+     */
     @SerialName(value = "WireGuard.interfaceHasInvalidDNS")
     wireGuardInterfaceHasInvalidDNS("WireGuard.interfaceHasInvalidDNS"),
 
+    /**
+     * WireGuard interface listen port is invalid.
+     */
     @SerialName(value = "WireGuard.interfaceHasInvalidListenPort")
     wireGuardInterfaceHasInvalidListenPort("WireGuard.interfaceHasInvalidListenPort"),
 
+    /**
+     * WireGuard interface MTU is invalid.
+     */
     @SerialName(value = "WireGuard.interfaceHasInvalidMTU")
     wireGuardInterfaceHasInvalidMTU("WireGuard.interfaceHasInvalidMTU"),
 
+    /**
+     * WireGuard interface private key is invalid.
+     */
     @SerialName(value = "WireGuard.interfaceHasInvalidPrivateKey")
     wireGuardInterfaceHasInvalidPrivateKey("WireGuard.interfaceHasInvalidPrivateKey"),
 
+    /**
+     * WireGuard interface has no private key.
+     */
     @SerialName(value = "WireGuard.interfaceHasNoPrivateKey")
     wireGuardInterfaceHasNoPrivateKey("WireGuard.interfaceHasNoPrivateKey"),
 
+    /**
+     * WireGuard interface key is unrecognized.
+     */
     @SerialName(value = "WireGuard.interfaceHasUnrecognizedKey")
     wireGuardInterfaceHasUnrecognizedKey("WireGuard.interfaceHasUnrecognizedKey"),
 
+    /**
+     * WireGuard key occurs more than once.
+     */
     @SerialName(value = "WireGuard.multipleEntriesForKey")
     wireGuardMultipleEntriesForKey("WireGuard.multipleEntriesForKey"),
 
+    /**
+     * WireGuard configuration has multiple interface sections.
+     */
     @SerialName(value = "WireGuard.multipleInterfaces")
     wireGuardMultipleInterfaces("WireGuard.multipleInterfaces"),
 
+    /**
+     * WireGuard configuration has multiple peers with the same public key.
+     */
     @SerialName(value = "WireGuard.multiplePeersWithSamePublicKey")
     wireGuardMultiplePeersWithSamePublicKey("WireGuard.multiplePeersWithSamePublicKey"),
 
+    /**
+     * WireGuard configuration has no interface section.
+     */
     @SerialName(value = "WireGuard.noInterface")
     wireGuardNoInterface("WireGuard.noInterface"),
 
+    /**
+     * WireGuard peer allowed IP is invalid.
+     */
     @SerialName(value = "WireGuard.peerHasInvalidAllowedIP")
     wireGuardPeerHasInvalidAllowedIP("WireGuard.peerHasInvalidAllowedIP"),
 
+    /**
+     * WireGuard peer endpoint is invalid.
+     */
     @SerialName(value = "WireGuard.peerHasInvalidEndpoint")
     wireGuardPeerHasInvalidEndpoint("WireGuard.peerHasInvalidEndpoint"),
 
+    /**
+     * WireGuard peer persistent keepalive is invalid.
+     */
     @SerialName(value = "WireGuard.peerHasInvalidPersistentKeepAlive")
     wireGuardPeerHasInvalidPersistentKeepAlive("WireGuard.peerHasInvalidPersistentKeepAlive"),
 
+    /**
+     * WireGuard peer pre-shared key is invalid.
+     */
     @SerialName(value = "WireGuard.peerHasInvalidPreSharedKey")
     wireGuardPeerHasInvalidPreSharedKey("WireGuard.peerHasInvalidPreSharedKey"),
 
+    /**
+     * WireGuard peer public key is invalid.
+     */
     @SerialName(value = "WireGuard.peerHasInvalidPublicKey")
     wireGuardPeerHasInvalidPublicKey("WireGuard.peerHasInvalidPublicKey"),
 
+    /**
+     * WireGuard peer has no public key.
+     */
     @SerialName(value = "WireGuard.peerHasNoPublicKey")
     wireGuardPeerHasNoPublicKey("WireGuard.peerHasNoPublicKey"),
 
+    /**
+     * WireGuard peer key is unrecognized.
+     */
     @SerialName(value = "WireGuard.peerHasUnrecognizedKey")
     wireGuardPeerHasUnrecognizedKey("WireGuard.peerHasUnrecognizedKey");
 

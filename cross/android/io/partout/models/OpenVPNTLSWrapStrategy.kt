@@ -36,12 +36,21 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class OpenVPNTLSWrapStrategy(val value: kotlin.String) {
 
+    /**
+     * Authenticates payload (--tls-auth).
+     */
     @SerialName(value = "auth")
     auth("auth"),
 
+    /**
+     * Encrypts payload (--tls-crypt).
+     */
     @SerialName(value = "crypt")
     crypt("crypt"),
 
+    /**
+     * Encrypts payload with a client-specific key (--tls-crypt-v2).
+     */
     @SerialName(value = "crypt-v2")
     cryptV2("crypt-v2");
 

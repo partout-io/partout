@@ -36,60 +36,117 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class WireGuardErrorCode(val value: kotlin.String) {
 
+    /**
+     * Configuration has no peers.
+     */
     @SerialName(value = "emptyPeers")
     emptyPeers("emptyPeers"),
 
+    /**
+     * Interface address is invalid.
+     */
     @SerialName(value = "interfaceHasInvalidAddress")
     interfaceHasInvalidAddress("interfaceHasInvalidAddress"),
 
+    /**
+     * Interface DNS entry is invalid.
+     */
     @SerialName(value = "interfaceHasInvalidDNS")
     interfaceHasInvalidDNS("interfaceHasInvalidDNS"),
 
+    /**
+     * Interface listen port is invalid.
+     */
     @SerialName(value = "interfaceHasInvalidListenPort")
     interfaceHasInvalidListenPort("interfaceHasInvalidListenPort"),
 
+    /**
+     * Interface MTU is invalid.
+     */
     @SerialName(value = "interfaceHasInvalidMTU")
     interfaceHasInvalidMTU("interfaceHasInvalidMTU"),
 
+    /**
+     * Interface private key is invalid.
+     */
     @SerialName(value = "interfaceHasInvalidPrivateKey")
     interfaceHasInvalidPrivateKey("interfaceHasInvalidPrivateKey"),
 
+    /**
+     * Interface has no private key.
+     */
     @SerialName(value = "interfaceHasNoPrivateKey")
     interfaceHasNoPrivateKey("interfaceHasNoPrivateKey"),
 
+    /**
+     * Interface key is unrecognized.
+     */
     @SerialName(value = "interfaceHasUnrecognizedKey")
     interfaceHasUnrecognizedKey("interfaceHasUnrecognizedKey"),
 
+    /**
+     * Key occurs more than once.
+     */
     @SerialName(value = "multipleEntriesForKey")
     multipleEntriesForKey("multipleEntriesForKey"),
 
+    /**
+     * Configuration has multiple interface sections.
+     */
     @SerialName(value = "multipleInterfaces")
     multipleInterfaces("multipleInterfaces"),
 
+    /**
+     * Configuration has multiple peers with the same public key.
+     */
     @SerialName(value = "multiplePeersWithSamePublicKey")
     multiplePeersWithSamePublicKey("multiplePeersWithSamePublicKey"),
 
+    /**
+     * Configuration has no interface section.
+     */
     @SerialName(value = "noInterface")
     noInterface("noInterface"),
 
+    /**
+     * Peer allowed IP is invalid.
+     */
     @SerialName(value = "peerHasInvalidAllowedIP")
     peerHasInvalidAllowedIP("peerHasInvalidAllowedIP"),
 
+    /**
+     * Peer endpoint is invalid.
+     */
     @SerialName(value = "peerHasInvalidEndpoint")
     peerHasInvalidEndpoint("peerHasInvalidEndpoint"),
 
+    /**
+     * Peer persistent keepalive is invalid.
+     */
     @SerialName(value = "peerHasInvalidPersistentKeepAlive")
     peerHasInvalidPersistentKeepAlive("peerHasInvalidPersistentKeepAlive"),
 
+    /**
+     * Peer pre-shared key is invalid.
+     */
     @SerialName(value = "peerHasInvalidPreSharedKey")
     peerHasInvalidPreSharedKey("peerHasInvalidPreSharedKey"),
 
+    /**
+     * Peer public key is invalid.
+     */
     @SerialName(value = "peerHasInvalidPublicKey")
     peerHasInvalidPublicKey("peerHasInvalidPublicKey"),
 
+    /**
+     * Peer has no public key.
+     */
     @SerialName(value = "peerHasNoPublicKey")
     peerHasNoPublicKey("peerHasNoPublicKey"),
 
+    /**
+     * Peer key is unrecognized.
+     */
     @SerialName(value = "peerHasUnrecognizedKey")
     peerHasUnrecognizedKey("peerHasUnrecognizedKey");
 
