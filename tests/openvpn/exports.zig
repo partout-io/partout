@@ -203,19 +203,22 @@ test "OpenVPN module importer rejects a wrong encrypted-key passphrase" {
     if (!has_real_default_crypto_backend) return error.SkipZigTest;
 
     const allocator = std.testing.allocator;
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
     var parser_context = parser.Parser.Context{ .passphrase = "wrong" };
-    if (exports.impl.module.importModule(
-        allocator,
-        tunnelbear_aes256_pkcs8,
-        core.ImportContext.init(
-            null,
-            @ptrCast(&parser_context),
-        ).withModuleType(.OpenVPN),
-    )) |imported| {
-        var module = imported;
-        module.deinit(allocator);
-        return error.TestUnexpectedResult;
-    } else |_| {}
+    try std.testing.expectError(
+        error.Parsing,
+        exports.impl.module.importModule(
+            allocator,
+            tunnelbear_aes256_pkcs8,
+            core.ImportContext.init(
+                &info,
+                @ptrCast(&parser_context),
+            ).withModuleType(.OpenVPN),
+        ),
+    );
+    try std.testing.expectEqual(api.ModuleType.OpenVPN, info.recognized_type.?);
+    try std.testing.expectEqualStrings(api.OpenVPNErrorCode.unableToDecrypt.raw(), info.sub_code.?);
 }
 
 fn expectDefaultImporterDecrypts(contents: []const u8) !void {

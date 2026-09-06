@@ -789,6 +789,7 @@ components:
         - recoverableAuthentication
         - serverShutdown
         - tlsFailure
+        - unableToDecrypt
         - unsupportedAlgorithm
         - unsupportedCompression
         - unsupportedOption
@@ -802,6 +803,7 @@ components:
         - recoverableAuthentication
         - serverShutdown
         - tlsFailure
+        - unableToDecrypt
         - unsupportedAlgorithm
         - unsupportedCompression
         - unsupportedOption
@@ -814,6 +816,7 @@ components:
         - Authentication can be retried.
         - Server requested shutdown.
         - TLS failure.
+        - Unable to decrypt configuration.
         - Algorithm is unsupported.
         - Compression setting is unsupported.
         - Option is unsupported.

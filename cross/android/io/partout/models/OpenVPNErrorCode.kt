@@ -31,7 +31,7 @@ import kotlinx.serialization.Serializable
 /**
  * An OpenVPN-specific error code.
  *
- * Values: compressionMismatch,connectionFailure,noRouting,otpRequired,passphraseRequired,recoverableAuthentication,serverShutdown,tlsFailure,unsupportedAlgorithm,unsupportedCompression,unsupportedOption
+ * Values: compressionMismatch,connectionFailure,noRouting,otpRequired,passphraseRequired,recoverableAuthentication,serverShutdown,tlsFailure,unableToDecrypt,unsupportedAlgorithm,unsupportedCompression,unsupportedOption
  */
 @Serializable
 enum class OpenVPNErrorCode(val value: kotlin.String) {
@@ -83,6 +83,12 @@ enum class OpenVPNErrorCode(val value: kotlin.String) {
      */
     @SerialName(value = "tlsFailure")
     tlsFailure("tlsFailure"),
+
+    /**
+     * Unable to decrypt configuration.
+     */
+    @SerialName(value = "unableToDecrypt")
+    unableToDecrypt("unableToDecrypt"),
 
     /**
      * Algorithm is unsupported.

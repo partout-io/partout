@@ -153,10 +153,10 @@ pub const Parser = struct {
 pub const ParseError = std.mem.Allocator.Error || error{
     ContinuationPushReply,
     DecrypterRequired,
+    DecryptionFailed,
     EmptyPassphrase,
     InvalidFormat,
     MalformedOption,
-    UnableToDecrypt,
     UnsupportedCompression,
     UnsupportedConfiguration,
 };
@@ -919,7 +919,7 @@ const Builder = struct {
         if (passphrase.len == 0) return error.EmptyPassphrase;
 
         const decrypt_key = self.decrypt_key orelse return error.DecrypterRequired;
-        const decrypted_pem = decrypt_key(self.decrypt_key_ctx, allocator, client_key.pem, passphrase) catch return error.UnableToDecrypt;
+        const decrypted_pem = try decrypt_key(self.decrypt_key_ctx, allocator, client_key.pem, passphrase);
         replaceOpenVPNCryptoContainer(allocator, &self.configuration.client_key, decrypted_pem);
     }
 };
@@ -1185,6 +1185,7 @@ fn setImportErrorCode(
     err: ParseError,
 ) void {
     const code: ?api.OpenVPNErrorCode = switch (err) {
+        error.DecrypterRequired, error.DecryptionFailed => .unableToDecrypt,
         error.EmptyPassphrase => .passphraseRequired,
         error.UnsupportedCompression => .unsupportedCompression,
         error.UnsupportedConfiguration => .unsupportedOption,

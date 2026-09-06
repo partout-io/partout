@@ -23,6 +23,8 @@ public enum OpenVPNErrorCode: String, Sendable, Codable, CaseIterable {
     case serverShutdown = "serverShutdown"
     /** TLS failure. */
     case tlsFailure = "tlsFailure"
+    /** Unable to decrypt configuration. */
+    case unableToDecrypt = "unableToDecrypt"
     /** Algorithm is unsupported. */
     case unsupportedAlgorithm = "unsupportedAlgorithm"
     /** Compression setting is unsupported. */

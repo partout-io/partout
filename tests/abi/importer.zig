@@ -358,9 +358,10 @@ test "OpenVPN module import context forwards its passphrase" {
             &info,
         ),
     );
-    // A missing passphrase has a dedicated sub-code. Reaching decryption with
-    // no sub-code proves that the context passphrase reached the parser.
-    try std.testing.expect(info.sub_code == null);
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unableToDecrypt.raw(),
+        info.sub_code.?,
+    );
 }
 
 fn expectImportEnvelope(

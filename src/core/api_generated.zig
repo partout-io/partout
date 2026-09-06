@@ -2415,6 +2415,7 @@ pub const OpenVPNErrorCode = enum {
     recoverableAuthentication,
     serverShutdown,
     tlsFailure,
+    unableToDecrypt,
     unsupportedAlgorithm,
     unsupportedCompression,
     unsupportedOption,
@@ -2433,6 +2434,7 @@ pub const OpenVPNErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "recoverableAuthentication")) return .recoverableAuthentication;
         if (std.mem.eql(u8, raw_value, "serverShutdown")) return .serverShutdown;
         if (std.mem.eql(u8, raw_value, "tlsFailure")) return .tlsFailure;
+        if (std.mem.eql(u8, raw_value, "unableToDecrypt")) return .unableToDecrypt;
         if (std.mem.eql(u8, raw_value, "unsupportedAlgorithm")) return .unsupportedAlgorithm;
         if (std.mem.eql(u8, raw_value, "unsupportedCompression")) return .unsupportedCompression;
         if (std.mem.eql(u8, raw_value, "unsupportedOption")) return .unsupportedOption;
@@ -2449,6 +2451,7 @@ pub const OpenVPNErrorCode = enum {
             .recoverableAuthentication => "recoverableAuthentication",
             .serverShutdown => "serverShutdown",
             .tlsFailure => "tlsFailure",
+            .unableToDecrypt => "unableToDecrypt",
             .unsupportedAlgorithm => "unsupportedAlgorithm",
             .unsupportedCompression => "unsupportedCompression",
             .unsupportedOption => "unsupportedOption",
