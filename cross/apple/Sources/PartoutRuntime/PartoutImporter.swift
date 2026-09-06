@@ -37,12 +37,12 @@ private extension PartoutImporter {
         let envelope = try decoder.decode(ABIEnvelope.self, from: data)
         if let code = envelope.code {
             if let payload = envelope.payload {
-                throw PartoutError(code, payload)
+                throw PartoutABIError(code, payload)
             }
-            throw PartoutError(code)
+            throw PartoutABIError(code)
         }
         guard let payload = envelope.payload else {
-            throw PartoutError(.decoding)
+            throw PartoutABIError(.decoding)
         }
         let encoder = JSONEncoder.shared()
         let payloadData = try encoder.encode(payload)

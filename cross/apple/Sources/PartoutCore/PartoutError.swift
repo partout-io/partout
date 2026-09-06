@@ -2,6 +2,17 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+/// ABI errors.
+public struct PartoutABIError: Error {
+    public let code: PartoutErrorCode
+    public let payload: JSON?
+
+    public init(_ code: PartoutErrorCode, _ payload: JSON? = nil) {
+        self.code = code
+        self.payload = payload
+    }
+}
+
 /// Mappable to ``PartoutError``.
 public protocol PartoutErrorMappable {
     var asPartoutError: PartoutError { get }
