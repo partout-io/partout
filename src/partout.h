@@ -29,8 +29,8 @@ typedef enum {
 typedef void (*partout_logger_cb)(void *ctx, int level, const char *message);
 typedef struct {
     bool logs_private_data;
+    partout_logger_cb logger_fn;
     void *logger_ctx;
-    partout_logger_cb logger;
 } partout_init_args;
 void partout_init(const partout_init_args *args);
 

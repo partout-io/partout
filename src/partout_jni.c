@@ -50,8 +50,8 @@ Java_io_partout_PartoutWrapper_partoutInit(
     const char *jni_tag = (*env)->GetStringUTFChars(env, tag, NULL);
     char *c_tag = jni_tag ? pp_dup(jni_tag) : NULL;
     args.logs_private_data = logs_private_data;
+    args.logger_fn = android_logger;
     args.logger_ctx = (void *)c_tag;
-    args.logger = android_logger;
     partout_init(&args);
     if (jni_tag) (*env)->ReleaseStringUTFChars(env, tag, jni_tag);
     // XXX: The tag must outlive the call, so we agree on leaking
