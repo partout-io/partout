@@ -5,8 +5,13 @@
 public final class PartoutImporter: Sendable {
     public init() {}
 
-    public func importProfile(from text: String) throws -> Profile {
-        guard let cJSON = partout_import_profile(text, nil) else {
+    public func importProfile(from url: URL) throws -> Profile {
+        let text = try String(contentsOf: url, encoding: .utf8)
+        return try importProfile(from: text, name: url.lastPathComponent)
+    }
+
+    public func importProfile(from text: String, name: String?) throws -> Profile {
+        guard let cJSON = partout_import_profile(text, name) else {
             throw PartoutABIError(.decoding)
         }
         defer { free(cJSON) }
