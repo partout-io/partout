@@ -6,13 +6,17 @@ public final class PartoutImporter: Sendable {
     public init() {}
 
     public func importModule(from url: URL) throws -> Module? {
-        let encoder = JSONEncoder.shared()
-        let decoder = JSONDecoder.shared()
         let text = try String(contentsOf: url, encoding: .utf8)
+        return try importModule(from: text)
+    }
+
+    public func importModule(from text: String) throws -> Module? {
         guard let cJSON = partout_import_module(text) else { return nil }
         defer { free(cJSON) }
         let json = String(cString: cJSON)
         guard let jsonData = json.data(using: .utf8) else { return nil }
+
+        let decoder = JSONDecoder.shared()
         let envelope = try decoder.decode(ABIEnvelope.self, from: jsonData)
         if let code = envelope.code {
             if let payload = envelope.payload {
@@ -21,6 +25,8 @@ public final class PartoutImporter: Sendable {
             throw PartoutError(code)
         }
         guard let payload = envelope.payload else { throw PartoutError(.decoding) }
+
+        let encoder = JSONEncoder.shared()
         let payloadData = try encoder.encode(payload)
         let tagged = try decoder.decode(TaggedModule.self, from: payloadData)
         return tagged.containedModule
