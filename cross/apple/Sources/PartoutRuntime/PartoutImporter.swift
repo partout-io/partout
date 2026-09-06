@@ -5,27 +5,33 @@
 public final class PartoutImporter: Sendable {
     public init() {}
 
-    public func importProfile(from text: String) throws -> Profile? {
-        guard let cJSON = partout_import_profile(text, nil) else { return nil }
+    public func importProfile(from text: String) throws -> Profile {
+        guard let cJSON = partout_import_profile(text, nil) else {
+            throw PartoutABIError(.decoding)
+        }
         defer { free(cJSON) }
         let json = String(cString: cJSON)
-        guard let jsonData = json.data(using: .utf8) else { return nil }
-
+        guard let jsonData = json.data(using: .utf8) else {
+            throw PartoutABIError(.decoding)
+        }
         let tagged = try abiPayload(TaggedProfile.self, from: jsonData)
         return try tagged.asProfile()
     }
 
-    public func importModule(from url: URL) throws -> Module? {
+    public func importModule(from url: URL) throws -> Module {
         let text = try String(contentsOf: url, encoding: .utf8)
         return try importModule(from: text)
     }
 
-    public func importModule(from text: String) throws -> Module? {
-        guard let cJSON = partout_import_module(text) else { return nil }
+    public func importModule(from text: String) throws -> Module {
+        guard let cJSON = partout_import_module(text) else {
+            throw PartoutABIError(.decoding)
+        }
         defer { free(cJSON) }
         let json = String(cString: cJSON)
-        guard let jsonData = json.data(using: .utf8) else { return nil }
-
+        guard let jsonData = json.data(using: .utf8) else {
+            throw PartoutABIError(.decoding)
+        }
         let tagged = try abiPayload(TaggedModule.self, from: jsonData)
         return tagged.containedModule
     }
