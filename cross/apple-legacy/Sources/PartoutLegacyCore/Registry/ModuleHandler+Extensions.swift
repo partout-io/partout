@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension ModuleHandler {
-    static let allKnownHandlers: [ModuleHandler] = [
+    public static let allKnownHandlers: [ModuleHandler] = [
         DNSModule.moduleHandler,
         HTTPProxyModule.moduleHandler,
         IPModule.moduleHandler,

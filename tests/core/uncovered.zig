@@ -17,14 +17,6 @@ test "uncovered BidirectionalStateTests: Swift BidirectionalState utility" {
     return error.SkipZigTest;
 }
 
-test "uncovered CodingRegistryTests: legacy Swift encoding and handler registry compatibility paths" {
-    return error.SkipZigTest;
-}
-
-test "uncovered CodingRegistryTests+Legacy: legacy V2 profile fixtures and unknown legacy handlers" {
-    return error.SkipZigTest;
-}
-
 test "uncovered CollectionExtensionsTests: Swift collection extension helpers" {
     return error.SkipZigTest;
 }
