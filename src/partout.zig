@@ -220,7 +220,8 @@ pub export fn partout_daemon_start(
 
 pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
     if (!build_options.wireguard) {
-        @panic("WireGuard is not implemented");
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
     }
     return wireguard.generatePrivateKey(allocator) catch return null;
 }
@@ -229,7 +230,8 @@ pub export fn partout_wireguard_pubkey(
     c_key: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     if (!build_options.wireguard) {
-        @panic("WireGuard is not implemented");
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
     }
     const key_ptr = c_key orelse return null;
     return wireguard.derivePublicKey(
