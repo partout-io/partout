@@ -13,8 +13,9 @@
 		0E179B2F2B8A6D2C0053163E /* DemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2A2B8A6D2C0053163E /* DemoApp.swift */; };
 		0E179B302B8A6D2C0053163E /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E179B2B2B8A6D2C0053163E /* ContentView.swift */; };
 		0E336F682B9232CD00BE7BA6 /* Demo+Profile.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E336F662B9232CD00BE7BA6 /* Demo+Profile.swift */; };
+		0E71F0FD304EE709009BB046 /* DemoRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 0E71F0FC304EE709009BB046 /* DemoRuntime */; };
+		0E71F0FF304EE70E009BB046 /* DemoRuntime in Frameworks */ = {isa = PBXBuildFile; productRef = 0E71F0FE304EE70E009BB046 /* DemoRuntime */; };
 		0E749EF5302E5C6900C09985 /* SingleProfileRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E749EF4302E5C6900C09985 /* SingleProfileRepository.swift */; };
-		0E8441AD302475B500260A8E /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8441AC302475B500260A8E /* partout */; };
 		0E8441AF302475B900260A8E /* partout in Frameworks */ = {isa = PBXBuildFile; productRef = 0E8441AE302475B900260A8E /* partout */; };
 		0E8445A82BD8E7360019DF51 /* Files in Resources */ = {isa = PBXBuildFile; fileRef = 0E8445A72BD8E7360019DF51 /* Files */; };
 		0E9CFB7B2B8B34C0009C8D82 /* Shared+App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0E9CFB7A2B8B34C0009C8D82 /* Shared+App.swift */; };
@@ -76,7 +77,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				0E8441AD302475B500260A8E /* partout in Frameworks */,
+				0E71F0FF304EE70E009BB046 /* DemoRuntime in Frameworks */,
 				0EC332CA2B8A1808000B9C2F /* NetworkExtension.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -85,6 +86,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				0E71F0FD304EE709009BB046 /* DemoRuntime in Frameworks */,
 				0E8441AF302475B900260A8E /* partout in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -217,7 +219,7 @@
 			);
 			name = PartoutDemoTunnel;
 			packageProductDependencies = (
-				0E8441AC302475B500260A8E /* partout */,
+				0E71F0FE304EE70E009BB046 /* DemoRuntime */,
 			);
 			productName = Tunnel;
 			productReference = 0EC332C82B8A1808000B9C2F /* PartoutDemoTunnel.appex */;
@@ -251,7 +253,7 @@
 			);
 			mainGroup = 0E06D1862B87629100176E1D;
 			packageReferences = (
-				0E8441A9302475A600260A8E /* XCLocalSwiftPackageReference "../../../partout" */,
+				0E71F0FB304EE518009BB046 /* XCLocalSwiftPackageReference "Demo" */,
 			);
 			productRefGroup = 0E06D1902B87629100176E1D /* Products */;
 			projectDirPath = "";
@@ -625,6 +627,10 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
+		0E71F0FB304EE518009BB046 /* XCLocalSwiftPackageReference "Demo" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Demo;
+		};
 		0E8441A9302475A600260A8E /* XCLocalSwiftPackageReference "../../../partout" */ = {
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../../partout;
@@ -632,10 +638,15 @@
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		0E8441AC302475B500260A8E /* partout */ = {
+		0E71F0FC304EE709009BB046 /* DemoRuntime */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0E8441A9302475A600260A8E /* XCLocalSwiftPackageReference "../../../partout" */;
-			productName = partout;
+			package = 0E71F0FB304EE518009BB046 /* XCLocalSwiftPackageReference "Demo" */;
+			productName = DemoRuntime;
+		};
+		0E71F0FE304EE70E009BB046 /* DemoRuntime */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0E71F0FB304EE518009BB046 /* XCLocalSwiftPackageReference "Demo" */;
+			productName = DemoRuntime;
 		};
 		0E8441AE302475B900260A8E /* partout */ = {
 			isa = XCSwiftPackageProductDependency;
