@@ -102,6 +102,10 @@ int partout_daemon_start(const partout_daemon_start_args *args);
 void partout_daemon_hold(void);
 void partout_daemon_stop(void);
 
+/* Specific module ABI. */
+char *partout_wireguard_genkey(void);
+char *partout_wireguard_pubkey(const char *key);
+
 #ifdef __cplusplus
 }
 #endif

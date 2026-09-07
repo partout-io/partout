@@ -12,3 +12,5 @@ _partout_daemon_start
 _partout_daemon_hold
 _partout_daemon_stop
 _partout_log
+_partout_wireguard_genkey
+_partout_wireguard_pubkey

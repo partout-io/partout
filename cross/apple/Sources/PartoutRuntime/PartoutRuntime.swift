@@ -75,6 +75,25 @@ public final class PartoutRuntime: Sendable {
         defer { free(cText) }
         return String(cString: cText)
     }
+
+    public func wireGuardGeneratePrivateKey() throws -> String {
+        guard let cKey = partout_wireguard_genkey() else {
+            throw PartoutABIError(.crypto)
+        }
+        defer { free(cKey) }
+        return String(cString: cKey)
+    }
+
+    public func wireGuardDerivePublicKey(privateKey: String) throws -> String {
+        let cPubKey = privateKey.withCString {
+            partout_wireguard_pubkey($0)
+        }
+        guard let cPubKey else {
+            throw PartoutABIError(.crypto)
+        }
+        defer { free(cPubKey) }
+        return String(cString: cPubKey)
+    }
 }
 
 private extension PartoutRuntime {
