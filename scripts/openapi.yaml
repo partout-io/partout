@@ -1378,9 +1378,6 @@ components:
         mtu:
           $ref: "#/components/schemas/UInt16"
           description: The optional MTU.
-        prefersIPv6:
-          type: boolean
-          description: Prefer resolved IPv6 addresses over IPv4.
       required:
         - privateKey
         - addresses

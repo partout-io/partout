@@ -64,19 +64,17 @@ const WireGuardConnection = struct {
         module: net.ConnectionModule,
         sandbox: net.Sandbox,
     ) net.ConnectionCreateError!net.Connection {
-        const wg_module = switch (module.module.*) {
+        // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
+        const base_configuration = switch (module.module.*) {
             .WireGuard => |*wireguard| blk: {
-                break :blk wireguard;
+                const configuration = if (wireguard.configuration) |*value|
+                    value
+                else
+                    return error.IncompleteModule;
+                break :blk configuration;
             },
             else => return error.MissingConnectionImplementation,
         };
-
-        // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
-        const base_configuration = if (wg_module.configuration) |*value|
-            value
-        else
-            return error.IncompleteModule;
-        const prefers_ipv6 = base_configuration.interface.prefers_ipv6 orelse false;
 
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);
@@ -109,7 +107,6 @@ const WireGuardConnection = struct {
             sandbox.factory,
             sandbox.profile,
             &created.configuration,
-            prefers_ipv6,
             sandbox.options.dns_timeout,
         );
         log.write(.notice, "Using v2 connection");

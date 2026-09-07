@@ -1405,7 +1405,6 @@ fn zigFieldName(name: []const u8) []const u8 {
 
 test "Zig field names keep IP version initialisms together" {
     try std.testing.expectEqualStrings("parse_ipv6", zigFieldName("parseIPv6"));
-    try std.testing.expectEqualStrings("prefers_ipv6", zigFieldName("prefersIPv6"));
     try std.testing.expectEqualStrings("blocks_ipv4", zigFieldName("blocksIPv4"));
 }
 

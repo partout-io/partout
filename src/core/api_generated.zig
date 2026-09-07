@@ -3494,7 +3494,6 @@ pub const WireGuardLocalInterface = struct {
     listen_port: ?u16 = null,
     dns: ?DNSModule = null,
     mtu: ?u16 = null,
-    prefers_ipv6: ?bool = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!WireGuardLocalInterface {
         return parseWithErrorInfo(allocator, text, null);
@@ -3521,7 +3520,6 @@ pub const WireGuardLocalInterface = struct {
         result.listen_port = try parseOptionalJsonField(u16, allocator, object, "listenPort", error_info);
         result.dns = try parseOptionalJsonField(DNSModule, allocator, object, "dns", error_info);
         result.mtu = try parseOptionalJsonField(u16, allocator, object, "mtu", error_info);
-        result.prefers_ipv6 = try parseOptionalJsonField(bool, allocator, object, "prefersIPv6", error_info);
         return result;
     }
 
@@ -3537,7 +3535,6 @@ pub const WireGuardLocalInterface = struct {
         if (self.listen_port) |*value| deinitJson(u16, allocator, value);
         if (self.dns) |*value| deinitJson(DNSModule, allocator, value);
         if (self.mtu) |*value| deinitJson(u16, allocator, value);
-        if (self.prefers_ipv6) |*value| deinitJson(bool, allocator, value);
     }
 
     pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
@@ -3556,10 +3553,6 @@ pub const WireGuardLocalInterface = struct {
         }
         if (self.mtu) |value| {
             try jw.objectField("mtu");
-            try writeJson(jw, value);
-        }
-        if (self.prefers_ipv6) |value| {
-            try jw.objectField("prefersIPv6");
             try writeJson(jw, value);
         }
         try jw.endObject();
