@@ -354,7 +354,13 @@ test "module export ABI rejects missing and invalid TaggedModule JSON" {
 }
 
 test "WireGuard key ABI generates a valid key pair" {
-    if (!source.wireguard_enabled) return;
+    if (!source.wireguard_enabled) {
+        try std.testing.expect(partout.partout_wireguard_genkey() == null);
+        try std.testing.expect(partout.partout_wireguard_pubkey(
+            "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=",
+        ) == null);
+        return;
+    }
 
     const generated_ptr = partout.partout_wireguard_genkey() orelse
         return error.TestUnexpectedResult;
