@@ -5,7 +5,7 @@
 @_exported import PartoutCore
 @_exported import PartoutNative_C
 
-public final class PartoutRuntime {
+public final class PartoutRuntime: Sendable {
     /// The library version.
     public static var version: String {
         guard let cVersion = partout_version() else {
