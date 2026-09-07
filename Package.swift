@@ -13,7 +13,7 @@ let package = Package(
     products: [
         .library(
             name: "partout",
-            targets: ["PartoutCore"]
+            targets: ["Partout"]
         ),
         .library(
             name: "PartoutCore",
@@ -29,6 +29,11 @@ let package = Package(
         )
     ],
     targets: [
+        .target(
+            name: "Partout",
+            dependencies: ["PartoutCore"],
+            path: "cross/apple/Sources/Partout"
+        ),
         .target(
             name: "PartoutCore",
             dependencies: ["PartoutCore_C"],
