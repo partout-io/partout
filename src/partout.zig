@@ -11,11 +11,13 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 const abi = @import("abi/exports.zig");
 const ffi = @import("c/exports.zig");
 const core = @import("core/exports.zig");
 const version = @import("version.zig");
+const wireguard = if (build_options.wireguard) @import("wireguard/exports.zig") else struct {};
 const api = core.api;
 const partout_c = abi.partout_c;
 const portable_c = ffi.portable;
@@ -83,28 +85,6 @@ pub export fn partout_readfile(
 ) callconv(.c) ?[*:0]u8 {
     const path = rel_path orelse return null;
     return portable_c.pp_file_read(path, parent);
-}
-
-pub export fn partout_export_module(
-    c_json: ?[*:0]const u8,
-) callconv(.c) ?[*:0]u8 {
-    const json_ptr = c_json orelse return null;
-
-    var importer = abi.Importer.init(allocator) catch return null;
-    defer importer.deinit(allocator);
-
-    const module = api.TaggedModule.parse(
-        allocator,
-        util.borrowedCString(json_ptr),
-    ) catch |err| {
-        log.writef(.fault, "Unable to parse module: {s}", .{@errorName(err)});
-        return null;
-    };
-    defer module.deinit(allocator);
-    return importer.exportModule(allocator, &module) catch |err| {
-        log.writef(.fault, "Unable to export module: {s}", .{@errorName(err)});
-        return null;
-    };
 }
 
 pub export fn partout_import_profile(
@@ -178,6 +158,28 @@ pub export fn partout_import_module(
     return abi.successPayloadAllocZ(allocator, module_json.ptr);
 }
 
+pub export fn partout_export_module(
+    c_json: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    const json_ptr = c_json orelse return null;
+
+    var importer = abi.Importer.init(allocator) catch return null;
+    defer importer.deinit(allocator);
+
+    const module = api.TaggedModule.parse(
+        allocator,
+        util.borrowedCString(json_ptr),
+    ) catch |err| {
+        log.writef(.fault, "Unable to parse module: {s}", .{@errorName(err)});
+        return null;
+    };
+    defer module.deinit(allocator);
+    return importer.exportModule(allocator, &module) catch |err| {
+        log.writef(.fault, "Unable to export module: {s}", .{@errorName(err)});
+        return null;
+    };
+}
+
 pub export fn partout_daemon_start(
     args_pointer: ?*const partout_c.partout_daemon_start_args,
 ) callconv(.c) c_int {
@@ -214,6 +216,28 @@ pub export fn partout_daemon_start(
     daemon_runtime = runtime;
     if (is_daemon) daemon_process_lock.wait();
     return partout_c.PartoutCompletionCodeOK;
+}
+
+pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    return wireguard.generatePrivateKey(allocator) catch return null;
+}
+
+pub export fn partout_wireguard_pubkey(
+    c_key: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    const key_ptr = c_key orelse return null;
+    return wireguard.derivePublicKey(
+        allocator,
+        core.util.borrowedCString(key_ptr),
+    ) catch return null;
 }
 
 fn releaseDaemonBindings(bindings: ?*const partout_c.partout_daemon_bindings) void {
