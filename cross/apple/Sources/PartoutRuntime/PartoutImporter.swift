@@ -47,6 +47,17 @@ public final class PartoutImporter: Sendable {
         let tagged = try abiPayload(TaggedModule.self, from: jsonData)
         return tagged.containedModule
     }
+
+    public func exportModule(_ module: Module) throws -> String {
+        guard let tagged = module.taggedModule else {
+            throw PartoutABIError(.decoding)
+        }
+        let json = try JSONEncoder.shared().encodeJSON(tagged)
+        guard let text = partout_export_module(json) else {
+            throw PartoutABIError(.encoding)
+        }
+        return String(cString: text)
+    }
 }
 
 private extension PartoutImporter {
