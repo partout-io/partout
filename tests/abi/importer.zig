@@ -120,6 +120,27 @@ test "ABI registry imports raw WireGuard module through parser implementation" {
     try std.testing.expect(std.mem.indexOf(u8, imported, "\"id\":\"") != null);
 }
 
+test "ABI registry exports TaggedModule through serializer implementation" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    const imported = try importer.importModule(
+        allocator,
+        valid_wireguard_profile,
+        core.ImportContext.init(null, null),
+    );
+    defer allocator.free(imported);
+    var module = try api.TaggedModule.parse(allocator, imported);
+    defer module.deinit(allocator);
+
+    const exported = try importer.exportModule(allocator, &module);
+    defer allocator.free(exported);
+
+    try std.testing.expectEqual(@as(u8, 0), exported[exported.len]);
+    try std.testing.expectEqualStrings(serialized_wireguard_profile, exported);
+}
+
 test "ABI importer reports parse error info for raw modules" {
     const allocator = std.testing.allocator;
 
@@ -306,6 +327,31 @@ test "module import export returns normalized success and failure payloads" {
     );
 }
 
+test "module export ABI returns native serialized text" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    const module_json = try importer.importModule(
+        allocator,
+        valid_wireguard_profile,
+        core.ImportContext.init(null, null),
+    );
+    defer allocator.free(module_json);
+
+    const exported_ptr = partout.partout_export_module(module_json.ptr) orelse
+        return error.TestUnexpectedResult;
+    const exported = std.mem.span(exported_ptr);
+    defer std.heap.c_allocator.free(exported);
+
+    try std.testing.expectEqualStrings(serialized_wireguard_profile, exported);
+}
+
+test "module export ABI rejects missing and invalid TaggedModule JSON" {
+    try std.testing.expect(partout.partout_export_module(null) == null);
+    try std.testing.expect(partout.partout_export_module("not JSON") == null);
+}
+
 test "module import context selects the expected importer" {
     try expectImportEnvelope(
         partout.partout_import_module(
@@ -397,6 +443,16 @@ const valid_wireguard_profile =
     \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
     \\Address = 10.0.0.2/32
     \\
+    \\[Peer]
+    \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
+    \\AllowedIPs = 0.0.0.0/0
+    \\Endpoint = wg.example.com:51820
+;
+
+const serialized_wireguard_profile =
+    \\[Interface]
+    \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+    \\Address = 10.0.0.2/32
     \\[Peer]
     \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
     \\AllowedIPs = 0.0.0.0/0

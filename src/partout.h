@@ -49,6 +49,9 @@ typedef enum {
 char *partout_import_profile(const char *text, const char *name);
 /* context_json is an optional serialized ModuleImportContext. */
 char *partout_import_module(const char *text, const char *context_json);
+/* Serializes a TaggedModule JSON to its native format.
+ * The caller owns the returned string and must free it. */
+char *partout_export_module(const char *module_json);
 
 /* Callbacks invoked on daemon events. */
 typedef struct {

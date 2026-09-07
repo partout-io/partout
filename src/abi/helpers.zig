@@ -83,6 +83,21 @@ pub const Importer = struct {
         defer profile.deinit(allocator);
         return api.encodeProfileZ(allocator, &profile);
     }
+
+    pub fn exportModule(
+        self: *const Importer,
+        allocator: std.mem.Allocator,
+        module: *const api.TaggedModule,
+    ) core.SerializeError![:0]u8 {
+        const text = try self.registry.serializeModule(allocator, module, null);
+        const text_len = text.len;
+        const terminated = allocator.realloc(text, text_len + 1) catch {
+            allocator.free(text);
+            return error.OutOfMemory;
+        };
+        terminated[text_len] = 0;
+        return terminated[0..text_len :0];
+    }
 };
 
 pub const BoundDaemonEvents = struct {
