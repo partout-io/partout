@@ -11,12 +11,13 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 const abi = @import("abi/exports.zig");
 const ffi = @import("c/exports.zig");
 const core = @import("core/exports.zig");
 const version = @import("version.zig");
-const wireguard = @import("wireguard/exports.zig");
+const wireguard = if (build_options.wireguard) @import("wireguard/exports.zig") else struct {};
 const api = core.api;
 const partout_c = abi.partout_c;
 const portable_c = ffi.portable;
@@ -218,12 +219,18 @@ pub export fn partout_daemon_start(
 }
 
 pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        @panic("WireGuard is not implemented");
+    }
     return wireguard.generatePrivateKey(allocator) catch return null;
 }
 
 pub export fn partout_wireguard_pubkey(
     c_key: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        @panic("WireGuard is not implemented");
+    }
     const key_ptr = c_key orelse return null;
     return wireguard.derivePublicKey(
         allocator,
