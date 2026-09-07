@@ -69,10 +69,11 @@ public final class PartoutRuntime: Sendable {
             throw PartoutABIError(.decoding)
         }
         let json = try JSONEncoder.shared().encodeJSON(tagged)
-        guard let text = partout_export_module(json) else {
+        guard let cText = partout_export_module(json) else {
             throw PartoutABIError(.encoding)
         }
-        return String(cString: text)
+        defer { free(cText) }
+        return String(cString: cText)
     }
 }
 
