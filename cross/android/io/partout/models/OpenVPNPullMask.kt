@@ -36,12 +36,21 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class OpenVPNPullMask(val value: kotlin.String) {
 
+    /**
+     * Routes and gateways.
+     */
     @SerialName(value = "routes")
     routes("routes"),
 
+    /**
+     * DNS settings.
+     */
     @SerialName(value = "dns")
     dns("dns"),
 
+    /**
+     * Proxy settings.
+     */
     @SerialName(value = "proxy")
     proxy("proxy");
 

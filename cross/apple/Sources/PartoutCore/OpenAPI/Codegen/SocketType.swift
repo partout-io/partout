@@ -7,8 +7,8 @@
 
 /** A socket type between UDP and TCP. */
 public enum SocketType: String, Sendable, Codable, CaseIterable {
-    /// UDP socket type.
+    /** UDP socket type. */
     case udp = "UDP"
-    /// TCP socket type.
+    /** TCP socket type. */
     case tcp = "TCP"
 }

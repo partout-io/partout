@@ -47,7 +47,8 @@ typedef enum {
 
 /* Import profiles. */
 char *partout_import_profile(const char *text, const char *name);
-char *partout_import_module(const char *text);
+/* context_json is an optional serialized ModuleImportContext. */
+char *partout_import_module(const char *text, const char *context_json);
 
 /* Callbacks invoked on daemon events. */
 typedef struct {

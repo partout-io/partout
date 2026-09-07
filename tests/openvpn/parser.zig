@@ -611,14 +611,14 @@ test "OpenVPNParser reports decrypt failures for encrypted client key" {
     const allocator = std.testing.allocator;
     const ovpn_parser = OpenVPNParser{ .decrypt_key = failDecryptKey };
 
-    try std.testing.expectError(error.UnableToDecrypt, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
+    try std.testing.expectError(error.DecryptionFailed, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
 }
 
 test "OpenVPNParser creates a decrypter from its default crypto backend" {
     const allocator = std.testing.allocator;
     const ovpn_parser = OpenVPNParser.init(null);
 
-    try std.testing.expectError(error.UnableToDecrypt, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
+    try std.testing.expectError(error.DecryptionFailed, ovpn_parser.parseWithContext(allocator, encrypted_key_configuration, .{ .passphrase = "secret" }));
 }
 
 test "OpenVPNParser decrypts encrypted client key" {

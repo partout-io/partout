@@ -36,12 +36,21 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class DNSProtocol(val value: kotlin.String) {
 
+    /**
+     * The value to fall back to when unset. Standard cleartext DNS (port 53).
+     */
     @SerialName(value = "cleartext")
     cleartext("cleartext"),
 
+    /**
+     * DNS over HTTPS.
+     */
     @SerialName(value = "https")
     https("https"),
 
+    /**
+     * DNS over TLS (port 853).
+     */
     @SerialName(value = "tls")
     tls("tls");
 

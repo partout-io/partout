@@ -295,6 +295,45 @@ components:
         - WireGuard
         - Undefined
       description: Raw type univocally associated to each ``Module`` implementation.
+    ModuleImportContext:
+      discriminator:
+        mapping:
+          OpenVPN: "#/components/schemas/ModuleImportContext.OpenVPN"
+          WireGuard: "#/components/schemas/ModuleImportContext.WireGuard"
+        propertyName: type
+      properties:
+        type:
+          type: string
+      required:
+        - type
+      type: object
+      description: Protocol-specific options for importing a module.
+    ModuleImportContext.OpenVPN:
+      additionalProperties: false
+      allOf:
+        - $ref: "#/components/schemas/ModuleImportContext"
+      properties:
+        type:
+          const: OpenVPN
+          type: string
+        passphrase:
+          type: string
+      required:
+        - type
+      type: object
+      description: Options for importing an OpenVPN module.
+    ModuleImportContext.WireGuard:
+      additionalProperties: false
+      allOf:
+        - $ref: "#/components/schemas/ModuleImportContext"
+      properties:
+        type:
+          const: WireGuard
+          type: string
+      required:
+        - type
+      type: object
+      description: Options for importing a WireGuard module.
     OnDemandModule:
       additionalProperties: false
       properties:
@@ -750,6 +789,7 @@ components:
         - recoverableAuthentication
         - serverShutdown
         - tlsFailure
+        - unableToDecrypt
         - unsupportedAlgorithm
         - unsupportedCompression
         - unsupportedOption
@@ -763,6 +803,7 @@ components:
         - recoverableAuthentication
         - serverShutdown
         - tlsFailure
+        - unableToDecrypt
         - unsupportedAlgorithm
         - unsupportedCompression
         - unsupportedOption
@@ -775,6 +816,7 @@ components:
         - Authentication can be retried.
         - Server requested shutdown.
         - TLS failure.
+        - Unable to decrypt configuration.
         - Algorithm is unsupported.
         - Compression setting is unsupported.
         - Option is unsupported.

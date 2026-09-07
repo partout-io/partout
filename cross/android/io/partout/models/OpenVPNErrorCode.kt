@@ -31,41 +31,80 @@ import kotlinx.serialization.Serializable
 /**
  * An OpenVPN-specific error code.
  *
- * Values: compressionMismatch,connectionFailure,noRouting,otpRequired,passphraseRequired,recoverableAuthentication,serverShutdown,tlsFailure,unsupportedAlgorithm,unsupportedCompression,unsupportedOption
+ * Values: compressionMismatch,connectionFailure,noRouting,otpRequired,passphraseRequired,recoverableAuthentication,serverShutdown,tlsFailure,unableToDecrypt,unsupportedAlgorithm,unsupportedCompression,unsupportedOption
  */
 @Serializable
 enum class OpenVPNErrorCode(val value: kotlin.String) {
 
+    /**
+     * Compression settings mismatch.
+     */
     @SerialName(value = "compressionMismatch")
     compressionMismatch("compressionMismatch"),
 
+    /**
+     * Connection failure.
+     */
     @SerialName(value = "connectionFailure")
     connectionFailure("connectionFailure"),
 
+    /**
+     * No routing configuration.
+     */
     @SerialName(value = "noRouting")
     noRouting("noRouting"),
 
+    /**
+     * One-time password is required.
+     */
     @SerialName(value = "otpRequired")
     otpRequired("otpRequired"),
 
+    /**
+     * Passphrase is required.
+     */
     @SerialName(value = "passphraseRequired")
     passphraseRequired("passphraseRequired"),
 
+    /**
+     * Authentication can be retried.
+     */
     @SerialName(value = "recoverableAuthentication")
     recoverableAuthentication("recoverableAuthentication"),
 
+    /**
+     * Server requested shutdown.
+     */
     @SerialName(value = "serverShutdown")
     serverShutdown("serverShutdown"),
 
+    /**
+     * TLS failure.
+     */
     @SerialName(value = "tlsFailure")
     tlsFailure("tlsFailure"),
 
+    /**
+     * Unable to decrypt configuration.
+     */
+    @SerialName(value = "unableToDecrypt")
+    unableToDecrypt("unableToDecrypt"),
+
+    /**
+     * Algorithm is unsupported.
+     */
     @SerialName(value = "unsupportedAlgorithm")
     unsupportedAlgorithm("unsupportedAlgorithm"),
 
+    /**
+     * Compression setting is unsupported.
+     */
     @SerialName(value = "unsupportedCompression")
     unsupportedCompression("unsupportedCompression"),
 
+    /**
+     * Option is unsupported.
+     */
     @SerialName(value = "unsupportedOption")
     unsupportedOption("unsupportedOption");
 

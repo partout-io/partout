@@ -7,42 +7,42 @@
 
 /** A WireGuard-specific error code. */
 public enum WireGuardErrorCode: String, Sendable, Codable, CaseIterable {
-    /// Configuration has no peers.
+    /** Configuration has no peers. */
     case emptyPeers = "emptyPeers"
-    /// Interface address is invalid.
+    /** Interface address is invalid. */
     case interfaceHasInvalidAddress = "interfaceHasInvalidAddress"
-    /// Interface DNS entry is invalid.
+    /** Interface DNS entry is invalid. */
     case interfaceHasInvalidDNS = "interfaceHasInvalidDNS"
-    /// Interface listen port is invalid.
+    /** Interface listen port is invalid. */
     case interfaceHasInvalidListenPort = "interfaceHasInvalidListenPort"
-    /// Interface MTU is invalid.
+    /** Interface MTU is invalid. */
     case interfaceHasInvalidMTU = "interfaceHasInvalidMTU"
-    /// Interface private key is invalid.
+    /** Interface private key is invalid. */
     case interfaceHasInvalidPrivateKey = "interfaceHasInvalidPrivateKey"
-    /// Interface has no private key.
+    /** Interface has no private key. */
     case interfaceHasNoPrivateKey = "interfaceHasNoPrivateKey"
-    /// Interface key is unrecognized.
+    /** Interface key is unrecognized. */
     case interfaceHasUnrecognizedKey = "interfaceHasUnrecognizedKey"
-    /// Key occurs more than once.
+    /** Key occurs more than once. */
     case multipleEntriesForKey = "multipleEntriesForKey"
-    /// Configuration has multiple interface sections.
+    /** Configuration has multiple interface sections. */
     case multipleInterfaces = "multipleInterfaces"
-    /// Configuration has multiple peers with the same public key.
+    /** Configuration has multiple peers with the same public key. */
     case multiplePeersWithSamePublicKey = "multiplePeersWithSamePublicKey"
-    /// Configuration has no interface section.
+    /** Configuration has no interface section. */
     case noInterface = "noInterface"
-    /// Peer allowed IP is invalid.
+    /** Peer allowed IP is invalid. */
     case peerHasInvalidAllowedIP = "peerHasInvalidAllowedIP"
-    /// Peer endpoint is invalid.
+    /** Peer endpoint is invalid. */
     case peerHasInvalidEndpoint = "peerHasInvalidEndpoint"
-    /// Peer persistent keepalive is invalid.
+    /** Peer persistent keepalive is invalid. */
     case peerHasInvalidPersistentKeepAlive = "peerHasInvalidPersistentKeepAlive"
-    /// Peer pre-shared key is invalid.
+    /** Peer pre-shared key is invalid. */
     case peerHasInvalidPreSharedKey = "peerHasInvalidPreSharedKey"
-    /// Peer public key is invalid.
+    /** Peer public key is invalid. */
     case peerHasInvalidPublicKey = "peerHasInvalidPublicKey"
-    /// Peer has no public key.
+    /** Peer has no public key. */
     case peerHasNoPublicKey = "peerHasNoPublicKey"
-    /// Peer key is unrecognized.
+    /** Peer key is unrecognized. */
     case peerHasUnrecognizedKey = "peerHasUnrecognizedKey"
 }

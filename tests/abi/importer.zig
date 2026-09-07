@@ -281,28 +281,86 @@ test "profile import export returns normalized success and failure payloads" {
 
 test "module import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
-        partout.partout_import_module(valid_wireguard_profile),
+        partout.partout_import_module(valid_wireguard_profile, null),
         null,
         "type",
         "WireGuard",
     );
     try expectImportEnvelope(
-        partout.partout_import_module(invalid_wireguard_profile),
+        partout.partout_import_module(invalid_wireguard_profile, null),
         .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
-        partout.partout_import_module(invalid_openvpn_profile),
+        partout.partout_import_module(invalid_openvpn_profile, null),
         .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
-        partout.partout_import_module(encrypted_openvpn_profile),
+        partout.partout_import_module(encrypted_openvpn_profile, null),
         .parsing,
         null,
         null,
+    );
+}
+
+test "module import context selects the expected importer" {
+    try expectImportEnvelope(
+        partout.partout_import_module(
+            valid_wireguard_profile,
+            "{\"type\":\"WireGuard\"}",
+        ),
+        null,
+        "type",
+        "WireGuard",
+    );
+    try expectImportEnvelope(
+        partout.partout_import_module(
+            valid_wireguard_profile,
+            "{\"type\":\"OpenVPN\"}",
+        ),
+        .unknownImportedModule,
+        null,
+        null,
+    );
+}
+
+test "module import rejects malformed context JSON" {
+    try expectImportEnvelope(
+        partout.partout_import_module(valid_wireguard_profile, "{}"),
+        .decoding,
+        null,
+        null,
+    );
+}
+
+test "OpenVPN module import context forwards its passphrase" {
+    const allocator = std.testing.allocator;
+
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    var context = try api.ModuleImportContext.parse(
+        allocator,
+        "{\"type\":\"OpenVPN\",\"passphrase\":\"secret\"}",
+    );
+    defer context.deinit(allocator);
+    var info: api.ParseErrorInfo = .{};
+    defer info.deinit(allocator);
+
+    try std.testing.expectError(
+        error.Parsing,
+        importer.importModuleWithContext(
+            allocator,
+            encrypted_openvpn_profile,
+            &context,
+            &info,
+        ),
+    );
+    try std.testing.expectEqualStrings(
+        api.OpenVPNErrorCode.unableToDecrypt.raw(),
+        info.sub_code.?,
     );
 }
 

@@ -7,26 +7,28 @@
 
 /** An OpenVPN-specific error code. */
 public enum OpenVPNErrorCode: String, Sendable, Codable, CaseIterable {
-    /// Compression settings mismatch.
+    /** Compression settings mismatch. */
     case compressionMismatch = "compressionMismatch"
-    /// Connection failure.
+    /** Connection failure. */
     case connectionFailure = "connectionFailure"
-    /// No routing configuration.
+    /** No routing configuration. */
     case noRouting = "noRouting"
-    /// One-time password is required.
+    /** One-time password is required. */
     case otpRequired = "otpRequired"
-    /// Passphrase is required.
+    /** Passphrase is required. */
     case passphraseRequired = "passphraseRequired"
-    /// Authentication can be retried.
+    /** Authentication can be retried. */
     case recoverableAuthentication = "recoverableAuthentication"
-    /// Server requested shutdown.
+    /** Server requested shutdown. */
     case serverShutdown = "serverShutdown"
-    /// TLS failure.
+    /** TLS failure. */
     case tlsFailure = "tlsFailure"
-    /// Algorithm is unsupported.
+    /** Unable to decrypt configuration. */
+    case unableToDecrypt = "unableToDecrypt"
+    /** Algorithm is unsupported. */
     case unsupportedAlgorithm = "unsupportedAlgorithm"
-    /// Compression setting is unsupported.
+    /** Compression setting is unsupported. */
     case unsupportedCompression = "unsupportedCompression"
-    /// Option is unsupported.
+    /** Option is unsupported. */
     case unsupportedOption = "unsupportedOption"
 }

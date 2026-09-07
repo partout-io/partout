@@ -49,6 +49,7 @@ case $language in
             --schema-mappings Endpoint=Endpoint \
             --schema-mappings EndpointProtocol=EndpointProtocol \
             --schema-mappings ExtendedEndpoint=ExtendedEndpoint \
+            --schema-mappings ModuleImportContext=ModuleImportContext \
             --schema-mappings Subnet=Subnet \
             --schema-mappings UniqueID=UniqueID \
             --schema-mappings UInt16=UInt16 \

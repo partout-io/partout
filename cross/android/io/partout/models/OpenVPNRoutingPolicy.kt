@@ -36,12 +36,21 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class OpenVPNRoutingPolicy(val value: kotlin.String) {
 
+    /**
+     * All IPv4 traffic goes through the VPN.
+     */
     @SerialName(value = "IPv4")
     IPv4("IPv4"),
 
+    /**
+     * All IPv6 traffic goes through the VPN.
+     */
     @SerialName(value = "IPv6")
     IPv6("IPv6"),
 
+    /**
+     * Block LAN while connected.
+     */
     @SerialName(value = "blockLocal")
     blockLocal("blockLocal");
 

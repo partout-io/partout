@@ -36,21 +36,39 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class IPSocketType(val value: kotlin.String) {
 
+    /**
+     * UDP socket type.
+     */
     @SerialName(value = "UDP")
     udp("UDP"),
 
+    /**
+     * TCP socket type.
+     */
     @SerialName(value = "TCP")
     tcp("TCP"),
 
+    /**
+     * UDP socket type (IPv4).
+     */
     @SerialName(value = "UDP4")
     udp4("UDP4"),
 
+    /**
+     * TCP socket type (IPv4).
+     */
     @SerialName(value = "TCP4")
     tcp4("TCP4"),
 
+    /**
+     * UDP socket type (IPv6).
+     */
     @SerialName(value = "UDP6")
     udp6("UDP6"),
 
+    /**
+     * TCP socket type (IPv6).
+     */
     @SerialName(value = "TCP6")
     tcp6("TCP6");
 

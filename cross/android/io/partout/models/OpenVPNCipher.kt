@@ -36,21 +36,39 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class OpenVPNCipher(val value: kotlin.String) {
 
+    /**
+     * AES encryption with 128-bit key size and CBC.
+     */
     @SerialName(value = "AES-128-CBC")
     aes128cbc("AES-128-CBC"),
 
+    /**
+     * AES encryption with 192-bit key size and CBC.
+     */
     @SerialName(value = "AES-192-CBC")
     aes192cbc("AES-192-CBC"),
 
+    /**
+     * AES encryption with 256-bit key size and CBC.
+     */
     @SerialName(value = "AES-256-CBC")
     aes256cbc("AES-256-CBC"),
 
+    /**
+     * AES encryption with 128-bit key size and GCM.
+     */
     @SerialName(value = "AES-128-GCM")
     aes128gcm("AES-128-GCM"),
 
+    /**
+     * AES encryption with 192-bit key size and GCM.
+     */
     @SerialName(value = "AES-192-GCM")
     aes192gcm("AES-192-GCM"),
 
+    /**
+     * AES encryption with 256-bit key size and GCM.
+     */
     @SerialName(value = "AES-256-GCM")
     aes256gcm("AES-256-GCM");
 

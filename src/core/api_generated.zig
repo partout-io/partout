@@ -1067,6 +1067,165 @@ pub const ModuleType = enum {
     }
 };
 
+pub const ModuleImportContextOpenVPN = struct {
+    passphrase: ?[]const u8 = null,
+
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ModuleImportContextOpenVPN {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContextOpenVPN {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ModuleImportContextOpenVPN {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContextOpenVPN {
+        resetJsonErrorInfo(error_info);
+        const object = objectValue(value) orelse return error.InvalidModel;
+        var result = ModuleImportContextOpenVPN{};
+        errdefer result.deinit(allocator);
+        result.passphrase = try parseOptionalJsonField([]const u8, allocator, object, "passphrase", error_info);
+        return result;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        if (self.passphrase) |*value| deinitJson([]const u8, allocator, value);
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.beginObject();
+        if (self.passphrase) |value| {
+            try jw.objectField("passphrase");
+            try writeJson(jw, value);
+        }
+        try jw.endObject();
+    }
+};
+
+pub const ModuleImportContextWireGuard = struct {
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ModuleImportContextWireGuard {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContextWireGuard {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ModuleImportContextWireGuard {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContextWireGuard {
+        resetJsonErrorInfo(error_info);
+        _ = objectValue(value) orelse return error.InvalidModel;
+        var result = ModuleImportContextWireGuard{};
+        errdefer result.deinit(allocator);
+        return result;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        _ = self;
+        _ = allocator;
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        _ = self;
+        try jw.beginObject();
+        try jw.endObject();
+    }
+};
+
+pub const ModuleImportContext = union(enum) {
+    OpenVPN: ModuleImportContextOpenVPN,
+    WireGuard: ModuleImportContextWireGuard,
+
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!ModuleImportContext {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContext {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!ModuleImportContext {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!ModuleImportContext {
+        resetJsonErrorInfo(error_info);
+        const object = objectValue(value) orelse return error.InvalidModel;
+        const raw_discriminator = object.get("type") orelse {
+            setJsonErrorKey(error_info, "type");
+            return error.InvalidModel;
+        };
+        const raw_type = stringValue(raw_discriminator) orelse {
+            setJsonErrorKey(error_info, "type");
+            return error.InvalidModel;
+        };
+        if (std.mem.eql(u8, raw_type, "OpenVPN")) return .{ .OpenVPN = try parseJsonWithErrorInfo(ModuleImportContextOpenVPN, allocator, value, error_info) };
+        if (std.mem.eql(u8, raw_type, "WireGuard")) return .{ .WireGuard = try parseJsonWithErrorInfo(ModuleImportContextWireGuard, allocator, value, error_info) };
+        setJsonErrorKey(error_info, "type");
+        return error.UnsupportedModel;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        switch (self.*) {
+            .OpenVPN => |*value| deinitJson(ModuleImportContextOpenVPN, allocator, value),
+            .WireGuard => |*value| deinitJson(ModuleImportContextWireGuard, allocator, value),
+        }
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.beginObject();
+        switch (self) {
+            .OpenVPN => |value| {
+                try jw.objectField("type");
+                try jw.write("OpenVPN");
+                if (value.passphrase) |inner| {
+                    try jw.objectField("passphrase");
+                    try writeJson(jw, inner);
+                }
+            },
+            .WireGuard => |value| {
+                try jw.objectField("type");
+                try jw.write("WireGuard");
+                _ = value;
+            },
+        }
+        try jw.endObject();
+    }
+};
+
 pub const OnDemandModule = struct {
     id: uuid.UUID = uuid.zero_id,
     policy: OnDemandModulePolicy,
@@ -2256,6 +2415,7 @@ pub const OpenVPNErrorCode = enum {
     recoverableAuthentication,
     serverShutdown,
     tlsFailure,
+    unableToDecrypt,
     unsupportedAlgorithm,
     unsupportedCompression,
     unsupportedOption,
@@ -2274,6 +2434,7 @@ pub const OpenVPNErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "recoverableAuthentication")) return .recoverableAuthentication;
         if (std.mem.eql(u8, raw_value, "serverShutdown")) return .serverShutdown;
         if (std.mem.eql(u8, raw_value, "tlsFailure")) return .tlsFailure;
+        if (std.mem.eql(u8, raw_value, "unableToDecrypt")) return .unableToDecrypt;
         if (std.mem.eql(u8, raw_value, "unsupportedAlgorithm")) return .unsupportedAlgorithm;
         if (std.mem.eql(u8, raw_value, "unsupportedCompression")) return .unsupportedCompression;
         if (std.mem.eql(u8, raw_value, "unsupportedOption")) return .unsupportedOption;
@@ -2290,6 +2451,7 @@ pub const OpenVPNErrorCode = enum {
             .recoverableAuthentication => "recoverableAuthentication",
             .serverShutdown => "serverShutdown",
             .tlsFailure => "tlsFailure",
+            .unableToDecrypt => "unableToDecrypt",
             .unsupportedAlgorithm => "unsupportedAlgorithm",
             .unsupportedCompression => "unsupportedCompression",
             .unsupportedOption => "unsupportedOption",

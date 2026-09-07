@@ -36,18 +36,33 @@ import kotlinx.serialization.Serializable
 @Serializable
 enum class OpenVPNDigest(val value: kotlin.String) {
 
+    /**
+     * SHA1 message digest.
+     */
     @SerialName(value = "SHA1")
     sha1("SHA1"),
 
+    /**
+     * SHA224 message digest.
+     */
     @SerialName(value = "SHA224")
     sha224("SHA224"),
 
+    /**
+     * SHA256 message digest.
+     */
     @SerialName(value = "SHA256")
     sha256("SHA256"),
 
+    /**
+     * SHA256 message digest.
+     */
     @SerialName(value = "SHA384")
     sha384("SHA384"),
 
+    /**
+     * SHA256 message digest.
+     */
     @SerialName(value = "SHA512")
     sha512("SHA512");
 

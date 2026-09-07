@@ -44,8 +44,14 @@ import kotlinx.serialization.encoding.Encoder
 @Serializable(with = OpenVPNStaticKeyDirectionSerializer::class)
 enum class OpenVPNStaticKeyDirection(val value: kotlin.Int) {
 
+    /**
+     * Conventional server direction (implicit for tls-crypt).
+     */
     server(0),
 
+    /**
+     * Conventional client direction (implicit for tls-crypt).
+     */
     client(1);
 
     /**
