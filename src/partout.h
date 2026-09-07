@@ -103,6 +103,7 @@ void partout_daemon_hold(void);
 void partout_daemon_stop(void);
 
 /* Specific module ABI. */
+/* Returned strings are owned by the caller and must be freed. */
 char *partout_wireguard_genkey(void);
 char *partout_wireguard_pubkey(const char *key);
 

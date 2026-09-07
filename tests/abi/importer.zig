@@ -4,8 +4,9 @@
 
 const std = @import("std");
 
-const conn = @import("source").net_connection;
-const core = @import("source").core;
+const source = @import("source");
+const conn = source.net_connection;
+const core = source.core;
 
 const api = core.api;
 
@@ -350,6 +351,43 @@ test "module export ABI returns native serialized text" {
 test "module export ABI rejects missing and invalid TaggedModule JSON" {
     try std.testing.expect(partout.partout_export_module(null) == null);
     try std.testing.expect(partout.partout_export_module("not JSON") == null);
+}
+
+test "WireGuard key ABI generates a valid key pair" {
+    if (!source.wireguard_enabled) return;
+
+    const generated_ptr = partout.partout_wireguard_genkey() orelse
+        return error.TestUnexpectedResult;
+    const generated = std.mem.span(generated_ptr);
+    defer std.heap.c_allocator.free(generated);
+
+    try std.testing.expectEqual(@as(usize, 44), generated.len);
+    try std.testing.expect(api.WireGuardKey.parseRaw(generated) != null);
+
+    const public_ptr = partout.partout_wireguard_pubkey(generated_ptr) orelse
+        return error.TestUnexpectedResult;
+    const public_key = std.mem.span(public_ptr);
+    defer std.heap.c_allocator.free(public_key);
+
+    try std.testing.expectEqual(@as(usize, 44), public_key.len);
+    try std.testing.expect(api.WireGuardKey.parseRaw(public_key) != null);
+}
+
+test "WireGuard public-key ABI derives a known vector and rejects invalid input" {
+    if (!source.wireguard_enabled) return;
+
+    const public_key_ptr = partout.partout_wireguard_pubkey(
+        "dwdtCnMYpX08FsFyUbJmRd9ML4frwJkqsXf7pR25LCo=",
+    ) orelse return error.TestUnexpectedResult;
+    const public_key = std.mem.span(public_key_ptr);
+    defer std.heap.c_allocator.free(public_key);
+
+    try std.testing.expectEqualStrings(
+        "hSDwCYkwp1R0i33ctD73Wg2/Og0mOBr066SpjqqbTmo=",
+        public_key,
+    );
+    try std.testing.expect(partout.partout_wireguard_pubkey(null) == null);
+    try std.testing.expect(partout.partout_wireguard_pubkey("not base64") == null);
 }
 
 test "module import context selects the expected importer" {
