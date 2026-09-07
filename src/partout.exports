@@ -7,6 +7,7 @@ _partout_init
 _partout_readfile
 _partout_import_profile
 _partout_import_module
+_partout_export_module
 _partout_daemon_start
 _partout_daemon_hold
 _partout_daemon_stop

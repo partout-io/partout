@@ -9,7 +9,7 @@ extension OpenVPN {
     static var demoModule: OpenVPNModule? {
         do {
             guard let url = Constants.demoURL else { return nil }
-            guard let module = try PartoutImporter()
+            guard let module = try PartoutRuntime()
                 .importModule(from: url) as? OpenVPNModule else { return nil }
             var builder = module.builder()
             builder.credentials = Constants.demoCredentials

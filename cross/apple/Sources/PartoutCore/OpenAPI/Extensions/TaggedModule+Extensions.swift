@@ -17,7 +17,7 @@ extension TaggedModule {
 }
 
 extension Module {
-    var taggedModule: TaggedModule? {
+    public var taggedModule: TaggedModule? {
         switch self {
         case let module as DNSModule:
             return .DNS(module)

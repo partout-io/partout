@@ -85,6 +85,28 @@ pub export fn partout_readfile(
     return portable_c.pp_file_read(path, parent);
 }
 
+pub export fn partout_export_module(
+    c_json: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    const json_ptr = c_json orelse return null;
+
+    var importer = abi.Importer.init(allocator) catch return null;
+    defer importer.deinit(allocator);
+
+    const module = api.TaggedModule.parse(
+        allocator,
+        util.borrowedCString(json_ptr),
+    ) catch |err| {
+        log.writef(.fault, "Unable to parse module: {s}", .{@errorName(err)});
+        return null;
+    };
+    defer module.deinit(allocator);
+    return importer.exportModule(allocator, &module) catch |err| {
+        log.writef(.fault, "Unable to export module: {s}", .{@errorName(err)});
+        return null;
+    };
+}
+
 pub export fn partout_import_profile(
     c_text: ?[*:0]const u8,
     c_name: ?[*:0]const u8,

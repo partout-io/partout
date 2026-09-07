@@ -9,7 +9,7 @@ extension WireGuard {
     static var demoModule: WireGuardModule? {
         do {
             guard let url = Constants.demoURL else { return nil }
-            guard let module = try PartoutImporter()
+            guard let module = try PartoutRuntime()
                 .importModule(from: url) as? WireGuardModule else { return nil }
             return module
         } catch {
