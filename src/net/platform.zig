@@ -64,7 +64,7 @@ pub const Platform = struct {
 
     /// Protects access to event handlers from the outside, because
     /// reachability and better path signals may come from any thread.
-    callbacksMutex: core.Mutex,
+    callbacks_mutex: core.Mutex,
     monitor_drainer: core.Drainer,
 
     current_reachability: ?ReachabilityInfo,
@@ -93,7 +93,7 @@ pub const Platform = struct {
             .fnt = functions,
             .dns = .{},
             .socket_buf_size = options.socket_buf_size,
-            .callbacksMutex = .{},
+            .callbacks_mutex = .{},
             .monitor_drainer = .{},
             .current_reachability = null,
             .monitor_event_handler = null,
@@ -131,7 +131,7 @@ pub const Platform = struct {
         }
         log.write(.debug, "Deinit Platform");
         self.monitor_drainer.deinit();
-        self.callbacksMutex.deinit();
+        self.callbacks_mutex.deinit();
     }
 
     //#region Implemented interfaces
@@ -166,64 +166,64 @@ pub const Platform = struct {
     //#region Network events (must serialize)
 
     pub fn currentReachability(self: *Platform) ?ReachabilityInfo {
-        self.callbacksMutex.lock();
-        defer self.callbacksMutex.unlock();
+        self.callbacks_mutex.lock();
+        defer self.callbacks_mutex.unlock();
 
         return self.current_reachability;
     }
 
     fn isReachable(self: *Platform) bool {
-        self.callbacksMutex.lock();
-        defer self.callbacksMutex.unlock();
+        self.callbacks_mutex.lock();
+        defer self.callbacks_mutex.unlock();
 
         return (self.current_reachability orelse return false).reachable;
     }
 
     fn setMonitorEventHandler(self: *Platform, handler: ?NetworkMonitor.EventHandler) void {
-        self.callbacksMutex.lock();
-        defer self.callbacksMutex.unlock();
+        self.callbacks_mutex.lock();
+        defer self.callbacks_mutex.unlock();
 
         self.monitor_event_handler = handler;
         if (handler == null) {
-            self.monitor_drainer.drain(&self.callbacksMutex);
+            self.monitor_drainer.drain(&self.callbacks_mutex);
         }
     }
 
     fn betterPathCount(self: *Platform) usize {
-        self.callbacksMutex.lock();
-        defer self.callbacksMutex.unlock();
+        self.callbacks_mutex.lock();
+        defer self.callbacks_mutex.unlock();
 
         return self.better_path_count;
     }
 
     fn notifyReachability(self: *Platform, reachability: ReachabilityInfo) void {
-        self.callbacksMutex.lock();
+        self.callbacks_mutex.lock();
         self.current_reachability = reachability;
         const handler = self.monitor_event_handler;
         if (handler != null) {
             self.monitor_drainer.enter();
         }
-        self.callbacksMutex.unlock();
+        self.callbacks_mutex.unlock();
 
         log.write(.debug, "Reachability changed");
         if (handler) |block| {
-            defer self.monitor_drainer.leave(&self.callbacksMutex);
+            defer self.monitor_drainer.leave(&self.callbacks_mutex);
             block.onReachability(reachability);
         }
     }
 
     fn notifyBetterPath(self: *Platform) void {
-        self.callbacksMutex.lock();
+        self.callbacks_mutex.lock();
         self.better_path_count += 1;
         const handler = self.monitor_event_handler;
         if (handler != null) {
             self.monitor_drainer.enter();
         }
-        self.callbacksMutex.unlock();
+        self.callbacks_mutex.unlock();
 
         log.write(.debug, "Network better path available");
         if (handler) |block| {
-            defer self.monitor_drainer.leave(&self.callbacksMutex);
+            defer self.monitor_drainer.leave(&self.callbacks_mutex);
             block.onBetterPath();
         }
     }
@@ -477,14 +477,15 @@ fn monitorIsReachable(ptr: ?*anyopaque) bool {
 fn cOnReachability(ctx: ?*anyopaque, reachability: [*c]const ReachabilityInfo) callconv(.c) void {
     const self: *Platform = @ptrCast(@alignCast(ctx orelse return));
     if (reachability == null) return;
-    self.notifyReachability(reachability.*);
+    const reach = reachability.*;
+    self.notifyReachability(reach);
     if (builtin.abi.isAndroid() and @hasField(ReachabilityInfo, "network_handle")) {
         log.writef(.debug, "Network reachability changed: reachable={}, network_handle={}", .{
-            reachability[0].reachable,
-            reachability[0].network_handle,
+            reach.reachable,
+            reach.network_handle,
         });
     } else {
-        log.writef(.debug, "Network reachability changed: reachable={}", .{reachability[0].reachable});
+        log.writef(.debug, "Network reachability changed: reachable={}", .{reach.reachable});
     }
 }
 
