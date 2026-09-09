@@ -76,7 +76,7 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode);
 /* Read a whole file into a string. */
 char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent);
 
-/* Create a directory and any missing parents. */
+/* Create a directory and any missing parents. Existing directories succeed. */
 bool pp_file_create_directory(const char *path);
 
 /* Return whether a path identifies a directory. */
