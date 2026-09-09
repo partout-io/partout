@@ -42,6 +42,7 @@ pub const ReachabilityInfo = io.ReachabilityInfo;
 pub const Sandbox = sandbox.Sandbox;
 pub const SocketDescriptor = io.SocketDescriptor;
 pub const SocketFactory = sandbox.SocketFactory;
+pub const SocketWrapper = io.SocketWrapper;
 pub const TunnelController = sandbox.TunnelController;
 pub const TunWrapper = io.TunWrapper;
 

@@ -12,6 +12,42 @@ const mapReadResult = io.testing.mapReadResult;
 const mapWriteResult = io.testing.mapWriteResult;
 const reachabilityNone = io.testing.reachabilityNone;
 
+test "Windows tunnel wrapper has no POSIX device or packet IO" {
+    if (comptime @import("builtin").os.tag != .windows) return error.SkipZigTest;
+    var tun = io.TunWrapper.init(null);
+    defer tun.deinit();
+    try std.testing.expect(tun.muxDescriptor() == null);
+    try std.testing.expect(tun.name() == null);
+    const native = tun.nativeIO();
+    var bytes: [1]u8 = undefined;
+    try std.testing.expectError(error.EndOfStream, native.read(&bytes));
+    try std.testing.expectError(error.EndOfStream, native.write(&bytes, 0));
+    native.cleanup();
+    native.cleanup();
+}
+
+test "WinRT wrapper exposes nonblocking IO and idempotent cleanup" {
+    if (comptime @import("builtin").os.tag != .windows) return error.SkipZigTest;
+    const Wrapper = @import("source").net.SocketWrapper;
+    if (comptime !Wrapper.enabled) return error.SkipZigTest;
+    // Exercise the ABI-facing function bodies without requiring WinRT setup
+    // on the Zig test runner. Native loopback coverage lives in tests/portable.
+    std.testing.refAllDecls(Wrapper);
+    var invalid_options: io.SocketOptions = undefined;
+    invalid_options.configure = null;
+    invalid_options.buf_size = 0;
+    try std.testing.expectError(error.InvalidArgs, Wrapper.create(std.testing.allocator, invalid_options));
+    var wrapper: Wrapper = .{ .socket = null, .options = undefined };
+    const native = wrapper.nativeIO();
+    var bytes: [1]u8 = undefined;
+    try std.testing.expectError(error.EndOfStream, native.read(&bytes));
+    try std.testing.expectError(error.EndOfStream, native.write(&bytes, 0));
+    try std.testing.expectError(error.EndOfStream, native.setEventMask(true, false));
+    try std.testing.expectEqual(@as(?io.FileDescriptor, null), wrapper.muxDescriptor());
+    native.cleanup();
+    native.cleanup();
+}
+
 test "maps native socket read results" {
     try std.testing.expectError(error.WouldBlock, mapReadResult(.link, io_c.PPIOErrorWouldBlock, false));
     try std.testing.expectEqual(@as(?usize, null), try mapReadResult(.link, 0, false));
@@ -33,6 +69,7 @@ test "constructs empty reachability" {
 }
 
 test "socket wrapper reports an invalid remote address" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
     const wrapper = io.SocketWrapper{
         .socket = null,
         .options = .{
