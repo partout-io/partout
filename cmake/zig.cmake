@@ -2,7 +2,7 @@ set(PARTOUT_ZIG_ARGS build install
     --prefix "${PP_BUILD_OUTPUT}/partout"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
     "-Dstrip=$<IF:$<CONFIG:Debug,RelWithDebInfo>,false,true>"
-    "-Dshared=$<IF:$<BOOL:${PP_BUILD_STATIC}>,false,true>"
+    -Dshared=true
 )
 
 if(PP_BUILD_USE_OPENSSL)
@@ -71,7 +71,6 @@ if(PP_BUILD_USE_MBEDTLS)
                 set_property(TARGET MbedTLS::${target}
                     PROPERTY IMPORTED_GLOBAL TRUE)
             endforeach()
-            list(APPEND PARTOUT_STATIC_LIBRARIES MbedTLS::mbedtls)
         endif()
     endif()
     list(APPEND PARTOUT_ZIG_ARGS
@@ -115,11 +114,6 @@ if(PP_BUILD_USE_WIREGUARD)
         "-Dwg-go-include=${PARTOUT_WGGO_INCLUDE_DIR}"
         "-Dwg-go-lib=${PARTOUT_WGGO_LIBRARY_DIR}"
     )
-endif()
-
-if(WIN32 AND PP_BUILD_LIBRARY)
-    include("${CMAKE_CURRENT_LIST_DIR}/wintun.cmake")
-    list(APPEND PARTOUT_ZIG_ARGS "-Dwintun-include=${WINTUN_DIR}")
 endif()
 
 set(PARTOUT_ZIG_ARCH "${ARCH_NAME}")
@@ -167,12 +161,11 @@ if(PARTOUT_ZIG_TARGET)
 endif()
 
 if(PP_BUILD_LIBRARY)
+    if(PP_BUILD_WINRT)
+        list(APPEND PARTOUT_ZIG_ARGS "-Dwinrt-lib=$<TARGET_FILE:partout-winrt>")
+    endif()
     find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
-    if(PP_BUILD_STATIC)
-        set(PARTOUT_LINK_LIBRARY
-            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}")
-        set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
-    elseif(WIN32)
+    if(WIN32)
         set(PARTOUT_LINK_LIBRARY "${PP_BUILD_OUTPUT}/partout/lib/partout.lib")
         set(PARTOUT_ZIG_BYPRODUCTS
             "${PARTOUT_LINK_LIBRARY}"
@@ -192,13 +185,12 @@ if(PP_BUILD_LIBRARY)
         COMMAND_EXPAND_LISTS
         VERBATIM
     )
+    if(PP_BUILD_WINRT)
+        add_dependencies(partout partout-winrt)
+    endif()
 
     file(MAKE_DIRECTORY "${PP_BUILD_OUTPUT}/partout/include")
-    if(PP_BUILD_STATIC)
-        add_library(Partout::Partout STATIC IMPORTED GLOBAL)
-        set_target_properties(Partout::Partout PROPERTIES
-            IMPORTED_LOCATION "${PARTOUT_LINK_LIBRARY}")
-    elseif(WIN32)
+    if(WIN32)
         add_library(Partout::Partout SHARED IMPORTED GLOBAL)
         set_target_properties(Partout::Partout PROPERTIES
             IMPORTED_IMPLIB "${PARTOUT_LINK_LIBRARY}"
@@ -213,9 +205,6 @@ if(PP_BUILD_LIBRARY)
     endif()
     add_dependencies(Partout::Partout partout)
     set(PARTOUT_INTERFACE_LIBRARIES ${PARTOUT_RUNTIME_LIBRARIES})
-    if(PP_BUILD_STATIC)
-        list(APPEND PARTOUT_INTERFACE_LIBRARIES ${PARTOUT_STATIC_LIBRARIES})
-    endif()
     set_target_properties(Partout::Partout PROPERTIES
         INTERFACE_INCLUDE_DIRECTORIES "${PP_BUILD_OUTPUT}/partout/include"
         INTERFACE_LINK_LIBRARIES "${PARTOUT_INTERFACE_LIBRARIES}"

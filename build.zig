@@ -67,7 +67,6 @@ const Vendors = struct {
     mbedtls: VendorPaths,
     wg_go: VendorPaths,
     openssl_config_include: ?[]const u8,
-    wintun_include: ?[]const u8,
 
     fn all(vendors: Vendors) [3]VendorPaths {
         return .{ vendors.openssl, vendors.mbedtls, vendors.wg_go };
@@ -85,7 +84,7 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    embed_c: bool,
+    winrt_library: ?[]const u8,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -131,12 +130,6 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
     const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
-    const legacy_build = b.option(
-        bool,
-        "legacy-build",
-        "Build for the legacy Swift integration that provides C implementations.",
-    ) orelse false;
-    const embed_c = !legacy_build;
     const shared = b.option(
         bool,
         "shared",
@@ -167,7 +160,6 @@ pub fn build(b: *std.Build) void {
             "OpenSSL platform-specific headers search path.",
             false,
         ),
-        .wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false),
     };
     const apple_sdk_path = if (target.result.os.tag.isDarwin())
         b.option([]const u8, "apple-sdk-path", "Path to the Apple platform SDK.")
@@ -175,9 +167,12 @@ pub fn build(b: *std.Build) void {
         null;
 
     const build_options = b.addOptions();
-    build_options.addOption(bool, "legacy_build", legacy_build);
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
+    const winrt_library = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
+    if (winrt_library != null and (target.result.os.tag != .windows or target.result.abi != .msvc))
+        std.debug.panic("-Dwinrt-lib requires a Windows MSVC target", .{});
+    build_options.addOption(bool, "winrt", winrt_library != null);
 
     const config = BuildConfig{
         .target = target,
@@ -186,7 +181,7 @@ pub fn build(b: *std.Build) void {
         .libc_installation = parseLibCInstallation(b, target),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
-        .embed_c = embed_c,
+        .winrt_library = winrt_library,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -204,6 +199,9 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
+    if (shared and winrt_library != null) {
+        lib.forceUndefinedSymbol("pp_winrt_runtime_link");
+    }
     if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
             std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
@@ -223,6 +221,8 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .root_module = test_module,
     });
+    // The MSVC C++/WinRT bridge is built with /MD.
+    if (winrt_library != null) unit_tests.linkage = .dynamic;
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -239,16 +239,10 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
-        b.installArtifact(lib);
-    }
-    if (target.result.os.tag == .windows) {
-        if (vendors.wintun_include) |include_path| {
-            const dll = b.fmt("{s}/wintun.dll", .{include_path});
-            b.getInstallStep().dependOn(&b.addInstallBinFile(
-                .{ .cwd_relative = dll },
-                "wintun.dll",
-            ).step);
+        if (target.result.os.tag == .windows) {
+            lib.installHeader(b.path("cross/windows/partout_winrt.h"), "partout_winrt.h");
         }
+        b.installArtifact(lib);
     }
 
     const install_docs = b.addInstallDirectory(.{
@@ -396,7 +390,17 @@ fn createPartoutModule(
     configurePartoutModule(module, b, config);
     c_bindings.addImports(module);
 
-    if (add_c_sources and config.embed_c) {
+    if (add_c_sources) {
+        if (config.target.result.os.tag == .windows) {
+            if (config.winrt_library) |library| {
+                addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
+                module.addObjectFile(.{ .cwd_relative = library });
+                module.linkSystemLibrary("windowsapp", .{});
+                module.linkSystemLibrary("runtimeobject", .{});
+            } else {
+                addCSourceFiles(module, &.{"src/c/portable/tun_dummy.c"});
+            }
+        }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
     }
@@ -469,6 +473,9 @@ fn configureCHeadersAndMacros(
     consumer.addIncludePath(b.path("src"));
     consumer.addIncludePath(b.path("src/c/portable/include"));
     consumer.addIncludePath(b.path("src/c/crypto/include"));
+    if (config.target.result.os.tag == .windows) {
+        consumer.addIncludePath(b.path("cross/windows"));
+    }
     if (config.openvpn) {
         consumer.addIncludePath(b.path("src/openvpn/c/include"));
     }
@@ -536,7 +543,6 @@ fn addVendorIncludePaths(
     }
     for ([_]?[]const u8{
         config.vendors.openssl_config_include,
-        config.vendors.wintun_include,
     }) |include_path| {
         consumer.addSystemIncludePath(.{ .cwd_relative = include_path orelse continue });
     }
@@ -701,7 +707,6 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
         "src/c/portable/tun_android.c",
         "src/c/portable/tun_darwin.c",
         "src/c/portable/tun_linux.c",
-        "src/c/portable/tun_windows.c",
         "src/c/portable/zd.c",
     });
 

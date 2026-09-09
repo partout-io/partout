@@ -322,11 +322,12 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     const maybe_tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr);
     if (!info.requires_virtual_device) {
         log.write(.debug, "Platform: No virtual device required");
-        if (maybe_tun) |tun| {
+        // Windows tunnel state belongs to VpnChannel, not a POSIX TUN handle.
+        if (builtin.os.tag != .windows) if (maybe_tun) |tun| {
             // Android retains the descriptor in the VPN service. Other
             // platforms return an independently owned tunnel handle here.
             io_c.pp_tun_free_and_close(tun, !builtin.abi.isAndroid());
-        }
+        };
         return null;
     }
     const tun = maybe_tun orelse {
@@ -426,23 +427,42 @@ fn socketFactoryCreate(
 ) SocketFactory.Error!looper.Looper.Descriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
+    const options = self.socketOptions(endpoint, effective_reachability, timeout);
 
-    // Must return owned variant to outlive method
-    const wrapper = try SocketWrapper.create(
-        allocator,
-        self.socketOptions(endpoint, effective_reachability, timeout),
-    ) orelse return error.LinkNotActive;
-    log.writef(.debug, "PlatformSocketFactory: Created socket for {s}", .{
-        log.sensitive(endpoint.address),
-    });
-    const fd = wrapper.muxDescriptor() orelse {
-        wrapper.nativeIO().cleanup();
-        return error.LinkNotActive;
-    };
-    return .{
-        .fd = fd,
-        .io = wrapper.nativeIO(),
-    };
+    if (builtin.os.tag == .windows) {
+        if (!SocketWrapper.enabled) {
+            log.write(.err, "SocketFactory: WinRT socket bridge is not linked");
+            return error.LinkNotActive;
+        }
+        log.write(.info, "Using WindowsSocketWrapper (WinRT)");
+        const wrapper = SocketWrapper.create(allocator, options) catch |err| {
+            log.writef(.err, "SocketFactory: WinRT socket creation failed: {s}", .{@errorName(err)});
+            return switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                else => error.LinkNotActive,
+            };
+        };
+        const fd = wrapper.muxDescriptor() orelse {
+            wrapper.nativeIO().cleanup();
+            return error.LinkNotActive;
+        };
+        return .{ .fd = fd, .io = wrapper.nativeIO() };
+    } else {
+        log.write(.info, "Using SocketWrapper (POSIX)");
+        // Must return owned variant to outlive method
+        const wrapper = try SocketWrapper.create(allocator, options) orelse return error.LinkNotActive;
+        log.writef(.debug, "SocketFactory: Created socket for {s}", .{
+            log.sensitive(endpoint.address),
+        });
+        const fd = wrapper.muxDescriptor() orelse {
+            wrapper.nativeIO().cleanup();
+            return error.LinkNotActive;
+        };
+        return .{
+            .fd = fd,
+            .io = wrapper.nativeIO(),
+        };
+    }
 }
 
 //#endregion

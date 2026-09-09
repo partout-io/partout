@@ -5,4 +5,7 @@
 #include <portable/dns.h>
 #include <portable/mux.h>
 #include <portable/socket.h>
+#if defined(_WIN32)
+#include <portable/socket_winrt.h>
+#endif
 #include <portable/tun.h>

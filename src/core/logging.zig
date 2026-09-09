@@ -51,9 +51,7 @@ fn partoutLog(
 }
 
 comptime {
-    if (!build_options.legacy_build) {
-        @export(&partoutLog, .{ .name = "partout_log" });
-    }
+    @export(&partoutLog, .{ .name = "partout_log" });
 }
 
 /// Configures global logging state.
