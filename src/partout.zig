@@ -76,7 +76,7 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
 
 pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) callconv(.c) void {
     const args = args_pointer orelse return;
-    log.init(args.logs_private_data, args.logger_ctx, args.logger_fn);
+    log.init(args.logs_private_data, args.logger_fn, args.logger_ctx);
 }
 
 pub export fn partout_readfile(

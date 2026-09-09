@@ -62,13 +62,13 @@ comptime {
 /// Passing a null `logger` disables logging.
 pub fn init(
     private_data: bool,
-    logger_ctx: ?*anyopaque,
     logger: Callback,
+    logger_ctx: ?*anyopaque,
 ) void {
     mutex.lock();
     logs_private_data = private_data;
-    external_logger_ctx = logger_ctx;
     external_logger = logger;
+    external_logger_ctx = logger_ctx;
     mutex.unlock();
 
     write(.notice, "Partout initialized");

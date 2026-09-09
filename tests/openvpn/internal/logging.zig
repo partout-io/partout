@@ -61,7 +61,7 @@ test "logConfiguration formats route collections as strings" {
         .{ .destination = api.Subnet.parseRaw("10.0.0.0/24").? },
     };
     const configuration = api.OpenVPNConfiguration{ .routes4 = &routes };
-    logging.init(false, null, CapturingLogger.log);
+    logging.init(false, CapturingLogger.log, null);
     defer logging.deinit();
 
     openvpn_logging.logConfiguration(&configuration, false);
@@ -70,7 +70,7 @@ test "logConfiguration formats route collections as strings" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(true, null, CapturingLogger.log);
+    logging.init(true, CapturingLogger.log, null);
     openvpn_logging.logConfiguration(&configuration, false);
     try std.testing.expectEqualStrings(
         "\tRoutes (IPv4): [{\"destination\":\"10.0.0.0/24\"}]",
