@@ -48,6 +48,7 @@ void aead_prepare_iv(void *vctx, uint8_t *_Nonnull iv, const pp_zd *_Nonnull hma
     memcpy(iv + ctx->id_len, hmac_key->bytes, ctx->crypto.meta.cipher_iv_len - ctx->id_len);
 }
 
+static
 size_t aead_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_aead *ctx = vctx;
     pp_assert(ctx);
