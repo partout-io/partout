@@ -64,7 +64,6 @@ Write-Host "Verifying install directory: $installRoot"
 
 $requiredArtifacts = @(
     "bin\partout.dll",
-    "bin\wintun.dll"
 )
 
 foreach ($artifact in $requiredArtifacts) {
