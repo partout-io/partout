@@ -139,60 +139,6 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-// Balance with pp_tun_ctrl_clear_tunnel
-static pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
-    (void)uuid;
-    assert(jni_ref);
-    pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_set_tunnel(%p)", jni_ref);
-
-    PP_JNI_ATTACH_OR_RETURN(env, NULL);
-
-    jclass cls = NULL;
-    jmethodID method = NULL;
-    jstring j_info_json = NULL;
-
-    // This will be the result on success
-    pp_tun tun_impl = malloc(sizeof(*tun_impl));
-    if (tun_impl == NULL) {
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL tun_impl");
-        goto cleanup;
-    }
-    tun_impl->fd = -1;
-
-    cls = (*env)->GetObjectClass(env, jni_ref);
-    if (cls == NULL) {
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL cls");
-        goto cleanup;
-    }
-    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnel.name, sig_ctrl_setTunnel.signature);
-    if (method == NULL) {
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL method");
-        goto cleanup;
-    }
-    j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
-    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
-    if ((*env)->ExceptionCheck(env)) {
-        (*env)->ExceptionDescribe(env);
-        (*env)->ExceptionClear(env);
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Kotlin exception");
-        tun_impl->fd = -1;
-        goto cleanup;
-    }
-    if (tun_impl->fd < 0) {
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Invalid fd");
-        goto cleanup;
-    }
-cleanup:
-    if (tun_impl != NULL && tun_impl->fd < 0) {
-        pp_free(tun_impl);
-        tun_impl = NULL;
-    }
-    if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
-    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
-    PP_JNI_DETACH(env);
-    return tun_impl;
-}
-
 static bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
                                           const pp_socket_fd *fds, const size_t fds_len) {
     assert(jni_ref);
@@ -247,6 +193,60 @@ cleanup:
     PP_JNI_DETACH(env);
 
     return success;
+}
+
+// Balance with pp_tun_ctrl_clear_tunnel
+static pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
+    (void)uuid;
+    assert(jni_ref);
+    pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_set_tunnel(%p)", jni_ref);
+
+    PP_JNI_ATTACH_OR_RETURN(env, NULL);
+
+    jclass cls = NULL;
+    jmethodID method = NULL;
+    jstring j_info_json = NULL;
+
+    // This will be the result on success
+    pp_tun tun_impl = malloc(sizeof(*tun_impl));
+    if (tun_impl == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL tun_impl");
+        goto cleanup;
+    }
+    tun_impl->fd = -1;
+
+    cls = (*env)->GetObjectClass(env, jni_ref);
+    if (cls == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL cls");
+        goto cleanup;
+    }
+    method = (*env)->GetMethodID(env, cls, sig_ctrl_setTunnel.name, sig_ctrl_setTunnel.signature);
+    if (method == NULL) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL method");
+        goto cleanup;
+    }
+    j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
+    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    if ((*env)->ExceptionCheck(env)) {
+        (*env)->ExceptionDescribe(env);
+        (*env)->ExceptionClear(env);
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Kotlin exception");
+        tun_impl->fd = -1;
+        goto cleanup;
+    }
+    if (tun_impl->fd < 0) {
+        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Invalid fd");
+        goto cleanup;
+    }
+cleanup:
+    if (tun_impl != NULL && tun_impl->fd < 0) {
+        pp_free(tun_impl);
+        tun_impl = NULL;
+    }
+    if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
+    PP_JNI_DETACH(env);
+    return tun_impl;
 }
 
 static void pp_tun_ctrl_report_snapshot(void *_Nullable ref, const char *snapshot_json) {
@@ -406,8 +406,8 @@ cleanup:
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,

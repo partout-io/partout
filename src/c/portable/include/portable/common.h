@@ -76,7 +76,7 @@ FILE *_Nullable pp_fopen(const char *filename, const char *mode);
 /* Read a whole file into a string. */
 char *_Nullable pp_file_read(const char *rel_path, const char *_Nullable parent);
 
-/* Create a directory and any missing parents. */
+/* Create a directory and any missing parents. Existing directories succeed. */
 bool pp_file_create_directory(const char *path);
 
 /* Return whether a path identifies a directory. */
@@ -104,6 +104,10 @@ extern const int PPIOErrorNoSpace;
 typedef void *_Nonnull pp_fd;
 typedef uintptr_t pp_socket_fd;
 
+static inline pp_fd pp_fd_invalid(void) {
+    return ((pp_fd)(void *)0);
+}
+
 static inline bool pp_fd_is_valid(pp_fd fd) {
     return (intptr_t)fd != -1;
 }
@@ -117,6 +121,10 @@ int pp_io_last_error_binding(void);
 
 typedef int pp_fd;
 typedef pp_fd pp_socket_fd;
+
+static inline pp_fd pp_fd_invalid(void) {
+    return -1;
+}
 
 static inline bool pp_fd_is_valid(pp_fd fd) {
     return fd != -1;

@@ -959,6 +959,8 @@ fn buildSettingsOnlyTunnelInfo(
 
 fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
     return switch (err) {
+        error.UnsupportedCryptoBackend,
+        => .crypto,
         error.InvalidJson,
         error.InvalidModel,
         error.InvalidProfile,

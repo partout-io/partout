@@ -159,6 +159,9 @@ static bool pp_file_is_separator(char value) {
 
 bool pp_file_create_directory(const char *path) {
     if (!path || path[0] == '\0') return false;
+    /* Try the target first: its parent may be writable even when inspecting
+     * ancestors is restricted (for example, in a Windows AppContainer). */
+    if (pp_file_create_single_directory(path)) return true;
 
     const size_t path_length = strlen(path);
     char *mutable_path = malloc(path_length + 1);

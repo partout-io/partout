@@ -238,7 +238,7 @@ test "writef formats PUSH_REPLY according to the private logging policy" {
         "PUSH_REPLY,ping 10,auth-token somethingsecret,cipher AES-256-GCM",
     )).?;
     defer reply.deinit(allocator);
-    logging.init(true, null, CapturingLogger.log);
+    logging.init(true, CapturingLogger.log, null);
     defer logging.deinit();
 
     logging.writef(.info, "{s}", .{reply});
@@ -248,7 +248,7 @@ test "writef formats PUSH_REPLY according to the private logging policy" {
         CapturingLogger.lastMessage(),
     );
 
-    logging.init(false, null, CapturingLogger.log);
+    logging.init(false, CapturingLogger.log, null);
     logging.writef(.info, "{s}", .{reply});
     try std.testing.expectEqualStrings(
         "<redacted>",

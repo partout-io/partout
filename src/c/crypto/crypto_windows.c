@@ -44,6 +44,7 @@ typedef struct {
     UCHAR tag[128]; // max length
 } pp_crypto_aead;
 
+static
 size_t aead_encryption_capacity(const void *vctx, size_t len) {
     const pp_crypto_aead *ctx = vctx;
     pp_assert(ctx);
@@ -932,7 +933,7 @@ pp_crypto_fnt pp_crypto_fnt_native(void) {
         pp_windows_crypto_ctr_free
     };
     pp_crypto_fnt table = pp_crypto_fnt_mbedtls();
-    table.name = "native-windows";
+    table.name = "BCrypt";
     table.enc = enc;
     return table;
 }
