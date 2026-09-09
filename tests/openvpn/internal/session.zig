@@ -7,6 +7,7 @@ const source = @import("source");
 
 const io = source.net_io;
 const net = source.net;
+const portable_c = source.ffi.portable;
 const AuthToken = source.openvpn_internal.auth.AuthToken;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
@@ -223,7 +224,10 @@ test "Session releases a link processor once when attach fails" {
     ).?;
     try std.testing.expectError(
         error.LinkFailure,
-        session.setLink(.{ .fd = -1, .io = mock_io.interface() }, endpoint),
+        session.setLink(.{
+            .fd = portable_c.pp_fd_invalid(),
+            .io = mock_io.interface(),
+        }, endpoint),
     );
     try std.testing.expectEqual(@as(usize, 1), mock_io.cleanup_count);
 

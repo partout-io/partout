@@ -104,6 +104,10 @@ extern const int PPIOErrorNoSpace;
 typedef void *_Nonnull pp_fd;
 typedef uintptr_t pp_socket_fd;
 
+static inline pp_fd pp_fd_invalid(void) {
+    return ((pp_fd)(void *)0);
+}
+
 static inline bool pp_fd_is_valid(pp_fd fd) {
     return (intptr_t)fd != -1;
 }
@@ -117,6 +121,10 @@ int pp_io_last_error_binding(void);
 
 typedef int pp_fd;
 typedef pp_fd pp_socket_fd;
+
+static inline pp_fd pp_fd_invalid(void) {
+    return -1;
+}
 
 static inline bool pp_fd_is_valid(pp_fd fd) {
     return fd != -1;
