@@ -66,10 +66,12 @@ pub fn init(
     logger: Callback,
 ) void {
     mutex.lock();
-    defer mutex.unlock();
     logs_private_data = private_data;
     external_logger_ctx = logger_ctx;
     external_logger = logger;
+    mutex.unlock();
+
+    write(.notice, "Partout initialized");
 }
 
 /// Resets global logging state to its disabled defaults.
