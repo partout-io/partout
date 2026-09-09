@@ -431,12 +431,12 @@ fn socketFactoryCreate(
 
     if (builtin.os.tag == .windows) {
         if (!SocketWrapper.enabled) {
-            log.write(.err, "PlatformSocketFactory: WinRT socket bridge is not linked");
+            log.write(.err, "SocketFactory: WinRT socket bridge is not linked");
             return error.LinkNotActive;
         }
         log.write(.info, "Using WindowsSocketWrapper (WinRT)");
         const wrapper = SocketWrapper.create(allocator, options) catch |err| {
-            log.writef(.err, "PlatformSocketFactory: WinRT socket creation failed: {s}", .{@errorName(err)});
+            log.writef(.err, "SocketFactory: WinRT socket creation failed: {s}", .{@errorName(err)});
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
                 else => error.LinkNotActive,
@@ -451,7 +451,7 @@ fn socketFactoryCreate(
         log.write(.info, "Using SocketWrapper (POSIX)");
         // Must return owned variant to outlive method
         const wrapper = try SocketWrapper.create(allocator, options) orelse return error.LinkNotActive;
-        log.writef(.debug, "PlatformSocketFactory: Created socket for {s}", .{
+        log.writef(.debug, "SocketFactory: Created socket for {s}", .{
             log.sensitive(endpoint.address),
         });
         const fd = wrapper.muxDescriptor() orelse {
