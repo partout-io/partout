@@ -27,14 +27,22 @@ const CapturingLogger = struct {
 };
 
 const ReplacementLogger = struct {
-    var called = false;
+    var saw_initialization = false;
+    var saw_secret = false;
 
     fn reset() void {
-        called = false;
+        saw_initialization = false;
+        saw_secret = false;
     }
 
-    fn log(_: ?*anyopaque, _: c_int, _: [*:0]const u8) callconv(.c) void {
-        called = true;
+    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+        const message = std.mem.span(raw_message);
+        saw_initialization = saw_initialization or std.mem.eql(
+            u8,
+            message,
+            "Partout initialized",
+        );
+        saw_secret = saw_secret or std.mem.eql(u8, message, "secret");
     }
 };
 
@@ -318,7 +326,8 @@ test "writef dispatches with the same state used to prepare arguments" {
         "secret",
         CapturingLogger.lastMessage(),
     );
-    try std.testing.expect(!ReplacementLogger.called);
+    try std.testing.expect(ReplacementLogger.saw_initialization);
+    try std.testing.expect(!ReplacementLogger.saw_secret);
 }
 
 test "writef infers array and dictionary debug representations" {
