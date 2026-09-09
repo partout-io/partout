@@ -17,6 +17,7 @@ pub const SocketWrapper = struct {
     last_error: c_int = 0,
 
     pub fn init(allocator: std.mem.Allocator, options: io.SocketOptions) !SocketWrapper {
+        if (options.buf_size <= 0) return error.InvalidArgs;
         const host = try allocator.dupeZ(u8, options.endpoint.address);
         defer allocator.free(host);
         var code: i32 = 0;

@@ -26,18 +26,42 @@ test "Windows tunnel wrapper has no POSIX device or packet IO" {
     native.cleanup();
 }
 
+test "WinRT wrapper rejects nonpositive buffer sizes before opening a socket" {
+    if (comptime @import("builtin").os.tag != .windows) return error.SkipZigTest;
+    const Wrapper = @import("source").net.SocketWrapper;
+    if (comptime !Wrapper.enabled) return error.SkipZigTest;
+    var options: io.SocketOptions = .{
+        .endpoint = .{
+            .address = "127.0.0.1",
+            .proto = api.EndpointProtocol.init(.udp, 1194),
+        },
+        .timeout_ms = 0,
+        .buf_size = 0,
+    };
+    for ([_]c_int{ 0, -1 }) |size| {
+        options.buf_size = size;
+        try std.testing.expectError(error.InvalidArgs, Wrapper.create(std.testing.allocator, options));
+    }
+}
+
 test "WinRT wrapper exposes nonblocking IO and idempotent cleanup" {
     if (comptime @import("builtin").os.tag != .windows) return error.SkipZigTest;
     const Wrapper = @import("source").net.SocketWrapper;
     if (comptime !Wrapper.enabled) return error.SkipZigTest;
     // Exercise the ABI-facing function bodies without requiring WinRT setup
-    // on the Zig test runner. Native loopback coverage lives in tests/portable.
+    // on the Zig test runner. Native loopback coverage lives in tests/c/portable.
     std.testing.refAllDecls(Wrapper);
-    var invalid_options: io.SocketOptions = undefined;
-    invalid_options.configure = null;
-    invalid_options.buf_size = 0;
-    try std.testing.expectError(error.InvalidArgs, Wrapper.create(std.testing.allocator, invalid_options));
-    var wrapper: Wrapper = .{ .socket = null, .options = undefined };
+    var wrapper: Wrapper = .{
+        .socket = null,
+        .options = .{
+            .endpoint = .{
+                .address = "127.0.0.1",
+                .proto = api.EndpointProtocol.init(.udp, 1194),
+            },
+            .timeout_ms = 0,
+            .buf_size = 1024,
+        },
+    };
     const native = wrapper.nativeIO();
     var bytes: [1]u8 = undefined;
     try std.testing.expectError(error.EndOfStream, native.read(&bytes));
