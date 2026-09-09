@@ -172,10 +172,11 @@ const OpenVPNConnection = struct {
             .current_endpoint = null,
             .tunnel = null,
         };
+        const fnt = try api.cryptoFunctionTable(session_options.backend);
         log.writef(
             .notice,
             "Using v3 connection (crypto = {s})",
-            .{@tagName(session_options.backend)},
+            .{fnt.name},
         );
         return created.asConnection();
     }

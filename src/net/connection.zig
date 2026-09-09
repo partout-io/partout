@@ -17,6 +17,7 @@ pub const CreateError = std.mem.Allocator.Error || error{
     IdGeneration,
     IncompleteModule,
     MissingConnectionImplementation,
+    UnsupportedCryptoBackend,
 };
 
 pub const StartError = std.mem.Allocator.Error || error{
