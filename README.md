@@ -10,7 +10,7 @@
 
 _The easiest way to build cross-platform tunnel apps_.
 
-Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, plus Swift and Kotlin for the OS bindings. It provides VPN functionality through the [Network Extension][apple-ne] framework on Apple platforms, through [VpnService][android-vpnservice] on Android, and it partially works on Windows (with [Wintun][wintun]) and Linux.
+Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, plus Swift and Kotlin for the OS bindings. It provides VPN functionality through the [Network Extension][apple-ne] framework on Apple platforms, through [VpnService][android-vpnservice] on Android, and it partially works on Windows and Linux.
 
 Partout is the backbone of [Passepartout][passepartout].
 
@@ -129,7 +129,6 @@ Libraries:
 - [MbedTLS][credits-mbedtls]
 - [OpenSSL][credits-openssl]
 - [url.c][credits-url.c]
-- [Wintun][credits-wintun]
 - [WireGuard (Go)][credits-wireguard-go]
 
 Special contributors:
@@ -159,7 +158,6 @@ Website: [partout.io][partout]
 [passepartout]: https://partout.io/passepartout/
 [apple-ne]: https://developer.apple.com/documentation/networkextension/
 [android-vpnservice]: https://developer.android.com/reference/android/net/VpnService
-[wintun]: https://git.zx2c4.com/wintun/about/
 [license]: LICENSE
 [contrib-cla]: CLA.rst
 [contrib-readme]: CONTRIBUTING.md
@@ -172,7 +170,6 @@ Website: [partout.io][partout]
 [credits-tmthecoder]: https://github.com/tmthecoder
 [credits-tmthecoder-xor]: https://github.com/partout-io/tunnelkit/pull/255
 [credits-url.c]: https://github.com/cozis/url.c
-[credits-wintun]: https://github.com/wireguard/wintun
 [credits-wireguard-go]: https://github.com/wireguard/wireguard-go
 
 [about-twitter]: https://twitter.com/keeshux
