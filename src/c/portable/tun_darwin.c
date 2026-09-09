@@ -237,13 +237,13 @@ const char *pp_tun_name(const pp_tun tun) {
 
 typedef void (*pp_swift_tun_ctrl_set_delegate_fn)(void *_Nullable ref,
                                                   const pp_tun_ctrl_delegate *_Nullable delegate);
-typedef bool (*pp_swift_tun_ctrl_set_tunnel_fn)(void *_Nullable ref,
-                                                const char *_Nullable uuid,
-                                                const char *_Nullable info_json);
 typedef bool (*pp_swift_tun_ctrl_configure_sockets_fn)(void *_Nullable ref,
                                                        const pp_reachability *_Nullable info,
                                                        const pp_socket_fd *_Nullable fds,
                                                        size_t fds_len);
+typedef bool (*pp_swift_tun_ctrl_set_tunnel_fn)(void *_Nullable ref,
+                                                const char *_Nullable uuid,
+                                                const char *_Nullable info_json);
 typedef void (*pp_swift_tun_ctrl_report_snapshot_fn)(void *_Nullable ref,
                                                      const char *_Nullable snapshot_json);
 typedef void (*pp_swift_tun_ctrl_set_environment_value_fn)(void *_Nullable ref,
@@ -264,8 +264,8 @@ typedef void (*pp_swift_tun_ctrl_cancel_tunnel_fn)(void *_Nullable ref,
     }
 
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_delegate, "pp_swift_tun_ctrl_set_delegate", pp_swift_tun_ctrl_set_delegate_fn)
-PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_tunnel, "pp_swift_tun_ctrl_set_tunnel", pp_swift_tun_ctrl_set_tunnel_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_configure_sockets, "pp_swift_tun_ctrl_configure_sockets", pp_swift_tun_ctrl_configure_sockets_fn)
+PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_tunnel, "pp_swift_tun_ctrl_set_tunnel", pp_swift_tun_ctrl_set_tunnel_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_report_snapshot, "pp_swift_tun_ctrl_report_snapshot", pp_swift_tun_ctrl_report_snapshot_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_set_environment_value, "pp_swift_tun_ctrl_set_environment_value", pp_swift_tun_ctrl_set_environment_value_fn)
 PP_SWIFT_TUN_CTRL_SYMBOL(pp_swift_tun_ctrl_clear_tunnel, "pp_swift_tun_ctrl_clear_tunnel", pp_swift_tun_ctrl_clear_tunnel_fn)
@@ -329,8 +329,8 @@ static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,

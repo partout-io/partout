@@ -108,14 +108,6 @@ static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *dele
     pp_clog_v(PPLogLevelDebug, "tun_linux: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
-static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
-    (void)ref;
-    (void)uuid;
-    (void)info_json;
-    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
-    return pp_tun_open(uuid);
-}
-
 static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
                                           const pp_socket_fd *fds, const size_t fds_len) {
     (void)ref;
@@ -124,6 +116,14 @@ static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info
     (void)fds_len;
     pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_configure_sockets(%p)", ref);
     return true;
+}
+
+static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+    (void)ref;
+    (void)uuid;
+    (void)info_json;
+    pp_clog_v(PPLogLevelInfo, "tun_linux: ctrl_set_tunnel(%p)", ref);
+    return pp_tun_open(uuid);
 }
 
 static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
@@ -152,8 +152,8 @@ static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .configure_sockets = pp_tun_ctrl_configure_sockets,
+        .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,
