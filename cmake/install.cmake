@@ -13,29 +13,14 @@ function(partout_install_runtime_file file)
     )
 endfunction()
 
-function(partout_install_link_file file)
-    install(FILES "${file}"
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        OPTIONAL
-    )
-endfunction()
-
-function(partout_install_link_directory directory)
-    install(DIRECTORY "${directory}/"
-        DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        OPTIONAL
-        USE_SOURCE_PERMISSIONS
-        FILES_MATCHING
-        PATTERN "*.a"
-        PATTERN "*.lib"
-    )
-endfunction()
-
-install(DIRECTORY "${PP_BUILD_OUTPUT}/partout/include/"
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    OPTIONAL
-    USE_SOURCE_PERMISSIONS
 )
+if(WIN32)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/partout_winrt.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+endif()
 
 if(WIN32 AND WINTUN_DIR)
     partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
@@ -43,26 +28,11 @@ endif()
 
 set(PARTOUT_INSTALL_RUNTIME_TARGETS ${PARTOUT_RUNTIME_LIBRARIES})
 if(PP_BUILD_LIBRARY)
-    if(PP_BUILD_STATIC)
-        partout_install_link_file(
-            "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}"
-        )
-    else()
-        list(PREPEND PARTOUT_INSTALL_RUNTIME_TARGETS Partout::Partout)
-    endif()
+    list(PREPEND PARTOUT_INSTALL_RUNTIME_TARGETS Partout::Partout)
 endif()
 if(PARTOUT_INSTALL_RUNTIME_TARGETS)
     install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_INSTALL_RUNTIME_TARGETS}
         LIBRARY DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
         RUNTIME DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
     )
-endif()
-if(PP_BUILD_STATIC AND WGGO_DIR)
-    partout_install_link_directory("${WGGO_DIR}/lib")
-endif()
-if(PP_BUILD_STATIC AND PARTOUT_OPENSSL_IS_PREBUILT)
-    partout_install_link_directory("${OPENSSL_DIR}/lib")
-endif()
-if(PP_BUILD_STATIC AND PARTOUT_MBEDTLS_IS_PREBUILT)
-    partout_install_link_directory("${MBEDTLS_DIR}/lib")
 endif()
