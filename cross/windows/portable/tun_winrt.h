@@ -20,16 +20,6 @@ extern "C" {
 
 #include "portable/tun.h"
 
-/* WinRT stubs: no device is created and configuration fails. */
-/* Controller ref borrows the runtime's internal PartoutTunnelController.
- * The caller must retain that context until daemon shutdown finishes. */
-pp_tun pp_winrt_tun_open(const char *uuid);
-int pp_winrt_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
-int pp_winrt_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
-void pp_winrt_tun_close(const pp_tun tun);
-void pp_winrt_tun_free_and_close(pp_tun tun, bool and_close);
-pp_fd pp_winrt_tun_get_watch_fd(const pp_tun tun);
-const char * pp_winrt_tun_name(const pp_tun tun);
 void pp_winrt_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate);
 bool pp_winrt_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t fds_len);
 pp_tun pp_winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json);
