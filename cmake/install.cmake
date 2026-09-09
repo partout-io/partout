@@ -22,10 +22,6 @@ if(WIN32)
     )
 endif()
 
-if(WIN32 AND WINTUN_DIR)
-    partout_install_runtime_file("${PP_BUILD_OUTPUT}/partout/bin/wintun.dll")
-endif()
-
 set(PARTOUT_INSTALL_RUNTIME_TARGETS ${PARTOUT_RUNTIME_LIBRARIES})
 if(PP_BUILD_LIBRARY)
     list(PREPEND PARTOUT_INSTALL_RUNTIME_TARGETS Partout::Partout)

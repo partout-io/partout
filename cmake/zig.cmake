@@ -116,11 +116,6 @@ if(PP_BUILD_USE_WIREGUARD)
     )
 endif()
 
-# if(WIN32 AND PP_BUILD_LIBRARY)
-#     include("${CMAKE_CURRENT_LIST_DIR}/wintun.cmake")
-#     list(APPEND PARTOUT_ZIG_ARGS "-Dwintun-include=${WINTUN_DIR}")
-# endif()
-
 set(PARTOUT_ZIG_ARCH "${ARCH_NAME}")
 if(PARTOUT_ZIG_ARCH MATCHES "^(arm64|aarch64)$")
     set(PARTOUT_ZIG_ARCH aarch64)
