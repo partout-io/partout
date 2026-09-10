@@ -1,4 +1,0 @@
-module _PartoutOpenVPN_C {
-    umbrella header "openvpn/openvpn.h"
-    export *
-}

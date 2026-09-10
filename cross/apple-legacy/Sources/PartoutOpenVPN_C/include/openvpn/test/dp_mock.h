@@ -1,1 +1,0 @@
-../../../../../../../src/openvpn/c/include/openvpn/test/dp_mock.h

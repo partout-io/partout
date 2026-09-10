@@ -1,4 +1,0 @@
-module _PartoutCrypto_C {
-    umbrella header "crypto/crypto.h"
-    export *
-}
