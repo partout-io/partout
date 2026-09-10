@@ -6,9 +6,9 @@ const std = @import("std");
 const source = @import("source");
 
 const logging = source.core_logging;
-const platform_dns = source.net_platform_dns;
 const io_c = source.net_io.io_c;
-const PlatformDNS = platform_dns.PlatformDNS;
+const resolver = source.net_resolver;
+const PlatformDNS = resolver.PlatformDNS;
 const ReachabilityInfo = source.net_io.ReachabilityInfo;
 
 const CapturingLogger = struct {
@@ -42,18 +42,18 @@ test "DNS resolver times out and caps abandoned queries" {
     };
 
     const allocator = std.testing.allocator;
-    const max_pending_queries = platform_dns.testing.maxPendingQueries;
+    const max_pending_queries = resolver.testing.maxPendingQueries;
     var dns = PlatformDNS.init();
     logging.init(false, CapturingLogger.log, null);
     defer logging.deinit();
     HangingResolver.release.store(false, .release);
     defer {
         HangingResolver.release.store(true, .release);
-        while (platform_dns.testing.pendingCount() != 0) std.Thread.yield() catch {};
+        while (resolver.testing.pendingCount() != 0) std.Thread.yield() catch {};
     }
 
     for (0..max_pending_queries) |_| {
-        try std.testing.expectError(error.Timeout, platform_dns.testing.resolveWith(
+        try std.testing.expectError(error.Timeout, resolver.testing.resolveWith(
             &dns,
             allocator,
             "example.com",
@@ -67,8 +67,8 @@ test "DNS resolver times out and caps abandoned queries" {
         "DNS resolution timed out for <redacted>",
         CapturingLogger.lastMessage(),
     );
-    try std.testing.expectEqual(max_pending_queries, platform_dns.testing.pendingCount());
-    try std.testing.expectError(error.Timeout, platform_dns.testing.resolveWith(
+    try std.testing.expectEqual(max_pending_queries, resolver.testing.pendingCount());
+    try std.testing.expectError(error.Timeout, resolver.testing.resolveWith(
         &dns,
         allocator,
         "example.com",
@@ -77,11 +77,11 @@ test "DNS resolver times out and caps abandoned queries" {
         1,
         HangingResolver.resolve,
     ));
-    try std.testing.expectEqual(max_pending_queries, platform_dns.testing.pendingCount());
+    try std.testing.expectEqual(max_pending_queries, resolver.testing.pendingCount());
 
     HangingResolver.release.store(true, .release);
-    while (platform_dns.testing.pendingCount() != 0) std.Thread.yield() catch {};
-    try std.testing.expectError(error.ResolutionFailure, platform_dns.testing.resolveWith(
+    while (resolver.testing.pendingCount() != 0) std.Thread.yield() catch {};
+    try std.testing.expectError(error.ResolutionFailure, resolver.testing.resolveWith(
         &dns,
         allocator,
         "example.com",
@@ -90,5 +90,5 @@ test "DNS resolver times out and caps abandoned queries" {
         100,
         HangingResolver.resolve,
     ));
-    try std.testing.expectEqual(@as(usize, 0), platform_dns.testing.pendingCount());
+    try std.testing.expectEqual(@as(usize, 0), resolver.testing.pendingCount());
 }

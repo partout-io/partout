@@ -10,7 +10,6 @@ const auth_mod = @import("internal/auth.zig");
 const configuration_mod = @import("internal/configuration.zig");
 const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
-const endpoint_resolver_mod = @import("internal/endpoint_resolver.zig");
 const logging_mod = @import("internal/logging.zig");
 const processing_mod = @import("internal/processing.zig");
 const session_mod = @import("internal/session.zig");
@@ -20,7 +19,7 @@ const api = core.api;
 const log = core.logging;
 const openvpn_log = logging_mod;
 const AuthToken = auth_mod.AuthToken;
-const EndpointResolver = endpoint_resolver_mod.EndpointResolver;
+const EndpointResolver = net.EndpointResolver;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
@@ -175,7 +174,7 @@ const OpenVPNConnection = struct {
         const fnt = try api.cryptoFunctionTable(session_options.backend);
         log.writef(
             .notice,
-            "Using v3 connection (crypto = {s})",
+            "Using Zig v1 connection (crypto = {s})",
             .{fnt.name},
         );
         return created.asConnection();
@@ -844,7 +843,6 @@ const SessionFinalizationFailure = struct {
             error.SessionMismatch,
             error.SessionStale,
             error.Timeout,
-            error.TransformFailure,
             error.TunnelFailure,
             error.TunNotAvailable,
             error.WouldBlock,
@@ -911,7 +909,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         error.PeerIdMismatch,
         error.SessionMismatch,
         error.SessionStale,
-        error.TransformFailure,
         error.TunnelFailure,
         error.WouldBlock,
         error.WriteIncomplete,

@@ -32,7 +32,7 @@ comptime {
     _ = @import("net/looper_queue.zig");
     _ = @import("net/mux.zig");
     _ = @import("net/platform.zig");
-    _ = @import("net/platform_dns.zig");
+    _ = @import("net/resolver.zig");
     if (source.openvpn_enabled) {
         _ = @import("openvpn/configuration.zig");
         _ = @import("openvpn/connection.zig");
