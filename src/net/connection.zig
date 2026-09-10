@@ -185,6 +185,8 @@ pub const Connection = struct {
 
     pub const VTable = struct {
         start: *const fn (*anyopaque, Events) StartError!bool,
+        // FIXME: ###, Make non-optional
+        endpoints: ?*const fn (*anyopaque) []const api.ExtendedEndpoint = null,
         stop: *const fn (*anyopaque, u32, Events) void,
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
@@ -195,8 +197,16 @@ pub const Connection = struct {
         destroy: *const fn (*anyopaque) void,
     };
 
-    pub fn start(self: Connection, events: Events) StartError!bool {
+    pub fn start(
+        self: Connection,
+        events: Events,
+    ) StartError!bool {
         return self.vtable.start(self.ptr, events);
+    }
+
+    pub fn endpoints(self: Connection) []const api.ExtendedEndpoint {
+        const block = self.vtable.endpoints orelse return &.{};
+        return block(self.ptr);
     }
 
     /// Stops the connection. No further events must be emitted.
