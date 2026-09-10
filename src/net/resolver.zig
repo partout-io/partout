@@ -22,6 +22,7 @@ const ResolveFn = *const fn ([:0]const u8, bool, ?*const ReachabilityInfo, *io_c
 const max_pending_queries = 3;
 
 pub const EndpointResolver = struct {
+    allocator: std.mem.Allocator,
     endpoints: []const api.ExtendedEndpoint,
     next_endpoint_index: usize,
     resolved: ?[]api.ExtendedEndpoint,
@@ -29,9 +30,10 @@ pub const EndpointResolver = struct {
 
     // MARK: - Public API
 
-    pub fn init(endpoints: []const api.ExtendedEndpoint) EndpointResolver {
+    pub fn init(allocator: std.mem.Allocator, endpoints: []const api.ExtendedEndpoint) EndpointResolver {
         std.debug.assert(endpoints.len > 0);
         return .{
+            .allocator = allocator,
             .endpoints = endpoints,
             .next_endpoint_index = 0,
             .resolved = null,
@@ -39,13 +41,12 @@ pub const EndpointResolver = struct {
         };
     }
 
-    pub fn deinit(self: *EndpointResolver, allocator: std.mem.Allocator) void {
-        self.clearResolved(allocator);
+    pub fn deinit(self: *EndpointResolver) void {
+        self.clearResolved(self.allocator);
     }
 
     pub fn next(
         self: *EndpointResolver,
-        allocator: std.mem.Allocator,
         resolver: *const DNSResolver,
         reachability: ?ReachabilityInfo,
         timeout_ms: u32,
@@ -57,7 +58,7 @@ pub const EndpointResolver = struct {
                     self.next_resolved_index += 1;
                     return endpoint;
                 }
-                self.clearResolved(allocator);
+                self.clearResolved(self.allocator);
             }
 
             if (self.next_endpoint_index >= self.endpoints.len) {
@@ -67,7 +68,7 @@ pub const EndpointResolver = struct {
             const source = self.endpoints[self.next_endpoint_index];
             self.next_endpoint_index += 1;
             self.resolved = resolveEndpoint(
-                allocator,
+                self.allocator,
                 resolver,
                 source,
                 reachability,

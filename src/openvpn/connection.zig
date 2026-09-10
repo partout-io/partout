@@ -162,7 +162,7 @@ const OpenVPNConnection = struct {
             .credentials = credentials,
             .auth_token = .{},
             .endpoints = endpoints,
-            .endpoint_resolver = EndpointResolver.init(endpoints),
+            .endpoint_resolver = EndpointResolver.init(allocator, endpoints),
             .cache_dir = cache_dir,
             .status = .disconnected,
             .events = null,
@@ -185,7 +185,7 @@ const OpenVPNConnection = struct {
         self.destroyCurrentSession();
         self.auth_token.deinit();
         self.clearLink();
-        self.endpoint_resolver.deinit(self.allocator);
+        self.endpoint_resolver.deinit();
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
@@ -330,7 +330,6 @@ const OpenVPNConnection = struct {
         log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
         const endpoint = try self.endpoint_resolver.next(
-            self.allocator,
             &self.resolver,
             reachability,
             self.connection_options.dns_timeout,
