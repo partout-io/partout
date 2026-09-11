@@ -7,6 +7,7 @@
       "command": "zig",
       "args": [
         "build",
+        "coverage",
         "-Dopenvpn=true",
         "-Dwireguard=true"
       ],
