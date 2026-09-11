@@ -22,17 +22,6 @@ pub const ReadAction = enum {
     pause,
 };
 
-/// Transformation callback to apply before submitting packets
-/// to the write queue.
-pub const TransformWrite = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, Packets) anyerror!Packets,
-
-    pub fn call(self: TransformWrite, packets: Packets) anyerror!Packets {
-        return self.callback(self.context, packets);
-    }
-};
-
 /// Invoked on read events from either looper side.
 pub const OnRead = struct {
     context: ?*anyopaque = null,
@@ -134,7 +123,6 @@ pub const DescriptorPair = union(io.Side) {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: DescriptorPair,
-    transform_write: ?TransformWrite = null,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };
@@ -148,7 +136,6 @@ pub const Errors = struct {
     pub const OOBOutsideQueue = error{OOBOutsideQueue};
     pub const ReentrantCall = error{ReentrantCall};
     pub const SideAlreadyAttached = error{SideAlreadyAttached};
-    pub const TransformFailure = error{TransformFailure};
     pub const WriteIncomplete = error{WriteIncomplete};
 };
 

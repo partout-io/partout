@@ -10,7 +10,7 @@ const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const looper = @import("looper.zig");
-const platform_dns = @import("platform_dns.zig");
+const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -19,7 +19,7 @@ const log = core.logging;
 const util = core.util;
 
 const DNSResolver = sandbox.DNSResolver;
-const PlatformDNS = platform_dns.PlatformDNS;
+const PlatformDNS = resolver.PlatformDNS;
 const ReachabilityInfo = io.ReachabilityInfo;
 const NetworkMonitor = sandbox.NetworkMonitor;
 const SocketDescriptor = io.SocketDescriptor;

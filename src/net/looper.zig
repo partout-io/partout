@@ -8,9 +8,8 @@
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
 //! looper itself for `OnFinish`). Packet slices passed to callbacks are borrowed
-//! for the duration of the callback. Slices returned by `TransformWrite` must
-//! remain valid until the enclosing `write()` call returns; `Looper` copies them
-//! before queuing them.
+//! for the duration of the callback. `writeQueued()` copies packet slices before
+//! queuing them.
 
 const std = @import("std");
 
@@ -30,7 +29,6 @@ pub const Looper = struct {
     pub const Packet = queue_mod.Packet;
     pub const Packets = queue_mod.Packets;
     pub const ReadAction = queue_mod.ReadAction;
-    pub const TransformWrite = queue_mod.TransformWrite;
     pub const OnRead = queue_mod.OnRead;
     pub const Failure = queue_mod.Failure;
     pub const OnFailure = queue_mod.OnFailure;
@@ -104,11 +102,10 @@ pub const Looper = struct {
     pub const DetachError = Errors.LooperUnavailable || Errors.ReentrantCall;
     pub const ResumeReadingError = SubmissionError;
     pub const StopError = Errors.LooperUnavailable || Errors.ReentrantCall;
-    pub const WriteError = SubmissionError || Errors.TransformFailure;
+    pub const WriteError = SubmissionError;
     pub const WriteOOBError = SubmissionError ||
         io.Error ||
         Errors.OOBOutsideQueue ||
-        Errors.TransformFailure ||
         Errors.WriteIncomplete;
 
     // Configuration.
@@ -675,52 +672,20 @@ pub const Looper = struct {
         side: io.Side,
     ) WriteError!void {
         self.lock.lock();
-        if (self.state != .started) {
-            self.lock.unlock();
-            return error.LooperUnavailable;
-        }
+        defer self.lock.unlock();
+        if (self.state != .started) return error.LooperUnavailable;
         const current = self.sideIO(side) orelse {
-            self.lock.unlock();
             log.writef(.err, "Ignoring {} packets, not attached", .{side});
             return;
         };
-        current.transform_drainer.enter();
-        const id = current.id;
-        const transform = current.transform_write;
-        self.lock.unlock();
-
-        const processed_result = if (transform) |callback|
-            callTransform(callback, packets)
-        else
-            packets;
-
-        self.lock.lock();
-        defer self.lock.unlock();
-        defer current.transform_drainer.leaveLocked();
-        const processed = processed_result catch |err| {
-            log.writef(.err, "{} write transform failed: {s}", .{
-                side,
-                @errorName(err),
-            });
-            return error.TransformFailure;
-        };
-        if (self.state != .started) return error.LooperUnavailable;
-        const attached = self.sideIO(side) orelse {
-            log.writef(.debug, "Ignoring detached {} during processing", .{side});
-            return;
-        };
-        if (attached.id != id) {
-            log.writef(.debug, "Ignoring detached {} during processing", .{side});
-            return;
-        }
 
         const command = try self.createCommandNode(.{ .enable_write = .{
             .side = side,
-            .id = id,
+            .id = current.id,
         } });
         errdefer self.allocator.destroy(command);
 
-        try attached.write_queue.append(processed);
+        try current.write_queue.append(packets);
         self.commands.append(command);
         self.wakeLocked();
     }
@@ -741,20 +706,9 @@ pub const Looper = struct {
             log.writef(.err, "Ignoring {} packets, not attached", .{side});
             return;
         };
-        const transform = side_io.transform_write;
         self.lock.unlock();
 
-        const processed = if (transform) |callback|
-            callTransform(callback, packets) catch |err| {
-                log.writef(.err, "{} write transform failed: {s}", .{
-                    side,
-                    @errorName(err),
-                });
-                return error.TransformFailure;
-            }
-        else
-            packets;
-        for (processed) |packet| {
+        for (packets) |packet| {
             const written = side_io.native_io.write(packet, 0) catch |err| {
                 log.writef(.err, "{} write failed: {s}", .{
                     side,
@@ -1144,7 +1098,6 @@ pub const Looper = struct {
             self.lock.unlock();
             return;
         };
-        side_io.transform_drainer.drain(&self.lock);
         const on_failure = side_io.on_failure;
         self.lock.unlock();
 
@@ -1243,23 +1196,13 @@ pub const Looper = struct {
         return borrowed_callback_depth > 0;
     }
 
-    fn callTransform(
-        transform: TransformWrite,
-        packets: Packets,
-    ) anyerror!Packets {
-        borrowed_callback_depth += 1;
-        defer borrowed_callback_depth -= 1;
-        return transform.call(packets);
-    }
-
     fn callNativeCleanup(side_io: *SideIO) void {
         borrowed_callback_depth += 1;
         defer borrowed_callback_depth -= 1;
         side_io.cleanupNative();
     }
 
-    /// Removes a side from publication before waiting for borrowed transform
-    /// callbacks. Caller must hold `lock`.
+    /// Removes a side from publication. Caller must hold `lock`.
     fn takeSideIOLocked(self: *Looper, side: io.Side) ?*SideIO {
         const side_io = self.sideIO(side) orelse return null;
         self.setSideIO(side, null);
@@ -1275,7 +1218,6 @@ pub const Looper = struct {
     /// Caller must hold `lock`, and `side_io` must already be unpublished.
     /// Returns with `lock` held, but invokes native cleanup without it.
     fn destroyDetachedSideIOLocked(self: *Looper, side_io: *SideIO) void {
-        side_io.transform_drainer.drain(&self.lock);
         const should_cleanup = side_io.detachFromMux(self.mux);
         self.lock.unlock();
         if (should_cleanup) callNativeCleanup(side_io);
@@ -1490,7 +1432,6 @@ pub const Looper = struct {
         native_io: io.IOInterface,
 
         // User callbacks.
-        transform_write: ?TransformWrite,
         on_read: ?OnRead,
         on_failure: ?OnFailure,
 
@@ -1502,9 +1443,6 @@ pub const Looper = struct {
         is_reading: bool,
         is_writing: bool,
         did_cleanup: bool,
-
-        // In-flight transform synchronization.
-        transform_drainer: core.Drainer,
 
         fn create(
             allocator: std.mem.Allocator,
@@ -1522,7 +1460,6 @@ pub const Looper = struct {
                 .side = side,
                 .fd = descriptor.fd,
                 .native_io = descriptor.io,
-                .transform_write = arguments.transform_write,
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
@@ -1530,7 +1467,6 @@ pub const Looper = struct {
                 .is_reading = true,
                 .is_writing = false,
                 .did_cleanup = false,
-                .transform_drainer = .{},
             };
             return self;
         }
@@ -1538,7 +1474,6 @@ pub const Looper = struct {
         fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
             self.write_queue.deinit();
             allocator.free(self.read_buf);
-            self.transform_drainer.deinit();
             allocator.destroy(self);
         }
 
