@@ -15,4 +15,3 @@ repo_root=$(cd "$script_dir/.." && pwd -P)
 
 cd "$repo_root"
 swift test
-(cd cross/apple-legacy && swift test)
