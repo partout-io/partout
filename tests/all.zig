@@ -27,6 +27,7 @@ comptime {
     _ = @import("core/uuid.zig");
     _ = @import("net/connection.zig");
     _ = @import("net/daemon.zig");
+    _ = @import("net/daemon_v2.zig");
     _ = @import("net/io.zig");
     _ = @import("net/looper.zig");
     _ = @import("net/looper_queue.zig");

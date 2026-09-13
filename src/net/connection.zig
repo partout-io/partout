@@ -166,6 +166,11 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
     return .{ .module = module };
 }
 
+pub const LinkDescriptor = struct {
+    endpoint: core.api.ExtendedEndpoint,
+    looper: *looper.Looper,
+};
+
 /// A physical connection to a network service. A connection
 /// may be started and stopped multiple times, and it emits
 /// events through callbacks.
@@ -173,39 +178,146 @@ pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
 
+    pub const ShutdownReason = union(enum) {
+        explicit_stop,
+        failure: Events.FailureDisposition,
+    };
+
+    // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
+    // FIXME: ###, Connections must not know about looper
+
     pub const Events = struct {
+        pub const Success = struct {
+            remote_endpoint: api.ExtendedEndpoint,
+            info: api.TunnelRemoteInfoWrapper,
+        };
+        pub const FailureDisposition = enum {
+            reconnect,
+            cancel,
+        };
+        pub const Failure = struct {
+            code: api.PartoutErrorCode,
+            disposition: FailureDisposition,
+        };
+
         ctx: *anyopaque,
+
+        // FIXME: ###, New v2 callbacks, temporary noops
+        established: *const fn (*anyopaque, Success) void = struct {
+            fn call(_: *anyopaque, _: Success) void {}
+        }.call,
+        failed: *const fn (*anyopaque, Failure) void = struct {
+            fn call(_: *anyopaque, _: Failure) void {}
+        }.call,
+        stopped: *const fn (*anyopaque) void = struct {
+            fn call(_: *anyopaque) void {}
+        }.call,
+        set_env: *const fn (*anyopaque, []const u8, ?[]const u8) void = struct {
+            fn call(_: *anyopaque, _: []const u8, _: ?[]const u8) void {}
+        }.call,
+
+        data_count: *const fn (*anyopaque, api.DataCount) void,
+
+        // Deprecated.
         status: *const fn (*anyopaque, api.ConnectionStatus) void,
         last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
-        data_count: *const fn (*anyopaque, api.DataCount) void,
         /// Requests host cancellation after an unrecoverable connection
         /// failure so the daemon can apply its cancellation policy.
         cancel: *const fn (*anyopaque, ?api.PartoutErrorCode) void,
     };
 
     pub const VTable = struct {
+        // FIXME: ###, New v2 callbacks, temporary noops
+        endpoints: *const fn (*anyopaque) []const api.ExtendedEndpoint = struct {
+            fn call(_: *anyopaque) []const api.ExtendedEndpoint {
+                return &.{};
+            }
+        }.call,
+        start_v2: *const fn (*anyopaque, LinkDescriptor) StartError!bool = struct {
+            fn call(_: *anyopaque, _: LinkDescriptor) StartError!bool {
+                return false;
+            }
+        }.call,
+        submit_packets: *const fn (*anyopaque, io.Side, looper.Looper.Packets) looper.Looper.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: looper.Looper.Packets) looper.Looper.ReadAction {
+                return .pause;
+            }
+        }.call,
+        looper_failed: *const fn (*anyopaque, io.Side, looper.Looper.Failure) void = struct {
+            fn call(_: *anyopaque, _: io.Side, _: looper.Looper.Failure) void {}
+        }.call,
+        looper_terminated: *const fn (*anyopaque, ?looper.Looper.Failure) void = struct {
+            fn call(_: *anyopaque, _: ?looper.Looper.Failure) void {}
+        }.call,
+
+        /// Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool,
+
+        /// Quiesces protocol activity and sends a best-effort exit notification
+        /// while I/O is attached. Carries the owner's reason so finalization
+        /// can preserve state needed for a retry. Does not release connection state.
+        shutdown: *const fn (*anyopaque, ShutdownReason) void = struct {
+            fn call(_: *anyopaque, _: ShutdownReason) void {}
+        }.call,
         stop: *const fn (*anyopaque, u32, Events) void,
+
+        /// Network reachability.
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
-        /// Called synchronously when the shared daemon-owned looper
-        /// terminates, before runtime recovery or connection destruction.
-        looper_terminated: ?*const fn (*anyopaque, ?looper.Looper.Failure) void = null,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
+
+    pub fn endpoints(self: Connection) []const api.ExtendedEndpoint {
+        return self.vtable.endpoints(self.ptr);
+    }
+
+    pub fn startV2(
+        self: Connection,
+        descriptor: LinkDescriptor,
+    ) StartError!bool {
+        return self.vtable.start_v2(self.ptr, descriptor);
+    }
 
     pub fn start(self: Connection, events: Events) StartError!bool {
         return self.vtable.start(self.ptr, events);
     }
 
-    /// Stops the connection. No further events must be emitted.
+    pub fn shutdown(self: Connection, reason: ShutdownReason) void {
+        self.vtable.shutdown(self.ptr, reason);
+    }
+
+    /// Finalizes the connection after I/O is detached. No further events
+    /// must be emitted after this returns.
     pub fn stop(
         self: Connection,
         timeout_ms: u32,
         events: Events,
     ) void {
         self.vtable.stop(self.ptr, timeout_ms, events);
+    }
+
+    pub fn submitPackets(
+        self: Connection,
+        side: io.Side,
+        packets: looper.Looper.Packets,
+    ) looper.Looper.ReadAction {
+        return self.vtable.submit_packets(self.ptr, side, packets);
+    }
+
+    pub fn looperFailed(
+        self: Connection,
+        side: io.Side,
+        failure: looper.Looper.Failure,
+    ) void {
+        self.vtable.looper_failed(self.ptr, side, failure);
+    }
+
+    pub fn looperTerminated(
+        self: Connection,
+        failure: ?looper.Looper.Failure,
+    ) void {
+        self.vtable.looper_terminated(self.ptr, failure);
     }
 
     pub fn networkChange(
@@ -218,14 +330,6 @@ pub const Connection = struct {
 
     pub fn betterPath(self: Connection, events: Events) void {
         self.vtable.better_path(self.ptr, events);
-    }
-
-    pub fn looperTerminated(
-        self: Connection,
-        failure: ?looper.Looper.Failure,
-    ) void {
-        const block = self.vtable.looper_terminated orelse return;
-        block(self.ptr, failure);
     }
 
     pub fn destroy(self: Connection) void {
