@@ -28,6 +28,11 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.sha }}
+
+      - name: Verify release commit
+        run: test "$(git rev-parse HEAD)" = "$GITHUB_SHA"
 
       - name: Read version
         id: version
@@ -74,7 +79,7 @@ jobs:
         env:
           VERSION: ${{ steps.version.outputs.value }}
         run: |
-          git tag -s "$VERSION" HEAD -m "$VERSION"
+          git tag -s "$VERSION" "$GITHUB_SHA" -m "$VERSION"
           test "$(git rev-list -n 1 "$VERSION")" = "$GITHUB_SHA"
           git tag --verify "$VERSION"
           git push origin "refs/tags/$VERSION"
