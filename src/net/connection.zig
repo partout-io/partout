@@ -246,8 +246,9 @@ pub const Connection = struct {
             fn call(_: *anyopaque, _: ?looper.Looper.Failure) void {}
         }.call,
 
-        /// Lifecycle (deprecated).
+        /// Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool,
+
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization
         /// can preserve state needed for a retry. Does not release connection state.
@@ -263,13 +264,6 @@ pub const Connection = struct {
         destroy: *const fn (*anyopaque) void,
     };
 
-    pub fn start(
-        self: Connection,
-        events: Events,
-    ) StartError!bool {
-        return self.vtable.start(self.ptr, events);
-    }
-
     pub fn endpoints(self: Connection) []const api.ExtendedEndpoint {
         return self.vtable.endpoints(self.ptr);
     }
@@ -279,6 +273,10 @@ pub const Connection = struct {
         descriptor: LinkDescriptor,
     ) StartError!bool {
         return self.vtable.start_v2(self.ptr, descriptor);
+    }
+
+    pub fn start(self: Connection, events: Events) StartError!bool {
+        return self.vtable.start(self.ptr, events);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
@@ -293,18 +291,6 @@ pub const Connection = struct {
         events: Events,
     ) void {
         self.vtable.stop(self.ptr, timeout_ms, events);
-    }
-
-    pub fn networkChange(
-        self: Connection,
-        reachability: io.ReachabilityInfo,
-        events: Events,
-    ) void {
-        self.vtable.network_change(self.ptr, reachability, events);
-    }
-
-    pub fn betterPath(self: Connection, events: Events) void {
-        self.vtable.better_path(self.ptr, events);
     }
 
     pub fn submitPackets(
@@ -328,6 +314,18 @@ pub const Connection = struct {
         failure: ?looper.Looper.Failure,
     ) void {
         self.vtable.looper_terminated(self.ptr, failure);
+    }
+
+    pub fn networkChange(
+        self: Connection,
+        reachability: io.ReachabilityInfo,
+        events: Events,
+    ) void {
+        self.vtable.network_change(self.ptr, reachability, events);
+    }
+
+    pub fn betterPath(self: Connection, events: Events) void {
+        self.vtable.better_path(self.ptr, events);
     }
 
     pub fn destroy(self: Connection) void {
