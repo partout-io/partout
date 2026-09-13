@@ -35,27 +35,12 @@ const activeConnectionModule = conn_mod.activeConnectionModule;
 pub const Error = api.DecodeError || conn_mod.CreateError || error{
     AlreadyStarted,
     Closed,
-    IdGeneration,
     InvalidProfile,
     LooperFailure,
-    TunNotAvailable,
 };
 
 const StartError = Error || conn_mod.StartError ||
     sandbox.TunnelController.Error;
-
-const LinkSetupError = std.mem.Allocator.Error ||
-    Looper.AttachError ||
-    error{
-        ExhaustedEndpoints,
-        LinkFailure,
-        LinkNotActive,
-    };
-
-const SideError = error{
-    LinkFailure,
-    TunnelFailure,
-};
 
 pub const EventKey = enum {
     connection_status,
@@ -819,7 +804,7 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn setupLink(self: *ConnectionDaemon) LinkSetupError!api.ExtendedEndpoint {
+    fn setupLink(self: *ConnectionDaemon) !api.ExtendedEndpoint {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         // FIXME: ###, Pick endpoint, resolve DNS, and connect link atomically in SocketFactory
