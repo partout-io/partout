@@ -643,11 +643,11 @@ const ConnectionDaemon = struct {
             self.daemon.finishStop();
             return;
         }
-        self.handleConnectionStatus(.disconnecting);
+        self.trackConnectionStatus(.disconnecting);
         self.stopConnection(self.daemon.options.stop_delay_ms, .explicit_stop) catch |err| {
             log.writef(.err, "Unable to stop connection: {s}", .{@errorName(err)});
         };
-        self.handleConnectionStatus(.disconnected);
+        self.trackConnectionStatus(.disconnected);
         self.releaseConnection();
         self.daemon.controller.clearTunnelSettings(false);
         self.daemon.finishStop();
@@ -790,7 +790,7 @@ const ConnectionDaemon = struct {
             self.detachLooperSides() catch {};
             self.scheduleResumeGate();
         } else {
-            self.handleConnectionStatus(.connecting);
+            self.trackConnectionStatus(.connecting);
         }
     }
 
@@ -942,7 +942,7 @@ const ConnectionDaemon = struct {
             },
         }) catch return error.TunNotAvailable;
 
-        self.handleConnectionStatus(.connected);
+        self.trackConnectionStatus(.connected);
     }
 
     fn handleConnectionFailed(
@@ -960,8 +960,8 @@ const ConnectionDaemon = struct {
         self.clearConnectionTunnel();
         self.daemon.handleLastError(failure.code);
         switch (failure.disposition) {
-            .reconnect => self.handleConnectionStatus(.disconnected),
-            .cancel => self.handleConnectionCancel(failure.code),
+            .reconnect => self.trackConnectionStatus(.disconnected),
+            .cancel => self.cancelConnection(failure.code),
         }
     }
 
@@ -969,10 +969,10 @@ const ConnectionDaemon = struct {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status == .disconnected) return;
         self.clearConnectionTunnel();
-        self.handleConnectionStatus(.disconnected);
+        self.trackConnectionStatus(.disconnected);
     }
 
-    fn handleConnectionStatus(self: *ConnectionDaemon, status: api.ConnectionStatus) void {
+    fn trackConnectionStatus(self: *ConnectionDaemon, status: api.ConnectionStatus) void {
         self.daemon.snapshot_publisher.setConnectionStatus(status);
         switch (status) {
             .connected => {
@@ -997,13 +997,13 @@ const ConnectionDaemon = struct {
         _ = self.gate.updateStatus(status);
     }
 
-    fn handleConnectionCancel(self: *ConnectionDaemon, code: ?api.PartoutErrorCode) void {
+    fn cancelConnection(self: *ConnectionDaemon, code: ?api.PartoutErrorCode) void {
         self.daemon.enterFailedState();
         self.daemon.controller.setReasserting(false);
         if (!self.daemon.options.cancels_unrecoverable and
             self.daemon.snapshot_publisher.environment.connection_status != .disconnected)
         {
-            self.handleConnectionStatus(.disconnected);
+            self.trackConnectionStatus(.disconnected);
         }
         self.daemon.requestCancellation(code, false);
     }
@@ -1040,7 +1040,7 @@ const ConnectionDaemon = struct {
         // connection. Recovery starts immediately; only a failed attempt needs
         // the delayed retry normally scheduled by the disconnected status.
         self.daemon.controller.clearTunnelSettings(false);
-        self.handleConnectionStatus(.disconnected);
+        self.trackConnectionStatus(.disconnected);
         self.resume_gate_timer.cancel();
         if (self.daemon.state != .started) return;
         self.createConnection() catch |err| {
