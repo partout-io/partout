@@ -16,16 +16,48 @@ fail() {
 }
 
 repo_dir=$(cd "$(dirname "$0")/.." && pwd -P)
-[[ $# -ge 1 && $# -le 4 ]] ||
-    fail "usage: $0 <prebuilts-version> [output.xcframework] [prebuilts-directory] [--full]"
+[[ $# -ge 1 ]] ||
+    fail "usage: $0 <prebuilts-version> [--out output.xcframework] [--prebuilts-out directory] [--full] [--crypto openssl,mbedtls]"
 prebuilts_version=$1
-output=${2:-"$repo_dir/$name.xcframework"}
-prebuilts=${3:-"$repo_dir/prebuilts"}
-mode=${4:-}
+shift
+output="$repo_dir/$name.xcframework"
+prebuilts="$repo_dir/prebuilts"
+mode=
+crypto_backends=openssl,mbedtls
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --out|--prebuilts-out|--crypto)
+            [[ $# -ge 2 && $2 != --* ]] || fail "missing value for $1"
+            case "$1" in
+                --out) output=$2 ;;
+                --prebuilts-out) prebuilts=$2 ;;
+                --crypto) crypto_backends=$2 ;;
+            esac
+            shift 2
+            ;;
+        --full) mode=--full; shift ;;
+        *) fail "unknown option: $1" ;;
+    esac
+done
+
+# Crypto backends default to all. WireGuard is always included.
+vendors=(wg-go)
+if [[ -n $crypto_backends ]]; then
+    [[ $crypto_backends != ,* && $crypto_backends != *, && $crypto_backends != *,,* ]] ||
+        fail "invalid crypto backend list: $crypto_backends"
+    IFS=, read -r -a backends <<< "$crypto_backends"
+    for backend in "${backends[@]}"; do
+        case "$backend" in
+            openssl|mbedtls) ;;
+            *) fail "unknown crypto backend: $backend" ;;
+        esac
+        [[ " ${vendors[*]} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
+        vendors+=("$backend")
+    done
+fi
 
 [[ $prebuilts_version =~ ^[0-9A-Za-z][0-9A-Za-z._+-]*$ ]] ||
     fail "invalid prebuilts version: $prebuilts_version"
-[[ -z $mode || $mode == --full ]] || fail "unknown option: $mode"
 [[ $output == *.xcframework ]] || fail "output must have an .xcframework extension"
 
 for tool in curl ditto lipo swift xcodebuild xcrun zig; do
@@ -96,7 +128,8 @@ chmod 755 "$work" "$work/install" "$cache" "$global_cache"
 
 build_slice() {
     local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
-    local sdk install openssl mbedtls wg_go library
+    local sdk install vendor vendor_path library
+    local vendor_args=() vendor_libraries=()
 
     [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
     case "$platform:$arch" in
@@ -135,11 +168,12 @@ build_slice() {
 
     sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
     install="$work/install/$platform-$arch"
-    openssl="$prebuilts/openssl.xcframework/$vendor_id"
-    mbedtls="$prebuilts/mbedtls.xcframework/$vendor_id"
-    wg_go="$prebuilts/wg-go.xcframework/$vendor_id"
-    for library in "$openssl/libopenssl.a" "$mbedtls/libmbedtls.a" "$wg_go/libwg-go.a"; do
+    for vendor in "${vendors[@]}"; do
+        vendor_path="$prebuilts/$vendor.xcframework/$vendor_id"
+        library="$vendor_path/lib$vendor.a"
         [[ -f $library ]] || fail "missing vendor library: $library"
+        vendor_args+=("-D$vendor-include=$vendor_path/Headers" "-D$vendor-lib=$vendor_path")
+        vendor_libraries+=("$library")
     done
 
     echo "Building $platform $arch"
@@ -155,12 +189,7 @@ build_slice() {
             -Dapple-sdk-path="$sdk" \
             -Dopenvpn=true \
             -Dwireguard=true \
-            -Dopenssl-include="$openssl/Headers" \
-            -Dopenssl-lib="$openssl" \
-            -Dmbedtls-include="$mbedtls/Headers" \
-            -Dmbedtls-lib="$mbedtls" \
-            -Dwg-go-include="$wg_go/Headers" \
-            -Dwg-go-lib="$wg_go"
+            "${vendor_args[@]}"
     )
 
     xcrun clang \
@@ -174,9 +203,7 @@ build_slice() {
         -Wl,-rpath,@loader_path \
         -Wl,-exported_symbols_list,"$repo_dir/src/partout.exports" \
         -Wl,-force_load,"$install/lib/libpartout.a" \
-        "$openssl/libopenssl.a" \
-        "$mbedtls/libmbedtls.a" \
-        "$wg_go/libwg-go.a" \
+        "${vendor_libraries[@]}" \
         -framework CoreFoundation \
         -framework Security \
         -o "$install/lib/libpartout.dylib"

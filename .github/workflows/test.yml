@@ -47,7 +47,7 @@ jobs:
         run: ci/run-tests.sh
       - name: Build active XCFramework slice
         if: matrix.suite == 'apple'
-        run: scripts/build-xcframework.sh "$PREBUILTS_VERSION"
+        run: scripts/build-xcframework.sh "$PREBUILTS_VERSION" --crypto openssl,mbedtls
       - name: Run Swift tests
         if: matrix.suite == 'apple'
         run: ci/run-swift-tests.sh

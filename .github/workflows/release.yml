@@ -62,7 +62,7 @@ jobs:
           prebuilts_version_file="$prebuilts/prebuilts-version.txt"
           archive="$xcframework.zip"
 
-          scripts/build-xcframework.sh "$PREBUILTS_VERSION" "$xcframework" "$prebuilts" --full
+          scripts/build-xcframework.sh "$PREBUILTS_VERSION" --out "$xcframework" --prebuilts-out "$prebuilts" --full --crypto openssl,mbedtls
           test "$(find "$xcframework" -name '*.dSYM' -type d | wc -l)" -eq 5
           test -s "$prebuilts_version_file"
           ditto -c -k --sequesterRsrc --keepParent "$xcframework" "$archive"
