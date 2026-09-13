@@ -12,7 +12,6 @@ const connection = @import("source").wireguard_connection;
 const conn = @import("source").net_connection;
 const core = @import("source").core;
 const io = @import("source").net_io;
-const looper = @import("source").net_looper;
 const sandbox = @import("source").net_sandbox;
 const tunnel_info = wireguard_internal.tunnel_info;
 const uapi = wireguard_internal.uapi;
