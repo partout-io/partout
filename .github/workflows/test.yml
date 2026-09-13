@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
 env:
-  PREBUILTS_VERSION: "0.6.0"
+  PREBUILTS_VERSION: "0.7.1"
 
 jobs:
   run_tests:

@@ -2,8 +2,4 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-enum RenegotiationType {
-    case client
-
-    case server
-}
+@_exported import PartoutCore
