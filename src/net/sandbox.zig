@@ -10,6 +10,7 @@
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
+const conn = @import("connection.zig");
 const io = @import("io.zig");
 const looper = @import("looper.zig");
 const api = core.api;
@@ -19,20 +20,17 @@ const TunWrapper = io.TunWrapper;
 /// to make a connection within it.
 pub const Sandbox = struct {
     profile: *const api.Profile,
-    controller: TunnelController,
-    resolver: DNSResolver,
-    factory: SocketFactory,
-    /// Daemon-owned I/O loop shared by its connections. Protocols that do not
-    /// multiplex link and tunnel descriptors may ignore it.
-    looper: *looper.Looper,
+    options: ConnectionOptions = .{},
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
-    /// Executes connection-owned work on the daemon actor. The daemon must
-    /// keep this capability alive until the connection and every producer of
-    /// submitted work have been drained.
+    events: ?conn.Connection.Events = null,
+    // FIXME: ###, Delete all these from Sandbox
+    controller: TunnelController,
+    resolver: DNSResolver,
+    factory: SocketFactory,
+    looper: *looper.Looper,
     serialized_executor: SerializedExecutor,
-    options: ConnectionOptions = .{},
 };
 
 /// Interacts with the platform API to establish the physical
@@ -269,12 +267,15 @@ pub const SerializedExecutor = core.SerializedExecutor;
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {
     /// The DNS resolution timeout, in milliseconds.
+    // FIXME: ###, Delete, it's a link concern
     dns_timeout: u32 = 3000,
 
     /// The link activity timeout, in milliseconds.
+    // FIXME: ###, Delete, it's a link concern
     link_activity_timeout: u32 = 5000,
 
     /// The link write timeout, in milliseconds.
+    // FIXME: ###, Delete, it's a link concern (replace timeout with fixed number of sendExit() attempts)
     link_write_timeout: u32 = 5000,
 
     /// The minimum interval before updating data count, in milliseconds.

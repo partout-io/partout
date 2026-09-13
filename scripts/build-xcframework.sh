@@ -42,6 +42,15 @@ download_prebuilts() {
     local repository=https://github.com/partout-io/prebuilts
     local base temp vendor archive checksum expected actual
 
+    if [[ -f "$prebuilts/prebuilts-version.txt" &&
+          $(cat "$prebuilts/prebuilts-version.txt") == "$prebuilts_version" &&
+          -d "$prebuilts/openssl.xcframework" &&
+          -d "$prebuilts/mbedtls.xcframework" &&
+          -d "$prebuilts/wg-go.xcframework" ]]; then
+        echo "Using local prebuilts $prebuilts_version"
+        return
+    fi
+
     base="$repository/releases/download/$prebuilts_version"
     temp=$(mktemp -d "${TMPDIR:-/tmp}/partout-prebuilts.XXXXXX")
     trap 'rm -rf "$temp"' EXIT

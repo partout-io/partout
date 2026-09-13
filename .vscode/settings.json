@@ -1,4 +1,6 @@
 {
+  "vim.ignorecase": false,
+  "vim.smartcase": false,
   "zig.path": "zig",
   "zig.zls.enabled": "on",
   "zig.formattingProvider": "zls",
