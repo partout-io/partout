@@ -473,10 +473,11 @@ const ConnectionDaemon = struct {
             .established = onConnectionEstablished,
             .failed = onConnectionFailed,
             .stopped = onConnectionStopped,
-            .status = onConnectionStatus,
-            .last_error = onConnectionLastError,
             .data_count = onConnectionDataCount,
-            .cancel = onConnectionCancel,
+            // Deprecated callbacks must never be emitted by a v2 connection.
+            .status = legacyStatus,
+            .last_error = legacyLastError,
+            .cancel = legacyCancel,
         };
     }
 
@@ -520,18 +521,12 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn onConnectionStatus(ctx: *anyopaque, status: api.ConnectionStatus) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.{ .onConnectionStatus = status }) catch |err| {
-            log.writef(.err, "Unable to report connection status: {s}", .{@errorName(err)});
-        };
+    fn legacyStatus(_: *anyopaque, _: api.ConnectionStatus) void {
+        @panic("Unimplemented");
     }
 
-    fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.{ .onConnectionLastError = code }) catch |err| {
-            log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
-        };
+    fn legacyLastError(_: *anyopaque, _: api.PartoutErrorCode) void {
+        @panic("Unimplemented");
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
@@ -541,11 +536,8 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn onConnectionCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.{ .onConnectionCancel = code }) catch |err| {
-            log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
-        };
+    fn legacyCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {
+        @panic("Unimplemented");
     }
 
     // Network callbacks may originate while the platform owns a lock that is
@@ -1142,10 +1134,7 @@ const ConnectionDaemon = struct {
         onConnectionEstablished: net.Connection.Events.Success,
         onConnectionFailed: net.Connection.Events.Failure,
         onConnectionStopped,
-        onConnectionStatus: api.ConnectionStatus,
-        onConnectionLastError: api.PartoutErrorCode,
         onConnectionDataCount: api.DataCount,
-        onConnectionCancel: ?api.PartoutErrorCode,
         onLooperTerminated: ?Looper.Failure,
         recoverConnection,
     };
@@ -1173,10 +1162,7 @@ const ConnectionDaemon = struct {
             },
             .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
             .onConnectionStopped => self.handleConnectionStopped(),
-            .onConnectionStatus => |status| if (self.daemon.state == .started) self.handleConnectionStatus(status),
-            .onConnectionLastError => |code| if (self.daemon.state == .started) self.daemon.handleLastError(code),
             .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
-            .onConnectionCancel => |code| if (self.daemon.state == .started) self.handleConnectionCancel(code),
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnection(),
         }

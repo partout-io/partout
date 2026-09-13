@@ -213,10 +213,11 @@ pub const Connection = struct {
             fn call(_: *anyopaque) void {}
         }.call,
 
+        data_count: *const fn (*anyopaque, api.DataCount) void,
+
         // Deprecated.
         status: *const fn (*anyopaque, api.ConnectionStatus) void,
         last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
-        data_count: *const fn (*anyopaque, api.DataCount) void,
         /// Requests host cancellation after an unrecoverable connection
         /// failure so the daemon can apply its cancellation policy.
         cancel: *const fn (*anyopaque, ?api.PartoutErrorCode) void,

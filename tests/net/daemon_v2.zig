@@ -72,7 +72,13 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         try sut.start();
         defer sut.stop();
         connection_daemon.resume_gate_timer.cancel();
-        try connection_daemon.actor.perform(.{ .onConnectionStatus = previous_status });
+        connection_daemon.resume_gate_timer.wait();
+        try std.testing.expectError(error.AlreadyStarted, sut.start());
+        // The mock has no event producers and the retry timer is drained.
+        // Seed the pre-termination state without a legacy status callback.
+        sut.snapshot_publisher.setConnectionStatus(previous_status);
+        _ = connection_daemon.gate.updateStatus(previous_status);
+        controller.reasserting = previous_status == .connecting;
 
         _ = try controller.interface().setTunnelSettings(.{
             .profile = profile,
