@@ -564,3 +564,108 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
     const monitor: *const mock_mod.MockNetworkMonitor = @ptrCast(@alignCast(ptr.?));
     return monitor.reachable;
 }
+
+test "v2 daemon owns environment updates and delivers finalization clears on actor" {
+    const Factory = struct {
+        events: ?net.Connection.Events = null,
+        producer_thread: ?std.Thread.Id = null,
+
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events;
+            return .{ .ptr = self, .vtable = &vtable };
+        }
+        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.producer_thread = std.Thread.getCurrentId();
+            var key = "OpenVPN.serverConfiguration".*;
+            var value = "{\"test\":true}".*;
+            // The actor is waiting for this looper operation to return, so it
+            // cannot consume the borrowed strings before we overwrite them.
+            sink.set_env(sink.ctx, &key, &value);
+            @memset(&key, 'x');
+            @memset(&value, 'x');
+        }
+        fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
+            sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", null);
+            sink.stopped(sink.ctx);
+        }
+        const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
+        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+            return &endpoint_list;
+        }
+        const vtable = blk: {
+            var value = FailingStartConnection.vtable;
+            value.endpoints = endpoints;
+            value.better_path = betterPath;
+            value.stop = stop;
+            break :blk value;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const Controller = struct {
+        mock: mock_mod.MockTunnelController = .{},
+        updates: usize = 0,
+        clears: usize = 0,
+        delivery_thread: ?std.Thread.Id = null,
+        valid_payload: bool = true,
+
+        fn setEnvironment(raw: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
+            const mock: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
+            const self: *@This() = @fieldParentPtr("mock", mock);
+            const current = std.Thread.getCurrentId();
+            if (self.delivery_thread) |previous| std.debug.assert(previous == current);
+            self.delivery_thread = current;
+            self.valid_payload = self.valid_payload and std.mem.eql(u8, key, "OpenVPN.serverConfiguration");
+            if (value) |bytes| {
+                self.updates += 1;
+                self.valid_payload = self.valid_payload and std.mem.eql(u8, bytes, "{\"test\":true}");
+            } else {
+                self.clears += 1;
+            }
+        }
+    };
+    const allocator = std.testing.allocator;
+    var factory = Factory{};
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &factory, .vtable = &Factory.implementation }});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller = Controller{};
+    var vtable = controller.mock.interface().vtable.*;
+    vtable.set_environment_value = Controller.setEnvironment;
+    var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = .{ .ptr = &controller.mock, .vtable = &vtable },
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{},
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const actor = sut.implementation.connection.actor;
+    try actor.perform(.onBetterPath);
+    try actor.perform(.resumeGate);
+    try std.testing.expectEqual(@as(usize, 1), controller.updates);
+    try std.testing.expect(controller.valid_payload);
+    try std.testing.expect(controller.delivery_thread.? != factory.producer_thread.?);
+    try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
+
+    sut.stop();
+    try actor.perform(.resumeGate);
+    try std.testing.expectEqual(@as(usize, 1), controller.clears);
+    // A late update must not recreate environment state after shutdown.
+    const sink = factory.events.?;
+    sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", "stale");
+    try actor.perform(.resumeGate);
+    try std.testing.expectEqual(@as(usize, 1), controller.updates);
+    try std.testing.expect(controller.valid_payload);
+}

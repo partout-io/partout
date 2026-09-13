@@ -473,6 +473,7 @@ const ConnectionDaemon = struct {
             .established = onConnectionEstablished,
             .failed = onConnectionFailed,
             .stopped = onConnectionStopped,
+            .set_env = onConnectionSetEnvironmentValue,
             .data_count = onConnectionDataCount,
             // Deprecated callbacks must never be emitted by a v2 connection.
             .status = legacyStatus,
@@ -521,12 +522,28 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn legacyStatus(_: *anyopaque, _: api.ConnectionStatus) void {
-        @panic("Unimplemented");
-    }
-
-    fn legacyLastError(_: *anyopaque, _: api.PartoutErrorCode) void {
-        @panic("Unimplemented");
+    fn onConnectionSetEnvironmentValue(ctx: *anyopaque, key: []const u8, value: ?[]const u8) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
+        // The producer releases this storage when the callback returns. Own both
+        // strings until the actor delivers the update (or discards it after stop).
+        const allocator = self.daemon.allocator;
+        const owned_key = allocator.dupe(u8, key) catch {
+            log.write(.err, "Unable to copy connection environment key");
+            return;
+        };
+        const owned_value = if (value) |bytes| allocator.dupe(u8, bytes) catch {
+            allocator.free(owned_key);
+            log.write(.err, "Unable to copy connection environment value");
+            return;
+        } else null;
+        self.actor.schedule(.{ .onConnectionSetEnvironmentValue = .{
+            .key = owned_key,
+            .value = owned_value,
+        } }) catch |err| {
+            allocator.free(owned_key);
+            if (owned_value) |bytes| allocator.free(bytes);
+            log.writef(.err, "Unable to enqueue connection environment update: {s}", .{@errorName(err)});
+        };
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
@@ -534,6 +551,14 @@ const ConnectionDaemon = struct {
         self.actor.schedule(.{ .onConnectionDataCount = data_count }) catch |err| {
             log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
         };
+    }
+
+    fn legacyStatus(_: *anyopaque, _: api.ConnectionStatus) void {
+        @panic("Unimplemented");
+    }
+
+    fn legacyLastError(_: *anyopaque, _: api.PartoutErrorCode) void {
+        @panic("Unimplemented");
     }
 
     fn legacyCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {
@@ -1134,6 +1159,10 @@ const ConnectionDaemon = struct {
         onConnectionEstablished: net.Connection.Events.Success,
         onConnectionFailed: net.Connection.Events.Failure,
         onConnectionStopped,
+        onConnectionSetEnvironmentValue: struct {
+            key: []const u8,
+            value: ?[]const u8,
+        },
         onConnectionDataCount: api.DataCount,
         onLooperTerminated: ?Looper.Failure,
         recoverConnection,
@@ -1162,6 +1191,15 @@ const ConnectionDaemon = struct {
             },
             .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
             .onConnectionStopped => self.handleConnectionStopped(),
+            .onConnectionSetEnvironmentValue => |update| {
+                defer self.daemon.allocator.free(update.key);
+                defer if (update.value) |bytes| self.daemon.allocator.free(bytes);
+                // Finalization can queue a clear while the actor is stopping.
+                // Deliver it, but do not restore stale values after shutdown.
+                if (self.daemon.state == .started or update.value == null) {
+                    self.daemon.controller.setEnvironmentValue(update.key, update.value);
+                }
+            },
             .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnection(),

@@ -60,12 +60,10 @@ const ConnectionError = SessionError || error{
 /// I/O before releasing resources. Creation before publication and destruction
 /// after full shutdown may run outside it. Outgoing callbacks must return
 /// promptly, never wait for the daemon actor, and never reenter the lifecycle.
-/// Platform/controller callbacks must obey the same nonblocking contract.
 const OpenVPNConnection = struct {
     allocator: std.mem.Allocator,
     module_id: api.UUID,
     profile: *const api.Profile,
-    controller: net.TunnelController,
     connection_options: net.ConnectionOptions,
     session_options: SessionOptions,
     session_events: SessionEvents,
@@ -163,7 +161,6 @@ const OpenVPNConnection = struct {
             .allocator = allocator,
             .module_id = module_id,
             .profile = sandbox.profile,
-            .controller = sandbox.controller,
             .connection_options = sandbox.options,
             .session_options = session_options,
             .session_events = session_events,
@@ -239,7 +236,7 @@ const OpenVPNConnection = struct {
 
         // Install the current attempt.
         self.current_session = session;
-        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, null);
+        self.reportServerConfiguration(null);
 
         session.start() catch |err| {
             log.writef(.fault, "Unable to start session: {s}", .{@errorName(err)});
@@ -399,14 +396,19 @@ const OpenVPNConnection = struct {
 
     fn reportServerConfiguration(
         self: *OpenVPNConnection,
-        configuration: *const api.OpenVPNConfiguration,
+        configuration: ?*const api.OpenVPNConfiguration,
     ) void {
-        const value = core.util.encodeJsonValue(self.allocator, configuration) catch {
+        const e = self.events orelse return;
+        const cfg = configuration orelse {
+            e.set_env(e.ctx, EnvironmentKeys.server_configuration, null);
+            return;
+        };
+        const value = core.util.encodeJsonValue(self.allocator, cfg) catch {
             log.write(.err, "Unable to encode server configuration");
             return;
         };
         defer self.allocator.free(value);
-        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, value);
+        e.set_env(e.ctx, EnvironmentKeys.server_configuration, value);
     }
 
     // MARK: - Termination and cleanup
@@ -428,7 +430,7 @@ const OpenVPNConnection = struct {
             self.with_local_options = false;
         }
         if (!has_session) return;
-        self.controller.setEnvironmentValue(EnvironmentKeys.server_configuration, null);
+        self.reportServerConfiguration(null);
         const events = self.events orelse return;
         // All owned state is settled before the synchronous terminal callback.
         events.stopped(events.ctx);

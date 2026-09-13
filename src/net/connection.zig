@@ -212,6 +212,9 @@ pub const Connection = struct {
         stopped: *const fn (*anyopaque) void = struct {
             fn call(_: *anyopaque) void {}
         }.call,
+        set_env: *const fn (*anyopaque, []const u8, ?[]const u8) void = struct {
+            fn call(_: *anyopaque, _: []const u8, _: ?[]const u8) void {}
+        }.call,
 
         data_count: *const fn (*anyopaque, api.DataCount) void,
 
