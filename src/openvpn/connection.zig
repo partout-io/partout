@@ -174,14 +174,14 @@ const OpenVPNConnection = struct {
         const fnt = try api.cryptoFunctionTable(session_options.backend);
         log.writef(
             .notice,
-            "Using Zig v1 connection (crypto = {s})",
+            "Using OpenVPNConnection v1 (crypto = {s})",
             .{fnt.name},
         );
         return created.asConnection();
     }
 
     fn destroy(self: *OpenVPNConnection) void {
-        log.write(.debug, "Deinit _OpenVPNConnectionV3");
+        log.write(.debug, "Deinit OpenVPNConnection v1");
         self.destroyCurrentSession();
         self.auth_token.deinit();
         self.clearLink();

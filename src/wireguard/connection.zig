@@ -109,13 +109,13 @@ const WireGuardConnection = struct {
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        log.write(.notice, "Using v2 connection");
+        log.write(.notice, "Using WireGuardConnection");
         return created.asConnection();
     }
 
     fn destroy(self: *WireGuardConnection) void {
         const allocator = self.allocator;
-        log.write(.debug, "Deinit _WireGuardConnectionV2");
+        log.write(.debug, "Deinit WireGuardConnection");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         self.data_count_timer.deinit();

@@ -107,7 +107,7 @@ pub const Daemon = struct {
         original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
-        log.write(.notice, "Using Zig v2 daemon");
+        log.write(.notice, "Using v2 daemon");
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
         log.write(.notice, "Decoded profile:");
@@ -138,6 +138,7 @@ pub const Daemon = struct {
     }
 
     pub fn destroy(self: *Daemon) void {
+        log.write(.debug, "Deinit v2 daemon");
         if (self.state != .initial and self.state != .stopped)
             @panic("Daemon.destroy() requires an initial or fully stopped daemon");
         switch (self.implementation) {

@@ -178,14 +178,14 @@ const OpenVPNConnection = struct {
         };
         log.writef(
             .notice,
-            "Using Zig v2 connection (crypto = {s})",
+            "Using OpenVPNConnection v2 (crypto = {s})",
             .{fnt.name},
         );
         return created.asConnection();
     }
 
     fn destroy(self: *OpenVPNConnection) void {
-        log.write(.debug, "Deinit _OpenVPNConnectionV3");
+        log.write(.debug, "Deinit OpenVPNConnection v2");
         self.releaseSession();
         self.auth_token.deinit();
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);

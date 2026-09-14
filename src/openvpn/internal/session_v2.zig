@@ -159,7 +159,7 @@ pub const Session = struct {
     // MARK: - Public API
 
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
-        log.write(.notice, "Using Zig v2 session");
+        log.write(.notice, "Using OpenVPN v2 Session");
 
         const remote_endpoint = try init.remote_endpoint.clone(allocator);
         errdefer remote_endpoint.deinit(allocator);
@@ -235,7 +235,7 @@ pub const Session = struct {
     }
 
     pub fn destroy(self: *Session) void {
-        log.write(.debug, "Deinit OpenVPNSession");
+        log.write(.debug, "Deinit OpenVPN v2 Session");
         switch (self.state) {
             .stopped => {},
             .active => |active| active.context.destroy(),
