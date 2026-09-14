@@ -79,14 +79,6 @@ pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) ca
     log.init(args.logs_private_data, args.logger_fn, args.logger_ctx);
 }
 
-pub export fn partout_readfile(
-    rel_path: ?[*:0]const u8,
-    parent: ?[*:0]const u8,
-) callconv(.c) ?[*:0]u8 {
-    const path = rel_path orelse return null;
-    return portable_c.pp_file_read(path, parent);
-}
-
 pub export fn partout_import_profile(
     c_text: ?[*:0]const u8,
     c_name: ?[*:0]const u8,
@@ -218,6 +210,20 @@ pub export fn partout_daemon_start(
     return partout_c.PartoutCompletionCodeOK;
 }
 
+pub export fn partout_daemon_hold() callconv(.c) void {
+    const runtime = daemon_runtime orelse return;
+    runtime.hold();
+}
+
+pub export fn partout_daemon_stop() callconv(.c) void {
+    const runtime = daemon_runtime orelse return;
+    const is_daemon = runtime.options.is_daemon;
+    runtime.stop();
+    runtime.destroy(allocator);
+    daemon_runtime = null;
+    if (is_daemon) daemon_process_lock.release();
+}
+
 pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
     if (!build_options.wireguard) {
         log.write(.fault, "WireGuard is not implemented");
@@ -246,23 +252,10 @@ fn releaseDaemonBindings(bindings: ?*const partout_c.partout_daemon_bindings) vo
     release(@constCast(value));
 }
 
-pub export fn partout_daemon_hold() callconv(.c) void {
-    const runtime = daemon_runtime orelse return;
-    runtime.hold();
-}
-
-pub export fn partout_daemon_stop() callconv(.c) void {
-    const runtime = daemon_runtime orelse return;
-    const is_daemon = runtime.options.is_daemon;
-    runtime.stop();
-    runtime.destroy(allocator);
-    daemon_runtime = null;
-    if (is_daemon) daemon_process_lock.release();
-}
-
 fn mapErrorToCode(err: abi.RuntimeError) c_int {
     log.writef(.err, "Unable to start daemon: {s}", .{@errorName(err)});
     return switch (err) {
+        error.OutOfMemory => partout_c.PartoutCompletionCodeMemory,
         error.InvalidArgs => partout_c.PartoutCompletionCodeArgs,
         else => partout_c.PartoutCompletionCodeFailure,
     };
