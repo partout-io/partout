@@ -57,7 +57,7 @@ jobs:
           git_tag_gpgsign: true
 
       - name: Set up Zig
-        uses: mlugg/setup-zig@v2
+        uses: partout-io/setup-zig@v3
 
       - name: Build XCFramework
         id: xcframework
