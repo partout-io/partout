@@ -68,7 +68,7 @@ typedef struct {
                                   const char *_Nullable value);
     void (*clear_tunnel)(void *_Nullable ref, bool kill_switch);
     void (*cancel_tunnel)(void *_Nullable ref,
-                          const char *_Nullable error_message);
+                          const char *_Nullable error_code);
 } pp_tun_ctrl_fnt;
 
 /* Return the function table for the current platform. */
