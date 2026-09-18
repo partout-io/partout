@@ -380,32 +380,6 @@ pub const CryptoBackend = enum(i32) {
     }
 };
 
-pub const DaemonFeatureFlag = enum(i32) {
-    experimentalDaemon = 1,
-
-    pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
-        const raw_value = try parseInteger(i32, value);
-        return parseFromRaw(raw_value) orelse error.UnsupportedModel;
-    }
-
-    pub fn parseFromRaw(raw_value: i32) ?@This() {
-        return switch (raw_value) {
-            1 => .experimentalDaemon,
-            else => null,
-        };
-    }
-
-    pub fn raw(self: @This()) i32 {
-        return switch (self) {
-            .experimentalDaemon => 1,
-        };
-    }
-
-    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
-        try jw.write(self.raw());
-    }
-};
-
 pub const DNSModule = struct {
     id: uuid.UUID = uuid.zero_id,
     protocol_type: DNSModuleProtocolType = .{ .cleartext = .{} },

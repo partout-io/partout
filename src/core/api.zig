@@ -20,7 +20,6 @@ pub const ABIEnvelope = gen.ABIEnvelope;
 pub const Address = manual.Address;
 pub const ConnectionStatus = gen.ConnectionStatus;
 pub const CryptoBackend = gen.CryptoBackend;
-pub const DaemonFeatureFlag = gen.DaemonFeatureFlag;
 pub const DataCount = gen.DataCount;
 pub const DNSModule = gen.DNSModule;
 pub const DNSModuleDomainPolicy = gen.DNSModuleDomainPolicy;

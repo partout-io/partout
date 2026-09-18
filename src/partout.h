@@ -87,8 +87,6 @@ typedef struct {
     const char *cache_dir;
     uint64_t min_data_count_delta;
     partout_crypto crypto;
-    /* DaemonFeatureFlag bit mask. Zero disables all optional features. */
-    uint64_t feature_flags;
 } partout_daemon_options;
 
 /* Daemon initialization. */

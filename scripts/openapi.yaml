@@ -49,13 +49,6 @@ components:
         - json
       type: object
       description: A type-erased ``Module`` for encoding external implementations.
-    DaemonFeatureFlag:
-      enum:
-        - 1
-      type: integer
-      x-enum-varnames:
-        - experimentalDaemon
-      description: A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field.
     DNSModule:
       additionalProperties: false
       properties:
