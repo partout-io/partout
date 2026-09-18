@@ -8,6 +8,8 @@ const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
+// FIXME: ###, anyerror
+
 /// Fine-tuning.
 pub const Options = struct {
     link_buf_size: usize = 64 * 1024,

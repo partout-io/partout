@@ -11,6 +11,7 @@ const ZeroingData = crypto_mod.ZeroingData;
 
 pub const StaticKey = struct {
     pub const ParseError = std.mem.Allocator.Error || error{InvalidStaticKey};
+    pub const ParseAndStringifyError = ParseError || error{ InvalidModel, Stringify };
 
     const content_length = 256;
     const key_count = 4;
@@ -26,7 +27,7 @@ pub const StaticKey = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         key: api.OpenVPNStaticKey,
-    ) !StaticKey {
+    ) ParseAndStringifyError!StaticKey {
         const bytes = try key.data.bytesAlloc(allocator);
         defer {
             @memset(bytes, 0);

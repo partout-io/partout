@@ -409,6 +409,7 @@ pub const PosixLooper = struct {
 
     /// Performs a task synchronously with the worker. Runs inline
     /// if on the same queue to prevent deadlock. Submission does not allocate.
+    // FIXME: ###, anyerror
     pub fn perform(
         self: *PosixLooper,
         comptime Result: type,
@@ -468,6 +469,7 @@ pub const PosixLooper = struct {
             @panic("Looper task completed without a result");
     }
 
+    // FIXME: ###, anyerror
     pub fn performTask(self: *PosixLooper, task: helpers.Task) anyerror!void {
         return self.perform(void, task.context, task.callback);
     }

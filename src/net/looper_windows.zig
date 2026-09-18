@@ -42,6 +42,7 @@ pub const WindowsLooper = struct {
         return self.actor.isOnQueue();
     }
 
+    // FIXME: ###, anyerror
     pub fn perform(
         self: *WindowsLooper,
         comptime Result: type,
@@ -52,6 +53,7 @@ pub const WindowsLooper = struct {
         return self.actor.perform(Result, .{ .perform = &task });
     }
 
+    // FIXME: ###, anyerror
     pub fn performTask(self: *WindowsLooper, task: helpers.Task) anyerror!void {
         return self.perform(void, task.context, task.callback);
     }
@@ -139,7 +141,8 @@ pub const WindowsLooper = struct {
     const Actor = core.actor.ActorWithFinish(
         WindowsLooper,
         Message,
-        anyerror, // FIXME: ###, Use specific error type
+        // FIXME: ###, anyerror
+        anyerror,
         handleMessage,
         actorDidFinish,
     );
@@ -147,6 +150,7 @@ pub const WindowsLooper = struct {
     fn Task(comptime Result: type) type {
         return struct {
             context: ?*anyopaque,
+            // FIXME: ###, anyerror
             callback: *const fn (?*anyopaque) anyerror!Result,
         };
     }

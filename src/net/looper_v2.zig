@@ -109,6 +109,7 @@ pub const Looper = struct {
 
     /// Performs a task synchronously with the worker. Runs inline
     /// if on the same queue to prevent deadlock. Submission does not allocate.
+    // FIXME: ###, anyerror
     pub fn perform(
         self: *Looper,
         comptime Result: type,
@@ -118,6 +119,7 @@ pub const Looper = struct {
         return self.impl.perform(Result, context, callback);
     }
 
+    // FIXME: ###, anyerror
     pub fn performTask(self: *Looper, task: helpers.Task) anyerror!void {
         return self.impl.performTask(task);
     }
