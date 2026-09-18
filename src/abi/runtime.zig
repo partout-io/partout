@@ -31,6 +31,7 @@ pub const DaemonOptions = struct {
     cancels_unrecoverable: bool,
     min_data_count_delta: u64,
     crypto_backend: ?api.CryptoBackend,
+    feature_flags: std.EnumSet(api.DaemonFeatureFlag) = .initEmpty(),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -38,6 +39,14 @@ pub const DaemonOptions = struct {
         error_info: ?*api.JsonErrorInfo,
     ) RuntimeError!DaemonOptions {
         const c_profile = args.profile orelse return error.InvalidArgs;
+        var feature_flags = std.EnumSet(api.DaemonFeatureFlag).initEmpty();
+        var remaining_flags = args.options.feature_flags;
+        inline for (std.meta.tags(api.DaemonFeatureFlag)) |flag| {
+            const mask: u64 = @intCast(@intFromEnum(flag));
+            if (remaining_flags & mask != 0) feature_flags.insert(flag);
+            remaining_flags &= ~mask;
+        }
+        if (remaining_flags != 0) return error.InvalidArgs;
 
         // Parse the profile from a JSON. This step doesn't recognize
         // a serialized module representation, for which a former
@@ -86,6 +95,7 @@ pub const DaemonOptions = struct {
             .cancels_unrecoverable = args.options.cancels_unrecoverable,
             .min_data_count_delta = args.options.min_data_count_delta,
             .crypto_backend = crypto_backend,
+            .feature_flags = feature_flags,
         };
     }
 
