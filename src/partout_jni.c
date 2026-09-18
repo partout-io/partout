@@ -112,6 +112,7 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
     args.options.cache_dir = jni_cache_dir;
     args.options.min_data_count_delta = minDataCountDelta;
     args.options.crypto = cryptoBackend;
+    args.options.feature_flags = 0;
     args.bindings = &bindings;
     const jint result = partout_daemon_start(&args);
 

@@ -95,7 +95,8 @@ public final class PartoutProviderRuntime: Sendable {
                 min_data_count_delta: UInt64(minDataCountDelta ?? .zero),
                 crypto: cryptoBackend.map {
                     partout_crypto(UInt32($0.rawValue))
-                } ?? PartoutCryptoDefault
+                } ?? PartoutCryptoDefault,
+                feature_flags: 0
             )
             return withUnsafePointer(to: &bindings) { bindingsPtr in
                 var start_args = partout_daemon_start_args(
