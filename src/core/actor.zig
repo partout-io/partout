@@ -7,6 +7,10 @@
 //! The actor owns a worker thread and a FIFO mailbox. `perform` enqueues
 //! stack-backed jobs and waits for completion; `schedule` enqueues heap-backed
 //! jobs and returns immediately.
+//!
+//! The handler has signature `fn (*Context, comptime Result: type, Message)
+//! Error!Result`. Each `perform` call chooses its result type; scheduled messages
+//! invoke the handler with `void`.
 
 const std = @import("std");
 
@@ -16,7 +20,7 @@ pub fn Actor(
     comptime Context: type,
     comptime Message: type,
     comptime Error: type,
-    comptime handler: fn (*Context, Message) Error!void,
+    comptime handler: anytype,
 ) type {
     return ActorWithFinish(Context, Message, Error, handler, null);
 }
@@ -25,23 +29,22 @@ pub fn ActorWithFinish(
     comptime Context: type,
     comptime Message: type,
     comptime Error: type,
-    comptime handler: fn (*Context, Message) Error!void,
+    comptime handler: anytype,
     comptime on_finish: ?*const fn (*Context) void,
 ) type {
     return struct {
         const Self = @This();
         const Command = union(enum) {
             message: Message,
+            perform: struct {
+                context: *anyopaque,
+                callback: *const fn (*Context, *anyopaque) Error!void,
+            },
             shutdown,
         };
 
-        const Result = union(enum) {
-            ok,
-            err: Error,
-        };
-
         const Outcome = struct {
-            result: Result = .ok,
+            result: Error!void = {},
             exit: bool = false,
         };
 
@@ -50,7 +53,7 @@ pub fn ActorWithFinish(
             next: ?*Job = null,
             owned: bool = false,
             done: bool = false,
-            result: Result = .ok,
+            result: Error!void = {},
         };
 
         pub const CreateError = std.mem.Allocator.Error || std.Thread.SpawnError;
@@ -102,7 +105,13 @@ pub fn ActorWithFinish(
             return thread_id == std.Thread.getCurrentId();
         }
 
-        /// Schedules a message asynchronously on the actor.
+        pub fn isOnQueue(self: *Self) bool {
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return self.isCurrentThread();
+        }
+
+        /// Schedules a message asynchronously with a void result.
         pub fn schedule(self: *Self, message: Message) ScheduleError!void {
             const job = try self.allocator.create(Job);
             errdefer self.allocator.destroy(job);
@@ -117,10 +126,23 @@ pub fn ActorWithFinish(
             self.pushLocked(job);
         }
 
-        /// Performs a message synchronously on the actor. Returns
-        /// a domain-specific error related to the job execution.
-        pub fn perform(self: *Self, message: Message) PerformError!void {
-            var job = Job{ .command = .{ .message = message } };
+        /// Performs a message synchronously on the actor, returning the handler's
+        /// result or a domain-specific error related to the job execution.
+        pub fn perform(self: *Self, comptime Result: type, message: Message) PerformError!Result {
+            const Request = struct {
+                message: Message,
+                result: Result = undefined,
+
+                fn call(context: *Context, opaque_request: *anyopaque) Error!void {
+                    const request: *@This() = @ptrCast(@alignCast(opaque_request));
+                    request.result = try handler(context, Result, request.message);
+                }
+            };
+            var request = Request{ .message = message };
+            var job = Job{ .command = .{ .perform = .{
+                .context = &request,
+                .callback = Request.call,
+            } } };
 
             // Watch out for recursive locks. If we are invoking perform()
             // on the actor thread, e.g., as the effect of a nested
@@ -129,7 +151,7 @@ pub fn ActorWithFinish(
             self.mutex.lock();
             if (self.isCurrentThread()) {
                 self.mutex.unlock();
-                return handler(self.context, message);
+                return handler(self.context, Result, message);
             }
             defer self.mutex.unlock();
 
@@ -138,10 +160,8 @@ pub fn ActorWithFinish(
             while (!job.done) {
                 self.cond.wait(&self.mutex);
             }
-            return switch (job.result) {
-                .ok => {},
-                .err => |err| err,
-            };
+            try job.result;
+            return request.result;
         }
 
         /// Stops the actor thread after already queued work completes.
@@ -233,14 +253,10 @@ pub fn ActorWithFinish(
 
         fn performCommand(self: *const Self, command: Command) Outcome {
             switch (command) {
-                .message => |message| {
-                    handler(self.context, message) catch |err| {
-                        return .{ .result = .{ .err = err } };
-                    };
-                },
+                .message => |message| return .{ .result = handler(self.context, void, message) },
+                .perform => |request| return .{ .result = request.callback(self.context, request.context) },
                 .shutdown => return .{ .exit = true },
             }
-            return .{};
         }
     };
 }

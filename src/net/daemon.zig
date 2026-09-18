@@ -283,7 +283,7 @@ pub const Daemon = struct {
         },
     };
 
-    fn perform(self: *Daemon, message: Message) Error!void {
+    fn perform(self: *Daemon, comptime Result: type, message: Message) Error!Result {
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doHold(),
@@ -307,15 +307,15 @@ pub const Daemon = struct {
     }
 
     pub fn start(self: *const Daemon) Error!void {
-        return self.actor.perform(.start);
+        return self.actor.perform(void, .start);
     }
 
     pub fn hold(self: *const Daemon) void {
-        self.actor.perform(.hold) catch return;
+        self.actor.perform(void, .hold) catch return;
     }
 
     pub fn stop(self: *const Daemon) void {
-        self.actor.perform(.stop) catch return;
+        self.actor.perform(void, .stop) catch return;
     }
 
     // The ready event gates the signals from:
@@ -325,7 +325,7 @@ pub const Daemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.actor.perform(.evaluateConnection) catch |err| {
+        self.actor.perform(void, .evaluateConnection) catch |err| {
             log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
         };
     }
@@ -333,7 +333,7 @@ pub const Daemon = struct {
     // This is scheduled with a delay
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.perform(.resumeGate) catch |err| {
+        self.actor.perform(void, .resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
         };
     }
@@ -379,28 +379,28 @@ pub const Daemon = struct {
 
     fn onConnectionStatus(ctx: *anyopaque, status: api.ConnectionStatus) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(.{ .onConnectionStatus = status }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionStatus = status }) catch |err| {
             log.writef(.err, "Unable to report connection status: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(.{ .onConnectionLastError = code }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionLastError = code }) catch |err| {
             log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(.{ .onConnectionDataCount = data_count }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionDataCount = data_count }) catch |err| {
             log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(.{ .onConnectionCancel = code }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionCancel = code }) catch |err| {
             log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
         };
     }
