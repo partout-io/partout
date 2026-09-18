@@ -56,6 +56,7 @@ test "daemon options parse DNS-only profile" {
         "/tmp" ++ std.fs.path.sep_str ++ profile_cache_directory,
         options.cache_dir,
     );
+    try std.testing.expect(options.feature_flags.count() == 0);
     try std.testing.expect(!options.is_daemon);
     try std.testing.expect(options.cancels_unrecoverable);
     try std.testing.expectEqual(@as(u64, 4096), options.min_data_count_delta);
@@ -304,4 +305,22 @@ fn blockingConnectionRegistry(
         mock.blockingConnectionImplementation(blocking_connection),
     };
     return conn.ConnectionRegistry.init(allocator, &implementations);
+}
+
+test "daemon options decode experimental daemon feature flag" {
+    const allocator = std.testing.allocator;
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.feature_flags = @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+    var options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+    defer options.deinit(allocator);
+
+    try std.testing.expect(options.feature_flags.contains(.experimentalDaemon));
+}
+
+test "daemon options reject unknown feature bits" {
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.feature_flags = @as(u64, 1) << 63;
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
+    args.options.feature_flags |= @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
