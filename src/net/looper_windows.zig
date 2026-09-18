@@ -63,7 +63,7 @@ pub const WindowsLooper = struct {
         _: *helpers.Timer,
         _: u64,
         _: helpers.TimedTask,
-    ) helpers.ScheduleTimerError!void {
+    ) helpers.SubmissionError!void {
         // FIXME: ###, Implement timers
         return error.LooperUnavailable;
     }

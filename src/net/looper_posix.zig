@@ -483,7 +483,7 @@ pub const PosixLooper = struct {
         timer: *helpers.Timer,
         delay_ms: u64,
         task: helpers.TimedTask,
-    ) helpers.ScheduleTimerError!void {
+    ) helpers.SubmissionError!void {
         if (!self.isOnQueue())
             @panic("Looper.scheduleReplacing() must run on the looper queue");
 
