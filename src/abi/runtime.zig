@@ -31,6 +31,7 @@ pub const DaemonOptions = struct {
     cancels_unrecoverable: bool,
     min_data_count_delta: u64,
     crypto_backend: ?api.CryptoBackend,
+    feature_flags: std.EnumSet(api.DaemonFeatureFlag) = .initEmpty(),
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -38,6 +39,14 @@ pub const DaemonOptions = struct {
         error_info: ?*api.JsonErrorInfo,
     ) RuntimeError!DaemonOptions {
         const c_profile = args.profile orelse return error.InvalidArgs;
+        var feature_flags = std.EnumSet(api.DaemonFeatureFlag).initEmpty();
+        var remaining_flags = args.options.feature_flags;
+        inline for (std.meta.tags(api.DaemonFeatureFlag)) |flag| {
+            const mask: u64 = @intCast(@intFromEnum(flag));
+            if (remaining_flags & mask != 0) feature_flags.insert(flag);
+            remaining_flags &= ~mask;
+        }
+        if (remaining_flags != 0) return error.InvalidArgs;
 
         // Parse the profile from a JSON. This step doesn't recognize
         // a serialized module representation, for which a former
@@ -86,6 +95,7 @@ pub const DaemonOptions = struct {
             .cancels_unrecoverable = args.options.cancels_unrecoverable,
             .min_data_count_delta = args.options.min_data_count_delta,
             .crypto_backend = crypto_backend,
+            .feature_flags = feature_flags,
         };
     }
 
@@ -105,20 +115,59 @@ pub const DaemonOptions = struct {
 };
 
 pub const DaemonRuntime = struct {
+    const Daemon = union(enum) {
+        legacy: *net.Daemon,
+        experimental: *net.DaemonV2,
+
+        fn create(allocator: std.mem.Allocator, profile: *const api.Profile, context: net.DaemonContext, experimental: bool) RuntimeError!Daemon {
+            return if (experimental)
+                .{ .experimental = try net.DaemonV2.create(allocator, profile, context) }
+            else
+                .{ .legacy = try net.Daemon.create(allocator, profile, context) };
+        }
+
+        fn destroy(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.destroy(),
+            }
+        }
+
+        fn start(self: Daemon) RuntimeError!void {
+            return switch (self) {
+                inline else => |impl| impl.start(),
+            };
+        }
+
+        fn hold(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.hold(),
+            }
+        }
+
+        fn stop(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.stop(),
+            }
+        }
+    };
+
     const Context = union(api.ModuleType) {
         Custom: void,
         DNS: void,
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: openvpn.ConnectionContext,
+        OpenVPN: union(enum) {
+            legacy: openvpn.ConnectionContext,
+            experimental: openvpn.ConnectionContextV2,
+        },
         Provider: void,
         WireGuard: wireguard.ConnectionContext,
         Undefined: void,
     };
 
     registry: net.ConnectionRegistry,
-    daemon: *net.Daemon,
+    daemon: Daemon,
     platform: net.Platform,
     options: DaemonOptions,
     events: helpers.BoundDaemonEvents,
@@ -138,20 +187,29 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
+        const experimental_requested = options.feature_flags.contains(.experimentalDaemon);
+        const is_openvpn = if (api.findActiveConnectionModule(&options.profile)) |module|
+            api.moduleType(module) == .OpenVPN
+        else
+            false;
+        const experimental = experimental_requested and is_openvpn;
+        if (experimental_requested and !is_openvpn) {
+            core.logging.write(.err, "experimentalDaemon is only applied for OpenVPN; using the legacy daemon for this profile");
+        }
+
         // Register the known connection implementations
         self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and ffi.has_default_crypto_backend) {
             const ctx = self.contexts.putUninitialized(.OpenVPN);
-            ctx.* = .{ .OpenVPN = .{
-                .session_options = .{
-                    .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
-                },
-            } };
-            const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx.OpenVPN),
-                .vtable = &openvpn.connection_vtable,
+            const backend = options.crypto_backend orelse api.defaultCryptoBackend();
+            const impl: net.ConnectionImplementation = if (experimental) blk: {
+                ctx.* = .{ .OpenVPN = .{ .experimental = .{ .session_options = .{ .backend = backend } } } };
+                break :blk .{ .ptr = &ctx.OpenVPN.experimental, .vtable = &openvpn.connection_v2_vtable };
+            } else blk: {
+                ctx.* = .{ .OpenVPN = .{ .legacy = .{ .session_options = .{ .backend = backend } } } };
+                break :blk .{ .ptr = &ctx.OpenVPN.legacy, .vtable = &openvpn.connection_vtable };
             };
             try impls.append(allocator, impl);
         }
@@ -175,7 +233,7 @@ pub const DaemonRuntime = struct {
         });
         errdefer self.platform.deinit();
         self.events = helpers.BoundDaemonEvents.init(bindings);
-        self.daemon = try net.Daemon.create(
+        self.daemon = try Daemon.create(
             allocator,
             &options.profile,
             .{
@@ -194,6 +252,7 @@ pub const DaemonRuntime = struct {
                     .cache_dir = options.cache_dir,
                 },
             },
+            experimental,
         );
         errdefer self.daemon.destroy();
 

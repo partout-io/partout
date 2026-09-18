@@ -3,7 +3,7 @@
 set -euo pipefail
 
 fail() {
-    echo "run-kotlin-tests.sh: $*" >&2
+    echo "run-android-tests.sh: $*" >&2
     exit 1
 }
 

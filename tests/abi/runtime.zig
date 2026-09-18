@@ -56,6 +56,7 @@ test "daemon options parse DNS-only profile" {
         "/tmp" ++ std.fs.path.sep_str ++ profile_cache_directory,
         options.cache_dir,
     );
+    try std.testing.expect(options.feature_flags.count() == 0);
     try std.testing.expect(!options.is_daemon);
     try std.testing.expect(options.cancels_unrecoverable);
     try std.testing.expectEqual(@as(u64, 4096), options.min_data_count_delta);
@@ -120,23 +121,32 @@ test "daemon runtime owns options during lifecycle" {
     defer allocator.free(cache_root);
     const cache_root_z = try allocator.dupeZ(u8, cache_root);
     defer allocator.free(cache_root_z);
-    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
-    args.options.cache_dir = cache_root_z.ptr;
-    const options = try abi_runtime.DaemonOptions.init(
-        allocator,
-        args,
-        null,
-    );
-    try std.testing.expectEqualStrings(
-        profile_cache_directory,
-        std.fs.path.basename(options.cache_dir),
-    );
-    const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
-    try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
-
-    try runtime.start();
-    runtime.stop();
-    runtime.destroy(allocator);
+    for ([_]bool{ false, true }) |experimental| {
+        var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+        args.options.cache_dir = cache_root_z.ptr;
+        if (experimental) args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
+        const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+            options.deinit(allocator);
+            return err;
+        };
+        defer runtime.destroy(allocator);
+        try std.testing.expectEqualStrings(profile_cache_directory, std.fs.path.basename(runtime.options.cache_dir));
+        try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
+        try std.testing.expect(runtime.daemon == .legacy);
+        if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
+            const impl = runtime.registry.implementation(.OpenVPN).?;
+            const ctx = runtime.contexts.getPtr(.OpenVPN).?;
+            try std.testing.expect(ctx.OpenVPN == .legacy);
+            const expected_vtable = &source.openvpn_exports.connection_vtable;
+            try std.testing.expect(impl.vtable == expected_vtable);
+            const expected_context: *anyopaque = &ctx.OpenVPN.legacy;
+            try std.testing.expect(impl.ptr == expected_context);
+        }
+        try runtime.start();
+        runtime.hold();
+        runtime.stop();
+    }
 }
 
 test "starts DNS-only profile through tunnel controller" {
@@ -304,4 +314,75 @@ fn blockingConnectionRegistry(
         mock.blockingConnectionImplementation(blocking_connection),
     };
     return conn.ConnectionRegistry.init(allocator, &implementations);
+}
+
+test "daemon options decode experimental daemon feature flag" {
+    const allocator = std.testing.allocator;
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
+    var options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+    defer options.deinit(allocator);
+
+    try std.testing.expect(options.feature_flags.contains(.experimentalDaemon));
+}
+
+test "daemon options reject unknown feature bits" {
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.feature_flags = @as(u64, 1) << 63;
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
+    args.options.feature_flags |= partout_c.PartoutDaemonFlagExperimentalDaemon;
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
+}
+
+test "experimental daemon flag only applies to active OpenVPN profiles" {
+    const Warning = struct {
+        seen: std.atomic.Value(bool) = .init(false),
+        fn log(raw: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            if (std.mem.indexOf(u8, std.mem.span(message), "experimentalDaemon is only applied for OpenVPN") != null) {
+                self.seen.store(true, .release);
+            }
+        }
+    };
+    const Case = struct { json: [:0]const u8, enabled: bool, is_openvpn: bool = false };
+    const cases = [_]Case{
+        .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
+        .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled, .is_openvpn = true },
+        .{ .json =
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333"}}],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+        , .enabled = source.wireguard_enabled },
+        .{ .json =
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"Inactive OpenVPN","modules":[{"type":"OpenVPN","value":{"id":"44444444-4444-4444-8444-444444444444","configuration":{}}}],"activeModulesIds":[]}
+        , .enabled = source.openvpn_enabled },
+    };
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_dir = try std.fmt.allocPrintSentinel(allocator, ".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
+    defer allocator.free(cache_dir);
+    for (cases) |case| {
+        if (!case.enabled) continue;
+        for ([_]bool{ false, true }) |requested| {
+            var warning = Warning{};
+            core.logging.init(false, Warning.log, &warning);
+            defer core.logging.deinit();
+            var args = daemonStartArgs(case.json.ptr);
+            args.options.cache_dir = cache_dir.ptr;
+            args.options.feature_flags = if (requested) partout_c.PartoutDaemonFlagExperimentalDaemon else 0;
+            const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+            const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+                options.deinit(allocator);
+                return err;
+            };
+            defer runtime.destroy(allocator);
+            const experimental = requested and case.is_openvpn;
+            try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
+            try std.testing.expectEqual(requested and !case.is_openvpn, warning.seen.load(.acquire));
+            if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
+                const impl = runtime.registry.implementation(.OpenVPN).?;
+                const expected = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
+                try std.testing.expect(impl.vtable == expected);
+            }
+        }
+    }
 }

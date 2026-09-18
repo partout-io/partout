@@ -13,9 +13,6 @@ concurrency:
   group: ${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/master' }}
 
-env:
-  PREBUILTS_VERSION: "0.7.1"
-
 jobs:
   run_tests:
     name: ${{ matrix.job_name }}
@@ -23,13 +20,17 @@ jobs:
       fail-fast: true
       matrix:
         include:
-          - job_name: Run Zig and Swift tests
+          - job_name: Run Zig tests
+            runner: macos-26
+            suite: zig
+            timeout_minutes: 10
+          - job_name: Run Apple tests
             runner: macos-26
             suite: apple
             timeout_minutes: 10
-          - job_name: Run Kotlin tests
+          - job_name: Run Android tests
             runner: ubuntu-latest
-            suite: kotlin
+            suite: android
             timeout_minutes: 5
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout_minutes }}
@@ -41,21 +42,18 @@ jobs:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Zig
         uses: partout-io/setup-zig@v3
-        if: matrix.suite == 'apple'
+        if: matrix.suite == 'zig'
       - name: Run Zig tests
-        if: matrix.suite == 'apple'
+        if: matrix.suite == 'zig'
         run: ci/run-tests.sh
-      - name: Build active XCFramework slice
+      - name: Run Apple tests
         if: matrix.suite == 'apple'
-        run: scripts/build-xcframework.sh "$PREBUILTS_VERSION"
-      - name: Run Swift tests
-        if: matrix.suite == 'apple'
-        run: ci/run-swift-tests.sh
+        run: ci/run-apple-tests.sh
       - uses: actions/setup-java@v5
-        if: matrix.suite == 'kotlin'
+        if: matrix.suite == 'android'
         with:
           distribution: temurin
           java-version: 21
-      - name: Run Kotlin tests
-        if: matrix.suite == 'kotlin'
-        run: ci/run-kotlin-tests.sh
+      - name: Run Android tests
+        if: matrix.suite == 'android'
+        run: ci/run-android-tests.sh

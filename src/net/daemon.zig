@@ -51,7 +51,7 @@ const conn_mod = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
-const looper_mod = @import("looper.zig");
+const looper_mod = @import("looper_runtime.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;

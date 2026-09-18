@@ -78,6 +78,9 @@ typedef enum {
     PartoutCryptoNative
 } partout_crypto;
 
+/* Daemon feature flags (DaemonFeatureFlag bit values). */
+#define PartoutDaemonFlagExperimentalDaemon (UINT64_C(1) << 0)
+
 /* Daemon options. */
 typedef struct {
     bool is_daemon;
@@ -87,6 +90,8 @@ typedef struct {
     const char *cache_dir;
     uint64_t min_data_count_delta;
     partout_crypto crypto;
+    /* DaemonFeatureFlag bit mask. Zero disables all optional features. */
+    uint64_t feature_flags;
 } partout_daemon_options;
 
 /* Daemon initialization. */

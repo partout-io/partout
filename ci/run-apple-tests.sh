@@ -3,7 +3,7 @@
 set -euo pipefail
 
 fail() {
-    echo "run-swift-tests.sh: $*" >&2
+    echo "run-apple-tests.sh: $*" >&2
     exit 1
 }
 
