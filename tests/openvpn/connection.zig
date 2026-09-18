@@ -14,8 +14,6 @@ const api = core.api;
 const Looper = net.Looper;
 
 test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const v2 = source.openvpn_connection_v2;
     const Request = struct {
         created: net.Connection,
@@ -105,8 +103,6 @@ test "OpenVPN connection declarations are semantically analyzed" {
 }
 
 test "OpenVPN connection borrows the daemon looper" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
