@@ -645,3 +645,27 @@ const DeinitWorker = struct {
         self.done.store(true, .release);
     }
 };
+
+test "experimental looper dispatches tasks and timers through the shared API" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var finish = FinishCallProbe{};
+    var looper = try Looper.initExperimental(std.testing.allocator, .{
+        .on_finish = .{ .context = &finish, .callback = FinishCallProbe.onFinish },
+    });
+    defer looper.deinit();
+    try looper.start();
+    var stopped = false;
+    defer if (!stopped) looper.stop() catch {};
+    try std.testing.expectEqual(@as(u8, 42), try looper.perform(u8, null, returnFortyTwo));
+
+    var timer = Looper.Timer{};
+    var probe = TimerProbe{ .looper = &looper };
+    try scheduleTimer(&looper, &timer, 1, .{ .context = &probe, .callback = TimerProbe.run });
+    waitUntil(&probe.did_run);
+    try std.testing.expect(probe.ran_on_looper.load(.acquire));
+    try cancelTimer(&looper, &timer);
+    try looper.stop();
+    stopped = true;
+    try std.testing.expect(finish.called.load(.acquire));
+    try std.testing.expectError(error.LooperUnavailable, looper.performTask(.{ .callback = noopTask }));
+}

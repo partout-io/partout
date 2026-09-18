@@ -17,9 +17,10 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
 const conn_mod = @import("connection.zig");
+const daemon_mod = @import("daemon.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
-const looper_mod = @import("looper.zig");
+const looper_mod = @import("looper_runtime.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -32,53 +33,15 @@ const Looper = looper_mod.Looper;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
-pub const Error = api.DecodeError || conn_mod.CreateError || error{
-    AlreadyStarted,
-    Closed,
-    InvalidProfile,
-    LooperFailure,
-};
+pub const Error = daemon_mod.Error;
 
 const StartError = Error || conn_mod.StartError ||
     sandbox.TunnelController.Error;
 
-pub const EventKey = enum {
-    connection_status,
-    data_count,
-    last_error_code,
-};
-
-pub const Events = struct {
-    ctx: *anyopaque,
-    status: *const fn (*anyopaque, api.ConnectionStatus) void,
-    last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
-    data_count: *const fn (*anyopaque, api.DataCount) void,
-    remove_key: *const fn (*anyopaque, EventKey) void,
-};
-
-pub const Context = struct {
-    pub const Objects = struct {
-        registry: *const ConnectionRegistry,
-        controller: sandbox.TunnelController,
-        resolver: sandbox.DNSResolver,
-        factory: sandbox.SocketFactory,
-        monitor: sandbox.NetworkMonitor,
-    };
-
-    pub const Options = struct {
-        starts_immediately: bool = false,
-        cancels_unrecoverable: bool = true,
-        stop_delay_ms: u32 = 2000,
-        reconnection_delay_ms: u32 = 2000,
-        min_data_count_delta: u64 = 0,
-        events: ?Events = null,
-        cache_dir: []const u8 = "",
-        connection_options: sandbox.ConnectionOptions = .{},
-    };
-
-    objects: Objects,
-    options: Options,
-};
+// Both implementations expose the same host-facing contract.
+pub const EventKey = daemon_mod.EventKey;
+pub const Events = daemon_mod.Events;
+pub const Context = daemon_mod.Context;
 
 pub const Daemon = struct {
     const State = enum { initial, started, failed, stopping, stopped };
@@ -683,7 +646,7 @@ const ConnectionDaemon = struct {
         errdefer connection.destroy();
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
-        looper.* = Looper.init(self.daemon.allocator, .{
+        looper.* = Looper.initExperimental(self.daemon.allocator, .{
             .on_finish = .{ .context = self, .callback = onLooperTerminate },
         }) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,

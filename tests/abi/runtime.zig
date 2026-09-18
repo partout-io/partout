@@ -121,23 +121,35 @@ test "daemon runtime owns options during lifecycle" {
     defer allocator.free(cache_root);
     const cache_root_z = try allocator.dupeZ(u8, cache_root);
     defer allocator.free(cache_root_z);
-    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
-    args.options.cache_dir = cache_root_z.ptr;
-    const options = try abi_runtime.DaemonOptions.init(
-        allocator,
-        args,
-        null,
-    );
-    try std.testing.expectEqualStrings(
-        profile_cache_directory,
-        std.fs.path.basename(options.cache_dir),
-    );
-    const runtime = try abi_runtime.DaemonRuntime.init(allocator, options, null);
-    try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
-
-    try runtime.start();
-    runtime.stop();
-    runtime.destroy(allocator);
+    for ([_]bool{ false, true }) |experimental| {
+        var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+        args.options.cache_dir = cache_root_z.ptr;
+        if (experimental) args.options.feature_flags = @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+        const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+            options.deinit(allocator);
+            return err;
+        };
+        defer runtime.destroy(allocator);
+        try std.testing.expectEqualStrings(profile_cache_directory, std.fs.path.basename(runtime.options.cache_dir));
+        try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
+        try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
+        if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
+            const impl = runtime.registry.implementation(.OpenVPN).?;
+            const ctx = runtime.contexts.getPtr(.OpenVPN).?;
+            try std.testing.expectEqual(experimental, ctx.OpenVPN == .experimental);
+            const expected_vtable = if (experimental)
+                &source.openvpn_exports.connection_v2_vtable
+            else
+                &source.openvpn_exports.connection_vtable;
+            try std.testing.expect(impl.vtable == expected_vtable);
+            const expected_context: *anyopaque = if (experimental) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
+            try std.testing.expect(impl.ptr == expected_context);
+        }
+        try runtime.start();
+        runtime.hold();
+        runtime.stop();
+    }
 }
 
 test "starts DNS-only profile through tunnel controller" {

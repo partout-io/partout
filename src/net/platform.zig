@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const looper = @import("looper.zig");
+const looper = @import("looper_runtime.zig");
 const builtin = @import("builtin");
 
 const platform_mod = @This();

@@ -12,7 +12,7 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const conn = @import("connection.zig");
 const io = @import("io.zig");
-const looper = @import("looper.zig");
+const looper = @import("looper_runtime.zig");
 const api = core.api;
 
 const Looper = looper.Looper;

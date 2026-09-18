@@ -58,6 +58,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 
 const connection = @import("connection.zig");
+const connection_v2 = @import("connection_v2.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
 const parser = @import("parser.zig");
@@ -77,6 +78,11 @@ const module_vtable: core.ModuleImplementation.VTable = .{
 };
 
 pub const ConnectionContext = connection.ConnectionContext;
+pub const ConnectionContextV2 = connection_v2.ConnectionContext;
+pub const connection_v2_vtable: net.ConnectionImplementation.VTable = .{
+    .module_type = moduleType,
+    .create_connection = connection_v2.createConnection,
+};
 pub const connection_vtable: net.ConnectionImplementation.VTable = .{
     .module_type = moduleType,
     .create_connection = connection.createConnection,

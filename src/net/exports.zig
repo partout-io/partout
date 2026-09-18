@@ -16,8 +16,9 @@
 
 const conn = @import("connection.zig");
 const daemon = @import("daemon.zig");
+const daemon_v2 = @import("daemon_v2.zig");
 const io = @import("io.zig");
-const looper = @import("looper.zig");
+const looper = @import("looper_runtime.zig");
 const platform = @import("platform.zig");
 const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
@@ -30,9 +31,11 @@ pub const ConnectionOptions = sandbox.ConnectionOptions;
 pub const ConnectionRegistry = conn.ConnectionRegistry;
 pub const ConnectionStartError = conn.StartError;
 pub const Daemon = daemon.Daemon;
+pub const DaemonContext = daemon.Context;
 pub const DaemonError = daemon.Error;
 pub const DaemonEventKey = daemon.EventKey;
 pub const DaemonEvents = daemon.Events;
+pub const DaemonV2 = daemon_v2.Daemon;
 pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
 pub const EndpointResolver = resolver.EndpointResolver;

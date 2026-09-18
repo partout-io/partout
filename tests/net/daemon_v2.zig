@@ -74,6 +74,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         const connection_daemon = sut.implementation.connection;
         try sut.start();
         defer sut.stop();
+        try std.testing.expect(connection_daemon.looper.implementation == .experimental);
         connection_daemon.resume_gate_timer.cancel();
         connection_daemon.resume_gate_timer.wait();
         try std.testing.expectError(error.AlreadyStarted, sut.start());

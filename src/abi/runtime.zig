@@ -115,20 +115,59 @@ pub const DaemonOptions = struct {
 };
 
 pub const DaemonRuntime = struct {
+    const Daemon = union(enum) {
+        legacy: *net.Daemon,
+        experimental: *net.DaemonV2,
+
+        fn create(allocator: std.mem.Allocator, profile: *const api.Profile, context: net.DaemonContext, experimental: bool) RuntimeError!Daemon {
+            return if (experimental)
+                .{ .experimental = try net.DaemonV2.create(allocator, profile, context) }
+            else
+                .{ .legacy = try net.Daemon.create(allocator, profile, context) };
+        }
+
+        fn destroy(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.destroy(),
+            }
+        }
+
+        fn start(self: Daemon) RuntimeError!void {
+            return switch (self) {
+                inline else => |impl| impl.start(),
+            };
+        }
+
+        fn hold(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.hold(),
+            }
+        }
+
+        fn stop(self: Daemon) void {
+            switch (self) {
+                inline else => |impl| impl.stop(),
+            }
+        }
+    };
+
     const Context = union(api.ModuleType) {
         Custom: void,
         DNS: void,
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: openvpn.ConnectionContext,
+        OpenVPN: union(enum) {
+            legacy: openvpn.ConnectionContext,
+            experimental: openvpn.ConnectionContextV2,
+        },
         Provider: void,
         WireGuard: wireguard.ConnectionContext,
         Undefined: void,
     };
 
     registry: net.ConnectionRegistry,
-    daemon: *net.Daemon,
+    daemon: Daemon,
     platform: net.Platform,
     options: DaemonOptions,
     events: helpers.BoundDaemonEvents,
@@ -148,20 +187,21 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
+        const experimental = options.feature_flags.contains(.experimentalDaemon);
+
         // Register the known connection implementations
         self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
         defer impls.deinit(allocator);
         if (build_options.openvpn and ffi.has_default_crypto_backend) {
             const ctx = self.contexts.putUninitialized(.OpenVPN);
-            ctx.* = .{ .OpenVPN = .{
-                .session_options = .{
-                    .backend = options.crypto_backend orelse api.defaultCryptoBackend(),
-                },
-            } };
-            const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx.OpenVPN),
-                .vtable = &openvpn.connection_vtable,
+            const backend = options.crypto_backend orelse api.defaultCryptoBackend();
+            const impl: net.ConnectionImplementation = if (experimental) blk: {
+                ctx.* = .{ .OpenVPN = .{ .experimental = .{ .session_options = .{ .backend = backend } } } };
+                break :blk .{ .ptr = &ctx.OpenVPN.experimental, .vtable = &openvpn.connection_v2_vtable };
+            } else blk: {
+                ctx.* = .{ .OpenVPN = .{ .legacy = .{ .session_options = .{ .backend = backend } } } };
+                break :blk .{ .ptr = &ctx.OpenVPN.legacy, .vtable = &openvpn.connection_vtable };
             };
             try impls.append(allocator, impl);
         }
@@ -185,7 +225,7 @@ pub const DaemonRuntime = struct {
         });
         errdefer self.platform.deinit();
         self.events = helpers.BoundDaemonEvents.init(bindings);
-        self.daemon = try net.Daemon.create(
+        self.daemon = try Daemon.create(
             allocator,
             &options.profile,
             .{
@@ -204,6 +244,7 @@ pub const DaemonRuntime = struct {
                     .cache_dir = options.cache_dir,
                 },
             },
+            experimental,
         );
         errdefer self.daemon.destroy();
 
