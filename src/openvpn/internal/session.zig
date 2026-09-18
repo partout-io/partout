@@ -440,7 +440,7 @@ pub const Session = struct {
     fn scheduleNegotiationCheck(
         raw: ?*anyopaque,
         delay_ms: u64,
-    ) Looper.ScheduleTimerError!void {
+    ) Looper.SubmissionError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().scheduleNegotiationCheck(delay_ms);
     }
@@ -885,7 +885,7 @@ const SessionOnQueue = struct {
     fn scheduleNegotiationCheck(
         self: *SessionOnQueue,
         delay_ms: u64,
-    ) Looper.ScheduleTimerError!void {
+    ) Looper.SubmissionError!void {
         try self.session.looper.scheduleReplacing(
             &self.negotiation_timer,
             delay_ms,

@@ -339,7 +339,7 @@ fn mapEncodeError(err: api.EncodeError) core.SerializeError {
     };
 }
 
-fn mapStaticKeyError(err: anyerror) core.SerializeError {
+fn mapStaticKeyError(err: StaticKey.ParseAndStringifyError) core.SerializeError {
     return switch (err) {
         error.OutOfMemory => error.OutOfMemory,
         else => error.SerializationFailed,

@@ -53,7 +53,7 @@ pub const MockSerializedExecutor = struct {
     }
 
     pub fn drain(self: *MockSerializedExecutor) void {
-        self.actor.perform(.{
+        self.actor.perform(void, .{
             .ptr = self,
             .block = drainBarrier,
             .discard = null,
@@ -74,7 +74,7 @@ pub const MockSerializedExecutor = struct {
         });
     }
 
-    fn perform(_: *MockSerializedExecutor, message: Message) error{}!void {
+    fn perform(_: *MockSerializedExecutor, comptime Result: type, message: Message) error{}!Result {
         message.block(message.ptr);
     }
 

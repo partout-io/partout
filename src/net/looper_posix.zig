@@ -4,7 +4,7 @@
 
 //! Serial, mux-backed I/O loop for a link descriptor and a tunnel descriptor.
 //!
-//! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
+//! `PosixLooper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
 //! looper itself for `OnFinish`). Packet slices passed to callbacks are borrowed
@@ -14,44 +14,18 @@
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
-const io = @import("io.zig");
 const helpers = @import("looper_helpers.zig");
+const io = @import("io.zig");
 const io_c = io.io_c;
 const log = core.logging;
 
-pub const Looper = struct {
+pub const PosixLooper = struct {
     /// Max number of attached sides.
     const number_of_descriptors = 2;
     /// Hardcoded delay on backpressure (ENOBUFS).
     const no_buf_retry_delay_ms = 10;
 
-    // Scheduling.
-    pub const Packet = helpers.Packet;
-    pub const Packets = helpers.Packets;
-    pub const ReadAction = helpers.ReadAction;
-    pub const OnRead = helpers.OnRead;
-    pub const Failure = helpers.Failure;
-    pub const OnFailure = helpers.OnFailure;
-    pub const OnFinish = helpers.OnFinish;
-    pub const Task = helpers.Task;
-    pub const TimedTask = helpers.TimedTask;
-    pub const Timer = helpers.Timer;
-
-    // Side attachment.
-    pub const Descriptor = helpers.Descriptor;
-    pub const DescriptorPair = helpers.DescriptorPair;
-    pub const AttachArguments = helpers.AttachArguments;
-
-    // Queues.
-    const SideIdentity = helpers.SideIdentity;
-    const Completion = helpers.Completion;
-    const CompletionQueue = helpers.CompletionQueue;
-    const Command = helpers.Command;
-    const CommandNode = helpers.CommandNode;
-    const CommandQueue = helpers.CommandQueue;
-    const WriteQueue = helpers.WriteQueue;
-
-    /// Looper state.
+    /// PosixLooper state.
     const State = enum {
         idle,
         starting,
@@ -64,7 +38,7 @@ pub const Looper = struct {
     /// Outcome of a command submission (caller-side).
     const CommandOutcome = struct {
         should_continue: bool = true,
-        failure: ?Failure = null,
+        failure: ?helpers.Failure = null,
     };
 
     /// Outcome of a command execution (worker-side).
@@ -72,27 +46,16 @@ pub const Looper = struct {
         ok,
         side_failure: struct {
             side: io.Side,
-            failure: Failure,
+            failure: helpers.Failure,
         },
-        fatal: Failure,
+        fatal: helpers.Failure,
     };
 
-    pub const Options = helpers.Options;
-    pub const SubmissionError = helpers.SubmissionError;
-    const CompletionError = helpers.CompletionError;
-    pub const InitError = helpers.InitError;
-    pub const StartError = helpers.StartError;
-    pub const AttachError = helpers.AttachError;
-    pub const DetachError = helpers.DetachError;
-    pub const ResumeReadingError = helpers.ResumeReadingError;
-    pub const StopError = helpers.StopError;
-    pub const WriteError = helpers.WriteError;
-    pub const WriteOOBError = helpers.WriteOOBError;
     const RetryScheduleError = std.mem.Allocator.Error || std.Thread.SpawnError;
 
     // Configuration.
     allocator: std.mem.Allocator,
-    options: Options,
+    options: helpers.Options,
 
     // Lifecycle synchronization.
     lock: core.Mutex,
@@ -100,14 +63,14 @@ pub const Looper = struct {
     state: State,
 
     // Command submission and synchronous completion.
-    commands: CommandQueue,
-    completions: CompletionQueue,
-    stop_completion: ?*Completion,
+    commands: helpers.CommandQueue,
+    completions: helpers.CompletionQueue,
+    stop_completion: ?*helpers.Completion,
     waiter_count: usize,
 
     // Delayed command scheduler.
     scheduler: core.RunAfter,
-    timers_head: ?*CommandNode,
+    timers_head: ?*helpers.CommandNode,
     next_timer_id: u64,
 
     // Mux-owned resources.
@@ -129,17 +92,19 @@ pub const Looper = struct {
     /// Prevents deadlock on callback reentrancy.
     threadlocal var borrowed_callback_depth: usize = 0;
 
-    pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
+    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*PosixLooper {
         const mux = io_c.pp_mux_create(number_of_descriptors) orelse {
             log.writef(.err, "Unable to create mux", .{});
             return error.MuxFailure;
         };
+        errdefer io_c.pp_mux_free(mux);
         var resolved_options = options;
         resolved_options.max_read_size = @max(
             options.max_read_size,
             @max(options.link_buf_size, options.tun_buf_size),
         );
-        return .{
+        const self = try allocator.create(PosixLooper);
+        self.* = .{
             .allocator = allocator,
             .options = resolved_options,
             .lock = .{},
@@ -162,9 +127,10 @@ pub const Looper = struct {
             .worker_thread = null,
             .loop_thread_id = null,
         };
+        return self;
     }
 
-    pub fn deinit(self: *Looper) void {
+    pub fn destroy(self: *PosixLooper) void {
         log.writef(.debug, "Deinit Looper", .{});
 
         if (self.isReentrantLifecycleCall()) {
@@ -208,9 +174,10 @@ pub const Looper = struct {
 
         self.condition.deinit();
         self.lock.deinit();
+        self.allocator.destroy(self);
     }
 
-    pub fn start(self: *Looper) StartError!void {
+    pub fn start(self: *PosixLooper) helpers.StartError!void {
         self.lock.lock();
         if (self.state != .idle) {
             self.lock.unlock();
@@ -261,7 +228,7 @@ pub const Looper = struct {
         self.lock.unlock();
     }
 
-    fn loopMain(self: *Looper) void {
+    fn loopMain(self: *PosixLooper) void {
         self.lock.lock();
         while (self.state == .starting) {
             self.condition.wait(&self.lock);
@@ -275,7 +242,7 @@ pub const Looper = struct {
         self.cleanupAfterLoop();
     }
 
-    fn loopOnce(self: *Looper) bool {
+    fn loopOnce(self: *PosixLooper) bool {
         self.lock.lock();
         if (self.state == .deinitializing or self.state == .stopped) {
             self.lock.unlock();
@@ -367,10 +334,10 @@ pub const Looper = struct {
     /// A failure that independently terminates the worker is logged by
     /// `finish` and delivered to `on_finish`; it is not returned by `stop`.
     /// `deinit` is still required to release the looper's resources.
-    pub fn stop(self: *Looper) StopError!void {
+    pub fn stop(self: *PosixLooper) helpers.StopError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
-        var completion = Completion{};
+        var completion = helpers.Completion{};
 
         self.lock.lock();
         while (self.state == .starting) {
@@ -410,7 +377,7 @@ pub const Looper = struct {
                 return;
             },
         }
-        var node = CommandNode{ .command = .stop };
+        var node = helpers.CommandNode{ .command = .stop };
         self.state = .stopping;
         self.stop_completion = &completion;
         self.commands.append(&node);
@@ -433,7 +400,7 @@ pub const Looper = struct {
         if (completion_failure != null) return error.LooperUnavailable;
     }
 
-    pub fn isOnQueue(self: *Looper) bool {
+    pub fn isOnQueue(self: *PosixLooper) bool {
         self.lock.lock();
         defer self.lock.unlock();
         const thread_id = self.loop_thread_id orelse return false;
@@ -442,8 +409,9 @@ pub const Looper = struct {
 
     /// Performs a task synchronously with the worker. Runs inline
     /// if on the same queue to prevent deadlock. Submission does not allocate.
+    // FIXME: ###, anyerror
     pub fn perform(
-        self: *Looper,
+        self: *PosixLooper,
         comptime Result: type,
         context: ?*anyopaque,
         callback: *const fn (?*anyopaque) anyerror!Result,
@@ -470,7 +438,7 @@ pub const Looper = struct {
             .context = context,
             .callback = callback,
         };
-        var completion = Completion{};
+        var completion = helpers.Completion{};
 
         self.lock.lock();
         if (self.state != .started) {
@@ -478,7 +446,7 @@ pub const Looper = struct {
             log.writef(.debug, "Ignoring perform before start() or after finish", .{});
             return error.LooperUnavailable;
         }
-        var node = CommandNode{ .command = .{ .perform = .{
+        var node = helpers.CommandNode{ .command = .{ .perform = .{
             .task = .{ .context = &holder, .callback = Holder.run },
             .completion = &completion,
         } } };
@@ -501,20 +469,21 @@ pub const Looper = struct {
             @panic("Looper task completed without a result");
     }
 
-    pub fn performTask(self: *Looper, task: Task) anyerror!void {
+    // FIXME: ###, anyerror
+    pub fn performTask(self: *PosixLooper, task: helpers.Task) anyerror!void {
         return self.perform(void, task.context, task.callback);
     }
 
-    /// Replaces one delayed task and executes its callback on the looper.
+    /// Replaces one delayed task and executes its callback on the helpers.
     ///
     /// This operation is queue-confined. The looper owns the internal command;
     /// `timer` is only an identity token and its address is never retained.
     pub fn scheduleReplacing(
-        self: *Looper,
-        timer: *Timer,
+        self: *PosixLooper,
+        timer: *helpers.Timer,
         delay_ms: u64,
-        task: TimedTask,
-    ) SubmissionError!void {
+        task: helpers.TimedTask,
+    ) helpers.SubmissionError!void {
         if (!self.isOnQueue())
             @panic("Looper.scheduleReplacing() must run on the looper queue");
 
@@ -547,7 +516,7 @@ pub const Looper = struct {
     /// Cancels one delayed task. After this returns, its borrowed callback
     /// context cannot be invoked, even if the scheduler deadline races with
     /// cancellation. A token whose task has already run is harmless.
-    pub fn cancelTimer(self: *Looper, timer: *Timer) void {
+    pub fn cancelTimer(self: *PosixLooper, timer: *helpers.Timer) void {
         if (!self.isOnQueue())
             @panic("Looper.cancelTimer() must run on the looper queue");
         const id = timer.id orelse return;
@@ -558,10 +527,10 @@ pub const Looper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *Looper, arguments: AttachArguments) AttachError!void {
+    pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
-        var completion = Completion{};
+        var completion = helpers.Completion{};
 
         self.lock.lock();
         if (self.state != .started) {
@@ -569,7 +538,7 @@ pub const Looper = struct {
             log.writef(.debug, "Ignoring attach before start() or after finish", .{});
             return error.LooperUnavailable;
         }
-        var node = CommandNode{ .command = .{ .attach = .{
+        var node = helpers.CommandNode{ .command = .{ .attach = .{
             .arguments = arguments,
             .completion = &completion,
         } } };
@@ -594,10 +563,10 @@ pub const Looper = struct {
     }
 
     /// Detaches a side synchronously without allocating a command node.
-    pub fn detach(self: *Looper, side: io.Side) DetachError!void {
+    pub fn detach(self: *PosixLooper, side: io.Side) helpers.DetachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
-        var completion = Completion{};
+        var completion = helpers.Completion{};
 
         self.lock.lock();
         if (self.state != .started) {
@@ -605,7 +574,7 @@ pub const Looper = struct {
             log.writef(.debug, "Ignoring detach before start() or after finish", .{});
             return error.LooperUnavailable;
         }
-        var node = CommandNode{ .command = .{ .detach = .{
+        var node = helpers.CommandNode{ .command = .{ .detach = .{
             .side = side,
             .completion = &completion,
         } } };
@@ -624,19 +593,19 @@ pub const Looper = struct {
         if (completion_failure != null) return error.LooperUnavailable;
     }
 
-    pub fn isLinkAttached(self: *Looper) bool {
+    pub fn isLinkAttached(self: *PosixLooper) bool {
         self.lock.lock();
         defer self.lock.unlock();
         return self.link != null;
     }
 
-    pub fn isTunAttached(self: *Looper) bool {
+    pub fn isTunAttached(self: *PosixLooper) bool {
         self.lock.lock();
         defer self.lock.unlock();
         return self.tun != null;
     }
 
-    pub fn resumeReading(self: *Looper, side: io.Side) ResumeReadingError!void {
+    pub fn resumeReading(self: *PosixLooper, side: io.Side) helpers.ResumeReadingError!void {
         self.lock.lock();
         defer self.lock.unlock();
         if (self.state != .started) return error.LooperUnavailable;
@@ -649,10 +618,10 @@ pub const Looper = struct {
     }
 
     pub fn writeQueued(
-        self: *Looper,
-        packets: Packets,
+        self: *PosixLooper,
+        packets: helpers.Packets,
         side: io.Side,
-    ) WriteError!void {
+    ) helpers.WriteError!void {
         self.lock.lock();
         defer self.lock.unlock();
         if (self.state != .started) return error.LooperUnavailable;
@@ -672,7 +641,7 @@ pub const Looper = struct {
         self.wakeLocked();
     }
 
-    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteOOBError!void {
+    pub fn writeOutOfBand(self: *PosixLooper, packets: helpers.Packets, side: io.Side) helpers.WriteOOBError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
             return error.OOBOutsideQueue;
@@ -719,7 +688,7 @@ pub const Looper = struct {
         fd_set.insertWritable(fd);
     }
 
-    fn handleCommands(self: *Looper, fd_set: *DescriptorSet) CommandOutcome {
+    fn handleCommands(self: *PosixLooper, fd_set: *DescriptorSet) CommandOutcome {
         self.lock.lock();
         var pending = self.commands.takeReady();
 
@@ -793,9 +762,9 @@ pub const Looper = struct {
     }
 
     fn handleAttachLocked(
-        self: *Looper,
-        arguments: AttachArguments,
-        completion: *Completion,
+        self: *PosixLooper,
+        arguments: helpers.AttachArguments,
+        completion: *helpers.Completion,
     ) void {
         if (self.state != .started) {
             self.queueCompletionLocked(completion, error.LooperUnavailable);
@@ -845,9 +814,9 @@ pub const Looper = struct {
     }
 
     fn handleDetachLocked(
-        self: *Looper,
+        self: *PosixLooper,
         side: io.Side,
-        completion: *Completion,
+        completion: *helpers.Completion,
     ) void {
         if (self.takeSideIOLocked(side)) |side_io| {
             self.destroyDetachedSideIOLocked(side_io);
@@ -855,7 +824,7 @@ pub const Looper = struct {
         self.queueCompletionLocked(completion, null);
     }
 
-    fn handleEnableReadLocked(self: *const Looper, side: io.Side) io.Error!void {
+    fn handleEnableReadLocked(self: *const PosixLooper, side: io.Side) io.Error!void {
         if (self.sideIO(side)) |side_io| {
             try side_io.setRead(self.mux, true);
         } else {
@@ -864,7 +833,7 @@ pub const Looper = struct {
     }
 
     fn handleEnableWriteLocked(
-        self: *const Looper,
+        self: *const PosixLooper,
         side: io.Side,
         fd_set: *DescriptorSet,
     ) io.Error!void {
@@ -876,7 +845,7 @@ pub const Looper = struct {
         }
     }
 
-    fn process(self: *Looper, fd_set: *DescriptorSet) ProcessOutcome {
+    fn process(self: *PosixLooper, fd_set: *DescriptorSet) ProcessOutcome {
         if (self.link) |link| {
             if (fd_set.isReadable(link.fd) or fd_set.isWritable(link.fd)) {
                 link.resetEvents() catch |err| return .{ .fatal = .{ .system = err } };
@@ -913,7 +882,7 @@ pub const Looper = struct {
     }
 
     fn processWrite(
-        self: *Looper,
+        self: *PosixLooper,
         side_io: *SideIO,
         opposite: ?*SideIO,
         fd_set: *DescriptorSet,
@@ -970,8 +939,8 @@ pub const Looper = struct {
         return .ok;
     }
 
-    fn processRead(self: *const Looper, side_io: *SideIO) ProcessOutcome {
-        var inbox: std.ArrayList(Packet) = .empty;
+    fn processRead(self: *const PosixLooper, side_io: *SideIO) ProcessOutcome {
+        var inbox: std.ArrayList(helpers.Packet) = .empty;
         defer {
             for (inbox.items) |packet| self.allocator.free(@constCast(packet));
             inbox.deinit(self.allocator);
@@ -1009,7 +978,7 @@ pub const Looper = struct {
                     } };
                 }
             else
-                ReadAction.keep;
+                helpers.ReadAction.keep;
             if (action == .pause) {
                 side_io.setRead(self.mux, false) catch |err| {
                     return .{ .fatal = .{ .system = err } };
@@ -1020,7 +989,7 @@ pub const Looper = struct {
     }
 
     fn suspendRead(
-        self: *Looper,
+        self: *PosixLooper,
         side_io: *SideIO,
         fd_set: *DescriptorSet,
     ) io.Error!void {
@@ -1029,7 +998,7 @@ pub const Looper = struct {
     }
 
     fn scheduleReadRetry(
-        self: *Looper,
+        self: *PosixLooper,
         side_io: *const SideIO,
     ) RetryScheduleError!void {
         self.lock.lock();
@@ -1052,7 +1021,7 @@ pub const Looper = struct {
     }
 
     fn scheduleWriteRetry(
-        self: *Looper,
+        self: *PosixLooper,
         side_io: *const SideIO,
     ) RetryScheduleError!void {
         self.lock.lock();
@@ -1074,7 +1043,7 @@ pub const Looper = struct {
         );
     }
 
-    fn detachImmediately(self: *Looper, side: io.Side, failure: Failure) void {
+    fn detachImmediately(self: *PosixLooper, side: io.Side, failure: helpers.Failure) void {
         self.lock.lock();
         const side_io = self.takeSideIOLocked(side) orelse {
             self.lock.unlock();
@@ -1091,7 +1060,7 @@ pub const Looper = struct {
         self.lock.unlock();
     }
 
-    fn finish(self: *Looper, failure: ?Failure) void {
+    fn finish(self: *PosixLooper, failure: ?helpers.Failure) void {
         self.lock.lock();
         switch (self.state) {
             .deinitializing => {
@@ -1144,14 +1113,14 @@ pub const Looper = struct {
         self.options.on_finish.call(failure);
     }
 
-    fn cleanupAfterLoop(self: *Looper) void {
+    fn cleanupAfterLoop(self: *PosixLooper) void {
         self.lock.lock();
         self.cleanupResourcesLocked();
         self.condition.broadcast();
         self.lock.unlock();
     }
 
-    fn joinWorker(self: *Looper) void {
+    fn joinWorker(self: *PosixLooper) void {
         self.lock.lock();
         const worker = self.worker_thread;
         self.worker_thread = null;
@@ -1159,18 +1128,18 @@ pub const Looper = struct {
         if (worker) |thread| thread.join();
     }
 
-    fn clearLoopThread(self: *Looper, thread_id: std.Thread.Id) void {
+    fn clearLoopThread(self: *PosixLooper, thread_id: std.Thread.Id) void {
         self.lock.lock();
         if (self.loop_thread_id == thread_id) self.loop_thread_id = null;
         self.condition.broadcast();
         self.lock.unlock();
     }
 
-    fn wakeLocked(self: *const Looper) void {
+    fn wakeLocked(self: *const PosixLooper) void {
         _ = io_c.pp_mux_wake(self.mux);
     }
 
-    fn isReentrantLifecycleCall(self: *Looper) bool {
+    fn isReentrantLifecycleCall(self: *PosixLooper) bool {
         return hasBorrowedCallback() or self.isOnQueue();
     }
 
@@ -1185,7 +1154,7 @@ pub const Looper = struct {
     }
 
     /// Removes a side from publication. Caller must hold `lock`.
-    fn takeSideIOLocked(self: *Looper, side: io.Side) ?*SideIO {
+    fn takeSideIOLocked(self: *PosixLooper, side: io.Side) ?*SideIO {
         const side_io = self.sideIO(side) orelse return null;
         self.setSideIO(side, null);
         self.read_retries[sideIndex(side)] = false;
@@ -1199,7 +1168,7 @@ pub const Looper = struct {
 
     /// Caller must hold `lock`, and `side_io` must already be unpublished.
     /// Returns with `lock` held, but invokes native cleanup without it.
-    fn destroyDetachedSideIOLocked(self: *Looper, side_io: *SideIO) void {
+    fn destroyDetachedSideIOLocked(self: *PosixLooper, side_io: *SideIO) void {
         const should_cleanup = side_io.detachFromMux(self.mux);
         self.lock.unlock();
         if (should_cleanup) callNativeCleanup(side_io);
@@ -1209,7 +1178,7 @@ pub const Looper = struct {
 
     /// Destroys every mux-owned resource. Caller must hold `lock` and the loop
     /// must either be the caller or have been joined.
-    fn cleanupResourcesLocked(self: *Looper) void {
+    fn cleanupResourcesLocked(self: *PosixLooper) void {
         self.cleanupSidesLocked();
         if (self.fd_set) |*fd_set| {
             fd_set.deinit();
@@ -1220,7 +1189,7 @@ pub const Looper = struct {
 
     /// Caller must hold `lock`, and the worker must be the only thread still
     /// processing descriptor state.
-    fn cleanupSidesLocked(self: *Looper) void {
+    fn cleanupSidesLocked(self: *PosixLooper) void {
         if (self.link != null) {
             const side_io = self.takeSideIOLocked(.link).?;
             self.destroyDetachedSideIOLocked(side_io);
@@ -1231,59 +1200,59 @@ pub const Looper = struct {
         }
     }
 
-    fn sideIO(self: *const Looper, side: io.Side) ?*SideIO {
+    fn sideIO(self: *const PosixLooper, side: io.Side) ?*SideIO {
         return switch (side) {
             .link => self.link,
             .tun => self.tun,
         };
     }
 
-    fn setSideIO(self: *Looper, side: io.Side, side_io: ?*SideIO) void {
+    fn setSideIO(self: *PosixLooper, side: io.Side, side_io: ?*SideIO) void {
         switch (side) {
             .link => self.link = side_io,
             .tun => self.tun = side_io,
         }
     }
 
-    fn readBufferSize(self: Looper, side: io.Side) usize {
+    fn readBufferSize(self: PosixLooper, side: io.Side) usize {
         return switch (side) {
             .link => self.options.link_buf_size,
             .tun => self.options.tun_buf_size,
         };
     }
 
-    fn isOutdatedLocked(self: *const Looper, identity: SideIdentity) bool {
+    fn isOutdatedLocked(self: *const PosixLooper, identity: helpers.SideIdentity) bool {
         const id = identity.id orelse return false;
         const side_io = self.sideIO(identity.side) orelse return true;
         return id != side_io.id;
     }
 
-    fn pendingWrite(self: *Looper, side_io: *SideIO) ?helpers.PendingWrite {
+    fn pendingWrite(self: *PosixLooper, side_io: *SideIO) ?helpers.PendingWrite {
         self.lock.lock();
         defer self.lock.unlock();
         return side_io.write_queue.pending();
     }
 
-    fn createCommandNode(self: *const Looper, command: Command) std.mem.Allocator.Error!*CommandNode {
-        const node = try self.allocator.create(CommandNode);
+    fn createCommandNode(self: *const PosixLooper, command: helpers.Command) std.mem.Allocator.Error!*helpers.CommandNode {
+        const node = try self.allocator.create(helpers.CommandNode);
         node.* = .{ .command = command, .allocated = true };
         return node;
     }
 
-    fn nextTimerIdLocked(self: *Looper) u64 {
+    fn nextTimerIdLocked(self: *PosixLooper) u64 {
         const id = self.next_timer_id;
         self.next_timer_id +%= 1;
         if (self.next_timer_id == 0) self.next_timer_id = 1;
         return id;
     }
 
-    fn registerTimerLocked(self: *Looper, node: *CommandNode) void {
+    fn registerTimerLocked(self: *PosixLooper, node: *helpers.CommandNode) void {
         node.timer_next = self.timers_head;
         self.timers_head = node;
     }
 
-    fn unregisterTimerLocked(self: *Looper, node: *CommandNode) void {
-        var previous: ?*CommandNode = null;
+    fn unregisterTimerLocked(self: *PosixLooper, node: *helpers.CommandNode) void {
+        var previous: ?*helpers.CommandNode = null;
         var current = self.timers_head;
         while (current) |candidate| {
             if (candidate == node) {
@@ -1300,7 +1269,7 @@ pub const Looper = struct {
         }
     }
 
-    fn cancelTimerLocked(self: *Looper, id: u64) void {
+    fn cancelTimerLocked(self: *PosixLooper, id: u64) void {
         var current = self.timers_head;
         while (current) |node| : (current = node.timer_next) {
             switch (node.command) {
@@ -1316,14 +1285,14 @@ pub const Looper = struct {
         }
     }
 
-    fn isActiveTimerCommand(command: Command) bool {
+    fn isActiveTimerCommand(command: helpers.Command) bool {
         return switch (command) {
             .timed_task => |timer| timer.task != null,
             else => true,
         };
     }
 
-    fn unregisterTimerCommandLocked(self: *Looper, node: *CommandNode) void {
+    fn unregisterTimerCommandLocked(self: *PosixLooper, node: *helpers.CommandNode) void {
         switch (node.command) {
             .timed_task => self.unregisterTimerLocked(node),
             else => {},
@@ -1334,8 +1303,8 @@ pub const Looper = struct {
         scheduled: *core.RunAfter.Scheduled,
         outcome: core.RunAfter.Scheduled.Outcome,
     ) void {
-        const node: *CommandNode = @fieldParentPtr("timer", scheduled);
-        const self: *Looper = @ptrCast(@alignCast(scheduled.context.?));
+        const node: *helpers.CommandNode = @fieldParentPtr("timer", scheduled);
+        const self: *PosixLooper = @ptrCast(@alignCast(scheduled.context.?));
         self.lock.lock();
         defer self.lock.unlock();
 
@@ -1352,7 +1321,7 @@ pub const Looper = struct {
         }
     }
 
-    fn clearRetryForCommand(self: *Looper, command: Command) void {
+    fn clearRetryForCommand(self: *PosixLooper, command: helpers.Command) void {
         switch (command) {
             .enable_read => |identity| if (identity.id != null) {
                 self.read_retries[sideIndex(identity.side)] = false;
@@ -1364,7 +1333,7 @@ pub const Looper = struct {
         }
     }
 
-    fn cancelPendingLocked(self: *Looper, pending_head: ?*CommandNode) void {
+    fn cancelPendingLocked(self: *PosixLooper, pending_head: ?*helpers.CommandNode) void {
         var pending = pending_head;
         while (pending) |node| {
             const next = node.next;
@@ -1383,18 +1352,18 @@ pub const Looper = struct {
     }
 
     fn queueCompletionLocked(
-        self: *Looper,
-        completion: *Completion,
-        failure: ?CompletionError,
+        self: *PosixLooper,
+        completion: *helpers.Completion,
+        failure: ?helpers.CompletionError,
     ) void {
         self.completions.append(completion, failure);
     }
 
-    fn releaseCompletionsLocked(self: *Looper) void {
+    fn releaseCompletionsLocked(self: *PosixLooper) void {
         self.completions.releaseAll();
     }
 
-    fn completeNow(completion: *Completion, failure: ?CompletionError) void {
+    fn completeNow(completion: *helpers.Completion, failure: ?helpers.CompletionError) void {
         completion.failure = failure;
         completion.done = true;
     }
@@ -1414,12 +1383,12 @@ pub const Looper = struct {
         native_io: io.IOInterface,
 
         // User callbacks.
-        on_read: ?OnRead,
-        on_failure: ?OnFailure,
+        on_read: ?helpers.OnRead,
+        on_failure: ?helpers.OnFailure,
 
         // Buffered packet state.
         read_buf: []u8,
-        write_queue: WriteQueue,
+        write_queue: helpers.WriteQueue,
 
         // Mux event and cleanup state.
         is_reading: bool,
@@ -1430,9 +1399,9 @@ pub const Looper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            descriptor: Descriptor,
+            descriptor: helpers.Descriptor,
             read_buf_size: usize,
-            arguments: AttachArguments,
+            arguments: helpers.AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {
             const self = try allocator.create(SideIO);
             errdefer allocator.destroy(self);
@@ -1445,7 +1414,7 @@ pub const Looper = struct {
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
-                .write_queue = WriteQueue.init(allocator),
+                .write_queue = helpers.WriteQueue.init(allocator),
                 .is_reading = true,
                 .is_writing = false,
                 .did_cleanup = false,
@@ -1490,7 +1459,7 @@ pub const Looper = struct {
             self.native_io.cleanup();
         }
 
-        fn ioFailure(self: *const SideIO, cause: io.Error) Failure {
+        fn ioFailure(self: *const SideIO, cause: io.Error) helpers.Failure {
             return .{ .io = .{
                 .side = self.side,
                 .cause = cause,

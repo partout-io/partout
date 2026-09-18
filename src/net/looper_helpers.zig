@@ -8,6 +8,8 @@ const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
+// FIXME: ###, anyerror
+
 /// Fine-tuning.
 pub const Options = struct {
     link_buf_size: usize = 64 * 1024,
@@ -137,7 +139,6 @@ pub const AttachArguments = struct {
 };
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-pub const ScheduleTimerError = std.mem.Allocator.Error || error{LooperUnavailable};
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
 pub const AttachError = SubmissionError || error{

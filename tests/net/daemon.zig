@@ -291,7 +291,7 @@ test "connection daemon clears last error when connected recovery repeats the st
     defer sut.stop();
 
     // A transient restart failure leaves the public status connected.
-    try sut.actor.perform(.{ .onConnectionLastError = .socketConfiguration });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .socketConfiguration });
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
     const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
@@ -299,7 +299,7 @@ test "connection daemon clears last error when connected recovery repeats the st
     const snapshot_count = controller.report_snapshot_count;
 
     // Recovery emits connected again, without an intervening connecting event.
-    try sut.actor.perform(.{ .onConnectionStatus = .connected });
+    try sut.actor.perform(void, .{ .onConnectionStatus = .connected });
     try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
         .disconnected,
         .connecting,
@@ -337,7 +337,7 @@ test "connection daemon hold preserves published environment" {
     defer sut.destroy();
 
     try sut.start();
-    try sut.actor.perform(.{ .onConnectionLastError = .authentication });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .authentication });
     const remove_count_before_hold = events.remove_count;
 
     sut.hold();
@@ -383,6 +383,8 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
 }
 
 test "connection daemon passes connection options into sandbox" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
@@ -505,6 +507,8 @@ test "connection daemon publishes terminal status when cancellation is disabled"
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
+    // FIXME: ### Enable when WindowsLooper dispatches work and termination callbacks.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 

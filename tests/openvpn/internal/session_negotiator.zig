@@ -24,7 +24,7 @@ fn negotiatorOptions(
         .session_options = .{ .backend = .mock },
         .callback_context = null,
         .schedule_negotiation_check = struct {
-            fn call(_: ?*anyopaque, _: u64) Looper.ScheduleTimerError!void {}
+            fn call(_: ?*anyopaque, _: u64) Looper.SubmissionError!void {}
         }.call,
     };
 }

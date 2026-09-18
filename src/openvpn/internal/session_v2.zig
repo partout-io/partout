@@ -676,7 +676,7 @@ pub const Session = struct {
         self.reportFailure(error.TLSFailure);
     }
 
-    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) Looper.ScheduleTimerError!void {
+    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) Looper.SubmissionError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.looper.scheduleReplacing(
             &self.negotiation_timer,

@@ -433,15 +433,15 @@ const ConnectionDaemon = struct {
     }
 
     fn start(self: *const ConnectionDaemon) Error!void {
-        return self.actor.perform(.start);
+        return self.actor.perform(void, .start);
     }
 
     fn hold(self: *const ConnectionDaemon) void {
-        self.actor.perform(.hold) catch return;
+        self.actor.perform(void, .hold) catch return;
     }
 
     fn stop(self: *const ConnectionDaemon) void {
-        self.actor.perform(.stop) catch return;
+        self.actor.perform(void, .stop) catch return;
     }
 
     //#endregion
@@ -581,7 +581,7 @@ const ConnectionDaemon = struct {
     // This is scheduled with a delay
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.perform(.resumeGate) catch |err| {
+        self.actor.perform(void, .resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
         };
     }
@@ -784,6 +784,7 @@ const ConnectionDaemon = struct {
         };
         // Performs connection.start() on the looper thread. Remember to
         // detach the link on failure.
+        self.trackConnectionStatus(.connecting);
         const did_start = self.callOnLooper(.{ .start = link }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
@@ -792,17 +793,19 @@ const ConnectionDaemon = struct {
                 error.Timeout => error.Timeout,
                 else => error.UnableToStart,
             });
+            self.trackConnectionStatus(.disconnected);
             self.detachLooperSides() catch {};
             self.scheduleResumeGate();
             return;
         };
         if (!did_start) {
             log.write(.err, "Connection could not start");
+            self.trackConnectionStatus(.disconnected);
             self.detachLooperSides() catch {};
             self.scheduleResumeGate();
-        } else {
-            self.trackConnectionStatus(.connecting);
+            return;
         }
+        // Connection attempted on the looper in background.
     }
 
     fn setupLink(self: *ConnectionDaemon) !api.ExtendedEndpoint {
@@ -881,7 +884,7 @@ const ConnectionDaemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.actor.perform(.evaluateConnection) catch |err| {
+        self.actor.perform(void, .evaluateConnection) catch |err| {
             log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
         };
     }
@@ -1154,7 +1157,7 @@ const ConnectionDaemon = struct {
         recoverConnection,
     };
 
-    fn perform(self: *ConnectionDaemon, message: Message) Error!void {
+    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doHold(),

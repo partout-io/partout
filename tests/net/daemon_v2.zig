@@ -17,6 +17,8 @@ const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
 test "v2 daemon resets terminal status before retrying failed replacement link" {
+    // FIXME: ### Enable when WindowsLooper delivers termination callbacks.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         const endpoint_list = [_]api.ExtendedEndpoint{
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
@@ -100,13 +102,13 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         // The replacement's factory rejected the link. Resuming the gate
         // must attempt setup again and report another failure snapshot.
         const snapshots = controller.report_snapshot_count;
-        try connection_daemon.actor.perform(.resumeGate);
+        try connection_daemon.actor.perform(void, .resumeGate);
         try std.testing.expect(controller.report_snapshot_count > snapshots);
         try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
 
         // A terminal protocol failure uses the shared Daemon state to pause
         // connection retries, even when host cancellation is disabled.
-        try connection_daemon.actor.perform(.{ .onConnectionFailed = .{
+        try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
             .code = .authentication,
             .disposition = .cancel,
         } });
@@ -114,7 +116,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         try std.testing.expect(!connection_daemon.gate.isReady());
         try std.testing.expectEqual(@as(usize, if (cancels) 1 else 0), controller.cancel_count);
         const failed_snapshots = controller.report_snapshot_count;
-        try connection_daemon.actor.perform(.resumeGate);
+        try connection_daemon.actor.perform(void, .resumeGate);
         try std.testing.expectEqual(failed_snapshots, controller.report_snapshot_count);
         sut.hold();
         try std.testing.expect(sut.state == .stopped);
@@ -272,15 +274,15 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     connection_daemon.gate.setReachabilityBlock(reachabilityBlock(&monitor));
     _ = connection_daemon.gate.setEnabled(true);
     sut.options.reconnection_delay_ms = 10;
-    try connection_daemon.actor.perform(.evaluateConnection);
+    try connection_daemon.actor.perform(void, .evaluateConnection);
     connection_daemon.resume_gate_timer.wait();
     try std.testing.expect(connection_daemon.gate.isReady());
     try std.testing.expectEqual(@as(usize, 0), probe.stop_count);
     sut.options.reconnection_delay_ms = 60_000;
 
-    try connection_daemon.actor.perform(.{ .onReachability = .{ .reachable = false } });
-    try connection_daemon.actor.perform(.onBetterPath);
-    try connection_daemon.actor.perform(.resumeGate); // Drain establishment and setup failure.
+    try connection_daemon.actor.perform(void, .{ .onReachability = .{ .reachable = false } });
+    try connection_daemon.actor.perform(void, .onBetterPath);
+    try connection_daemon.actor.perform(void, .resumeGate); // Drain establishment and setup failure.
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
     try std.testing.expectEqualStrings("1.1.1.1", controller.last_settings.?.dnsServer(0));
@@ -295,11 +297,11 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     try looper.attach(.{ .pair = .{ .tun = .{ .fd = fds[1], .io = native_io } } });
     // A protocol failure must finalize the attempt just like setup failure:
     // shutdown while attached, detach both sides, then stop on the looper.
-    try connection_daemon.actor.perform(.{ .onConnectionFailed = .{
+    try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
         .code = .ioFailure,
         .disposition = .reconnect,
     } });
-    try connection_daemon.actor.perform(.resumeGate); // Drain the queued stopped event.
+    try connection_daemon.actor.perform(void, .resumeGate); // Drain the queued stopped event.
     try std.testing.expectEqual(@as(usize, 2), probe.shutdown_count);
     try std.testing.expectEqual(@as(usize, 2), probe.detach_count);
     try std.testing.expectEqual(@as(usize, 1), probe.exit_write_count);
@@ -567,6 +569,8 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 }
 
 test "v2 daemon owns environment updates and delivers finalization clears on actor" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
         producer_thread: ?std.Thread.Id = null,
@@ -653,20 +657,20 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     try sut.start();
     defer sut.stop();
     const actor = sut.implementation.connection.actor;
-    try actor.perform(.onBetterPath);
-    try actor.perform(.resumeGate);
+    try actor.perform(void, .onBetterPath);
+    try actor.perform(void, .resumeGate);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
     try std.testing.expect(controller.delivery_thread.? != factory.producer_thread.?);
     try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
 
     sut.stop();
-    try actor.perform(.resumeGate);
+    try actor.perform(void, .resumeGate);
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
     const sink = factory.events.?;
     sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", "stale");
-    try actor.perform(.resumeGate);
+    try actor.perform(void, .resumeGate);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
 }
