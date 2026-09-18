@@ -13,6 +13,7 @@ const openvpn = @import("../openvpn/exports.zig");
 const wireguard = @import("../wireguard/exports.zig");
 
 const api = core.api;
+const log = core.logging;
 const partout_c = helpers.partout_c;
 const portable_c = ffi.portable;
 const util = core.util;
@@ -188,13 +189,23 @@ pub const DaemonRuntime = struct {
         errdefer allocator.destroy(self);
 
         const experimental_requested = options.feature_flags.contains(.experimentalDaemon);
-        const is_openvpn = if (api.findActiveConnectionModule(&options.profile)) |module|
-            api.moduleType(module) == .OpenVPN
+        const module_type = if (api.findActiveConnectionModule(&options.profile)) |module|
+            api.moduleType(module)
         else
-            false;
-        const experimental = experimental_requested and is_openvpn;
-        if (experimental_requested and !is_openvpn) {
-            core.logging.write(.err, "experimentalDaemon is only applied for OpenVPN; using the legacy daemon for this profile");
+            null;
+        const is_null_or_openvpn = module_type == null or module_type == .OpenVPN;
+        const experimental = experimental_requested and is_null_or_openvpn;
+        if (experimental) {
+            log.write(.notice, "Using daemon v2 (experimental)");
+        } else {
+            log.write(.notice, "Using daemon v1 (legacy)");
+            if (experimental_requested) {
+                if (module_type) |mt| {
+                    log.writef(.err, "\tIgnoring .experimentalDaemon, not applied for {s}", .{mt.raw()});
+                } else {
+                    std.debug.assert(false);
+                }
+            }
         }
 
         // Register the known connection implementations

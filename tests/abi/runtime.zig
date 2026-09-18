@@ -133,14 +133,14 @@ test "daemon runtime owns options during lifecycle" {
         defer runtime.destroy(allocator);
         try std.testing.expectEqualStrings(profile_cache_directory, std.fs.path.basename(runtime.options.cache_dir));
         try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
-        try std.testing.expect(runtime.daemon == .legacy);
+        try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            try std.testing.expect(ctx.OpenVPN == .legacy);
-            const expected_vtable = &source.openvpn_exports.connection_vtable;
+            try std.testing.expectEqual(experimental, ctx.OpenVPN == .experimental);
+            const expected_vtable = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
             try std.testing.expect(impl.vtable == expected_vtable);
-            const expected_context: *anyopaque = &ctx.OpenVPN.legacy;
+            const expected_context: *anyopaque = if (experimental) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
             try std.testing.expect(impl.ptr == expected_context);
         }
         try runtime.start();
@@ -334,23 +334,23 @@ test "daemon options reject unknown feature bits" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
 
-test "experimental daemon flag only applies to active OpenVPN profiles" {
+test "experimental daemon flag applies to OpenVPN and settings-only profiles" {
     const Warning = struct {
         seen: std.atomic.Value(bool) = .init(false),
         fn log(raw: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            if (std.mem.indexOf(u8, std.mem.span(message), "experimentalDaemon is only applied for OpenVPN") != null) {
+            if (std.mem.indexOf(u8, std.mem.span(message), "Ignoring .experimentalDaemon,") != null) {
                 self.seen.store(true, .release);
             }
         }
     };
-    const Case = struct { json: [:0]const u8, enabled: bool, is_openvpn: bool = false };
+    const Case = struct { json: [:0]const u8, enabled: bool, supports_experimental: bool = true };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
-        .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled, .is_openvpn = true },
+        .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled },
         .{ .json =
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333"}}],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
-        , .enabled = source.wireguard_enabled },
+        , .enabled = source.wireguard_enabled, .supports_experimental = false },
         .{ .json =
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"Inactive OpenVPN","modules":[{"type":"OpenVPN","value":{"id":"44444444-4444-4444-8444-444444444444","configuration":{}}}],"activeModulesIds":[]}
         , .enabled = source.openvpn_enabled },
@@ -375,9 +375,9 @@ test "experimental daemon flag only applies to active OpenVPN profiles" {
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = requested and case.is_openvpn;
+            const experimental = requested and case.supports_experimental;
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
-            try std.testing.expectEqual(requested and !case.is_openvpn, warning.seen.load(.acquire));
+            try std.testing.expectEqual(requested and !case.supports_experimental, warning.seen.load(.acquire));
             if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
                 const impl = runtime.registry.implementation(.OpenVPN).?;
                 const expected = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
