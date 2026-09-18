@@ -74,7 +74,7 @@ pub const NegotiatorOptions = struct {
     schedule_negotiation_check: *const fn (
         ?*anyopaque,
         u64,
-    ) Looper.ScheduleTimerError!void,
+    ) Looper.SubmissionError!void,
 
     pub fn newAuthenticator(
         self: NegotiatorOptions,

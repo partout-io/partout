@@ -39,13 +39,13 @@ pub const Looper = struct {
     pub const Descriptor = helpers.Descriptor;
     pub const DescriptorPair = helpers.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
-    pub const ScheduleTimerError = helpers.ScheduleTimerError;
     pub const InitError = helpers.InitError;
     pub const StartError = helpers.StartError;
+    pub const StopError = helpers.StopError;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
-    pub const StopError = helpers.StopError;
+    pub const SubmissionError = helpers.SubmissionError;
     pub const WriteError = helpers.WriteError;
     pub const WriteOOBError = helpers.WriteOOBError;
 
@@ -133,7 +133,7 @@ pub const Looper = struct {
         timer: *helpers.Timer,
         delay_ms: u64,
         task: helpers.TimedTask,
-    ) helpers.ScheduleTimerError!void {
+    ) helpers.SubmissionError!void {
         return self.impl.scheduleReplacing(timer, delay_ms, task);
     }
 

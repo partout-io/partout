@@ -78,9 +78,8 @@ pub const Looper = struct {
     };
 
     pub const Options = helpers.Options;
-    const SubmissionError = helpers.SubmissionError;
+    pub const SubmissionError = helpers.SubmissionError;
     const CompletionError = helpers.CompletionError;
-    pub const ScheduleTimerError = helpers.ScheduleTimerError;
     pub const InitError = helpers.InitError;
     pub const StartError = helpers.StartError;
     pub const AttachError = helpers.AttachError;
@@ -515,7 +514,7 @@ pub const Looper = struct {
         timer: *Timer,
         delay_ms: u64,
         task: TimedTask,
-    ) ScheduleTimerError!void {
+    ) SubmissionError!void {
         if (!self.isOnQueue())
             @panic("Looper.scheduleReplacing() must run on the looper queue");
 

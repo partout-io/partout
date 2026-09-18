@@ -139,7 +139,6 @@ pub const AttachArguments = struct {
 };
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-pub const ScheduleTimerError = std.mem.Allocator.Error || error{LooperUnavailable};
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
 pub const AttachError = SubmissionError || error{
