@@ -17,6 +17,8 @@ const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
 test "v2 daemon resets terminal status before retrying failed replacement link" {
+    // FIXME: ### Enable when WindowsLooper delivers termination callbacks.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         const endpoint_list = [_]api.ExtendedEndpoint{
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
@@ -567,6 +569,8 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 }
 
 test "v2 daemon owns environment updates and delivers finalization clears on actor" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
         producer_thread: ?std.Thread.Id = null,
