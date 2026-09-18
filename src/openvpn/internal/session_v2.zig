@@ -34,6 +34,7 @@ const ControlConstants = constants_mod.Control;
 const DataChannel = data_mod.DataChannel;
 const DataLink = data_mod.DataLink;
 const LinkProcessor = processing_mod.LinkProcessor;
+const Looper = net.Looper;
 const Negotiator = session_negotiator_mod.Negotiator;
 const NegotiationResult = session_negotiator_mod.NegotiationResult;
 const OCCPacket = packet_mod.OCCPacket;
@@ -128,20 +129,20 @@ pub const Session = struct {
     options: SessionOptions,
 
     // Link interface.
-    looper: *net.Looper,
+    looper: *Looper,
     remote_endpoint: api.ExtendedEndpoint,
     events: SessionEvents,
 
     // Internal state.
     state: SessionState,
     control_channel: *ControlChannel,
-    negotiation_timer: net.Looper.Timer,
-    ping_timer: net.Looper.Timer,
+    negotiation_timer: Looper.Timer,
+    ping_timer: Looper.Timer,
     link_processor: *LinkProcessor,
 
     pub const Init = struct {
         /// I/O strategy.
-        looper: *net.Looper,
+        looper: *Looper,
         remote_endpoint: api.ExtendedEndpoint,
         events: SessionEvents,
         /// OpenVPN configuration.
@@ -319,8 +320,8 @@ pub const Session = struct {
     pub fn submitPackets(
         self: *Session,
         side: net.Side,
-        packets: net.Looper.Packets,
-    ) net.Looper.ReadAction {
+        packets: Looper.Packets,
+    ) Looper.ReadAction {
         self.assertLooperThread();
         const active = self.state.activeState() orelse return .pause;
         if (active.phase == .stopping) {
@@ -346,7 +347,7 @@ pub const Session = struct {
         return .keep;
     }
 
-    pub fn looperFailed(self: *Session, side: net.Side, failure: net.Looper.Failure) void {
+    pub fn looperFailed(self: *Session, side: net.Side, failure: Looper.Failure) void {
         self.assertLooperThread();
         const fallback = switch (side) {
             .link => error.LinkFailure,
@@ -359,7 +360,7 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperTerminated(self: *Session, failure: ?net.Looper.Failure) void {
+    pub fn looperTerminated(self: *Session, failure: ?Looper.Failure) void {
         self.assertLooperThread();
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
@@ -468,7 +469,7 @@ pub const Session = struct {
 
     // MARK: Packet I/O
 
-    fn receiveLink(self: *Session, packets: net.Looper.Packets) SessionError!void {
+    fn receiveLink(self: *Session, packets: Looper.Packets) SessionError!void {
         var processed = try self.link_processor.processInbound(packets);
         defer processed.deinit();
 
@@ -675,7 +676,7 @@ pub const Session = struct {
         self.reportFailure(error.TLSFailure);
     }
 
-    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) net.Looper.ScheduleTimerError!void {
+    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) Looper.ScheduleTimerError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.looper.scheduleReplacing(
             &self.negotiation_timer,
@@ -819,7 +820,7 @@ pub const Session = struct {
     }
 };
 
-fn sideFailureError(failure: net.Looper.Failure, fallback: SessionError) SessionError {
+fn sideFailureError(failure: Looper.Failure, fallback: SessionError) SessionError {
     return switch (failure) {
         .user => |cause| blk: {
             inline for (@typeInfo(SessionError).error_set.?) |entry| {

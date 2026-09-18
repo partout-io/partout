@@ -6,10 +6,12 @@ const std = @import("std");
 const source = @import("source");
 
 const core = source.core;
-const api = core.api;
 const connection = source.openvpn_connection;
 const mock = source.mock;
 const net = source.net;
+
+const api = core.api;
+const Looper = net.Looper;
 
 test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
     const v2 = source.openvpn_connection_v2;
@@ -50,7 +52,7 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
         fn ignoreError(_: *anyopaque, _: api.PartoutErrorCode) void {}
         fn ignoreCount(_: *anyopaque, _: api.DataCount) void {}
         fn ignoreCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {}
-        fn finish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
     };
     const allocator = std.testing.allocator;
     const remotes = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
@@ -67,7 +69,7 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
     };
     var context = v2.ConnectionContext{ .session_options = .{ .backend = .mock } };
     var controller = mock.MockTunnelController{};
-    var looper = try net.Looper.init(allocator, .{ .on_finish = .{ .callback = Request.finish } });
+    var looper = try Looper.init(allocator, .{ .on_finish = .{ .callback = Request.finish } });
     defer looper.deinit();
     const created = try v2.createConnection(
         &context,
@@ -102,13 +104,13 @@ test "OpenVPN connection declarations are semantically analyzed" {
 
 test "OpenVPN connection borrows the daemon looper" {
     const Callbacks = struct {
-        fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
         fn barrier(_: ?*anyopaque) !void {}
     };
 
     const allocator = std.testing.allocator;
-    var looper = try net.Looper.init(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();

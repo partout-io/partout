@@ -8,6 +8,7 @@ const core = @import("source").core;
 const daemon = @import("source").net_daemon_v2;
 const daemon_helpers = @import("source").net_daemon_helpers;
 const net = @import("source").net;
+const Looper = net.Looper;
 const mock_mod = @import("source").mock;
 
 const api = core.api;
@@ -128,7 +129,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         extern "c" fn close(fd: std.c.fd_t) c_int;
     };
     const Probe = struct {
-        looper: *net.Looper,
+        looper: *Looper,
         profile: *const api.Profile,
         reachability_count: usize = 0,
         stop_count: usize = 0,
@@ -219,7 +220,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
             std.debug.assert(!self.looper.isOnQueue());
             self.destroyed = true;
         }
-        fn finish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
         const vtable = net.Connection.VTable{
             .start = start,
             .shutdown = shutdown,
@@ -253,8 +254,8 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    const looper = try allocator.create(net.Looper);
-    looper.* = try net.Looper.init(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
+    const looper = try allocator.create(Looper);
+    looper.* = try Looper.init(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
     var probe = Probe{ .looper = looper, .profile = &sut.profile };
     const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
     // Publish a runtime before any actor/looper work, without opening sockets.

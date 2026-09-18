@@ -15,7 +15,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const queue_mod = @import("looper_queue.zig");
+const helpers = @import("looper_helpers.zig");
 const io_c = io.io_c;
 const log = core.logging;
 
@@ -26,30 +26,30 @@ pub const Looper = struct {
     const no_buf_retry_delay_ms = 10;
 
     // Scheduling.
-    pub const Packet = queue_mod.Packet;
-    pub const Packets = queue_mod.Packets;
-    pub const ReadAction = queue_mod.ReadAction;
-    pub const OnRead = queue_mod.OnRead;
-    pub const Failure = queue_mod.Failure;
-    pub const OnFailure = queue_mod.OnFailure;
-    pub const OnFinish = queue_mod.OnFinish;
-    pub const Task = queue_mod.Task;
-    pub const TimedTask = queue_mod.TimedTask;
-    pub const Timer = queue_mod.Timer;
+    pub const Packet = helpers.Packet;
+    pub const Packets = helpers.Packets;
+    pub const ReadAction = helpers.ReadAction;
+    pub const OnRead = helpers.OnRead;
+    pub const Failure = helpers.Failure;
+    pub const OnFailure = helpers.OnFailure;
+    pub const OnFinish = helpers.OnFinish;
+    pub const Task = helpers.Task;
+    pub const TimedTask = helpers.TimedTask;
+    pub const Timer = helpers.Timer;
 
     // Side attachment.
-    pub const Descriptor = queue_mod.Descriptor;
-    pub const DescriptorPair = queue_mod.DescriptorPair;
-    pub const AttachArguments = queue_mod.AttachArguments;
+    pub const Descriptor = helpers.Descriptor;
+    pub const DescriptorPair = helpers.DescriptorPair;
+    pub const AttachArguments = helpers.AttachArguments;
 
     // Queues.
-    const SideIdentity = queue_mod.SideIdentity;
-    const Completion = queue_mod.Completion;
-    const CompletionQueue = queue_mod.CompletionQueue;
-    const Command = queue_mod.Command;
-    const CommandNode = queue_mod.CommandNode;
-    const CommandQueue = queue_mod.CommandQueue;
-    const WriteQueue = queue_mod.WriteQueue;
+    const SideIdentity = helpers.SideIdentity;
+    const Completion = helpers.Completion;
+    const CompletionQueue = helpers.CompletionQueue;
+    const Command = helpers.Command;
+    const CommandNode = helpers.CommandNode;
+    const CommandQueue = helpers.CommandQueue;
+    const WriteQueue = helpers.WriteQueue;
 
     /// Looper state.
     const State = enum {
@@ -77,36 +77,19 @@ pub const Looper = struct {
         fatal: Failure,
     };
 
-    /// Fine-tuning.
-    pub const Options = struct {
-        link_buf_size: usize = 64 * 1024,
-        tun_buf_size: usize = 16 * 1024,
-        max_read_size: usize = 256 * 1024,
-        max_read_count: usize = 128,
-        on_finish: OnFinish,
-    };
-
-    const Errors = queue_mod.Errors;
-    const SubmissionError = std.mem.Allocator.Error || Errors.LooperUnavailable;
-    const CompletionError = queue_mod.CompletionError;
+    pub const Options = helpers.Options;
+    const SubmissionError = helpers.SubmissionError;
+    const CompletionError = helpers.CompletionError;
+    pub const ScheduleTimerError = helpers.ScheduleTimerError;
+    pub const InitError = helpers.InitError;
+    pub const StartError = helpers.StartError;
+    pub const AttachError = helpers.AttachError;
+    pub const DetachError = helpers.DetachError;
+    pub const ResumeReadingError = helpers.ResumeReadingError;
+    pub const StopError = helpers.StopError;
+    pub const WriteError = helpers.WriteError;
+    pub const WriteOOBError = helpers.WriteOOBError;
     const RetryScheduleError = std.mem.Allocator.Error || std.Thread.SpawnError;
-    pub const ScheduleTimerError = std.mem.Allocator.Error || Errors.LooperUnavailable;
-    pub const InitError = std.mem.Allocator.Error || Errors.MuxFailure;
-    pub const StartError = std.mem.Allocator.Error ||
-        std.Thread.SpawnError ||
-        Errors.AlreadyStarted;
-    pub const AttachError = SubmissionError ||
-        Errors.MuxFailure ||
-        Errors.SideAlreadyAttached ||
-        Errors.ReentrantCall;
-    pub const DetachError = Errors.LooperUnavailable || Errors.ReentrantCall;
-    pub const ResumeReadingError = SubmissionError;
-    pub const StopError = Errors.LooperUnavailable || Errors.ReentrantCall;
-    pub const WriteError = SubmissionError;
-    pub const WriteOOBError = SubmissionError ||
-        io.Error ||
-        Errors.OOBOutsideQueue ||
-        Errors.WriteIncomplete;
 
     // Configuration.
     allocator: std.mem.Allocator,
@@ -1276,7 +1259,7 @@ pub const Looper = struct {
         return id != side_io.id;
     }
 
-    fn pendingWrite(self: *Looper, side_io: *SideIO) ?queue_mod.PendingWrite {
+    fn pendingWrite(self: *Looper, side_io: *SideIO) ?helpers.PendingWrite {
         self.lock.lock();
         defer self.lock.unlock();
         return side_io.write_queue.pending();

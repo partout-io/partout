@@ -27,12 +27,12 @@ const log = core.logging;
 
 const ActiveContext = session_context_mod.ActiveContext;
 const AuthToken = auth_mod.AuthToken;
-const SessionOptions = configuration_mod.SessionOptions;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const DataChannel = data_mod.DataChannel;
 const DataLink = data_mod.DataLink;
 const LinkProcessor = processing_mod.LinkProcessor;
+const Looper = net.Looper;
 const Negotiator = session_negotiator_mod.Negotiator;
 const NegotiationResult = session_negotiator_mod.NegotiationResult;
 const OCCPacket = packet_mod.OCCPacket;
@@ -40,6 +40,7 @@ const PacketCode = packet_mod.PacketCode;
 const PRNG = crypto_mod.PRNG;
 const RenegotiationType = session_negotiator_mod.RenegotiationType;
 const Serializer = control_serializers_mod.Serializer;
+const SessionOptions = configuration_mod.SessionOptions;
 const SessionState = session_context_mod.SessionState;
 const TLSWrapper = tls_mod.TLSWrapper;
 
@@ -112,9 +113,9 @@ pub const CreateError = error{
     OTPRequired,
 } || configuration_mod.ValidationError;
 
-pub const SetLinkError = processing_mod.ProcessorError || net.Looper.AttachError || error{LinkFailure};
-pub const SetTunnelError = net.Looper.AttachError;
-pub const ShutdownError = net.Looper.DetachError || error{UnableToShutdown};
+pub const SetLinkError = processing_mod.ProcessorError || Looper.AttachError || error{LinkFailure};
+pub const SetTunnelError = Looper.AttachError;
+pub const ShutdownError = Looper.DetachError || error{UnableToShutdown};
 
 /// Default V3 OpenVPN session implementation.
 ///
@@ -132,12 +133,12 @@ pub const Session = struct {
     ca_filename: []u8,
     options: SessionOptions,
 
-    looper: *net.Looper,
+    looper: *Looper,
     events: SessionEvents,
     on_queue: SessionOnQueue,
 
     pub const Init = struct {
-        looper: *net.Looper,
+        looper: *Looper,
         events: SessionEvents,
         configuration: api.OpenVPNConfiguration,
         credentials: ?api.OpenVPNCredentials,
@@ -227,7 +228,7 @@ pub const Session = struct {
 
     pub fn setLink(
         self: *Session,
-        descriptor: net.Looper.Descriptor,
+        descriptor: Looper.Descriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) SetLinkError!void {
         var descriptor_transferred = false;
@@ -289,7 +290,7 @@ pub const Session = struct {
 
     pub fn setTunnel(
         self: *Session,
-        descriptor: net.Looper.Descriptor,
+        descriptor: Looper.Descriptor,
     ) SetTunnelError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
@@ -375,7 +376,7 @@ pub const Session = struct {
     /// Routes the externally owned looper's terminal callback into the
     /// session. The owner must call this synchronously from `Looper.OnFinish`
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperTerminated(self: *Session, failure: ?net.Looper.Failure) void {
+    pub fn looperTerminated(self: *Session, failure: ?Looper.Failure) void {
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -401,8 +402,8 @@ pub const Session = struct {
 
     fn onLinkRead(
         raw: ?*anyopaque,
-        packets: net.Looper.Packets,
-    ) SessionError!net.Looper.ReadAction {
+        packets: Looper.Packets,
+    ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const on_queue = self.onQueue();
         on_queue.receiveLink(packets) catch |err| {
@@ -412,21 +413,21 @@ pub const Session = struct {
         return .keep;
     }
 
-    fn onLinkFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
+    fn onLinkFailure(raw: ?*anyopaque, failure: Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         self.reportFailure(sideFailureError(failure, error.LinkFailure));
     }
 
     fn onTunnelRead(
         raw: ?*anyopaque,
-        packets: net.Looper.Packets,
-    ) SessionError!net.Looper.ReadAction {
+        packets: Looper.Packets,
+    ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().receiveTunnel(packets);
         return .keep;
     }
 
-    fn onTunnelFailure(raw: ?*anyopaque, failure: net.Looper.Failure) void {
+    fn onTunnelFailure(raw: ?*anyopaque, failure: Looper.Failure) void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         self.reportFailure(sideFailureError(failure, error.TunnelFailure));
     }
@@ -439,7 +440,7 @@ pub const Session = struct {
     fn scheduleNegotiationCheck(
         raw: ?*anyopaque,
         delay_ms: u64,
-    ) net.Looper.ScheduleTimerError!void {
+    ) Looper.ScheduleTimerError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().scheduleNegotiationCheck(delay_ms);
     }
@@ -500,8 +501,8 @@ pub const Session = struct {
 const SessionOnQueue = struct {
     session: *Session,
     control_channel: *ControlChannel,
-    negotiation_timer: net.Looper.Timer,
-    ping_timer: net.Looper.Timer,
+    negotiation_timer: Looper.Timer,
+    ping_timer: Looper.Timer,
     state: SessionState,
     link_processor: ?*LinkProcessor,
 
@@ -675,7 +676,7 @@ const SessionOnQueue = struct {
 
     // MARK: Packet I/O
 
-    fn receiveLink(self: *SessionOnQueue, packets: net.Looper.Packets) SessionError!void {
+    fn receiveLink(self: *SessionOnQueue, packets: Looper.Packets) SessionError!void {
         const processor = self.link_processor orelse return;
         var processed = try processor.processInbound(packets);
         defer processed.deinit();
@@ -884,7 +885,7 @@ const SessionOnQueue = struct {
     fn scheduleNegotiationCheck(
         self: *SessionOnQueue,
         delay_ms: u64,
-    ) net.Looper.ScheduleTimerError!void {
+    ) Looper.ScheduleTimerError!void {
         try self.session.looper.scheduleReplacing(
             &self.negotiation_timer,
             delay_ms,
@@ -1027,7 +1028,7 @@ const SessionOnQueue = struct {
     }
 };
 
-fn sideFailureError(failure: net.Looper.Failure, fallback: SessionError) SessionError {
+fn sideFailureError(failure: Looper.Failure, fallback: SessionError) SessionError {
     return switch (failure) {
         .user => |cause| @errorCast(cause),
         .io, .system, .wait => fallback,

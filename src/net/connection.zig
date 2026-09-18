@@ -13,6 +13,8 @@ const looper = @import("looper.zig");
 const platform = @import("sandbox.zig");
 const api = core.api;
 
+const Looper = looper.Looper;
+
 pub const CreateError = std.mem.Allocator.Error || error{
     IdGeneration,
     IncompleteModule,
@@ -168,7 +170,7 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 
 pub const LinkDescriptor = struct {
     endpoint: core.api.ExtendedEndpoint,
-    looper: *looper.Looper,
+    looper: *Looper,
 };
 
 /// A physical connection to a network service. A connection
@@ -238,16 +240,16 @@ pub const Connection = struct {
                 return false;
             }
         }.call,
-        submit_packets: *const fn (*anyopaque, io.Side, looper.Looper.Packets) looper.Looper.ReadAction = struct {
-            fn call(_: *anyopaque, _: io.Side, _: looper.Looper.Packets) looper.Looper.ReadAction {
+        submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets) Looper.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: Looper.Packets) Looper.ReadAction {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, looper.Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: io.Side, _: looper.Looper.Failure) void {}
+        looper_failed: *const fn (*anyopaque, io.Side, Looper.Failure) void = struct {
+            fn call(_: *anyopaque, _: io.Side, _: Looper.Failure) void {}
         }.call,
-        looper_terminated: *const fn (*anyopaque, ?looper.Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?looper.Looper.Failure) void {}
+        looper_terminated: *const fn (*anyopaque, ?Looper.Failure) void = struct {
+            fn call(_: *anyopaque, _: ?Looper.Failure) void {}
         }.call,
 
         /// Deprecated.
@@ -300,22 +302,22 @@ pub const Connection = struct {
     pub fn submitPackets(
         self: Connection,
         side: io.Side,
-        packets: looper.Looper.Packets,
-    ) looper.Looper.ReadAction {
+        packets: Looper.Packets,
+    ) Looper.ReadAction {
         return self.vtable.submit_packets(self.ptr, side, packets);
     }
 
     pub fn looperFailed(
         self: Connection,
         side: io.Side,
-        failure: looper.Looper.Failure,
+        failure: Looper.Failure,
     ) void {
         self.vtable.looper_failed(self.ptr, side, failure);
     }
 
     pub fn looperTerminated(
         self: Connection,
-        failure: ?looper.Looper.Failure,
+        failure: ?Looper.Failure,
     ) void {
         self.vtable.looper_terminated(self.ptr, failure);
     }

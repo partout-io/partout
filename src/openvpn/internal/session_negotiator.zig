@@ -23,7 +23,7 @@ const api = core_mod.api;
 const log = core_mod.logging;
 
 const Authenticator = auth_mod.Authenticator;
-const SessionOptions = configuration_mod.SessionOptions;
+const Looper = net_mod.Looper;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
@@ -34,6 +34,7 @@ const PacketCode = packet_mod.PacketCode;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PushReply = push_mod.PushReply;
+const SessionOptions = configuration_mod.SessionOptions;
 const TLSWrapper = tls_mod.TLSWrapper;
 
 pub const NegotiationResult = struct {
@@ -73,7 +74,7 @@ pub const NegotiatorOptions = struct {
     schedule_negotiation_check: *const fn (
         ?*anyopaque,
         u64,
-    ) net_mod.Looper.ScheduleTimerError!void,
+    ) Looper.ScheduleTimerError!void,
 
     pub fn newAuthenticator(
         self: NegotiatorOptions,
@@ -98,7 +99,7 @@ pub const Negotiator = struct {
     key: u8,
     history: ?PushReply,
     renegotiation: ?RenegotiationType,
-    looper: *net_mod.Looper,
+    looper: *Looper,
     link_processor: *LinkProcessor,
     remote_endpoint: *const api.ExtendedEndpoint,
     channel: *ControlChannel,
@@ -118,7 +119,7 @@ pub const Negotiator = struct {
         key: u8 = 0,
         history: ?PushReply = null,
         renegotiation: ?RenegotiationType = null,
-        looper: *net_mod.Looper,
+        looper: *Looper,
         link_processor: *LinkProcessor,
         remote_endpoint: *const api.ExtendedEndpoint,
         channel: *ControlChannel,

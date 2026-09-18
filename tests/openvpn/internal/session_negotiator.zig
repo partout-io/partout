@@ -7,6 +7,7 @@ const source = @import("source");
 
 const session_negotiator = source.openvpn_internal.session_negotiator;
 
+const Looper = source.net.Looper;
 const Negotiator = session_negotiator.Negotiator;
 const NegotiatorState = session_negotiator.NegotiatorState;
 const RenegotiationType = session_negotiator.RenegotiationType;
@@ -23,7 +24,7 @@ fn negotiatorOptions(
         .session_options = .{ .backend = .mock },
         .callback_context = null,
         .schedule_negotiation_check = struct {
-            fn call(_: ?*anyopaque, _: u64) source.net.Looper.ScheduleTimerError!void {}
+            fn call(_: ?*anyopaque, _: u64) Looper.ScheduleTimerError!void {}
         }.call,
     };
 }

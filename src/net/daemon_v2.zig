@@ -933,7 +933,7 @@ const ConnectionDaemon = struct {
             log.write(.fault, "Unable to get mux descriptor");
             return error.MuxFailure;
         };
-        const descriptor = net.Looper.Descriptor{
+        const descriptor = Looper.Descriptor{
             .fd = fd,
             .io = active_tunnel.nativeIO(),
         };

@@ -30,7 +30,7 @@ comptime {
     _ = @import("net/daemon_v2.zig");
     _ = @import("net/io.zig");
     _ = @import("net/looper.zig");
-    _ = @import("net/looper_queue.zig");
+    _ = @import("net/looper_helpers.zig");
     _ = @import("net/mux.zig");
     _ = @import("net/platform.zig");
     _ = @import("net/resolver.zig");
