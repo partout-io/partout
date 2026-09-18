@@ -187,7 +187,15 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        const experimental = options.feature_flags.contains(.experimentalDaemon);
+        const experimental_requested = options.feature_flags.contains(.experimentalDaemon);
+        const is_openvpn = if (api.findActiveConnectionModule(&options.profile)) |module|
+            api.moduleType(module) == .OpenVPN
+        else
+            false;
+        const experimental = experimental_requested and is_openvpn;
+        if (experimental_requested and !is_openvpn) {
+            core.logging.write(.err, "experimentalDaemon is only applied for OpenVPN; using the legacy daemon for this profile");
+        }
 
         // Register the known connection implementations
         self.contexts = .{};
