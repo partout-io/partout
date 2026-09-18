@@ -53,7 +53,7 @@ test "daemon options parse DNS-only profile" {
     defer options.deinit(allocator);
 
     try std.testing.expectEqualStrings(
-        "/tmp" ++ std.fs.path.sep_str ++ profile_cache_directory,
+        "/tmp" ++ profile_cache_directory,
         options.cache_dir,
     );
     try std.testing.expect(!options.is_daemon);

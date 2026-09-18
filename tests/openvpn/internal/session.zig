@@ -53,8 +53,6 @@ test "Session declarations are semantically analyzed" {
 }
 
 test "Session borrows an externally managed Looper" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
@@ -177,8 +175,6 @@ test "Session reports protocol failures without owning shutdown policy" {
 }
 
 test "Session releases a link processor once when attach fails" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch and attachment.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn established(
             _: ?*anyopaque,

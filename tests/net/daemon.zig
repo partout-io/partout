@@ -383,8 +383,6 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
 }
 
 test "connection daemon passes connection options into sandbox" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
