@@ -784,6 +784,7 @@ const ConnectionDaemon = struct {
         };
         // Performs connection.start() on the looper thread. Remember to
         // detach the link on failure.
+        self.trackConnectionStatus(.connecting);
         const did_start = self.callOnLooper(.{ .start = link }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
@@ -792,17 +793,19 @@ const ConnectionDaemon = struct {
                 error.Timeout => error.Timeout,
                 else => error.UnableToStart,
             });
+            self.trackConnectionStatus(.disconnected);
             self.detachLooperSides() catch {};
             self.scheduleResumeGate();
             return;
         };
         if (!did_start) {
             log.write(.err, "Connection could not start");
+            self.trackConnectionStatus(.disconnected);
             self.detachLooperSides() catch {};
             self.scheduleResumeGate();
-        } else {
-            self.trackConnectionStatus(.connecting);
+            return;
         }
+        // Connection attempted on the looper in background.
     }
 
     fn setupLink(self: *ConnectionDaemon) !api.ExtendedEndpoint {
