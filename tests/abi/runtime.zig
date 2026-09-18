@@ -124,7 +124,7 @@ test "daemon runtime owns options during lifecycle" {
     for ([_]bool{ false, true }) |experimental| {
         var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
         args.options.cache_dir = cache_root_z.ptr;
-        if (experimental) args.options.feature_flags = @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+        if (experimental) args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
         const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
         const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
             options.deinit(allocator);
@@ -322,7 +322,7 @@ fn blockingConnectionRegistry(
 test "daemon options decode experimental daemon feature flag" {
     const allocator = std.testing.allocator;
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
-    args.options.feature_flags = @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+    args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
     var options = try abi_runtime.DaemonOptions.init(allocator, args, null);
     defer options.deinit(allocator);
 
@@ -333,6 +333,6 @@ test "daemon options reject unknown feature bits" {
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
     args.options.feature_flags = @as(u64, 1) << 63;
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
-    args.options.feature_flags |= @intCast(@intFromEnum(api.DaemonFeatureFlag.experimentalDaemon));
+    args.options.feature_flags |= partout_c.PartoutDaemonFlagExperimentalDaemon;
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }

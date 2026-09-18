@@ -78,6 +78,9 @@ typedef enum {
     PartoutCryptoNative
 } partout_crypto;
 
+/* Daemon feature flags (DaemonFeatureFlag bit values). */
+#define PartoutDaemonFlagExperimentalDaemon (UINT64_C(1) << 0)
+
 /* Daemon options. */
 typedef struct {
     bool is_daemon;
