@@ -16,6 +16,8 @@ const net_sandbox = @import("../net/sandbox.zig");
 const api = core.api;
 const util = core.util;
 
+const Looper = net.Looper;
+
 pub const MockSerializedExecutor = struct {
     const Message = struct {
         ptr: *anyopaque,
@@ -80,7 +82,7 @@ pub const MockSerializedExecutor = struct {
 };
 
 pub const MockConnectionEnvironment = struct {
-    looper: net.Looper,
+    looper: Looper,
     executor: *MockSerializedExecutor,
 
     pub fn init(
@@ -90,7 +92,7 @@ pub const MockConnectionEnvironment = struct {
         const executor = try MockSerializedExecutor.create(allocator);
         errdefer executor.destroy();
         self.* = .{
-            .looper = try net.Looper.init(allocator, .{
+            .looper = try Looper.init(allocator, .{
                 .on_finish = .{ .callback = onLooperFinish },
             }),
             .executor = executor,
@@ -108,7 +110,7 @@ pub const MockConnectionEnvironment = struct {
         return self.executor.interface();
     }
 
-    fn onLooperFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+    fn onLooperFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 };
 
 pub const MockRuntime = struct {
@@ -418,7 +420,7 @@ fn noopSocketFactoryCreate(
     _: api.ExtendedEndpoint,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-) net.SocketFactory.Error!net.Looper.Descriptor {
+) net.SocketFactory.Error!Looper.Descriptor {
     return error.LinkNotActive;
 }
 

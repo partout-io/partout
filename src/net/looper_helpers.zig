@@ -8,6 +8,15 @@ const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
+/// Fine-tuning.
+pub const Options = struct {
+    link_buf_size: usize = 64 * 1024,
+    tun_buf_size: usize = 16 * 1024,
+    max_read_size: usize = 256 * 1024,
+    max_read_count: usize = 128,
+    on_finish: OnFinish,
+};
+
 /// Single binary data packet.
 pub const Packet = []const u8;
 /// Slice of packets.
@@ -127,22 +136,29 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-/// Exact error sets used to compose the looper API. Keeping every custom
-/// error name here makes misspellings in set compositions a compile error.
-pub const Errors = struct {
-    pub const AlreadyStarted = error{AlreadyStarted};
-    pub const LooperUnavailable = error{LooperUnavailable};
-    pub const MuxFailure = error{MuxFailure};
-    pub const OOBOutsideQueue = error{OOBOutsideQueue};
-    pub const ReentrantCall = error{ReentrantCall};
-    pub const SideAlreadyAttached = error{SideAlreadyAttached};
-    pub const WriteIncomplete = error{WriteIncomplete};
+pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+pub const ScheduleTimerError = std.mem.Allocator.Error || error{LooperUnavailable};
+pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
+pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
+pub const AttachError = SubmissionError || error{
+    MuxFailure,
+    SideAlreadyAttached,
+    ReentrantCall,
+};
+pub const DetachError = error{ LooperUnavailable, ReentrantCall };
+pub const ResumeReadingError = SubmissionError;
+pub const StopError = error{ LooperUnavailable, ReentrantCall };
+pub const WriteError = SubmissionError;
+pub const WriteOOBError = SubmissionError || io.Error || error{
+    OOBOutsideQueue,
+    WriteIncomplete,
 };
 
-pub const CompletionError = std.mem.Allocator.Error ||
-    Errors.LooperUnavailable ||
-    Errors.MuxFailure ||
-    Errors.SideAlreadyAttached;
+pub const CompletionError = std.mem.Allocator.Error || error{
+    LooperUnavailable,
+    MuxFailure,
+    SideAlreadyAttached,
+};
 
 pub const Completion = struct {
     // Completion state.

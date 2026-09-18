@@ -18,8 +18,10 @@ const settings_mod = @import("internal/settings.zig");
 const api = core.api;
 const log = core.logging;
 const openvpn_log = logging_mod;
+
 const AuthToken = auth_mod.AuthToken;
 const EndpointResolver = net.EndpointResolver;
+const Looper = net.Looper;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
@@ -49,7 +51,7 @@ pub const ConnectionContext = struct {
 };
 
 const LinkSetupError = std.mem.Allocator.Error ||
-    net.Looper.AttachError ||
+    Looper.AttachError ||
     processing_mod.ProcessorError ||
     error{
         ExhaustedEndpoints,
@@ -72,7 +74,7 @@ const OpenVPNConnection = struct {
     controller: net.TunnelController,
     resolver: net.DNSResolver,
     factory: net.SocketFactory,
-    looper: *net.Looper,
+    looper: *Looper,
     serialized_executor: core.SerializedExecutor,
     connection_options: net.ConnectionOptions,
     session_options: SessionOptions,
@@ -317,7 +319,7 @@ const OpenVPNConnection = struct {
 
     fn looperTerminated(
         self: *OpenVPNConnection,
-        failure: ?net.Looper.Failure,
+        failure: ?Looper.Failure,
     ) void {
         const session = self.current_session orelse return;
         session.looperTerminated(failure);
@@ -413,7 +415,7 @@ const OpenVPNConnection = struct {
             self.failTunnelSetup(session, error.MuxFailure);
             return;
         };
-        const descriptor = net.Looper.Descriptor{
+        const descriptor = Looper.Descriptor{
             .fd = fd,
             .io = active_tunnel.nativeIO(),
         };
@@ -759,7 +761,7 @@ fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
 
 fn looperTerminated(
     ptr: *anyopaque,
-    failure: ?net.Looper.Failure,
+    failure: ?Looper.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperTerminated(failure);

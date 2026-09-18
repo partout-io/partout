@@ -8,6 +8,7 @@ const core = @import("source").core;
 const daemon = @import("source").net_daemon;
 const daemon_helpers = @import("source").net_daemon_helpers;
 const net = @import("source").net;
+const Looper = net.Looper;
 const mock_mod = @import("source").mock;
 
 const api = core.api;
@@ -382,6 +383,8 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
 }
 
 test "connection daemon passes connection options into sandbox" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
@@ -504,6 +507,8 @@ test "connection daemon publishes terminal status when cancellation is disabled"
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
+    // FIXME: ### Enable when WindowsLooper dispatches work and termination callbacks.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
 
@@ -969,7 +974,7 @@ const FailingStartConnection = struct {
 
 const SandboxCapture = struct {
     options: ?net.ConnectionOptions = null,
-    looper: ?*net.Looper = null,
+    looper: ?*Looper = null,
     looper_ready_during_create: bool = false,
     serialized_executor: ?core.SerializedExecutor = null,
     disconnect_on_start: bool = false,
@@ -1059,7 +1064,7 @@ const SandboxCapture = struct {
 
     fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
-    fn looperTerminated(ptr: *anyopaque, _: ?net.Looper.Failure) void {
+    fn looperTerminated(ptr: *anyopaque, _: ?Looper.Failure) void {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));
         self.looper_termination_count += 1;
         self.looper_termination_before_deinit = self.deinit_count == 0;

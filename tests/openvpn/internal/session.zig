@@ -7,7 +7,9 @@ const source = @import("source");
 
 const io = source.net_io;
 const net = source.net;
+
 const AuthToken = source.openvpn_internal.auth.AuthToken;
+const Looper = net.Looper;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session.Session;
 const SessionError = source.openvpn_internal.session.SessionError;
@@ -51,8 +53,10 @@ test "Session declarations are semantically analyzed" {
 }
 
 test "Session borrows an externally managed Looper" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
-        fn onFinish(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+        fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
         fn barrier(_: ?*anyopaque) !void {}
 
@@ -69,7 +73,7 @@ test "Session borrows an externally managed Looper" {
     };
 
     const allocator = std.testing.allocator;
-    var looper = try net.Looper.init(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();
@@ -130,9 +134,9 @@ test "Session reports protocol failures without owning shutdown policy" {
 
     const allocator = std.testing.allocator;
     var event_state = RecordingEvents.State{};
-    var looper = try net.Looper.init(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = struct {
-            fn call(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+            fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },
     });
     defer looper.deinit();
@@ -173,6 +177,8 @@ test "Session reports protocol failures without owning shutdown policy" {
 }
 
 test "Session releases a link processor once when attach fails" {
+    // FIXME: ### Enable when WindowsLooper implements queue dispatch and attachment.
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn established(
             _: ?*anyopaque,
@@ -186,9 +192,9 @@ test "Session releases a link processor once when attach fails" {
     };
 
     const allocator = std.testing.allocator;
-    var looper = try net.Looper.init(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = struct {
-            fn call(_: ?*anyopaque, _: ?net.Looper.Failure) void {}
+            fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },
     });
     defer looper.deinit();

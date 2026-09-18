@@ -8,8 +8,8 @@ const builtin = @import("builtin");
 const source = @import("source");
 const io = source.net_io;
 
-const Looper = source.net_looper.Looper;
 const AtomicBool = std.atomic.Value(bool);
+const Looper = source.net_looper.Looper;
 
 const libc = struct {
     extern "c" fn close(fd: std.c.fd_t) c_int;

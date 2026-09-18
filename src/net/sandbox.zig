@@ -14,6 +14,8 @@ const conn = @import("connection.zig");
 const io = @import("io.zig");
 const looper = @import("looper.zig");
 const api = core.api;
+
+const Looper = looper.Looper;
 const TunWrapper = io.TunWrapper;
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
@@ -29,7 +31,7 @@ pub const Sandbox = struct {
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
-    looper: *looper.Looper,
+    looper: *Looper,
     serialized_executor: SerializedExecutor,
 };
 
@@ -187,7 +189,7 @@ pub const SocketFactory = struct {
             endpoint: api.ExtendedEndpoint,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-        ) Error!looper.Looper.Descriptor,
+        ) Error!Looper.Descriptor,
     };
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
@@ -200,7 +202,7 @@ pub const SocketFactory = struct {
         endpoint: api.ExtendedEndpoint,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
-    ) Error!looper.Looper.Descriptor {
+    ) Error!Looper.Descriptor {
         const native_timeout: c_int = @intCast(@min(
             timeout,
             @as(u32, @intCast(std.math.maxInt(c_int))),

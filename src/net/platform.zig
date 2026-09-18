@@ -3,13 +3,13 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const looper = @import("looper.zig");
 const builtin = @import("builtin");
 
 const platform_mod = @This();
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const looper = @import("looper.zig");
 const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
@@ -19,6 +19,7 @@ const log = core.logging;
 const util = core.util;
 
 const DNSResolver = sandbox.DNSResolver;
+const Looper = looper.Looper;
 const PlatformDNS = resolver.PlatformDNS;
 const ReachabilityInfo = io.ReachabilityInfo;
 const NetworkMonitor = sandbox.NetworkMonitor;
@@ -424,7 +425,7 @@ fn socketFactoryCreate(
     endpoint: api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-) SocketFactory.Error!looper.Looper.Descriptor {
+) SocketFactory.Error!Looper.Descriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
     const options = self.socketOptions(endpoint, effective_reachability, timeout);

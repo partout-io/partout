@@ -82,15 +82,9 @@ pub const TLSWrapper = struct {
         const free_tls = functions.free orelse
             @panic("OpenVPN TLS backend does not define free");
 
-        const ca_path = try std.fmt.allocPrintSentinel(
+        const ca_path = try std.fs.path.joinZ(
             allocator,
-            "{s}{s}{s}",
-            .{
-                parameters.caches_directory,
-                if (std.mem.endsWith(u8, parameters.caches_directory, "/")) "" else "/",
-                parameters.ca_filename,
-            },
-            0,
+            &.{ parameters.caches_directory, parameters.ca_filename },
         );
         errdefer allocator.free(ca_path);
         try writeCA(ca_path, ca.pem);

@@ -24,6 +24,7 @@ const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
 const LinkProcessor = processing_mod.LinkProcessor;
+const Looper = net_mod.Looper;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PRNGError = crypto_mod.PRNGError;
@@ -368,7 +369,7 @@ pub const DataChannel = struct {
 /// deliberately rejects calls from any other thread.
 pub const DataLink = struct {
     pub const SendError = DataPath.ProcessingError || processing_mod.PacketError ||
-        net_mod.Looper.WriteError ||
+        Looper.WriteError ||
         error{
             EndOfStream,
             LibcFailure,
@@ -376,10 +377,10 @@ pub const DataLink = struct {
             Timeout,
             WriteIncomplete,
         };
-    pub const ReceiveError = DataPath.ProcessingError || net_mod.Looper.WriteError;
+    pub const ReceiveError = DataPath.ProcessingError || Looper.WriteError;
 
     allocator: std.mem.Allocator,
-    looper: *net_mod.Looper,
+    looper: *Looper,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
@@ -392,7 +393,7 @@ pub const DataLink = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        looper: *net_mod.Looper,
+        looper: *Looper,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
         callbacks: Callbacks,
