@@ -79,13 +79,13 @@ const module_vtable: core.ModuleImplementation.VTable = .{
 
 pub const ConnectionContext = connection.ConnectionContext;
 pub const ConnectionContextV2 = connection_v2.ConnectionContext;
-pub const connection_v2_vtable: net.ConnectionImplementation.VTable = .{
-    .module_type = moduleType,
-    .create_connection = connection_v2.createConnection,
-};
 pub const connection_vtable: net.ConnectionImplementation.VTable = .{
     .module_type = moduleType,
     .create_connection = connection.createConnection,
+};
+pub const connection_v2_vtable: net.ConnectionImplementation.VTable = .{
+    .module_type = moduleType,
+    .create_connection = connection_v2.createConnection,
 };
 
 fn moduleType(_: ?*anyopaque) ModuleType {
