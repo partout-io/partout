@@ -24,20 +24,20 @@ jobs:
             runner: macos-26
             suite: zig
             timeout_minutes: 10
-          - job_name: Run Swift tests
+          - job_name: Run Apple tests
             runner: macos-26
-            suite: swift
+            suite: apple
             timeout_minutes: 10
-          - job_name: Run Kotlin tests
+          - job_name: Run Android tests
             runner: ubuntu-latest
-            suite: kotlin
+            suite: android
             timeout_minutes: 5
     runs-on: ${{ matrix.runner }}
     timeout-minutes: ${{ matrix.timeout_minutes }}
     steps:
       - uses: actions/checkout@v6
       - uses: partout-io/action-prepare-xcode-build@master
-        if: matrix.suite == 'swift'
+        if: matrix.suite == 'apple'
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Zig
@@ -46,14 +46,14 @@ jobs:
       - name: Run Zig tests
         if: matrix.suite == 'zig'
         run: ci/run-tests.sh
-      - name: Run Swift tests
-        if: matrix.suite == 'swift'
-        run: ci/run-swift-tests.sh
+      - name: Run Apple tests
+        if: matrix.suite == 'apple'
+        run: ci/run-apple-tests.sh
       - uses: actions/setup-java@v5
-        if: matrix.suite == 'kotlin'
+        if: matrix.suite == 'android'
         with:
           distribution: temurin
           java-version: 21
-      - name: Run Kotlin tests
-        if: matrix.suite == 'kotlin'
-        run: ci/run-kotlin-tests.sh
+      - name: Run Android tests
+        if: matrix.suite == 'android'
+        run: ci/run-android-tests.sh
