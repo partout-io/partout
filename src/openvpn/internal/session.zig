@@ -154,7 +154,7 @@ pub const Session = struct {
     // MARK: - Public API
 
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
-        log.write(.notice, "Using Zig v1 session");
+        log.write(.notice, "Using OpenVPN Session v1");
         var owned_configuration = init.configuration.clone(allocator) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.fault, "Unable to clone configuration: {s}", .{@errorName(err)});

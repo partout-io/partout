@@ -15,6 +15,7 @@ public final class PartoutProviderRuntime: Sendable {
     private let cacheDir: String?
     private let minDataCountDelta: Int64?
     private let cryptoBackend: CryptoBackend?
+    private let featureFlags: Set<DaemonFeatureFlag>
     private let logger: partout_logger_cb?
 
     public init(
@@ -26,6 +27,7 @@ public final class PartoutProviderRuntime: Sendable {
         cacheDir: String? = nil,
         minDataCountDelta: Int64? = nil,
         cryptoBackend: CryptoBackend? = nil,
+        featureFlags: Set<DaemonFeatureFlag> = [],
         logger: partout_logger_cb?
     ) throws {
         ctx = PartoutLoggerContext(profile.id)
@@ -44,6 +46,7 @@ public final class PartoutProviderRuntime: Sendable {
         self.cacheDir = cacheDir
         self.minDataCountDelta = minDataCountDelta
         self.cryptoBackend = cryptoBackend
+        self.featureFlags = featureFlags
         self.logger = logger
     }
 
@@ -96,7 +99,7 @@ public final class PartoutProviderRuntime: Sendable {
                 crypto: cryptoBackend.map {
                     partout_crypto(UInt32($0.rawValue))
                 } ?? PartoutCryptoDefault,
-                feature_flags: 0
+                feature_flags: featureFlags.toBitmask
             )
             return withUnsafePointer(to: &bindings) { bindingsPtr in
                 var start_args = partout_daemon_start_args(
@@ -212,5 +215,15 @@ private extension partout_daemon_events {
             return nil
         }
         return Unmanaged<UserDefaultsEnvironment>.fromOpaque(ctx).takeUnretainedValue()
+    }
+}
+
+private extension Collection where Element == DaemonFeatureFlag {
+    var toBitmask: UInt64 {
+        var mask: UInt64 = 0
+        forEach {
+            mask |= UInt64($0.rawValue)
+        }
+        return mask
     }
 }

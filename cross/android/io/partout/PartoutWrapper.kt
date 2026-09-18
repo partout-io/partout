@@ -23,7 +23,8 @@ interface PartoutWrapperProtocol {
         cacheDir: String,
         controller: NativeTunnelControllerJNI,
         minDataCountDelta: Long,
-        cryptoBackend: Int
+        cryptoBackend: Int,
+        featureFlags: Long = 0
     ): Int
     fun partoutDaemonStop()
 }
@@ -77,7 +78,8 @@ class PartoutWrapper(
         cacheDir: String,
         controller: NativeTunnelControllerJNI,
         minDataCountDelta: Long,
-        cryptoBackend: Int
+        cryptoBackend: Int,
+        featureFlags: Long
     ): Int
     override external fun partoutDaemonStop()
     //endregion

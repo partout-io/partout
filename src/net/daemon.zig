@@ -162,7 +162,7 @@ pub const Daemon = struct {
         original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
-        log.write(.notice, "Using Zig v1 daemon");
+        log.write(.notice, "Using daemon v1");
 
         // Clone profile for safety, then log it.
         var profile = try original_profile.clone(allocator);

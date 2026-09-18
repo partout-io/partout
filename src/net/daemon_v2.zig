@@ -70,7 +70,7 @@ pub const Daemon = struct {
         original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
-        log.write(.notice, "Using v2 daemon");
+        log.write(.notice, "Using daemon v2");
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
         log.write(.notice, "Decoded profile:");

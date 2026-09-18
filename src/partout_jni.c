@@ -95,7 +95,8 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
         jstring cacheDir,
         jobject controller,
         jlong minDataCountDelta,
-        jint cryptoBackend
+        jint cryptoBackend,
+        jlong featureFlags
 ) {
     (void) thiz;
     const char *jni_profile = (*env)->GetStringUTFChars(env, profile, NULL);
@@ -112,7 +113,7 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
     args.options.cache_dir = jni_cache_dir;
     args.options.min_data_count_delta = minDataCountDelta;
     args.options.crypto = cryptoBackend;
-    args.options.feature_flags = 0;
+    args.options.feature_flags = (uint64_t) featureFlags;
     args.bindings = &bindings;
     const jint result = partout_daemon_start(&args);
 

@@ -160,7 +160,7 @@ pub const Session = struct {
     // MARK: - Public API
 
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
-        log.write(.notice, "Using OpenVPN v2 Session");
+        log.write(.notice, "Using OpenVPN Session v2");
 
         const remote_endpoint = try init.remote_endpoint.clone(allocator);
         errdefer remote_endpoint.deinit(allocator);
