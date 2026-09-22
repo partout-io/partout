@@ -38,7 +38,8 @@ pub const Looper = struct {
     pub const Timer = helpers.Timer;
 
     // Side attachment.
-    pub const Descriptor = helpers.Descriptor;
+    pub const LinkDescriptor = helpers.LinkDescriptor;
+    pub const TunDescriptor = helpers.TunDescriptor;
     pub const DescriptorPair = helpers.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
 
@@ -1430,7 +1431,7 @@ pub const Looper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            descriptor: Descriptor,
+            descriptor: helpers.Descriptor,
             read_buf_size: usize,
             arguments: AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {

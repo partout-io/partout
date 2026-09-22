@@ -161,7 +161,7 @@ const TimerProbe = struct {
     }
 };
 
-fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
+fn descriptor(pipe: Pipe, mock: *MockIO) Looper.LinkDescriptor {
     return .{
         .fd = pipe.fds[0],
         .io = mock.interface(),

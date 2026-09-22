@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
@@ -123,12 +124,30 @@ pub const Timer = struct {
 pub const Descriptor = struct {
     fd: io.FileDescriptor,
     io: io.IOInterface,
+
+    pub fn cleanup(self: Descriptor) void {
+        self.io.cleanup();
+    }
+};
+
+/// Descriptor for the link side of the looper.
+pub const LinkDescriptor = switch (builtin.os.tag) {
+    // TODO: Replace the mux-backed bridge with native Windows socket handles.
+    .windows => Descriptor,
+    else => Descriptor,
+};
+
+/// Descriptor for the tunnel side of the looper.
+pub const TunDescriptor = switch (builtin.os.tag) {
+    // TODO: Use a VpnChannel handle when Windows tunnel attachment is implemented.
+    .windows => Descriptor,
+    else => Descriptor,
 };
 
 /// The looper manages exactly one link and one tun (at most).
 pub const DescriptorPair = union(io.Side) {
-    link: Descriptor,
-    tun: Descriptor,
+    link: LinkDescriptor,
+    tun: TunDescriptor,
 };
 
 /// The arguments to attach a side of the looper.

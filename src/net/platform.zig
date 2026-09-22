@@ -425,7 +425,7 @@ fn socketFactoryCreate(
     endpoint: api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-) SocketFactory.Error!Looper.Descriptor {
+) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
     const options = self.socketOptions(endpoint, effective_reachability, timeout);

@@ -168,7 +168,7 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
     return .{ .module = module };
 }
 
-pub const LinkDescriptor = struct {
+pub const RemoteDescriptor = struct {
     endpoint: core.api.ExtendedEndpoint,
     looper: *Looper,
 };
@@ -235,8 +235,8 @@ pub const Connection = struct {
                 return &.{};
             }
         }.call,
-        start_v2: *const fn (*anyopaque, LinkDescriptor) StartError!bool = struct {
-            fn call(_: *anyopaque, _: LinkDescriptor) StartError!bool {
+        start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
+            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
                 return false;
             }
         }.call,
@@ -276,9 +276,9 @@ pub const Connection = struct {
 
     pub fn startV2(
         self: Connection,
-        descriptor: LinkDescriptor,
+        remote: RemoteDescriptor,
     ) StartError!bool {
-        return self.vtable.start_v2(self.ptr, descriptor);
+        return self.vtable.start_v2(self.ptr, remote);
     }
 
     pub fn start(self: Connection, events: Events) StartError!bool {

@@ -415,7 +415,7 @@ const OpenVPNConnection = struct {
             self.failTunnelSetup(session, error.MuxFailure);
             return;
         };
-        const descriptor = Looper.Descriptor{
+        const descriptor = Looper.TunDescriptor{
             .fd = fd,
             .io = active_tunnel.nativeIO(),
         };

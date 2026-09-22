@@ -189,7 +189,7 @@ pub const SocketFactory = struct {
             endpoint: api.ExtendedEndpoint,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-        ) Error!Looper.Descriptor,
+        ) Error!Looper.LinkDescriptor,
     };
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
@@ -202,7 +202,7 @@ pub const SocketFactory = struct {
         endpoint: api.ExtendedEndpoint,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
-    ) Error!Looper.Descriptor {
+    ) Error!Looper.LinkDescriptor {
         const native_timeout: c_int = @intCast(@min(
             timeout,
             @as(u32, @intCast(std.math.maxInt(c_int))),

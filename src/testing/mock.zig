@@ -420,7 +420,7 @@ fn noopSocketFactoryCreate(
     _: api.ExtendedEndpoint,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-) net.SocketFactory.Error!Looper.Descriptor {
+) net.SocketFactory.Error!Looper.LinkDescriptor {
     return error.LinkNotActive;
 }
 
