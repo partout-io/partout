@@ -12,7 +12,7 @@ const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
 const logging_mod = @import("internal/logging.zig");
 const processing_mod = @import("internal/processing.zig");
-const session_mod = @import("internal/session.zig");
+const session_mod = @import("../runtime_policy.zig").openvpn_session;
 const settings_mod = @import("internal/settings.zig");
 
 const api = core.api;

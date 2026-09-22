@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const build_options = @import("build_options");
+pub const runtime_policy = @import("runtime_policy.zig");
 pub const abi = @import("abi/exports.zig");
 pub const abi_helpers = @import("abi/helpers.zig");
 pub const abi_runtime = @import("abi/runtime.zig");
@@ -26,7 +27,7 @@ pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const net_resolver = @import("net/resolver.zig");
 pub const openvpn_enabled = build_options.openvpn;
-pub const openvpn_connection = if (openvpn_enabled) @import("openvpn/connection.zig") else struct {};
+pub const openvpn_connection = if (openvpn_enabled) runtime_policy.openvpn_connection else struct {};
 pub const openvpn_connection_v2 = if (openvpn_enabled) @import("openvpn/connection_v2.zig") else struct {};
 pub const openvpn_exports = if (openvpn_enabled) @import("openvpn/exports.zig") else struct {};
 pub const openvpn_parser = if (openvpn_enabled) @import("openvpn/parser.zig") else struct {};
@@ -45,7 +46,9 @@ pub const openvpn_internal = if (openvpn_enabled) struct {
     pub const packet = @import("openvpn/internal/packet.zig");
     pub const processing = @import("openvpn/internal/processing.zig");
     pub const push = @import("openvpn/internal/push.zig");
-    pub const session = @import("openvpn/internal/session.zig");
+    pub const session = runtime_policy.openvpn_session;
+    pub const session_legacy = if (runtime_policy.v2_only) struct {} else @import("openvpn/internal/session.zig");
+    pub const session_v2 = @import("openvpn/internal/session_v2.zig");
     pub const session_context = @import("openvpn/internal/session_context.zig");
     pub const session_negotiator = @import("openvpn/internal/session_negotiator.zig");
     pub const settings = @import("openvpn/internal/settings.zig");

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const runtime_policy = @import("../runtime_policy.zig");
 const build_options = @import("build_options");
 
 const ffi = @import("../c/exports.zig");
@@ -117,11 +118,11 @@ pub const DaemonOptions = struct {
 
 pub const DaemonRuntime = struct {
     const Daemon = union(enum) {
-        legacy: *net.Daemon,
+        legacy: if (runtime_policy.v2_only) void else *net.Daemon,
         experimental: *net.DaemonV2,
 
         fn create(allocator: std.mem.Allocator, profile: *const api.Profile, context: net.DaemonContext, experimental: bool) RuntimeError!Daemon {
-            return if (experimental)
+            return if (runtime_policy.v2_only or experimental)
                 .{ .experimental = try net.DaemonV2.create(allocator, profile, context) }
             else
                 .{ .legacy = try net.Daemon.create(allocator, profile, context) };
@@ -129,25 +130,25 @@ pub const DaemonRuntime = struct {
 
         fn destroy(self: Daemon) void {
             switch (self) {
-                inline else => |impl| impl.destroy(),
+                inline else => |impl| if (@TypeOf(impl) != void) impl.destroy() else unreachable,
             }
         }
 
         fn start(self: Daemon) RuntimeError!void {
             return switch (self) {
-                inline else => |impl| impl.start(),
+                inline else => |impl| if (@TypeOf(impl) != void) impl.start() else unreachable,
             };
         }
 
         fn hold(self: Daemon) void {
             switch (self) {
-                inline else => |impl| impl.hold(),
+                inline else => |impl| if (@TypeOf(impl) != void) impl.hold() else unreachable,
             }
         }
 
         fn stop(self: Daemon) void {
             switch (self) {
-                inline else => |impl| impl.stop(),
+                inline else => |impl| if (@TypeOf(impl) != void) impl.stop() else unreachable,
             }
         }
     };
@@ -159,7 +160,7 @@ pub const DaemonRuntime = struct {
         IP: void,
         OnDemand: void,
         OpenVPN: union(enum) {
-            legacy: openvpn.ConnectionContext,
+            legacy: if (runtime_policy.v2_only) void else openvpn.ConnectionContext,
             experimental: openvpn.ConnectionContextV2,
         },
         Provider: void,
@@ -194,7 +195,8 @@ pub const DaemonRuntime = struct {
         else
             null;
         const is_null_or_openvpn = module_type == null or module_type == .OpenVPN;
-        const experimental = experimental_requested and is_null_or_openvpn;
+        // The shared policy excludes legacy implementations at compile time.
+        const experimental = if (runtime_policy.v2_only) true else experimental_requested and is_null_or_openvpn;
         if (experimental) {
             log.write(.notice, "Using daemon v2 (experimental)");
         } else {

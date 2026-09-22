@@ -383,7 +383,7 @@ test "connection daemon does not cancel tunnel when connection fails to start" {
 }
 
 test "connection daemon passes connection options into sandbox" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;
@@ -507,7 +507,7 @@ test "connection daemon publishes terminal status when cancellation is disabled"
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
-    // FIXME: ### Enable when WindowsLooper dispatches work and termination callbacks.
+    // FIXME: ###, Enable when WindowsLooper dispatches work and termination callbacks.
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = mock_mod;

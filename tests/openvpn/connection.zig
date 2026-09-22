@@ -13,8 +13,16 @@ const net = source.net;
 const api = core.api;
 const Looper = net.Looper;
 
+test "v2-only policy selects OpenVPN connection v2" {
+    if (!source.runtime_policy.v2_only) return error.SkipZigTest;
+    const v2 = source.openvpn_connection_v2;
+    try std.testing.expect(connection == v2);
+    try std.testing.expect(source.openvpn_exports.ConnectionContext == v2.ConnectionContext);
+    try std.testing.expect(source.openvpn_exports.connection_vtable.create_connection == v2.createConnection);
+}
+
 test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const v2 = source.openvpn_connection_v2;
     const Request = struct {
@@ -105,7 +113,7 @@ test "OpenVPN connection declarations are semantically analyzed" {
 }
 
 test "OpenVPN connection borrows the daemon looper" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
+    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}

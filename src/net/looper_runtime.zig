@@ -2,14 +2,15 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Shared looper API. The implementation is selected at initialization and
-//! remains fixed for its lifetime. Keep this object at a stable address from
+//! Shared looper API. The compile-time runtime policy may force v2.
+//! The implementation remains fixed for its lifetime. Keep this object at a stable address from
 //! start() until stop()/deinit() completes; callbacks borrow their contexts.
 
 const std = @import("std");
+const runtime_policy = @import("../runtime_policy.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
-const legacy = @import("looper.zig");
+const legacy = runtime_policy.legacy_looper;
 const experimental = @import("looper_v2.zig");
 
 pub const Looper = struct {
@@ -38,12 +39,15 @@ pub const Looper = struct {
     pub const WriteError = helpers.WriteError;
     pub const WriteOOBError = helpers.WriteOOBError;
 
-    implementation: union(enum) {
+    implementation: if (runtime_policy.v2_only) union(enum) {
+        experimental: experimental.Looper,
+    } else union(enum) {
         legacy: legacy.Looper,
         experimental: experimental.Looper,
     },
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
+        if (runtime_policy.v2_only) return initExperimental(allocator, options);
         return .{ .implementation = .{ .legacy = try legacy.Looper.init(allocator, options) } };
     }
 
