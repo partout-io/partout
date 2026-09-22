@@ -132,8 +132,7 @@ private extension Profile {
             TunnelRemoteInfo(
                 originalModuleId: $0.originalModuleId,
                 address: $0.address,
-                modules: $0.modules?.map(\.containedModule),
-                requiresVirtualDevice: $0.requiresVirtualDevice
+                modules: $0.modules?.map(\.containedModule)
             )
         }
         return networkSettings(with: info, options: options)

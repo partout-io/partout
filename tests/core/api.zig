@@ -721,7 +721,7 @@ const tagged_profile_json =
 const tunnel_remote_info_json =
     \\{"profile":
 ++ tagged_profile_json ++
-    \\,"originalModuleId":"00000000-0000-0000-0000-000000000106","address":"198.51.100.44","requiresVirtualDevice":true,"modules":[
+    \\,"originalModuleId":"00000000-0000-0000-0000-000000000106","address":"198.51.100.44","modules":[
 ++ tagged_dns_json ++ "," ++ tagged_ip_json ++
     \\]}
 ;
