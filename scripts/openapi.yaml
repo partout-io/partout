@@ -1275,8 +1275,6 @@ components:
           $ref: "#/components/schemas/UniqueID"
         address:
           $ref: "#/components/schemas/Address"
-        requiresVirtualDevice:
-          type: boolean
         modules:
           description: Connection-derived modules to inject immediately after the originating module. Omitted when the profile alone supplies settings.
           items:
@@ -1285,7 +1283,6 @@ components:
       required:
         - profile
         - originalModuleId
-        - requiresVirtualDevice
       type: object
     TunnelSnapshot:
       additionalProperties: false

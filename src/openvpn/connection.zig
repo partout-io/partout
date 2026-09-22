@@ -12,7 +12,7 @@ const constants_mod = @import("internal/constants.zig");
 const crypto_mod = @import("internal/crypto.zig");
 const logging_mod = @import("internal/logging.zig");
 const processing_mod = @import("internal/processing.zig");
-const session_mod = @import("internal/session.zig");
+const session_mod = @import("../runtime_policy.zig").openvpn_session;
 const settings_mod = @import("internal/settings.zig");
 
 const api = core.api;
@@ -397,7 +397,6 @@ const OpenVPNConnection = struct {
             .profile = self.profile.*,
             .original_module_id = self.module_id,
             .address = address,
-            .requires_virtual_device = true,
             .modules = modules,
         };
         self.tunnel = self.controller.setTunnelSettings(info) catch |err| {
@@ -415,7 +414,7 @@ const OpenVPNConnection = struct {
             self.failTunnelSetup(session, error.MuxFailure);
             return;
         };
-        const descriptor = Looper.Descriptor{
+        const descriptor = Looper.TunDescriptor{
             .fd = fd,
             .io = active_tunnel.nativeIO(),
         };

@@ -137,8 +137,7 @@ struct ProfileNetworkSettingsTests {
         let sut = profile.networkSettings(with: .init(
             originalModuleId: bogusModule.id,
             address: Address(rawValue: "5.6.7.8")!,
-            modules: [bogusModule],
-            requiresVirtualDevice: false
+            modules: [bogusModule]
         ))
 
         #expect(sut.tunnelRemoteAddress == "5.6.7.8")
@@ -163,8 +162,7 @@ struct ProfileNetworkSettingsTests {
                             Route(defaultWithGateway: nil)
                         ])
                 ).build()
-            ],
-            requiresVirtualDevice: false
+            ]
         )
         let ipModule = IPModule.Builder(
             ipv4: IPSettings(subnet: Subnet(rawValue: "1.2.3.4/32")!)

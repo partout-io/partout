@@ -76,7 +76,6 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
 
     try std.testing.expectEqual(conn_module.id(), info.original_module_id);
     try std.testing.expectEqualStrings("127.0.0.1", info.address.?.raw);
-    try std.testing.expectEqual(builtin.os.tag != .windows, info.requires_virtual_device);
     try std.testing.expect(info.profile.name.ptr != profile.name.ptr);
 
     const modules = info.modules orelse return error.TestUnexpectedResult;
@@ -897,7 +896,7 @@ const fake_controller_vtable = sandbox.TunnelController.VTable{
     .cancel_tunnel_connection = fakeCancelTunnelConnection,
 };
 
-fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sandbox.TunnelController.Error!?io.TunWrapper {
+fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sandbox.TunnelController.Error!io.TunWrapper {
     const self: *FakeController = @ptrCast(@alignCast(ptr.?));
     self.set_tunnel_settings_count += 1;
     if (self.fail_set_tunnel_settings_number == self.set_tunnel_settings_count)

@@ -15,4 +15,5 @@
 #include "prng.h"
 #include "portable/socket.h"
 #include "portable/tun.h"
+#include "portable/tun_ctrl.h"
 #include "zd.h"

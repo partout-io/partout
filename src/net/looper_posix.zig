@@ -16,6 +16,7 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
+const io_posix = @import("io_posix.zig");
 const io_c = io.io_c;
 const log = core.logging;
 
@@ -1380,7 +1381,7 @@ pub const PosixLooper = struct {
         id: u64,
         side: io.Side,
         fd: io.FileDescriptor,
-        native_io: io.IOInterface,
+        native_io: io_posix.POSIXInterface,
 
         // User callbacks.
         on_read: ?helpers.OnRead,
@@ -1399,7 +1400,7 @@ pub const PosixLooper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            descriptor: helpers.Descriptor,
+            descriptor: io_posix.POSIXDescriptor,
             read_buf_size: usize,
             arguments: helpers.AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {

@@ -20,7 +20,7 @@ const socketOptions = platform_source.testing.socketOptions;
 
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
-    received_settings_only_info: bool = false,
+    received_module_id: bool = false,
     environment_set_calls: usize = 0,
     environment_remove_calls: usize = 0,
     received_environment_key: bool = false,
@@ -36,10 +36,10 @@ fn recordSetTunnel(
     if (info_json == null) return null;
     const json = std.mem.span(info_json);
     recorder.calls += 1;
-    recorder.received_settings_only_info = std.mem.indexOf(
+    recorder.received_module_id = std.mem.indexOf(
         u8,
         json,
-        "\"requiresVirtualDevice\":false",
+        "\"originalModuleId\":\"11111111-1111-4111-8111-111111111111\"",
     ) != null;
     return null;
 }
@@ -71,16 +71,20 @@ fn platformOptions(recorder: *TunnelCommitRecorder) Platform.Options {
     return .{ .ref = recorder, .fnt = functions };
 }
 
-test "platform commits settings when no virtual device is required" {
+test "platform reports unavailable tunnel after committing settings" {
     var recorder = TunnelCommitRecorder{};
     var platform = try Platform.init(platformOptions(&recorder));
     defer platform.deinit();
 
-    const tun = try platform.tunnelController().setTunnelSettings(.{});
+    try std.testing.expectError(
+        error.TunNotAvailable,
+        platform.tunnelController().setTunnelSettings(.{
+            .original_module_id = "11111111-1111-4111-8111-111111111111".*,
+        }),
+    );
 
-    try std.testing.expect(tun == null);
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
-    try std.testing.expect(recorder.received_settings_only_info);
+    try std.testing.expect(recorder.received_module_id);
 }
 
 test "platform forwards environment values and removals" {
@@ -147,7 +151,8 @@ test "platform network monitor receives reachability changes" {
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
 }
 
-test "platform builds socket wrapper options" {
+test "platform builds POSIX socket wrapper options" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
     var platform = try Platform.init(.{
         .socket_buf_size = 4096,
     });
@@ -206,4 +211,78 @@ test "platform records better path notifications" {
     platform_source.testing.notifyBetterPath(&platform);
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
     try std.testing.expectEqual(@as(usize, 2), platform_source.testing.betterPathCount(&platform));
+}
+
+test "settings-only daemons release owned TUN descriptors" {
+    const builtin = @import("builtin");
+    if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
+    const source = @import("source");
+    const mock = source.mock;
+    const libc = struct {
+        extern "c" fn close(fd: c_int) c_int;
+    };
+    // Match portable TUN storage on POSIX. A pipe exercises ownership without
+    // requiring privileges to create a real TUN device. Android uses only fd.
+    const NativeTun = extern struct {
+        fd: c_int,
+        dev_name: ?[*:0]const u8 = null,
+    };
+    const Controller = struct {
+        mock: mock.MockTunnelController = .{},
+        native: *NativeTun,
+        handed_out: bool = false,
+
+        fn setTunnel(raw: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) source.net.TunnelController.Error!io.TunWrapper {
+            const base: *mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
+            const self: *@This() = @fieldParentPtr("mock", base);
+            self.handed_out = true;
+            return io.TunWrapper.init(@ptrCast(self.native));
+        }
+    };
+    const allocator = std.testing.allocator;
+    var profile = try api.Profile.parse(allocator, mock.dnsOnlyProfileJson());
+    defer profile.deinit(allocator);
+    var registry = try source.net.ConnectionRegistry.init(allocator, &.{});
+    defer registry.deinit(allocator);
+    inline for (.{ source.net_daemon.Daemon, source.net_daemon_v2.Daemon }) |Daemon| {
+        var fds: [2]c_int = undefined;
+        if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+        defer _ = libc.close(fds[1]);
+        var read_fd_open = true;
+        defer if (read_fd_open) {
+            _ = libc.close(fds[0]);
+        };
+        const native = try std.heap.c_allocator.create(NativeTun);
+        native.* = .{ .fd = fds[0] };
+        var controller = Controller{ .native = native };
+        defer if (!controller.handed_out) {
+            std.heap.c_allocator.destroy(native);
+        };
+        var vtable = controller.mock.interface().vtable.*;
+        vtable.set_tunnel_settings = Controller.setTunnel;
+        var monitor = mock.MockNetworkMonitor{};
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = .{ .ptr = &controller.mock, .vtable = &vtable },
+                .resolver = mock.noopDNSResolver(),
+                .factory = mock.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{},
+        });
+        defer sut.destroy();
+        try sut.start();
+        defer sut.stop();
+        try std.testing.expect(controller.handed_out);
+        read_fd_open = std.c.fcntl(fds[0], std.c.F.GETFD) != -1;
+        if (comptime builtin.abi.isAndroid()) {
+            // The service retains ownership of the original Android fd.
+            try std.testing.expect(read_fd_open);
+        } else {
+            // Free the leaked allocation if this regression is reintroduced.
+            if (read_fd_open) std.heap.c_allocator.destroy(native);
+            try std.testing.expect(!read_fd_open);
+        }
+    }
 }

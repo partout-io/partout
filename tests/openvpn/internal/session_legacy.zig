@@ -6,20 +6,21 @@ const std = @import("std");
 const source = @import("source");
 
 const io = source.net_io;
+const io_posix = source.net_io_posix;
 const net = source.net;
 
 const AuthToken = source.openvpn_internal.auth.AuthToken;
 const Looper = net.Looper;
 const PRNG = source.openvpn_internal.crypto.PRNG;
-const Session = source.openvpn_internal.session.Session;
-const SessionError = source.openvpn_internal.session.SessionError;
-const session_testing = source.openvpn_internal.session.testing;
+const Session = source.openvpn_internal.session_legacy.Session;
+const SessionError = source.openvpn_internal.session_legacy.SessionError;
+const session_testing = source.openvpn_internal.session_legacy.testing;
 
 const MockIO = struct {
     cleanup_count: usize = 0,
 
-    fn interface(self: *MockIO) io.IOInterface {
-        return .{ .ptr = self, .vtable = &vtable };
+    fn interface(self: *MockIO) io_posix.POSIXInterface {
+        return .{ .mock = .{ .ptr = self, .vtable = &vtable } };
     }
 
     fn setEventMask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -38,7 +39,7 @@ const MockIO = struct {
         return 0;
     }
 
-    const vtable = io.IOInterface.VTable{
+    const vtable = io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = setEventMask,
         .reset_events = resetEvents,
         .read = read,
@@ -53,8 +54,6 @@ test "Session declarations are semantically analyzed" {
 }
 
 test "Session borrows an externally managed Looper" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
@@ -177,8 +176,6 @@ test "Session reports protocol failures without owning shutdown policy" {
 }
 
 test "Session releases a link processor once when attach fails" {
-    // FIXME: ### Enable when WindowsLooper implements queue dispatch and attachment.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn established(
             _: ?*anyopaque,

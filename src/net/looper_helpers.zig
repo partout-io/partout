@@ -117,23 +117,9 @@ pub const Timer = struct {
     id: ?u64 = null,
 };
 
-/// A descriptor includes:
-/// - The `fd` to watch for I/O events.
-/// - The `io` interface to perform reads and writes.
-pub const Descriptor = struct {
-    fd: io.FileDescriptor,
-    io: io.IOInterface,
-};
-
-/// The looper manages exactly one link and one tun (at most).
-pub const DescriptorPair = union(io.Side) {
-    link: Descriptor,
-    tun: Descriptor,
-};
-
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
-    pair: DescriptorPair,
+    pair: io.DescriptorPair,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };

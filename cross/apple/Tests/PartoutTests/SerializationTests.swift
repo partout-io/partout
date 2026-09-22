@@ -545,15 +545,12 @@ struct SerializationTests {
                     ipv4: try IPSettings(subnet: Subnet("10.99.0.2", 24)),
                     mtu: 1_320
                 ).build()
-            ],
-            requiresVirtualDevice: true
+            ]
         )
 
         let json = try jsonObject(from: Data(try info.encodedAsJSON(profile).utf8))
         #expect(json["originalModuleId"] as? String == IDs.openVPN.uuidString)
         #expect(json["address"] as? String == "198.51.100.44")
-        #expect(json["requiresVirtualDevice"] as? Bool == true)
-
         #expect(json["options"] == nil)
 
         let profileJSON = try requireObject(json["profile"])

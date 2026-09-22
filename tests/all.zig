@@ -29,7 +29,13 @@ comptime {
     _ = @import("net/daemon.zig");
     _ = @import("net/daemon_v2.zig");
     _ = @import("net/io.zig");
-    _ = @import("net/looper.zig");
+    if (@import("builtin").os.tag != .windows) {
+        _ = @import("net/io_posix.zig");
+    }
+    if (!source.runtime_policy.v2_only) {
+        _ = @import("net/looper_legacy.zig");
+    }
+    _ = @import("net/looper_v2.zig");
     _ = @import("net/looper_helpers.zig");
     _ = @import("net/mux.zig");
     _ = @import("net/platform.zig");
@@ -51,7 +57,10 @@ comptime {
         _ = @import("openvpn/internal/processing.zig");
         _ = @import("openvpn/internal/push.zig");
         _ = @import("openvpn/internal/serialization.zig");
-        _ = @import("openvpn/internal/session.zig");
+        if (!source.runtime_policy.v2_only) {
+            _ = @import("openvpn/internal/session_legacy.zig");
+        }
+        _ = @import("openvpn/internal/session_v2.zig");
         _ = @import("openvpn/internal/session_context.zig");
         _ = @import("openvpn/internal/session_negotiator.zig");
         _ = @import("openvpn/internal/settings.zig");

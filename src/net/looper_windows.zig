@@ -50,7 +50,10 @@ pub const WindowsLooper = struct {
         callback: *const fn (?*anyopaque) anyerror!Result,
     ) anyerror!Result {
         var task = Task(Result){ .context = context, .callback = callback };
-        return self.actor.perform(Result, .{ .perform = &task });
+        return self.actor.perform(Result, .{ .perform = &task }) catch |err| switch (err) {
+            error.Closed => error.LooperUnavailable,
+            else => err,
+        };
     }
 
     // FIXME: ###, anyerror

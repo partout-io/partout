@@ -444,12 +444,13 @@ pub const Daemon = struct {
             };
             if (maybe_info) |*info| {
                 defer info.deinit(self.allocator);
-                _ = self.controller.setTunnelSettings(info.*) catch |err| {
+                var tun = self.controller.setTunnelSettings(info.*) catch |err| {
                     log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                     const code = self.handleStartError(err);
                     self.requestCancellation(code, false);
                     return;
                 };
+                tun.deinit();
             }
             log.write(.notice, "Daemon started successfully");
             return;
@@ -952,7 +953,6 @@ fn buildSettingsOnlyTunnelInfo(
     const info = api.TunnelRemoteInfoWrapper{
         .profile = profile.*,
         .original_module_id = original_module_id orelse return null,
-        .requires_virtual_device = false,
     };
     return try info.clone(allocator);
 }

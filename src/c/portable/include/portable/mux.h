@@ -8,7 +8,7 @@
 #include "portable/conditionals.h"
 
 #include <stdbool.h>
-#include "portable/socket.h"
+#include "portable/common.h"
 
 #pragma clang assume_nonnull begin
 

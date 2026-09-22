@@ -9,8 +9,25 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include "partout_winrt.h"
-#include "portable/tun_ctrl_winrt.h"
+// MSVC does not support Clang's nullability annotations.
+#if defined(_MSC_VER) && !defined(__clang__)
+#pragma warning(push)
+#pragma warning(disable: 4068)
+#define _Nullable
+#define _Nonnull
+#endif
+
+#include "runtime.h"
+#include "tun_ctrl_windows.h"
+extern "C" {
+#include "portable/common.h"
+}
+
+#if defined(_MSC_VER) && !defined(__clang__)
+#undef _Nonnull
+#undef _Nullable
+#pragma warning(pop)
+#endif
 
 // Forces this archive member, including its C++ exports, into partout.dll.
 extern "C" void pp_winrt_runtime_link() {}

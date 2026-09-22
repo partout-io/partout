@@ -3,10 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const source = @import("source");
 const io = source.net_io;
+const io_posix = source.net_io_posix;
 
 const AtomicBool = std.atomic.Value(bool);
 const Looper = source.net_looper.Looper;
@@ -54,8 +54,8 @@ const MockIO = struct {
     fail_writes: AtomicBool = AtomicBool.init(false),
     cleaned: AtomicBool = AtomicBool.init(false),
 
-    fn interface(self: *MockIO) io.IOInterface {
-        return .{ .ptr = self, .vtable = &vtable };
+    fn interface(self: *MockIO) io_posix.POSIXInterface {
+        return .{ .mock = .{ .ptr = self, .vtable = &vtable } };
     }
 
     fn setEventMask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -83,7 +83,7 @@ const MockIO = struct {
         return 0;
     }
 
-    const vtable = io.IOInterface.VTable{
+    const vtable = io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = setEventMask,
         .reset_events = resetEvents,
         .read = read,
@@ -102,7 +102,10 @@ fn returnFortyTwo(_: ?*anyopaque) anyerror!u8 {
 }
 
 fn initLooper(on_finish: Looper.OnFinish) !Looper {
-    return Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
+    var looper = try Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
+    errdefer looper.deinit();
+    try std.testing.expect(looper.implementation == .legacy);
+    return looper;
 }
 
 fn scheduleTimer(
@@ -161,7 +164,7 @@ const TimerProbe = struct {
     }
 };
 
-fn descriptor(pipe: Pipe, mock: *MockIO) Looper.Descriptor {
+fn descriptor(pipe: Pipe, mock: *MockIO) Looper.LinkDescriptor {
     return .{
         .fd = pipe.fds[0],
         .io = mock.interface(),
@@ -380,8 +383,6 @@ const FinishProbe = struct {
 };
 
 test "side failure callback runs after the looper mutex is released" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-
     var pipe = try Pipe.init();
     defer pipe.deinit();
     var mock = MockIO{};
@@ -409,8 +410,6 @@ test "side failure callback runs after the looper mutex is released" {
 }
 
 test "out-of-band write returns the underlying I/O error" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-
     var pipe = try Pipe.init();
     defer pipe.deinit();
     var mock = MockIO{};
@@ -420,6 +419,7 @@ test "out-of-band write returns the underlying I/O error" {
     try looper.attach(.{
         .pair = .{ .link = descriptor(pipe, &mock) },
     });
+
     mock.fail_writes.store(true, .release);
 
     const WriteTask = struct {
@@ -438,8 +438,6 @@ test "out-of-band write returns the underlying I/O error" {
 }
 
 test "synchronous lifecycle commands do not allocate" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     var pipe = try Pipe.init();
     defer pipe.deinit();
@@ -494,8 +492,6 @@ const DetachWorker = struct {
 };
 
 test "deinit completes a queued detach with LooperUnavailable" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-
     var pipe = try Pipe.init();
     defer pipe.deinit();
     var mock = MockIO{};
@@ -645,27 +641,3 @@ const DeinitWorker = struct {
         self.done.store(true, .release);
     }
 };
-
-test "experimental looper dispatches tasks and timers through the shared API" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-    var finish = FinishCallProbe{};
-    var looper = try Looper.initExperimental(std.testing.allocator, .{
-        .on_finish = .{ .context = &finish, .callback = FinishCallProbe.onFinish },
-    });
-    defer looper.deinit();
-    try looper.start();
-    var stopped = false;
-    defer if (!stopped) looper.stop() catch {};
-    try std.testing.expectEqual(@as(u8, 42), try looper.perform(u8, null, returnFortyTwo));
-
-    var timer = Looper.Timer{};
-    var probe = TimerProbe{ .looper = &looper };
-    try scheduleTimer(&looper, &timer, 1, .{ .context = &probe, .callback = TimerProbe.run });
-    waitUntil(&probe.did_run);
-    try std.testing.expect(probe.ran_on_looper.load(.acquire));
-    try cancelTimer(&looper, &timer);
-    try looper.stop();
-    stopped = true;
-    try std.testing.expect(finish.called.load(.acquire));
-    try std.testing.expectError(error.LooperUnavailable, looper.performTask(.{ .callback = noopTask }));
-}

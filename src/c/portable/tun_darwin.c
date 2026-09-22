@@ -6,6 +6,7 @@
 
 #include "portable/common.h"
 #include "portable/tun.h"
+#include "portable/tun_ctrl.h"
 
 #if PARTOUT_APPLE
 
@@ -112,11 +113,9 @@ struct sockaddr_ctl {
 };
 #endif
 
-void pp_tun_free_and_close(pp_tun tun, bool and_close) {
+void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-    if (and_close) {
-        pp_tun_close(tun);
-    }
+    if (tun->fd >= 0) close(tun->fd);
     if (tun->dev_name) {
         pp_free((void *)tun->dev_name);
     }
@@ -220,18 +219,13 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     return (int)src_len;
 }
 
-void pp_tun_close(const pp_tun tun) {
-    if (!tun || tun->fd < 0) return;
-    close(tun->fd);
-    tun->fd = -1;
-}
-
 pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
 }
 
 const char *pp_tun_name(const pp_tun tun) {
+    if (!tun) return NULL;
     return tun->dev_name;
 }
 

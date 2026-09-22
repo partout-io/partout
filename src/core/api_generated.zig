@@ -3232,7 +3232,6 @@ pub const TunnelRemoteInfoWrapper = struct {
     profile: Profile = .{},
     original_module_id: uuid.UUID = uuid.zero_id,
     address: ?manual.Address = null,
-    requires_virtual_device: bool = false,
     modules: ?[]const TaggedModule = null,
 
     pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!TunnelRemoteInfoWrapper {
@@ -3258,7 +3257,6 @@ pub const TunnelRemoteInfoWrapper = struct {
         result.profile = try parseJsonField(Profile, allocator, object, "profile", error_info);
         result.original_module_id = try parseJsonField(uuid.UUID, allocator, object, "originalModuleId", error_info);
         result.address = try parseOptionalJsonField(manual.Address, allocator, object, "address", error_info);
-        result.requires_virtual_device = try parseJsonField(bool, allocator, object, "requiresVirtualDevice", error_info);
         result.modules = try parseOptionalJsonField([]const TaggedModule, allocator, object, "modules", error_info);
         return result;
     }
@@ -3273,7 +3271,6 @@ pub const TunnelRemoteInfoWrapper = struct {
         deinitJson(Profile, allocator, &self.profile);
         deinitJson(uuid.UUID, allocator, &self.original_module_id);
         if (self.address) |*value| deinitJson(manual.Address, allocator, value);
-        deinitJson(bool, allocator, &self.requires_virtual_device);
         if (self.modules) |*value| deinitJson([]const TaggedModule, allocator, value);
     }
 
@@ -3287,8 +3284,6 @@ pub const TunnelRemoteInfoWrapper = struct {
             try jw.objectField("address");
             try writeJson(jw, value);
         }
-        try jw.objectField("requiresVirtualDevice");
-        try writeJson(jw, self.requires_virtual_device);
         if (self.modules) |value| {
             try jw.objectField("modules");
             try writeJson(jw, value);

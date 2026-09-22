@@ -2,7 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Serial, mux-backed I/O loop for a link descriptor and a tunnel descriptor.
+//! Legacy POSIX-only, mux-backed I/O loop for link and tunnel descriptors.
+//! Excluded on Windows by runtime_policy.zig.
 //!
 //! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
@@ -15,6 +16,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const io_posix = @import("io_posix.zig");
 const helpers = @import("looper_helpers.zig");
 const io_c = io.io_c;
 const log = core.logging;
@@ -38,8 +40,9 @@ pub const Looper = struct {
     pub const Timer = helpers.Timer;
 
     // Side attachment.
-    pub const Descriptor = helpers.Descriptor;
-    pub const DescriptorPair = helpers.DescriptorPair;
+    pub const LinkDescriptor = io.LinkDescriptor;
+    pub const TunDescriptor = io.TunDescriptor;
+    pub const DescriptorPair = io.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
 
     // Queues.
@@ -1411,7 +1414,7 @@ pub const Looper = struct {
         id: u64,
         side: io.Side,
         fd: io.FileDescriptor,
-        native_io: io.IOInterface,
+        native_io: io_posix.POSIXInterface,
 
         // User callbacks.
         on_read: ?OnRead,
@@ -1430,7 +1433,7 @@ pub const Looper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            descriptor: Descriptor,
+            descriptor: io_posix.POSIXDescriptor,
             read_buf_size: usize,
             arguments: AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {

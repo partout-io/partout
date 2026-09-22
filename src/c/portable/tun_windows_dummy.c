@@ -7,47 +7,11 @@
 #include "portable/conditionals.h"
 
 #if PARTOUT_WINDOWS
-#include "portable/tun.h"
+#include "portable/tun_ctrl.h"
 
-/* No tunnel backend is available in Windows builds without WinRT. */
-pp_tun pp_tun_open(const char *uuid) {
-    (void)uuid;
-    return NULL;
-}
-
-int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
-    (void)tun;
-    (void)dst;
-    (void)dst_len;
-    return -1;
-}
-
-int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
-    (void)tun;
-    (void)src;
-    (void)src_len;
-    return -1;
-}
-
-void pp_tun_close(const pp_tun tun) {
-    (void)tun;
-}
-
-void pp_tun_free_and_close(pp_tun tun, bool and_close) {
-    (void)tun;
-    (void)and_close;
-}
-
-pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
-    (void)tun;
-    return pp_fd_invalid();
-}
-
-const char *pp_tun_name(const pp_tun tun) {
-    (void)tun;
-    return NULL;
-}
-
+/* Controller fallback for Windows builds without the WinRT bridge.
+ * Keep every callback callable, but report transport/tunnel setup as unavailable.
+ */
 static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     (void)ref;
     (void)delegate;

@@ -30,6 +30,7 @@ const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
 const EndpointResolver = net.EndpointResolver;
 const Looper = looper_mod.Looper;
+const RemoteDescriptor = conn_mod.RemoteDescriptor;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
@@ -274,12 +275,13 @@ const SettingsDaemon = struct {
         };
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
-            _ = daemon.controller.setTunnelSettings(info.*) catch |err| {
+            var tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
                 log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(code, false);
                 return;
             };
+            tun.deinit();
         }
     }
 
@@ -312,7 +314,6 @@ const SettingsDaemon = struct {
         const info = api.TunnelRemoteInfoWrapper{
             .profile = profile.*,
             .original_module_id = original_module_id orelse return null,
-            .requires_virtual_device = false,
         };
         return try info.clone(allocator);
     }
@@ -741,14 +742,14 @@ const ConnectionDaemon = struct {
         };
         // EndpointResolver owns this endpoint; perform() keeps the borrow
         // valid until Connection has consumed it on the looper.
-        const link: net.LinkDescriptor = .{
+        const remote: RemoteDescriptor = .{
             .endpoint = endpoint,
             .looper = self.looper,
         };
         // Performs connection.start() on the looper thread. Remember to
         // detach the link on failure.
         self.trackConnectionStatus(.connecting);
-        const did_start = self.callOnLooper(.{ .start = link }) catch |err| {
+        const did_start = self.callOnLooper(.{ .start = remote }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -782,14 +783,14 @@ const ConnectionDaemon = struct {
             self.daemon.options.connection_options.dns_timeout,
         );
         log.writef(.notice, "Connect to {s}", .{endpoint});
-        const descriptor = try self.factory.create(
+        var descriptor = try self.factory.create(
             self.daemon.allocator,
             endpoint,
             reachability,
             self.daemon.options.connection_options.link_activity_timeout,
         );
         // The looper takes ownership only after a successful attach.
-        errdefer descriptor.io.cleanup();
+        errdefer descriptor.cleanup();
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
             endpoint.proto.socket_type.raw(),
@@ -891,18 +892,7 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        const active_tunnel = if (self.tunnel) |*value| value else {
-            log.write(.fault, "Unable to get tun device");
-            return error.TunNotAvailable;
-        };
-        const fd = active_tunnel.muxDescriptor() orelse {
-            log.write(.fault, "Unable to get mux descriptor");
-            return error.MuxFailure;
-        };
-        const descriptor = Looper.Descriptor{
-            .fd = fd,
-            .io = active_tunnel.nativeIO(),
-        };
+        const descriptor = self.tunnel.?.tunDescriptor();
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
@@ -1183,7 +1173,7 @@ const ConnectionDaemon = struct {
         connection: Connection,
         events: Connection.Events,
         operation: union(enum) {
-            start: net.LinkDescriptor,
+            start: RemoteDescriptor,
             shutdown: Connection.ShutdownReason,
             stop: u32,
             reachability: io.ReachabilityInfo,
@@ -1193,7 +1183,7 @@ const ConnectionDaemon = struct {
         fn run(ctx: ?*anyopaque) !bool {
             const request: *const CallOnLooper = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
-                .start => |link| return request.connection.startV2(link),
+                .start => |remote| return request.connection.startV2(remote),
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
                 .reachability => |info| request.connection.networkChange(info, request.events),

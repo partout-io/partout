@@ -228,7 +228,7 @@ pub const Session = struct {
 
     pub fn setLink(
         self: *Session,
-        descriptor: Looper.Descriptor,
+        descriptor: Looper.LinkDescriptor,
         remote_endpoint: api.ExtendedEndpoint,
     ) SetLinkError!void {
         var descriptor_transferred = false;
@@ -290,7 +290,7 @@ pub const Session = struct {
 
     pub fn setTunnel(
         self: *Session,
-        descriptor: Looper.Descriptor,
+        descriptor: Looper.TunDescriptor,
     ) SetTunnelError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();

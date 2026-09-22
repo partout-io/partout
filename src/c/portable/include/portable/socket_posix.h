@@ -68,10 +68,6 @@ static inline int local_close_fd(pp_socket_fd fd) {
     return close(fd);
 }
 
-static inline int local_shutdown_fd(pp_socket_fd fd) {
-    return shutdown(fd, SHUT_RDWR);
-}
-
 static inline int local_recv_fd(pp_socket_fd fd, void *dst, size_t dst_len) {
     return (int)read(fd, dst, dst_len);
 }

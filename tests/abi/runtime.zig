@@ -133,14 +133,15 @@ test "daemon runtime owns options during lifecycle" {
         defer runtime.destroy(allocator);
         try std.testing.expectEqualStrings(profile_cache_directory, std.fs.path.basename(runtime.options.cache_dir));
         try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
-        try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
+        const expected_experimental = if (source.runtime_policy.v2_only) true else experimental;
+        try std.testing.expectEqual(expected_experimental, runtime.daemon == .experimental);
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            try std.testing.expectEqual(experimental, ctx.OpenVPN == .experimental);
-            const expected_vtable = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
+            try std.testing.expectEqual(expected_experimental, ctx.OpenVPN == .experimental);
+            const expected_vtable = if (expected_experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
             try std.testing.expect(impl.vtable == expected_vtable);
-            const expected_context: *anyopaque = if (experimental) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
+            const expected_context: *anyopaque = if (expected_experimental) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
             try std.testing.expect(impl.ptr == expected_context);
         }
         try runtime.start();
@@ -166,7 +167,6 @@ test "starts DNS-only profile through tunnel controller" {
     try std.testing.expect(daemon.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), runtime.controller.set_tunnel_settings_count);
     const settings = runtime.controller.last_settings orelse return error.TestUnexpectedResult;
-    try std.testing.expect(!settings.requires_virtual_device);
     try std.testing.expectEqualStrings("11111111-1111-4111-8111-111111111111", settings.original_module_id[0..]);
     try std.testing.expectEqual(@as(usize, 1), settings.profile_module_count);
     try std.testing.expectEqual(@as(usize, 1), settings.profile_active_module_count);
@@ -375,9 +375,9 @@ test "experimental daemon flag applies to OpenVPN and settings-only profiles" {
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = requested and case.supports_experimental;
+            const experimental = if (source.runtime_policy.v2_only) true else requested and case.supports_experimental;
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
-            try std.testing.expectEqual(requested and !case.supports_experimental, warning.seen.load(.acquire));
+            try std.testing.expectEqual(!source.runtime_policy.v2_only and requested and !case.supports_experimental, warning.seen.load(.acquire));
             if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
                 const impl = runtime.registry.implementation(.OpenVPN).?;
                 const expected = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;

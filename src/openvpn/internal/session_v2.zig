@@ -456,7 +456,7 @@ pub const Session = struct {
         const exit = OCCPacket.exit.serialized();
         const packet: []const u8 = &exit;
         // Zero timeout sends OOB without waiting.
-        // FIXME: Honor the caller's stop timeout with daemon-coordinated retries
+        // FIXME: ###, Honor the caller's stop timeout with daemon-coordinated retries
         // before detaching LINK; this single OOB attempt currently ignores it.
         try pair.send(&.{packet}, null, 0);
         log.write(.info, "Sent OCCPacket correctly");

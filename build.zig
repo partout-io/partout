@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const c_flags = &.{
     "-W",
@@ -84,7 +85,7 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    winrt_library: ?[]const u8,
+    winrt_library: ?std.Build.LazyPath,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -126,7 +127,9 @@ const default_api_excluded_schemas =
     "WireGuard.Key";
 
 pub fn build(b: *std.Build) void {
-    const target = b.standardTargetOptions(.{});
+    const target = b.standardTargetOptions(.{
+        .default_target = .{ .abi = if (builtin.os.tag == .windows) .msvc else null },
+    });
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
     const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
@@ -169,9 +172,22 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_library = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
-    if (winrt_library != null and (target.result.os.tag != .windows or target.result.abi != .msvc))
-        std.debug.panic("-Dwinrt-lib requires a Windows MSVC target", .{});
+    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
+    const use_winrt = b.option(bool, "winrt", "Build and link the WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
+    if (!use_winrt and winrt_path != null)
+        std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
+    if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
+        std.debug.panic("WinRT requires a Windows MSVC target", .{});
+    const winrt_build = if (use_winrt and winrt_path == null)
+        addWinRTBuild(b, target, optimize)
+    else
+        null;
+    const winrt_library: ?std.Build.LazyPath = if (winrt_path) |path|
+        .{ .cwd_relative = path }
+    else if (winrt_build) |bridge|
+        bridge.library
+    else
+        null;
     build_options.addOption(bool, "winrt", winrt_library != null);
 
     const config = BuildConfig{
@@ -199,6 +215,7 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
+    if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
     if (shared and winrt_library != null) {
         lib.forceUndefinedSymbol("pp_winrt_runtime_link");
     }
@@ -223,6 +240,7 @@ pub fn build(b: *std.Build) void {
     });
     // The MSVC C++/WinRT bridge is built with /MD.
     if (winrt_library != null) unit_tests.linkage = .dynamic;
+    if (winrt_build) |bridge| unit_tests.step.dependOn(bridge.step);
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -239,8 +257,8 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
-        if (target.result.os.tag == .windows) {
-            lib.installHeader(b.path("cross/windows/partout_winrt.h"), "partout_winrt.h");
+        if (winrt_library != null) {
+            lib.installHeader(b.path("cross/windows/runtime.h"), "runtime.h");
         }
         b.installArtifact(lib);
     }
@@ -252,6 +270,36 @@ pub fn build(b: *std.Build) void {
     });
     const docs_step = b.step("docs", "Install docs into zig-out/docs");
     docs_step.dependOn(&install_docs.step);
+}
+
+// CMake builds the C++/WinRT bridge with MSVC; Zig consumes the resulting archive.
+fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
+    library: std.Build.LazyPath,
+    step: *std.Build.Step,
+} {
+    if (builtin.os.tag != .windows)
+        std.debug.panic("Building WinRT requires a Windows host; supply -Dwinrt-lib when cross-compiling", .{});
+    const architecture = switch (target.result.cpu.arch) {
+        .aarch64 => "ARM64",
+        .x86_64 => "x64",
+        .x86 => "Win32",
+        else => std.debug.panic("Unsupported WinRT architecture", .{}),
+    };
+    const configuration = if (optimize == .Debug) "Debug" else "Release";
+    const configure = b.addSystemCommand(&.{ "cmake", "-G", "Visual Studio 17 2022", "-A", architecture, "-S" });
+    configure.addDirectoryArg(b.path("."));
+    configure.addArg("-B");
+    const directory = configure.addOutputDirectoryArg("winrt");
+    configure.addArgs(&.{ "-DPP_BUILD_WINRT=ON", "-DPP_BUILD_LIBRARY=OFF" });
+    configure.has_side_effects = true;
+    const compile = b.addSystemCommand(&.{ "cmake", "--build" });
+    compile.addDirectoryArg(directory);
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt" });
+    compile.has_side_effects = true;
+    return .{
+        .library = directory.path(b, b.fmt("{s}/partout-winrt.lib", .{configuration})),
+        .step = &compile.step,
+    };
 }
 
 fn parseLibCInstallation(
@@ -393,12 +441,11 @@ fn createPartoutModule(
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
             if (config.winrt_library) |library| {
-                addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
-                module.addObjectFile(.{ .cwd_relative = library });
+                module.addObjectFile(library);
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
             } else {
-                addCSourceFiles(module, &.{"src/c/portable/tun_dummy.c"});
+                addCSourceFiles(module, &.{"src/c/portable/tun_windows_dummy.c"});
             }
         }
         addCSources(module, config.openvpn, config.wireguard);

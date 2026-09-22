@@ -8,7 +8,6 @@ extension TunnelRemoteInfoWrapper {
             profile: profile.asTaggedProfile,
             originalModuleId: info.originalModuleId,
             address: info.address,
-            requiresVirtualDevice: info.requiresVirtualDevice,
             modules: info.modules?.compactMap(\.taggedModule)
         )
     }
