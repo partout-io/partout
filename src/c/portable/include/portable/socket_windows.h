@@ -75,10 +75,6 @@ static inline int local_close_fd(pp_socket_fd fd) {
     return closesocket(fd);
 }
 
-static inline int local_shutdown_fd(pp_socket_fd fd) {
-    return shutdown(fd, SD_BOTH);
-}
-
 static inline int local_recv_fd(pp_socket_fd fd, void *dst, size_t dst_len) {
     return (int)recv(fd, dst, (int)dst_len, 0);
 }

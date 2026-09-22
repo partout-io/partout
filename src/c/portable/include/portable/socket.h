@@ -24,13 +24,8 @@ typedef enum {
 /* The opaque socket type. */
 typedef struct __pp_socket_struct *pp_socket;
 
-void pp_socket_shutdown(pp_socket sock);
-void pp_socket_close(pp_socket sock);
-void pp_socket_free_and_close(pp_socket sock, bool and_close);
-
-static inline void pp_socket_free(pp_socket sock) {
-    pp_socket_free_and_close(sock, true);
-}
+/* Close the owned socket and free the wrapper. */
+void pp_socket_free(pp_socket sock);
 
 /* Create socket to endpoint. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,

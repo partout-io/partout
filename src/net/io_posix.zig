@@ -130,7 +130,7 @@ pub const SocketWrapper = struct {
 
     pub fn destroy(self: *SocketWrapper) void {
         log.write(.debug, "Destroy SocketWrapper");
-        self.freeAndClose();
+        self.free();
         self.allocator.destroy(self);
     }
 
@@ -186,15 +186,10 @@ pub const SocketWrapper = struct {
         self.destroy();
     }
 
-    fn freeAndClose(self: *SocketWrapper) void {
+    fn free(self: *SocketWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
-        io_c.pp_socket_free_and_close(self.socket, true);
-    }
-
-    fn close(self: *const SocketWrapper) void {
-        if (self.is_closed) return;
-        io_c.pp_socket_close(self.socket);
+        io_c.pp_socket_free(self.socket);
     }
 
     fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
@@ -247,7 +242,7 @@ pub const TunWrapper = struct {
 
     pub fn deinit(self: *TunWrapper) void {
         log.write(.debug, "Deinit TunWrapper");
-        self.freeAndClose();
+        self.free();
     }
 
     fn open(
@@ -282,13 +277,13 @@ pub const TunWrapper = struct {
     }
 
     fn cleanup(self: *TunWrapper) void {
-        self.freeAndClose();
+        self.free();
     }
 
-    fn freeAndClose(self: *TunWrapper) void {
+    fn free(self: *TunWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
-        io_c.pp_tun_free_and_close(self.tun, true);
+        io_c.pp_tun_free(self.tun);
     }
 
     pub fn muxDescriptor(self: TunWrapper) ?io_c.pp_fd {

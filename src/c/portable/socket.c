@@ -39,7 +39,6 @@ static void local_set_reset_error(void);
 static void local_set_error(int err);
 static bool local_is_connect_pending(void);
 static int local_close_fd(pp_socket_fd fd);
-static int local_shutdown_fd(pp_socket_fd fd);
 static int local_recv_fd(pp_socket_fd fd, void *dst, size_t dst_len);
 static int local_send_fd(pp_socket_fd fd, const void *src, size_t src_len);
 static int local_select_nfds(pp_socket_fd fd);
@@ -237,26 +236,10 @@ failure:
     return NULL;
 }
 
-/* Close the native file descriptor without freeing the wrapper. */
-void pp_socket_shutdown(pp_socket sock) {
-    if (!local_is_valid_socket(sock)) return;
-    (void)local_shutdown_fd(sock->fd);
-}
-
-/* Close the native file descriptor without freeing the wrapper. */
-void pp_socket_close(pp_socket sock) {
+/* Close the owned socket and free the wrapper. */
+void pp_socket_free(pp_socket sock) {
     if (!sock) return;
     local_close_impl(sock);
-}
-
-/* Free the socket wrapper. */
-void pp_socket_free_and_close(pp_socket sock, bool and_close) {
-    if (!sock) return;
-    if (and_close) {
-        local_close_impl(sock);
-    } else {
-        local_cleanup_socket(sock);
-    }
     pp_free(sock);
 }
 
