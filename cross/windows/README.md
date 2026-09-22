@@ -1,23 +1,46 @@
 # Windows WinRT backend
 
-The native backend owns WinRT objects. Partout owns the portable ABI adapters;
-the backend interfaces do not import Partout portable headers.
+The native backend owns WinRT objects and asynchronous I/O. Partout owns the
+portable ABI adapters. Dependencies run from Partout to the backend:
 
-## Layout and dependencies
+```text
+VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
+                                              -> PartoutTunnelController
+Partout io_windows.zig       -> winrt/socket.h  -> src/socket.cc
+Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun_ctrl.cc
+```
+
+## Where code belongs
 
 | Location | Responsibility |
 | --- | --- |
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/` | Backend-owned socket, tunnel controller and logging interfaces. |
+| `include/winrt/` | Backend-owned socket, tunnel controller and logging interfaces; no Partout headers. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
-| `src/socket.cc` | Reserved for the native socket implementation. |
-| `src/tun_ctrl.h`, `src/tun_ctrl.cc` | Private `PartoutTunnelController` and native controller callbacks. |
-| `src/log.cc` | Optional process-wide logger, with a debugger-output fallback. |
-| `../../src/c/portable/tun_winrt.c` | Converts the portable controller ABI into backend calls. |
+| `src/socket.cc` | Owns UDP/TCP transports, receive callbacks, TCP read loop, writes and callback lifetime. |
+| `src/tun_ctrl.h`, `src/tun_ctrl.cc` | Private `PartoutTunnelController`, transport association and channel startup/stop. |
+| `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
+| `../../src/net/io_windows.zig` | Partout socket wrapper and WindowsLooper attachment/delivery. |
+| `../../src/c/portable/tun_winrt.c` | Converts Partout's portable controller ABI into backend calls. |
 
-`partout-winrt-backend` compiles with only the native include directory.
-`partout-winrt` adds `runtime.cc` and packages all objects into one archive for
-Zig. Partout depends on the backend; the backend does not depend on the portable ABI.
+`partout-winrt-backend` compiles sockets, the controller and logging with only
+the native include directory. `partout-winrt` adds `runtime.cc` and packages all
+objects into one archive for Zig. The backend has no portable ABI dependency.
+
+## Socket lifecycle
+
+Create a socket, associate its transport through the tunnel controller, then
+open it. Association must happen before bind/connect. The Partout adapter passes
+the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
+
+UDP uses the OS `MessageReceived` event. TCP runs an asynchronous read loop.
+Both deliver buffers or errors to the registered callback and borrowed context.
+Clearing the callback drains delivery, including reentrant removal. Buffer
+contents are borrowed until the callback returns. Writes wait for WinRT's
+asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
+
+The WindowsLooper owns attachment callbacks and forwards received buffers.
+The native socket owns the lifetime of its OS callbacks and pending reads.
 
 ## VPN channel runtime
 
@@ -32,9 +55,9 @@ CMake builds Partout as a shared library and installs `partout.h` and
 runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
-Socket I/O and transport association are pending. Channel addresses remain
-placeholders; packet TUN I/O, encapsulation/decapsulation, controller notifications
-and WindowsLooper timers remain unimplemented.
+Transport association and socket I/O are implemented. Channel addresses are
+still placeholders; packet TUN I/O, encapsulation/decapsulation, controller
+notifications and WindowsLooper timers remain unimplemented.
 
 ## Build
 

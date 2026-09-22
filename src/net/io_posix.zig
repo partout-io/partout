@@ -232,7 +232,7 @@ pub const SocketWrapper = struct {
         });
         const socket = io_c.pp_socket_open(
             c_address.ptr(),
-            socketProto(endpoint),
+            io.socketProto(endpoint),
             endpoint.proto.port,
             &.{
                 .unconnected = unconnected,
@@ -346,13 +346,6 @@ pub const SocketWrapper = struct {
         };
     }
 };
-
-fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
-    return switch (endpoint.plainSocketType()) {
-        .udp => io_c.PPSocketProtoUDP,
-        .tcp => io_c.PPSocketProtoTCP,
-    };
-}
 
 pub const TunWrapper = struct {
     allocator: std.mem.Allocator,

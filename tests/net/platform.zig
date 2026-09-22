@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const platform_target = @import("builtin");
+const winrt_enabled = @import("source").winrt_enabled;
 
 const core = @import("source").core;
 const io = @import("source").net_io;
@@ -152,8 +154,7 @@ test "platform network monitor receives reachability changes" {
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
 }
 
-test "platform builds POSIX socket wrapper options" {
-    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
+test "platform builds identical socket configuration options on all backends" {
     var platform = try Platform.init(.{
         .socket_buf_size = 4096,
     });
@@ -169,6 +170,40 @@ test "platform builds POSIX socket wrapper options" {
 
 test "platform configure socket allows missing context" {
     try std.testing.expect(platformConfigureSocket(null, @as(SocketDescriptor, 42), null));
+}
+
+test "Windows configuration callback receives the WinRT pointer and can reject open" {
+    if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
+    const Probe = struct {
+        calls: usize = 0,
+        descriptor: SocketDescriptor = 0,
+        reachable: bool = false,
+        allow: bool = true,
+
+        fn configure(context: ?*anyopaque, info: [*c]const ReachabilityInfo, descriptors: [*c]const SocketDescriptor, count: usize) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(context.?));
+            std.debug.assert(count == 1);
+            self.calls += 1;
+            self.descriptor = descriptors[0];
+            self.reachable = info != null and info[0].reachable;
+            return self.allow;
+        }
+    };
+    var probe = Probe{};
+    var functions = io_c.pp_tun_ctrl_fnt_current();
+    functions.configure_sockets = Probe.configure;
+    var platform = try Platform.init(.{ .ref = &probe, .fnt = functions });
+    defer platform.deinit();
+    const endpoint: api.ExtendedEndpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, 1194) };
+    const options = socketOptions(&platform, reachable(true), 1000);
+    const wrapper = (try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) orelse return error.SocketFailed;
+    try std.testing.expectEqual(@intFromPtr(wrapper.socket.?), probe.descriptor);
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try std.testing.expect(probe.reachable);
+    wrapper.destroy();
+    probe.allow = false;
+    try std.testing.expect((try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) == null);
+    try std.testing.expectEqual(@as(usize, 2), probe.calls);
 }
 
 test "platform records better path notifications" {

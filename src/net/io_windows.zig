@@ -2,37 +2,85 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
 
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
 const api = core.api;
 const io_c = ffi.io;
+const util = core.util;
 
+const WinRT = io_c;
+
+pub const OnReceive = ?*const fn (?*anyopaque, [*c]const u8, usize, [*c]const io.SocketAddress, i32) callconv(.c) bool;
 pub const LinkDescriptor = *SocketWrapper;
 pub const TunDescriptor = *TunWrapper;
 
 // FIXME: ###, Windows, SocketWrapper
 pub const SocketWrapper = struct {
     allocator: std.mem.Allocator,
+    socket: WinRT.winrt_socket,
+    on_receive: OnReceive = null,
+    receive_context: ?*anyopaque = null,
+    unconnected: bool = false,
 
-    // FIXME: ###, Windows, Open and configure the native socket using endpoint and options.
     pub fn create(
         allocator: std.mem.Allocator,
         endpoint: ?api.ExtendedEndpoint,
         options: io.SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
+        // FIXME: ###, Windows, Support sockets without the WinRT bridge.
+        if (!build_options.winrt) return null;
+        if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
+        const peer = endpoint orelse api.ExtendedEndpoint{
+            .address = if (options.ipv6) "::" else "0.0.0.0",
+            .proto = .init(.udp, options.port),
+        };
+        var c_address: util.TemporaryCString = .{};
+        try c_address.init(allocator, peer.address);
+        defer c_address.deinit();
+
+        const socket = WinRT.winrt_socket_create(switch (peer.plainSocketType()) {
+            .tcp => WinRT.WinrtSocketProtoTCP,
+            .udp => WinRT.WinrtSocketProtoUDP,
+        }) orelse return null;
+        errdefer WinRT.winrt_socket_free(socket);
+        // uintptr_t carries the WinRT wrapper through the same callback ABI as
+        // POSIX descriptors. It must never be used as a Winsock SOCKET.
+        const reachability = options.reachability orelse io.reachabilityNone();
+        if (options.configure) |configure| {
+            if (!configure(options.configure_ctx, @intFromPtr(socket), &reachability)) {
+                WinRT.winrt_socket_free(socket);
+                return null;
+            }
+        }
+        // AssociateTransport has completed before either bind or connect.
+        if (!WinRT.winrt_socket_open(
+            socket,
+            c_address.ptr(),
+            peer.proto.port,
+            &.{
+                .unconnected = endpoint == null,
+                .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
+                .timeout_ms = options.timeout_ms,
+            },
+        )) {
+            WinRT.winrt_socket_free(socket);
+            return null;
+        }
         const self = try allocator.create(SocketWrapper);
-        _ = endpoint;
-        _ = options;
         self.* = .{
             .allocator = allocator,
+            .socket = socket,
+            .unconnected = endpoint == null,
         };
         return self;
     }
 
     // FIXME: ###, Windows, Close the native socket and watch handle.
     pub fn destroy(self: *SocketWrapper) void {
+        if (build_options.winrt) WinRT.winrt_socket_free(self.socket);
         self.allocator.destroy(self);
     }
 
@@ -52,6 +100,76 @@ pub const SocketWrapper = struct {
 
     pub fn socketWrapper(self: *SocketWrapper) ?*SocketWrapper {
         return self;
+    }
+
+    /// The native wrapper serializes callbacks on WinRT workers. Clearing the
+    /// callback drains active delivery before releasing its borrowed context.
+    pub fn setOnReceive(
+        self: *SocketWrapper,
+        callback: OnReceive,
+        context: ?*anyopaque,
+    ) io.SubmissionError!void {
+        if (!build_options.winrt or !WinRT.winrt_socket_set_on_receive(self.socket, null, null))
+            return error.LooperUnavailable;
+        self.on_receive = callback;
+        self.receive_context = context;
+        if (callback != null and !WinRT.winrt_socket_set_on_receive(self.socket, onNativeReceive, self)) {
+            self.on_receive = null;
+            self.receive_context = null;
+            return error.LooperUnavailable;
+        }
+    }
+
+    fn onNativeReceive(
+        context: ?*anyopaque,
+        bytes: [*c]const u8,
+        length: usize,
+        source: [*c]const WinRT.winrt_socket_address,
+        code: i32,
+    ) callconv(.c) bool {
+        const self: *SocketWrapper = @ptrCast(@alignCast(context.?));
+        // The consumer may detach and release the wrapper during this call.
+        const callback = self.on_receive orelse return false;
+        const callback_context = self.receive_context;
+        var address: io.SocketAddress = undefined;
+        if (source != null) address = .{
+            .address = source[0].address,
+            .scope_id = source[0].scope_id,
+            .port = source[0].port,
+            .family = source[0].family,
+        };
+        return callback(callback_context, bytes, length, if (source == null) null else &address, code);
+    }
+
+    pub fn resumeReading(self: *SocketWrapper) io.SubmissionError!void {
+        if (!build_options.winrt or !WinRT.winrt_socket_resume_reading(self.socket))
+            return error.LooperUnavailable;
+    }
+
+    pub fn notifyFailure(self: *SocketWrapper, code: i32) void {
+        if (build_options.winrt) WinRT.winrt_socket_notify_failure(self.socket, code);
+    }
+
+    /// Completes a whole packet write; UDP requires a destination when unconnected.
+    /// Native failures are returned by value for the looper's on_failure callback.
+    pub fn write(
+        self: *SocketWrapper,
+        packet: io.Packet,
+        destination: ?io.SocketAddress,
+    ) io.SubmissionError!?io.Failure {
+        if (!build_options.winrt) return error.LooperUnavailable;
+        const native: ?WinRT.winrt_socket_address = if (destination) |address| .{
+            .address = address.address,
+            .scope_id = address.scope_id,
+            .port = address.port,
+            .family = address.family,
+        } else null;
+        const code = WinRT.winrt_socket_write(self.socket, packet.ptr, packet.len, if (native) |*address| address else null);
+        return if (code == 0) null else .{ .io = .{
+            .side = .link,
+            .cause = error.LibcFailure,
+            .code = code,
+        } };
     }
 };
 

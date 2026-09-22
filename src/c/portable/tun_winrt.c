@@ -35,7 +35,7 @@ static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
 }
 static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t count) {
     (void)info;
-    if (!fds || count == 0) return false;
+    if (count && !fds) return false;
     for (size_t i = 0; i < count; ++i) {
         const winrt_socket socket = (winrt_socket)(uintptr_t)fds[i];
         if (!winrt_tun_ctrl_configure_sockets(ref, &socket, 1)) return false;

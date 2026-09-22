@@ -2,9 +2,10 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Caller-driven platform I/O. The caller serializes access and owns the mux
-//! and its wake source. loopOnce() runs callbacks inline. Read storage and queued writes
-//! are owned by the looper; read packet views expire when the callback returns.
+//! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
+//! caller's mux and runs callbacks inline in loopOnce(). Windows forwards socket
+//! receives directly on WinRT workers and ignores the mux. Read packet views
+//! expire when the callback returns.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -31,7 +32,7 @@ pub const Looper = struct {
     allocator: std.mem.Allocator,
     impl: *Impl,
 
-    /// Allocates a looper borrowing the caller's mux through destroy().
+    /// Allocates a looper. Only POSIX borrows the caller's mux through destroy().
     pub fn create(
         allocator: std.mem.Allocator,
         options: Options,
@@ -116,7 +117,8 @@ pub const Looper = struct {
         return self.impl.resumeReading(side);
     }
 
-    /// Copies the complete batch before returning; loopOnce() writes it in FIFO order.
+    /// POSIX copies the batch and writes it in FIFO order during loopOnce().
+    /// Windows completes socket writes synchronously before returning.
     /// The destination is stored by value. Empty batches are no-ops.
     /// Unconnected UDP requires a destination. Side failures use on_failure;
     /// rejected datagrams are dropped without detaching the socket.

@@ -16,10 +16,18 @@ PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
 
 PartoutTunnelController::~PartoutTunnelController() { Stop(); }
 
-bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
-    // FIXME: ###, Windows, Associate transports after the socket backend rewrite.
-    (void)socket;
-    return false;
+bool PartoutTunnelController::Associate(IInspectable const &transport) noexcept {
+    try {
+        if (!channel_ || !transport) return false;
+        if (transport_ == transport) return true;
+        channel_.AssociateTransport(transport, nullptr);
+        transport_ = transport;
+        return true;
+    } catch (...) {
+        winrt_log(WinrtLogError, "PartoutTunnelController.Associate failed: HRESULT 0x%08x",
+            static_cast<unsigned int>(to_hresult().value));
+        return false;
+    }
 }
 
 bool PartoutTunnelController::Start(const char *info_json) noexcept {
@@ -72,10 +80,9 @@ extern "C" void winrt_tun_ctrl_set_delegate(void *ref, const winrt_tun_ctrl_dele
 extern "C" bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, size_t count) {
     if (count && !sockets) return false;
     const auto controller = get_controller(ref);
-    if (!controller || !sockets || count == 0) return false;
     for (size_t i = 0; i < count; ++i) {
         if (!sockets[i]) return false;
-        if (controller && !controller->Associate(sockets[i])) return false;
+        if (controller && !controller->Associate(winrt_socket_transport(sockets[i]))) return false;
     }
     return true;
 }

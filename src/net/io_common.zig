@@ -216,6 +216,13 @@ pub const SocketOptions = struct {
     configure_ctx: ?*anyopaque = null,
 };
 
+pub fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
+    return switch (endpoint.plainSocketType()) {
+        .udp => io_c.PPSocketProtoUDP,
+        .tcp => io_c.PPSocketProtoTCP,
+    };
+}
+
 pub fn reachabilityNone() io_c.pp_reachability {
     var reachability = std.mem.zeroes(io_c.pp_reachability);
     reachability.reachable = false;
