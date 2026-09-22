@@ -53,7 +53,7 @@ pub fn ActorWithFinish(
             next: ?*Job = null,
             owned: bool = false,
             done: bool = false,
-            result: PerformError!void = {},
+            result: Error!void = {},
         };
 
         pub const CreateError = std.mem.Allocator.Error || std.Thread.SpawnError;
@@ -67,7 +67,6 @@ pub fn ActorWithFinish(
         thread: ?std.Thread,
         thread_id: ?std.Thread.Id,
         accepting: bool,
-        waiting_performs: usize = 0,
         head: ?*Job,
         tail: ?*Job,
 
@@ -94,31 +93,11 @@ pub fn ActorWithFinish(
             return self;
         }
 
-        /// Cancels queued jobs, waits for the running job, and releases the actor.
-        /// Call shutdown() first when queued work must complete.
         pub fn destroy(self: *Self) void {
-            self.cancelPending();
             self.shutdown();
             self.cond.deinit();
             self.mutex.deinit();
             self.allocator.destroy(self);
-        }
-
-        fn cancelPending(self: *Self) void {
-            self.mutex.lock();
-            defer self.mutex.unlock();
-            self.accepting = false;
-            while (self.head) |job| {
-                self.head = job.next;
-                if (job.owned) {
-                    self.allocator.destroy(job);
-                } else {
-                    job.result = error.Closed;
-                    job.done = true;
-                }
-            }
-            self.tail = null;
-            self.cond.broadcast();
         }
 
         fn isCurrentThread(self: *const Self) bool {
@@ -177,11 +156,6 @@ pub fn ActorWithFinish(
             defer self.mutex.unlock();
 
             if (!self.accepting) return error.Closed;
-            self.waiting_performs += 1;
-            defer {
-                self.waiting_performs -= 1;
-                self.cond.broadcast();
-            }
             self.pushLocked(&job);
             while (!job.done) {
                 self.cond.wait(&self.mutex);
@@ -216,8 +190,6 @@ pub fn ActorWithFinish(
 
             self.mutex.lock();
             self.thread_id = null;
-            // Completed callers still borrow the mutex until perform() returns.
-            while (self.waiting_performs != 0) self.cond.wait(&self.mutex);
             self.mutex.unlock();
         }
 
