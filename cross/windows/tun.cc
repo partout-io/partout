@@ -34,9 +34,9 @@ PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
 
 PartoutTunnelController::~PartoutTunnelController() { Stop(); }
 
-bool PartoutTunnelController::Associate(uintptr_t fd) noexcept {
+bool PartoutTunnelController::Associate(uintptr_t socket) noexcept {
     // FIXME: ###, Associate transports after the Windows socket backend rewrite.
-    (void)fd;
+    (void)socket;
     return false;
 }
 

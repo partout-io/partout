@@ -15,7 +15,7 @@ public:
     PartoutTunnelController(const PartoutTunnelController &) = delete;
     PartoutTunnelController &operator=(const PartoutTunnelController &) = delete;
 
-    bool Associate(uintptr_t fd) noexcept;
+    bool Associate(uintptr_t socket) noexcept;
     bool Start(const char *info_json) noexcept;
     void Stop() noexcept;
 
