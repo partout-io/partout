@@ -205,7 +205,6 @@ pub const WireGuardAdapter = struct {
             return self.module_id[0..];
         }
         const tunnel = self.tunnel orelse return null;
-        if (tunnel.tun == null) return null;
         return tunnel.name();
     }
 

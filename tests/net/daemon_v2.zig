@@ -87,7 +87,6 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         _ = try controller.interface().setTunnelSettings(.{
             .profile = profile,
             .original_module_id = @import("source").net_connection.activeConnectionModule(&profile).?.id(),
-            .requires_virtual_device = false,
         });
         try std.testing.expect(controller.last_settings != null);
         const cleared_before = controller.clear_tunnel_settings_count;
@@ -127,18 +126,12 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
 
 test "v2 daemon dispatches controls to looper and owns queued establishment metadata" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
-    const source = @import("source");
-    const libc = struct {
-        extern "c" fn close(fd: std.c.fd_t) c_int;
-    };
     const Probe = struct {
         looper: *Looper,
         profile: *const api.Profile,
         reachability_count: usize = 0,
         stop_count: usize = 0,
         shutdown_count: usize = 0,
-        detach_count: usize = 0,
-        exit_write_count: usize = 0,
         destroyed: bool = false,
 
         fn start(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
@@ -152,38 +145,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
                 1, 2 => std.debug.assert(reason == .failure and reason.failure == .reconnect),
                 else => std.debug.assert(reason == .explicit_stop),
             }
-            if (self.shutdown_count == 2) {
-                std.debug.assert(self.looper.isLinkAttached() and self.looper.isTunAttached());
-                self.looper.writeOutOfBand(&.{"exit"}, .link) catch unreachable;
-            }
         }
-        fn setMask(_: *anyopaque, _: bool, _: bool) source.net_io.Error!void {}
-        fn reset(_: *anyopaque) source.net_io.Error!void {}
-        fn read(_: *anyopaque, _: []u8) source.net_io.Error!?usize {
-            return null;
-        }
-        fn write(raw: *anyopaque, bytes: []const u8, offset: usize) source.net_io.Error!usize {
-            const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.shutdown_count == 2 and self.detach_count == 0);
-            self.exit_write_count += 1;
-            return bytes.len - offset;
-        }
-        fn cleanup(raw: *anyopaque) void {
-            const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.shutdown_count == 2 and self.stop_count == 1);
-            self.detach_count += 1;
-        }
-        fn lastError(_: *anyopaque) c_int {
-            return 0;
-        }
-        const io_vtable = source.net_io.IOInterface.VTable{
-            .set_event_mask = setMask,
-            .reset_events = reset,
-            .read = read,
-            .write = write,
-            .cleanup = cleanup,
-            .last_error_code = lastError,
-        };
         fn stop(raw: *anyopaque, _: u32, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.looper.isOnQueue());
@@ -211,7 +173,6 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
                 .info = .{
                     .profile = self.profile.*,
                     .original_module_id = "11111111-1111-4111-8111-111111111111".*,
-                    .requires_virtual_device = true,
                     .modules = &modules,
                 },
             });
@@ -238,7 +199,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     defer profile.deinit(allocator);
     var registry = try net.ConnectionRegistry.init(allocator, &.{});
     defer registry.deinit(allocator);
-    var controller = mock_mod.MockTunnelController{};
+    var controller = mock_mod.MockTunnelController{ .set_tunnel_settings_error = error.TunNotAvailable };
     var controller_vtable = controller.interface().vtable.*;
     // Retain the recorded payload after the deliberately failed setup.
     controller_vtable.clear_tunnel_settings = struct {
@@ -258,7 +219,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
     const looper = try allocator.create(Looper);
-    looper.* = try Looper.init(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
+    looper.* = try Looper.initExperimental(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
     var probe = Probe{ .looper = looper, .profile = &sut.profile };
     const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
     // Publish a runtime before any actor/looper work, without opening sockets.
@@ -287,25 +248,16 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
     try std.testing.expectEqualStrings("1.1.1.1", controller.last_settings.?.dnsServer(0));
-    // The null mock TUN makes establishment fail; stopping it also runs on looper.
+    // The controller rejects establishment; stopping it also runs on looper.
     try std.testing.expectEqual(@as(usize, 1), probe.stop_count);
-    var fds: [2]std.c.fd_t = undefined;
-    if (std.c.pipe(&fds) != 0) return error.SkipZigTest;
-    defer _ = libc.close(fds[0]);
-    defer _ = libc.close(fds[1]);
-    const native_io = source.net_io.IOInterface{ .ptr = &probe, .vtable = &Probe.io_vtable };
-    try looper.attach(.{ .pair = .{ .link = .{ .fd = fds[0], .io = native_io } } });
-    try looper.attach(.{ .pair = .{ .tun = .{ .fd = fds[1], .io = native_io } } });
     // A protocol failure must finalize the attempt just like setup failure:
-    // shutdown while attached, detach both sides, then stop on the looper.
+    // shutdown and stop must run in order on the looper before status changes.
     try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
         .code = .ioFailure,
         .disposition = .reconnect,
     } });
     try connection_daemon.actor.perform(void, .resumeGate); // Drain the queued stopped event.
     try std.testing.expectEqual(@as(usize, 2), probe.shutdown_count);
-    try std.testing.expectEqual(@as(usize, 2), probe.detach_count);
-    try std.testing.expectEqual(@as(usize, 1), probe.exit_write_count);
     try std.testing.expectEqual(@as(usize, 2), probe.stop_count);
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
     try std.testing.expect(!probe.destroyed);
@@ -331,7 +283,7 @@ test "v2 daemon preserves settings-only failure and hold behavior" {
             self.callbacks_on_caller = self.callbacks_on_caller and std.Thread.getCurrentId() == self.caller_thread;
             if (key == .last_error_code) self.last_error = null;
         }
-        fn failSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!?net.TunWrapper {
+        fn failSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net.TunWrapper {
             return error.TunNotAvailable;
         }
     };
@@ -376,7 +328,6 @@ test "v2 daemon preserves settings-only failure and hold behavior" {
                     try std.testing.expect(!controller.reasserting);
                 } else {
                     try std.testing.expectEqual(@as(usize, 1), controller.last_settings.?.profile_module_count);
-                    try std.testing.expect(!controller.last_settings.?.requires_virtual_device);
                 }
                 if (hold) sut.hold() else sut.stop();
                 try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);

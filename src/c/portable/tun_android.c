@@ -6,6 +6,7 @@
 
 #include "portable/common.h"
 #include "portable/tun.h"
+#include "portable/tun_ctrl.h"
 
 #if PARTOUT_ANDROID
 

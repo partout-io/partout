@@ -5,57 +5,133 @@
 //! POSIX socket implementation. Selected by io.zig on non-Windows platforms.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
 const api = core.api;
 const log = core.logging;
 const util = core.util;
 const io_c = io.io_c;
-const FileDescriptor = io.FileDescriptor;
-const SocketDescriptor = io.SocketDescriptor;
-const SocketOptions = io.SocketOptions;
-const IOInterface = io.IOInterface;
+
 const Error = io.Error;
+const SocketOptions = io.SocketOptions;
+
+pub const FileDescriptor = io_c.pp_fd;
+pub const SocketDescriptor = io_c.pp_socket_fd;
 const reachabilityNone = io.reachabilityNone;
-const mapReadResult = io.mapReadResult;
-const mapWriteResult = io.mapWriteResult;
+
+/// A descriptor includes:
+/// - The `fd` to watch for I/O events.
+/// - The `io` interface to perform reads and writes.
+pub const POSIXDescriptor = struct {
+    fd: FileDescriptor,
+    io: POSIXInterface,
+
+    pub fn cleanup(self: POSIXDescriptor) void {
+        self.io.cleanup();
+    }
+};
+
+pub const LinkDescriptor = POSIXDescriptor;
+pub const TunDescriptor = POSIXDescriptor;
+
+/// Native I/O for the closed set of POSIX wrappers. Each switch arm calls
+/// the concrete wrapper directly. Tests can supply a callback-backed mock;
+/// its payload is uninhabited outside test builds.
+/// Wrappers must remain at a stable address until cleanup. Socket wrappers
+/// are also destroyed and must be cleaned up exactly once.
+pub const POSIXInterface = union(enum) {
+    socket: *SocketWrapper,
+    tun: *TunWrapper,
+    mock: Mock,
+
+    pub const Mock = if (builtin.is_test) struct {
+        ptr: *anyopaque,
+        vtable: *const VTable,
+
+        pub const VTable = struct {
+            set_event_mask: *const fn (*anyopaque, bool, bool) Error!void,
+            reset_events: *const fn (*anyopaque) Error!void,
+            read: *const fn (*anyopaque, []u8) Error!?usize,
+            write: *const fn (*anyopaque, []const u8, usize) Error!usize,
+            cleanup: *const fn (*anyopaque) void,
+            last_error_code: *const fn (*anyopaque) c_int,
+        };
+    } else noreturn;
+
+    pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
+        return switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.set_event_mask(mock.ptr, readable, writable) else unreachable,
+            inline else => |wrapper| wrapper.setEventMask(readable, writable),
+        };
+    }
+
+    pub fn resetEvents(self: POSIXInterface) Error!void {
+        return switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.reset_events(mock.ptr) else unreachable,
+            inline else => |wrapper| wrapper.resetEvents(),
+        };
+    }
+
+    pub fn read(self: POSIXInterface, buf: []u8) Error!?usize {
+        return switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.read(mock.ptr, buf) else unreachable,
+            inline else => |wrapper| wrapper.read(buf),
+        };
+    }
+
+    pub fn write(self: POSIXInterface, data: []const u8, offset: usize) Error!usize {
+        return switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.write(mock.ptr, data, offset) else unreachable,
+            inline else => |wrapper| wrapper.write(data, offset),
+        };
+    }
+
+    pub fn cleanup(self: POSIXInterface) void {
+        switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.cleanup(mock.ptr) else unreachable,
+            inline else => |wrapper| wrapper.cleanup(),
+        }
+    }
+
+    pub fn lastErrorCode(self: POSIXInterface) c_int {
+        return switch (self) {
+            .mock => |mock| if (builtin.is_test) mock.vtable.last_error_code(mock.ptr) else unreachable,
+            inline else => |wrapper| wrapper.lastErrorCode(),
+        };
+    }
+};
 
 pub const SocketWrapper = struct {
     socket: io_c.pp_socket,
     options: SocketOptions,
     closes_on_empty_read: bool,
     is_closed: bool = false,
-    owner_allocator: ?std.mem.Allocator = null,
-
-    pub fn init(
-        allocator: std.mem.Allocator,
-        options: SocketOptions,
-    ) error{OutOfMemory}!?SocketWrapper {
-        const socket = try open(allocator, options) orelse return null;
-        return .{
-            .socket = socket,
-            .options = options,
-            .closes_on_empty_read = options.closesOnEmptyRead(),
-        };
-    }
+    allocator: std.mem.Allocator,
 
     pub fn create(
         allocator: std.mem.Allocator,
         options: SocketOptions,
-    ) error{OutOfMemory}!?*SocketWrapper {
+    ) std.mem.Allocator.Error!?*SocketWrapper {
         const wrapper = try allocator.create(SocketWrapper);
         errdefer allocator.destroy(wrapper);
-        wrapper.* = try init(allocator, options) orelse {
+        const socket = try open(allocator, options) orelse {
             allocator.destroy(wrapper);
             return null;
         };
-        wrapper.owner_allocator = allocator;
+        wrapper.* = .{
+            .socket = socket,
+            .options = options,
+            .closes_on_empty_read = options.closesOnEmptyRead(),
+            .allocator = allocator,
+        };
         return wrapper;
     }
 
-    pub fn deinit(self: *const SocketWrapper) void {
-        log.write(.debug, "Deinit SocketWrapper");
-        self.cleanup();
+    pub fn destroy(self: *SocketWrapper) void {
+        log.write(.debug, "Destroy SocketWrapper");
+        self.freeAndClose();
+        self.allocator.destroy(self);
     }
 
     fn open(
@@ -82,49 +158,51 @@ pub const SocketWrapper = struct {
         return socket;
     }
 
-    pub fn nativeIO(self: *SocketWrapper) IOInterface {
-        return .{
-            .ptr = self,
-            .vtable = if (self.owner_allocator != null) &owned_socket_vtable else &socket_vtable,
-        };
+    fn nativeIO(self: *SocketWrapper) POSIXInterface {
+        return .{ .socket = self };
     }
 
-    pub fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) Error!void {
+    fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) Error!void {
         if (!io_c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
     }
 
-    pub fn resetEvents(self: *const SocketWrapper) Error!void {
+    fn resetEvents(self: *const SocketWrapper) Error!void {
         if (!io_c.pp_socket_reset_events(self.socket)) return error.LibcFailure;
     }
 
-    pub fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
+    fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
         const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
-    pub fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
+    fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
         const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
         return mapWriteResult(.link, written, false);
     }
 
-    pub fn cleanup(self: *SocketWrapper) void {
+    /// Releases native I/O and the wrapper itself.
+    fn cleanup(self: *SocketWrapper) void {
+        self.destroy();
+    }
+
+    fn freeAndClose(self: *SocketWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
         io_c.pp_socket_free_and_close(self.socket, true);
     }
 
-    pub fn close(self: *const SocketWrapper) void {
+    fn close(self: *const SocketWrapper) void {
         if (self.is_closed) return;
         io_c.pp_socket_close(self.socket);
     }
 
-    pub fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
+    fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
         const fd = io_c.pp_socket_get_watch_fd(self.socket);
         return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
 
-    pub fn socketDescriptor(self: SocketWrapper) SocketDescriptor {
+    fn socketDescriptor(self: SocketWrapper) SocketDescriptor {
         return io_c.pp_socket_get_fd(self.socket);
     }
 
@@ -132,16 +210,23 @@ pub const SocketWrapper = struct {
         return api.Address.parseRaw(self.options.endpoint.address);
     }
 
-    pub fn remoteProtocol(self: SocketWrapper) api.EndpointProtocol {
+    fn remoteProtocol(self: SocketWrapper) api.EndpointProtocol {
         return self.options.endpoint.proto;
     }
 
-    pub fn isReliable(self: SocketWrapper) bool {
+    fn isReliable(self: SocketWrapper) bool {
         return self.options.endpoint.plainSocketType() == .tcp;
     }
 
-    pub fn lastErrorCode(_: SocketWrapper) c_int {
+    fn lastErrorCode(_: SocketWrapper) c_int {
         return io_c.pp_socket_last_error_binding();
+    }
+
+    pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
+        return .{
+            .fd = io_c.pp_socket_get_watch_fd(self.socket),
+            .io = self.nativeIO(),
+        };
     }
 };
 
@@ -150,65 +235,6 @@ fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
         .udp => io_c.PPSocketProtoUDP,
         .tcp => io_c.PPSocketProtoTCP,
     };
-}
-
-const socket_vtable = IOInterface.VTable{
-    .set_event_mask = socketSetEventMask,
-    .reset_events = socketResetEvents,
-    .read = socketRead,
-    .write = socketWrite,
-    .cleanup = socketCleanup,
-    .last_error_code = socketLastErrorCode,
-};
-
-fn socketSetEventMask(ptr: *anyopaque, read: bool, write: bool) Error!void {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    return self.setEventMask(read, write);
-}
-
-fn socketResetEvents(ptr: *anyopaque) Error!void {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    return self.resetEvents();
-}
-
-fn socketRead(ptr: *anyopaque, buf: []u8) Error!?usize {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    return self.read(buf);
-}
-
-fn socketWrite(ptr: *anyopaque, data: []const u8, offset: usize) Error!usize {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    return self.write(data, offset);
-}
-
-fn socketCleanup(ptr: *anyopaque) void {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    self.cleanup();
-}
-
-fn socketLastErrorCode(ptr: *anyopaque) c_int {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    return self.lastErrorCode();
-}
-
-const owned_socket_vtable = IOInterface.VTable{
-    .set_event_mask = socketSetEventMask,
-    .reset_events = socketResetEvents,
-    .read = socketRead,
-    .write = socketWrite,
-    .cleanup = ownedSocketCleanup,
-    .last_error_code = socketLastErrorCode,
-};
-
-fn ownedSocketCleanup(ptr: *anyopaque) void {
-    const self: *SocketWrapper = @ptrCast(@alignCast(ptr));
-    const allocator = self.owner_allocator orelse {
-        self.cleanup();
-        return;
-    };
-    log.write(.debug, "Deinit SocketWrapper");
-    self.cleanup();
-    allocator.destroy(self);
 }
 
 pub const TunWrapper = struct {
@@ -221,7 +247,7 @@ pub const TunWrapper = struct {
 
     pub fn deinit(self: *TunWrapper) void {
         log.write(.debug, "Deinit TunWrapper");
-        self.cleanup();
+        self.freeAndClose();
     }
 
     fn open(
@@ -235,29 +261,31 @@ pub const TunWrapper = struct {
         return io_c.pp_tun_open(c_uuid.ptr());
     }
 
-    pub fn nativeIO(self: *TunWrapper) IOInterface {
-        return .{
-            .ptr = self,
-            .vtable = &tun_vtable,
-        };
+    // FIXME: ###, Drop pub after v2
+    pub fn nativeIO(self: *TunWrapper) POSIXInterface {
+        return .{ .tun = self };
     }
 
-    pub fn setEventMask(_: *TunWrapper, _: bool, _: bool) Error!void {}
+    fn setEventMask(_: *TunWrapper, _: bool, _: bool) Error!void {}
 
-    pub fn resetEvents(_: *TunWrapper) Error!void {}
+    fn resetEvents(_: *TunWrapper) Error!void {}
 
-    pub fn read(self: *const TunWrapper, buf: []u8) Error!?usize {
+    fn read(self: *const TunWrapper, buf: []u8) Error!?usize {
         const read_count = io_c.pp_tun_read(self.tun, buf.ptr, buf.len);
         return mapReadResult(.tun, read_count, false);
     }
 
-    pub fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
+    fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.LibcFailure;
         const written = io_c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
         return mapWriteResult(.tun, written, true);
     }
 
-    pub fn cleanup(self: *TunWrapper) void {
+    fn cleanup(self: *TunWrapper) void {
+        self.freeAndClose();
+    }
+
+    fn freeAndClose(self: *TunWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
         io_c.pp_tun_free_and_close(self.tun, true);
@@ -269,50 +297,37 @@ pub const TunWrapper = struct {
     }
 
     pub fn name(self: TunWrapper) ?[]const u8 {
-        const c_name = io_c.pp_tun_name(self.tun) orelse return null;
+        const tun = self.tun orelse return null;
+        const c_name = io_c.pp_tun_name(tun) orelse return null;
         return std.mem.span(c_name);
     }
 
-    pub fn lastErrorCode(_: TunWrapper) c_int {
+    fn lastErrorCode(_: TunWrapper) c_int {
         return io_c.pp_io_last_error_binding();
+    }
+
+    pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {
+        return .{
+            .fd = io_c.pp_tun_get_watch_fd(self.tun),
+            .io = self.nativeIO(),
+        };
     }
 };
 
-const tun_vtable = IOInterface.VTable{
-    .set_event_mask = tunSetEventMask,
-    .reset_events = tunResetEvents,
-    .read = tunRead,
-    .write = tunWrite,
-    .cleanup = tunCleanup,
-    .last_error_code = tunLastErrorCode,
-};
-
-fn tunSetEventMask(ptr: *anyopaque, read: bool, write: bool) Error!void {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    return self.setEventMask(read, write);
+pub fn mapReadResult(_: io.Side, result: c_int, closes_on_empty_read: bool) Error!?usize {
+    if (result == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
+    if (result < 0) return error.LibcFailure;
+    if (result == 0) {
+        if (closes_on_empty_read) return error.EndOfStream;
+        return null;
+    }
+    return @intCast(result);
 }
 
-fn tunResetEvents(ptr: *anyopaque) Error!void {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    return self.resetEvents();
-}
-
-fn tunRead(ptr: *anyopaque, buf: []u8) Error!?usize {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    return self.read(buf);
-}
-
-fn tunWrite(ptr: *anyopaque, data: []const u8, offset: usize) Error!usize {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    return self.write(data, offset);
-}
-
-fn tunCleanup(ptr: *anyopaque) void {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    self.cleanup();
-}
-
-fn tunLastErrorCode(ptr: *anyopaque) c_int {
-    const self: *TunWrapper = @ptrCast(@alignCast(ptr));
-    return self.lastErrorCode();
+pub fn mapWriteResult(_: io.Side, result: c_int, comptime maps_no_space: bool) Error!usize {
+    if (result == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
+    if (result == io_c.PPIOErrorNoBufs) return error.Backpressure;
+    if (maps_no_space and result == io_c.PPIOErrorNoSpace) return error.Backpressure;
+    if (result < 0) return error.LibcFailure;
+    return @intCast(result);
 }

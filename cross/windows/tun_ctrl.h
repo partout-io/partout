@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
-#include "portable/socket_winrt.h"
+
+#include <stdint.h>
 #include <winrt/Windows.Networking.Vpn.h>
 
 // Internal platform ref. Daemon bindings retain the channel until callbacks drain.
@@ -14,7 +15,7 @@ public:
     PartoutTunnelController(const PartoutTunnelController &) = delete;
     PartoutTunnelController &operator=(const PartoutTunnelController &) = delete;
 
-    bool Associate(pp_socket_fd fd) noexcept;
+    bool Associate(uintptr_t fd) noexcept;
     bool Start(const char *info_json) noexcept;
     void Stop() noexcept;
 

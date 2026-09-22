@@ -6,6 +6,7 @@ const std = @import("std");
 
 const source = @import("source");
 const io = source.net_io;
+const io_posix = source.net_io_posix;
 
 const AtomicBool = std.atomic.Value(bool);
 const Looper = source.net_looper.Looper;
@@ -53,8 +54,8 @@ const MockIO = struct {
     fail_writes: AtomicBool = AtomicBool.init(false),
     cleaned: AtomicBool = AtomicBool.init(false),
 
-    fn interface(self: *MockIO) io.IOInterface {
-        return .{ .ptr = self, .vtable = &vtable };
+    fn interface(self: *MockIO) io_posix.POSIXInterface {
+        return .{ .mock = .{ .ptr = self, .vtable = &vtable } };
     }
 
     fn setEventMask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -82,7 +83,7 @@ const MockIO = struct {
         return 0;
     }
 
-    const vtable = io.IOInterface.VTable{
+    const vtable = io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = setEventMask,
         .reset_events = resetEvents,
         .read = read,

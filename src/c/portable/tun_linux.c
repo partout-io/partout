@@ -6,6 +6,7 @@
 
 #include "portable/common.h"
 #include "portable/tun.h"
+#include "portable/tun_ctrl.h"
 
 #if PARTOUT_LINUX
 
@@ -99,6 +100,7 @@ pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
 }
 
 const char *pp_tun_name(const pp_tun tun) {
+    if (!tun) return NULL;
     return tun->dev_name;
 }
 

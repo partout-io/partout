@@ -434,8 +434,8 @@ const noop_controller_vtable = net.TunnelController.VTable{
     .cancel_tunnel_connection = noopCancelTunnelConnection,
 };
 
-fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!?net_io.TunWrapper {
-    return null;
+fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net_io.TunWrapper {
+    return error.TunNotAvailable;
 }
 
 fn noopConfigureSockets(_: ?*anyopaque, _: []const net_io.SocketDescriptor) net.TunnelController.Error!void {}
@@ -640,7 +640,6 @@ fn moduleTypeName(module_type: api.ModuleType) []const u8 {
 
 fn snapshotTunnelSettings(info: api.TunnelRemoteInfoWrapper) MockTunnelController.LastTunnelSettings {
     var snapshot = MockTunnelController.LastTunnelSettings{
-        .requires_virtual_device = info.requires_virtual_device,
         .original_module_id = info.original_module_id,
         .profile_module_count = info.profile.modules.len,
         .profile_active_module_count = info.profile.active_modules_ids.len,
@@ -675,7 +674,6 @@ pub const MockTunnelController = struct {
     };
 
     pub const LastTunnelSettings = struct {
-        requires_virtual_device: bool,
         original_module_id: api.UUID,
         profile_module_count: usize,
         profile_active_module_count: usize,
@@ -691,6 +689,7 @@ pub const MockTunnelController = struct {
     };
 
     set_tunnel_settings_count: usize = 0,
+    set_tunnel_settings_error: ?net.TunnelController.Error = null,
     clear_tunnel_settings_count: usize = 0,
     configure_sockets_count: usize = 0,
     report_snapshot_count: usize = 0,
@@ -721,12 +720,13 @@ const mock_controller_vtable = net.TunnelController.VTable{
     .cancel_tunnel_connection = mockCancelTunnelConnection,
 };
 
-fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!?net_io.TunWrapper {
+fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net_io.TunWrapper {
     const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
     self.set_tunnel_settings_count += 1;
     self.last_settings_info = info;
     self.last_settings = snapshotTunnelSettings(info);
-    return null;
+    if (self.set_tunnel_settings_error) |err| return err;
+    return net_io.TunWrapper.init(null);
 }
 
 fn mockConfigureSockets(ptr: ?*anyopaque, descriptors: []const net_io.SocketDescriptor) net.TunnelController.Error!void {

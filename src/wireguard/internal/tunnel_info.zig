@@ -57,7 +57,6 @@ pub const TunnelRemoteInfoBuilder = struct {
                 .raw = "127.0.0.1",
                 .family = .v4,
             },
-            .requires_virtual_device = builtin.os.tag != .windows,
             .modules = modules,
         };
     }

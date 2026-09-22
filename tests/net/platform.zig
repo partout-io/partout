@@ -20,7 +20,7 @@ const socketOptions = platform_source.testing.socketOptions;
 
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
-    received_settings_only_info: bool = false,
+    received_module_id: bool = false,
     environment_set_calls: usize = 0,
     environment_remove_calls: usize = 0,
     received_environment_key: bool = false,
@@ -36,10 +36,10 @@ fn recordSetTunnel(
     if (info_json == null) return null;
     const json = std.mem.span(info_json);
     recorder.calls += 1;
-    recorder.received_settings_only_info = std.mem.indexOf(
+    recorder.received_module_id = std.mem.indexOf(
         u8,
         json,
-        "\"requiresVirtualDevice\":false",
+        "\"originalModuleId\":\"11111111-1111-4111-8111-111111111111\"",
     ) != null;
     return null;
 }
@@ -71,16 +71,20 @@ fn platformOptions(recorder: *TunnelCommitRecorder) Platform.Options {
     return .{ .ref = recorder, .fnt = functions };
 }
 
-test "platform commits settings when no virtual device is required" {
+test "platform reports unavailable tunnel after committing settings" {
     var recorder = TunnelCommitRecorder{};
     var platform = try Platform.init(platformOptions(&recorder));
     defer platform.deinit();
 
-    const tun = try platform.tunnelController().setTunnelSettings(.{});
+    try std.testing.expectError(
+        error.TunNotAvailable,
+        platform.tunnelController().setTunnelSettings(.{
+            .original_module_id = "11111111-1111-4111-8111-111111111111".*,
+        }),
+    );
 
-    try std.testing.expect(tun == null);
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
-    try std.testing.expect(recorder.received_settings_only_info);
+    try std.testing.expect(recorder.received_module_id);
 }
 
 test "platform forwards environment values and removals" {
@@ -147,7 +151,8 @@ test "platform network monitor receives reachability changes" {
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
 }
 
-test "platform builds socket wrapper options" {
+test "platform builds POSIX socket wrapper options" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
     var platform = try Platform.init(.{
         .socket_buf_size = 4096,
     });

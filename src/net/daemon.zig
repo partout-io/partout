@@ -952,7 +952,6 @@ fn buildSettingsOnlyTunnelInfo(
     const info = api.TunnelRemoteInfoWrapper{
         .profile = profile.*,
         .original_module_id = original_module_id orelse return null,
-        .requires_virtual_device = false,
     };
     return try info.clone(allocator);
 }

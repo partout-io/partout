@@ -35,7 +35,6 @@ import kotlinx.serialization.Contextual
  *
  * @param profile The original profile whose active modules supply platform settings.
  * @param originalModuleId 
- * @param requiresVirtualDevice 
  * @param address A hostname or IP address.
  * @param modules Connection-derived modules to inject immediately after the originating module. Omitted when the profile alone supplies settings.
  */
@@ -49,9 +48,6 @@ data class TunnelRemoteInfoWrapper (
 
     @SerialName(value = "originalModuleId")
     val originalModuleId: kotlin.String,
-
-    @SerialName(value = "requiresVirtualDevice")
-    val requiresVirtualDevice: kotlin.Boolean,
 
     /* A hostname or IP address. */
     @SerialName(value = "address")

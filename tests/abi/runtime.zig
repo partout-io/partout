@@ -167,7 +167,6 @@ test "starts DNS-only profile through tunnel controller" {
     try std.testing.expect(daemon.isSettingsOnly());
     try std.testing.expectEqual(@as(usize, 1), runtime.controller.set_tunnel_settings_count);
     const settings = runtime.controller.last_settings orelse return error.TestUnexpectedResult;
-    try std.testing.expect(!settings.requires_virtual_device);
     try std.testing.expectEqualStrings("11111111-1111-4111-8111-111111111111", settings.original_module_id[0..]);
     try std.testing.expectEqual(@as(usize, 1), settings.profile_module_count);
     try std.testing.expectEqual(@as(usize, 1), settings.profile_active_module_count);

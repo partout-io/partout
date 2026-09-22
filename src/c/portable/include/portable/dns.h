@@ -8,9 +8,31 @@
 
 #include <stdbool.h>
 #include <stddef.h>
-#include "portable/socket.h"
+#include <stdint.h>
+#include "portable/conditionals.h"
 
 #pragma clang assume_nonnull begin
+
+/* Network reachability. */
+typedef struct {
+    bool reachable;
+#if PARTOUT_ANDROID
+    uint64_t network_handle;
+#endif
+} pp_reachability;
+static inline pp_reachability pp_reachability_none(void) {
+#if PARTOUT_ANDROID
+    static const pp_reachability none = {
+        .reachable = false,
+        .network_handle = 0
+    };
+#else
+    static const pp_reachability none = {
+        .reachable = false
+    };
+#endif
+    return none;
+}
 
 /* Opaque wrapper around the platform-native addrinfo list. */
 typedef struct __pp_dns_result *pp_dns_result;

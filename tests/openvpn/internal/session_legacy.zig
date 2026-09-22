@@ -6,6 +6,7 @@ const std = @import("std");
 const source = @import("source");
 
 const io = source.net_io;
+const io_posix = source.net_io_posix;
 const net = source.net;
 
 const AuthToken = source.openvpn_internal.auth.AuthToken;
@@ -18,8 +19,8 @@ const session_testing = source.openvpn_internal.session_legacy.testing;
 const MockIO = struct {
     cleanup_count: usize = 0,
 
-    fn interface(self: *MockIO) io.IOInterface {
-        return .{ .ptr = self, .vtable = &vtable };
+    fn interface(self: *MockIO) io_posix.POSIXInterface {
+        return .{ .mock = .{ .ptr = self, .vtable = &vtable } };
     }
 
     fn setEventMask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -38,7 +39,7 @@ const MockIO = struct {
         return 0;
     }
 
-    const vtable = io.IOInterface.VTable{
+    const vtable = io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = setEventMask,
         .reset_events = resetEvents,
         .read = read,

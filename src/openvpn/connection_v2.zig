@@ -358,7 +358,6 @@ const OpenVPNConnection = struct {
             .profile = self.profile.*,
             .original_module_id = self.module_id,
             .address = address,
-            .requires_virtual_device = true,
             .modules = modules,
         };
 

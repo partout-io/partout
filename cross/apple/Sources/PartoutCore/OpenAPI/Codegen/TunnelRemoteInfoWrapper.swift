@@ -11,15 +11,13 @@ public struct TunnelRemoteInfoWrapper: Sendable, Codable, Hashable {
     public var profile: TaggedProfile
     public var originalModuleId: UniqueID
     public var address: Address?
-    public var requiresVirtualDevice: Bool
     /** Connection-derived modules to inject immediately after the originating module. Omitted when the profile alone supplies settings. */
     public var modules: [TaggedModule]?
 
-    public init(profile: TaggedProfile, originalModuleId: UniqueID, address: Address? = nil, requiresVirtualDevice: Bool, modules: [TaggedModule]? = nil) {
+    public init(profile: TaggedProfile, originalModuleId: UniqueID, address: Address? = nil, modules: [TaggedModule]? = nil) {
         self.profile = profile
         self.originalModuleId = originalModuleId
         self.address = address
-        self.requiresVirtualDevice = requiresVirtualDevice
         self.modules = modules
     }
 }

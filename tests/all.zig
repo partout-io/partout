@@ -29,6 +29,9 @@ comptime {
     _ = @import("net/daemon.zig");
     _ = @import("net/daemon_v2.zig");
     _ = @import("net/io.zig");
+    if (@import("builtin").os.tag != .windows) {
+        _ = @import("net/io_posix.zig");
+    }
     if (!source.runtime_policy.v2_only) {
         _ = @import("net/looper_legacy.zig");
     }

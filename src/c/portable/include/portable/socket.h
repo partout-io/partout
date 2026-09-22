@@ -11,29 +11,9 @@
 #include <stddef.h>
 #include <stdint.h>
 #include "portable/common.h"
+#include "portable/dns.h"
 
 #pragma clang assume_nonnull begin
-
-/* Network reachability. */
-typedef struct {
-    bool reachable;
-#if PARTOUT_ANDROID
-    uint64_t network_handle;
-#endif
-} pp_reachability;
-static inline pp_reachability pp_reachability_none(void) {
-#if PARTOUT_ANDROID
-    static const pp_reachability none = {
-        .reachable = false,
-        .network_handle = 0
-    };
-#else
-    static const pp_reachability none = {
-        .reachable = false
-    };
-#endif
-    return none;
-}
 
 /* The available protocols. */
 typedef enum {
@@ -56,6 +36,7 @@ static inline void pp_socket_free(pp_socket sock) {
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,
                                     const pp_reachability *_Nullable reachability);
+
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,

@@ -10,14 +10,15 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "portable/common.h"
-#include "portable/socket.h"
 
 #pragma clang assume_nonnull begin
 
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-#if PARTOUT_MACOS || PARTOUT_LINUX || PARTOUT_WINDOWS
+#if !PARTOUT_WINDOWS
+
+#if PARTOUT_MACOS || PARTOUT_LINUX
 /* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
 #endif
@@ -44,34 +45,6 @@ pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);
 
-/* Tunnel controller. */
-typedef struct {
-    void *_Nullable ctx;
-    void (*on_reachability)(void *_Nullable ctx, const pp_reachability *reachability);
-    void (*on_better_path)(void *_Nullable ctx);
-} pp_tun_ctrl_delegate;
-
-typedef struct {
-    void (*set_delegate)(void *_Nullable ref,
-                         const pp_tun_ctrl_delegate *_Nullable delegate);
-    bool (*configure_sockets)(void *_Nullable ref,
-                              const pp_reachability *_Nullable info,
-                              const pp_socket_fd *_Nonnull fds,
-                              size_t fds_len);
-    pp_tun _Nullable (*_Nonnull set_tunnel)(void *_Nullable ref,
-                                            const char *uuid,
-                                            const char *_Nullable info_json);
-    void (*report_snapshot)(void *_Nullable ref,
-                            const char *snapshot_json);
-    void (*set_environment_value)(void *_Nullable ref,
-                                  const char *key,
-                                  const char *_Nullable value);
-    void (*clear_tunnel)(void *_Nullable ref, bool kill_switch);
-    void (*cancel_tunnel)(void *_Nullable ref,
-                          const char *_Nullable error_code);
-} pp_tun_ctrl_fnt;
-
-/* Return the function table for the current platform. */
-pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void);
+#endif
 
 #pragma clang assume_nonnull end

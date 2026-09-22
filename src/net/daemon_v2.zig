@@ -313,7 +313,6 @@ const SettingsDaemon = struct {
         const info = api.TunnelRemoteInfoWrapper{
             .profile = profile.*,
             .original_module_id = original_module_id orelse return null,
-            .requires_virtual_device = false,
         };
         return try info.clone(allocator);
     }
@@ -783,7 +782,7 @@ const ConnectionDaemon = struct {
             self.daemon.options.connection_options.dns_timeout,
         );
         log.writef(.notice, "Connect to {s}", .{endpoint});
-        const descriptor = try self.factory.create(
+        var descriptor = try self.factory.create(
             self.daemon.allocator,
             endpoint,
             reachability,
@@ -892,18 +891,7 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        const active_tunnel = if (self.tunnel) |*value| value else {
-            log.write(.fault, "Unable to get tun device");
-            return error.TunNotAvailable;
-        };
-        const fd = active_tunnel.muxDescriptor() orelse {
-            log.write(.fault, "Unable to get mux descriptor");
-            return error.MuxFailure;
-        };
-        const descriptor = Looper.TunDescriptor{
-            .fd = fd,
-            .io = active_tunnel.nativeIO(),
-        };
+        const descriptor = self.tunnel.?.tunDescriptor();
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{

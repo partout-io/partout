@@ -240,7 +240,7 @@ pub fn build(b: *std.Build) void {
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
         if (target.result.os.tag == .windows) {
-            lib.installHeader(b.path("cross/windows/partout_winrt.h"), "partout_winrt.h");
+            lib.installHeader(b.path("cross/windows/runtime.h"), "runtime.h");
         }
         b.installArtifact(lib);
     }
@@ -393,12 +393,11 @@ fn createPartoutModule(
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
             if (config.winrt_library) |library| {
-                addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
                 module.addObjectFile(.{ .cwd_relative = library });
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
             } else {
-                addCSourceFiles(module, &.{"src/c/portable/tun_dummy.c"});
+                addCSourceFiles(module, &.{"src/c/portable/tun_windows_dummy.c"});
             }
         }
         addCSources(module, config.openvpn, config.wireguard);
