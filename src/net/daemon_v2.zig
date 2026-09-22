@@ -275,12 +275,13 @@ const SettingsDaemon = struct {
         };
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
-            _ = daemon.controller.setTunnelSettings(info.*) catch |err| {
+            var tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
                 log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(code, false);
                 return;
             };
+            tun.deinit();
         }
     }
 
