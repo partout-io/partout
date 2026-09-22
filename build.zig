@@ -259,7 +259,6 @@ pub fn build(b: *std.Build) void {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
         if (winrt_library != null) {
             lib.installHeader(b.path("cross/windows/include/partout_winrt.h"), "partout_winrt.h");
-            lib.installHeader(b.path("cross/windows/include/winrt/runtime.h"), "winrt/runtime.h");
         }
         b.installArtifact(lib);
     }
@@ -445,6 +444,7 @@ fn createPartoutModule(
                 module.addObjectFile(library);
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
+                addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
             } else {
                 addCSourceFiles(module, &.{"src/c/portable/tun_windows_dummy.c"});
             }
@@ -522,7 +522,7 @@ fn configureCHeadersAndMacros(
     consumer.addIncludePath(b.path("src/c/portable/include"));
     consumer.addIncludePath(b.path("src/c/crypto/include"));
     if (config.target.result.os.tag == .windows) {
-        consumer.addIncludePath(b.path("cross/windows"));
+        consumer.addIncludePath(b.path("cross/windows/include"));
     }
     if (config.openvpn) {
         consumer.addIncludePath(b.path("src/openvpn/c/include"));

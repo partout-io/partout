@@ -4,7 +4,7 @@
 
 #pragma once
 
-#include <stdint.h>
+#include "winrt/socket.h"
 #include <winrt/Windows.Networking.Vpn.h>
 
 // Internal platform ref. Daemon bindings retain the channel until callbacks drain.
@@ -15,7 +15,7 @@ public:
     PartoutTunnelController(const PartoutTunnelController &) = delete;
     PartoutTunnelController &operator=(const PartoutTunnelController &) = delete;
 
-    bool Associate(uintptr_t socket) noexcept;
+    bool Associate(winrt_socket socket) noexcept;
     bool Start(const char *info_json) noexcept;
     void Stop() noexcept;
 

@@ -10,21 +10,23 @@
 
 #if PARTOUT_WINDOWS
 
+/* Intentional fallback for Windows builds without the WinRT bridge, including
+ * portable unit tests. The build excludes this file when WinRT is linked.
+ * These stubs provide the required cleanup and controller symbols: callbacks
+ * are callable, but transport configuration and tunnel creation are unavailable.
+ * Real Windows tunnel support belongs to the WinRT backend.
+ */
+
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     pp_free(tun);
 }
 
-/* Controller fallback for Windows builds without the WinRT bridge.
- * Keep every callback callable, but report transport/tunnel setup as unavailable.
- */
-// FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
 static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     (void)ref;
     (void)delegate;
 }
 
-// FIXME: ###, Windows, Associate native sockets with the tunnel transport.
 static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
                                          const pp_socket_fd *fds, size_t fds_len) {
     (void)ref;
@@ -34,7 +36,6 @@ static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info
     return false;
 }
 
-// FIXME: ###, Windows, Apply tunnel settings and return a native tunnel.
 static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
     (void)uuid;
@@ -42,26 +43,22 @@ static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *in
     return NULL;
 }
 
-// FIXME: ###, Windows, Publish tunnel snapshots to the host.
 static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     (void)ref;
     (void)snapshot_json;
 }
 
-// FIXME: ###, Windows, Publish environment updates to the host.
 static void pp_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
     (void)ref;
     (void)key;
     (void)value;
 }
 
-// FIXME: ###, Windows, Clear tunnel settings and honor kill_switch.
 static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
     (void)kill_switch;
 }
 
-// FIXME: ###, Windows, Cancel the host tunnel and report its error.
 static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     (void)ref;
     (void)error_message;

@@ -17,11 +17,9 @@
 #define _Nonnull
 #endif
 
-#include "winrt/runtime.h"
-#include "tun_ctrl_windows.h"
-extern "C" {
-#include "portable/common.h"
-}
+#include "partout_winrt.h"
+#include "tun_ctrl.h"
+#include "winrt/log.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -152,7 +150,7 @@ struct PartoutVpnChannelRuntime::Impl {
             Log(L"PartoutVpnChannelRuntime: Connection established");
         } catch (...) {
             const auto failure = to_hresult();
-            pp_clog_v(PPLogLevelError, "PartoutVpnChannelRuntime.Connect failed: HRESULT 0x%08x",
+            winrt_log(WinrtLogError, "PartoutVpnChannelRuntime.Connect failed: HRESULT 0x%08x",
                 static_cast<unsigned int>(failure.value));
             Stop();
             Log(L"PartoutVpnChannelRuntime.Connect failed");
