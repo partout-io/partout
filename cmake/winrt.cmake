@@ -15,7 +15,7 @@ if(PP_BUILD_WINRT)
         cross/windows/tun.cc
     )
     target_include_directories(partout-winrt PRIVATE
-        src src/c/portable/include cross/windows)
+        src src/c/portable/include cross/windows cross/windows/include)
     target_compile_features(partout-winrt PRIVATE cxx_std_20)
     target_compile_definitions(partout-winrt PRIVATE
         NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINRT_EXPORTS)

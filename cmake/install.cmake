@@ -17,8 +17,11 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 if(WIN32)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/runtime.h"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+    )
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/winrt/runtime.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/winrt"
     )
 endif()
 

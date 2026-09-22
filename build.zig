@@ -258,7 +258,8 @@ pub fn build(b: *std.Build) void {
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
         if (winrt_library != null) {
-            lib.installHeader(b.path("cross/windows/runtime.h"), "runtime.h");
+            lib.installHeader(b.path("cross/windows/include/partout_winrt.h"), "partout_winrt.h");
+            lib.installHeader(b.path("cross/windows/include/winrt/runtime.h"), "winrt/runtime.h");
         }
         b.installArtifact(lib);
     }

@@ -17,7 +17,7 @@
 #define _Nonnull
 #endif
 
-#include "runtime.h"
+#include "winrt/runtime.h"
 #include "tun_ctrl_windows.h"
 extern "C" {
 #include "portable/common.h"

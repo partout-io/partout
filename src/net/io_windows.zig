@@ -3,34 +3,14 @@
 
 const std = @import("std");
 const ffi = @import("../c/exports.zig");
-const api = @import("../core/exports.zig").api;
 
+const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
+const api = core.api;
 const io_c = ffi.io;
 
-// Native handle types used by the Windows host ABI.
-pub const FileDescriptor = io_c.pp_fd;
-pub const SocketDescriptor = io_c.pp_socket_fd;
-
-pub const LinkDescriptor = struct {
-    socket: *SocketWrapper,
-
-    pub fn localAddress(self: LinkDescriptor) !io.SocketAddress {
-        return self.socket.localAddress();
-    }
-
-    pub fn cleanup(self: LinkDescriptor) void {
-        self.socket.destroy();
-    }
-};
-
-pub const TunDescriptor = struct {
-    tun: *TunWrapper,
-
-    pub fn cleanup(self: *TunDescriptor) void {
-        self.tun.destroy();
-    }
-};
+pub const LinkDescriptor = *SocketWrapper;
+pub const TunDescriptor = *TunWrapper;
 
 // FIXME: ###, Windows, SocketWrapper
 pub const SocketWrapper = struct {
@@ -62,8 +42,16 @@ pub const SocketWrapper = struct {
     }
 
     // FIXME: ###, Windows, Expose native packet I/O and readiness through the descriptor.
+    pub fn cleanup(self: *SocketWrapper) void {
+        self.destroy();
+    }
+
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
-        return .{ .socket = self };
+        return self;
+    }
+
+    pub fn socketWrapper(self: *SocketWrapper) ?*SocketWrapper {
+        return self;
     }
 };
 
@@ -88,7 +76,20 @@ pub const TunWrapper = struct {
     }
 
     // FIXME: ###, Windows, Expose native TUN packet I/O and readiness.
-    pub fn tunDescriptor(_: *TunWrapper) !TunDescriptor {
-        @panic("Windows TunWrapper.tunDescriptor is not implemented");
+    pub fn cleanup(self: *TunWrapper) void {
+        self.destroy();
+    }
+
+    pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
+        return self;
+    }
+
+    pub fn tunWrapper(self: *TunWrapper) ?*TunWrapper {
+        return self;
+    }
+
+    // FIXME: ###, Windows, Expose the native TUN watch handle.
+    pub fn muxDescriptor(_: *const TunWrapper) ?io_c.pp_fd {
+        @panic("Windows TunWrapper.muxDescriptor is not implemented");
     }
 };

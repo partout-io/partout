@@ -42,7 +42,7 @@ pub const PassiveIO = struct {
         self.lock.lock();
         defer self.lock.unlock();
         self.wake();
-        if (self.link) |*link| link.cleanup();
+        if (self.link) |link| link.cleanup();
         self.link = descriptor;
         self.closed = false;
     }
@@ -52,7 +52,7 @@ pub const PassiveIO = struct {
         self.lock.lock();
         defer self.lock.unlock();
         self.wake();
-        if (self.link) |*link| link.cleanup();
+        if (self.link) |link| link.cleanup();
         self.link = null;
     }
 
@@ -65,7 +65,7 @@ pub const PassiveIO = struct {
             return;
         }
         self.wake();
-        if (self.tun) |*tun| tun.cleanup();
+        if (self.tun) |tun| tun.cleanup();
         self.tun = descriptor;
     }
 
@@ -88,9 +88,9 @@ pub const PassiveIO = struct {
         defer self.lock.unlock();
         self.closed = true;
         self.wake();
-        if (self.link) |*link| link.cleanup();
+        if (self.link) |link| link.cleanup();
         self.link = null;
-        if (self.tun) |*tun| tun.cleanup();
+        if (self.tun) |tun| tun.cleanup();
         self.tun = null;
     }
 

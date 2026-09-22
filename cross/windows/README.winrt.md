@@ -3,7 +3,7 @@
 ## VPN channel runtime
 
 On Windows, C++ consumers include `partout.h` for the C ABI and then
-`runtime.h` for `PartoutVpnChannelRuntime`. Construct it with a retained
+`partout_winrt.h` for `PartoutVpnChannelRuntime`. Construct it with a retained
 `VpnChannel`, profile JSON, logger settings, and nonblocking daemon options
 (`is_daemon = false`). The runtime copies the profile and cache path.
 Serialize calls and forward the five `IVpnPlugIn` callbacks unchanged.
@@ -13,8 +13,8 @@ the daemon before releasing its channel and transport, including on destruction.
 CMake links the MSVC-built bridge into `partout.dll`, which exports these C++
 methods. Shared-library consumers link only Partout's import library and use a
 compatible MSVC runtime. CMake always builds Partout as a shared library.
-Both headers are installed on Windows.
-Of the installed headers, only `runtime.h` depends on the Windows SDK's C++/WinRT headers.
+The public headers `partout.h`, `partout_winrt.h`, and `winrt/runtime.h` are installed on Windows.
+`partout_winrt.h` includes `winrt/runtime.h`, which depends on the Windows SDK's C++/WinRT headers.
 
 Transport association is pending the Windows socket backend rewrite. Tunnel
 addresses remain placeholders, and packet encapsulation and decapsulation are stubs.

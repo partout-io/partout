@@ -8,6 +8,7 @@ const common = @import("io_common.zig");
 const builtin = @import("builtin");
 const windows = @import("io_windows.zig");
 const posix = @import("io_posix.zig");
+const ffi = @import("../c/exports.zig");
 const backend = if (builtin.os.tag == .windows) windows else posix;
 
 pub const testing = common.testing;
@@ -27,9 +28,10 @@ pub const Side = common.Side;
 pub const SocketOptions = common.SocketOptions;
 pub const Waiter = common.Waiter;
 
-pub const FileDescriptor = backend.FileDescriptor;
+// Native ABI types, independent of the platform's link representation.
+pub const FileDescriptor = ffi.io.pp_fd;
 pub const LinkDescriptor = backend.LinkDescriptor;
-pub const SocketDescriptor = backend.SocketDescriptor;
+pub const SocketDescriptor = ffi.io.pp_socket_fd;
 pub const SocketWrapper = backend.SocketWrapper;
 pub const TunDescriptor = backend.TunDescriptor;
 pub const TunWrapper = backend.TunWrapper;

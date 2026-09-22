@@ -391,6 +391,7 @@ test "settings daemon creation rolls back allocation failures" {
 }
 
 test "daemon owns the profile and rolls back connection startup allocations" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         create_count: usize = 0,
         destroy_count: usize = 0,

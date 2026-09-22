@@ -379,10 +379,7 @@ pub const WireGuardAdapter = struct {
         log.writef(.debug, "Start {s} wg-go backend", .{@tagName(self.transport)});
         const handle = (switch (self.transport) {
             .active => |active| self.backend.turnOn(allocator, wg_config, .{
-                .tun = if (builtin.os.tag == .windows) active.tunnel.tun else switch (active.tunnel.io) {
-                    .tun => |tun| tun,
-                    else => return error.CannotLocateTunnelFileDescriptor,
-                },
+                .tun = active.tunnel.tunWrapper() orelse return error.CannotLocateTunnelFileDescriptor,
                 .ifname = self.module_id[0..],
             }),
             .passive => |*passive| blk: {

@@ -12,6 +12,12 @@
 
 extern "C" {
 #include "portable/tun_ctrl.h"
+
+// FIXME: ###, Windows, Release native packet-I/O resources when implemented.
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    pp_free(tun);
+}
 }
 
 #if defined(_MSC_VER) && !defined(__clang__)
