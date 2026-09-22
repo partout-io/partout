@@ -20,7 +20,7 @@ extern "C" {
 #pragma warning(pop)
 #endif
 
-#include "tun_ctrl.h"
+#include "tun_ctrl_windows.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 

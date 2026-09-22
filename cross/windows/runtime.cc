@@ -18,7 +18,7 @@
 #endif
 
 #include "runtime.h"
-#include "tun_ctrl.h"
+#include "tun_ctrl_windows.h"
 extern "C" {
 #include "portable/common.h"
 }
