@@ -63,13 +63,13 @@ struct PartoutErrorTests {
     }
 
     @Test
-    func givenMappableError_whenWrap_thenReturnsMapped() {
-        do {
-            throw SomeMappableError()
-        } catch {
-            let sut = PartoutError(error)
-            #expect(sut == PartoutError.invalidField(.DNS.ipDomains))
-        }
+    func givenABIErrorWithoutPayload_whenWrap_thenPreservesCode() {
+        let error: Error = PartoutABIError(.decoding)
+        let sut = PartoutError(error)
+        #expect(sut.code == .decoding)
+        #expect(sut.userInfo == nil)
+        #expect(sut.reason == nil)
+        #expect(error.partoutErrorCode == .decoding)
     }
 
     @Test(arguments: [
@@ -84,12 +84,6 @@ struct PartoutErrorTests {
 
 private extension PartoutErrorTests {
     struct SomeUnmappableError: Error {
-    }
-
-    struct SomeMappableError: Error, PartoutErrorMappable {
-        var asPartoutError: PartoutError {
-            .invalidField(.DNS.ipDomains)
-        }
     }
 
     struct SomeDescriptiveError: Error, LocalizedError {

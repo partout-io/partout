@@ -36,20 +36,6 @@ public struct PartoutABIError: Error {
     }
 }
 
-extension PartoutABIError: PartoutErrorMappable {
-    public var asPartoutError: PartoutError {
-        guard let payload else {
-            return PartoutError(code)
-        }
-        return PartoutError(code, payload)
-    }
-}
-
-/// Mappable to ``PartoutError``.
-public protocol PartoutErrorMappable {
-    var asPartoutError: PartoutError { get }
-}
-
 /// Extensible error type thrown by the library.
 public struct PartoutError: Error {
     public let code: Code
@@ -77,15 +63,14 @@ public struct PartoutError: Error {
     }
 
     public init(_ error: Error) {
-        do {
-            throw error
-        } catch let error as Self {
+        switch error {
+        case let error as Self:
             self = error
-        } catch let error as PartoutErrorMappable {
-            self = error.asPartoutError
-        }
-        // anything else
-        catch {
+        case let error as PartoutABIError:
+            code = error.code
+            userInfo = error.payload
+            reason = nil
+        default:
             self = Self.unhandled(reason: error)
         }
     }
@@ -102,8 +87,8 @@ extension Error {
         switch self {
         case let pe as PartoutError:
             return pe.code
-        case let me as PartoutErrorMappable:
-            return me.asPartoutError.code
+        case let error as PartoutABIError:
+            return error.code
         default:
             return .unhandled
         }
