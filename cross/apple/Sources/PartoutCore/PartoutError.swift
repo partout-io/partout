@@ -10,14 +10,22 @@ public struct PartoutError: Error {
 
     public let reason: Error?
 
-    public let userInfo: Sendable?
+    /// Native context for validation and module errors; never serialized into an ABI envelope.
+    public enum Context: Sendable {
+        case incompatibleModules([Module])
+        case incompleteModule(any ModuleBuilder)
+        case invalidField(ModuleField)
+    }
+
+    public let context: Context?
 
     /// Portable JSON context received from or sent to the native runtime.
-    public var payload: JSON? { userInfo as? JSON }
+    public let payload: JSON?
 
-    public init(_ code: Code, payload: JSON?, reason: Error? = nil) {
+    public init(_ code: Code, context: Context? = nil, payload: JSON? = nil, reason: Error? = nil) {
         self.code = code
-        self.userInfo = payload
+        self.context = context
+        self.payload = payload
         self.reason = reason
     }
 
@@ -46,22 +54,8 @@ public struct PartoutError: Error {
         self.init(.wireGuard, payload: [Self.subCodeKey: .string(code.rawValue)])
     }
 
-    public init(_ code: Code) {
-        self.code = code
-        reason = nil
-        userInfo = nil
-    }
-
     public init(_ code: Code, _ reason: Error) {
-        self.code = code
-        self.reason = reason
-        userInfo = nil
-    }
-
-    public init(_ code: Code, _ userInfo: Sendable, _ reason: Error? = nil) {
-        self.code = code
-        self.reason = reason
-        self.userInfo = userInfo
+        self.init(code, reason: reason)
     }
 
     public init(_ error: Error) {
@@ -96,8 +90,11 @@ extension Error {
 extension PartoutError: CustomDebugStringConvertible {
     public var debugDescription: String {
         var desc: [String] = ["PartoutError.\(code.rawValue)"]
-        if let userInfo {
-            desc.append("userInfo=\(String(describing: userInfo))")
+        if let context {
+            desc.append("context=\(String(describing: context))")
+        }
+        if let payload {
+            desc.append("payload=\(payload.debugDescription)")
         }
         if let reason {
             desc.append("reason=\(reason) (\(reason.localizedDescription))")

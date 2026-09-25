@@ -47,7 +47,7 @@ extension Module {
                 return
             }
             guard !otherModule.buildsConnection else {
-                throw PartoutError(.incompatibleModules, [self, otherModule])
+                throw PartoutError(.incompatibleModules, context: .incompatibleModules([self, otherModule]))
             }
             return
         }
@@ -57,7 +57,7 @@ extension Module {
             return
         }
         guard !(otherModule is Self) else {
-            throw PartoutError(.incompatibleModules, [self, otherModule])
+            throw PartoutError(.incompatibleModules, context: .incompatibleModules([self, otherModule]))
         }
     }
 }

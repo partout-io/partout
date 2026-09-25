@@ -26,7 +26,7 @@ extension WireGuardModule {
 
         public func build() throws -> WireGuardModule {
             guard let configurationBuilder else {
-                throw PartoutError(.incompleteModule, self)
+                throw PartoutError(.incompleteModule, context: .incompleteModule(self))
             }
             return WireGuardModule(id: id, configuration: try configurationBuilder.build())
         }

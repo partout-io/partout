@@ -37,7 +37,7 @@ extension TaggedModule: Codable {
         case .WireGuard:
             self = .WireGuard(try WireGuardModule(from: value))
         default:
-            throw PartoutError(.decoding, "Unknown discriminator '\(rawType)'")
+            throw PartoutError(.decoding, payload: .string("Unknown discriminator '\(rawType)'"))
         }
     }
 

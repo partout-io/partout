@@ -9,11 +9,35 @@ struct PartoutErrorTests {
     @Test
     func givenNativeContext_whenWrap_thenPreservesContextAndReason() {
         let field = PartoutError.ModuleField.DNS.ipDomains
-        let error: Error = PartoutError(.invalidField, field, SomeDescriptiveError())
+        let error: Error = PartoutError(.invalidField, context: .invalidField(field), reason: SomeDescriptiveError())
         let wrapped = PartoutError(error)
-        #expect(wrapped.userInfo as? PartoutError.ModuleField == field)
+        guard case .invalidField(let wrappedField) = wrapped.context else {
+            Issue.record("Expected native field context")
+            return
+        }
+        #expect(wrappedField == field)
+        #expect(ABIEnvelope(wrapped).payload == nil)
         #expect(wrapped.reason is SomeDescriptiveError)
         #expect(wrapped.payload == nil)
+    }
+
+    @Test
+    func givenContextAndPayload_whenEncode_thenOnlySerializesPayload() throws {
+        let field = PartoutError.ModuleField.DNS.ipDomains
+        let error = PartoutError(
+            .invalidField,
+            context: .invalidField(field),
+            payload: ["field": .string(field.key)]
+        )
+        let wrapped = PartoutError(error as Error)
+        guard case .invalidField(let wrappedField) = wrapped.context else {
+            Issue.record("Expected native field context")
+            return
+        }
+        #expect(wrappedField == field)
+        let envelope = ABIEnvelope(wrapped)
+        let json = try JSON(encodable: envelope)
+        #expect(json == ["code": "invalidField", "payload": ["field": .string(field.key)]])
     }
 
     @Test(arguments: [JSON.null, ["subCode": "tlsFailure", "arguments": ["detail"]]])
@@ -87,15 +111,16 @@ struct PartoutErrorTests {
         let error: Error = PartoutError(.decoding)
         let sut = PartoutError(error)
         #expect(sut.code == .decoding)
-        #expect(sut.userInfo == nil)
+        #expect(sut.context == nil)
+        #expect(sut.payload == nil)
         #expect(sut.reason == nil)
         #expect(error.partoutErrorCode == .decoding)
     }
 
     @Test(arguments: [
         (PartoutError(.authentication), "{PartoutError.authentication}"),
-        (PartoutError(.authentication, "userInfo"), "{PartoutError.authentication, userInfo=userInfo}"),
-        (PartoutError(.authentication, "userInfo", SomeDescriptiveError()), "{PartoutError.authentication, userInfo=userInfo, reason=SomeDescriptiveError() (errorDescription)}")
+        (PartoutError(.authentication, payload: .null), "{PartoutError.authentication, payload=null}"),
+        (PartoutError(.authentication, payload: .null, reason: SomeDescriptiveError()), "{PartoutError.authentication, payload=null, reason=SomeDescriptiveError() (errorDescription)}")
     ])
     func givenError_whenDescribe_thenReturnsDescription(error: PartoutError, expectedDescription: String) {
         #expect(error.debugDescription == expectedDescription)
