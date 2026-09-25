@@ -6,11 +6,31 @@
 import Testing
 
 struct PartoutErrorTests {
+    @Test
+    func givenNativeContext_whenWrap_thenPreservesContextAndReason() {
+        let field = PartoutError.ModuleField.DNS.ipDomains
+        let error: Error = PartoutError(.invalidField, field, SomeDescriptiveError())
+        let wrapped = PartoutError(error)
+        #expect(wrapped.userInfo as? PartoutError.ModuleField == field)
+        #expect(wrapped.reason is SomeDescriptiveError)
+        #expect(wrapped.payload == nil)
+    }
+
+    @Test(arguments: [JSON.null, ["subCode": "tlsFailure", "arguments": ["detail"]]])
+    func givenPayloadAndReason_whenWrap_thenPreservesEnvelope(payload: JSON) {
+        let error: Error = PartoutError(.openVPN, payload: payload, reason: SomeDescriptiveError())
+        let wrapped = PartoutError(error)
+        #expect(wrapped.reason is SomeDescriptiveError)
+        #expect(wrapped.payload == payload)
+        #expect(ABIEnvelope(wrapped).payload == payload)
+    }
+
+
     @Test(arguments: ["timeout", "openVPN.tlsFailure", "wireGuard.peerHasInvalidPublicKey", "openVPN.future.code"])
     func givenRuntimeCode_whenParse_thenRoundTrips(raw: String) throws {
         let extended = try #require(PartoutErrorExtendedCode(rawValue: raw))
         #expect(extended.rawValue == raw)
-        let error = try #require(PartoutABIError(rawValue: raw))
+        let error = try #require(PartoutError(rawValue: raw))
         #expect(error.code == extended.code)
         #expect(error.subCode == extended.subCode)
         #expect(error.rawValue == raw)
@@ -22,11 +42,11 @@ struct PartoutErrorTests {
     }
 
     @Test(arguments: [
-        (PartoutABIError(codeForOpenVPN: .otpRequired), PartoutErrorCode.openVPN, "otpRequired"),
-        (PartoutABIError(codeForWireGuard: .emptyPeers), PartoutErrorCode.wireGuard, "emptyPeers")
+        (PartoutError(codeForOpenVPN: .otpRequired), PartoutErrorCode.openVPN, "otpRequired"),
+        (PartoutError(codeForWireGuard: .emptyPeers), PartoutErrorCode.wireGuard, "emptyPeers")
     ])
     func givenProtocolError_whenEncodeEnvelope_thenPreservesCodeAndPayload(
-        error: PartoutABIError,
+        error: PartoutError,
         code: PartoutErrorCode,
         subCode: String
     ) throws {
@@ -42,12 +62,12 @@ struct PartoutErrorTests {
     }
 
     @Test(arguments: [OpenVPN.Credentials.OTPMethod.append, .encode])
-    func givenMissingOTP_whenAuthenticate_thenThrowsABIError(method: OpenVPN.Credentials.OTPMethod) {
+    func givenMissingOTP_whenAuthenticate_thenThrowsProtocolError(method: OpenVPN.Credentials.OTPMethod) {
         let credentials = OpenVPN.Credentials.Builder(username: "user", password: "password", otpMethod: method)
         #expect {
             _ = try credentials.buildForAuthentication()
         } throws: { error in
-            guard let error = error as? PartoutABIError else { return false }
+            guard let error = error as? PartoutError else { return false }
             return error.code == .openVPN && error.payload == ["subCode": "otpRequired"]
         }
     }
@@ -63,8 +83,8 @@ struct PartoutErrorTests {
     }
 
     @Test
-    func givenABIErrorWithoutPayload_whenWrap_thenPreservesCode() {
-        let error: Error = PartoutABIError(.decoding)
+    func givenErrorWithoutPayload_whenWrap_thenPreservesCode() {
+        let error: Error = PartoutError(.decoding)
         let sut = PartoutError(error)
         #expect(sut.code == .decoding)
         #expect(sut.userInfo == nil)

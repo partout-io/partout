@@ -28,10 +28,6 @@ public func ~= (pattern: PartoutError.Code, value: String?) -> Bool {
 
 extension ABIEnvelope {
     public init(_ error: Error) {
-        if let abiError = error as? PartoutABIError {
-            self.init(code: abiError.code, payload: abiError.payload)
-            return
-        }
         guard let partoutError = error as? PartoutError else {
             self.init(
                 code: .unhandled,

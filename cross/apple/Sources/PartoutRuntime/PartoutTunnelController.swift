@@ -66,7 +66,7 @@ final class PartoutTunnelController: Sendable {
     func setTunnelSettings(with info: TunnelRemoteInfoWrapper) async throws {
         guard let provider else {
             logReleasedProvider()
-            throw PartoutABIError(.releasedObject)
+            throw PartoutError(.releasedObject)
         }
         let profile = try info.profile.asProfile()
         let tunnelSettings = profile.networkSettingsWrapper(with: info, options: options)
@@ -252,10 +252,10 @@ extension PartoutTunnelController {
             }
             let error: Error? = errorCode.map {
                 let rawCode = String(cString: $0)
-                if let error = PartoutABIError(rawValue: rawCode) {
+                if let error = PartoutError(rawValue: rawCode) {
                     return error
                 }
-                return PartoutABIError(.unhandled)
+                return PartoutError(.unhandled)
             }
             controller.cancelTunnelConnection(with: error)
         }

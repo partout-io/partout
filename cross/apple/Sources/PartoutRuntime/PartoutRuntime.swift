@@ -28,12 +28,12 @@ public final class PartoutRuntime: Sendable {
 
     public func importProfile(from text: String, name: String?) throws -> Profile {
         guard let cJSON = partout_import_profile(text, name) else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         defer { free(cJSON) }
         let json = String(cString: cJSON)
         guard let jsonData = json.data(using: .utf8) else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         let tagged = try abiPayload(TaggedProfile.self, from: jsonData)
         return try tagged.asProfile()
@@ -53,12 +53,12 @@ public final class PartoutRuntime: Sendable {
     ) throws -> Module {
         let contextJSON = try context.map { try JSONEncoder.shared().encodeJSON($0) }
         guard let cJSON = partout_import_module(text, contextJSON) else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         defer { free(cJSON) }
         let json = String(cString: cJSON)
         guard let jsonData = json.data(using: .utf8) else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         let tagged = try abiPayload(TaggedModule.self, from: jsonData)
         return tagged.containedModule
@@ -66,11 +66,11 @@ public final class PartoutRuntime: Sendable {
 
     public func exportModule(_ module: Module) throws -> String {
         guard let tagged = module.taggedModule else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         let json = try JSONEncoder.shared().encodeJSON(tagged)
         guard let cText = partout_export_module(json) else {
-            throw PartoutABIError(.encoding)
+            throw PartoutError(.encoding)
         }
         defer { free(cText) }
         return String(cString: cText)
@@ -78,7 +78,7 @@ public final class PartoutRuntime: Sendable {
 
     public func wireGuardGeneratePrivateKey() throws -> String {
         guard let cKey = partout_wireguard_genkey() else {
-            throw PartoutABIError(.crypto)
+            throw PartoutError(.crypto)
         }
         defer { free(cKey) }
         return String(cString: cKey)
@@ -89,7 +89,7 @@ public final class PartoutRuntime: Sendable {
             partout_wireguard_pubkey($0)
         }
         guard let cPubKey else {
-            throw PartoutABIError(.crypto)
+            throw PartoutError(.crypto)
         }
         defer { free(cPubKey) }
         return String(cString: cPubKey)
@@ -102,12 +102,12 @@ private extension PartoutRuntime {
         let envelope = try decoder.decode(ABIEnvelope.self, from: data)
         if let code = envelope.code {
             if let payload = envelope.payload {
-                throw PartoutABIError(code, payload)
+                throw PartoutError(code, payload: payload)
             }
-            throw PartoutABIError(code)
+            throw PartoutError(code)
         }
         guard let payload = envelope.payload else {
-            throw PartoutABIError(.decoding)
+            throw PartoutError(.decoding)
         }
         let encoder = JSONEncoder.shared()
         let payloadData = try encoder.encode(payload)

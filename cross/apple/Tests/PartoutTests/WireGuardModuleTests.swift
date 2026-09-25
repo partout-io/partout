@@ -16,7 +16,7 @@ struct WireGuardModuleTests {
         #expect {
             _ = try sut.build()
         } throws: { error in
-            guard let error = error as? PartoutABIError else { return false }
+            guard let error = error as? PartoutError else { return false }
             return error.code == .wireGuard && error.payload == ["subCode": "emptyPeers"]
         }
 

@@ -84,12 +84,12 @@ private extension OpenVPN.Credentials.OTPMethod {
             return password
         case .append:
             guard let otp else {
-                throw PartoutABIError(codeForOpenVPN: .otpRequired)
+                throw PartoutError(codeForOpenVPN: .otpRequired)
             }
             return password + otp
         case .encode:
             guard let otp else {
-                throw PartoutABIError(codeForOpenVPN: .otpRequired)
+                throw PartoutError(codeForOpenVPN: .otpRequired)
             }
             let base64Password = password.data(using: .utf8)?.base64EncodedString() ?? ""
             let base64OTP = otp.data(using: .utf8)?.base64EncodedString() ?? ""

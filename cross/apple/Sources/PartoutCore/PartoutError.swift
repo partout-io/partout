@@ -2,23 +2,34 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// ABI errors.
-public struct PartoutABIError: Error {
-    public let code: PartoutErrorCode
-    public let payload: JSON?
+/// Extensible error type thrown by the library.
+public struct PartoutError: Error {
+    private static let subCodeKey = "subCode"
 
-    public init(_ code: PartoutErrorCode, _ payload: JSON? = nil) {
+    public let code: Code
+
+    public let reason: Error?
+
+    public let userInfo: Sendable?
+
+    /// Portable JSON context received from or sent to the native runtime.
+    public var payload: JSON? { userInfo as? JSON }
+
+    public init(_ code: Code, payload: JSON?, reason: Error? = nil) {
         self.code = code
-        self.payload = payload
+        self.userInfo = payload
+        self.reason = reason
     }
 
     public init?(rawValue: String) {
         guard let extendedCode = PartoutErrorExtendedCode(rawValue: rawValue) else { return nil }
-        self.init(extendedCode.code, extendedCode.subCode.map { ["subCode": .string($0)] })
+        self.init(extendedCode.code, payload: extendedCode.subCode.map {
+            [Self.subCodeKey: .string($0)]
+        })
     }
 
     public var subCode: String? {
-        payload?["subCode"]?.stringValue
+        payload?[Self.subCodeKey]?.stringValue
     }
 
     public var extendedCode: PartoutErrorExtendedCode {
@@ -28,21 +39,12 @@ public struct PartoutABIError: Error {
     public var rawValue: String { extendedCode.rawValue }
 
     public init(codeForOpenVPN code: OpenVPNErrorCode) {
-        self.init(.openVPN, ["subCode": .string(code.rawValue)])
+        self.init(.openVPN, payload: [Self.subCodeKey: .string(code.rawValue)])
     }
 
     public init(codeForWireGuard code: WireGuardErrorCode) {
-        self.init(.wireGuard, ["subCode": .string(code.rawValue)])
+        self.init(.wireGuard, payload: [Self.subCodeKey: .string(code.rawValue)])
     }
-}
-
-/// Extensible error type thrown by the library.
-public struct PartoutError: Error {
-    public let code: Code
-
-    public let reason: Error?
-
-    public let userInfo: Sendable?
 
     public init(_ code: Code) {
         self.code = code
@@ -66,10 +68,6 @@ public struct PartoutError: Error {
         switch error {
         case let error as Self:
             self = error
-        case let error as PartoutABIError:
-            code = error.code
-            userInfo = error.payload
-            reason = nil
         default:
             self = Self.unhandled(reason: error)
         }
@@ -87,8 +85,6 @@ extension Error {
         switch self {
         case let pe as PartoutError:
             return pe.code
-        case let error as PartoutABIError:
-            return error.code
         default:
             return .unhandled
         }
