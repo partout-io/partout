@@ -27,7 +27,7 @@ extension WireGuard.Configuration {
 
         public func build() throws -> WireGuard.Configuration {
             guard !peers.isEmpty else {
-                throw PartoutError(.wireGuardEmptyPeers)
+                throw PartoutABIError(codeForWireGuard: .emptyPeers)
             }
             return WireGuard.Configuration(
                 interface: try interface.build(),

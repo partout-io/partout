@@ -83,7 +83,7 @@ pub const EventKey = enum {
 pub const Events = struct {
     ctx: *anyopaque,
     status: *const fn (*anyopaque, api.ConnectionStatus) void,
-    last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
+    last_error: *const fn (*anyopaque, []const u8) void,
     data_count: *const fn (*anyopaque, api.DataCount) void,
     remove_key: *const fn (*anyopaque, EventKey) void,
 };
@@ -189,6 +189,7 @@ pub const Daemon = struct {
             .connection_runtime = null,
             .gate = null,
             .snapshot_publisher = SnapshotPublisher.init(
+                allocator,
                 profile.id,
                 reportSnapshot,
                 daemon,
@@ -238,6 +239,7 @@ pub const Daemon = struct {
         }
         if (self.connection_runtime != null)
             @panic("Daemon.destroy() cannot release a live connection runtime");
+        self.snapshot_publisher.deinit();
         self.profile.deinit(self.allocator);
         self.allocator.destroy(self);
 
@@ -271,9 +273,9 @@ pub const Daemon = struct {
         onReachability: io.ReachabilityInfo,
         onBetterPath,
         onConnectionStatus: api.ConnectionStatus,
-        onConnectionLastError: api.PartoutErrorCode,
+        onConnectionLastError: []const u8,
         onConnectionDataCount: api.DataCount,
-        onConnectionCancel: ?api.PartoutErrorCode,
+        onConnectionCancel: ?[]const u8,
         onLooperTerminated: ?Looper.Failure,
         recoverConnection,
         onConnectionBlock: struct {
@@ -384,7 +386,7 @@ pub const Daemon = struct {
         };
     }
 
-    fn onConnectionLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
+    fn onConnectionLastError(ctx: *anyopaque, code: []const u8) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(void, .{ .onConnectionLastError = code }) catch |err| {
             log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
@@ -398,7 +400,7 @@ pub const Daemon = struct {
         };
     }
 
-    fn onConnectionCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
+    fn onConnectionCancel(ctx: *anyopaque, code: ?[]const u8) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
         self.actor.perform(void, .{ .onConnectionCancel = code }) catch |err| {
             log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
@@ -439,7 +441,7 @@ pub const Daemon = struct {
             var maybe_info = buildSettingsOnlyTunnelInfo(self.allocator, &self.profile) catch |err| {
                 log.writef(.fault, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
                 const code = self.handleStartError(err);
-                self.requestCancellation(code, false);
+                self.requestCancellation(code.raw(), false);
                 return;
             };
             if (maybe_info) |*info| {
@@ -447,7 +449,7 @@ pub const Daemon = struct {
                 var tun = self.controller.setTunnelSettings(info.*) catch |err| {
                     log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                     const code = self.handleStartError(err);
-                    self.requestCancellation(code, false);
+                    self.requestCancellation(code.raw(), false);
                     return;
                 };
                 tun.deinit();
@@ -496,7 +498,7 @@ pub const Daemon = struct {
 
     fn handleStartError(self: *Daemon, err: StartError) api.PartoutErrorCode {
         const code = partoutCodeForDaemonStartError(err);
-        self.handleLastError(code);
+        self.handleLastError(code.raw());
         self.controller.setReasserting(false);
         return code;
     }
@@ -683,7 +685,7 @@ pub const Daemon = struct {
         }
     }
 
-    fn handleLastError(self: *Daemon, code: api.PartoutErrorCode) void {
+    fn handleLastError(self: *Daemon, code: []const u8) void {
         self.resetDataCount();
         self.snapshot_publisher.setLastError(code);
         self.snapshot_publisher.publishCurrentSnapshot(true);
@@ -696,7 +698,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.data_count(e.ctx, data_count);
     }
 
-    fn handleConnectionCancel(self: *Daemon, code: ?api.PartoutErrorCode) void {
+    fn handleConnectionCancel(self: *Daemon, code: ?[]const u8) void {
         self.enterFailedState();
         self.controller.setReasserting(false);
         if (!self.options.cancels_unrecoverable and
@@ -721,7 +723,7 @@ pub const Daemon = struct {
         log.write(.fault, "Daemon-owned looper terminated");
 
         if (partoutCodeForLooperFailure(failure)) |code| {
-            self.handleLastError(code);
+            self.handleLastError(code.raw());
         }
 
         // The looper terminal callback already stopped protocol producers and
@@ -734,13 +736,13 @@ pub const Daemon = struct {
         self.actor.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
             self.controller.setReasserting(false);
-            self.requestCancellation(partoutCodeForLooperFailure(failure), true);
+            self.requestCancellation(if (partoutCodeForLooperFailure(failure)) |code| code.raw() else null, true);
         };
     }
 
     fn requestCancellation(
         self: *Daemon,
-        code: ?api.PartoutErrorCode,
+        code: ?[]const u8,
         force: bool,
     ) void {
         self.enterFailedState();
@@ -881,7 +883,7 @@ pub const Daemon = struct {
         self.initConnectionRuntime() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
             const code = self.handleStartError(err);
-            self.requestCancellation(code, true);
+            self.requestCancellation(code.raw(), true);
             return;
         };
 

@@ -252,8 +252,8 @@ extension PartoutTunnelController {
             }
             let error: Error? = errorCode.map {
                 let rawCode = String(cString: $0)
-                if let code = PartoutError.Code(rawValue: rawCode) {
-                    return PartoutABIError(code)
+                if let error = PartoutABIError(rawValue: rawCode) {
+                    return error
                 }
                 return PartoutABIError(.unhandled)
             }

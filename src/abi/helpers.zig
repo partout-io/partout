@@ -133,10 +133,13 @@ fn boundEventDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
     set(binding.ctx, data_count.received, data_count.sent);
 }
 
-fn boundEventLastError(ptr: *anyopaque, code: api.PartoutErrorCode) void {
+fn boundEventLastError(ptr: *anyopaque, code: []const u8) void {
     const binding = boundEventsBinding(ptr) orelse return;
     const set = binding.set_last_error_code orelse return;
-    util.withCString(code.raw(), set, binding.ctx);
+    var c_code: util.TemporaryCString = .{};
+    c_code.init(std.heap.c_allocator, code) catch return;
+    defer c_code.deinit();
+    set(binding.ctx, c_code.ptr());
 }
 
 fn boundEventRemoveKey(ptr: *anyopaque, key: net.DaemonEventKey) void {
@@ -188,7 +191,7 @@ pub fn importErrorPayloadAllocZ(
     err: ImportAndEncodeError,
     context: core.ImportContext,
 ) ?[*:0]u8 {
-    const code = importErrorCode(err);
+    const code = protocolImportErrorCode(err, context.parse_error_info) orelse importErrorCode(err);
     const user_info = errorUserInfoAllocZ(allocator, context.parse_error_info);
     return wrapOwnedImportPayload(
         allocator,
@@ -230,5 +233,19 @@ fn importErrorCode(err: ImportAndEncodeError) api.PartoutErrorCode {
         error.InvalidModel, error.Stringify => .encoding,
         error.Parsing => .parsing,
         error.UnknownImportedModule => .unknownImportedModule,
+    };
+}
+
+fn protocolImportErrorCode(err: ImportAndEncodeError, info: ?*const api.ParseErrorInfo) ?api.PartoutErrorCode {
+    switch (err) {
+        error.Parsing, error.InvalidJson, error.InvalidProfile => {},
+        else => return null,
+    }
+    const details = info orelse return null;
+    if (details.sub_code == null) return null;
+    return switch (details.recognized_type orelse return null) {
+        .OpenVPN => .openVPN,
+        .WireGuard => .wireGuard,
+        else => null,
     };
 }

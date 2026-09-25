@@ -70,6 +70,18 @@ pub const OpenVPNTLSWrap = gen.OpenVPNTLSWrap;
 pub const OpenVPNTLSWrapStrategy = gen.OpenVPNTLSWrapStrategy;
 pub const ParseErrorInfo = gen.ParseErrorInfo;
 pub const PartoutErrorCode = gen.PartoutErrorCode;
+pub const PartoutErrorExtendedCode = gen.PartoutErrorExtendedCode;
+
+pub fn formatErrorCode(allocator: std.mem.Allocator, value: PartoutErrorExtendedCode) error{OutOfMemory}![:0]u8 {
+    if (value.sub_code) |sub_code| {
+        return std.fmt.allocPrintSentinel(allocator, "{s}.{s}", .{ value.code.raw(), sub_code }, 0);
+    }
+    return allocator.dupeZ(u8, value.code.raw());
+}
+
+pub fn openVPNErrorCode(code: OpenVPNErrorCode) PartoutErrorExtendedCode {
+    return .{ .code = .openVPN, .sub_code = code.raw() };
+}
 pub const Profile = gen.Profile;
 pub const ProfileBehavior = gen.ProfileBehavior;
 pub const Route = gen.Route;

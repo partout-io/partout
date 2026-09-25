@@ -67,7 +67,7 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
 
     var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
     defer envelope.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.wireGuard, envelope.code.?);
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);

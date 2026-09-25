@@ -922,7 +922,7 @@ fn fakeClearTunnelSettings(ptr: ?*anyopaque, _: bool) void {
 
 fn fakeSetReasserting(_: ?*anyopaque, _: bool) void {}
 
-fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorCode) void {}
+fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?[]const u8) void {}
 
 const EventRecorder = struct {
     statuses: [8]api.ConnectionStatus = undefined,
@@ -950,9 +950,9 @@ fn recordStatus(ctx: *anyopaque, status_value: api.ConnectionStatus) void {
     self.status_count += 1;
 }
 
-fn recordLastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
+fn recordLastError(ctx: *anyopaque, code: []const u8) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.last_error = code;
+    self.last_error = api.PartoutErrorCode.parseFromRaw(code);
 }
 
 fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
@@ -961,8 +961,8 @@ fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     self.has_data_count.store(true, .release);
 }
 
-fn recordCancel(ctx: *anyopaque, code: ?api.PartoutErrorCode) void {
+fn recordCancel(ctx: *anyopaque, code: ?[]const u8) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
     self.cancel_count += 1;
-    self.cancel_code = code;
+    self.cancel_code = if (code) |value| api.PartoutErrorCode.parseFromRaw(value) else null;
 }

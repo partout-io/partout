@@ -381,14 +381,20 @@ fn ctrlClearTunnelSettings(ptr: ?*anyopaque, with_kill_switch: bool) void {
 
 fn ctrlSetReasserting(_: ?*anyopaque, _: bool) void {}
 
-fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, code: ?api.PartoutErrorCode) void {
+fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, code: ?[]const u8) void {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const cancel_tunnel = self.fnt.cancel_tunnel orelse
         @panic("Platform function table has no cancel_tunnel callback");
-    const raw_code = if (code) |value| @tagName(value) else null;
+    const raw_code = code;
     if (raw_code) |value| {
         log.writef(.err, "Cancel tunnel connection: {s}", .{value});
-        cancel_tunnel(self.ref, value.ptr);
+        var c_code: util.TemporaryCString = .{};
+        c_code.init(std.heap.c_allocator, value) catch {
+            cancel_tunnel(self.ref, "outOfMemory");
+            return;
+        };
+        defer c_code.deinit();
+        cancel_tunnel(self.ref, c_code.ptr());
         return;
     }
     log.write(.debug, "Cancel tunnel connection");

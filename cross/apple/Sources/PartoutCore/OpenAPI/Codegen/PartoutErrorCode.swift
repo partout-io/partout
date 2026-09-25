@@ -6,10 +6,12 @@
 //
 
 public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
+    /** OpenVPN error; payload contains an OpenVPNErrorCode in subCode. */
+    case openVPN = "openVPN"
+    /** WireGuard error; payload contains a WireGuardErrorCode in subCode. */
+    case wireGuard = "wireGuard"
     /** Authentication failure. */
     case authentication = "authentication"
-    /** Response is cached. */
-    case cached = "cached"
     /** Crypto error. */
     case crypto = "crypto"
     /** Decoding error. */
@@ -18,8 +20,6 @@ public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     case dnsFailure = "dnsFailure"
     /** Encoding error. */
     case encoding = "encoding"
-    /** No more endpoints available to try. */
-    case exhaustedEndpoints = "exhaustedEndpoints"
     /** File descriptor is not available. */
     case fdUnavailable = "fdUnavailable"
     /** Some modules are incompatible (`userInfo` is an array of incompatible ``Module``). */
@@ -40,102 +40,28 @@ public enum PartoutErrorCode: String, Sendable, Codable, CaseIterable {
     case linkNotActive = "linkNotActive"
     /** Network changed. */
     case networkChanged = "networkChanged"
-    /** Network is unreachable. */
-    case networkUnreachable = "networkUnreachable"
     /** The profile has no active modules. */
     case noActiveModules = "noActiveModules"
-    /** The profile has non-final modules that must be resolved to final modules first. */
-    case nonFinalModules = "nonFinalModules"
-    /** Entity not found. */
-    case notFound = "notFound"
-    /** Compression settings mismatch. */
-    case openVPNCompressionMismatch = "OpenVPN.compressionMismatch"
-    /** Connection failure. */
-    case openVPNConnectionFailure = "OpenVPN.connectionFailure"
-    /** No routing configuration. */
-    case openVPNNoRouting = "OpenVPN.noRouting"
-    /** One-time password is required. */
-    case openVPNOTPRequired = "OpenVPN.otpRequired"
-    /** Passphrase is required. */
-    case openVPNPassphraseRequired = "OpenVPN.passphraseRequired"
-    /** Authentication can be retried. */
-    case openVPNRecoverableAuthentication = "OpenVPN.recoverableAuthentication"
-    /** Server requested shutdown. */
-    case openVPNServerShutdown = "OpenVPN.serverShutdown"
-    /** TLS failure. */
-    case openVPNTLSFailure = "OpenVPN.tlsFailure"
-    /** Algorithm is unsupported. */
-    case openVPNUnsupportedAlgorithm = "OpenVPN.unsupportedAlgorithm"
-    /** Compression setting is unsupported. */
-    case openVPNUnsupportedCompression = "OpenVPN.unsupportedCompression"
-    /** Option is unsupported. */
-    case openVPNUnsupportedOption = "OpenVPN.unsupportedOption"
     /** Operation cancelled or unauthorized. */
     case operationCancelled = "operationCancelled"
     /** Memory allocation failed. */
     case outOfMemory = "outOfMemory"
     /** Parsing error. */
     case parsing = "parsing"
-    /** A passphrase is required. */
-    case passphraseRequired = "passphraseRequired"
     /** A required object was released prematurely. */
     case releasedObject = "releasedObject"
     /** Missing a required implementation. */
     case requiredImplementation = "requiredImplementation"
-    /** An exception was raised during a script execution. */
-    case scriptException = "scriptException"
     /** Native sockets could not be configured. */
     case socketConfiguration = "socketConfiguration"
     /** Operation timed out. */
     case timeout = "timeout"
-    /** TUN device is not active. */
-    case tunNotActive = "tunNotActive"
     /** TUN device is not available for I/O. */
     case tunNotAvailable = "tunNotAvailable"
-    /** Module type is unexpected */
-    case unexpectedModuleType = "unexpectedModuleType"
     /** Generic failure. */
     case unhandled = "unhandled"
     /** Module content is unknown for the importer. */
     case unknownImportedModule = "unknownImportedModule"
     /** Module handler is unknown. */
     case unknownModuleHandler = "unknownModuleHandler"
-    /** Configuration has no peers. */
-    case wireGuardEmptyPeers = "WireGuard.emptyPeers"
-    /** WireGuard interface address is invalid. */
-    case wireGuardInterfaceHasInvalidAddress = "WireGuard.interfaceHasInvalidAddress"
-    /** WireGuard interface DNS entry is invalid. */
-    case wireGuardInterfaceHasInvalidDNS = "WireGuard.interfaceHasInvalidDNS"
-    /** WireGuard interface listen port is invalid. */
-    case wireGuardInterfaceHasInvalidListenPort = "WireGuard.interfaceHasInvalidListenPort"
-    /** WireGuard interface MTU is invalid. */
-    case wireGuardInterfaceHasInvalidMTU = "WireGuard.interfaceHasInvalidMTU"
-    /** WireGuard interface private key is invalid. */
-    case wireGuardInterfaceHasInvalidPrivateKey = "WireGuard.interfaceHasInvalidPrivateKey"
-    /** WireGuard interface has no private key. */
-    case wireGuardInterfaceHasNoPrivateKey = "WireGuard.interfaceHasNoPrivateKey"
-    /** WireGuard interface key is unrecognized. */
-    case wireGuardInterfaceHasUnrecognizedKey = "WireGuard.interfaceHasUnrecognizedKey"
-    /** WireGuard key occurs more than once. */
-    case wireGuardMultipleEntriesForKey = "WireGuard.multipleEntriesForKey"
-    /** WireGuard configuration has multiple interface sections. */
-    case wireGuardMultipleInterfaces = "WireGuard.multipleInterfaces"
-    /** WireGuard configuration has multiple peers with the same public key. */
-    case wireGuardMultiplePeersWithSamePublicKey = "WireGuard.multiplePeersWithSamePublicKey"
-    /** WireGuard configuration has no interface section. */
-    case wireGuardNoInterface = "WireGuard.noInterface"
-    /** WireGuard peer allowed IP is invalid. */
-    case wireGuardPeerHasInvalidAllowedIP = "WireGuard.peerHasInvalidAllowedIP"
-    /** WireGuard peer endpoint is invalid. */
-    case wireGuardPeerHasInvalidEndpoint = "WireGuard.peerHasInvalidEndpoint"
-    /** WireGuard peer persistent keepalive is invalid. */
-    case wireGuardPeerHasInvalidPersistentKeepAlive = "WireGuard.peerHasInvalidPersistentKeepAlive"
-    /** WireGuard peer pre-shared key is invalid. */
-    case wireGuardPeerHasInvalidPreSharedKey = "WireGuard.peerHasInvalidPreSharedKey"
-    /** WireGuard peer public key is invalid. */
-    case wireGuardPeerHasInvalidPublicKey = "WireGuard.peerHasInvalidPublicKey"
-    /** WireGuard peer has no public key. */
-    case wireGuardPeerHasNoPublicKey = "WireGuard.peerHasNoPublicKey"
-    /** WireGuard peer key is unrecognized. */
-    case wireGuardPeerHasUnrecognizedKey = "WireGuard.peerHasUnrecognizedKey"
 }

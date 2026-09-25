@@ -861,15 +861,26 @@ components:
       required:
         - arguments
       type: object
+    PartoutErrorExtendedCode:
+      additionalProperties: false
+      properties:
+        code:
+          $ref: "#/components/schemas/PartoutErrorCode"
+        subCode:
+          type: string
+      required:
+        - code
+      type: object
+      description: An error code with an optional protocol-specific subcode. Runtime error strings encode this as code.subCode, or code when subCode is absent.
     PartoutErrorCode:
       enum:
+        - openVPN
+        - wireGuard
         - authentication
-        - cached
         - crypto
         - decoding
         - dnsFailure
         - encoding
-        - exhaustedEndpoints
         - fdUnavailable
         - incompatibleModules
         - incompleteModule
@@ -880,64 +891,27 @@ components:
         - keychainItemNotFound
         - linkNotActive
         - networkChanged
-        - networkUnreachable
         - noActiveModules
-        - nonFinalModules
-        - notFound
-        - OpenVPN.compressionMismatch
-        - OpenVPN.connectionFailure
-        - OpenVPN.noRouting
-        - OpenVPN.otpRequired
-        - OpenVPN.passphraseRequired
-        - OpenVPN.recoverableAuthentication
-        - OpenVPN.serverShutdown
-        - OpenVPN.tlsFailure
-        - OpenVPN.unsupportedAlgorithm
-        - OpenVPN.unsupportedCompression
-        - OpenVPN.unsupportedOption
         - operationCancelled
         - outOfMemory
         - parsing
-        - passphraseRequired
         - releasedObject
         - requiredImplementation
-        - scriptException
         - socketConfiguration
         - timeout
-        - tunNotActive
         - tunNotAvailable
-        - unexpectedModuleType
         - unhandled
         - unknownImportedModule
         - unknownModuleHandler
-        - WireGuard.emptyPeers
-        - WireGuard.interfaceHasInvalidAddress
-        - WireGuard.interfaceHasInvalidDNS
-        - WireGuard.interfaceHasInvalidListenPort
-        - WireGuard.interfaceHasInvalidMTU
-        - WireGuard.interfaceHasInvalidPrivateKey
-        - WireGuard.interfaceHasNoPrivateKey
-        - WireGuard.interfaceHasUnrecognizedKey
-        - WireGuard.multipleEntriesForKey
-        - WireGuard.multipleInterfaces
-        - WireGuard.multiplePeersWithSamePublicKey
-        - WireGuard.noInterface
-        - WireGuard.peerHasInvalidAllowedIP
-        - WireGuard.peerHasInvalidEndpoint
-        - WireGuard.peerHasInvalidPersistentKeepAlive
-        - WireGuard.peerHasInvalidPreSharedKey
-        - WireGuard.peerHasInvalidPublicKey
-        - WireGuard.peerHasNoPublicKey
-        - WireGuard.peerHasUnrecognizedKey
       type: string
       x-enum-varnames:
+        - openVPN
+        - wireGuard
         - authentication
-        - cached
         - crypto
         - decoding
         - dnsFailure
         - encoding
-        - exhaustedEndpoints
         - fdUnavailable
         - incompatibleModules
         - incompleteModule
@@ -948,63 +922,26 @@ components:
         - keychainItemNotFound
         - linkNotActive
         - networkChanged
-        - networkUnreachable
         - noActiveModules
-        - nonFinalModules
-        - notFound
-        - openVPNCompressionMismatch
-        - openVPNConnectionFailure
-        - openVPNNoRouting
-        - openVPNOTPRequired
-        - openVPNPassphraseRequired
-        - openVPNRecoverableAuthentication
-        - openVPNServerShutdown
-        - openVPNTLSFailure
-        - openVPNUnsupportedAlgorithm
-        - openVPNUnsupportedCompression
-        - openVPNUnsupportedOption
         - operationCancelled
         - outOfMemory
         - parsing
-        - passphraseRequired
         - releasedObject
         - requiredImplementation
-        - scriptException
         - socketConfiguration
         - timeout
-        - tunNotActive
         - tunNotAvailable
-        - unexpectedModuleType
         - unhandled
         - unknownImportedModule
         - unknownModuleHandler
-        - wireGuardEmptyPeers
-        - wireGuardInterfaceHasInvalidAddress
-        - wireGuardInterfaceHasInvalidDNS
-        - wireGuardInterfaceHasInvalidListenPort
-        - wireGuardInterfaceHasInvalidMTU
-        - wireGuardInterfaceHasInvalidPrivateKey
-        - wireGuardInterfaceHasNoPrivateKey
-        - wireGuardInterfaceHasUnrecognizedKey
-        - wireGuardMultipleEntriesForKey
-        - wireGuardMultipleInterfaces
-        - wireGuardMultiplePeersWithSamePublicKey
-        - wireGuardNoInterface
-        - wireGuardPeerHasInvalidAllowedIP
-        - wireGuardPeerHasInvalidEndpoint
-        - wireGuardPeerHasInvalidPersistentKeepAlive
-        - wireGuardPeerHasInvalidPreSharedKey
-        - wireGuardPeerHasInvalidPublicKey
-        - wireGuardPeerHasNoPublicKey
-        - wireGuardPeerHasUnrecognizedKey
       x-enum-descriptions:
+        - OpenVPN error; payload contains an OpenVPNErrorCode in subCode.
+        - WireGuard error; payload contains a WireGuardErrorCode in subCode.
         - Authentication failure.
-        - Response is cached.
         - Crypto error.
         - Decoding error.
         - DNS resolution failure.
         - Encoding error.
-        - No more endpoints available to try.
         - File descriptor is not available.
         - Some modules are incompatible (`userInfo` is an array of incompatible ``Module``).
         - A module is incomplete (`userInfo` is the incomplete ``ModuleBuilder`` ID).
@@ -1015,55 +952,18 @@ components:
         - Keychain item not found.
         - Link device is not active.
         - Network changed.
-        - Network is unreachable.
         - The profile has no active modules.
-        - The profile has non-final modules that must be resolved to final modules first.
-        - Entity not found.
-        - Compression settings mismatch.
-        - Connection failure.
-        - No routing configuration.
-        - One-time password is required.
-        - Passphrase is required.
-        - Authentication can be retried.
-        - Server requested shutdown.
-        - TLS failure.
-        - Algorithm is unsupported.
-        - Compression setting is unsupported.
-        - Option is unsupported.
         - Operation cancelled or unauthorized.
         - Memory allocation failed.
         - Parsing error.
-        - A passphrase is required.
         - A required object was released prematurely.
         - Missing a required implementation.
-        - An exception was raised during a script execution.
         - Native sockets could not be configured.
         - Operation timed out.
-        - TUN device is not active.
         - TUN device is not available for I/O.
-        - Module type is unexpected
         - Generic failure.
         - Module content is unknown for the importer.
         - Module handler is unknown.
-        - Configuration has no peers.
-        - WireGuard interface address is invalid.
-        - WireGuard interface DNS entry is invalid.
-        - WireGuard interface listen port is invalid.
-        - WireGuard interface MTU is invalid.
-        - WireGuard interface private key is invalid.
-        - WireGuard interface has no private key.
-        - WireGuard interface key is unrecognized.
-        - WireGuard key occurs more than once.
-        - WireGuard configuration has multiple interface sections.
-        - WireGuard configuration has multiple peers with the same public key.
-        - WireGuard configuration has no interface section.
-        - WireGuard peer allowed IP is invalid.
-        - WireGuard peer endpoint is invalid.
-        - WireGuard peer persistent keepalive is invalid.
-        - WireGuard peer pre-shared key is invalid.
-        - WireGuard peer public key is invalid.
-        - WireGuard peer has no public key.
-        - WireGuard peer key is unrecognized.
     Profile:
       additionalProperties: false
       properties:

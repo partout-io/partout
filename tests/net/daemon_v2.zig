@@ -59,6 +59,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
         defer profile.deinit(allocator);
         var controller = mock_mod.MockTunnelController{};
+        var event_recorder = mock_mod.DaemonEventRecorder{};
         var monitor = mock_mod.MockNetworkMonitor{};
         const sut = try Daemon.create(allocator, &profile, .{
             .objects = .{
@@ -68,7 +69,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
                 .factory = mock_mod.noopSocketFactory(),
                 .monitor = monitor.interface(),
             },
-            .options = .{ .reconnection_delay_ms = 60_000, .cancels_unrecoverable = cancels },
+            .options = .{ .events = event_recorder.events(), .reconnection_delay_ms = 60_000, .cancels_unrecoverable = cancels },
         });
         defer sut.destroy();
         const connection_daemon = sut.implementation.connection;
@@ -109,18 +110,21 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         // A terminal protocol failure uses the shared Daemon state to pause
         // connection retries, even when host cancellation is disabled.
         try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
-            .code = .authentication,
+            .code = .openVPN,
+            .sub_code = "tlsFailure",
             .disposition = .cancel,
         } });
         try std.testing.expect(sut.state == .failed);
         try std.testing.expect(!connection_daemon.gate.isReady());
         try std.testing.expectEqual(@as(usize, if (cancels) 1 else 0), controller.cancel_count);
+        try std.testing.expectEqualStrings("openVPN.tlsFailure", event_recorder.last_error_raw[0..event_recorder.last_error_len]);
+        if (cancels) try std.testing.expectEqualStrings("openVPN.tlsFailure", controller.last_cancel_raw[0..controller.last_cancel_len]);
         const failed_snapshots = controller.report_snapshot_count;
         try connection_daemon.actor.perform(void, .resumeGate);
         try std.testing.expectEqual(failed_snapshots, controller.report_snapshot_count);
         sut.hold();
         try std.testing.expect(sut.state == .stopped);
-        try std.testing.expectEqualStrings("authentication", sut.snapshot_publisher.environment.last_error_code.?);
+        try std.testing.expectEqualStrings("openVPN.tlsFailure", sut.snapshot_publisher.environment.last_error_code.?);
     }
 }
 
@@ -273,10 +277,10 @@ test "v2 daemon preserves settings-only failure and hold behavior" {
         last_error: ?api.PartoutErrorCode = null,
         fn status(_: *anyopaque, _: api.ConnectionStatus) void {}
         fn dataCount(_: *anyopaque, _: api.DataCount) void {}
-        fn lastError(ctx: *anyopaque, code: api.PartoutErrorCode) void {
+        fn lastError(ctx: *anyopaque, code: []const u8) void {
             const self: *@This() = @ptrCast(@alignCast(ctx));
             self.callbacks_on_caller = self.callbacks_on_caller and std.Thread.getCurrentId() == self.caller_thread;
-            self.last_error = code;
+            self.last_error = api.PartoutErrorCode.parseFromRaw(code);
         }
         fn remove(ctx: *anyopaque, key: daemon.EventKey) void {
             const self: *@This() = @ptrCast(@alignCast(ctx));

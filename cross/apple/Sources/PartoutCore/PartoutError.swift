@@ -11,6 +11,38 @@ public struct PartoutABIError: Error {
         self.code = code
         self.payload = payload
     }
+
+    public init?(rawValue: String) {
+        guard let extendedCode = PartoutErrorExtendedCode(rawValue: rawValue) else { return nil }
+        self.init(extendedCode.code, extendedCode.subCode.map { ["subCode": .string($0)] })
+    }
+
+    public var subCode: String? {
+        payload?["subCode"]?.stringValue
+    }
+
+    public var extendedCode: PartoutErrorExtendedCode {
+        PartoutErrorExtendedCode(code: code, subCode: subCode)
+    }
+
+    public var rawValue: String { extendedCode.rawValue }
+
+    public init(codeForOpenVPN code: OpenVPNErrorCode) {
+        self.init(.openVPN, ["subCode": .string(code.rawValue)])
+    }
+
+    public init(codeForWireGuard code: WireGuardErrorCode) {
+        self.init(.wireGuard, ["subCode": .string(code.rawValue)])
+    }
+}
+
+extension PartoutABIError: PartoutErrorMappable {
+    public var asPartoutError: PartoutError {
+        guard let payload else {
+            return PartoutError(code)
+        }
+        return PartoutError(code, payload)
+    }
 }
 
 /// Mappable to ``PartoutError``.

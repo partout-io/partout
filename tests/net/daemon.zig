@@ -130,7 +130,8 @@ test "connection gate waits for enable after cached reachable disconnected state
 
 test "snapshot publisher force-publishes status and last error snapshots" {
     var recorder = SnapshotRecorder{};
-    var publisher = SnapshotPublisher.init((api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    defer publisher.deinit();
 
     publisher.setConnectionStatus(.connecting);
     publisher.publishCurrentSnapshot(true);
@@ -138,7 +139,7 @@ test "snapshot publisher force-publishes status and last error snapshots" {
     try std.testing.expectEqual(api.TunnelStatus.activating, recorder.last_snapshot.status);
     try std.testing.expectEqual(api.ConnectionStatus.connecting, recorder.last_snapshot.environment.?.connection_status);
 
-    publisher.setLastError(.authentication);
+    publisher.setLastError("authentication");
     publisher.publishCurrentSnapshot(true);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);
     try std.testing.expectEqualStrings("authentication", recorder.last_snapshot.environment.?.last_error_code.?);
@@ -146,7 +147,8 @@ test "snapshot publisher force-publishes status and last error snapshots" {
 
 test "snapshot publisher filters data-count-only snapshots by minimum delta" {
     var recorder = SnapshotRecorder{};
-    var publisher = SnapshotPublisher.init((api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 10);
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 10);
+    defer publisher.deinit();
 
     publisher.setConnectionStatus(.connected);
     publisher.setDataCount(.{ .received = 100, .sent = 100 });
@@ -291,7 +293,7 @@ test "connection daemon clears last error when connected recovery repeats the st
     defer sut.stop();
 
     // A transient restart failure leaves the public status connected.
-    try sut.actor.perform(void, .{ .onConnectionLastError = .socketConfiguration });
+    try sut.actor.perform(void, .{ .onConnectionLastError = "socketConfiguration" });
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
     const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
@@ -337,7 +339,7 @@ test "connection daemon hold preserves published environment" {
     defer sut.destroy();
 
     try sut.start();
-    try sut.actor.perform(void, .{ .onConnectionLastError = .authentication });
+    try sut.actor.perform(void, .{ .onConnectionLastError = "authentication" });
     const remove_count_before_hold = events.remove_count;
 
     sut.hold();
@@ -1035,7 +1037,7 @@ const SandboxCapture = struct {
         self.start_count += 1;
         if (self.cancel_on_start) |code| {
             events.status(events.ctx, .connecting);
-            events.cancel(events.ctx, code);
+            events.cancel(events.ctx, code.raw());
         }
         if (self.disconnect_on_start) {
             events.status(events.ctx, .connecting);
@@ -1123,4 +1125,21 @@ fn withEvents(
     var updated = options;
     updated.events = events.events();
     return updated;
+}
+
+test "snapshot publisher owns extended error strings and clears cached snapshots" {
+    var recorder = SnapshotRecorder{};
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    defer publisher.deinit();
+    var raw = "openVPN.tlsFailure".*;
+    publisher.setLastError(&raw);
+    publisher.publishCurrentSnapshot(false);
+    @memset(&raw, 'x');
+    try std.testing.expectEqualStrings("openVPN.tlsFailure", publisher.environment.last_error_code.?);
+    publisher.setLastError("openVPN.serverShutdown");
+    publisher.publishCurrentSnapshot(false);
+    try std.testing.expectEqual(@as(usize, 2), recorder.count);
+    publisher.clearEnvironment();
+    publisher.publishCurrentSnapshot(false);
+    try std.testing.expect(publisher.environment.last_error_code == null);
 }

@@ -206,6 +206,8 @@ pub const SnapshotPublisher = struct {
     const ProfileId = api.UUID;
     const ReportBlock = *const fn (*const anyopaque, api.TunnelSnapshot) void;
 
+    allocator: std.mem.Allocator,
+    error_storage: ?[]u8 = null,
     profile_id: ProfileId,
     report_snapshot: ReportBlock,
     report_snapshot_ctx: *const anyopaque,
@@ -214,12 +216,14 @@ pub const SnapshotPublisher = struct {
     last_published_snapshot: ?api.TunnelSnapshot = null,
 
     pub fn init(
+        allocator: std.mem.Allocator,
         profile_id: ProfileId,
         report_snapshot: ReportBlock,
         report_snapshot_ctx: *const anyopaque,
         min_data_count_delta: u64,
     ) SnapshotPublisher {
         return .{
+            .allocator = allocator,
             .profile_id = profile_id,
             .report_snapshot = report_snapshot,
             .report_snapshot_ctx = report_snapshot_ctx,
@@ -227,7 +231,12 @@ pub const SnapshotPublisher = struct {
         };
     }
 
+    pub fn deinit(self: *SnapshotPublisher) void {
+        if (self.error_storage) |value| self.allocator.free(value);
+    }
+
     pub fn clearEnvironment(self: *SnapshotPublisher) void {
+        self.setLastError(null);
         self.environment = emptyEnvironment();
     }
 
@@ -235,8 +244,13 @@ pub const SnapshotPublisher = struct {
         self.environment.connection_status = status;
     }
 
-    pub fn setLastError(self: *SnapshotPublisher, code: ?api.PartoutErrorCode) void {
-        self.environment.last_error_code = if (code) |c| c.raw() else null;
+    pub fn setLastError(self: *SnapshotPublisher, code: ?[]const u8) void {
+        if (core.util.optionalStringsEqual(self.environment.last_error_code, code)) return;
+        const owned = if (code) |value| self.allocator.dupe(u8, value) catch null else null;
+        self.last_published_snapshot = null;
+        if (self.error_storage) |value| self.allocator.free(value);
+        self.error_storage = owned;
+        self.environment.last_error_code = if (code != null) owned orelse "outOfMemory" else null;
     }
 
     pub fn setDataCount(self: *SnapshotPublisher, data_count: api.DataCount) void {
