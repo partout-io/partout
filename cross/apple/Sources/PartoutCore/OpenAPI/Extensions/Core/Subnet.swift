@@ -2,8 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutPortable_C
-
 /// An IPv4/v6 subnet.
 public struct Subnet: Hashable, Codable, Sendable {
     /// The subnet address.
@@ -113,7 +111,7 @@ private extension String {
     var asPrefixLength: Int {
         var n = UInt32()
         inet_pton(AF_INET, self, &n)
-        n = pp_swap_big32_to_host(n)
+        n = CFSwapInt32BigToHost(n)
         var i = 0
         while n > 0 {
             if n & 1 == 1 {

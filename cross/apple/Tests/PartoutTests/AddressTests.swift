@@ -40,9 +40,9 @@ struct AddressTests {
 
     @Test
     func givenIPv6_whenParseData_thenIsExpected() {
-        #expect(Address(data: Data(hex: "2607f0d0100200510000000000000004")) == .ip("2607:f0d0:1002:0051:0000:0000:0000:0004", .v6))
-        #expect(Address(data: Data(hex: "00000000000000000000000000000004")) == .ip("0000:0000:0000:0000:0000:0000:0000:0004", .v6))
-        #expect(Address(data: Data(hex: "2607f0d010020051ffff543545500004")) == .ip("2607:f0d0:1002:0051:ffff:5435:4550:0004", .v6))
+        #expect(Address(data: Data(hex: "2607f0d0100200510000000000000004")) == .ip("2607:f0d0:1002:51::4", .v6))
+        #expect(Address(data: Data(hex: "00000000000000000000000000000004")) == .ip("::4", .v6))
+        #expect(Address(data: Data(hex: "2607f0d010020051ffff543545500004")) == .ip("2607:f0d0:1002:51:ffff:5435:4550:4", .v6))
     }
 
     @Test

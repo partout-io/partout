@@ -20,10 +20,6 @@ let package = Package(
             targets: ["PartoutCore"]
         ),
         .library(
-            name: "PartoutCore_C",
-            targets: ["PartoutCore_C"]
-        ),
-        .library(
             name: "PartoutRuntime",
             targets: ["PartoutRuntime"]
         )
@@ -36,12 +32,7 @@ let package = Package(
         ),
         .target(
             name: "PartoutCore",
-            dependencies: ["PartoutCore_C"],
             path: "cross/apple/Sources/PartoutCore"
-        ),
-        .target(
-            name: "PartoutCore_C",
-            path: "cross/apple/Sources/PartoutCore_C"
         ),
         .target(
             name: "PartoutNative_C",

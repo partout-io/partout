@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@_exported import _PartoutPortable_C
 @_exported import Foundation
 
 public enum PartoutCore {

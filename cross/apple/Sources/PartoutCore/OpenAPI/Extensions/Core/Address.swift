@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutPortable_C
+import Network
 
 /// A hostname or IP address.
 @frozen
@@ -48,10 +48,10 @@ extension Address: RawRepresentable {
         guard !baseValue.isEmpty else {
             return nil
         }
-        switch baseValue.addressFamily {
-        case .v4:
+        switch NWEndpoint.Host(baseValue) {
+        case .ipv4:
             self = .ip(baseValue, .v4)
-        case .v6:
+        case .ipv6:
             self = .ip(baseValue, .v6)
         default:
             guard baseValue != PartoutLogger.redactedValue else {
@@ -62,32 +62,13 @@ extension Address: RawRepresentable {
     }
 
     public init?(data: Data) {
-        switch data.count {
-        case 4:
-            let comps = data.map {
-                UInt8($0).description
-            }
-            self = .ip(comps.joined(separator: "."), .v4)
-        case 16:
-            let comps = data.map {
-                String(format: "%.02x", $0)
-            }
-            let quadComps = comps.joined().components(withLength: 4)
-            self = .ip(quadComps.joined(separator: ":"), .v6)
-        default:
+        if let address = IPv4Address(data) {
+            self = .ip(address.debugDescription, .v4)
+        } else if let address = IPv6Address(data) {
+            self = .ip(address.debugDescription, .v6)
+        } else {
             return nil
         }
-    }
-}
-
-private extension String {
-    func components(withLength length: Int) -> [String] {
-        stride(from: 0, to: count, by: length)
-            .map {
-                let start = index(startIndex, offsetBy: $0)
-                let end = index(start, offsetBy: length, limitedBy: endIndex) ?? endIndex
-                return String(self[start..<end])
-            }
     }
 }
 
@@ -100,57 +81,35 @@ extension Address: CustomStringConvertible {
 extension Address {
     public func network(with ipv4Mask: String) -> Address? {
         assert(family == .v4)
-        let dstLength = Int(INET_ADDRSTRLEN)
-        var dst: [CChar] = Array(repeating: .zero, count: dstLength)
-        let result = rawValue.utf8CString.withUnsafeBytes { addrPtr in
-            ipv4Mask.utf8CString.withUnsafeBytes { netmaskPtr in
-                dst.withUnsafeMutableBytes { dstPtr in
-                    pp_addr_network_v4(
-                        dstPtr.baseAddress,
-                        dstLength,
-                        addrPtr.baseAddress,
-                        netmaskPtr.baseAddress
-                    )
-                }
-            }
-        }
-        guard result != 0 else {
+        guard let address = IPv4Address(rawValue),
+              let mask = IPv4Address(ipv4Mask) else {
             return nil
         }
-        return Address(rawValue: dst.string)
+        let bytes = Data(zip(address.rawValue, mask.rawValue).map { $0 & $1 })
+        guard let network = IPv4Address(bytes) else {
+            return nil
+        }
+        return .ip(network.debugDescription, .v4)
     }
 
     public func network(with ipv6PrefixLength: Int) -> Address? {
-        let dstLength = Int(INET6_ADDRSTRLEN)
-        var dst: [CChar] = Array(repeating: .zero, count: dstLength)
-        let result = rawValue.utf8CString.withUnsafeBytes { addrPtr in
-            dst.withUnsafeMutableBytes { dstPtr in
-                pp_addr_network_v6(
-                    dstPtr.baseAddress,
-                    dstLength,
-                    addrPtr.baseAddress,
-                    Int32(ipv6PrefixLength)
-                )
-            }
-        }
-        guard result != 0 else {
+        guard (0...128).contains(ipv6PrefixLength),
+              let address = IPv6Address(rawValue) else {
             return nil
         }
-        return Address(rawValue: dst.string)
-    }
-}
-
-private extension String {
-    var addressFamily: Address.Family? {
-        let cFamily = pp_addr_family_of(cString(using: .utf8))
-        switch cFamily {
-        case PPAddrFamilyV4:
-            return .v4
-        case PPAddrFamilyV6:
-            return .v6
-        default:
+        var bytes = address.rawValue
+        let fullBytes = ipv6PrefixLength / 8
+        let remainingBits = ipv6PrefixLength % 8
+        if remainingBits == 0 {
+            bytes.resetBytes(in: fullBytes..<bytes.count)
+        } else {
+            bytes[fullBytes] &= UInt8.max << (8 - remainingBits)
+            bytes.resetBytes(in: (fullBytes + 1)..<bytes.count)
+        }
+        guard let network = IPv6Address(bytes) else {
             return nil
         }
+        return .ip(network.debugDescription, .v6)
     }
 }
 
