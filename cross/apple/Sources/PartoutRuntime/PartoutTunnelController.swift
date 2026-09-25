@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 import NetworkExtension
+import PartoutNative_C
 
 /// A controller based on `NEPacketTunnelProvider`.
 final class PartoutTunnelController: Sendable {
