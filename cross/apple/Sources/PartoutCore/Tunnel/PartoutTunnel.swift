@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 /// Manages a tunnel and observes its status.
-public actor Tunnel {
+public actor PartoutTunnel {
     public typealias WillInstallBlock = @Sendable (_ profile: Profile) async throws -> Profile
 
     private let ctx: PartoutLoggerContext
@@ -54,7 +54,7 @@ public actor Tunnel {
 
 // MARK: - TunnelStrategy
 
-extension Tunnel: TunnelStrategy {
+extension PartoutTunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
         observeObjects()
         pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
@@ -113,7 +113,7 @@ extension Tunnel: TunnelStrategy {
     }
 }
 
-extension Tunnel {
+extension PartoutTunnel {
     public func install(_ profile: Profile, connect: Bool) async throws {
         try await install(profile, connect: connect, options: nil)
     }
@@ -121,7 +121,7 @@ extension Tunnel {
 
 // MARK: - State
 
-extension Tunnel {
+extension PartoutTunnel {
     public private(set) nonisolated var snapshots: [Profile.ID: TunnelSnapshot] {
         get {
             snapshotsSubject.value
@@ -147,7 +147,7 @@ extension Tunnel {
 // MARK: Single profile
 
 #if os(iOS) || os(tvOS)
-extension Tunnel {
+extension PartoutTunnel {
     public var snapshot: TunnelSnapshot? {
         snapshots.first?.value
     }
@@ -165,7 +165,7 @@ extension Tunnel {
 
 // MARK: - Observation
 
-private extension Tunnel {
+private extension PartoutTunnel {
     func observeObjects() {
         // Subscribe once
         guard subscriptions.isEmpty else { return }

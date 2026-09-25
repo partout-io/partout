@@ -301,8 +301,8 @@ private extension TunnelTests {
     func newTunnel(
         env: TunnelEnvironment? = nil,
         processor: MockTunnelProcessor? = nil
-    ) async throws -> Tunnel {
-        let tunnel = Tunnel(
+    ) async throws -> PartoutTunnel {
+        let tunnel = PartoutTunnel(
             .global,
             strategy: FakeTunnelStrategy(delay: 100),
             refreshInterval: 100,
@@ -316,7 +316,7 @@ private extension TunnelTests {
     }
 }
 
-private extension Tunnel {
+private extension PartoutTunnel {
     func connect(with profile: Profile) async throws {
         try await install(profile, connect: true)
     }

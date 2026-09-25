@@ -18,7 +18,7 @@ struct MessageHandlerTests {
         let strategy = FakeTunnelStrategy { _ in
             (try? JSONEncoder.shared().encode(output)) ?? Data()
         }
-        let sut = Tunnel(.global, strategy: strategy) { _ in
+        let sut = PartoutTunnel(.global, strategy: strategy) { _ in
             SharedTunnelEnvironment(profileId: nil)
         }
 
