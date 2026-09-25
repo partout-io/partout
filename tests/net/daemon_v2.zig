@@ -110,8 +110,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         // A terminal protocol failure uses the shared Daemon state to pause
         // connection retries, even when host cancellation is disabled.
         try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
-            .code = .openVPN,
-            .sub_code = "tlsFailure",
+            .err_pair = api.openVPNErrorCode(.tlsFailure),
             .disposition = .cancel,
         } });
         try std.testing.expect(sut.state == .failed);
@@ -257,7 +256,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     // A protocol failure must finalize the attempt just like setup failure:
     // shutdown and stop must run in order on the looper before status changes.
     try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
-        .code = .ioFailure,
+        .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
     } });
     try connection_daemon.actor.perform(void, .resumeGate); // Drain the queued stopped event.
@@ -277,10 +276,10 @@ test "v2 daemon preserves settings-only failure and hold behavior" {
         last_error: ?api.PartoutErrorCode = null,
         fn status(_: *anyopaque, _: api.ConnectionStatus) void {}
         fn dataCount(_: *anyopaque, _: api.DataCount) void {}
-        fn lastError(ctx: *anyopaque, code: []const u8) void {
+        fn lastError(ctx: *anyopaque, err_pair: api.PartoutErrorPair) void {
             const self: *@This() = @ptrCast(@alignCast(ctx));
             self.callbacks_on_caller = self.callbacks_on_caller and std.Thread.getCurrentId() == self.caller_thread;
-            self.last_error = api.PartoutErrorCode.parseFromRaw(code);
+            self.last_error = err_pair.code;
         }
         fn remove(ctx: *anyopaque, key: daemon.EventKey) void {
             const self: *@This() = @ptrCast(@alignCast(ctx));

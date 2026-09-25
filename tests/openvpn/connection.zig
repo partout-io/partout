@@ -59,9 +59,9 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
         }
 
         fn ignoreStatus(_: *anyopaque, _: api.ConnectionStatus) void {}
-        fn ignoreError(_: *anyopaque, _: []const u8) void {}
+        fn ignoreError(_: *anyopaque, _: api.PartoutErrorPair) void {}
         fn ignoreCount(_: *anyopaque, _: api.DataCount) void {}
-        fn ignoreCancel(_: *anyopaque, _: ?[]const u8) void {}
+        fn ignoreCancel(_: *anyopaque, _: ?api.PartoutErrorPair) void {}
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
     };
     const allocator = std.testing.allocator;

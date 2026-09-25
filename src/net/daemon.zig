@@ -83,7 +83,7 @@ pub const EventKey = enum {
 pub const Events = struct {
     ctx: *anyopaque,
     status: *const fn (*anyopaque, api.ConnectionStatus) void,
-    last_error: *const fn (*anyopaque, []const u8) void,
+    last_error: *const fn (*anyopaque, api.PartoutErrorPair) void,
     data_count: *const fn (*anyopaque, api.DataCount) void,
     remove_key: *const fn (*anyopaque, EventKey) void,
 };
@@ -273,9 +273,9 @@ pub const Daemon = struct {
         onReachability: io.ReachabilityInfo,
         onBetterPath,
         onConnectionStatus: api.ConnectionStatus,
-        onConnectionLastError: []const u8,
+        onConnectionLastError: api.PartoutErrorPair,
         onConnectionDataCount: api.DataCount,
-        onConnectionCancel: ?[]const u8,
+        onConnectionCancel: ?api.PartoutErrorPair,
         onLooperTerminated: ?Looper.Failure,
         recoverConnection,
         onConnectionBlock: struct {
@@ -295,9 +295,9 @@ pub const Daemon = struct {
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionStatus => |status| self.handleConnectionStatus(status),
-            .onConnectionLastError => |code| self.handleLastError(code),
+            .onConnectionLastError => |err_pair| self.handleLastError(err_pair),
             .onConnectionDataCount => |count| self.handleDataCount(count),
-            .onConnectionCancel => |code| self.handleConnectionCancel(code),
+            .onConnectionCancel => |err_pair| self.handleConnectionCancel(err_pair),
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnectionRuntime(),
             .onConnectionBlock => |payload| self.handleConnectionBlock(
@@ -386,9 +386,9 @@ pub const Daemon = struct {
         };
     }
 
-    fn onConnectionLastError(ctx: *anyopaque, code: []const u8) void {
+    fn onConnectionLastError(ctx: *anyopaque, err_pair: api.PartoutErrorPair) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(void, .{ .onConnectionLastError = code }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionLastError = err_pair }) catch |err| {
             log.writef(.err, "Unable to report connection last error: {s}", .{@errorName(err)});
         };
     }
@@ -400,9 +400,9 @@ pub const Daemon = struct {
         };
     }
 
-    fn onConnectionCancel(ctx: *anyopaque, code: ?[]const u8) void {
+    fn onConnectionCancel(ctx: *anyopaque, err_pair: ?api.PartoutErrorPair) void {
         const self: *Daemon = @ptrCast(@alignCast(ctx));
-        self.actor.perform(void, .{ .onConnectionCancel = code }) catch |err| {
+        self.actor.perform(void, .{ .onConnectionCancel = err_pair }) catch |err| {
             log.writef(.err, "Unable to request connection cancellation: {s}", .{@errorName(err)});
         };
     }
@@ -441,7 +441,7 @@ pub const Daemon = struct {
             var maybe_info = buildSettingsOnlyTunnelInfo(self.allocator, &self.profile) catch |err| {
                 log.writef(.fault, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
                 const code = self.handleStartError(err);
-                self.requestCancellation(code.raw(), false);
+                self.requestCancellation(.{ .code = code }, false);
                 return;
             };
             if (maybe_info) |*info| {
@@ -449,7 +449,7 @@ pub const Daemon = struct {
                 var tun = self.controller.setTunnelSettings(info.*) catch |err| {
                     log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                     const code = self.handleStartError(err);
-                    self.requestCancellation(code.raw(), false);
+                    self.requestCancellation(.{ .code = code }, false);
                     return;
                 };
                 tun.deinit();
@@ -498,7 +498,7 @@ pub const Daemon = struct {
 
     fn handleStartError(self: *Daemon, err: StartError) api.PartoutErrorCode {
         const code = partoutCodeForDaemonStartError(err);
-        self.handleLastError(code.raw());
+        self.handleLastError(.{ .code = code });
         self.controller.setReasserting(false);
         return code;
     }
@@ -685,11 +685,11 @@ pub const Daemon = struct {
         }
     }
 
-    fn handleLastError(self: *Daemon, code: []const u8) void {
+    fn handleLastError(self: *Daemon, err_pair: api.PartoutErrorPair) void {
         self.resetDataCount();
-        self.snapshot_publisher.setLastError(code);
+        self.snapshot_publisher.setLastError(err_pair);
         self.snapshot_publisher.publishCurrentSnapshot(true);
-        if (self.options.events) |e| e.last_error(e.ctx, code);
+        if (self.options.events) |e| e.last_error(e.ctx, err_pair);
     }
 
     fn handleDataCount(self: *Daemon, data_count: api.DataCount) void {
@@ -698,7 +698,7 @@ pub const Daemon = struct {
         if (self.options.events) |e| e.data_count(e.ctx, data_count);
     }
 
-    fn handleConnectionCancel(self: *Daemon, code: ?[]const u8) void {
+    fn handleConnectionCancel(self: *Daemon, err_pair: ?api.PartoutErrorPair) void {
         self.enterFailedState();
         self.controller.setReasserting(false);
         if (!self.options.cancels_unrecoverable and
@@ -706,7 +706,7 @@ pub const Daemon = struct {
         {
             self.handleConnectionStatus(.disconnected);
         }
-        self.requestCancellation(code, false);
+        self.requestCancellation(err_pair, false);
     }
 
     fn resetDataCount(self: *Daemon) void {
@@ -723,7 +723,7 @@ pub const Daemon = struct {
         log.write(.fault, "Daemon-owned looper terminated");
 
         if (partoutCodeForLooperFailure(failure)) |code| {
-            self.handleLastError(code.raw());
+            self.handleLastError(.{ .code = code });
         }
 
         // The looper terminal callback already stopped protocol producers and
@@ -736,20 +736,20 @@ pub const Daemon = struct {
         self.actor.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
             self.controller.setReasserting(false);
-            self.requestCancellation(if (partoutCodeForLooperFailure(failure)) |code| code.raw() else null, true);
+            self.requestCancellation(if (partoutCodeForLooperFailure(failure)) |code| .{ .code = code } else null, true);
         };
     }
 
     fn requestCancellation(
         self: *Daemon,
-        code: ?[]const u8,
+        err_pair: ?api.PartoutErrorPair,
         force: bool,
     ) void {
         self.enterFailedState();
         if (self.cancellation_requested) return;
         if (!force and !self.options.cancels_unrecoverable) return;
         self.cancellation_requested = true;
-        self.controller.cancelTunnelConnection(code);
+        self.controller.cancelTunnelConnection(err_pair);
     }
 
     fn enterFailedState(self: *Daemon) void {
@@ -883,7 +883,7 @@ pub const Daemon = struct {
         self.initConnectionRuntime() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
             const code = self.handleStartError(err);
-            self.requestCancellation(code.raw(), true);
+            self.requestCancellation(.{ .code = code }, true);
             return;
         };
 

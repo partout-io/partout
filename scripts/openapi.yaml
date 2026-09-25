@@ -861,7 +861,7 @@ components:
       required:
         - arguments
       type: object
-    PartoutErrorExtendedCode:
+    PartoutErrorPair:
       additionalProperties: false
       properties:
         code:

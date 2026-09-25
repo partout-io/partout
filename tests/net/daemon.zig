@@ -139,7 +139,7 @@ test "snapshot publisher force-publishes status and last error snapshots" {
     try std.testing.expectEqual(api.TunnelStatus.activating, recorder.last_snapshot.status);
     try std.testing.expectEqual(api.ConnectionStatus.connecting, recorder.last_snapshot.environment.?.connection_status);
 
-    publisher.setLastError("authentication");
+    publisher.setLastError(.{ .code = .authentication });
     publisher.publishCurrentSnapshot(true);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);
     try std.testing.expectEqualStrings("authentication", recorder.last_snapshot.environment.?.last_error_code.?);
@@ -293,7 +293,7 @@ test "connection daemon clears last error when connected recovery repeats the st
     defer sut.stop();
 
     // A transient restart failure leaves the public status connected.
-    try sut.actor.perform(void, .{ .onConnectionLastError = "socketConfiguration" });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .{ .code = .socketConfiguration } });
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
     const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
@@ -339,7 +339,7 @@ test "connection daemon hold preserves published environment" {
     defer sut.destroy();
 
     try sut.start();
-    try sut.actor.perform(void, .{ .onConnectionLastError = "authentication" });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .{ .code = .authentication } });
     const remove_count_before_hold = events.remove_count;
 
     sut.hold();
@@ -506,6 +506,49 @@ test "connection daemon publishes terminal status when cancellation is disabled"
     monitor.setReachable(true);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqual(@as(usize, 1), capture.start_count);
+}
+
+test "connection daemon preserves extended and optional error codes at string boundaries" {
+    const cases = [_]struct { err_pair: ?api.PartoutErrorPair, raw: ?[]const u8 }{
+        .{ .err_pair = api.openVPNErrorCode(.tlsFailure), .raw = "openVPN.tlsFailure" },
+        .{ .err_pair = .{ .code = .authentication }, .raw = "authentication" },
+        .{ .err_pair = null, .raw = null },
+    };
+    for (cases) |case| {
+        const allocator = std.testing.allocator;
+        var implementations = [_]net.ConnectionImplementation{mock_mod.mockConnectionImplementation()};
+        var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+        defer registry.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var events = mock_mod.DaemonEventRecorder{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        var sut = try newDaemon(
+            allocator,
+            mock_mod.connectionProfileJson(),
+            &registry,
+            &controller,
+            &events,
+            &monitor,
+            .{},
+        );
+        defer sut.destroy();
+        try sut.start();
+        defer sut.stop();
+
+        if (case.err_pair) |err_pair| {
+            try sut.actor.perform(void, .{ .onConnectionLastError = err_pair });
+            try std.testing.expectEqualStrings(case.raw.?, events.last_error_raw[0..events.last_error_len]);
+            try std.testing.expectEqualStrings(case.raw.?, sut.snapshot_publisher.environment.last_error_code.?);
+        }
+        try sut.actor.perform(void, .{ .onConnectionCancel = case.err_pair });
+        try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+        if (case.raw) |raw| {
+            try std.testing.expectEqualStrings(raw, controller.last_cancel_raw[0..controller.last_cancel_len]);
+        } else {
+            try std.testing.expect(controller.last_cancel_code == null);
+            try std.testing.expectEqual(@as(usize, 0), controller.last_cancel_len);
+        }
+    }
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
@@ -1037,7 +1080,7 @@ const SandboxCapture = struct {
         self.start_count += 1;
         if (self.cancel_on_start) |code| {
             events.status(events.ctx, .connecting);
-            events.cancel(events.ctx, code.raw());
+            events.cancel(events.ctx, .{ .code = code });
         }
         if (self.disconnect_on_start) {
             events.status(events.ctx, .connecting);
@@ -1131,12 +1174,12 @@ test "snapshot publisher owns extended error strings and clears cached snapshots
     var recorder = SnapshotRecorder{};
     var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
     defer publisher.deinit();
-    var raw = "openVPN.tlsFailure".*;
-    publisher.setLastError(&raw);
+    var raw = "tlsFailure".*;
+    publisher.setLastError(.{ .code = .openVPN, .sub_code = &raw });
     publisher.publishCurrentSnapshot(false);
     @memset(&raw, 'x');
     try std.testing.expectEqualStrings("openVPN.tlsFailure", publisher.environment.last_error_code.?);
-    publisher.setLastError("openVPN.serverShutdown");
+    publisher.setLastError(api.openVPNErrorCode(.serverShutdown));
     publisher.publishCurrentSnapshot(false);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);
     publisher.clearEnvironment();

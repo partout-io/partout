@@ -387,10 +387,9 @@ const OpenVPNConnection = struct {
         // The owner schedules shutdown/detachment/stop. Never reenter the
         // lifecycle here: this callback can run inside TLS.
         const events = self.events orelse return;
-        const failure_code = partoutCodeForError(cause);
+        const err_pair = partoutCodeForError(cause);
         events.failed(events.ctx, .{
-            .code = failure_code.code,
-            .sub_code = failure_code.sub_code,
+            .err_pair = err_pair,
             .disposition = errorDisposition(cause),
         });
     }
@@ -644,7 +643,7 @@ pub const testing = struct {
     pub const codeForError = partoutCodeForError;
 };
 
-const FailureCode = api.PartoutErrorExtendedCode;
+const FailureCode = api.PartoutErrorPair;
 
 fn partoutCodeForError(err: ConnectionError) FailureCode {
     return switch (err) {

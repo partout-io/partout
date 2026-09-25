@@ -207,7 +207,7 @@ pub const SnapshotPublisher = struct {
     const ReportBlock = *const fn (*const anyopaque, api.TunnelSnapshot) void;
 
     allocator: std.mem.Allocator,
-    error_storage: ?[]u8 = null,
+    error_storage: ?[:0]u8 = null,
     profile_id: ProfileId,
     report_snapshot: ReportBlock,
     report_snapshot_ctx: *const anyopaque,
@@ -244,13 +244,17 @@ pub const SnapshotPublisher = struct {
         self.environment.connection_status = status;
     }
 
-    pub fn setLastError(self: *SnapshotPublisher, code: ?[]const u8) void {
-        if (core.util.optionalStringsEqual(self.environment.last_error_code, code)) return;
-        const owned = if (code) |value| self.allocator.dupe(u8, value) catch null else null;
+    pub fn setLastError(self: *SnapshotPublisher, err_pair: ?api.PartoutErrorPair) void {
+        const owned = if (err_pair) |value| api.formatErrorPair(self.allocator, value) catch null else null;
+        const raw: ?[]const u8 = if (err_pair != null) owned orelse "outOfMemory" else null;
+        if (core.util.optionalStringsEqual(self.environment.last_error_code, raw)) {
+            if (owned) |value| self.allocator.free(value);
+            return;
+        }
         self.last_published_snapshot = null;
         if (self.error_storage) |value| self.allocator.free(value);
         self.error_storage = owned;
-        self.environment.last_error_code = if (code != null) owned orelse "outOfMemory" else null;
+        self.environment.last_error_code = raw;
     }
 
     pub fn setDataCount(self: *SnapshotPublisher, data_count: api.DataCount) void {

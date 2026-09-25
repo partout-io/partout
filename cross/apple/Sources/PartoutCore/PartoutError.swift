@@ -30,8 +30,8 @@ public struct PartoutError: Error {
     }
 
     public init?(rawValue: String) {
-        guard let extendedCode = PartoutErrorExtendedCode(rawValue: rawValue) else { return nil }
-        self.init(extendedCode.code, payload: extendedCode.subCode.map {
+        guard let errorPair = PartoutErrorPair(rawValue: rawValue) else { return nil }
+        self.init(errorPair.code, payload: errorPair.subCode.map {
             [Self.subCodeKey: .string($0)]
         })
     }
@@ -40,11 +40,11 @@ public struct PartoutError: Error {
         payload?[Self.subCodeKey]?.stringValue
     }
 
-    public var extendedCode: PartoutErrorExtendedCode {
-        PartoutErrorExtendedCode(code: code, subCode: subCode)
+    public var errorPair: PartoutErrorPair {
+        PartoutErrorPair(code: code, subCode: subCode)
     }
 
-    public var rawValue: String { extendedCode.rawValue }
+    public var rawValue: String { errorPair.rawValue }
 
     public init(codeForOpenVPN code: OpenVPNErrorCode) {
         self.init(.openVPN, payload: [Self.subCodeKey: .string(code.rawValue)])

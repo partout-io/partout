@@ -52,7 +52,7 @@ struct PartoutErrorTests {
 
     @Test(arguments: ["timeout", "openVPN.tlsFailure", "wireGuard.peerHasInvalidPublicKey", "openVPN.future.code"])
     func givenRuntimeCode_whenParse_thenRoundTrips(raw: String) throws {
-        let extended = try #require(PartoutErrorExtendedCode(rawValue: raw))
+        let extended = try #require(PartoutErrorPair(rawValue: raw))
         #expect(extended.rawValue == raw)
         let error = try #require(PartoutError(rawValue: raw))
         #expect(error.code == extended.code)
@@ -62,7 +62,7 @@ struct PartoutErrorTests {
 
     @Test(arguments: ["", "unknown.subcode", "openVPN."])
     func givenInvalidRuntimeCode_whenParse_thenFails(raw: String) {
-        #expect(PartoutErrorExtendedCode(rawValue: raw) == nil)
+        #expect(PartoutErrorPair(rawValue: raw) == nil)
     }
 
     @Test(arguments: [

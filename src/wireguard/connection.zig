@@ -174,7 +174,7 @@ const WireGuardConnection = struct {
                     log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
                 },
             }
-            events.last_error(events.ctx, partoutCodeForError(err).raw());
+            events.last_error(events.ctx, .{ .code = partoutCodeForError(err) });
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
                 error.DNSResolutionFailure => error.DNSResolutionFailure,
@@ -331,9 +331,9 @@ const WireGuardConnection = struct {
         self.adapter.stop(self.allocator);
         self.events = null;
 
-        const code = partoutCodeForError(err).raw();
-        events.last_error(events.ctx, code);
-        events.cancel(events.ctx, code);
+        const err_pair: api.PartoutErrorPair = .{ .code = partoutCodeForError(err) };
+        events.last_error(events.ctx, err_pair);
+        events.cancel(events.ctx, err_pair);
     }
 
     fn reportActivationFailure(
@@ -341,8 +341,8 @@ const WireGuardConnection = struct {
         events: net.Connection.Events,
         err: ConnectionError,
     ) void {
-        const code = partoutCodeForError(err).raw();
-        events.last_error(events.ctx, code);
+        const err_pair: api.PartoutErrorPair = .{ .code = partoutCodeForError(err) };
+        events.last_error(events.ctx, err_pair);
         if (self.adapter.isStopped()) {
             events.status(events.ctx, .disconnected);
         }

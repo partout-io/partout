@@ -70,16 +70,16 @@ pub const OpenVPNTLSWrap = gen.OpenVPNTLSWrap;
 pub const OpenVPNTLSWrapStrategy = gen.OpenVPNTLSWrapStrategy;
 pub const ParseErrorInfo = gen.ParseErrorInfo;
 pub const PartoutErrorCode = gen.PartoutErrorCode;
-pub const PartoutErrorExtendedCode = gen.PartoutErrorExtendedCode;
+pub const PartoutErrorPair = gen.PartoutErrorPair;
 
-pub fn formatErrorCode(allocator: std.mem.Allocator, value: PartoutErrorExtendedCode) error{OutOfMemory}![:0]u8 {
-    if (value.sub_code) |sub_code| {
-        return std.fmt.allocPrintSentinel(allocator, "{s}.{s}", .{ value.code.raw(), sub_code }, 0);
+pub fn formatErrorPair(allocator: std.mem.Allocator, err_pair: PartoutErrorPair) error{OutOfMemory}![:0]u8 {
+    if (err_pair.sub_code) |sub_code| {
+        return std.fmt.allocPrintSentinel(allocator, "{s}.{s}", .{ err_pair.code.raw(), sub_code }, 0);
     }
-    return allocator.dupeZ(u8, value.code.raw());
+    return allocator.dupeZ(u8, err_pair.code.raw());
 }
 
-pub fn openVPNErrorCode(code: OpenVPNErrorCode) PartoutErrorExtendedCode {
+pub fn openVPNErrorCode(code: OpenVPNErrorCode) PartoutErrorPair {
     return .{ .code = .openVPN, .sub_code = code.raw() };
 }
 pub const Profile = gen.Profile;

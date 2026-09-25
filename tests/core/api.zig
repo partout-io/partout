@@ -728,10 +728,10 @@ const tunnel_remote_info_json =
 
 test "extended errors encode a code and optional subcode" {
     const allocator = std.testing.allocator;
-    const simple = try api.formatErrorCode(allocator, .{ .code = .timeout });
+    const simple = try api.formatErrorPair(allocator, .{ .code = .timeout });
     defer allocator.free(simple);
     try std.testing.expectEqualStrings("timeout", simple);
-    const specific = try api.formatErrorCode(allocator, .{ .code = .openVPN, .sub_code = "tlsFailure" });
+    const specific = try api.formatErrorPair(allocator, .{ .code = .openVPN, .sub_code = "tlsFailure" });
     defer allocator.free(specific);
     try std.testing.expectEqualStrings("openVPN.tlsFailure", specific);
 }

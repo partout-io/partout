@@ -2628,32 +2628,32 @@ pub const ParseErrorInfo = struct {
     }
 };
 
-pub const PartoutErrorExtendedCode = struct {
+pub const PartoutErrorPair = struct {
     code: PartoutErrorCode,
     sub_code: ?[]const u8 = null,
 
-    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!PartoutErrorExtendedCode {
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!PartoutErrorPair {
         return parseWithErrorInfo(allocator, text, null);
     }
 
-    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorExtendedCode {
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorPair {
         resetJsonErrorInfo(error_info);
         var parsed = try util.parseJsonValue(allocator, text);
         defer parsed.deinit();
         return parseValueWithErrorInfo(allocator, parsed.value, error_info);
     }
 
-    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!PartoutErrorExtendedCode {
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!PartoutErrorPair {
         return parseValueWithErrorInfo(allocator, value, null);
     }
 
-    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorExtendedCode {
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorPair {
         resetJsonErrorInfo(error_info);
         const object = objectValue(value) orelse return error.InvalidModel;
         const explicit_0 = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
         var owns_explicit_0 = true;
         errdefer if (owns_explicit_0) deinitJson(PartoutErrorCode, allocator, &explicit_0);
-        var result = PartoutErrorExtendedCode{
+        var result = PartoutErrorPair{
             .code = explicit_0,
         };
         owns_explicit_0 = false;

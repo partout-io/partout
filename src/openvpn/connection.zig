@@ -484,11 +484,8 @@ const OpenVPNConnection = struct {
                     log.write(.err, "Disconnection is not recoverable");
                     self.prepareTerminalCancellation();
                 }
-                const failure_code = partoutCodeForError(failure.cause);
-                const owned_code = api.formatErrorCode(self.allocator, failure_code) catch null;
-                defer if (owned_code) |value| self.allocator.free(value);
-                const error_code = owned_code orelse failure_code.code.raw();
-                events.last_error(events.ctx, error_code);
+                const err_pair = partoutCodeForError(failure.cause);
+                events.last_error(events.ctx, err_pair);
                 switch (disp) {
                     .reconnect => {
                         // The .disconnected status will trigger a reconnection
@@ -496,7 +493,7 @@ const OpenVPNConnection = struct {
                         _ = self.sendStatus(.disconnected, events);
                         self.events = null;
                     },
-                    .cancel => events.cancel(events.ctx, error_code),
+                    .cancel => events.cancel(events.ctx, err_pair),
                 }
             },
         }
@@ -864,7 +861,7 @@ pub const testing = struct {
     pub const codeForError = partoutCodeForError;
 };
 
-fn partoutCodeForError(err: ConnectionError) api.PartoutErrorExtendedCode {
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
     return switch (err) {
         error.BadCredentials => .{ .code = .authentication },
         error.BadCredentialsWithLocalOptions => api.openVPNErrorCode(.recoverableAuthentication),

@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-extension PartoutErrorExtendedCode: RawRepresentable {
+extension PartoutErrorPair: RawRepresentable {
     public init?(rawValue: String) {
         let components = rawValue.split(separator: ".", maxSplits: 1, omittingEmptySubsequences: false)
         guard let first = components.first, let code = PartoutErrorCode(rawValue: String(first)) else { return nil }

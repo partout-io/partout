@@ -133,13 +133,12 @@ fn boundEventDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
     set(binding.ctx, data_count.received, data_count.sent);
 }
 
-fn boundEventLastError(ptr: *anyopaque, code: []const u8) void {
+fn boundEventLastError(ptr: *anyopaque, err_pair: api.PartoutErrorPair) void {
     const binding = boundEventsBinding(ptr) orelse return;
     const set = binding.set_last_error_code orelse return;
-    var c_code: util.TemporaryCString = .{};
-    c_code.init(std.heap.c_allocator, code) catch return;
-    defer c_code.deinit();
-    set(binding.ctx, c_code.ptr());
+    const c_code = api.formatErrorPair(std.heap.c_allocator, err_pair) catch return;
+    defer std.heap.c_allocator.free(c_code);
+    set(binding.ctx, c_code.ptr);
 }
 
 fn boundEventRemoveKey(ptr: *anyopaque, key: net.DaemonEventKey) void {

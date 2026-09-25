@@ -37,7 +37,7 @@ import kotlinx.serialization.Contextual
  */
 @Serializable
 
-data class PartoutErrorExtendedCode (
+data class PartoutErrorPair (
 
     @Contextual @SerialName(value = "code")
     val code: PartoutErrorCode,

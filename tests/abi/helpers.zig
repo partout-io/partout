@@ -106,3 +106,29 @@ test "ABI import errors map to stable public codes" {
         try std.testing.expect(envelope.payload == null);
     }
 }
+
+test "ABI daemon error callback formats structured codes" {
+    const Recorder = struct {
+        buffer: [128]u8 = undefined,
+        len: usize = 0,
+
+        fn record(ctx: ?*anyopaque, code: [*c]const u8) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(ctx.?));
+            const raw = std.mem.span(code);
+            @memcpy(self.buffer[0..raw.len], raw);
+            self.len = raw.len;
+        }
+    };
+    var recorder = Recorder{};
+    var binding: helpers.BoundDaemonEvents = .{
+        .binding = .{
+            .ctx = &recorder,
+            .set_last_error_code = Recorder.record,
+        },
+    };
+    const events = binding.interface().?;
+    events.last_error(events.ctx, api.openVPNErrorCode(.tlsFailure));
+    try std.testing.expectEqualStrings("openVPN.tlsFailure", recorder.buffer[0..recorder.len]);
+    events.last_error(events.ctx, .{ .code = .authentication });
+    try std.testing.expectEqualStrings("authentication", recorder.buffer[0..recorder.len]);
+}
