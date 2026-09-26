@@ -529,7 +529,8 @@ struct SerializationTests {
     @Test
     func givenTunnelRemoteInfo_whenEncodeAsJSON_thenWrapperPreservesProfileAndModules() throws {
         let profile = try makeProfile()
-        let info = TunnelRemoteInfo(
+        let info = TunnelRemoteInfoWrapper(
+            profile: profile.asTaggedProfile,
             originalModuleId: IDs.openVPN,
             address: try requireAddress("198.51.100.44"),
             modules: [
@@ -539,16 +540,17 @@ struct SerializationTests {
                     servers: ["9.9.9.9"],
                     dotHostname: "dns.remote.example.com",
                     routesThroughVPN: true
-                ).build(),
+                ).build().taggedModule!,
                 IPModule.Builder(
                     id: IDs.remoteIP,
                     ipv4: try IPSettings(subnet: Subnet("10.99.0.2", 24)),
                     mtu: 1_320
-                ).build()
+                ).build().taggedModule!
             ]
         )
 
-        let json = try jsonObject(from: Data(try info.encodedAsJSON(profile).utf8))
+        let jsonString = try JSONEncoder.shared().encodeJSON(info)
+        let json = try jsonObject(from: Data(jsonString.utf8))
         #expect(json["originalModuleId"] as? String == IDs.openVPN.uuidString)
         #expect(json["address"] as? String == "198.51.100.44")
         #expect(json["options"] == nil)
