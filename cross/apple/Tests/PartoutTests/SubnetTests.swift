@@ -11,8 +11,36 @@ struct SubnetTests {
         try assertSubnet(with: "1.2.3.4", 0, .v4)
         try assertSubnet(with: "1.2.3.4", 16, .v4)
         try assertSubnet(with: "1.2.3.4", 32, .v4)
-        try assertSubnet(with: "1.2.3", 16, .v4)
         assertSubnetFailure(with: "1.2.3.4.5", 16, .v4)
+    }
+
+    @Test(arguments: [
+        ("1.2.3", "1.2.0.3"),
+        ("192.168", "192.0.0.168"),
+        ("2130706433", "127.0.0.1"),
+        ("0x7f000001", "127.0.0.1"),
+        ("::ffff:192.168.1.1", "192.168.1.1")
+    ])
+    func givenNonCanonicalIPv4_whenEncode_thenUsesDottedDecimal(raw: String, canonical: String) throws {
+        let address = try #require(Address(rawValue: raw))
+        #expect(address == .ip(canonical, .v4))
+        #expect(try JSONEncoder.shared().encodeJSON(address) == "\"\(canonical)\"")
+
+        let subnet = try Subnet(raw, 24)
+        #expect(subnet.rawValue == "\(canonical)/24")
+        let json = try JSONEncoder.shared().encode(subnet)
+        #expect(try JSONDecoder.shared().decode(String.self, from: json) == "\(canonical)/24")
+        #expect(try JSONDecoder.shared().decode(Subnet.self, from: json) == subnet)
+    }
+
+    @Test(arguments: ["fe80::1%en0", "fe80::1%1"])
+    func givenScopedIPv6_whenParseSubnet_thenFails(raw: String) {
+        #expect(Subnet(.ip(raw, .v6), 64) == nil)
+        #expect(Subnet(rawValue: raw) == nil)
+        #expect(Subnet(rawValue: "\(raw)/64") == nil)
+        #expect(throws: PartoutError.self) {
+            try Subnet(raw, 64)
+        }
     }
 
     @Test

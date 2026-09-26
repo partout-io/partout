@@ -19,7 +19,7 @@ extension Profile {
     }
 
     public func networkSettings(
-        with info: TunnelRemoteInfo?,
+        with info: TunnelRemoteInfoWrapper?,
         options: TunnelControllerOptions = .init()
     ) -> NEPacketTunnelNetworkSettings {
         let ctx = PartoutLoggerContext(id)
@@ -39,7 +39,10 @@ extension Profile {
 
         if let info, let remoteModules = info.modules,
            let indexOfRemoteModule = applicableModules.firstIndex(where: { $0.id == info.originalModuleId }) {
-            applicableModules.insert(contentsOf: remoteModules, at: indexOfRemoteModule + 1)
+            applicableModules.insert(
+                contentsOf: remoteModules.map(\.containedModule),
+                at: indexOfRemoteModule + 1
+            )
         }
 
         // 3. Apply modules to NE settings

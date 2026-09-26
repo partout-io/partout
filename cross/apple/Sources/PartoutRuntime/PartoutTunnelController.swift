@@ -69,7 +69,7 @@ final class PartoutTunnelController: Sendable {
             throw PartoutError(.releasedObject)
         }
         let profile = try info.profile.asProfile()
-        let tunnelSettings = profile.networkSettingsWrapper(with: info, options: options)
+        let tunnelSettings = profile.networkSettings(with: info, options: options)
         pp_log(ctx, .runtime, .info, "Commit tunnel settings: \(tunnelSettings)")
         try await provider.setTunnelNetworkSettings(tunnelSettings)
     }
@@ -121,22 +121,6 @@ final class PartoutTunnelController: Sendable {
 private extension PartoutTunnelController {
     func logReleasedProvider() {
         pp_log(ctx, .runtime, .info, "NEPacketTunnelProvider released")
-    }
-}
-
-private extension Profile {
-    func networkSettingsWrapper(
-        with infoWrapper: TunnelRemoteInfoWrapper?,
-        options: TunnelControllerOptions
-    ) -> NEPacketTunnelNetworkSettings {
-        let info = infoWrapper.map {
-            TunnelRemoteInfo(
-                originalModuleId: $0.originalModuleId,
-                address: $0.address,
-                modules: $0.modules?.map(\.containedModule)
-            )
-        }
-        return networkSettings(with: info, options: options)
     }
 }
 

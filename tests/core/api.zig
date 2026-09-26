@@ -280,6 +280,28 @@ test "parses IPv6 subnets" {
     try expectSubnetFailure("::4::/72", .v6);
 }
 
+test "round-trips normalized Swift IPv4 subnets" {
+    // Wire representations produced by SubnetTests in the Swift client.
+    try expectRoundTrip(api.Subnet, "\"1.2.0.3/24\"");
+    try expectRoundTrip(api.Subnet, "\"192.0.0.168/24\"");
+    try expectRoundTrip(api.Subnet, "\"127.0.0.1/24\"");
+    try expectRoundTrip(api.Subnet, "\"192.168.1.1/24\"");
+}
+
+test "rejects noncanonical and scoped subnet wire representations" {
+    const allocator = std.testing.allocator;
+    for ([_][]const u8{
+        "\"1.2.3/24\"",
+        "\"192.168/24\"",
+        "\"2130706433/24\"",
+        "\"0x7f000001/24\"",
+        "\"fe80::1%en0/64\"",
+        "\"fe80::1%1/64\"",
+    }) |json| {
+        try std.testing.expectError(error.InvalidModel, parseFromJson(api.Subnet, allocator, json));
+    }
+}
+
 test "formats subnet network addresses" {
     try expectNetworkRaw("192.168.12.34/24", "192.168.12.0/24");
     try expectNetworkRaw("2001:db8:abcd:1234::1/64", "2001:db8:abcd:1234::/64");

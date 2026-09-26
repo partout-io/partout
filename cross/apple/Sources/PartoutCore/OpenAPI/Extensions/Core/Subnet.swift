@@ -60,6 +60,10 @@ public struct Subnet: Hashable, Codable, Sendable {
         guard case .ip(_, let family) = address else {
             preconditionFailure()
         }
+        // The native subnet model does not support interface scopes.
+        guard !address.rawValue.contains("%") else {
+            return nil
+        }
         let maxPrefixLength = family == .v6 ? 128 : 32
         guard prefixLength >= 0 && prefixLength <= maxPrefixLength else {
             return nil
