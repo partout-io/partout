@@ -16,7 +16,7 @@ extension PartoutTunnelObservable {
     static let shared: PartoutTunnelObservable = {
 #if targetEnvironment(simulator)
         let strategy = FakeTunnelStrategy()
-        let tunnel = Tunnel(.global, strategy: strategy) {
+        let tunnel = PartoutTunnel(.global, strategy: strategy) {
             SharedTunnelEnvironment(profileId: $0)
         }
 #else
@@ -27,7 +27,7 @@ extension PartoutTunnelObservable {
             coder: Demo.neProtocolCoder,
             fingerprint: { _ in UUID().uuidString }
         )
-        let tunnel = Tunnel(.global, strategy: strategy) {
+        let tunnel = PartoutTunnel(.global, strategy: strategy) {
             NETunnelEnvironment(profileId: $0) {
                 let output = try await strategy.sendMessage(.environment(), to: $0)
                 switch output {
