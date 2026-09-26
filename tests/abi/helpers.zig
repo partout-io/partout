@@ -67,7 +67,7 @@ test "ABI import error envelope preserves parse error sub-code in payload" {
 
     var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
     defer envelope.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.wireGuard, envelope.code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
 
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
@@ -103,7 +103,14 @@ test "ABI import errors map to stable public codes" {
         var envelope = try api.ABIEnvelope.parse(allocator, payload_json);
         defer envelope.deinit(allocator);
         try std.testing.expectEqual(entry[1], envelope.code.?);
-        try std.testing.expect(envelope.payload == null);
+        if (entry[1] == .parsing) {
+            var info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
+            defer info.deinit(allocator);
+            try std.testing.expect(info.sub_code == null);
+            try std.testing.expectEqual(@as(usize, 0), info.arguments.len);
+        } else {
+            try std.testing.expect(envelope.payload == null);
+        }
     }
 }
 
@@ -133,34 +140,33 @@ test "ABI daemon error callback formats structured codes" {
     try std.testing.expectEqualStrings("authentication", recorder.buffer[0..recorder.len]);
 }
 
-test "ABI error payload takes its code and subcode from the pair" {
+test "ABI parsing payload preserves its own subcode and diagnostics" {
     const allocator = std.testing.allocator;
     const info: api.ParseErrorInfo = .{
         .recognized_type = .OpenVPN,
-        .sub_code = "stale",
+        .sub_code = api.OpenVPNErrorCode.unsupportedCompression.raw(),
         .name = "compress",
         .line = "compress lzo",
         .arguments = &.{"lzo"},
     };
     const c_payload = helpers.errorPayloadAllocZ(
         allocator,
-        api.openVPNErrorPair(.unsupportedCompression),
+        .{ .code = .parsing },
         &info,
     ) orelse return error.TestUnexpectedResult;
     defer allocator.free(std.mem.span(c_payload));
     var envelope = try api.ABIEnvelope.parse(allocator, std.mem.span(c_payload));
     defer envelope.deinit(allocator);
-    try std.testing.expectEqual(api.PartoutErrorCode.openVPN, envelope.code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.parsing, envelope.code.?);
     var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
     defer parsed_info.deinit(allocator);
     try std.testing.expectEqualStrings("unsupportedCompression", parsed_info.sub_code.?);
     try std.testing.expectEqualStrings("compress", parsed_info.name.?);
     try std.testing.expectEqualStrings("compress lzo", parsed_info.line.?);
     try std.testing.expectEqualStrings("lzo", parsed_info.arguments[0]);
-    try std.testing.expectEqualStrings("stale", info.sub_code.?);
 }
 
-test "ABI import error pairs specialize only protocol parsing failures" {
+test "ABI import errors attach parsing information only to parsing failures" {
     const allocator = std.testing.allocator;
     var info: api.ParseErrorInfo = .{
         .recognized_type = .OpenVPN,
@@ -168,9 +174,9 @@ test "ABI import error pairs specialize only protocol parsing failures" {
     };
     const context = core.ImportContext.init(&info, null);
     const cases = .{
-        .{ error.Parsing, api.PartoutErrorCode.openVPN },
-        .{ error.InvalidJson, api.PartoutErrorCode.openVPN },
-        .{ error.InvalidProfile, api.PartoutErrorCode.openVPN },
+        .{ error.Parsing, api.PartoutErrorCode.parsing },
+        .{ error.InvalidJson, api.PartoutErrorCode.decoding },
+        .{ error.InvalidProfile, api.PartoutErrorCode.decoding },
         .{ error.OutOfMemory, api.PartoutErrorCode.outOfMemory },
         .{ error.InvalidModel, api.PartoutErrorCode.encoding },
     };
@@ -180,9 +186,13 @@ test "ABI import error pairs specialize only protocol parsing failures" {
         var envelope = try api.ABIEnvelope.parse(allocator, std.mem.span(c_payload));
         defer envelope.deinit(allocator);
         try std.testing.expectEqual(entry[1], envelope.code.?);
-        var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
-        defer parsed_info.deinit(allocator);
-        try std.testing.expectEqualStrings(info.sub_code.?, parsed_info.sub_code.?);
+        if (entry[1] == .parsing) {
+            var parsed_info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
+            defer parsed_info.deinit(allocator);
+            try std.testing.expectEqualStrings(info.sub_code.?, parsed_info.sub_code.?);
+        } else {
+            try std.testing.expect(envelope.payload == null);
+        }
     }
 }
 
@@ -193,7 +203,5 @@ test "ABI error pair serializes without diagnostic context" {
     var envelope = try api.ABIEnvelope.parse(allocator, std.mem.span(c_payload));
     defer envelope.deinit(allocator);
     try std.testing.expectEqual(api.PartoutErrorCode.openVPN, envelope.code.?);
-    var info = try api.ParseErrorInfo.parse(allocator, envelope.payload.?.bytes);
-    defer info.deinit(allocator);
-    try std.testing.expectEqualStrings("passphraseRequired", info.sub_code.?);
+    try std.testing.expectEqualStrings("{\"subCode\":\"passphraseRequired\"}", envelope.payload.?.bytes);
 }

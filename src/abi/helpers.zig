@@ -170,22 +170,20 @@ pub fn errorPayloadAllocZ(
     err_pair: api.PartoutErrorPair,
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
-    var info = if (parse_error_info) |value| value.* else api.ParseErrorInfo{};
-    info.sub_code = err_pair.sub_code;
-
-    // No meaningful parse error information
-    if (info.recognized_type == null and info.sub_code == null and
-        info.name == null and info.line == null and info.arguments.len == 0)
-    {
-        return util.encodeJsonValueZ(allocator, api.ABIEnvelope{
+    if (err_pair.code == .parsing) {
+        return util.encodeJsonValueZ(allocator, .{
             .code = err_pair.code,
+            .payload = if (parse_error_info) |info| info.* else api.ParseErrorInfo{},
         }) catch null;
     }
-
-    // Encode info as anonymous ABIEnvelope (skip raw JSON payload)
-    return util.encodeJsonValueZ(allocator, .{
+    if (err_pair.sub_code) |sub_code| {
+        return util.encodeJsonValueZ(allocator, .{
+            .code = err_pair.code,
+            .payload = .{ .subCode = sub_code },
+        }) catch null;
+    }
+    return util.encodeJsonValueZ(allocator, api.ABIEnvelope{
         .code = err_pair.code,
-        .payload = info,
     }) catch null;
 }
 
@@ -196,7 +194,7 @@ pub fn importErrorPayloadAllocZ(
 ) ?[*:0]u8 {
     return errorPayloadAllocZ(
         allocator,
-        importErrorPair(err, context),
+        importErrorPair(err),
         context.parse_error_info,
     );
 }
@@ -211,8 +209,8 @@ fn eventKeyString(key: net.DaemonEventKey) [:0]const u8 {
     };
 }
 
-fn importErrorPair(err: ImportAndEncodeError, context: core.ImportContext) api.PartoutErrorPair {
-    var err_pair: api.PartoutErrorPair = .{
+fn importErrorPair(err: ImportAndEncodeError) api.PartoutErrorPair {
+    return .{
         .code = switch (err) {
             error.OutOfMemory => .outOfMemory,
             error.IdGeneration => .unhandled,
@@ -222,22 +220,4 @@ fn importErrorPair(err: ImportAndEncodeError, context: core.ImportContext) api.P
             error.UnknownImportedModule => .unknownImportedModule,
         },
     };
-    const info = context.parse_error_info orelse return err_pair;
-    err_pair.sub_code = info.sub_code;
-    switch (err) {
-        error.Parsing,
-        error.InvalidJson,
-        error.InvalidProfile,
-        => {
-            if (info.sub_code == null) return err_pair;
-            const module_type = info.recognized_type orelse return err_pair;
-            err_pair.code = switch (module_type) {
-                .OpenVPN => .openVPN,
-                .WireGuard => .wireGuard,
-                else => err_pair.code,
-            };
-        },
-        else => {},
-    }
-    return err_pair;
 }
