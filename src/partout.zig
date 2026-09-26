@@ -28,8 +28,6 @@ pub const panic = std.debug.FullPanic(panicHandler);
 
 const allocator = std.heap.c_allocator;
 
-// const DaemonRuntime = if (builtin.is_test) @import("testing/mock.zig").MockRuntime else abi.DaemonRuntime;
-// var daemon_runtime = DaemonRuntime{};
 var daemon_runtime: ?*abi.DaemonRuntime = null;
 var daemon_process_lock: DaemonProcessLock = .{};
 
