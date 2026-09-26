@@ -176,11 +176,18 @@ test "snapshot publisher filters data-count-only snapshots by minimum delta" {
 const SnapshotRecorder = struct {
     count: usize = 0,
     last_snapshot: api.TunnelSnapshot = .{ .status = .inactive },
+    error_buffer: [256]u8 = undefined,
 
     fn reportSnapshot(ptr: *const anyopaque, snapshot: api.TunnelSnapshot) void {
         const self: *SnapshotRecorder = @ptrCast(@alignCast(@constCast(ptr)));
         self.count += 1;
         self.last_snapshot = snapshot;
+        if (snapshot.environment) |env| {
+            if (env.last_error_code) |raw| {
+                @memcpy(self.error_buffer[0..raw.len], raw);
+                self.last_snapshot.environment.?.last_error_code = self.error_buffer[0..raw.len];
+            }
+        }
     }
 };
 
@@ -297,7 +304,8 @@ test "connection daemon clears last error when connected recovery repeats the st
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
     const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
-    try std.testing.expectEqualStrings("socketConfiguration", failed_snapshot.environment.?.last_error_code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, sut.snapshot_publisher.last_error.?.code);
+    try std.testing.expect(failed_snapshot.environment.?.last_error_code == null);
     const snapshot_count = controller.report_snapshot_count;
 
     // Recovery emits connected again, without an intervening connecting event.
@@ -538,7 +546,7 @@ test "connection daemon preserves extended and optional error codes at string bo
         if (case.err_pair) |err_pair| {
             try sut.actor.perform(void, .{ .onConnectionLastError = err_pair });
             try std.testing.expectEqualStrings(case.raw.?, events.last_error_raw[0..events.last_error_len]);
-            try std.testing.expectEqualStrings(case.raw.?, sut.snapshot_publisher.environment.last_error_code.?);
+            try std.testing.expectEqualDeep(case.err_pair.?, sut.snapshot_publisher.last_error.?);
         }
         try sut.actor.perform(void, .{ .onConnectionCancel = case.err_pair });
         try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
@@ -1170,7 +1178,7 @@ fn withEvents(
     return updated;
 }
 
-test "snapshot publisher owns extended error strings and clears cached snapshots" {
+test "snapshot publisher owns retained subcodes and formats only on delivery" {
     var recorder = SnapshotRecorder{};
     var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
     defer publisher.deinit();
@@ -1178,7 +1186,9 @@ test "snapshot publisher owns extended error strings and clears cached snapshots
     publisher.setLastError(.{ .code = .openVPN, .sub_code = &raw });
     publisher.publishCurrentSnapshot(false);
     @memset(&raw, 'x');
-    try std.testing.expectEqualStrings("openVPN.tlsFailure", publisher.environment.last_error_code.?);
+    try std.testing.expectEqualStrings("tlsFailure", publisher.last_error.?.sub_code.?);
+    try std.testing.expect(publisher.environment.last_error_code == null);
+    try std.testing.expect(publisher.last_published_snapshot.?.environment.?.last_error_code == null);
     publisher.setLastError(api.openVPNErrorPair(.serverShutdown));
     publisher.publishCurrentSnapshot(false);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);

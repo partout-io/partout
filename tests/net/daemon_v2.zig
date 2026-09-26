@@ -123,7 +123,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         try std.testing.expectEqual(failed_snapshots, controller.report_snapshot_count);
         sut.hold();
         try std.testing.expect(sut.state == .stopped);
-        try std.testing.expectEqualStrings("openVPN.tlsFailure", sut.snapshot_publisher.environment.last_error_code.?);
+        try std.testing.expectEqualStrings("tlsFailure", sut.snapshot_publisher.last_error.?.sub_code.?);
     }
 }
 

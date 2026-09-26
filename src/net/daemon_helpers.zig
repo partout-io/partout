@@ -207,7 +207,7 @@ pub const SnapshotPublisher = struct {
     const ReportBlock = *const fn (*const anyopaque, api.TunnelSnapshot) void;
 
     allocator: std.mem.Allocator,
-    error_storage: ?[:0]u8 = null,
+    last_error: ?api.PartoutErrorPair = null,
     profile_id: ProfileId,
     report_snapshot: ReportBlock,
     report_snapshot_ctx: *const anyopaque,
@@ -232,7 +232,7 @@ pub const SnapshotPublisher = struct {
     }
 
     pub fn deinit(self: *SnapshotPublisher) void {
-        if (self.error_storage) |value| self.allocator.free(value);
+        if (self.last_error) |value| value.deinit(self.allocator);
     }
 
     pub fn clearEnvironment(self: *SnapshotPublisher) void {
@@ -245,16 +245,23 @@ pub const SnapshotPublisher = struct {
     }
 
     pub fn setLastError(self: *SnapshotPublisher, err_pair: ?api.PartoutErrorPair) void {
-        const owned = if (err_pair) |value| api.errorPairFormatZ(self.allocator, value) catch null else null;
-        const raw: ?[]const u8 = if (err_pair != null) owned orelse "outOfMemory" else null;
-        if (core.util.optionalStringsEqual(self.environment.last_error_code, raw)) {
-            if (owned) |value| self.allocator.free(value);
-            return;
+        if (self.last_error == null and err_pair == null) return;
+        if (self.last_error != null and err_pair != null and
+            self.last_error.?.code == err_pair.?.code and
+            core.util.optionalStringsEqual(self.last_error.?.sub_code, err_pair.?.sub_code)) return;
+
+        var next = err_pair;
+        if (next) |*value| {
+            if (value.sub_code) |sub_code| {
+                value.sub_code = self.allocator.dupe(u8, sub_code) catch {
+                    self.setLastError(.{ .code = .outOfMemory });
+                    return;
+                };
+            }
         }
+        if (self.last_error) |previous| previous.deinit(self.allocator);
+        self.last_error = next;
         self.last_published_snapshot = null;
-        if (self.error_storage) |value| self.allocator.free(value);
-        self.error_storage = owned;
-        self.environment.last_error_code = raw;
     }
 
     pub fn setDataCount(self: *SnapshotPublisher, data_count: api.DataCount) void {
@@ -262,7 +269,7 @@ pub const SnapshotPublisher = struct {
     }
 
     pub fn publishCurrentSnapshot(self: *SnapshotPublisher, force: bool) void {
-        const snapshot = api.TunnelSnapshot{
+        var snapshot = api.TunnelSnapshot{
             .id = self.profile_id,
             .is_enabled = true,
             .status = tunnelStatus(self.environment.connection_status),
@@ -271,7 +278,15 @@ pub const SnapshotPublisher = struct {
         };
         if (!self.shouldPublishSnapshot(snapshot, force)) return;
 
+        const formatted = if (self.last_error) |err_pair|
+            api.errorPairFormatZ(self.allocator, err_pair) catch return
+        else
+            null;
+        defer if (formatted) |value| self.allocator.free(value);
+
         self.last_published_snapshot = snapshot;
+        // Only the delivered snapshot borrows the temporary wire representation.
+        snapshot.environment.?.last_error_code = formatted;
         self.report_snapshot(self.report_snapshot_ctx, snapshot);
     }
 
