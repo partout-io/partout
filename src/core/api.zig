@@ -163,6 +163,7 @@ pub const encodeModule = extensions.encodeModule;
 pub const encodeModuleZ = extensions.encodeModuleZ;
 pub const encodeProfile = extensions.encodeProfile;
 pub const encodeProfileZ = extensions.encodeProfileZ;
+pub const errorPairEqual = extensions.errorPairEqual;
 pub const findActiveConnectionModule = extensions.findActiveConnectionModule;
 pub const hasConnection = extensions.hasConnection;
 pub const isActiveProfileModule = extensions.isActiveProfileModule;

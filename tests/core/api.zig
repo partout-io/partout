@@ -735,3 +735,17 @@ test "extended errors encode a code and optional subcode" {
     defer allocator.free(specific);
     try std.testing.expectEqualStrings("openVPN.tlsFailure", specific);
 }
+
+test "error pair equality compares optional values and subcode contents" {
+    var sub_code = "tlsFailure".*;
+    const pair = api.openVPNErrorPair(.tlsFailure);
+    const copy: api.PartoutErrorPair = .{ .code = .openVPN, .sub_code = &sub_code };
+    try std.testing.expect(api.errorPairEqual(pair, copy));
+    try std.testing.expect(api.errorPairEqual(null, null));
+    try std.testing.expect(!api.errorPairEqual(pair, null));
+    try std.testing.expect(!api.errorPairEqual(null, pair));
+    try std.testing.expect(!api.errorPairEqual(pair, api.openVPNErrorPair(.serverShutdown)));
+    try std.testing.expect(!api.errorPairEqual(pair, .{ .code = .wireGuard, .sub_code = &sub_code }));
+    try std.testing.expect(api.errorPairEqual(.{ .code = .timeout }, .{ .code = .timeout }));
+    try std.testing.expect(!api.errorPairEqual(.{ .code = .openVPN }, .{ .code = .openVPN, .sub_code = "" }));
+}
