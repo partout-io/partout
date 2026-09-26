@@ -534,18 +534,18 @@ struct SerializationTests {
             originalModuleId: IDs.openVPN,
             address: try requireAddress("198.51.100.44"),
             modules: [
-                try DNSModule.Builder(
+                .DNS(try DNSModule.Builder(
                     id: IDs.remoteDNS,
                     protocolType: .tls,
                     servers: ["9.9.9.9"],
                     dotHostname: "dns.remote.example.com",
                     routesThroughVPN: true
-                ).build().taggedModule!,
-                IPModule.Builder(
+                ).build()),
+                .IP(IPModule.Builder(
                     id: IDs.remoteIP,
                     ipv4: try IPSettings(subnet: Subnet("10.99.0.2", 24)),
                     mtu: 1_320
-                ).build().taggedModule!
+                ).build())
             ]
         )
 
