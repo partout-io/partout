@@ -12,7 +12,7 @@ struct AddressTests {
         #expect(Address(rawValue: "0.0.0.0") == .ip("0.0.0.0", .v4))
         #expect(Address(rawValue: "255.255.255.255") == .ip("255.255.255.255", .v4))
         #expect(Address(rawValue: " 1.2.3.4 ") == .ip("1.2.3.4", .v4))
-        #expect(Address(rawValue: "1.2.3") == .ip("1.2.3", .v4))
+        #expect(Address(rawValue: "1.2.3") == .ip("1.2.0.3", .v4))
         #expect(Address(rawValue: "-1.2.3.4") != .ip("1.2.3.4", .v4))
         #expect(Address(rawValue: "1#2.3.4") != .ip("1.2.3.4", .v4))
         #expect(Address(rawValue: "1.2.3.4.5")?.isIPAddress ?? false == false)

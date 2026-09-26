@@ -11,7 +11,7 @@ struct EndpointTests {
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
-        try assertEndpoint(with: "1.2.3", 1194, .v4)
+        #expect(try Endpoint("1.2.3", 1194).rawValue == "1.2.0.3:1194")
         assertEndpointFailure(with: "1.2.3.4.5", 1194, .v4)
     }
 

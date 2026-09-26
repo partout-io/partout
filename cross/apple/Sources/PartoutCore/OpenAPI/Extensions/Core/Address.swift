@@ -49,8 +49,8 @@ extension Address: RawRepresentable {
             return nil
         }
         switch NWEndpoint.Host(baseValue) {
-        case .ipv4:
-            self = .ip(baseValue, .v4)
+        case .ipv4(let address):
+            self = .ip(address.debugDescription, .v4)
         case .ipv6:
             self = .ip(baseValue, .v6)
         default:
