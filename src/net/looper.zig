@@ -814,6 +814,11 @@ pub const Looper = struct {
             .link => |value| value,
             .tun => |value| value,
         };
+        // Addressed UDP links are supported by v2 only.
+        if (descriptor.io.isUnconnected() or arguments.on_datagrams != null) {
+            self.queueCompletionLocked(completion, error.MuxFailure);
+            return;
+        }
         if (!io_c.pp_mux_add(self.mux, descriptor.fd)) {
             log.writef(.err, "Unable to attach {} (fd={any})", .{ side, descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);

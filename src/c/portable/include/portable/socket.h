@@ -50,6 +50,26 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
 
+/* Numeric UDP endpoint. family is 4 or 6; port and scope_id are host endian. */
+typedef struct {
+    uint8_t address[16];
+    uint32_t scope_id;
+    uint16_t port;
+    uint8_t family;
+} pp_socket_address;
+
+#if !PARTOUT_WINDOWS
+/* Unconnected, nonblocking UDP (POSIX). Configuration runs before bind. */
+pp_socket _Nullable pp_socket_open_datagram(const pp_socket_address *local,
+    const pp_reachability *_Nullable reachability,
+    pp_socket_configure _Nullable configure, void *_Nullable ctx);
+bool pp_socket_local_address(pp_socket sock, pp_socket_address *address);
+int pp_socket_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
+    pp_socket_address *source);
+int pp_socket_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
+    const pp_socket_address *destination);
+#endif
+
 /* Native socket descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);
 

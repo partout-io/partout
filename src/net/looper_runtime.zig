@@ -18,6 +18,8 @@ pub const Looper = struct {
     pub const Packets = helpers.Packets;
     pub const ReadAction = helpers.ReadAction;
     pub const OnRead = helpers.OnRead;
+    pub const OnDatagrams = helpers.OnDatagrams;
+    pub const Datagram = io.Datagram;
     pub const Failure = helpers.Failure;
     pub const OnFailure = helpers.OnFailure;
     pub const OnFinish = helpers.OnFinish;
@@ -164,6 +166,16 @@ pub const Looper = struct {
     pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
         return switch (self.implementation) {
             inline else => |*impl| impl.writeQueued(packets, side),
+        };
+    }
+
+    /// Addressed UDP is available only with the v2 implementation.
+    pub fn writeDatagrams(self: *Looper, packets: []const Datagram) (WriteError || error{NotDatagramLink})!void {
+        return switch (self.implementation) {
+            inline else => |*impl| if (@TypeOf(impl.*) == experimental.Looper)
+                impl.writeDatagrams(packets)
+            else
+                error.LooperUnavailable,
         };
     }
 

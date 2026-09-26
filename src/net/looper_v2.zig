@@ -30,6 +30,8 @@ pub const Looper = struct {
     pub const Packets = helpers.Packets;
     pub const ReadAction = helpers.ReadAction;
     pub const OnRead = helpers.OnRead;
+    pub const OnDatagrams = helpers.OnDatagrams;
+    pub const Datagram = io.Datagram;
     pub const Failure = helpers.Failure;
     pub const OnFailure = helpers.OnFailure;
     pub const OnFinish = helpers.OnFinish;
@@ -173,6 +175,12 @@ pub const Looper = struct {
         side: io.Side,
     ) helpers.WriteError!void {
         return self.impl.writeQueued(packets, side);
+    }
+
+    /// Sends addressed UDP packets through the single logical link.
+    pub fn writeDatagrams(self: *Looper, packets: []const Datagram) (helpers.WriteError || error{NotDatagramLink})!void {
+        if (comptime builtin.os.tag == .windows) return error.LooperUnavailable;
+        return self.impl.writeDatagrams(packets);
     }
 
     pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side) helpers.WriteOOBError!void {

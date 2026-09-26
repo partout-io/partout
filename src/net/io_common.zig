@@ -56,3 +56,7 @@ pub const testing = struct {
     }
     pub const reachabilityNone = io_mod.reachabilityNone;
 };
+
+/// Numeric endpoint, suitable for copying across a C ABI.
+pub const SocketAddress = io_c.pp_socket_address;
+pub const Datagram = struct { payload: []const u8, address: SocketAddress };

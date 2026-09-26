@@ -59,6 +59,44 @@ pub const POSIXInterface = union(enum) {
         };
     } else noreturn;
 
+    pub fn isUnconnected(self: POSIXInterface) bool {
+        return switch (self) {
+            .socket => |socket| socket.isUnconnected(),
+            else => false,
+        };
+    }
+
+    pub fn extraDescriptor(self: POSIXInterface) ?FileDescriptor {
+        return switch (self) {
+            .socket => |socket| if (socket.extra_socket) |extra| io_c.pp_socket_get_watch_fd(extra) else null,
+            else => null,
+        };
+    }
+
+    /// Packet I/O preserves optional endpoint metadata without exposing UDP
+    /// socket details to the looper. Streams and TUN retain their byte I/O path.
+    pub fn readPacket(self: POSIXInterface, buf: []u8, address: *io.SocketAddress) Error!?usize {
+        return switch (self) {
+            .socket => |socket| if (socket.isUnconnected()) try socket.receiveFrom(buf, address) else socket.read(buf),
+            else => self.read(buf),
+        };
+    }
+
+    pub fn writePacket(self: POSIXInterface, data: []const u8, offset: usize, address: ?io.SocketAddress) Error!usize {
+        return switch (self) {
+            .socket => |socket| if (socket.isUnconnected())
+                socket.sendTo(data, address orelse return error.LibcFailure) catch |err| switch (err) {
+                    // A pair shares one write queue. Use the existing delayed
+                    // retry rather than watching the wrong family's descriptor.
+                    error.WouldBlock => if (socket.extra_socket != null) error.Backpressure else error.WouldBlock,
+                    else => err,
+                }
+            else
+                socket.write(data, offset),
+            else => self.write(data, offset),
+        };
+    }
+
     pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
         return switch (self) {
             .mock => |mock| if (builtin.is_test) mock.vtable.set_event_mask(mock.ptr, readable, writable) else unreachable,
@@ -104,8 +142,11 @@ pub const POSIXInterface = union(enum) {
 
 pub const SocketWrapper = struct {
     socket: io_c.pp_socket,
-    options: SocketOptions,
-    closes_on_empty_read: bool,
+    options: ?SocketOptions = null,
+    closes_on_empty_read: bool = false,
+    extra_socket: ?io_c.pp_socket = null,
+    datagram_family: u8 = 0,
+    read_extra: bool = false,
     is_closed: bool = false,
     allocator: std.mem.Allocator,
 
@@ -126,6 +167,73 @@ pub const SocketWrapper = struct {
             .allocator = allocator,
         };
         return wrapper;
+    }
+
+    pub const DatagramOptions = struct {
+        ipv4: bool = true,
+        ipv6: bool = true,
+        port: u16 = 0,
+        reachability: ?io.ReachabilityInfo = null,
+        configure: io_c.pp_socket_configure = null,
+        context: ?*anyopaque = null,
+    };
+
+    /// Unconnected UDP, with one socket per requested family on the same port.
+    /// Ownership transfers on successful looper_v2 attachment, as for create().
+    pub fn createDatagram(allocator: std.mem.Allocator, options: DatagramOptions) Error!*SocketWrapper {
+        if (!options.ipv4 and !options.ipv6) return error.LibcFailure;
+        var address = std.mem.zeroes(io.SocketAddress);
+        address.family = if (options.ipv4) 4 else 6;
+        address.port = options.port;
+        const socket = io_c.pp_socket_open_datagram(&address, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+        errdefer io_c.pp_socket_free(socket);
+        var extra: ?io_c.pp_socket = null;
+        errdefer if (extra) |value| io_c.pp_socket_free(value);
+        if (options.ipv4 and options.ipv6) {
+            if (!io_c.pp_socket_local_address(socket, &address)) return error.LibcFailure;
+            address.family = 6;
+            extra = io_c.pp_socket_open_datagram(&address, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+        }
+        const self = try allocator.create(SocketWrapper);
+        self.* = .{ .allocator = allocator, .socket = socket, .extra_socket = extra, .datagram_family = if (options.ipv4) 4 else 6 };
+        return self;
+    }
+
+    pub fn isUnconnected(self: *const SocketWrapper) bool {
+        return self.options == null;
+    }
+
+    fn socketFor(self: *const SocketWrapper, family: u8) Error!io_c.pp_socket {
+        if (!self.isUnconnected()) return error.LibcFailure;
+        if (family == self.datagram_family) return self.socket;
+        if (family == 6) if (self.extra_socket) |extra| return extra;
+        return error.LibcFailure;
+    }
+
+    pub fn localAddress(self: *const SocketWrapper, family: u8) Error!io.SocketAddress {
+        var address: io.SocketAddress = undefined;
+        if (!io_c.pp_socket_local_address(try self.socketFor(family), &address)) return error.LibcFailure;
+        return address;
+    }
+
+    /// Nonblocking and queue-confined; alternate families to avoid starving either.
+    pub fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
+        if (!self.isUnconnected()) return error.LibcFailure;
+        for (0..2) |_| {
+            const socket = if (self.read_extra) self.extra_socket else self.socket;
+            self.read_extra = !self.read_extra;
+            if (socket) |value| {
+                const count = io_c.pp_socket_receive_datagram(value, buf.ptr, buf.len, address);
+                if (count == io_c.PPIOErrorWouldBlock) continue;
+                if (count < 0) return error.LibcFailure;
+                return @intCast(count);
+            }
+        }
+        return error.WouldBlock;
+    }
+
+    pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
+        return mapWriteResult(.link, io_c.pp_socket_send_datagram(try self.socketFor(address.family), data.ptr, data.len, &address), false);
     }
 
     pub fn destroy(self: *SocketWrapper) void {
@@ -171,12 +279,13 @@ pub const SocketWrapper = struct {
     }
 
     fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
+        if (self.isUnconnected()) return error.LibcFailure;
         const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
     fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
-        if (offset > data.len) return error.LibcFailure;
+        if (self.isUnconnected() or offset > data.len) return error.LibcFailure;
         const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
         return mapWriteResult(.link, written, false);
     }
@@ -190,6 +299,7 @@ pub const SocketWrapper = struct {
         if (self.is_closed) return;
         self.is_closed = true;
         io_c.pp_socket_free(self.socket);
+        if (self.extra_socket) |extra| io_c.pp_socket_free(extra);
     }
 
     fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
@@ -202,15 +312,15 @@ pub const SocketWrapper = struct {
     }
 
     pub fn remoteAddress(self: SocketWrapper) ?api.Address {
-        return api.Address.parseRaw(self.options.endpoint.address);
+        return api.Address.parseRaw((self.options orelse return null).endpoint.address);
     }
 
     fn remoteProtocol(self: SocketWrapper) api.EndpointProtocol {
-        return self.options.endpoint.proto;
+        return self.options.?.endpoint.proto;
     }
 
     fn isReliable(self: SocketWrapper) bool {
-        return self.options.endpoint.plainSocketType() == .tcp;
+        return if (self.options) |options| options.endpoint.plainSocketType() == .tcp else false;
     }
 
     fn lastErrorCode(_: SocketWrapper) c_int {

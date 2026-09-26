@@ -453,3 +453,108 @@ done:
     // Success
     return 0;
 }
+
+#if !PARTOUT_WINDOWS
+#include <sys/uio.h>
+
+static bool datagram_native_address(const pp_socket_address *address,
+                                    struct sockaddr_storage *storage,
+                                    socklen_t *length) {
+    memset(storage, 0, sizeof(*storage));
+    if (address->family == 4) {
+        struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
+        v4->sin_family = AF_INET;
+        v4->sin_port = htons(address->port);
+        memcpy(&v4->sin_addr, address->address, 4);
+        *length = sizeof(*v4);
+    } else if (address->family == 6) {
+        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
+        v6->sin6_family = AF_INET6;
+        v6->sin6_port = htons(address->port);
+        v6->sin6_scope_id = address->scope_id;
+        memcpy(&v6->sin6_addr, address->address, 16);
+        *length = sizeof(*v6);
+    } else { errno = EAFNOSUPPORT; return false; }
+    return true;
+}
+
+static bool datagram_address(const struct sockaddr_storage *storage,
+                             pp_socket_address *address) {
+    memset(address, 0, sizeof(*address));
+    if (storage->ss_family == AF_INET) {
+        const struct sockaddr_in *v4 = (const struct sockaddr_in *)storage;
+        address->family = 4;
+        address->port = ntohs(v4->sin_port);
+        memcpy(address->address, &v4->sin_addr, 4);
+    } else if (storage->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)storage;
+        address->port = ntohs(v6->sin6_port);
+        address->family = 6;
+        address->scope_id = v6->sin6_scope_id;
+        memcpy(address->address, &v6->sin6_addr, 16);
+    } else { errno = EAFNOSUPPORT; return false; }
+    return true;
+}
+
+pp_socket pp_socket_open_datagram(const pp_socket_address *local,
+    const pp_reachability *reachability, pp_socket_configure configure, void *ctx) {
+    struct sockaddr_storage address;
+    socklen_t length;
+    if (!datagram_native_address(local, &address, &length)) return NULL;
+    int fd = socket(address.ss_family, SOCK_DGRAM, 0);
+    if (fd < 0) return NULL;
+    if (local->family == 6) {
+        const int v6_only = 1;
+        if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, sizeof(v6_only)) < 0) goto fail;
+    }
+    const int flags = fcntl(fd, F_GETFD, 0);
+    if (flags < 0 || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0 ||
+        pp_socket_set_nonblocking(fd, NULL) < 0) goto fail;
+    if (configure && !configure(ctx, fd, reachability)) goto fail;
+    if (bind(fd, (const struct sockaddr *)&address, length) < 0) goto fail;
+    pp_socket result = pp_socket_create(fd);
+    if (result) return result;
+fail:
+    close(fd);
+    return NULL;
+}
+
+bool pp_socket_local_address(pp_socket sock, pp_socket_address *address) {
+    struct sockaddr_storage storage;
+    socklen_t length = sizeof(storage);
+    return getsockname(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
+           datagram_address(&storage, address);
+}
+
+int pp_socket_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
+    pp_socket_address *source) {
+    struct sockaddr_storage address;
+    struct iovec iov = { .iov_base = dst, .iov_len = capacity };
+    struct msghdr message = { .msg_name = &address, .msg_namelen = sizeof(address),
+        .msg_iov = &iov, .msg_iovlen = 1 };
+    ssize_t n;
+    do { n = recvmsg(sock->fd, &message, 0); } while (n < 0 && errno == EINTR);
+    if (n < 0) return local_is_wouldblock() ? PPIOErrorWouldBlock : -1;
+    if (message.msg_flags & MSG_TRUNC) { errno = EMSGSIZE; return -1; }
+    if (!datagram_address(&address, source)) return -1;
+    return (int)n;
+}
+
+int pp_socket_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
+    const pp_socket_address *destination) {
+    struct sockaddr_storage address;
+    socklen_t length;
+    if (!datagram_native_address(destination, &address, &length)) return -1;
+    ssize_t n;
+    do {
+        n = sendto(sock->fd, src, size, 0, (const struct sockaddr *)&address, length);
+    } while (n < 0 && errno == EINTR);
+    if (n < 0) {
+        if (local_is_wouldblock()) return PPIOErrorWouldBlock;
+        if (local_is_nobufs()) return PPIOErrorNoBufs;
+        return -1;
+    }
+    if ((size_t)n != size) { errno = EIO; return -1; }
+    return (int)n;
+}
+#endif

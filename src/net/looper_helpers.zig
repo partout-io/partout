@@ -69,6 +69,12 @@ pub const Failure = union(enum) {
     user: anyerror,
 };
 
+/// Borrowed UDP payloads and source addresses, valid for this callback only.
+pub const OnDatagrams = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque, []const io.Datagram) anyerror!ReadAction,
+};
+
 /// Invoked on any failure event.
 pub const OnFailure = struct {
     context: ?*anyopaque = null,
@@ -120,6 +126,8 @@ pub const Timer = struct {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
+    /// Only looper_v2 supports an addressed UDP link. Mutually exclusive with on_read.
+    on_datagrams: ?OnDatagrams = null,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };
@@ -264,12 +272,14 @@ pub const CommandQueue = struct {
 /// Helps storing a pending write without copying the
 /// original buffer to a partial buffer.
 pub const PendingWrite = struct {
+    address: ?io.SocketAddress = null,
     data: []const u8,
     offset: usize,
 };
 
 /// A node in `WriteQueue`.
 const WriteNode = struct {
+    address: ?io.SocketAddress = null,
     data: []u8,
     next: ?*WriteNode = null,
 };
@@ -297,15 +307,23 @@ pub const WriteQueue = struct {
 
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
     pub fn append(self: *WriteQueue, packets: Packets) std.mem.Allocator.Error!void {
+        return self.appendBatch(packets);
+    }
+
+    pub fn appendDatagrams(self: *WriteQueue, packets: []const io.Datagram) std.mem.Allocator.Error!void {
+        return self.appendBatch(packets);
+    }
+
+    fn appendBatch(self: *WriteQueue, packets: anytype) std.mem.Allocator.Error!void {
         var new_head: ?*WriteNode = null;
         var new_tail: ?*WriteNode = null;
         errdefer destroyList(self.allocator, new_head);
 
         for (packets) |packet| {
-            const copy = try self.allocator.dupe(u8, packet);
+            const copy = try self.allocator.dupe(u8, if (@TypeOf(packet) == io.Datagram) packet.payload else packet);
             errdefer self.allocator.free(copy);
             const node = try self.allocator.create(WriteNode);
-            node.* = .{ .data = copy };
+            node.* = .{ .data = copy, .address = if (@TypeOf(packet) == io.Datagram) packet.address else null };
             if (new_tail) |tail| {
                 tail.next = node;
             } else {
@@ -329,6 +347,7 @@ pub const WriteQueue = struct {
         const first = self.head orelse return null;
         return .{
             .data = first.data,
+            .address = first.address,
             .offset = self.offset,
         };
     }

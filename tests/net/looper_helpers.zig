@@ -130,3 +130,28 @@ fn expectPending(queue: *const WriteQueue, data: []const u8, offset: usize) !voi
     try std.testing.expectEqualSlices(u8, data, pending.data);
     try std.testing.expectEqual(offset, pending.offset);
 }
+
+test "write queue owns UDP payloads and destinations and rolls back failed batches" {
+    const io = @import("source").net_io;
+    var address = std.mem.zeroes(io.SocketAddress);
+    address.family = 6;
+    address.scope_id = 7;
+    address.port = 12345;
+    var payload = [_]u8{ 1, 2, 3 };
+    var packets = [_]io.Datagram{.{ .payload = &payload, .address = address }};
+    var queue = WriteQueue.init(std.testing.allocator);
+    defer queue.deinit();
+    try queue.appendDatagrams(&packets);
+    payload[0] = 9;
+    packets[0].address.port = 9;
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, queue.pending().?.data);
+    try std.testing.expectEqual(@as(u16, 12345), queue.pending().?.address.?.port);
+    try std.testing.expectEqual(@as(u32, 7), queue.pending().?.address.?.scope_id);
+    for (0..4) |index| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = index });
+        var batch = WriteQueue.init(failing.allocator());
+        defer batch.deinit();
+        try std.testing.expectError(error.OutOfMemory, batch.appendDatagrams(&.{ packets[0], packets[0] }));
+        try std.testing.expect(batch.pending() == null);
+    }
+}
