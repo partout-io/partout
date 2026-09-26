@@ -110,7 +110,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         // A terminal protocol failure uses the shared Daemon state to pause
         // connection retries, even when host cancellation is disabled.
         try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
-            .err_pair = api.openVPNErrorCode(.tlsFailure),
+            .err_pair = api.openVPNErrorPair(.tlsFailure),
             .disposition = .cancel,
         } });
         try std.testing.expect(sut.state == .failed);

@@ -386,7 +386,7 @@ fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair)
     const cancel_tunnel = self.fnt.cancel_tunnel orelse
         @panic("Platform function table has no cancel_tunnel callback");
     if (err_pair) |value| {
-        const c_code = api.formatErrorPair(std.heap.c_allocator, value) catch {
+        const c_code = api.errorPairFormatZ(std.heap.c_allocator, value) catch {
             cancel_tunnel(self.ref, "outOfMemory");
             return;
         };

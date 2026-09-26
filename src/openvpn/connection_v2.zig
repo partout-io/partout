@@ -643,13 +643,11 @@ pub const testing = struct {
     pub const codeForError = partoutCodeForError;
 };
 
-const FailureCode = api.PartoutErrorPair;
-
-fn partoutCodeForError(err: ConnectionError) FailureCode {
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
     return switch (err) {
         error.BadCredentials => .{ .code = .authentication },
-        error.BadCredentialsWithLocalOptions => api.openVPNErrorCode(.recoverableAuthentication),
-        error.CompressionMismatch => api.openVPNErrorCode(.compressionMismatch),
+        error.BadCredentialsWithLocalOptions => api.openVPNErrorPair(.recoverableAuthentication),
+        error.CompressionMismatch => api.openVPNErrorPair(.compressionMismatch),
         error.CryptoEncryption,
         error.CryptoHMAC,
         error.CryptoPRNG,
@@ -658,18 +656,18 @@ fn partoutCodeForError(err: ConnectionError) FailureCode {
         error.ModulesAllocation => .{ .code = .unhandled },
         error.MuxFailure => .{ .code = .fdUnavailable },
         error.NetworkChanged => .{ .code = .networkChanged },
-        error.NoRouting => api.openVPNErrorCode(.noRouting),
-        error.ServerShutdown => api.openVPNErrorCode(.serverShutdown),
+        error.NoRouting => api.openVPNErrorPair(.noRouting),
+        error.ServerShutdown => api.openVPNErrorPair(.serverShutdown),
         error.MissingCA,
         error.TLSFailure,
-        => api.openVPNErrorCode(.tlsFailure),
+        => api.openVPNErrorPair(.tlsFailure),
         error.Timeout => .{ .code = .timeout },
         error.TunNotAvailable => .{ .code = .tunNotAvailable },
         error.CryptoDerivation,
         error.UnsupportedAlgorithm,
         error.UnsupportedCryptoBackend,
-        => api.openVPNErrorCode(.unsupportedAlgorithm),
-        error.UnsupportedCompression => api.openVPNErrorCode(.unsupportedCompression),
+        => api.openVPNErrorPair(.unsupportedAlgorithm),
+        error.UnsupportedCompression => api.openVPNErrorPair(.unsupportedCompression),
 
         error.AckIdsTooLong,
         error.Backpressure,
@@ -699,6 +697,6 @@ fn partoutCodeForError(err: ConnectionError) FailureCode {
         error.WouldBlock,
         error.WriteIncomplete,
         error.WrongControlDataPrefix,
-        => api.openVPNErrorCode(.connectionFailure),
+        => api.openVPNErrorPair(.connectionFailure),
     };
 }

@@ -245,7 +245,7 @@ pub const SnapshotPublisher = struct {
     }
 
     pub fn setLastError(self: *SnapshotPublisher, err_pair: ?api.PartoutErrorPair) void {
-        const owned = if (err_pair) |value| api.formatErrorPair(self.allocator, value) catch null else null;
+        const owned = if (err_pair) |value| api.errorPairFormatZ(self.allocator, value) catch null else null;
         const raw: ?[]const u8 = if (err_pair != null) owned orelse "outOfMemory" else null;
         if (core.util.optionalStringsEqual(self.environment.last_error_code, raw)) {
             if (owned) |value| self.allocator.free(value);

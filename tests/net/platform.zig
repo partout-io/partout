@@ -311,7 +311,7 @@ test "platform cancellation formats extended errors only at the C boundary" {
     defer platform.deinit();
     const controller = platform.tunnelController();
 
-    controller.cancelTunnelConnection(api.openVPNErrorCode(.tlsFailure));
+    controller.cancelTunnelConnection(api.openVPNErrorPair(.tlsFailure));
     try std.testing.expectEqualStrings("openVPN.tlsFailure", recorder.buffer[0..recorder.len.?]);
     controller.cancelTunnelConnection(.{ .code = .authentication });
     try std.testing.expectEqualStrings("authentication", recorder.buffer[0..recorder.len.?]);

@@ -510,7 +510,7 @@ test "connection daemon publishes terminal status when cancellation is disabled"
 
 test "connection daemon preserves extended and optional error codes at string boundaries" {
     const cases = [_]struct { err_pair: ?api.PartoutErrorPair, raw: ?[]const u8 }{
-        .{ .err_pair = api.openVPNErrorCode(.tlsFailure), .raw = "openVPN.tlsFailure" },
+        .{ .err_pair = api.openVPNErrorPair(.tlsFailure), .raw = "openVPN.tlsFailure" },
         .{ .err_pair = .{ .code = .authentication }, .raw = "authentication" },
         .{ .err_pair = null, .raw = null },
     };
@@ -1179,7 +1179,7 @@ test "snapshot publisher owns extended error strings and clears cached snapshots
     publisher.publishCurrentSnapshot(false);
     @memset(&raw, 'x');
     try std.testing.expectEqualStrings("openVPN.tlsFailure", publisher.environment.last_error_code.?);
-    publisher.setLastError(api.openVPNErrorCode(.serverShutdown));
+    publisher.setLastError(api.openVPNErrorPair(.serverShutdown));
     publisher.publishCurrentSnapshot(false);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);
     publisher.clearEnvironment();
