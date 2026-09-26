@@ -448,7 +448,7 @@ fn noopClearTunnelSettings(_: ?*anyopaque, _: bool) void {}
 
 fn noopSetReasserting(_: ?*anyopaque, _: bool) void {}
 
-fn noopCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorCode) void {}
+fn noopCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorPair) void {}
 
 pub const DaemonEventRecorder = struct {
     connection_status: ?api.ConnectionStatus = null,
@@ -457,6 +457,8 @@ pub const DaemonEventRecorder = struct {
     has_data_count: bool = false,
     data_count: api.DataCount = .{},
     last_error_code: ?api.PartoutErrorCode = null,
+    last_error_raw: [256]u8 = undefined,
+    last_error_len: usize = 0,
     remove_count: usize = 0,
 
     pub fn events(self: *DaemonEventRecorder) net_daemon.Events {
@@ -489,9 +491,14 @@ fn recordDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
     self.data_count = data_count;
 }
 
-fn recordLastErrorCode(ptr: *anyopaque, code: api.PartoutErrorCode) void {
+fn recordLastErrorCode(ptr: *anyopaque, err_pair: api.PartoutErrorPair) void {
     const self: *DaemonEventRecorder = @ptrCast(@alignCast(ptr));
-    self.last_error_code = code;
+    const raw = if (err_pair.sub_code) |sub_code|
+        std.fmt.bufPrint(&self.last_error_raw, "{s}.{s}", .{ err_pair.code.raw(), sub_code }) catch unreachable
+    else
+        std.fmt.bufPrint(&self.last_error_raw, "{s}", .{err_pair.code.raw()}) catch unreachable;
+    self.last_error_len = raw.len;
+    self.last_error_code = err_pair.code;
 }
 
 fn recordRemove(ptr: *anyopaque, key: net_daemon.EventKey) void {
@@ -701,6 +708,8 @@ pub const MockTunnelController = struct {
     reasserting: bool = false,
     cancel_count: usize = 0,
     last_cancel_code: ?api.PartoutErrorCode = null,
+    last_cancel_raw: [256]u8 = undefined,
+    last_cancel_len: usize = 0,
 
     pub fn interface(self: *MockTunnelController) net.TunnelController {
         return .{
@@ -769,10 +778,19 @@ fn mockSetReasserting(ptr: ?*anyopaque, reasserting: bool) void {
     self.reasserting = reasserting;
 }
 
-fn mockCancelTunnelConnection(ptr: ?*anyopaque, code: ?api.PartoutErrorCode) void {
+fn mockCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair) void {
     const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
     self.cancel_count += 1;
-    self.last_cancel_code = code;
+    self.last_cancel_len = 0;
+    self.last_cancel_code = null;
+    if (err_pair) |value| {
+        const raw = if (value.sub_code) |sub_code|
+            std.fmt.bufPrint(&self.last_cancel_raw, "{s}.{s}", .{ value.code.raw(), sub_code }) catch unreachable
+        else
+            std.fmt.bufPrint(&self.last_cancel_raw, "{s}", .{value.code.raw()}) catch unreachable;
+        self.last_cancel_len = raw.len;
+        self.last_cancel_code = value.code;
+    }
 }
 
 pub const MockNetworkMonitor = struct {
@@ -858,7 +876,7 @@ const daemon_mock_connection_vtable = net_conn.Connection.VTable{
 fn daemonMockStart(_: *anyopaque, events: net_conn.Connection.Events) net_conn.StartError!bool {
     events.status(events.ctx, .connecting);
     events.data_count(events.ctx, .{ .received = 10, .sent = 20 });
-    events.last_error(events.ctx, .authentication);
+    events.last_error(events.ctx, .{ .code = .authentication });
     events.status(events.ctx, .connected);
     return true;
 }

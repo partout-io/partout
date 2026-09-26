@@ -149,7 +149,7 @@ public final class AppleKeychain: Keychain {
 
         default:
             pp_log(ctx, .core, .error, "password(for:), keychain status is \(status)")
-            throw PartoutError(.keychainItemNotFound, status)
+            throw PartoutError(.keychainItemNotFound, payload: .number(Double(status)))
         }
         guard let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {
@@ -181,7 +181,7 @@ public final class AppleKeychain: Keychain {
 
         default:
             pp_log(ctx, .core, .error, "passwordReference(for:), keychain status is \(status)")
-            throw PartoutError(.keychainItemNotFound, status)
+            throw PartoutError(.keychainItemNotFound, payload: .number(Double(status)))
         }
         guard let data = result as? Data else {
             pp_log(ctx, .core, .error, "passwordReference(for:), result is not Data")
@@ -208,7 +208,7 @@ public final class AppleKeychain: Keychain {
             return []
         default:
             pp_log(ctx, .core, .error, "allPasswordReferences(), keychain status is \(status)")
-            throw PartoutError(.keychainItemNotFound, status)
+            throw PartoutError(.keychainItemNotFound, payload: .number(Double(status)))
         }
         guard let refs = result as? [Data] else {
             pp_log(ctx, .core, .error, "allPasswordReferences(), result is not [Data]")
@@ -236,7 +236,7 @@ public final class AppleKeychain: Keychain {
 
         default:
             pp_log(ctx, .core, .error, "password(forReference:), keychain status is \(status)")
-            throw PartoutError(.keychainItemNotFound, status)
+            throw PartoutError(.keychainItemNotFound, payload: .number(Double(status)))
         }
         guard let data = result as? Data,
               let string = String(data: data, encoding: .utf8) else {

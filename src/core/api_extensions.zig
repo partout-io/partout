@@ -52,6 +52,13 @@ pub fn encodeProfileZ(
     return gen.encodeJsonValueZ(allocator, profile);
 }
 
+/// Compares optional error pairs by code and subcode contents.
+pub fn errorPairEqual(lhs: ?gen.PartoutErrorPair, rhs: ?gen.PartoutErrorPair) bool {
+    const left = lhs orelse return rhs == null;
+    const right = rhs orelse return false;
+    return left.code == right.code and util.optionalStringsEqual(left.sub_code, right.sub_code);
+}
+
 /// Finds the first active module that can establish a tunnel connection.
 pub fn findActiveConnectionModule(profile: *const gen.Profile) ?*const gen.TaggedModule {
     for (profile.modules) |*module| {

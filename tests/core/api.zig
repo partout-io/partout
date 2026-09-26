@@ -725,3 +725,27 @@ const tunnel_remote_info_json =
 ++ tagged_dns_json ++ "," ++ tagged_ip_json ++
     \\]}
 ;
+
+test "extended errors encode a code and optional subcode" {
+    const allocator = std.testing.allocator;
+    const simple = try api.errorPairFormatZ(allocator, .{ .code = .timeout });
+    defer allocator.free(simple);
+    try std.testing.expectEqualStrings("timeout", simple);
+    const specific = try api.errorPairFormatZ(allocator, .{ .code = .openVPN, .sub_code = "tlsFailure" });
+    defer allocator.free(specific);
+    try std.testing.expectEqualStrings("openVPN.tlsFailure", specific);
+}
+
+test "error pair equality compares optional values and subcode contents" {
+    var sub_code = "tlsFailure".*;
+    const pair = api.openVPNErrorPair(.tlsFailure);
+    const copy: api.PartoutErrorPair = .{ .code = .openVPN, .sub_code = &sub_code };
+    try std.testing.expect(api.errorPairEqual(pair, copy));
+    try std.testing.expect(api.errorPairEqual(null, null));
+    try std.testing.expect(!api.errorPairEqual(pair, null));
+    try std.testing.expect(!api.errorPairEqual(null, pair));
+    try std.testing.expect(!api.errorPairEqual(pair, api.openVPNErrorPair(.serverShutdown)));
+    try std.testing.expect(!api.errorPairEqual(pair, .{ .code = .wireGuard, .sub_code = &sub_code }));
+    try std.testing.expect(api.errorPairEqual(.{ .code = .timeout }, .{ .code = .timeout }));
+    try std.testing.expect(!api.errorPairEqual(.{ .code = .openVPN }, .{ .code = .openVPN, .sub_code = "" }));
+}

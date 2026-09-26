@@ -484,8 +484,8 @@ const OpenVPNConnection = struct {
                     log.write(.err, "Disconnection is not recoverable");
                     self.prepareTerminalCancellation();
                 }
-                const error_code = partoutCodeForError(failure.cause);
-                events.last_error(events.ctx, error_code);
+                const err_pair = partoutCodeForError(failure.cause);
+                events.last_error(events.ctx, err_pair);
                 switch (disp) {
                     .reconnect => {
                         // The .disconnected status will trigger a reconnection
@@ -493,7 +493,7 @@ const OpenVPNConnection = struct {
                         _ = self.sendStatus(.disconnected, events);
                         self.events = null;
                     },
-                    .cancel => events.cancel(events.ctx, error_code),
+                    .cancel => events.cancel(events.ctx, err_pair),
                 }
             },
         }
@@ -861,29 +861,29 @@ pub const testing = struct {
     pub const codeForError = partoutCodeForError;
 };
 
-fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
     return switch (err) {
-        error.BadCredentials => .authentication,
-        error.BadCredentialsWithLocalOptions => .openVPNRecoverableAuthentication,
-        error.CompressionMismatch => .openVPNCompressionMismatch,
+        error.BadCredentials => .{ .code = .authentication },
+        error.BadCredentialsWithLocalOptions => api.openVPNErrorPair(.recoverableAuthentication),
+        error.CompressionMismatch => api.openVPNErrorPair(.compressionMismatch),
         error.CryptoEncryption,
         error.CryptoHMAC,
         error.CryptoPRNG,
-        => .crypto,
-        error.InvalidEndpoint => .invalidValue,
-        error.ModulesAllocation => .unhandled,
-        error.MuxFailure => .fdUnavailable,
-        error.NetworkChanged => .networkChanged,
-        error.NoRouting => .openVPNNoRouting,
-        error.ServerShutdown => .openVPNServerShutdown,
-        error.TLSFailure => .openVPNTLSFailure,
-        error.Timeout => .timeout,
-        error.TunNotAvailable => .tunNotAvailable,
+        => .{ .code = .crypto },
+        error.InvalidEndpoint => .{ .code = .invalidValue },
+        error.ModulesAllocation => .{ .code = .unhandled },
+        error.MuxFailure => .{ .code = .fdUnavailable },
+        error.NetworkChanged => .{ .code = .networkChanged },
+        error.NoRouting => api.openVPNErrorPair(.noRouting),
+        error.ServerShutdown => api.openVPNErrorPair(.serverShutdown),
+        error.TLSFailure => api.openVPNErrorPair(.tlsFailure),
+        error.Timeout => .{ .code = .timeout },
+        error.TunNotAvailable => .{ .code = .tunNotAvailable },
         error.CryptoDerivation,
         error.UnsupportedAlgorithm,
         error.UnsupportedCryptoBackend,
-        => .openVPNUnsupportedAlgorithm,
-        error.UnsupportedCompression => .openVPNUnsupportedCompression,
+        => api.openVPNErrorPair(.unsupportedAlgorithm),
+        error.UnsupportedCompression => api.openVPNErrorPair(.unsupportedCompression),
 
         error.AckIdsTooLong,
         error.Backpressure,
@@ -913,6 +913,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         error.WouldBlock,
         error.WriteIncomplete,
         error.WrongControlDataPrefix,
-        => .openVPNConnectionFailure,
+        => api.openVPNErrorPair(.connectionFailure),
     };
 }

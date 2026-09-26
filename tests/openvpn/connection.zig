@@ -59,9 +59,9 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
         }
 
         fn ignoreStatus(_: *anyopaque, _: api.ConnectionStatus) void {}
-        fn ignoreError(_: *anyopaque, _: api.PartoutErrorCode) void {}
+        fn ignoreError(_: *anyopaque, _: api.PartoutErrorPair) void {}
         fn ignoreCount(_: *anyopaque, _: api.DataCount) void {}
-        fn ignoreCancel(_: *anyopaque, _: ?api.PartoutErrorCode) void {}
+        fn ignoreCancel(_: *anyopaque, _: ?api.PartoutErrorPair) void {}
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
     };
     const allocator = std.testing.allocator;
@@ -195,29 +195,38 @@ test "OpenVPN connection failure dispositions" {
     try std.testing.expect(isRecoverableError(error.TunNotAvailable));
 }
 
-test "OpenVPN connection errors map to legacy public codes" {
-    const codeForError = connection.testing.codeForError;
-    const cases = .{
-        .{ error.BadCredentials, api.PartoutErrorCode.authentication },
-        .{ error.BadCredentialsWithLocalOptions, api.PartoutErrorCode.openVPNRecoverableAuthentication },
-        .{ error.CompressionMismatch, api.PartoutErrorCode.openVPNCompressionMismatch },
-        .{ error.CryptoDerivation, api.PartoutErrorCode.openVPNUnsupportedAlgorithm },
-        .{ error.CryptoEncryption, api.PartoutErrorCode.crypto },
-        .{ error.InvalidEndpoint, api.PartoutErrorCode.invalidValue },
-        .{ error.InvalidPushReply, api.PartoutErrorCode.openVPNConnectionFailure },
-        .{ error.LinkFailure, api.PartoutErrorCode.openVPNConnectionFailure },
-        .{ error.ModulesAllocation, api.PartoutErrorCode.unhandled },
-        .{ error.MuxFailure, api.PartoutErrorCode.fdUnavailable },
-        .{ error.NetworkChanged, api.PartoutErrorCode.networkChanged },
-        .{ error.NoRouting, api.PartoutErrorCode.openVPNNoRouting },
-        .{ error.ServerShutdown, api.PartoutErrorCode.openVPNServerShutdown },
-        .{ error.TLSFailure, api.PartoutErrorCode.openVPNTLSFailure },
-        .{ error.Timeout, api.PartoutErrorCode.timeout },
-        .{ error.TunNotAvailable, api.PartoutErrorCode.tunNotAvailable },
-        .{ error.UnsupportedAlgorithm, api.PartoutErrorCode.openVPNUnsupportedAlgorithm },
-        .{ error.UnsupportedCompression, api.PartoutErrorCode.openVPNUnsupportedCompression },
-    };
-
-    inline for (cases) |entry|
-        try std.testing.expectEqual(entry[1], codeForError(entry[0]));
+test "OpenVPN failures separate protocol subcodes from general codes" {
+    inline for (.{ source.openvpn_connection_v2, connection }) |implementation| {
+        const codeForError = implementation.testing.codeForError;
+        const protocol_cases = .{
+            .{ error.BadCredentialsWithLocalOptions, api.OpenVPNErrorCode.recoverableAuthentication },
+            .{ error.CompressionMismatch, api.OpenVPNErrorCode.compressionMismatch },
+            .{ error.NoRouting, api.OpenVPNErrorCode.noRouting },
+            .{ error.ServerShutdown, api.OpenVPNErrorCode.serverShutdown },
+            .{ error.TLSFailure, api.OpenVPNErrorCode.tlsFailure },
+            .{ error.CryptoDerivation, api.OpenVPNErrorCode.unsupportedAlgorithm },
+            .{ error.UnsupportedAlgorithm, api.OpenVPNErrorCode.unsupportedAlgorithm },
+            .{ error.UnsupportedCompression, api.OpenVPNErrorCode.unsupportedCompression },
+            .{ error.LinkFailure, api.OpenVPNErrorCode.connectionFailure },
+        };
+        inline for (protocol_cases) |entry| {
+            const result = codeForError(entry[0]);
+            try std.testing.expectEqual(api.PartoutErrorCode.openVPN, result.code);
+            try std.testing.expectEqualStrings(entry[1].raw(), result.sub_code.?);
+        }
+        const generic_cases = .{
+            .{ error.BadCredentials, api.PartoutErrorCode.authentication },
+            .{ error.CryptoEncryption, api.PartoutErrorCode.crypto },
+            .{ error.InvalidEndpoint, api.PartoutErrorCode.invalidValue },
+            .{ error.MuxFailure, api.PartoutErrorCode.fdUnavailable },
+            .{ error.NetworkChanged, api.PartoutErrorCode.networkChanged },
+            .{ error.Timeout, api.PartoutErrorCode.timeout },
+            .{ error.TunNotAvailable, api.PartoutErrorCode.tunNotAvailable },
+        };
+        inline for (generic_cases) |entry| {
+            const result = codeForError(entry[0]);
+            try std.testing.expectEqual(entry[1], result.code);
+            try std.testing.expectEqual(@as(?[]const u8, null), result.sub_code);
+        }
+    }
 }

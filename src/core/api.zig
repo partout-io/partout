@@ -70,6 +70,7 @@ pub const OpenVPNTLSWrap = gen.OpenVPNTLSWrap;
 pub const OpenVPNTLSWrapStrategy = gen.OpenVPNTLSWrapStrategy;
 pub const ParseErrorInfo = gen.ParseErrorInfo;
 pub const PartoutErrorCode = gen.PartoutErrorCode;
+pub const PartoutErrorPair = gen.PartoutErrorPair;
 pub const Profile = gen.Profile;
 pub const ProfileBehavior = gen.ProfileBehavior;
 pub const Route = gen.Route;
@@ -99,6 +100,21 @@ pub const WireGuardRemoteInterface = gen.WireGuardRemoteInterface;
 pub const CryptoFunctionTableError = error{UnsupportedCryptoBackend};
 
 const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.tag.isDarwin();
+
+pub fn errorPairFormatZ(allocator: std.mem.Allocator, err_pair: PartoutErrorPair) error{OutOfMemory}![:0]u8 {
+    if (err_pair.sub_code) |sub_code| {
+        return std.fmt.allocPrintSentinel(allocator, "{s}.{s}", .{ err_pair.code.raw(), sub_code }, 0);
+    }
+    return allocator.dupeZ(u8, err_pair.code.raw());
+}
+
+pub fn openVPNErrorPair(code: OpenVPNErrorCode) PartoutErrorPair {
+    return .{ .code = .openVPN, .sub_code = code.raw() };
+}
+
+pub fn wireGuardErrorPair(code: WireGuardErrorCode) PartoutErrorPair {
+    return .{ .code = .wireGuard, .sub_code = code.raw() };
+}
 
 pub fn defaultCryptoBackend() CryptoBackend {
     if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL")) return .openssl;
@@ -147,6 +163,7 @@ pub const encodeModule = extensions.encodeModule;
 pub const encodeModuleZ = extensions.encodeModuleZ;
 pub const encodeProfile = extensions.encodeProfile;
 pub const encodeProfileZ = extensions.encodeProfileZ;
+pub const errorPairEqual = extensions.errorPairEqual;
 pub const findActiveConnectionModule = extensions.findActiveConnectionModule;
 pub const hasConnection = extensions.hasConnection;
 pub const isActiveProfileModule = extensions.isActiveProfileModule;

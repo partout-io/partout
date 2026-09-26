@@ -197,8 +197,10 @@ pub const Connection = struct {
             reconnect,
             cancel,
         };
+
         pub const Failure = struct {
-            code: api.PartoutErrorCode,
+            /// The borrowed subcode must outlive asynchronous event delivery.
+            err_pair: api.PartoutErrorPair,
             disposition: FailureDisposition,
         };
 
@@ -222,10 +224,10 @@ pub const Connection = struct {
 
         // Deprecated.
         status: *const fn (*anyopaque, api.ConnectionStatus) void,
-        last_error: *const fn (*anyopaque, api.PartoutErrorCode) void,
+        last_error: *const fn (*anyopaque, api.PartoutErrorPair) void,
         /// Requests host cancellation after an unrecoverable connection
         /// failure so the daemon can apply its cancellation policy.
-        cancel: *const fn (*anyopaque, ?api.PartoutErrorCode) void,
+        cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
     };
 
     pub const VTable = struct {

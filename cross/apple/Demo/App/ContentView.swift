@@ -296,7 +296,7 @@ private extension ButtonAction {
     }
 }
 
-private extension Tunnel {
+private extension PartoutTunnel {
     var status: TunnelStatus {
         snapshots.first?.value.status ?? .inactive
     }

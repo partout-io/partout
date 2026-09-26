@@ -133,10 +133,12 @@ fn boundEventDataCount(ptr: *anyopaque, data_count: api.DataCount) void {
     set(binding.ctx, data_count.received, data_count.sent);
 }
 
-fn boundEventLastError(ptr: *anyopaque, code: api.PartoutErrorCode) void {
+fn boundEventLastError(ptr: *anyopaque, err_pair: api.PartoutErrorPair) void {
     const binding = boundEventsBinding(ptr) orelse return;
     const set = binding.set_last_error_code orelse return;
-    util.withCString(code.raw(), set, binding.ctx);
+    const c_code = api.errorPairFormatZ(std.heap.c_allocator, err_pair) catch return;
+    defer std.heap.c_allocator.free(c_code);
+    set(binding.ctx, c_code.ptr);
 }
 
 fn boundEventRemoveKey(ptr: *anyopaque, key: net.DaemonEventKey) void {
@@ -156,31 +158,35 @@ pub fn successPayloadAllocZ(
     allocator: std.mem.Allocator,
     json: [*:0]const u8,
 ) ?[*:0]u8 {
-    return wrapOwnedImportPayload(
-        allocator,
-        null,
-        json,
-    );
+    const payload_json = std.mem.span(json);
+    defer allocator.free(payload_json);
+    return util.encodeJsonValueZ(allocator, api.ABIEnvelope{
+        .payload = .{ .bytes = payload_json },
+    }) catch null;
 }
 
 pub fn errorPayloadAllocZ(
     allocator: std.mem.Allocator,
-    code: api.PartoutErrorCode,
-) ?[*:0]u8 {
-    return wrapOwnedImportPayload(
-        allocator,
-        code,
-        null,
-    );
-}
-
-fn errorUserInfoAllocZ(
-    allocator: std.mem.Allocator,
+    err_pair: api.PartoutErrorPair,
     parse_error_info: ?*const api.ParseErrorInfo,
 ) ?[*:0]u8 {
-    const info = parse_error_info orelse return null;
-    if (info.recognized_type == null and info.sub_code == null and info.name == null and info.line == null and info.arguments.len == 0) return null;
-    return util.encodeJsonValueZ(allocator, info.*) catch null;
+    var info = if (parse_error_info) |value| value.* else api.ParseErrorInfo{};
+    info.sub_code = err_pair.sub_code;
+
+    // No meaningful parse error information
+    if (info.recognized_type == null and info.sub_code == null and
+        info.name == null and info.line == null and info.arguments.len == 0)
+    {
+        return util.encodeJsonValueZ(allocator, api.ABIEnvelope{
+            .code = err_pair.code,
+        }) catch null;
+    }
+
+    // Encode info as anonymous ABIEnvelope (skip raw JSON payload)
+    return util.encodeJsonValueZ(allocator, .{
+        .code = err_pair.code,
+        .payload = info,
+    }) catch null;
 }
 
 pub fn importErrorPayloadAllocZ(
@@ -188,28 +194,11 @@ pub fn importErrorPayloadAllocZ(
     err: ImportAndEncodeError,
     context: core.ImportContext,
 ) ?[*:0]u8 {
-    const code = importErrorCode(err);
-    const user_info = errorUserInfoAllocZ(allocator, context.parse_error_info);
-    return wrapOwnedImportPayload(
+    return errorPayloadAllocZ(
         allocator,
-        code,
-        user_info,
+        importErrorPair(err, context),
+        context.parse_error_info,
     );
-}
-
-fn wrapOwnedImportPayload(
-    allocator: std.mem.Allocator,
-    code: ?api.PartoutErrorCode,
-    c_payload: ?[*:0]const u8,
-) ?[*:0]u8 {
-    const payload_json = if (c_payload) |payload_ptr| std.mem.span(payload_ptr) else null;
-    defer if (payload_json) |bytes| allocator.free(bytes);
-
-    const envelope: api.ABIEnvelope = .{
-        .code = code,
-        .payload = if (payload_json) |bytes| api.JSONValue{ .bytes = bytes } else null,
-    };
-    return util.encodeJsonValueZ(allocator, envelope) catch null;
 }
 
 // MARK: - Mappings
@@ -222,13 +211,33 @@ fn eventKeyString(key: net.DaemonEventKey) [:0]const u8 {
     };
 }
 
-fn importErrorCode(err: ImportAndEncodeError) api.PartoutErrorCode {
-    return switch (err) {
-        error.OutOfMemory => .outOfMemory,
-        error.IdGeneration => .unhandled,
-        error.InvalidJson, error.InvalidProfile => .decoding,
-        error.InvalidModel, error.Stringify => .encoding,
-        error.Parsing => .parsing,
-        error.UnknownImportedModule => .unknownImportedModule,
+fn importErrorPair(err: ImportAndEncodeError, context: core.ImportContext) api.PartoutErrorPair {
+    var err_pair: api.PartoutErrorPair = .{
+        .code = switch (err) {
+            error.OutOfMemory => .outOfMemory,
+            error.IdGeneration => .unhandled,
+            error.InvalidJson, error.InvalidProfile => .decoding,
+            error.InvalidModel, error.Stringify => .encoding,
+            error.Parsing => .parsing,
+            error.UnknownImportedModule => .unknownImportedModule,
+        },
     };
+    const info = context.parse_error_info orelse return err_pair;
+    err_pair.sub_code = info.sub_code;
+    switch (err) {
+        error.Parsing,
+        error.InvalidJson,
+        error.InvalidProfile,
+        => {
+            if (info.sub_code == null) return err_pair;
+            const module_type = info.recognized_type orelse return err_pair;
+            err_pair.code = switch (module_type) {
+                .OpenVPN => .openVPN,
+                .WireGuard => .wireGuard,
+                else => err_pair.code,
+            };
+        },
+        else => {},
+    }
+    return err_pair;
 }

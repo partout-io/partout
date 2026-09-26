@@ -35,10 +35,6 @@ extension ABIEnvelope {
             )
             return
         }
-        guard let userInfo = partoutError.userInfo as? Encodable else {
-            self.init(code: partoutError.code)
-            return
-        }
-        self.init(code: partoutError.code, payload: try? JSON(encodable: userInfo))
+        self.init(code: partoutError.code, payload: partoutError.payload)
     }
 }

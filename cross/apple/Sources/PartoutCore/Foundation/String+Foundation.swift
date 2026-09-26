@@ -15,7 +15,7 @@ extension String {
 
     public func append(toFile path: String, encoding: String.Encoding) throws {
         guard let file = FileHandle(forUpdatingAtPath: path) else {
-            throw MiniFoundationError.io()
+            throw PartoutError(.ioFailure)
         }
         try file.seekToEnd()
         if let data = data(using: encoding) {

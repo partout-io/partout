@@ -31,22 +31,28 @@ import kotlinx.serialization.Serializable
 /**
  * 
  *
- * Values: authentication,cached,crypto,decoding,dnsFailure,encoding,exhaustedEndpoints,fdUnavailable,incompatibleModules,incompleteModule,invalidField,invalidValue,ioFailure,keychainAddItem,keychainItemNotFound,linkNotActive,networkChanged,networkUnreachable,noActiveModules,nonFinalModules,notFound,openVPNCompressionMismatch,openVPNConnectionFailure,openVPNNoRouting,openVPNOTPRequired,openVPNPassphraseRequired,openVPNRecoverableAuthentication,openVPNServerShutdown,openVPNTLSFailure,openVPNUnsupportedAlgorithm,openVPNUnsupportedCompression,openVPNUnsupportedOption,operationCancelled,outOfMemory,parsing,passphraseRequired,releasedObject,requiredImplementation,scriptException,socketConfiguration,timeout,tunNotActive,tunNotAvailable,unexpectedModuleType,unhandled,unknownImportedModule,unknownModuleHandler,wireGuardEmptyPeers,wireGuardInterfaceHasInvalidAddress,wireGuardInterfaceHasInvalidDNS,wireGuardInterfaceHasInvalidListenPort,wireGuardInterfaceHasInvalidMTU,wireGuardInterfaceHasInvalidPrivateKey,wireGuardInterfaceHasNoPrivateKey,wireGuardInterfaceHasUnrecognizedKey,wireGuardMultipleEntriesForKey,wireGuardMultipleInterfaces,wireGuardMultiplePeersWithSamePublicKey,wireGuardNoInterface,wireGuardPeerHasInvalidAllowedIP,wireGuardPeerHasInvalidEndpoint,wireGuardPeerHasInvalidPersistentKeepAlive,wireGuardPeerHasInvalidPreSharedKey,wireGuardPeerHasInvalidPublicKey,wireGuardPeerHasNoPublicKey,wireGuardPeerHasUnrecognizedKey
+ * Values: openVPN,wireGuard,authentication,crypto,decoding,dnsFailure,encoding,fdUnavailable,incompatibleModules,incompleteModule,invalidField,invalidValue,ioFailure,keychainAddItem,keychainItemNotFound,linkNotActive,networkChanged,noActiveModules,operationCancelled,outOfMemory,parsing,releasedObject,requiredImplementation,socketConfiguration,timeout,tunNotAvailable,unhandled,unknownImportedModule,unknownModuleHandler
  */
 @Serializable
 enum class PartoutErrorCode(val value: kotlin.String) {
+
+    /**
+     * OpenVPN error; payload contains an OpenVPNErrorCode in subCode.
+     */
+    @SerialName(value = "openVPN")
+    openVPN("openVPN"),
+
+    /**
+     * WireGuard error; payload contains a WireGuardErrorCode in subCode.
+     */
+    @SerialName(value = "wireGuard")
+    wireGuard("wireGuard"),
 
     /**
      * Authentication failure.
      */
     @SerialName(value = "authentication")
     authentication("authentication"),
-
-    /**
-     * Response is cached.
-     */
-    @SerialName(value = "cached")
-    cached("cached"),
 
     /**
      * Crypto error.
@@ -71,12 +77,6 @@ enum class PartoutErrorCode(val value: kotlin.String) {
      */
     @SerialName(value = "encoding")
     encoding("encoding"),
-
-    /**
-     * No more endpoints available to try.
-     */
-    @SerialName(value = "exhaustedEndpoints")
-    exhaustedEndpoints("exhaustedEndpoints"),
 
     /**
      * File descriptor is not available.
@@ -139,94 +139,10 @@ enum class PartoutErrorCode(val value: kotlin.String) {
     networkChanged("networkChanged"),
 
     /**
-     * Network is unreachable.
-     */
-    @SerialName(value = "networkUnreachable")
-    networkUnreachable("networkUnreachable"),
-
-    /**
      * The profile has no active modules.
      */
     @SerialName(value = "noActiveModules")
     noActiveModules("noActiveModules"),
-
-    /**
-     * The profile has non-final modules that must be resolved to final modules first.
-     */
-    @SerialName(value = "nonFinalModules")
-    nonFinalModules("nonFinalModules"),
-
-    /**
-     * Entity not found.
-     */
-    @SerialName(value = "notFound")
-    notFound("notFound"),
-
-    /**
-     * Compression settings mismatch.
-     */
-    @SerialName(value = "OpenVPN.compressionMismatch")
-    openVPNCompressionMismatch("OpenVPN.compressionMismatch"),
-
-    /**
-     * Connection failure.
-     */
-    @SerialName(value = "OpenVPN.connectionFailure")
-    openVPNConnectionFailure("OpenVPN.connectionFailure"),
-
-    /**
-     * No routing configuration.
-     */
-    @SerialName(value = "OpenVPN.noRouting")
-    openVPNNoRouting("OpenVPN.noRouting"),
-
-    /**
-     * One-time password is required.
-     */
-    @SerialName(value = "OpenVPN.otpRequired")
-    openVPNOTPRequired("OpenVPN.otpRequired"),
-
-    /**
-     * Passphrase is required.
-     */
-    @SerialName(value = "OpenVPN.passphraseRequired")
-    openVPNPassphraseRequired("OpenVPN.passphraseRequired"),
-
-    /**
-     * Authentication can be retried.
-     */
-    @SerialName(value = "OpenVPN.recoverableAuthentication")
-    openVPNRecoverableAuthentication("OpenVPN.recoverableAuthentication"),
-
-    /**
-     * Server requested shutdown.
-     */
-    @SerialName(value = "OpenVPN.serverShutdown")
-    openVPNServerShutdown("OpenVPN.serverShutdown"),
-
-    /**
-     * TLS failure.
-     */
-    @SerialName(value = "OpenVPN.tlsFailure")
-    openVPNTLSFailure("OpenVPN.tlsFailure"),
-
-    /**
-     * Algorithm is unsupported.
-     */
-    @SerialName(value = "OpenVPN.unsupportedAlgorithm")
-    openVPNUnsupportedAlgorithm("OpenVPN.unsupportedAlgorithm"),
-
-    /**
-     * Compression setting is unsupported.
-     */
-    @SerialName(value = "OpenVPN.unsupportedCompression")
-    openVPNUnsupportedCompression("OpenVPN.unsupportedCompression"),
-
-    /**
-     * Option is unsupported.
-     */
-    @SerialName(value = "OpenVPN.unsupportedOption")
-    openVPNUnsupportedOption("OpenVPN.unsupportedOption"),
 
     /**
      * Operation cancelled or unauthorized.
@@ -247,12 +163,6 @@ enum class PartoutErrorCode(val value: kotlin.String) {
     parsing("parsing"),
 
     /**
-     * A passphrase is required.
-     */
-    @SerialName(value = "passphraseRequired")
-    passphraseRequired("passphraseRequired"),
-
-    /**
      * A required object was released prematurely.
      */
     @SerialName(value = "releasedObject")
@@ -263,12 +173,6 @@ enum class PartoutErrorCode(val value: kotlin.String) {
      */
     @SerialName(value = "requiredImplementation")
     requiredImplementation("requiredImplementation"),
-
-    /**
-     * An exception was raised during a script execution.
-     */
-    @SerialName(value = "scriptException")
-    scriptException("scriptException"),
 
     /**
      * Native sockets could not be configured.
@@ -283,22 +187,10 @@ enum class PartoutErrorCode(val value: kotlin.String) {
     timeout("timeout"),
 
     /**
-     * TUN device is not active.
-     */
-    @SerialName(value = "tunNotActive")
-    tunNotActive("tunNotActive"),
-
-    /**
      * TUN device is not available for I/O.
      */
     @SerialName(value = "tunNotAvailable")
     tunNotAvailable("tunNotAvailable"),
-
-    /**
-     * Module type is unexpected
-     */
-    @SerialName(value = "unexpectedModuleType")
-    unexpectedModuleType("unexpectedModuleType"),
 
     /**
      * Generic failure.
@@ -316,121 +208,7 @@ enum class PartoutErrorCode(val value: kotlin.String) {
      * Module handler is unknown.
      */
     @SerialName(value = "unknownModuleHandler")
-    unknownModuleHandler("unknownModuleHandler"),
-
-    /**
-     * Configuration has no peers.
-     */
-    @SerialName(value = "WireGuard.emptyPeers")
-    wireGuardEmptyPeers("WireGuard.emptyPeers"),
-
-    /**
-     * WireGuard interface address is invalid.
-     */
-    @SerialName(value = "WireGuard.interfaceHasInvalidAddress")
-    wireGuardInterfaceHasInvalidAddress("WireGuard.interfaceHasInvalidAddress"),
-
-    /**
-     * WireGuard interface DNS entry is invalid.
-     */
-    @SerialName(value = "WireGuard.interfaceHasInvalidDNS")
-    wireGuardInterfaceHasInvalidDNS("WireGuard.interfaceHasInvalidDNS"),
-
-    /**
-     * WireGuard interface listen port is invalid.
-     */
-    @SerialName(value = "WireGuard.interfaceHasInvalidListenPort")
-    wireGuardInterfaceHasInvalidListenPort("WireGuard.interfaceHasInvalidListenPort"),
-
-    /**
-     * WireGuard interface MTU is invalid.
-     */
-    @SerialName(value = "WireGuard.interfaceHasInvalidMTU")
-    wireGuardInterfaceHasInvalidMTU("WireGuard.interfaceHasInvalidMTU"),
-
-    /**
-     * WireGuard interface private key is invalid.
-     */
-    @SerialName(value = "WireGuard.interfaceHasInvalidPrivateKey")
-    wireGuardInterfaceHasInvalidPrivateKey("WireGuard.interfaceHasInvalidPrivateKey"),
-
-    /**
-     * WireGuard interface has no private key.
-     */
-    @SerialName(value = "WireGuard.interfaceHasNoPrivateKey")
-    wireGuardInterfaceHasNoPrivateKey("WireGuard.interfaceHasNoPrivateKey"),
-
-    /**
-     * WireGuard interface key is unrecognized.
-     */
-    @SerialName(value = "WireGuard.interfaceHasUnrecognizedKey")
-    wireGuardInterfaceHasUnrecognizedKey("WireGuard.interfaceHasUnrecognizedKey"),
-
-    /**
-     * WireGuard key occurs more than once.
-     */
-    @SerialName(value = "WireGuard.multipleEntriesForKey")
-    wireGuardMultipleEntriesForKey("WireGuard.multipleEntriesForKey"),
-
-    /**
-     * WireGuard configuration has multiple interface sections.
-     */
-    @SerialName(value = "WireGuard.multipleInterfaces")
-    wireGuardMultipleInterfaces("WireGuard.multipleInterfaces"),
-
-    /**
-     * WireGuard configuration has multiple peers with the same public key.
-     */
-    @SerialName(value = "WireGuard.multiplePeersWithSamePublicKey")
-    wireGuardMultiplePeersWithSamePublicKey("WireGuard.multiplePeersWithSamePublicKey"),
-
-    /**
-     * WireGuard configuration has no interface section.
-     */
-    @SerialName(value = "WireGuard.noInterface")
-    wireGuardNoInterface("WireGuard.noInterface"),
-
-    /**
-     * WireGuard peer allowed IP is invalid.
-     */
-    @SerialName(value = "WireGuard.peerHasInvalidAllowedIP")
-    wireGuardPeerHasInvalidAllowedIP("WireGuard.peerHasInvalidAllowedIP"),
-
-    /**
-     * WireGuard peer endpoint is invalid.
-     */
-    @SerialName(value = "WireGuard.peerHasInvalidEndpoint")
-    wireGuardPeerHasInvalidEndpoint("WireGuard.peerHasInvalidEndpoint"),
-
-    /**
-     * WireGuard peer persistent keepalive is invalid.
-     */
-    @SerialName(value = "WireGuard.peerHasInvalidPersistentKeepAlive")
-    wireGuardPeerHasInvalidPersistentKeepAlive("WireGuard.peerHasInvalidPersistentKeepAlive"),
-
-    /**
-     * WireGuard peer pre-shared key is invalid.
-     */
-    @SerialName(value = "WireGuard.peerHasInvalidPreSharedKey")
-    wireGuardPeerHasInvalidPreSharedKey("WireGuard.peerHasInvalidPreSharedKey"),
-
-    /**
-     * WireGuard peer public key is invalid.
-     */
-    @SerialName(value = "WireGuard.peerHasInvalidPublicKey")
-    wireGuardPeerHasInvalidPublicKey("WireGuard.peerHasInvalidPublicKey"),
-
-    /**
-     * WireGuard peer has no public key.
-     */
-    @SerialName(value = "WireGuard.peerHasNoPublicKey")
-    wireGuardPeerHasNoPublicKey("WireGuard.peerHasNoPublicKey"),
-
-    /**
-     * WireGuard peer key is unrecognized.
-     */
-    @SerialName(value = "WireGuard.peerHasUnrecognizedKey")
-    wireGuardPeerHasUnrecognizedKey("WireGuard.peerHasUnrecognizedKey");
+    unknownModuleHandler("unknownModuleHandler");
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use

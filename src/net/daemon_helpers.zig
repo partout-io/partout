@@ -206,6 +206,9 @@ pub const SnapshotPublisher = struct {
     const ProfileId = api.UUID;
     const ReportBlock = *const fn (*const anyopaque, api.TunnelSnapshot) void;
 
+    allocator: std.mem.Allocator,
+    /// Owned copy, independent of the connection callback's lifetime.
+    last_error: ?api.PartoutErrorPair = null,
     profile_id: ProfileId,
     report_snapshot: ReportBlock,
     report_snapshot_ctx: *const anyopaque,
@@ -214,12 +217,14 @@ pub const SnapshotPublisher = struct {
     last_published_snapshot: ?api.TunnelSnapshot = null,
 
     pub fn init(
+        allocator: std.mem.Allocator,
         profile_id: ProfileId,
         report_snapshot: ReportBlock,
         report_snapshot_ctx: *const anyopaque,
         min_data_count_delta: u64,
     ) SnapshotPublisher {
         return .{
+            .allocator = allocator,
             .profile_id = profile_id,
             .report_snapshot = report_snapshot,
             .report_snapshot_ctx = report_snapshot_ctx,
@@ -227,7 +232,12 @@ pub const SnapshotPublisher = struct {
         };
     }
 
+    pub fn deinit(self: *SnapshotPublisher) void {
+        if (self.last_error) |value| value.deinit(self.allocator);
+    }
+
     pub fn clearEnvironment(self: *SnapshotPublisher) void {
+        self.setLastError(null);
         self.environment = emptyEnvironment();
     }
 
@@ -235,8 +245,16 @@ pub const SnapshotPublisher = struct {
         self.environment.connection_status = status;
     }
 
-    pub fn setLastError(self: *SnapshotPublisher, code: ?api.PartoutErrorCode) void {
-        self.environment.last_error_code = if (code) |c| c.raw() else null;
+    pub fn setLastError(self: *SnapshotPublisher, err_pair: ?api.PartoutErrorPair) void {
+        if (api.errorPairEqual(self.last_error, err_pair)) return;
+
+        const next: ?api.PartoutErrorPair = if (err_pair) |value|
+            value.clone(self.allocator) catch .{ .code = .outOfMemory }
+        else
+            null;
+        if (self.last_error) |previous| previous.deinit(self.allocator);
+        self.last_error = next;
+        self.last_published_snapshot = null;
     }
 
     pub fn setDataCount(self: *SnapshotPublisher, data_count: api.DataCount) void {
@@ -244,7 +262,7 @@ pub const SnapshotPublisher = struct {
     }
 
     pub fn publishCurrentSnapshot(self: *SnapshotPublisher, force: bool) void {
-        const snapshot = api.TunnelSnapshot{
+        var snapshot = api.TunnelSnapshot{
             .id = self.profile_id,
             .is_enabled = true,
             .status = tunnelStatus(self.environment.connection_status),
@@ -253,7 +271,15 @@ pub const SnapshotPublisher = struct {
         };
         if (!self.shouldPublishSnapshot(snapshot, force)) return;
 
+        const formatted = if (self.last_error) |err_pair|
+            api.errorPairFormatZ(self.allocator, err_pair) catch return
+        else
+            null;
+        defer if (formatted) |value| self.allocator.free(value);
+
         self.last_published_snapshot = snapshot;
+        // Only the delivered snapshot borrows the temporary wire representation.
+        snapshot.environment.?.last_error_code = formatted;
         self.report_snapshot(self.report_snapshot_ctx, snapshot);
     }
 

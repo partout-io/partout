@@ -17,7 +17,7 @@ extension JSONEncoder {
     public func encodeJSON<T>(_ value: T) throws -> String where T: Encodable {
         let data = try encode(value)
         guard let json = String(data: data, encoding: .utf8) else {
-            throw MiniFoundationError.encoding
+            throw PartoutError(.encoding)
         }
         return json
     }

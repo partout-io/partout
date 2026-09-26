@@ -73,3 +73,5 @@ extension SubjectStreamInternal {
         }
     }
 }
+
+extension UUID: RandomlyInitialized {}

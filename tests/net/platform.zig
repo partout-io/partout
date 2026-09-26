@@ -286,3 +286,36 @@ test "settings-only daemons release owned TUN descriptors" {
         }
     }
 }
+
+test "platform cancellation formats extended errors only at the C boundary" {
+    const Recorder = struct {
+        buffer: [128]u8 = undefined,
+        len: ?usize = null,
+        calls: usize = 0,
+
+        fn cancel(ctx: ?*anyopaque, code: [*c]const u8) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(ctx.?));
+            self.calls += 1;
+            self.len = null;
+            if (code != null) {
+                const raw = std.mem.span(code);
+                @memcpy(self.buffer[0..raw.len], raw);
+                self.len = raw.len;
+            }
+        }
+    };
+    var recorder = Recorder{};
+    var functions = io_c.pp_tun_ctrl_fnt_current();
+    functions.cancel_tunnel = Recorder.cancel;
+    var platform = try Platform.init(.{ .ref = &recorder, .fnt = functions });
+    defer platform.deinit();
+    const controller = platform.tunnelController();
+
+    controller.cancelTunnelConnection(api.openVPNErrorPair(.tlsFailure));
+    try std.testing.expectEqualStrings("openVPN.tlsFailure", recorder.buffer[0..recorder.len.?]);
+    controller.cancelTunnelConnection(.{ .code = .authentication });
+    try std.testing.expectEqualStrings("authentication", recorder.buffer[0..recorder.len.?]);
+    controller.cancelTunnelConnection(null);
+    try std.testing.expect(recorder.len == null);
+    try std.testing.expectEqual(@as(usize, 3), recorder.calls);
+}

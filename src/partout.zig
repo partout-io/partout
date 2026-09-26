@@ -86,7 +86,7 @@ pub export fn partout_import_profile(
     const text_ptr = c_text orelse return null;
 
     var importer = abi.Importer.init(allocator) catch
-        return abi.errorPayloadAllocZ(allocator, .outOfMemory);
+        return abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null);
     defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
@@ -110,7 +110,7 @@ pub export fn partout_import_module(
     const text_ptr = c_text orelse return null;
 
     var importer = abi.Importer.init(allocator) catch
-        return abi.errorPayloadAllocZ(allocator, .outOfMemory);
+        return abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null);
     defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
@@ -122,8 +122,8 @@ pub export fn partout_import_module(
             allocator,
             util.borrowedCString(context_ptr),
         ) catch |err| return switch (err) {
-            error.OutOfMemory => abi.errorPayloadAllocZ(allocator, .outOfMemory),
-            else => abi.errorPayloadAllocZ(allocator, .decoding),
+            error.OutOfMemory => abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null),
+            else => abi.errorPayloadAllocZ(allocator, .{ .code = .decoding }, null),
         };
     }
 

@@ -387,8 +387,9 @@ const OpenVPNConnection = struct {
         // The owner schedules shutdown/detachment/stop. Never reenter the
         // lifecycle here: this callback can run inside TLS.
         const events = self.events orelse return;
+        const err_pair = partoutCodeForError(cause);
         events.failed(events.ctx, .{
-            .code = partoutCodeForError(cause),
+            .err_pair = err_pair,
             .disposition = errorDisposition(cause),
         });
     }
@@ -642,31 +643,31 @@ pub const testing = struct {
     pub const codeForError = partoutCodeForError;
 };
 
-fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
+fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
     return switch (err) {
-        error.BadCredentials => .authentication,
-        error.BadCredentialsWithLocalOptions => .openVPNRecoverableAuthentication,
-        error.CompressionMismatch => .openVPNCompressionMismatch,
+        error.BadCredentials => .{ .code = .authentication },
+        error.BadCredentialsWithLocalOptions => api.openVPNErrorPair(.recoverableAuthentication),
+        error.CompressionMismatch => api.openVPNErrorPair(.compressionMismatch),
         error.CryptoEncryption,
         error.CryptoHMAC,
         error.CryptoPRNG,
-        => .crypto,
-        error.InvalidEndpoint => .invalidValue,
-        error.ModulesAllocation => .unhandled,
-        error.MuxFailure => .fdUnavailable,
-        error.NetworkChanged => .networkChanged,
-        error.NoRouting => .openVPNNoRouting,
-        error.ServerShutdown => .openVPNServerShutdown,
+        => .{ .code = .crypto },
+        error.InvalidEndpoint => .{ .code = .invalidValue },
+        error.ModulesAllocation => .{ .code = .unhandled },
+        error.MuxFailure => .{ .code = .fdUnavailable },
+        error.NetworkChanged => .{ .code = .networkChanged },
+        error.NoRouting => api.openVPNErrorPair(.noRouting),
+        error.ServerShutdown => api.openVPNErrorPair(.serverShutdown),
         error.MissingCA,
         error.TLSFailure,
-        => .openVPNTLSFailure,
-        error.Timeout => .timeout,
-        error.TunNotAvailable => .tunNotAvailable,
+        => api.openVPNErrorPair(.tlsFailure),
+        error.Timeout => .{ .code = .timeout },
+        error.TunNotAvailable => .{ .code = .tunNotAvailable },
         error.CryptoDerivation,
         error.UnsupportedAlgorithm,
         error.UnsupportedCryptoBackend,
-        => .openVPNUnsupportedAlgorithm,
-        error.UnsupportedCompression => .openVPNUnsupportedCompression,
+        => api.openVPNErrorPair(.unsupportedAlgorithm),
+        error.UnsupportedCompression => api.openVPNErrorPair(.unsupportedCompression),
 
         error.AckIdsTooLong,
         error.Backpressure,
@@ -696,6 +697,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         error.WouldBlock,
         error.WriteIncomplete,
         error.WrongControlDataPrefix,
-        => .openVPNConnectionFailure,
+        => api.openVPNErrorPair(.connectionFailure),
     };
 }

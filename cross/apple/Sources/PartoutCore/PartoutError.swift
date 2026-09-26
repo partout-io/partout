@@ -2,58 +2,67 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-/// ABI errors.
-public struct PartoutABIError: Error {
-    public let code: PartoutErrorCode
-    public let payload: JSON?
-
-    public init(_ code: PartoutErrorCode, _ payload: JSON? = nil) {
-        self.code = code
-        self.payload = payload
-    }
-}
-
-/// Mappable to ``PartoutError``.
-public protocol PartoutErrorMappable {
-    var asPartoutError: PartoutError { get }
-}
-
 /// Extensible error type thrown by the library.
 public struct PartoutError: Error {
+    private static let subCodeKey = "subCode"
+
     public let code: Code
 
     public let reason: Error?
 
-    public let userInfo: Sendable?
+    /// Native context for validation and module errors; never serialized into an ABI envelope.
+    public enum Context: Sendable {
+        case incompatibleModules([Module])
+        case incompleteModule(any ModuleBuilder)
+        case invalidField(ModuleField)
+    }
 
-    public init(_ code: Code) {
+    public let context: Context?
+
+    /// Portable JSON context received from or sent to the native runtime.
+    public let payload: JSON?
+
+    public init(_ code: Code, context: Context? = nil, payload: JSON? = nil, reason: Error? = nil) {
         self.code = code
-        reason = nil
-        userInfo = nil
+        self.context = context
+        self.payload = payload
+        self.reason = reason
+    }
+
+    public init?(rawValue: String) {
+        guard let errorPair = PartoutErrorPair(rawValue: rawValue) else { return nil }
+        self.init(errorPair.code, payload: errorPair.subCode.map {
+            [Self.subCodeKey: .string($0)]
+        })
+    }
+
+    public var subCode: String? {
+        payload?[Self.subCodeKey]?.stringValue
+    }
+
+    public var errorPair: PartoutErrorPair {
+        PartoutErrorPair(code: code, subCode: subCode)
+    }
+
+    public var rawValue: String { errorPair.rawValue }
+
+    public init(codeForOpenVPN code: OpenVPNErrorCode) {
+        self.init(.openVPN, payload: [Self.subCodeKey: .string(code.rawValue)])
+    }
+
+    public init(codeForWireGuard code: WireGuardErrorCode) {
+        self.init(.wireGuard, payload: [Self.subCodeKey: .string(code.rawValue)])
     }
 
     public init(_ code: Code, _ reason: Error) {
-        self.code = code
-        self.reason = reason
-        userInfo = nil
-    }
-
-    public init(_ code: Code, _ userInfo: Sendable, _ reason: Error? = nil) {
-        self.code = code
-        self.reason = reason
-        self.userInfo = userInfo
+        self.init(code, reason: reason)
     }
 
     public init(_ error: Error) {
-        do {
-            throw error
-        } catch let error as Self {
+        switch error {
+        case let error as Self:
             self = error
-        } catch let error as PartoutErrorMappable {
-            self = error.asPartoutError
-        }
-        // anything else
-        catch {
+        default:
             self = Self.unhandled(reason: error)
         }
     }
@@ -70,8 +79,6 @@ extension Error {
         switch self {
         case let pe as PartoutError:
             return pe.code
-        case let me as PartoutErrorMappable:
-            return me.asPartoutError.code
         default:
             return .unhandled
         }
@@ -83,8 +90,11 @@ extension Error {
 extension PartoutError: CustomDebugStringConvertible {
     public var debugDescription: String {
         var desc: [String] = ["PartoutError.\(code.rawValue)"]
-        if let userInfo {
-            desc.append("userInfo=\(String(describing: userInfo))")
+        if let context {
+            desc.append("context=\(String(describing: context))")
+        }
+        if let payload {
+            desc.append("payload=\(payload.debugDescription)")
         }
         if let reason {
             desc.append("reason=\(reason) (\(reason.localizedDescription))")

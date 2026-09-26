@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-import _PartoutPortable_C
+import Network
 
 /// Aggregates an address and an ``EndpointProtocol``.
 public struct ExtendedEndpoint: Hashable, Codable, Sendable {
@@ -32,15 +32,17 @@ public struct ExtendedEndpoint: Hashable, Codable, Sendable {
     }
 
     public var isIPv4: Bool {
-        address.rawValue.withCString {
-            pp_addr_family_of($0) == PPAddrFamilyV4
+        if case .ipv4 = NWEndpoint.Host(address.rawValue) {
+            return true
         }
+        return false
     }
 
     public var isIPv6: Bool {
-        address.rawValue.withCString {
-            pp_addr_family_of($0) == PPAddrFamilyV6
+        if case .ipv6 = NWEndpoint.Host(address.rawValue) {
+            return true
         }
+        return false
     }
 
     public var isHostname: Bool {

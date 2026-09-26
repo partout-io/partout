@@ -56,7 +56,7 @@ extension OpenVPNModule {
 
         public func build() throws -> OpenVPNModule {
             guard configurationBuilder != nil else {
-                throw PartoutError(.incompleteModule, self)
+                throw PartoutError(.incompleteModule, context: .incompleteModule(self))
             }
             var builder = configurationBuilder
             builder?.staticChallenge = isInteractive

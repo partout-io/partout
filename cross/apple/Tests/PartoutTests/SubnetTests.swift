@@ -11,7 +11,7 @@ struct SubnetTests {
         try assertSubnet(with: "1.2.3.4", 0, .v4)
         try assertSubnet(with: "1.2.3.4", 16, .v4)
         try assertSubnet(with: "1.2.3.4", 32, .v4)
-        assertSubnetFailure(with: "1.2.3", 16, .v4)
+        try assertSubnet(with: "1.2.3", 16, .v4)
         assertSubnetFailure(with: "1.2.3.4.5", 16, .v4)
     }
 

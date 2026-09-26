@@ -8,11 +8,11 @@ import Observation
 @available(iOS 17, macOS 14, tvOS 17, *)
 @MainActor @Observable
 public final class PartoutTunnelObservable {
-    private let tunnel: Tunnel
+    private let tunnel: PartoutTunnel
 
     public private(set) var snapshots: [Profile.ID: TunnelSnapshot]
 
-    public init(tunnel: Tunnel) {
+    public init(tunnel: PartoutTunnel) {
         self.tunnel = tunnel
         snapshots = [:]
         Task { [weak self, weak tunnel] in

@@ -116,7 +116,7 @@ public final class PartoutProviderRuntime: Sendable {
             break
         default:
             pp_log(ctx, .runtime, .fault, "Unable to start runtime: result=\(cResult)")
-            throw PartoutABIError(.invalidValue)
+            throw PartoutError(.invalidValue)
         }
         pp_log(ctx, .runtime, .notice, "Runtime started")
     }

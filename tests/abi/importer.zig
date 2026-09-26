@@ -283,19 +283,19 @@ test "profile import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_wireguard_profile, null),
-        .parsing,
+        .wireGuard,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(invalid_openvpn_profile, null),
-        .parsing,
+        .openVPN,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_profile(encrypted_openvpn_profile, null),
-        .parsing,
+        .openVPN,
         null,
         null,
     );
@@ -310,19 +310,19 @@ test "module import export returns normalized success and failure payloads" {
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_wireguard_profile, null),
-        .parsing,
+        .wireGuard,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(invalid_openvpn_profile, null),
-        .parsing,
+        .openVPN,
         null,
         null,
     );
     try expectImportEnvelope(
         partout.partout_import_module(encrypted_openvpn_profile, null),
-        .parsing,
+        .openVPN,
         null,
         null,
     );

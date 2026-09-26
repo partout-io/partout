@@ -130,7 +130,8 @@ test "connection gate waits for enable after cached reachable disconnected state
 
 test "snapshot publisher force-publishes status and last error snapshots" {
     var recorder = SnapshotRecorder{};
-    var publisher = SnapshotPublisher.init((api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    defer publisher.deinit();
 
     publisher.setConnectionStatus(.connecting);
     publisher.publishCurrentSnapshot(true);
@@ -138,7 +139,7 @@ test "snapshot publisher force-publishes status and last error snapshots" {
     try std.testing.expectEqual(api.TunnelStatus.activating, recorder.last_snapshot.status);
     try std.testing.expectEqual(api.ConnectionStatus.connecting, recorder.last_snapshot.environment.?.connection_status);
 
-    publisher.setLastError(.authentication);
+    publisher.setLastError(.{ .code = .authentication });
     publisher.publishCurrentSnapshot(true);
     try std.testing.expectEqual(@as(usize, 2), recorder.count);
     try std.testing.expectEqualStrings("authentication", recorder.last_snapshot.environment.?.last_error_code.?);
@@ -146,7 +147,8 @@ test "snapshot publisher force-publishes status and last error snapshots" {
 
 test "snapshot publisher filters data-count-only snapshots by minimum delta" {
     var recorder = SnapshotRecorder{};
-    var publisher = SnapshotPublisher.init((api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 10);
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 10);
+    defer publisher.deinit();
 
     publisher.setConnectionStatus(.connected);
     publisher.setDataCount(.{ .received = 100, .sent = 100 });
@@ -174,11 +176,18 @@ test "snapshot publisher filters data-count-only snapshots by minimum delta" {
 const SnapshotRecorder = struct {
     count: usize = 0,
     last_snapshot: api.TunnelSnapshot = .{ .status = .inactive },
+    error_buffer: [256]u8 = undefined,
 
     fn reportSnapshot(ptr: *const anyopaque, snapshot: api.TunnelSnapshot) void {
         const self: *SnapshotRecorder = @ptrCast(@alignCast(@constCast(ptr)));
         self.count += 1;
         self.last_snapshot = snapshot;
+        if (snapshot.environment) |env| {
+            if (env.last_error_code) |raw| {
+                @memcpy(self.error_buffer[0..raw.len], raw);
+                self.last_snapshot.environment.?.last_error_code = self.error_buffer[0..raw.len];
+            }
+        }
     }
 };
 
@@ -291,11 +300,12 @@ test "connection daemon clears last error when connected recovery repeats the st
     defer sut.stop();
 
     // A transient restart failure leaves the public status connected.
-    try sut.actor.perform(void, .{ .onConnectionLastError = .socketConfiguration });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .{ .code = .socketConfiguration } });
     try std.testing.expectEqual(api.ConnectionStatus.connected, events.connection_status.?);
     try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, events.last_error_code.?);
     const failed_snapshot = sut.snapshot_publisher.last_published_snapshot.?;
-    try std.testing.expectEqualStrings("socketConfiguration", failed_snapshot.environment.?.last_error_code.?);
+    try std.testing.expectEqual(api.PartoutErrorCode.socketConfiguration, sut.snapshot_publisher.last_error.?.code);
+    try std.testing.expect(failed_snapshot.environment.?.last_error_code == null);
     const snapshot_count = controller.report_snapshot_count;
 
     // Recovery emits connected again, without an intervening connecting event.
@@ -337,7 +347,7 @@ test "connection daemon hold preserves published environment" {
     defer sut.destroy();
 
     try sut.start();
-    try sut.actor.perform(void, .{ .onConnectionLastError = .authentication });
+    try sut.actor.perform(void, .{ .onConnectionLastError = .{ .code = .authentication } });
     const remove_count_before_hold = events.remove_count;
 
     sut.hold();
@@ -504,6 +514,49 @@ test "connection daemon publishes terminal status when cancellation is disabled"
     monitor.setReachable(true);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectEqual(@as(usize, 1), capture.start_count);
+}
+
+test "connection daemon preserves extended and optional error codes at string boundaries" {
+    const cases = [_]struct { err_pair: ?api.PartoutErrorPair, raw: ?[]const u8 }{
+        .{ .err_pair = api.openVPNErrorPair(.tlsFailure), .raw = "openVPN.tlsFailure" },
+        .{ .err_pair = .{ .code = .authentication }, .raw = "authentication" },
+        .{ .err_pair = null, .raw = null },
+    };
+    for (cases) |case| {
+        const allocator = std.testing.allocator;
+        var implementations = [_]net.ConnectionImplementation{mock_mod.mockConnectionImplementation()};
+        var registry = try net.ConnectionRegistry.init(allocator, &implementations);
+        defer registry.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var events = mock_mod.DaemonEventRecorder{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        var sut = try newDaemon(
+            allocator,
+            mock_mod.connectionProfileJson(),
+            &registry,
+            &controller,
+            &events,
+            &monitor,
+            .{},
+        );
+        defer sut.destroy();
+        try sut.start();
+        defer sut.stop();
+
+        if (case.err_pair) |err_pair| {
+            try sut.actor.perform(void, .{ .onConnectionLastError = err_pair });
+            try std.testing.expectEqualStrings(case.raw.?, events.last_error_raw[0..events.last_error_len]);
+            try std.testing.expectEqualDeep(case.err_pair.?, sut.snapshot_publisher.last_error.?);
+        }
+        try sut.actor.perform(void, .{ .onConnectionCancel = case.err_pair });
+        try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+        if (case.raw) |raw| {
+            try std.testing.expectEqualStrings(raw, controller.last_cancel_raw[0..controller.last_cancel_len]);
+        } else {
+            try std.testing.expect(controller.last_cancel_code == null);
+            try std.testing.expectEqual(@as(usize, 0), controller.last_cancel_len);
+        }
+    }
 }
 
 test "connection daemon replaces a terminal looper and reconnects" {
@@ -1035,7 +1088,7 @@ const SandboxCapture = struct {
         self.start_count += 1;
         if (self.cancel_on_start) |code| {
             events.status(events.ctx, .connecting);
-            events.cancel(events.ctx, code);
+            events.cancel(events.ctx, .{ .code = code });
         }
         if (self.disconnect_on_start) {
             events.status(events.ctx, .connecting);
@@ -1123,4 +1176,23 @@ fn withEvents(
     var updated = options;
     updated.events = events.events();
     return updated;
+}
+
+test "snapshot publisher owns retained subcodes and formats only on delivery" {
+    var recorder = SnapshotRecorder{};
+    var publisher = SnapshotPublisher.init(std.testing.allocator, (api.Profile{}).id, SnapshotRecorder.reportSnapshot, &recorder, 100);
+    defer publisher.deinit();
+    var raw = "tlsFailure".*;
+    publisher.setLastError(.{ .code = .openVPN, .sub_code = &raw });
+    publisher.publishCurrentSnapshot(false);
+    @memset(&raw, 'x');
+    try std.testing.expectEqualStrings("tlsFailure", publisher.last_error.?.sub_code.?);
+    try std.testing.expect(publisher.environment.last_error_code == null);
+    try std.testing.expect(publisher.last_published_snapshot.?.environment.?.last_error_code == null);
+    publisher.setLastError(api.openVPNErrorPair(.serverShutdown));
+    publisher.publishCurrentSnapshot(false);
+    try std.testing.expectEqual(@as(usize, 2), recorder.count);
+    publisher.clearEnvironment();
+    publisher.publishCurrentSnapshot(false);
+    try std.testing.expect(publisher.environment.last_error_code == null);
 }

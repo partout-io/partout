@@ -1,0 +1,5 @@
+module PartoutNative_C {
+    header "partout.h"
+    header "portable/tun_ctrl.h"
+    export *
+}

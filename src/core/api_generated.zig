@@ -2628,14 +2628,71 @@ pub const ParseErrorInfo = struct {
     }
 };
 
+pub const PartoutErrorPair = struct {
+    code: PartoutErrorCode,
+    sub_code: ?[]const u8 = null,
+
+    pub fn parse(allocator: std.mem.Allocator, text: []const u8) DecodeError!PartoutErrorPair {
+        return parseWithErrorInfo(allocator, text, null);
+    }
+
+    pub fn parseWithErrorInfo(allocator: std.mem.Allocator, text: []const u8, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorPair {
+        resetJsonErrorInfo(error_info);
+        var parsed = try util.parseJsonValue(allocator, text);
+        defer parsed.deinit();
+        return parseValueWithErrorInfo(allocator, parsed.value, error_info);
+    }
+
+    pub fn parseValue(allocator: std.mem.Allocator, value: std.json.Value) DecodeError!PartoutErrorPair {
+        return parseValueWithErrorInfo(allocator, value, null);
+    }
+
+    pub fn parseValueWithErrorInfo(allocator: std.mem.Allocator, value: std.json.Value, error_info: ?*JsonErrorInfo) DecodeError!PartoutErrorPair {
+        resetJsonErrorInfo(error_info);
+        const object = objectValue(value) orelse return error.InvalidModel;
+        const explicit_0 = try parseJsonField(PartoutErrorCode, allocator, object, "code", error_info);
+        var owns_explicit_0 = true;
+        errdefer if (owns_explicit_0) deinitJson(PartoutErrorCode, allocator, &explicit_0);
+        var result = PartoutErrorPair{
+            .code = explicit_0,
+        };
+        owns_explicit_0 = false;
+        errdefer result.deinit(allocator);
+        result.sub_code = try parseOptionalJsonField([]const u8, allocator, object, "subCode", error_info);
+        return result;
+    }
+
+    pub fn clone(self: @This(), allocator: std.mem.Allocator) DecodeError!@This() {
+        const encoded = try util.encodeJsonValue(allocator, self);
+        defer allocator.free(encoded);
+        return parse(allocator, encoded);
+    }
+
+    pub fn deinit(self: *const @This(), allocator: std.mem.Allocator) void {
+        deinitJson(PartoutErrorCode, allocator, &self.code);
+        if (self.sub_code) |*value| deinitJson([]const u8, allocator, value);
+    }
+
+    pub fn jsonStringify(self: @This(), jw: anytype) JsonStringifyError!void {
+        try jw.beginObject();
+        try jw.objectField("code");
+        try writeJson(jw, self.code);
+        if (self.sub_code) |value| {
+            try jw.objectField("subCode");
+            try writeJson(jw, value);
+        }
+        try jw.endObject();
+    }
+};
+
 pub const PartoutErrorCode = enum {
+    openVPN,
+    wireGuard,
     authentication,
-    cached,
     crypto,
     decoding,
     dnsFailure,
     encoding,
-    exhaustedEndpoints,
     fdUnavailable,
     incompatibleModules,
     incompleteModule,
@@ -2646,55 +2703,18 @@ pub const PartoutErrorCode = enum {
     keychainItemNotFound,
     linkNotActive,
     networkChanged,
-    networkUnreachable,
     noActiveModules,
-    nonFinalModules,
-    notFound,
-    openVPNCompressionMismatch,
-    openVPNConnectionFailure,
-    openVPNNoRouting,
-    openVPNOTPRequired,
-    openVPNPassphraseRequired,
-    openVPNRecoverableAuthentication,
-    openVPNServerShutdown,
-    openVPNTLSFailure,
-    openVPNUnsupportedAlgorithm,
-    openVPNUnsupportedCompression,
-    openVPNUnsupportedOption,
     operationCancelled,
     outOfMemory,
     parsing,
-    passphraseRequired,
     releasedObject,
     requiredImplementation,
-    scriptException,
     socketConfiguration,
     timeout,
-    tunNotActive,
     tunNotAvailable,
-    unexpectedModuleType,
     unhandled,
     unknownImportedModule,
     unknownModuleHandler,
-    wireGuardEmptyPeers,
-    wireGuardInterfaceHasInvalidAddress,
-    wireGuardInterfaceHasInvalidDNS,
-    wireGuardInterfaceHasInvalidListenPort,
-    wireGuardInterfaceHasInvalidMTU,
-    wireGuardInterfaceHasInvalidPrivateKey,
-    wireGuardInterfaceHasNoPrivateKey,
-    wireGuardInterfaceHasUnrecognizedKey,
-    wireGuardMultipleEntriesForKey,
-    wireGuardMultipleInterfaces,
-    wireGuardMultiplePeersWithSamePublicKey,
-    wireGuardNoInterface,
-    wireGuardPeerHasInvalidAllowedIP,
-    wireGuardPeerHasInvalidEndpoint,
-    wireGuardPeerHasInvalidPersistentKeepAlive,
-    wireGuardPeerHasInvalidPreSharedKey,
-    wireGuardPeerHasInvalidPublicKey,
-    wireGuardPeerHasNoPublicKey,
-    wireGuardPeerHasUnrecognizedKey,
 
     pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
         const raw_value = stringValue(value) orelse return error.InvalidModel;
@@ -2702,13 +2722,13 @@ pub const PartoutErrorCode = enum {
     }
 
     pub fn parseFromRaw(raw_value: []const u8) ?@This() {
+        if (std.mem.eql(u8, raw_value, "openVPN")) return .openVPN;
+        if (std.mem.eql(u8, raw_value, "wireGuard")) return .wireGuard;
         if (std.mem.eql(u8, raw_value, "authentication")) return .authentication;
-        if (std.mem.eql(u8, raw_value, "cached")) return .cached;
         if (std.mem.eql(u8, raw_value, "crypto")) return .crypto;
         if (std.mem.eql(u8, raw_value, "decoding")) return .decoding;
         if (std.mem.eql(u8, raw_value, "dnsFailure")) return .dnsFailure;
         if (std.mem.eql(u8, raw_value, "encoding")) return .encoding;
-        if (std.mem.eql(u8, raw_value, "exhaustedEndpoints")) return .exhaustedEndpoints;
         if (std.mem.eql(u8, raw_value, "fdUnavailable")) return .fdUnavailable;
         if (std.mem.eql(u8, raw_value, "incompatibleModules")) return .incompatibleModules;
         if (std.mem.eql(u8, raw_value, "incompleteModule")) return .incompleteModule;
@@ -2719,67 +2739,30 @@ pub const PartoutErrorCode = enum {
         if (std.mem.eql(u8, raw_value, "keychainItemNotFound")) return .keychainItemNotFound;
         if (std.mem.eql(u8, raw_value, "linkNotActive")) return .linkNotActive;
         if (std.mem.eql(u8, raw_value, "networkChanged")) return .networkChanged;
-        if (std.mem.eql(u8, raw_value, "networkUnreachable")) return .networkUnreachable;
         if (std.mem.eql(u8, raw_value, "noActiveModules")) return .noActiveModules;
-        if (std.mem.eql(u8, raw_value, "nonFinalModules")) return .nonFinalModules;
-        if (std.mem.eql(u8, raw_value, "notFound")) return .notFound;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.compressionMismatch")) return .openVPNCompressionMismatch;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.connectionFailure")) return .openVPNConnectionFailure;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.noRouting")) return .openVPNNoRouting;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.otpRequired")) return .openVPNOTPRequired;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.passphraseRequired")) return .openVPNPassphraseRequired;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.recoverableAuthentication")) return .openVPNRecoverableAuthentication;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.serverShutdown")) return .openVPNServerShutdown;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.tlsFailure")) return .openVPNTLSFailure;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedAlgorithm")) return .openVPNUnsupportedAlgorithm;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedCompression")) return .openVPNUnsupportedCompression;
-        if (std.mem.eql(u8, raw_value, "OpenVPN.unsupportedOption")) return .openVPNUnsupportedOption;
         if (std.mem.eql(u8, raw_value, "operationCancelled")) return .operationCancelled;
         if (std.mem.eql(u8, raw_value, "outOfMemory")) return .outOfMemory;
         if (std.mem.eql(u8, raw_value, "parsing")) return .parsing;
-        if (std.mem.eql(u8, raw_value, "passphraseRequired")) return .passphraseRequired;
         if (std.mem.eql(u8, raw_value, "releasedObject")) return .releasedObject;
         if (std.mem.eql(u8, raw_value, "requiredImplementation")) return .requiredImplementation;
-        if (std.mem.eql(u8, raw_value, "scriptException")) return .scriptException;
         if (std.mem.eql(u8, raw_value, "socketConfiguration")) return .socketConfiguration;
         if (std.mem.eql(u8, raw_value, "timeout")) return .timeout;
-        if (std.mem.eql(u8, raw_value, "tunNotActive")) return .tunNotActive;
         if (std.mem.eql(u8, raw_value, "tunNotAvailable")) return .tunNotAvailable;
-        if (std.mem.eql(u8, raw_value, "unexpectedModuleType")) return .unexpectedModuleType;
         if (std.mem.eql(u8, raw_value, "unhandled")) return .unhandled;
         if (std.mem.eql(u8, raw_value, "unknownImportedModule")) return .unknownImportedModule;
         if (std.mem.eql(u8, raw_value, "unknownModuleHandler")) return .unknownModuleHandler;
-        if (std.mem.eql(u8, raw_value, "WireGuard.emptyPeers")) return .wireGuardEmptyPeers;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidAddress")) return .wireGuardInterfaceHasInvalidAddress;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidDNS")) return .wireGuardInterfaceHasInvalidDNS;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidListenPort")) return .wireGuardInterfaceHasInvalidListenPort;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidMTU")) return .wireGuardInterfaceHasInvalidMTU;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasInvalidPrivateKey")) return .wireGuardInterfaceHasInvalidPrivateKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasNoPrivateKey")) return .wireGuardInterfaceHasNoPrivateKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.interfaceHasUnrecognizedKey")) return .wireGuardInterfaceHasUnrecognizedKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.multipleEntriesForKey")) return .wireGuardMultipleEntriesForKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.multipleInterfaces")) return .wireGuardMultipleInterfaces;
-        if (std.mem.eql(u8, raw_value, "WireGuard.multiplePeersWithSamePublicKey")) return .wireGuardMultiplePeersWithSamePublicKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.noInterface")) return .wireGuardNoInterface;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidAllowedIP")) return .wireGuardPeerHasInvalidAllowedIP;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidEndpoint")) return .wireGuardPeerHasInvalidEndpoint;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPersistentKeepAlive")) return .wireGuardPeerHasInvalidPersistentKeepAlive;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPreSharedKey")) return .wireGuardPeerHasInvalidPreSharedKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasInvalidPublicKey")) return .wireGuardPeerHasInvalidPublicKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasNoPublicKey")) return .wireGuardPeerHasNoPublicKey;
-        if (std.mem.eql(u8, raw_value, "WireGuard.peerHasUnrecognizedKey")) return .wireGuardPeerHasUnrecognizedKey;
         return null;
     }
 
     pub fn raw(self: @This()) [:0]const u8 {
         return switch (self) {
+            .openVPN => "openVPN",
+            .wireGuard => "wireGuard",
             .authentication => "authentication",
-            .cached => "cached",
             .crypto => "crypto",
             .decoding => "decoding",
             .dnsFailure => "dnsFailure",
             .encoding => "encoding",
-            .exhaustedEndpoints => "exhaustedEndpoints",
             .fdUnavailable => "fdUnavailable",
             .incompatibleModules => "incompatibleModules",
             .incompleteModule => "incompleteModule",
@@ -2790,55 +2773,18 @@ pub const PartoutErrorCode = enum {
             .keychainItemNotFound => "keychainItemNotFound",
             .linkNotActive => "linkNotActive",
             .networkChanged => "networkChanged",
-            .networkUnreachable => "networkUnreachable",
             .noActiveModules => "noActiveModules",
-            .nonFinalModules => "nonFinalModules",
-            .notFound => "notFound",
-            .openVPNCompressionMismatch => "OpenVPN.compressionMismatch",
-            .openVPNConnectionFailure => "OpenVPN.connectionFailure",
-            .openVPNNoRouting => "OpenVPN.noRouting",
-            .openVPNOTPRequired => "OpenVPN.otpRequired",
-            .openVPNPassphraseRequired => "OpenVPN.passphraseRequired",
-            .openVPNRecoverableAuthentication => "OpenVPN.recoverableAuthentication",
-            .openVPNServerShutdown => "OpenVPN.serverShutdown",
-            .openVPNTLSFailure => "OpenVPN.tlsFailure",
-            .openVPNUnsupportedAlgorithm => "OpenVPN.unsupportedAlgorithm",
-            .openVPNUnsupportedCompression => "OpenVPN.unsupportedCompression",
-            .openVPNUnsupportedOption => "OpenVPN.unsupportedOption",
             .operationCancelled => "operationCancelled",
             .outOfMemory => "outOfMemory",
             .parsing => "parsing",
-            .passphraseRequired => "passphraseRequired",
             .releasedObject => "releasedObject",
             .requiredImplementation => "requiredImplementation",
-            .scriptException => "scriptException",
             .socketConfiguration => "socketConfiguration",
             .timeout => "timeout",
-            .tunNotActive => "tunNotActive",
             .tunNotAvailable => "tunNotAvailable",
-            .unexpectedModuleType => "unexpectedModuleType",
             .unhandled => "unhandled",
             .unknownImportedModule => "unknownImportedModule",
             .unknownModuleHandler => "unknownModuleHandler",
-            .wireGuardEmptyPeers => "WireGuard.emptyPeers",
-            .wireGuardInterfaceHasInvalidAddress => "WireGuard.interfaceHasInvalidAddress",
-            .wireGuardInterfaceHasInvalidDNS => "WireGuard.interfaceHasInvalidDNS",
-            .wireGuardInterfaceHasInvalidListenPort => "WireGuard.interfaceHasInvalidListenPort",
-            .wireGuardInterfaceHasInvalidMTU => "WireGuard.interfaceHasInvalidMTU",
-            .wireGuardInterfaceHasInvalidPrivateKey => "WireGuard.interfaceHasInvalidPrivateKey",
-            .wireGuardInterfaceHasNoPrivateKey => "WireGuard.interfaceHasNoPrivateKey",
-            .wireGuardInterfaceHasUnrecognizedKey => "WireGuard.interfaceHasUnrecognizedKey",
-            .wireGuardMultipleEntriesForKey => "WireGuard.multipleEntriesForKey",
-            .wireGuardMultipleInterfaces => "WireGuard.multipleInterfaces",
-            .wireGuardMultiplePeersWithSamePublicKey => "WireGuard.multiplePeersWithSamePublicKey",
-            .wireGuardNoInterface => "WireGuard.noInterface",
-            .wireGuardPeerHasInvalidAllowedIP => "WireGuard.peerHasInvalidAllowedIP",
-            .wireGuardPeerHasInvalidEndpoint => "WireGuard.peerHasInvalidEndpoint",
-            .wireGuardPeerHasInvalidPersistentKeepAlive => "WireGuard.peerHasInvalidPersistentKeepAlive",
-            .wireGuardPeerHasInvalidPreSharedKey => "WireGuard.peerHasInvalidPreSharedKey",
-            .wireGuardPeerHasInvalidPublicKey => "WireGuard.peerHasInvalidPublicKey",
-            .wireGuardPeerHasNoPublicKey => "WireGuard.peerHasNoPublicKey",
-            .wireGuardPeerHasUnrecognizedKey => "WireGuard.peerHasUnrecognizedKey",
         };
     }
 

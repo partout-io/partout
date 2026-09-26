@@ -53,7 +53,7 @@ pub const TunnelController = struct {
         set_environment_value: *const fn (?*anyopaque, []const u8, ?[]const u8) void,
         clear_tunnel_settings: *const fn (?*anyopaque, bool) void,
         set_reasserting: *const fn (?*anyopaque, bool) void,
-        cancel_tunnel_connection: *const fn (?*anyopaque, ?api.PartoutErrorCode) void,
+        cancel_tunnel_connection: *const fn (?*anyopaque, ?api.PartoutErrorPair) void,
     };
 
     pub fn setTunnelSettings(self: TunnelController, info: api.TunnelRemoteInfoWrapper) Error!TunWrapper {
@@ -82,8 +82,8 @@ pub const TunnelController = struct {
         self.vtable.set_reasserting(self.ptr, reasserting);
     }
 
-    pub fn cancelTunnelConnection(self: TunnelController, code: ?api.PartoutErrorCode) void {
-        self.vtable.cancel_tunnel_connection(self.ptr, code);
+    pub fn cancelTunnelConnection(self: TunnelController, err_pair: ?api.PartoutErrorPair) void {
+        self.vtable.cancel_tunnel_connection(self.ptr, err_pair);
     }
 };
 

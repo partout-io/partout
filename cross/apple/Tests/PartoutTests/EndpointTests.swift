@@ -11,7 +11,7 @@ struct EndpointTests {
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
-        assertEndpointFailure(with: "1.2.3", 1194, .v4)
+        try assertEndpoint(with: "1.2.3", 1194, .v4)
         assertEndpointFailure(with: "1.2.3.4.5", 1194, .v4)
     }
 

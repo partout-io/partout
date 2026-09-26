@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-@_exported import _PartoutPortable_C
 @_exported import Foundation
 
 public enum PartoutCore {
@@ -23,12 +22,12 @@ extension LoggerCategory: CaseIterable {
 
 extension PartoutError {
     public static func incompatibleModules(module: Module, otherModule: Module) -> Self {
-        Self(.incompatibleModules, [module, otherModule])
+        Self(.incompatibleModules, context: .incompatibleModules([module, otherModule]))
     }
 
     @available(*, deprecated, message: "Legacy decoding")
     public static func unknownModuleHandler(moduleType: ModuleType) -> Self {
-        Self(.unknownModuleHandler, moduleType.debugDescription)
+        Self(.unknownModuleHandler, payload: .string(moduleType.debugDescription))
     }
 }
 
@@ -44,7 +43,7 @@ extension PartoutError {
     }
 
     public static func invalidField(_ key: ModuleField) -> Self {
-        Self(.invalidField, key)
+        Self(.invalidField, context: .invalidField(key))
     }
 }
 
