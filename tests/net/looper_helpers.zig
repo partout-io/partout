@@ -58,13 +58,13 @@ test "write queue preserves FIFO order and partial progress" {
     var queue = WriteQueue.init(std.testing.allocator);
     defer queue.deinit();
 
-    try queue.append(&.{ "abcd", "ef" });
+    try queue.append(&.{ "abcd", "ef" }, null);
     try expectPending(&queue, "abcd", 0);
 
     try std.testing.expect(!queue.advance(2));
     try expectPending(&queue, "abcd", 2);
 
-    try queue.append(&.{"gh"});
+    try queue.append(&.{"gh"}, null);
     try std.testing.expect(queue.advance(2));
     try expectPending(&queue, "ef", 0);
     try std.testing.expect(queue.advance(2));
@@ -78,7 +78,7 @@ test "write queue owns packet copies" {
     defer queue.deinit();
 
     var packet = [_]u8{ 1, 2, 3 };
-    try queue.append(&.{&packet});
+    try queue.append(&.{&packet}, null);
     packet[0] = 9;
 
     try expectPending(&queue, &.{ 1, 2, 3 }, 0);
@@ -92,7 +92,7 @@ test "write queue rolls back a failed batch" {
         var queue = WriteQueue.init(failing.allocator());
         defer queue.deinit();
 
-        try std.testing.expectError(error.OutOfMemory, queue.append(&.{ "one", "two" }));
+        try std.testing.expectError(error.OutOfMemory, queue.append(&.{ "one", "two" }, null));
         try std.testing.expect(queue.pending() == null);
     }
 }
@@ -104,9 +104,9 @@ test "write queue preserves existing partial state after append failure" {
     var queue = WriteQueue.init(failing.allocator());
     defer queue.deinit();
 
-    try queue.append(&.{"head"});
+    try queue.append(&.{"head"}, null);
     try std.testing.expect(!queue.advance(2));
-    try std.testing.expectError(error.OutOfMemory, queue.append(&.{ "one", "two" }));
+    try std.testing.expectError(error.OutOfMemory, queue.append(&.{ "one", "two" }, null));
     try expectPending(&queue, "head", 2);
     try std.testing.expect(queue.advance(2));
     try std.testing.expect(queue.pending() == null);
@@ -116,10 +116,10 @@ test "write queue accepts empty batches and packets" {
     var queue = WriteQueue.init(std.testing.allocator);
     defer queue.deinit();
 
-    try queue.append(&.{});
+    try queue.append(&.{}, null);
     try std.testing.expect(queue.pending() == null);
 
-    try queue.append(&.{""});
+    try queue.append(&.{""}, null);
     try expectPending(&queue, "", 0);
     try std.testing.expect(queue.advance(0));
     try std.testing.expect(queue.pending() == null);
@@ -141,7 +141,7 @@ test "write queue owns UDP payloads and destinations and rolls back failed batch
     var packets = [_]io.Datagram{.{ .payload = &payload, .address = address }};
     var queue = WriteQueue.init(std.testing.allocator);
     defer queue.deinit();
-    try queue.appendDatagrams(&packets);
+    try queue.append(&.{packets[0].payload}, packets[0].address);
     payload[0] = 9;
     packets[0].address.port = 9;
     try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, queue.pending().?.data);
@@ -151,7 +151,7 @@ test "write queue owns UDP payloads and destinations and rolls back failed batch
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = index });
         var batch = WriteQueue.init(failing.allocator());
         defer batch.deinit();
-        try std.testing.expectError(error.OutOfMemory, batch.appendDatagrams(&.{ packets[0], packets[0] }));
+        try std.testing.expectError(error.OutOfMemory, batch.append(&.{ packets[0].payload, packets[0].payload }, packets[0].address));
         try std.testing.expect(batch.pending() == null);
     }
 }

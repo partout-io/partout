@@ -622,6 +622,7 @@ pub const PosixLooper = struct {
         self: *PosixLooper,
         packets: helpers.Packets,
         side: io.Side,
+        destination: ?io.SocketAddress,
     ) helpers.WriteError!void {
         self.lock.lock();
         defer self.lock.unlock();
@@ -631,7 +632,7 @@ pub const PosixLooper = struct {
             return;
         };
 
-        if (current.native_io.isUnconnected()) return error.LooperUnavailable;
+        if (current.native_io.isUnconnected() and destination == null) return error.LooperUnavailable;
 
         const command = try self.createCommandNode(.{ .enable_write = .{
             .side = side,
@@ -639,27 +640,12 @@ pub const PosixLooper = struct {
         } });
         errdefer self.allocator.destroy(command);
 
-        try current.write_queue.append(packets);
+        try current.write_queue.append(packets, destination);
         self.commands.append(command);
         self.wakeLocked();
     }
 
-    /// One logical link; destinations are copied with the queued payloads.
-    pub fn writeDatagrams(self: *PosixLooper, packets: []const io.Datagram) (helpers.WriteError || error{NotDatagramLink})!void {
-        self.lock.lock();
-        defer self.lock.unlock();
-        if (self.state != .started) return error.LooperUnavailable;
-        const current = self.link orelse return error.NotDatagramLink;
-        if (!current.native_io.isUnconnected()) return error.NotDatagramLink;
-        if (packets.len == 0) return;
-        const command = try self.createCommandNode(.{ .enable_write = .{ .side = .link, .id = current.id } });
-        errdefer self.allocator.destroy(command);
-        try current.write_queue.appendDatagrams(packets);
-        self.commands.append(command);
-        self.wakeLocked();
-    }
-
-    pub fn writeOutOfBand(self: *PosixLooper, packets: helpers.Packets, side: io.Side) helpers.WriteOOBError!void {
+    pub fn writeOutOfBand(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
             return error.OOBOutsideQueue;
@@ -677,10 +663,10 @@ pub const PosixLooper = struct {
         };
         self.lock.unlock();
 
-        if (side_io.native_io.isUnconnected()) return error.LooperUnavailable;
+        if (side_io.native_io.isUnconnected() and destination == null) return error.LooperUnavailable;
 
         for (packets) |packet| {
-            const written = side_io.native_io.write(packet, 0) catch |err| {
+            const written = side_io.native_io.writePacket(packet, 0, destination) catch |err| {
                 log.writef(.err, "{} write failed: {s}", .{
                     side,
                     @errorName(err),

@@ -60,3 +60,29 @@ pub const testing = struct {
 /// Numeric endpoint, suitable for copying across a C ABI.
 pub const SocketAddress = io_c.pp_socket_address;
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
+
+/// Converts a resolved endpoint; hostnames and named IPv6 zones must be resolved first.
+pub fn socketAddress(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!SocketAddress {
+    var text = endpoint.address;
+    var scope: u32 = 0;
+    if (std.mem.lastIndexOfScalar(u8, text, '%')) |index| {
+        scope = std.fmt.parseInt(u32, text[index + 1 ..], 10) catch return error.InvalidEndpoint;
+        text = text[0..index];
+    }
+    const parsed = std.Io.net.IpAddress.parse(text, endpoint.proto.port) catch return error.InvalidEndpoint;
+    var result = std.mem.zeroes(SocketAddress);
+    result.port = endpoint.proto.port;
+    switch (parsed) {
+        .ip4 => |value| {
+            if (text.len != endpoint.address.len) return error.InvalidEndpoint;
+            result.family = 4;
+            @memcpy(result.address[0..4], &value.bytes);
+        },
+        .ip6 => |value| {
+            result.family = 6;
+            result.address = value.bytes;
+            result.scope_id = scope;
+        },
+    }
+    return result;
+}

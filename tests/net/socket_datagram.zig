@@ -65,7 +65,7 @@ const Echo = struct {
                 else => return error.UnexpectedFamily,
             }
         }
-        try self.looper.writeDatagrams(packets);
+        for (packets) |packet| try self.looper.writeQueued(&.{packet.payload}, .link, packet.address);
         _ = self.count.fetchAdd(packets.len, .release);
         if (self.pause_once) {
             self.pause_once = false;
@@ -117,7 +117,6 @@ test "v2 one UDP link echoes several peers across both address families" {
     var loop = try Looper.initExperimental(allocator, .{ .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
-    try std.testing.expectError(error.NotDatagramLink, loop.writeDatagrams(&.{}));
     try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
     var configure_count: usize = 0;
     const server = try io.SocketWrapper.createDatagram(allocator, .{ .configure = configured, .context = &configure_count });
@@ -135,7 +134,7 @@ test "v2 one UDP link echoes several peers across both address families" {
         server.destroy();
         return err;
     };
-    try std.testing.expectError(error.LooperUnavailable, loop.writeQueued(&.{"address required"}, .link));
+    try std.testing.expectError(error.LooperUnavailable, loop.writeQueued(&.{"address required"}, .link, null));
     const first = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
     defer first.destroy();
     const second = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
@@ -155,10 +154,15 @@ test "v2 one UDP link echoes several peers across both address families" {
     try std.testing.expectEqual(@as(usize, 0), try receive(third, &buf, &address));
     try std.testing.expectEqual(@as(u8, 6), address.family);
     try std.testing.expectEqual(v6.port, address.port);
+    try loop.writeQueued(&.{ "batch one", "batch two" }, .link, try destination(first, 4));
+    n = try receive(first, &buf, &address);
+    try std.testing.expectEqualStrings("batch one", buf[0..n]);
+    n = try receive(first, &buf, &address);
+    try std.testing.expectEqualStrings("batch two", buf[0..n]);
     try loop.detach(.link);
     try std.testing.expect(!loop.isLinkAttached());
     try std.testing.expect(loop.isTunAttached());
-    try loop.writeQueued(&.{"tun still usable"}, .tun);
+    try loop.writeQueued(&.{"tun still usable"}, .tun, null);
     try loop.stop();
     try std.testing.expectEqual(@as(usize, 1), tun.cleaned.load(.acquire));
     try std.testing.expectEqual(@as(usize, 3), echo.count.load(.acquire));

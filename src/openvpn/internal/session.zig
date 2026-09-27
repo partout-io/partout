@@ -226,10 +226,13 @@ pub const Session = struct {
         allocator.destroy(self);
     }
 
+    const LinkRequest = struct { endpoint: api.ExtendedEndpoint, destination: net.SocketAddress };
+
     pub fn setLink(
         self: *Session,
         descriptor: Looper.LinkDescriptor,
         remote_endpoint: api.ExtendedEndpoint,
+        destination: net.SocketAddress,
     ) SetLinkError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
@@ -281,7 +284,7 @@ pub const Session = struct {
         errdefer self.looper.detach(.link) catch {};
 
         // Initiate the session on the attached link.
-        self.performOnQueue(void, remote_endpoint, SessionOnQueue.setLink) catch |err| {
+        self.performOnQueue(void, LinkRequest{ .endpoint = remote_endpoint, .destination = destination }, SessionOnQueue.setLink) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.fault, "Unable to set link: {s}", .{@errorName(err)});
             return error.LinkFailure;
@@ -566,7 +569,8 @@ const SessionOnQueue = struct {
         self.link_processor = null;
     }
 
-    fn setLink(self: *SessionOnQueue, remote_endpoint: api.ExtendedEndpoint) !void {
+    fn setLink(self: *SessionOnQueue, request: Session.LinkRequest) !void {
+        const remote_endpoint = request.endpoint;
         const idle = switch (self.state) {
             .stopped => |context| context,
             .active => {
@@ -582,6 +586,7 @@ const SessionOnQueue = struct {
         const data_link = DataLink.init(
             self.session.allocator,
             self.session.looper,
+            request.destination,
             processor,
             self.session,
             .{
@@ -800,6 +805,7 @@ const SessionOnQueue = struct {
             .link_processor = self.link_processor orelse
                 @panic("Cannot start negotiation before the link processor is configured"),
             .remote_endpoint = &context.remote_endpoint,
+            .destination = context.data_link.destination,
             .channel = self.control_channel,
             .prng = self.session.prng,
             .tls = tls,

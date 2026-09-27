@@ -58,6 +58,7 @@ test "Session borrows an externally managed Looper" {
     const session = try Session.create(allocator, .{
         .looper = &looper,
         .remote_endpoint = source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+        .destination = try source.net.socketAddress(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .events = .{
             .established = Callbacks.established,
             .failed = Callbacks.failed,
@@ -127,6 +128,7 @@ test "Session reports protocol failures without owning shutdown policy" {
         },
         .looper = &looper,
         .remote_endpoint = source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+        .destination = try source.net.socketAddress(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .configuration = .{},
         .credentials = null,
         .auth_token = &auth_token,

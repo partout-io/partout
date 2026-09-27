@@ -163,25 +163,17 @@ pub const Looper = struct {
         };
     }
 
-    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side) WriteError!void {
+    /// Copies one destination with every packet in the batch. Required for
+    /// unconnected UDP; ignored by connected sockets. Pass null for TUN writes.
+    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) WriteError!void {
         return switch (self.implementation) {
-            inline else => |*impl| impl.writeQueued(packets, side),
+            inline else => |*impl| impl.writeQueued(packets, side, destination),
         };
     }
 
-    /// Addressed UDP is available only with the v2 implementation.
-    pub fn writeDatagrams(self: *Looper, packets: []const Datagram) (WriteError || error{NotDatagramLink})!void {
+    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) WriteOOBError!void {
         return switch (self.implementation) {
-            inline else => |*impl| if (@TypeOf(impl.*) == experimental.Looper)
-                impl.writeDatagrams(packets)
-            else
-                error.LooperUnavailable,
-        };
-    }
-
-    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteOOBError!void {
-        return switch (self.implementation) {
-            inline else => |*impl| impl.writeOutOfBand(packets, side),
+            inline else => |*impl| impl.writeOutOfBand(packets, side, destination),
         };
     }
 };

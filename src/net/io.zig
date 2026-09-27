@@ -33,3 +33,5 @@ pub const DescriptorPair = union(Side) {
 
 pub const SocketAddress = common.SocketAddress;
 pub const Datagram = common.Datagram;
+
+pub const socketAddress = common.socketAddress;

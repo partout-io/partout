@@ -110,6 +110,7 @@ pub const WindowsLooper = struct {
         _: *WindowsLooper,
         _: helpers.Packets,
         _: io.Side,
+        _: ?io.SocketAddress,
     ) helpers.WriteError!void {
         // FIXME: ###, Implement socket write
         return error.LooperUnavailable;
@@ -119,6 +120,7 @@ pub const WindowsLooper = struct {
         _: *WindowsLooper,
         _: helpers.Packets,
         _: io.Side,
+        _: ?io.SocketAddress,
     ) helpers.WriteOOBError!void {
         // FIXME: ###, Implement socket write
         return error.LooperUnavailable;

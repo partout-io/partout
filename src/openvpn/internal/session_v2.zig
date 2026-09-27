@@ -131,6 +131,7 @@ pub const Session = struct {
     // Link interface.
     looper: *Looper,
     remote_endpoint: api.ExtendedEndpoint,
+    destination: net.SocketAddress,
     events: SessionEvents,
 
     // Internal state.
@@ -144,6 +145,7 @@ pub const Session = struct {
         /// I/O strategy.
         looper: *Looper,
         remote_endpoint: api.ExtendedEndpoint,
+        destination: net.SocketAddress,
         events: SessionEvents,
         /// OpenVPN configuration.
         configuration: api.OpenVPNConfiguration,
@@ -221,6 +223,7 @@ pub const Session = struct {
             .options = init.options,
             .looper = init.looper,
             .remote_endpoint = remote_endpoint,
+            .destination = init.destination,
             .events = init.events,
             .state = .{
                 .stopped = .{
@@ -291,6 +294,7 @@ pub const Session = struct {
         const data_link = DataLink.init(
             self.allocator,
             self.looper,
+            self.destination,
             self.link_processor,
             self,
             .{
@@ -591,6 +595,7 @@ pub const Session = struct {
             .looper = self.looper,
             .link_processor = self.link_processor,
             .remote_endpoint = &context.remote_endpoint,
+            .destination = context.data_link.destination,
             .channel = self.control_channel,
             .prng = self.prng,
             .tls = tls,

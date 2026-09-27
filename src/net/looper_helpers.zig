@@ -306,24 +306,16 @@ pub const WriteQueue = struct {
     }
 
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
-    pub fn append(self: *WriteQueue, packets: Packets) std.mem.Allocator.Error!void {
-        return self.appendBatch(packets);
-    }
-
-    pub fn appendDatagrams(self: *WriteQueue, packets: []const io.Datagram) std.mem.Allocator.Error!void {
-        return self.appendBatch(packets);
-    }
-
-    fn appendBatch(self: *WriteQueue, packets: anytype) std.mem.Allocator.Error!void {
+    pub fn append(self: *WriteQueue, packets: Packets, destination: ?io.SocketAddress) std.mem.Allocator.Error!void {
         var new_head: ?*WriteNode = null;
         var new_tail: ?*WriteNode = null;
         errdefer destroyList(self.allocator, new_head);
 
         for (packets) |packet| {
-            const copy = try self.allocator.dupe(u8, if (@TypeOf(packet) == io.Datagram) packet.payload else packet);
+            const copy = try self.allocator.dupe(u8, packet);
             errdefer self.allocator.free(copy);
             const node = try self.allocator.create(WriteNode);
-            node.* = .{ .data = copy, .address = if (@TypeOf(packet) == io.Datagram) packet.address else null };
+            node.* = .{ .data = copy, .address = destination };
             if (new_tail) |tail| {
                 tail.next = node;
             } else {

@@ -56,3 +56,5 @@ pub const Datagram = io.Datagram;
 pub const SocketAddress = io.SocketAddress;
 
 pub const canChangeStatus = conn.canChangeStatus;
+
+pub const socketAddress = io.socketAddress;

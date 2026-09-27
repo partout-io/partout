@@ -219,9 +219,11 @@ const OpenVPNConnection = struct {
             return false;
         }
 
+        const destination = net.socketAddress(remote.endpoint) catch return error.UnableToStart;
         const session = Session.create(self.allocator, .{
             .looper = remote.looper,
             .remote_endpoint = remote.endpoint,
+            .destination = destination,
             .events = self.session_events,
             .configuration = self.configuration,
             .credentials = self.credentials,
