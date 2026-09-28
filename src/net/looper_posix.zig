@@ -791,11 +791,11 @@ pub const PosixLooper = struct {
             return;
         }
         var descriptor_storage: [2]io.FileDescriptor = undefined;
-        const descriptors = descriptor.muxDescriptors(&descriptor_storage);
-        for (descriptors, 0..) |fd, index| {
+        const mux_fds = descriptor.muxDescriptors(&descriptor_storage);
+        for (mux_fds, 0..) |fd, index| {
             if (!io_c.pp_mux_add(self.mux, fd)) {
                 log.writef(.err, "Unable to attach {} (fd={any})", .{ side, fd });
-                for (descriptors[0..index]) |added| _ = io_c.pp_mux_delete(self.mux, added);
+                for (mux_fds[0..index]) |added| _ = io_c.pp_mux_delete(self.mux, added);
                 self.queueCompletionLocked(completion, error.MuxFailure);
                 return;
             }
@@ -809,16 +809,17 @@ pub const PosixLooper = struct {
             id,
             side,
             descriptor,
+            mux_fds,
             self.readBufferSize(side),
             arguments,
         ) catch |err| {
-            for (descriptors) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
+            for (mux_fds) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
             self.queueCompletionLocked(completion, err);
             return;
         };
         side_io.syncEventMask() catch {
             log.writef(.err, "Unable to retain {}", .{side});
-            for (descriptors) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
+            for (mux_fds) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
             side_io.destroyStorage(self.allocator);
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
@@ -1015,8 +1016,7 @@ pub const PosixLooper = struct {
         fd_set: *DescriptorSet,
     ) io.Error!void {
         try side_io.setRead(self.mux, false);
-        var storage: [2]io.FileDescriptor = undefined;
-        for (side_io.muxDescriptors(&storage)) |fd| fd_set.removeReadable(fd);
+        for (side_io.muxDescriptors()) |fd| fd_set.removeReadable(fd);
     }
 
     fn scheduleReadRetry(
@@ -1182,8 +1182,7 @@ pub const PosixLooper = struct {
         self.read_retries[sideIndex(side)] = false;
         self.write_retries[sideIndex(side)] = false;
         if (self.fd_set) |*fd_set| {
-            var storage: [2]io.FileDescriptor = undefined;
-            for (side_io.muxDescriptors(&storage)) |fd| {
+            for (side_io.muxDescriptors()) |fd| {
                 fd_set.removeReadable(fd);
                 fd_set.removeWritable(fd);
             }
@@ -1407,6 +1406,10 @@ pub const PosixLooper = struct {
         fd: io.FileDescriptor,
         native_io: io_posix.POSIXInterface,
 
+        // Fixed for this attachment; replacing descriptors requires reattaching.
+        mux_fds: [2]io.FileDescriptor,
+        mux_fd_count: usize,
+
         // User callbacks.
         on_read: ?helpers.OnRead,
         on_failure: ?helpers.OnFailure,
@@ -1424,7 +1427,8 @@ pub const PosixLooper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            descriptor: io_posix.POSIXDescriptor,
+            fd: io_posix.POSIXDescriptor,
+            mux_fds: []const io.FileDescriptor,
             read_buf_size: usize,
             arguments: helpers.AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {
@@ -1434,8 +1438,10 @@ pub const PosixLooper = struct {
             self.* = .{
                 .id = id,
                 .side = side,
-                .fd = descriptor.fd,
-                .native_io = descriptor.io,
+                .fd = fd.fd,
+                .native_io = fd.io,
+                .mux_fds = undefined,
+                .mux_fd_count = mux_fds.len,
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
@@ -1444,6 +1450,7 @@ pub const PosixLooper = struct {
                 .is_writing = false,
                 .did_cleanup = false,
             };
+            @memcpy(self.mux_fds[0..mux_fds.len], mux_fds);
             return self;
         }
 
@@ -1453,14 +1460,12 @@ pub const PosixLooper = struct {
             allocator.destroy(self);
         }
 
-        fn muxDescriptors(self: *const SideIO, storage: *[2]io.FileDescriptor) []const io.FileDescriptor {
-            const descriptor = io_posix.POSIXDescriptor{ .fd = self.fd, .io = self.native_io };
-            return descriptor.muxDescriptors(storage);
+        fn muxDescriptors(self: *const SideIO) []const io.FileDescriptor {
+            return self.mux_fds[0..self.mux_fd_count];
         }
 
         fn isReadable(self: *const SideIO, set: *DescriptorSet) bool {
-            var storage: [2]io.FileDescriptor = undefined;
-            for (self.muxDescriptors(&storage)) |fd| if (set.isReadable(fd)) return true;
+            for (self.muxDescriptors()) |fd| if (set.isReadable(fd)) return true;
             return false;
         }
 
@@ -1469,8 +1474,7 @@ pub const PosixLooper = struct {
         }
 
         fn setRead(self: *SideIO, mux: io_c.pp_mux, enabled: bool) io.Error!void {
-            var storage: [2]io.FileDescriptor = undefined;
-            for (self.muxDescriptors(&storage)) |fd| _ = io_c.pp_mux_set_read(mux, fd, enabled);
+            for (self.muxDescriptors()) |fd| _ = io_c.pp_mux_set_read(mux, fd, enabled);
             self.is_reading = enabled;
             try self.syncEventMask();
         }
@@ -1488,8 +1492,7 @@ pub const PosixLooper = struct {
         fn detachFromMux(self: *SideIO, mux: io_c.pp_mux) bool {
             if (self.did_cleanup) return false;
             self.did_cleanup = true;
-            var storage: [2]io.FileDescriptor = undefined;
-            for (self.muxDescriptors(&storage)) |fd| _ = io_c.pp_mux_delete(mux, fd);
+            for (self.muxDescriptors()) |fd| _ = io_c.pp_mux_delete(mux, fd);
             return true;
         }
 
