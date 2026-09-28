@@ -31,20 +31,20 @@ test "C socket I/O selects addressing by socket mode" {
         try std.testing.expectEqual(@as(c_int, 3), try receiveC(server, &buf, &sender));
         try std.testing.expectEqualStrings("one", buf[0..3]);
         try std.testing.expectEqual(peer.family, sender.family);
-        // Only unconnected writes require a destination.
-        try std.testing.expectEqual(@as(c_int, -1), io.io_c.pp_socket_write(server, "x", 1, null));
+        // Unconnected writes validate the destination.
+        try std.testing.expectEqual(@as(c_int, -1), io.io_c.pp_socket_write(server, "x", 1, &invalid));
         try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(server, "two", 3, &sender));
         var source_address = peer;
         try std.testing.expectEqual(@as(c_int, 3), try receiveC(client, &buf, &source_address));
         try std.testing.expectEqualStrings("two", buf[0..3]);
         try std.testing.expectEqualDeep(invalid, source_address);
-        // Omitting the source still preserves empty datagrams and truncation checks.
+        // Source capture preserves empty datagrams and truncation checks.
         try std.testing.expectEqual(@as(c_int, 0), io.io_c.pp_socket_write(server, "", 0, &peer));
-        try std.testing.expectEqual(@as(c_int, 0), try receiveC(server, &buf, null));
+        try std.testing.expectEqual(@as(c_int, 0), try receiveC(server, &buf, &sender));
         try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client, "big", 3, null));
-        try std.testing.expectEqual(@as(c_int, -1), try receiveC(server, buf[0..1], null));
+        try std.testing.expectEqual(@as(c_int, -1), try receiveC(server, buf[0..1], &sender));
         try std.testing.expectEqual(@as(c_int, 2), io.io_c.pp_socket_write(client, "ok", 2, null));
-        try std.testing.expectEqual(@as(c_int, 2), try receiveC(server, &buf, null));
+        try std.testing.expectEqual(@as(c_int, 2), try receiveC(server, &buf, &sender));
         try std.testing.expectEqualStrings("ok", buf[0..2]);
     }
 }
@@ -63,6 +63,6 @@ test "C unconnected socket validates endpoints and binds both families to one po
     try std.testing.expect(io.io_c.pp_socket_local_address(v6, &address6));
     try std.testing.expectEqual(address.port, address6.port);
     var buf: [1]u8 = undefined;
-    try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v4, &buf, buf.len, null));
-    try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v6, &buf, buf.len, null));
+    try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v4, &buf, buf.len, &address));
+    try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v6, &buf, buf.len, &address6));
 }
