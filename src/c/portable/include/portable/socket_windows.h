@@ -9,6 +9,7 @@
 /* Windows uses SOCKET for I/O and HANDLE for watching.  */
 struct __pp_socket_struct {
     pp_socket_fd fd;
+    bool unconnected;
     pp_fd handle;
 };
 

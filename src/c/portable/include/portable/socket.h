@@ -28,7 +28,7 @@ typedef struct __pp_socket_struct *pp_socket;
 void pp_socket_free(pp_socket sock);
 
 /* Create a connected socket, or bind unconnected UDP to a numeric local endpoint
- * (POSIX only). Unconnected IPv6 is IPv6-only; configuration runs before bind.
+ * Unconnected IPv6 is IPv6-only; configuration runs before bind.
  * timeout_ms applies only to connected sockets. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,
@@ -68,9 +68,7 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
 
-#if !PARTOUT_WINDOWS
 bool pp_socket_local_address(pp_socket sock, pp_socket_address *address);
-#endif
 
 /* Native socket descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);

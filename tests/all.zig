@@ -10,6 +10,7 @@ comptime {
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
     _ = @import("c/exports.zig");
+    _ = @import("c/socket.zig");
     if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL") or
         @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
     {
