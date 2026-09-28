@@ -483,6 +483,7 @@ pub const DataLink = struct {
                         error.LooperUnavailable => error.LooperUnavailable,
                         error.OOBOutsideQueue => error.OOBOutsideQueue,
                         error.OutOfMemory => error.OutOfMemory,
+                        error.UnconnectedDestination => error.UnconnectedDestination,
                         error.WriteIncomplete => error.WriteIncomplete,
                     };
                     log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{

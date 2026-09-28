@@ -145,7 +145,13 @@ test "v2 one UDP link echoes several peers across both address families" {
         server.destroy();
         return err;
     };
-    try std.testing.expectError(error.LooperUnavailable, loop.writeQueued(&.{"address required"}, .link, null));
+    try std.testing.expectError(error.UnconnectedDestination, loop.writeQueued(&.{"address required"}, .link, null));
+    try loop.performTask(.{ .context = &loop, .callback = struct {
+        fn check(raw: ?*anyopaque) anyerror!void {
+            const looper: *Looper = @ptrCast(@alignCast(raw.?));
+            try std.testing.expectError(error.UnconnectedDestination, looper.writeOutOfBand(&.{"address required"}, .link, null));
+        }
+    }.check });
     const first = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
     defer first.destroy();
     const second = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
