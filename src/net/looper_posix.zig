@@ -792,9 +792,9 @@ pub const PosixLooper = struct {
         }
         var descriptor_storage: [2]io.FileDescriptor = undefined;
         const mux_fds = descriptor.muxDescriptors(&descriptor_storage);
-        for (mux_fds, 0..) |fd, index| {
-            if (!io_c.pp_mux_add(self.mux, fd)) {
-                log.writef(.err, "Unable to attach {} (fd={any})", .{ side, fd });
+        for (mux_fds, 0..) |mux_fd, index| {
+            if (!io_c.pp_mux_add(self.mux, mux_fd)) {
+                log.writef(.err, "Unable to attach {} (fd={any})", .{ side, mux_fd });
                 for (mux_fds[0..index]) |added| _ = io_c.pp_mux_delete(self.mux, added);
                 self.queueCompletionLocked(completion, error.MuxFailure);
                 return;
@@ -813,13 +813,13 @@ pub const PosixLooper = struct {
             self.readBufferSize(side),
             arguments,
         ) catch |err| {
-            for (mux_fds) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
+            for (mux_fds) |mux_fd| _ = io_c.pp_mux_delete(self.mux, mux_fd);
             self.queueCompletionLocked(completion, err);
             return;
         };
         side_io.syncEventMask() catch {
             log.writef(.err, "Unable to retain {}", .{side});
-            for (mux_fds) |fd| _ = io_c.pp_mux_delete(self.mux, fd);
+            for (mux_fds) |mux_fd| _ = io_c.pp_mux_delete(self.mux, mux_fd);
             side_io.destroyStorage(self.allocator);
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
@@ -1427,7 +1427,7 @@ pub const PosixLooper = struct {
             allocator: std.mem.Allocator,
             id: u64,
             side: io.Side,
-            fd: io_posix.POSIXDescriptor,
+            descriptor: io_posix.POSIXDescriptor,
             mux_fds: []const io.FileDescriptor,
             read_buf_size: usize,
             arguments: helpers.AttachArguments,
@@ -1438,8 +1438,8 @@ pub const PosixLooper = struct {
             self.* = .{
                 .id = id,
                 .side = side,
-                .fd = fd.fd,
-                .native_io = fd.io,
+                .fd = descriptor.fd,
+                .native_io = descriptor.io,
                 .mux_fds = undefined,
                 .mux_fd_count = mux_fds.len,
                 .on_read = arguments.on_read,
