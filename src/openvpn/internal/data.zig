@@ -28,6 +28,7 @@ const Looper = net_mod.Looper;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PRNGError = crypto_mod.PRNGError;
+const SocketEndpoint = net_mod.SocketEndpoint;
 const ZeroingData = crypto_mod.ZeroingData;
 
 /// C-backed OpenVPN data path.
@@ -381,7 +382,7 @@ pub const DataLink = struct {
 
     allocator: std.mem.Allocator,
     looper: *Looper,
-    remote_endpoint: net_mod.SocketEndpoint,
+    remote_endpoint: SocketEndpoint,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
@@ -395,7 +396,7 @@ pub const DataLink = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         looper: *Looper,
-        remote_endpoint: net_mod.SocketEndpoint,
+        remote_endpoint: SocketEndpoint,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
         callbacks: Callbacks,
