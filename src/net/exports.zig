@@ -36,6 +36,7 @@ pub const DaemonError = daemon.Error;
 pub const DaemonEventKey = daemon.EventKey;
 pub const DaemonEvents = daemon.Events;
 pub const DaemonV2 = daemon_v2.Daemon;
+pub const Datagram = io.Datagram;
 pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
 pub const EndpointResolver = resolver.EndpointResolver;
@@ -52,7 +53,6 @@ pub const SocketFactory = sandbox.SocketFactory;
 pub const SocketWrapper = io.SocketWrapper;
 pub const TunnelController = sandbox.TunnelController;
 pub const TunWrapper = io.TunWrapper;
-pub const Datagram = io.Datagram;
 pub const SocketAddress = io.SocketAddress;
 
 pub const canChangeStatus = conn.canChangeStatus;

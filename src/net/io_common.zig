@@ -15,7 +15,9 @@ const ffi = @import("../c/exports.zig");
 const api = core.api;
 pub const io_c = ffi.io;
 
+pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const ReachabilityInfo = io_c.pp_reachability;
+pub const SocketAddress = io_c.pp_socket_address;
 
 pub const Side = enum {
     link,
@@ -42,25 +44,6 @@ pub const SocketOptions = struct {
     }
 };
 
-pub fn reachabilityNone() io_c.pp_reachability {
-    var reachability = std.mem.zeroes(io_c.pp_reachability);
-    reachability.reachable = false;
-    return reachability;
-}
-
-pub const testing = struct {
-    pub fn reachable(value: bool) ReachabilityInfo {
-        var result = std.mem.zeroes(ReachabilityInfo);
-        result.reachable = value;
-        return result;
-    }
-    pub const reachabilityNone = io_mod.reachabilityNone;
-};
-
-/// Numeric endpoint, suitable for copying across a C ABI.
-pub const SocketAddress = io_c.pp_socket_address;
-pub const Datagram = struct { payload: []const u8, address: SocketAddress };
-
 /// Converts a resolved endpoint; hostnames and named IPv6 zones must be resolved first.
 pub fn socketAddress(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!SocketAddress {
     var text = endpoint.address;
@@ -86,3 +69,18 @@ pub fn socketAddress(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!Sock
     }
     return result;
 }
+
+pub fn reachabilityNone() io_c.pp_reachability {
+    var reachability = std.mem.zeroes(io_c.pp_reachability);
+    reachability.reachable = false;
+    return reachability;
+}
+
+pub const testing = struct {
+    pub fn reachable(value: bool) ReachabilityInfo {
+        var result = std.mem.zeroes(ReachabilityInfo);
+        result.reachable = value;
+        return result;
+    }
+    pub const reachabilityNone = io_mod.reachabilityNone;
+};
