@@ -790,8 +790,8 @@ pub const PosixLooper = struct {
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
         }
-        var descriptor_storage: [2]io.FileDescriptor = undefined;
-        const mux_fds = descriptor.muxDescriptors(&descriptor_storage);
+        var mux_storage: [2]io.FileDescriptor = undefined;
+        const mux_fds = descriptor.muxDescriptors(&mux_storage);
         for (mux_fds, 0..) |mux_fd, index| {
             if (!io_c.pp_mux_add(self.mux, mux_fd)) {
                 log.writef(.err, "Unable to attach {} (fd={any})", .{ side, mux_fd });
