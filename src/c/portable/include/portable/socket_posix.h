@@ -16,6 +16,7 @@
 /* POSIX systems use int for both I/O and watching.  */
 struct __pp_socket_struct {
     pp_socket_fd fd;
+    bool unconnected;
 };
 
 typedef socklen_t os_socklen_t;

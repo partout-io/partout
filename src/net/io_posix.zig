@@ -223,7 +223,7 @@ pub const SocketWrapper = struct {
             const socket = if (self.read_extra) self.extra_socket else self.socket;
             self.read_extra = !self.read_extra;
             if (socket) |value| {
-                const count = io_c.pp_socket_receive_datagram(value, buf.ptr, buf.len, address);
+                const count = io_c.pp_socket_read(value, buf.ptr, buf.len, address);
                 if (count == io_c.PPIOErrorWouldBlock) continue;
                 if (count < 0) return error.LibcFailure;
                 return @intCast(count);
@@ -233,7 +233,7 @@ pub const SocketWrapper = struct {
     }
 
     pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
-        return mapWriteResult(.link, io_c.pp_socket_send_datagram(try self.socketFor(address.family), data.ptr, data.len, &address), false);
+        return mapWriteResult(.link, io_c.pp_socket_write(try self.socketFor(address.family), data.ptr, data.len, &address), false);
     }
 
     pub fn destroy(self: *SocketWrapper) void {
@@ -280,13 +280,13 @@ pub const SocketWrapper = struct {
 
     fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
         if (self.isUnconnected()) return error.LibcFailure;
-        const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len);
+        const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, null);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
     fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
         if (self.isUnconnected() or offset > data.len) return error.LibcFailure;
-        const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset);
+        const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset, null);
         return mapWriteResult(.link, written, false);
     }
 

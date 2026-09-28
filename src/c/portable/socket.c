@@ -31,6 +31,13 @@ static bool local_is_valid_socket(pp_socket sock);
 #include "portable/socket_posix.h"
 #endif
 
+#if !PARTOUT_WINDOWS
+static int local_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
+                                  pp_socket_address *source);
+static int local_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
+                               const pp_socket_address *destination);
+#endif
+
 static bool local_platform_init(void);
 static void local_print_error(const char *msg);
 static void local_set_not_socket_error(void);
@@ -101,6 +108,9 @@ int pp_socket_last_error_binding(void) {
 static pp_socket pp_socket_create(pp_socket_fd fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
     sock->fd = (pp_socket_fd)fd;
+#if !PARTOUT_WINDOWS
+    sock->unconnected = false;
+#endif
     if (!local_init_socket(sock)) {
         pp_free(sock);
         return NULL;
@@ -245,12 +255,19 @@ void pp_socket_free(pp_socket sock) {
 
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
-int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
+int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_address *source) {
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
 
+    if (source) memset(source, 0, sizeof(*source));
+#if !PARTOUT_WINDOWS
+    /* Unconnected UDP must preserve datagram boundaries and detect truncation,
+     * even when the caller does not request the sender's address. */
+    if (sock->unconnected) return local_receive_datagram(sock, dst, dst_len, source);
+#endif
+    /* Connected sockets keep the existing receive path; their peer is fixed. */
     while (true) {
         const int read_len = local_recv_fd(sock->fd, dst, dst_len);
         if (read_len < 0 && local_is_interrupted()) {
@@ -270,14 +287,27 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
     }
 }
 
-/* Write src_len bytes, and repeat until fully written. Returns the amount
- * of written bytes, expected to always be src_len. Returns < 0 on failure. */
-int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
+/* Write one datagram or advance a connected write. Returns the amount written,
+ * which may be partial on connected sockets, or < 0 on failure. */
+int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
+                    const pp_socket_address *destination) {
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
 
+#if !PARTOUT_WINDOWS
+    /* An unconnected UDP write is one whole datagram, including empty payloads.
+     * Never feed it through the connected path's partial-write loop. */
+    if (sock->unconnected) {
+        if (!destination) { errno = EDESTADDRREQ; return -1; }
+        return local_send_datagram(sock, src, src_len, destination);
+    }
+#else
+    (void)destination;
+#endif
+    /* Connected UDP/TCP ignore destination: the peer was chosen at open time.
+     * Retain the existing partial-write/retry behavior for this path. */
     size_t offset = 0;
     while (offset < src_len) {
         const uint8_t *current_src = src + offset;
@@ -513,7 +543,10 @@ pp_socket pp_socket_open_datagram(const pp_socket_address *local,
     if (configure && !configure(ctx, fd, reachability)) goto fail;
     if (bind(fd, (const struct sockaddr *)&address, length) < 0) goto fail;
     pp_socket result = pp_socket_create(fd);
-    if (result) return result;
+    if (result) {
+        result->unconnected = true;
+        return result;
+    }
 fail:
     close(fd);
     return NULL;
@@ -526,7 +559,7 @@ bool pp_socket_local_address(pp_socket sock, pp_socket_address *address) {
            datagram_address(&storage, address);
 }
 
-int pp_socket_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
+static int local_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
     pp_socket_address *source) {
     struct sockaddr_storage address;
     struct iovec iov = { .iov_base = dst, .iov_len = capacity };
@@ -536,11 +569,11 @@ int pp_socket_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
     do { n = recvmsg(sock->fd, &message, 0); } while (n < 0 && errno == EINTR);
     if (n < 0) return local_is_wouldblock() ? PPIOErrorWouldBlock : -1;
     if (message.msg_flags & MSG_TRUNC) { errno = EMSGSIZE; return -1; }
-    if (!datagram_address(&address, source)) return -1;
+    if (source && !datagram_address(&address, source)) return -1;
     return (int)n;
 }
 
-int pp_socket_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
+static int local_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
     const pp_socket_address *destination) {
     struct sockaddr_storage address;
     socklen_t length;

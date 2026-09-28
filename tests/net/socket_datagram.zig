@@ -307,3 +307,47 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         try loop.stop();
     }
 }
+
+fn receiveC(socket: io.io_c.pp_socket, buf: []u8, source_address: ?*io.SocketAddress) !c_int {
+    for (0..5000) |_| {
+        const n = io.io_c.pp_socket_read(socket, buf.ptr, buf.len, source_address);
+        if (n != io.io_c.PPIOErrorWouldBlock) return n;
+        _ = libc.usleep(1000);
+    }
+    return error.Timeout;
+}
+
+test "C socket I/O selects addressing by socket mode" {
+    const server = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    defer server.destroy();
+    const peer = try destination(server, 4);
+    const client = (try io.SocketWrapper.create(allocator, .{
+        .endpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, peer.port) },
+        .timeout_ms = 1000,
+        .buf_size = 4096,
+    })) orelse return error.SocketFailed;
+    defer client.destroy();
+    const invalid = std.mem.zeroes(io.SocketAddress);
+    // A connected socket ignores even an invalid destination.
+    try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client.socket, "one", 3, &invalid));
+    var buf: [32]u8 = undefined;
+    var sender: io.SocketAddress = undefined;
+    try std.testing.expectEqual(@as(c_int, 3), try receiveC(server.socket, &buf, &sender));
+    try std.testing.expectEqualStrings("one", buf[0..3]);
+    try std.testing.expectEqual(@as(u8, 4), sender.family);
+    // Only unconnected writes require a destination.
+    try std.testing.expectEqual(@as(c_int, -1), io.io_c.pp_socket_write(server.socket, "x", 1, null));
+    try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(server.socket, "two", 3, &sender));
+    var source_address = peer;
+    try std.testing.expectEqual(@as(c_int, 3), try receiveC(client.socket, &buf, &source_address));
+    try std.testing.expectEqualStrings("two", buf[0..3]);
+    try std.testing.expectEqualDeep(invalid, source_address);
+    // Omitting the source still preserves empty datagrams and truncation checks.
+    try std.testing.expectEqual(@as(c_int, 0), io.io_c.pp_socket_write(server.socket, "", 0, &peer));
+    try std.testing.expectEqual(@as(c_int, 0), try receiveC(server.socket, &buf, null));
+    try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client.socket, "big", 3, null));
+    try std.testing.expectEqual(@as(c_int, -1), try receiveC(server.socket, buf[0..1], null));
+    try std.testing.expectEqual(@as(c_int, 2), io.io_c.pp_socket_write(client.socket, "ok", 2, null));
+    try std.testing.expectEqual(@as(c_int, 2), try receiveC(server.socket, &buf, null));
+    try std.testing.expectEqualStrings("ok", buf[0..2]);
+}
