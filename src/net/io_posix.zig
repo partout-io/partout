@@ -142,7 +142,7 @@ pub const POSIXInterface = union(enum) {
 
 pub const SocketWrapper = struct {
     socket: io_c.pp_socket,
-    options: ?SocketOptions = null,
+    remote_endpoint: ?io.SocketEndpoint = null,
     closes_on_empty_read: bool = false,
     extra_socket: ?io_c.pp_socket = null,
     datagram_family: u8 = 0,
@@ -154,6 +154,7 @@ pub const SocketWrapper = struct {
         allocator: std.mem.Allocator,
         options: SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
+        const remote_endpoint = io.SocketEndpoint.init(options.endpoint) catch return null;
         const wrapper = try allocator.create(SocketWrapper);
         errdefer allocator.destroy(wrapper);
         const socket = try open(allocator, options) orelse {
@@ -162,7 +163,7 @@ pub const SocketWrapper = struct {
         };
         wrapper.* = .{
             .socket = socket,
-            .options = options,
+            .remote_endpoint = remote_endpoint,
             .closes_on_empty_read = options.closesOnEmptyRead(),
             .allocator = allocator,
         };
@@ -203,7 +204,7 @@ pub const SocketWrapper = struct {
     }
 
     pub fn isUnconnected(self: *const SocketWrapper) bool {
-        return self.options == null;
+        return self.remote_endpoint == null;
     }
 
     fn socketFor(self: *const SocketWrapper, family: u8) Error!io_c.pp_socket {
@@ -315,16 +316,8 @@ pub const SocketWrapper = struct {
         return io_c.pp_socket_get_fd(self.socket);
     }
 
-    pub fn remoteAddress(self: SocketWrapper) ?api.Address {
-        return api.Address.parseRaw((self.options orelse return null).endpoint.address);
-    }
-
-    fn remoteProtocol(self: SocketWrapper) api.EndpointProtocol {
-        return self.options.?.endpoint.proto;
-    }
-
-    fn isReliable(self: SocketWrapper) bool {
-        return if (self.options) |options| options.endpoint.plainSocketType() == .tcp else false;
+    pub fn remoteAddress(self: SocketWrapper) ?io.SocketAddress {
+        return (self.remote_endpoint orelse return null).address;
     }
 
     fn lastErrorCode(_: SocketWrapper) c_int {

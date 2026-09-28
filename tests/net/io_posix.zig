@@ -27,26 +27,12 @@ test "maps native write backpressure results" {
     try std.testing.expectEqual(@as(usize, 7), try mapWriteResult(.link, 7, false));
 }
 
-test "socket wrapper reports an invalid remote address" {
-    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
-    const allocator = std.testing.allocator;
-    const wrapper = try allocator.create(io.SocketWrapper);
-    wrapper.* = .{
-        .allocator = allocator,
-        .socket = null,
-        .options = .{
-            .endpoint = .{
-                .address = " \t",
-                .proto = api.EndpointProtocol.init(.udp, 1194),
-            },
-            .timeout_ms = 0,
-            .buf_size = 0,
-        },
-        .closes_on_empty_read = false,
-    };
-    defer wrapper.destroy();
-
-    try std.testing.expect(wrapper.remoteAddress() == null);
+test "socket wrapper rejects an invalid remote address" {
+    try std.testing.expect((try io.SocketWrapper.create(std.testing.allocator, .{
+        .endpoint = .{ .address = " \t", .proto = api.EndpointProtocol.init(.udp, 1194) },
+        .timeout_ms = 0,
+        .buf_size = 0,
+    })) == null);
 }
 
 test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
@@ -57,14 +43,7 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     socket.* = .{
         .allocator = allocator,
         .socket = null,
-        .options = .{
-            .endpoint = .{
-                .address = "127.0.0.1",
-                .proto = api.EndpointProtocol.init(.udp, 1194),
-            },
-            .timeout_ms = 0,
-            .buf_size = 1024,
-        },
+        .remote_endpoint = try io.SocketEndpoint.init(.{ .address = "127.0.0.1", .proto = .init(.udp, 1194) }),
         .closes_on_empty_read = false,
     };
     var tun = io_posix.TunWrapper.init(null);

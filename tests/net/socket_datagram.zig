@@ -307,3 +307,25 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         try loop.stop();
     }
 }
+
+test "connected socket wrapper does not retain endpoint text" {
+    const peer = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    defer peer.destroy();
+    const address = try destination(peer, 4);
+    var text = "127.0.0.1".*;
+    const socket = (try io.SocketWrapper.create(allocator, .{
+        .endpoint = .{ .address = &text, .proto = .init(.udp, address.port) },
+        .timeout_ms = 1000,
+        .buf_size = 4096,
+    })) orelse return error.SocketFailed;
+    defer socket.destroy();
+    @memset(&text, 'x');
+    try std.testing.expectEqualDeep(address, socket.remoteAddress().?);
+    try std.testing.expectEqual(io.SocketType.udp, socket.remote_endpoint.?.type);
+    try std.testing.expect(!socket.isUnconnected());
+    try std.testing.expectEqual(@as(usize, 5), try socket.linkDescriptor().io.writePacket("owned", 0, null));
+    var buf: [32]u8 = undefined;
+    var source_address: io.SocketAddress = undefined;
+    const n = try receive(peer, &buf, &source_address);
+    try std.testing.expectEqualStrings("owned", buf[0..n]);
+}

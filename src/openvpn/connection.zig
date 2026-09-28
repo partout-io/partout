@@ -89,7 +89,6 @@ const OpenVPNConnection = struct {
     events: ?net.Connection.Events,
     with_local_options: bool,
     current_session: ?*Session,
-    current_endpoint: ?api.ExtendedEndpoint,
     tunnel: ?net.TunWrapper,
 
     // MARK: - Public API
@@ -170,7 +169,6 @@ const OpenVPNConnection = struct {
             .events = null,
             .with_local_options = true,
             .current_session = null,
-            .current_endpoint = null,
             .tunnel = null,
         };
         const fnt = try api.cryptoFunctionTable(session_options.backend);
@@ -253,7 +251,7 @@ const OpenVPNConnection = struct {
 
         self.clearServerConfiguration();
         _ = self.sendStatus(.connecting, events);
-        const current_endpoint = self.setupLink(session) catch |err| {
+        self.setupLink(session) catch |err| {
             log.writef(.fault, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.shutdown(false, null) catch {};
@@ -263,7 +261,6 @@ const OpenVPNConnection = struct {
                 else => error.UnableToStart,
             };
         };
-        self.current_endpoint = current_endpoint;
         return true;
     }
 
@@ -327,7 +324,7 @@ const OpenVPNConnection = struct {
 
     // MARK: - Link setup
 
-    fn setupLink(self: *OpenVPNConnection, session: *Session) LinkSetupError!api.ExtendedEndpoint {
+    fn setupLink(self: *OpenVPNConnection, session: *Session) LinkSetupError!void {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
@@ -337,22 +334,19 @@ const OpenVPNConnection = struct {
             self.connection_options.dns_timeout,
         );
 
-        var owned_endpoint = try endpoint.clone(self.allocator);
-        errdefer owned_endpoint.deinit(self.allocator);
-        log.writef(.notice, "Connect to {s}", .{owned_endpoint});
-        const remote_endpoint = net.SocketEndpoint.init(owned_endpoint) catch return error.LinkFailure;
+        log.writef(.notice, "Connect to {s}", .{endpoint});
+        const remote_endpoint = net.SocketEndpoint.init(endpoint) catch return error.LinkFailure;
         const descriptor = try self.factory.create(
             self.allocator,
-            owned_endpoint,
+            endpoint,
             reachability,
             self.connection_options.link_activity_timeout,
         );
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
-            owned_endpoint.proto.socket_type.raw(),
+            endpoint.proto.socket_type.raw(),
         });
         try session.setLink(descriptor, remote_endpoint);
-        return owned_endpoint;
     }
 
     // MARK: - Session events
@@ -554,8 +548,6 @@ const OpenVPNConnection = struct {
     fn clearLink(self: *OpenVPNConnection) void {
         if (self.tunnel) |*tunnel| tunnel.deinit();
         self.tunnel = null;
-        if (self.current_endpoint) |*endpoint| endpoint.deinit(self.allocator);
-        self.current_endpoint = null;
     }
 };
 
