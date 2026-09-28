@@ -235,12 +235,10 @@ pub const Platform = struct {
 
     fn socketOptions(
         self: *Platform,
-        endpoint: api.ExtendedEndpoint,
         reachability: ?ReachabilityInfo,
         timeout: c_int,
     ) SocketOptions {
         return .{
-            .endpoint = endpoint,
             .timeout_ms = timeout,
             .buf_size = self.socket_buf_size,
             .reachability = reachability,
@@ -422,9 +420,9 @@ fn socketFactoryCreate(
 ) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
-    const options = self.socketOptions(endpoint, effective_reachability, timeout);
+    const options = self.socketOptions(effective_reachability, timeout);
     log.write(.info, "Creating SocketWrapper");
-    const wrapper = try SocketWrapper.create(allocator, options) orelse
+    const wrapper = try SocketWrapper.create(allocator, endpoint, options) orelse
         return error.LinkNotActive;
     log.writef(.debug, "SocketFactory: Created socket for {s}", .{
         log.sensitive(endpoint.address),
@@ -488,11 +486,10 @@ pub const testing = struct {
 
     pub fn socketOptions(
         platform: *Platform,
-        endpoint: api.ExtendedEndpoint,
         reachability: ?ReachabilityInfo,
         timeout: c_int,
     ) SocketOptions {
-        return platform.socketOptions(endpoint, reachability, timeout);
+        return platform.socketOptions(reachability, timeout);
     }
 
     pub fn betterPathCount(platform: *Platform) usize {

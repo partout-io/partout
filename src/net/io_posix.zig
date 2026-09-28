@@ -147,65 +147,58 @@ pub const POSIXInterface = union(enum) {
 
 pub const SocketWrapper = struct {
     socket: io_c.pp_socket,
+    extra_socket: ?io_c.pp_socket = null,
     remote_endpoint: ?io.SocketEndpoint = null,
     closes_on_empty_read: bool = false,
-    extra_socket: ?io_c.pp_socket = null,
     datagram_family: u8 = 0,
     read_extra: bool = false,
     is_closed: bool = false,
     allocator: std.mem.Allocator,
 
+    /// Creates a connected socket, or unconnected UDP on the requested families.
+    /// A null endpoint selects unconnected UDP.
+    /// Ownership transfers on successful looper_v2 attachment.
     pub fn create(
         allocator: std.mem.Allocator,
+        endpoint: ?api.ExtendedEndpoint,
         options: SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
-        const remote_endpoint = io.SocketEndpoint.init(options.endpoint) catch return null;
-        const wrapper = try allocator.create(SocketWrapper);
-        errdefer allocator.destroy(wrapper);
-        const socket = try open(allocator, options) orelse {
-            allocator.destroy(wrapper);
-            return null;
+        const remote_endpoint = if (endpoint) |value|
+            io.SocketEndpoint.init(value) catch return null
+        else
+            null;
+        if (remote_endpoint == null and !options.ipv4 and !options.ipv6) return null;
+
+        const socket_endpoint = endpoint orelse api.ExtendedEndpoint{
+            .address = if (options.ipv4) "0.0.0.0" else "::",
+            .proto = .init(.udp, options.port),
         };
+        const socket = try open(allocator, socket_endpoint, endpoint == null, options) orelse return null;
+        var extra: ?io_c.pp_socket = null;
+        var did_create = false;
+        defer if (!did_create) {
+            if (extra) |value| io_c.pp_socket_free(value);
+            io_c.pp_socket_free(socket);
+        };
+        if (remote_endpoint == null and options.ipv4 and options.ipv6) {
+            var address: io.SocketAddress = undefined;
+            if (!io_c.pp_socket_local_address(socket, &address)) return null;
+            extra = try open(allocator, .{
+                .address = "::",
+                .proto = .init(.udp, address.port),
+            }, true, options) orelse return null;
+        }
+        const wrapper = try allocator.create(SocketWrapper);
         wrapper.* = .{
             .socket = socket,
+            .extra_socket = extra,
             .remote_endpoint = remote_endpoint,
-            .closes_on_empty_read = options.closesOnEmptyRead(),
+            .closes_on_empty_read = if (endpoint) |value| value.plainSocketType() == .tcp else false,
+            .datagram_family = if (remote_endpoint != null) 0 else if (options.ipv4) 4 else 6,
             .allocator = allocator,
         };
+        did_create = true;
         return wrapper;
-    }
-
-    pub const DatagramOptions = struct {
-        ipv4: bool = true,
-        ipv6: bool = true,
-        port: u16 = 0,
-        reachability: ?io.ReachabilityInfo = null,
-        configure: io_c.pp_socket_configure = null,
-        context: ?*anyopaque = null,
-    };
-
-    /// Unconnected UDP, with one socket per requested family on the same port.
-    /// Ownership transfers on successful looper_v2 attachment, as for create().
-    pub fn createDatagram(allocator: std.mem.Allocator, options: DatagramOptions) Error!*SocketWrapper {
-        if (!options.ipv4 and !options.ipv6) return error.LibcFailure;
-        const open_options = io_c.pp_socket_open_options{
-            .unconnected = true,
-            .reachability = if (options.reachability) |*r| r else null,
-            .configure = options.configure,
-            .configure_ctx = options.context,
-        };
-        var address = std.mem.zeroes(io.SocketAddress);
-        const socket = io_c.pp_socket_open(if (options.ipv4) "0.0.0.0" else "::", io_c.PPSocketProtoUDP, options.port, &open_options) orelse return error.LibcFailure;
-        errdefer io_c.pp_socket_free(socket);
-        var extra: ?io_c.pp_socket = null;
-        errdefer if (extra) |value| io_c.pp_socket_free(value);
-        if (options.ipv4 and options.ipv6) {
-            if (!io_c.pp_socket_local_address(socket, &address)) return error.LibcFailure;
-            extra = io_c.pp_socket_open("::", io_c.PPSocketProtoUDP, address.port, &open_options) orelse return error.LibcFailure;
-        }
-        const self = try allocator.create(SocketWrapper);
-        self.* = .{ .allocator = allocator, .socket = socket, .extra_socket = extra, .datagram_family = if (options.ipv4) 4 else 6 };
-        return self;
     }
 
     pub fn isUnconnected(self: *const SocketWrapper) bool {
@@ -253,18 +246,21 @@ pub const SocketWrapper = struct {
 
     fn open(
         allocator: std.mem.Allocator,
+        endpoint: api.ExtendedEndpoint,
+        unconnected: bool,
         options: SocketOptions,
     ) error{OutOfMemory}!?io_c.pp_socket {
         var c_address: util.TemporaryCString = .{};
-        try c_address.init(allocator, options.endpoint.address);
+        try c_address.init(allocator, endpoint.address);
         defer c_address.deinit();
 
         const reachability = options.reachability orelse reachabilityNone();
         const socket = io_c.pp_socket_open(
             c_address.ptr(),
-            socketProto(options.endpoint),
-            options.endpoint.proto.port,
+            socketProto(endpoint),
+            endpoint.proto.port,
             &.{
+                .unconnected = unconnected,
                 .timeout_ms = options.timeout_ms,
                 .reachability = &reachability,
                 .configure = options.configure,

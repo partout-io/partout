@@ -126,7 +126,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     try loop.start();
     try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
     var configure_count: usize = 0;
-    const server = try io.SocketWrapper.createDatagram(allocator, .{ .configure = configured, .context = &configure_count });
+    const server = (try io.SocketWrapper.create(allocator, null, .{ .configure = configured, .configure_ctx = &configure_count })) orelse return error.SocketFailed;
     try std.testing.expectEqual(@as(usize, 2), configure_count);
     try std.testing.expect(server.isUnconnected());
     try std.testing.expect(server.remoteAddress() == null);
@@ -152,11 +152,11 @@ test "v2 one UDP link echoes several peers across both address families" {
             try std.testing.expectError(error.UnconnectedDestination, looper.writeOutOfBand(&.{"address required"}, .link, null));
         }
     }.check });
-    const first = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const first = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer first.destroy();
-    const second = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const second = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer second.destroy();
-    const third = try io.SocketWrapper.createDatagram(allocator, .{ .ipv4 = false });
+    const third = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
     defer third.destroy();
     _ = try first.sendTo("one", v4);
     _ = try second.sendTo("two", v4);
@@ -191,7 +191,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     var loop = try Looper.initExperimental(allocator, .{ .max_read_count = 1, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
-    const server = try io.SocketWrapper.createDatagram(allocator, .{});
+    const server = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     const v4 = try destination(server, 4);
     const v6 = try destination(server, 6);
     var echo = Echo{ .looper = &loop, .pause_once = true };
@@ -201,7 +201,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
         server.destroy();
         return err;
     };
-    const peer = try io.SocketWrapper.createDatagram(allocator, .{});
+    const peer = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     defer peer.destroy();
     _ = try peer.sendTo("pause", v4);
     try wait(&echo.count, 1);
@@ -212,7 +212,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     try loop.resumeReading(.link);
     try wait(&echo.count, 2);
     try loop.detach(.link);
-    const replacement = try io.SocketWrapper.createDatagram(allocator, .{ .ipv4 = false });
+    const replacement = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
     const new_address = try destination(replacement, 6);
     loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         replacement.destroy();
@@ -228,19 +228,19 @@ test "v2 UDP truncation fails the link and permits replacement" {
     defer loop.deinit();
     try loop.start();
     var echo = Echo{ .looper = &loop };
-    const server = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const server = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     const address = try destination(server, 4);
     loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_failure = .{ .context = &echo, .callback = Echo.failed } }) catch |err| {
         server.destroy();
         return err;
     };
-    const peer = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer peer.destroy();
     _ = try peer.sendTo("oversized", address);
     try wait(&echo.failures, 1);
     try loop.performTask(.{ .callback = barrier });
     try std.testing.expect(!loop.isLinkAttached());
-    const replacement = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const replacement = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     const new_address = try destination(replacement, 4);
     loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         replacement.destroy();
@@ -255,7 +255,7 @@ test "v2 UDP truncation fails the link and permits replacement" {
 }
 
 fn allocationRollback(a: std.mem.Allocator) !void {
-    const link = try io.SocketWrapper.createDatagram(a, .{});
+    const link = (try io.SocketWrapper.create(a, null, .{})) orelse return error.SocketFailed;
     defer link.destroy();
 }
 test "unconnected socket wrapper rolls back ownership on allocation failure" {
@@ -293,11 +293,10 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         if (std.c.write(fds[1], "x", 1) != 1) return error.PipeWriteFailed;
         try wait(&probe.count, 1);
 
-        const server = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+        const server = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
         defer server.destroy();
         const peer = try destination(server, 4);
-        const client = (try io.SocketWrapper.create(allocator, .{
-            .endpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, peer.port) },
+        const client = (try io.SocketWrapper.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, peer.port) }, .{
             .timeout_ms = 1000,
             .buf_size = 4096,
         })) orelse return error.SocketFailed;
@@ -319,12 +318,11 @@ test "unified read callback has no addresses for connected UDP and TUN" {
 }
 
 test "connected socket wrapper does not retain endpoint text" {
-    const peer = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+    const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer peer.destroy();
     const address = try destination(peer, 4);
     var text = "127.0.0.1".*;
-    const socket = (try io.SocketWrapper.create(allocator, .{
-        .endpoint = .{ .address = &text, .proto = .init(.udp, address.port) },
+    const socket = (try io.SocketWrapper.create(allocator, .{ .address = &text, .proto = .init(.udp, address.port) }, .{
         .timeout_ms = 1000,
         .buf_size = 4096,
     })) orelse return error.SocketFailed;

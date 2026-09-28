@@ -158,17 +158,7 @@ test "platform builds POSIX socket wrapper options" {
     });
     defer platform.deinit();
 
-    const endpoint = api.ExtendedEndpoint.init(
-        "127.0.0.1",
-        api.EndpointProtocol.init(.udp, 1194),
-    ) orelse return error.TestUnexpectedResult;
-
-    const options = socketOptions(&platform, endpoint, reachable(true), 5000);
-    try std.testing.expectEqualStrings("127.0.0.1", options.endpoint.address);
-    try std.testing.expectEqual(api.EndpointProtocol{
-        .socket_type = .udp,
-        .port = 1194,
-    }, options.endpoint.proto);
+    const options = socketOptions(&platform, reachable(true), 5000);
     try std.testing.expectEqual(@as(c_int, 5000), options.timeout_ms);
     try std.testing.expectEqual(@as(c_int, 4096), options.buf_size);
     try std.testing.expect(options.reachability.?.reachable);

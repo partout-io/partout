@@ -28,8 +28,7 @@ test "maps native write backpressure results" {
 }
 
 test "socket wrapper rejects an invalid remote address" {
-    try std.testing.expect((try io.SocketWrapper.create(std.testing.allocator, .{
-        .endpoint = .{ .address = " \t", .proto = api.EndpointProtocol.init(.udp, 1194) },
+    try std.testing.expect((try io.SocketWrapper.create(std.testing.allocator, .{ .address = " \t", .proto = api.EndpointProtocol.init(.udp, 1194) }, .{
         .timeout_ms = 0,
         .buf_size = 0,
     })) == null);

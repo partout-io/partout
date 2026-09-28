@@ -60,16 +60,15 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const SocketOptions = struct {
-    endpoint: api.ExtendedEndpoint,
-    timeout_ms: c_int,
-    buf_size: c_int,
+    /// Used only for unconnected UDP. Both families bind to the same local port.
+    ipv4: bool = true,
+    ipv6: bool = true,
+    port: u16 = 0,
+    timeout_ms: c_int = 0,
+    buf_size: c_int = 0,
     reachability: ?io_c.pp_reachability = null,
     configure: io_c.pp_socket_configure = null,
     configure_ctx: ?*anyopaque = null,
-
-    pub fn closesOnEmptyRead(self: *const SocketOptions) bool {
-        return self.endpoint.plainSocketType() == .tcp;
-    }
 };
 
 /// Converts a resolved endpoint; hostnames and named IPv6 zones must be resolved first.

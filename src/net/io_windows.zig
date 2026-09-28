@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const api = @import("../core/exports.zig").api;
 
 const io = @import("io_common.zig");
 const io_c = io.io_c;
@@ -32,9 +33,11 @@ pub const SocketWrapper = struct {
 
     pub fn create(
         allocator: std.mem.Allocator,
+        endpoint: ?api.ExtendedEndpoint,
         options: io.SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
         const self = try allocator.create(SocketWrapper);
+        _ = endpoint;
         _ = options;
         self.* = .{
             .allocator = allocator,
