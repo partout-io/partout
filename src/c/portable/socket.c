@@ -123,13 +123,8 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
 pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
-                         bool blocking,
-                         bool unconnected,
-                         int timeout_ms,
-                         const pp_reachability *reachability,
-                         pp_socket_configure configure,
-                         void *configure_ctx) {
-    if (unconnected) {
+                         const pp_socket_open_options *options) {
+    if (options->unconnected) {
 #if PARTOUT_WINDOWS
         local_set_error(WSAEOPNOTSUPP);
         return NULL;
@@ -166,28 +161,28 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
 #if !PARTOUT_WINDOWS
-        if (unconnected) {
+        if (options->unconnected) {
             /* IPv6 stays separate from the IPv4 socket sharing the same port. */
             const int v6_only = 1;
             if (numeric_addr.ss_family == AF_INET6 &&
                 setsockopt(new_fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, sizeof(v6_only)) < 0) goto failure;
             const int flags = fcntl(new_fd, F_GETFD, 0);
             if (flags < 0 || fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0 ||
-                (!blocking && pp_socket_set_nonblocking(new_fd, NULL) < 0)) goto failure;
+                (!options->blocking && pp_socket_set_nonblocking(new_fd, NULL) < 0)) goto failure;
         }
 #endif
-        if (configure && !configure(configure_ctx, new_fd, reachability)) {
+        if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
             local_print_error("configure()");
             goto failure;
         }
         /* Unconnected endpoints are local bind addresses, not remote peers. */
-        if (unconnected) {
+        if (options->unconnected) {
             if (bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen) < 0) goto failure;
         } else if (local_connect_with_timeout(new_fd,
                                        (const struct sockaddr *)&numeric_addr,
                                        numeric_addrlen,
-                                       blocking,
-                                       timeout_ms) != 0) {
+                                       options->blocking,
+                                       options->timeout_ms) != 0) {
             local_print_error("connect()");
             goto failure;
         }
@@ -196,14 +191,14 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
 #if !PARTOUT_WINDOWS
-        sock->unconnected = unconnected;
+        sock->unconnected = options->unconnected;
 #endif
         return sock;
     }
 
 #if !PARTOUT_WINDOWS
     /* Local bind addresses must be numeric; only peers use DNS resolution. */
-    if (unconnected) { errno = EINVAL; goto failure; }
+    if (options->unconnected) { errno = EINVAL; goto failure; }
 #endif
 
     pp_zero(&hints, sizeof(hints));
@@ -226,7 +221,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     const int ret = local_getaddrinfo(ip_addr,
                                       port_str,
                                       &hints,
-                                      reachability,
+                                      options->reachability,
                                       &resolved);
     if (ret != 0) {
         local_print_error("pp_dns_resolve()");
@@ -240,15 +235,15 @@ pp_socket pp_socket_open(const char *ip_addr,
             local_print_error("socket()");
             continue;
         }
-        if (configure && !configure(configure_ctx, new_fd, reachability)) {
+        if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
             local_print_error("configure()");
             goto failure;
         }
         const int ret = local_connect_with_timeout(new_fd,
                                                    p->ai_addr,
                                                    (os_socklen_t)p->ai_addrlen,
-                                                   blocking,
-                                                   timeout_ms);
+                                                   options->blocking,
+                                                   options->timeout_ms);
         if (ret != 0) {
             local_close_fd(new_fd);
             new_fd = local_invalid_fd();

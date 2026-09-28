@@ -34,15 +34,19 @@ typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,
                                     const pp_reachability *_Nullable reachability);
 
+typedef struct {
+    bool blocking;
+    bool unconnected;
+    int timeout_ms;
+    const pp_reachability *_Nullable reachability;
+    pp_socket_configure _Nullable configure;
+    void *_Nullable configure_ctx;
+} pp_socket_open_options;
+
 pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
-                                   bool blocking,
-                                   bool unconnected,
-                                   int timeout_ms,
-                                   const pp_reachability *_Nullable reachability,
-                                   pp_socket_configure _Nullable configure,
-                                   void *_Nullable configure_ctx);
+                                   const pp_socket_open_options *options);
 
 /* Numeric UDP endpoint. family is 4 or 6; port and scope_id are host endian. */
 typedef struct {

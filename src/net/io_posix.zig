@@ -182,14 +182,20 @@ pub const SocketWrapper = struct {
     /// Ownership transfers on successful looper_v2 attachment, as for create().
     pub fn createDatagram(allocator: std.mem.Allocator, options: DatagramOptions) Error!*SocketWrapper {
         if (!options.ipv4 and !options.ipv6) return error.LibcFailure;
+        const open_options = io_c.pp_socket_open_options{
+            .unconnected = true,
+            .reachability = if (options.reachability) |*r| r else null,
+            .configure = options.configure,
+            .configure_ctx = options.context,
+        };
         var address = std.mem.zeroes(io.SocketAddress);
-        const socket = io_c.pp_socket_open(if (options.ipv4) "0.0.0.0" else "::", io_c.PPSocketProtoUDP, options.port, false, true, 0, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+        const socket = io_c.pp_socket_open(if (options.ipv4) "0.0.0.0" else "::", io_c.PPSocketProtoUDP, options.port, &open_options) orelse return error.LibcFailure;
         errdefer io_c.pp_socket_free(socket);
         var extra: ?io_c.pp_socket = null;
         errdefer if (extra) |value| io_c.pp_socket_free(value);
         if (options.ipv4 and options.ipv6) {
             if (!io_c.pp_socket_local_address(socket, &address)) return error.LibcFailure;
-            extra = io_c.pp_socket_open("::", io_c.PPSocketProtoUDP, address.port, false, true, 0, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+            extra = io_c.pp_socket_open("::", io_c.PPSocketProtoUDP, address.port, &open_options) orelse return error.LibcFailure;
         }
         const self = try allocator.create(SocketWrapper);
         self.* = .{ .allocator = allocator, .socket = socket, .extra_socket = extra, .datagram_family = if (options.ipv4) 4 else 6 };
@@ -252,12 +258,12 @@ pub const SocketWrapper = struct {
             c_address.ptr(),
             socketProto(options.endpoint),
             options.endpoint.proto.port,
-            false,
-            false,
-            options.timeout_ms,
-            &reachability,
-            options.configure,
-            options.configure_ctx,
+            &.{
+                .timeout_ms = options.timeout_ms,
+                .reachability = &reachability,
+                .configure = options.configure,
+                .configure_ctx = options.configure_ctx,
+            },
         ) orelse return null;
 
         _ = io_c.pp_socket_set_buffers(socket, options.buf_size, options.buf_size);
