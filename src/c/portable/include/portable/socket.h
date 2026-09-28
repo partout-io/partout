@@ -27,7 +27,7 @@ typedef struct __pp_socket_struct *pp_socket;
 /* Close the owned socket and free the wrapper. */
 void pp_socket_free(pp_socket sock);
 
-/* Create a connected socket, or bind unconnected UDP to a numeric local endpoint
+/* Create a nonblocking connected socket, or bind unconnected UDP to a numeric local endpoint
  * Unconnected IPv6 is IPv6-only; configuration runs before bind.
  * timeout_ms applies only to connected sockets. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
@@ -35,7 +35,6 @@ typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     const pp_reachability *_Nullable reachability);
 
 typedef struct {
-    bool blocking;
     bool unconnected;
     int timeout_ms;
     const pp_reachability *_Nullable reachability;
@@ -76,9 +75,8 @@ pp_socket_fd pp_socket_get_fd(pp_socket sock);
 /* Return the file descriptor to watch. Check result with pp_fd_is_valid(). */
 pp_fd pp_socket_get_watch_fd(pp_socket sock);
 
-/* These are tied to sockets on Windows. */
-int pp_socket_set_nonblocking(pp_socket_fd fd, int *_Nullable original_flags);
-int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags);
+/* Configure nonblocking I/O for the native socket. */
+int pp_socket_set_nonblocking(pp_socket_fd fd);
 
 /* Configure and reset the socket events associated with the watch fd. */
 bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write);

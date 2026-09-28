@@ -104,18 +104,10 @@ static inline bool local_is_nobufs(void) {
 
 // pp_socket_fd == pp_fd in POSIX
 
-int pp_socket_set_nonblocking(pp_socket_fd fd, int *original_flags) {
-    const int ret = pp_fd_set_nonblocking(fd, original_flags);
+int pp_socket_set_nonblocking(pp_socket_fd fd) {
+    const int ret = pp_fd_set_nonblocking(fd, NULL);
     if (ret < 0) {
         local_print_error("pp_fd_set_nonblocking()");
-    }
-    return ret;
-}
-
-int pp_socket_restore_blocking(pp_socket_fd fd, int original_flags) {
-    const int ret = pp_fd_restore_blocking(fd, original_flags);
-    if (ret < 0) {
-        local_print_error("pp_socket_restore_blocking()");
     }
     return ret;
 }

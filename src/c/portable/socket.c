@@ -64,7 +64,6 @@ static int local_getaddrinfo(const char *hostname,
 static int local_connect_with_timeout(pp_socket_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
-                                      bool blocking,
                                       int timeout_ms);
 static bool local_parse_numeric_addr(const char *ip_addr,
                                      uint16_t port,
@@ -118,9 +117,8 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
     return sock;
 }
 
-/* Open a socket to an IP address, an UDP/TCP protocol, and a port. Set
- * the non-blocking flag as an option, though the DNS resolution may
- * block regardless. */
+/* Open a nonblocking UDP/TCP socket. DNS resolution and connection setup
+ * may still wait; timeout_ms limits the connection wait. */
 pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
@@ -172,7 +170,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             const int flags = fcntl(new_fd, F_GETFD, 0);
             if (flags < 0 || fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
 #endif
-            if (!options->blocking && pp_socket_set_nonblocking(new_fd, NULL) < 0) goto failure;
+            if (pp_socket_set_nonblocking(new_fd) < 0) goto failure;
         }
         if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
             local_print_error("configure()");
@@ -184,7 +182,6 @@ pp_socket pp_socket_open(const char *ip_addr,
         } else if (local_connect_with_timeout(new_fd,
                                        (const struct sockaddr *)&numeric_addr,
                                        numeric_addrlen,
-                                       options->blocking,
                                        options->timeout_ms) != 0) {
             local_print_error("connect()");
             goto failure;
@@ -241,7 +238,6 @@ pp_socket pp_socket_open(const char *ip_addr,
         const int ret = local_connect_with_timeout(new_fd,
                                                    p->ai_addr,
                                                    (os_socklen_t)p->ai_addrlen,
-                                                   options->blocking,
                                                    options->timeout_ms);
         if (ret != 0) {
             local_close_fd(new_fd);
@@ -462,11 +458,9 @@ void local_close_impl(pp_socket sock) {
 int local_connect_with_timeout(pp_socket_fd fd,
                                const struct sockaddr *addr,
                                os_socklen_t addrlen,
-                               bool blocking,
                                int timeout_ms) {
     // Set non-blocking
-    int original_flags = 0;
-    if (pp_socket_set_nonblocking(fd, &original_flags) < 0) {
+    if (pp_socket_set_nonblocking(fd) < 0) {
         return -1;
     }
 
@@ -474,7 +468,7 @@ int local_connect_with_timeout(pp_socket_fd fd,
     int ret = connect(fd, addr, addrlen);
     if (ret == 0) {
         // Connected immediately
-        goto done;
+        return 0;
     }
     // Tell real errors from non-blocking pending states
     if (!local_is_connect_pending() && !local_is_interrupted()) {
@@ -515,14 +509,6 @@ int local_connect_with_timeout(pp_socket_fd fd,
     if (err != 0) {
         local_set_error(err);
         return -1;
-    }
-
-done:
-    // Store/restore blocking mode as needed
-    if (blocking) {
-        if (pp_socket_restore_blocking(fd, original_flags) < 0) {
-            return -1;
-        }
     }
 
     // Success

@@ -27,6 +27,7 @@ test "C socket I/O selects addressing by socket mode" {
         try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client, "one", 3, &invalid));
         var buf: [32]u8 = undefined;
         var sender: io.SocketAddress = undefined;
+        try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(client, &buf, buf.len, null));
         try std.testing.expectEqual(@as(c_int, 3), try receiveC(server, &buf, &sender));
         try std.testing.expectEqualStrings("one", buf[0..3]);
         try std.testing.expectEqual(peer.family, sender.family);
