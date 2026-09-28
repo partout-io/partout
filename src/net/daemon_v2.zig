@@ -1045,7 +1045,7 @@ const ConnectionDaemon = struct {
     // run protocol work directly, but must never wait for the actor. Termination
     // finalizes protocol state here, then enqueues actor-owned recovery.
 
-    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets) !Looper.ReadAction {
+    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
         return conn.submitPackets(.link, packets);
@@ -1057,7 +1057,7 @@ const ConnectionDaemon = struct {
         conn.looperFailed(.link, failure);
     }
 
-    fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets) !Looper.ReadAction {
+    fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
         return conn.submitPackets(.tun, packets);

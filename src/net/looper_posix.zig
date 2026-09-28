@@ -786,9 +786,7 @@ pub const PosixLooper = struct {
             .link => |value| value,
             .tun => |value| value,
         };
-        if ((descriptor.io.isUnconnected() and (side != .link or arguments.on_read != null)) or
-            (!descriptor.io.isUnconnected() and arguments.on_datagrams != null))
-        {
+        if (descriptor.io.isUnconnected() and side != .link) {
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
         }
@@ -971,8 +969,8 @@ pub const PosixLooper = struct {
             inbox.deinit(self.allocator);
         }
 
-        var datagrams: std.ArrayList(io.Datagram) = .empty;
-        defer datagrams.deinit(self.allocator);
+        var addresses: std.ArrayList(io.SocketAddress) = .empty;
+        defer addresses.deinit(self.allocator);
         var read_count: usize = 0;
         var read_size: usize = 0;
         while (read_count < self.options.max_read_count and read_size < self.options.max_read_size) {
@@ -992,7 +990,7 @@ pub const PosixLooper = struct {
                     self.allocator.free(packet);
                     return .{ .fatal = .{ .system = err } };
                 };
-                if (side_io.native_io.isUnconnected()) datagrams.append(self.allocator, .{ .payload = packet, .address = address }) catch |err| {
+                if (side_io.native_io.isUnconnected()) addresses.append(self.allocator, address) catch |err| {
                     return .{ .fatal = .{ .system = err } };
                 };
                 read_size += count;
@@ -1001,12 +999,8 @@ pub const PosixLooper = struct {
         }
 
         if (inbox.items.len > 0) {
-            const action = if (side_io.on_datagrams) |callback|
-                callback.callback(callback.context, datagrams.items) catch |err| {
-                    return .{ .side_failure = .{ .side = side_io.side, .failure = .{ .user = err } } };
-                }
-            else if (side_io.on_read) |callback|
-                callback.call(inbox.items) catch |err| {
+            const action = if (side_io.on_read) |callback|
+                callback.call(inbox.items, if (side_io.native_io.isUnconnected()) addresses.items else null) catch |err| {
                     return .{ .side_failure = .{
                         .side = side_io.side,
                         .failure = .{ .user = err },
@@ -1421,7 +1415,6 @@ pub const PosixLooper = struct {
 
         // User callbacks.
         on_read: ?helpers.OnRead,
-        on_datagrams: ?helpers.OnDatagrams,
         on_failure: ?helpers.OnFailure,
 
         // Buffered packet state.
@@ -1450,7 +1443,6 @@ pub const PosixLooper = struct {
                 .fd = descriptor.fd,
                 .native_io = descriptor.io,
                 .on_read = arguments.on_read,
-                .on_datagrams = arguments.on_datagrams,
                 .on_failure = arguments.on_failure,
                 .read_buf = read_buf,
                 .write_queue = helpers.WriteQueue.init(allocator),

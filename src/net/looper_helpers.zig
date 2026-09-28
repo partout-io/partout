@@ -33,13 +33,15 @@ pub const ReadAction = enum {
     pause,
 };
 
-/// Invoked on read events from either looper side.
+/// Invoked on read events from either looper side. Payloads and addresses are
+/// borrowed until the callback returns. Unconnected UDP supplies one source
+/// address per packet, in the same order; connected sockets and TUN supply null.
 pub const OnRead = struct {
     context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, Packets) anyerror!ReadAction,
+    callback: *const fn (?*anyopaque, Packets, ?[]const io.SocketAddress) anyerror!ReadAction,
 
-    pub fn call(self: OnRead, packets: Packets) anyerror!ReadAction {
-        return self.callback(self.context, packets);
+    pub fn call(self: OnRead, packets: Packets, addresses: ?[]const io.SocketAddress) anyerror!ReadAction {
+        return self.callback(self.context, packets, addresses);
     }
 };
 
@@ -67,12 +69,6 @@ pub const Failure = union(enum) {
         code: ?c_int,
     },
     user: anyerror,
-};
-
-/// Borrowed UDP payloads and source addresses, valid for this callback only.
-pub const OnDatagrams = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, []const io.Datagram) anyerror!ReadAction,
 };
 
 /// Invoked on any failure event.
@@ -126,8 +122,6 @@ pub const Timer = struct {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
-    /// Only looper_v2 supports an addressed UDP link. Mutually exclusive with on_read.
-    on_datagrams: ?OnDatagrams = null,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };

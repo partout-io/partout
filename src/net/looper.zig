@@ -816,7 +816,7 @@ pub const Looper = struct {
             .tun => |value| value,
         };
         // Addressed UDP links are supported by v2 only.
-        if (descriptor.io.isUnconnected() or arguments.on_datagrams != null) {
+        if (descriptor.io.isUnconnected()) {
             self.queueCompletionLocked(completion, error.MuxFailure);
             return;
         }
@@ -1011,7 +1011,7 @@ pub const Looper = struct {
 
         if (inbox.items.len > 0) {
             const action = if (side_io.on_read) |callback|
-                callback.call(inbox.items) catch |err| {
+                callback.call(inbox.items, null) catch |err| {
                     return .{ .side_failure = .{
                         .side = side_io.side,
                         .failure = .{ .user = err },

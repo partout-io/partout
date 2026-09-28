@@ -52,10 +52,12 @@ const Echo = struct {
     ipv6: Atomic = .init(0),
     failures: Atomic = .init(0),
     pause_once: bool = false,
-    fn read(raw: ?*anyopaque, packets: []const io.Datagram) anyerror!Looper.ReadAction {
+    fn read(raw: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) anyerror!Looper.ReadAction {
         const self: *Echo = @ptrCast(@alignCast(raw.?));
-        for (packets) |packet| {
-            switch (packet.address.family) {
+        const addresses = sources orelse return error.MissingAddresses;
+        try std.testing.expectEqual(packets.len, addresses.len);
+        for (addresses) |address| {
+            switch (address.family) {
                 4 => {
                     _ = self.ipv4.fetchAdd(1, .release);
                 },
@@ -65,7 +67,7 @@ const Echo = struct {
                 else => return error.UnexpectedFamily,
             }
         }
-        for (packets) |packet| try self.looper.writeQueued(&.{packet.payload}, .link, packet.address);
+        for (packets, addresses) |packet, address| try self.looper.writeQueued(&.{packet}, .link, address);
         _ = self.count.fetchAdd(packets.len, .release);
         if (self.pause_once) {
             self.pause_once = false;
@@ -80,11 +82,16 @@ const Echo = struct {
 };
 
 const TunProbe = struct {
+    payload: ?[]const u8 = null,
     cleaned: Atomic = .init(0),
     fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
     fn reset(_: *anyopaque) io.Error!void {}
-    fn read(_: *anyopaque, _: []u8) io.Error!?usize {
-        return error.WouldBlock;
+    fn read(raw: *anyopaque, buf: []u8) io.Error!?usize {
+        const self: *TunProbe = @ptrCast(@alignCast(raw));
+        const payload = self.payload orelse return error.WouldBlock;
+        @memcpy(buf[0..payload.len], payload);
+        self.payload = null;
+        return payload.len;
     }
     fn write(_: *anyopaque, bytes: []const u8, offset: usize) io.Error!usize {
         return bytes.len - offset;
@@ -130,7 +137,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     const v6 = try destination(server, 6);
     try std.testing.expectEqual(v4.port, v6.port);
     var echo = Echo{ .looper = &loop };
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_datagrams = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
@@ -180,7 +187,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     var echo = Echo{ .looper = &loop, .pause_once = true };
     try std.testing.expectError(error.MuxFailure, loop.attach(.{ .pair = .{ .tun = server.linkDescriptor() } }));
     // Failed attach retains ownership, so the same object can be attached correctly.
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_datagrams = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
@@ -197,7 +204,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     try loop.detach(.link);
     const replacement = try io.SocketWrapper.createDatagram(allocator, .{ .ipv4 = false });
     const new_address = try destination(replacement, 6);
-    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_datagrams = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         replacement.destroy();
         return err;
     };
@@ -225,7 +232,7 @@ test "v2 UDP truncation fails the link and permits replacement" {
     try std.testing.expect(!loop.isLinkAttached());
     const replacement = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
     const new_address = try destination(replacement, 4);
-    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_datagrams = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         replacement.destroy();
         return err;
     };
@@ -243,4 +250,60 @@ fn allocationRollback(a: std.mem.Allocator) !void {
 }
 test "unconnected socket wrapper rolls back ownership on allocation failure" {
     try std.testing.checkAllAllocationFailures(allocator, allocationRollback, .{});
+}
+
+test "unified read callback has no addresses for connected UDP and TUN" {
+    const Probe = struct {
+        count: Atomic = .init(0),
+        fn read(raw: ?*anyopaque, packets: Looper.Packets, addresses: ?[]const io.SocketAddress) !Looper.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            try std.testing.expect(addresses == null);
+            try std.testing.expectEqual(@as(usize, 1), packets.len);
+            try std.testing.expectEqualStrings("plain", packets[0]);
+            _ = self.count.fetchAdd(1, .release);
+            return .pause;
+        }
+    };
+    inline for (.{ Looper.init, Looper.initExperimental }) |init| {
+        var fds: [2]std.c.fd_t = undefined;
+        if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+        defer {
+            _ = libc.close(fds[0]);
+            _ = libc.close(fds[1]);
+        }
+        var tun = TunProbe{ .payload = "plain" };
+        var probe = Probe{};
+        var loop = try init(allocator, .{ .on_finish = .{ .callback = finish } });
+        defer loop.deinit();
+        try loop.start();
+        try loop.attach(.{
+            .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } },
+            .on_read = .{ .context = &probe, .callback = Probe.read },
+        });
+        if (std.c.write(fds[1], "x", 1) != 1) return error.PipeWriteFailed;
+        try wait(&probe.count, 1);
+
+        const server = try io.SocketWrapper.createDatagram(allocator, .{ .ipv6 = false });
+        defer server.destroy();
+        const peer = try destination(server, 4);
+        const client = (try io.SocketWrapper.create(allocator, .{
+            .endpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, peer.port) },
+            .timeout_ms = 1000,
+            .buf_size = 4096,
+        })) orelse return error.SocketFailed;
+        loop.attach(.{
+            .pair = .{ .link = client.linkDescriptor() },
+            .on_read = .{ .context = &probe, .callback = Probe.read },
+        }) catch |err| {
+            client.destroy();
+            return err;
+        };
+        try loop.writeQueued(&.{"request"}, .link, peer);
+        var buf: [32]u8 = undefined;
+        var sender: io.SocketAddress = undefined;
+        _ = try receive(server, &buf, &sender);
+        _ = try server.sendTo("plain", sender);
+        try wait(&probe.count, 2);
+        try loop.stop();
+    }
 }

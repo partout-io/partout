@@ -406,6 +406,7 @@ pub const Session = struct {
     fn onLinkRead(
         raw: ?*anyopaque,
         packets: Looper.Packets,
+        _: ?[]const net.SocketAddress,
     ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const on_queue = self.onQueue();
@@ -424,6 +425,7 @@ pub const Session = struct {
     fn onTunnelRead(
         raw: ?*anyopaque,
         packets: Looper.Packets,
+        _: ?[]const net.SocketAddress,
     ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().receiveTunnel(packets);
