@@ -32,6 +32,8 @@ static bool local_is_valid_socket(pp_socket sock);
 #endif
 
 #if !PARTOUT_WINDOWS
+static pp_socket local_open_unconnected(const char *ip_addr, uint16_t port, bool blocking,
+    const pp_reachability *reachability, pp_socket_configure configure, void *ctx);
 static int local_receive_datagram(pp_socket sock, uint8_t *dst, size_t capacity,
                                   pp_socket_address *source);
 static int local_send_datagram(pp_socket sock, const uint8_t *src, size_t size,
@@ -125,10 +127,22 @@ pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
                          bool blocking,
+                         bool unconnected,
                          int timeout_ms,
                          const pp_reachability *reachability,
                          pp_socket_configure configure,
                          void *configure_ctx) {
+    /* Unconnected UDP binds a local endpoint; the connected path below is unchanged. */
+    if (unconnected) {
+#if PARTOUT_WINDOWS
+        local_set_error(WSAEOPNOTSUPP);
+        return NULL;
+#else
+        if (proto != PPSocketProtoUDP) { errno = EINVAL; return NULL; }
+        return local_open_unconnected(ip_addr, port, blocking, reachability, configure, configure_ctx);
+#endif
+    }
+
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
@@ -526,20 +540,20 @@ static bool datagram_address(const struct sockaddr_storage *storage,
     return true;
 }
 
-pp_socket pp_socket_open_datagram(const pp_socket_address *local,
+static pp_socket local_open_unconnected(const char *ip_addr, uint16_t port, bool blocking,
     const pp_reachability *reachability, pp_socket_configure configure, void *ctx) {
     struct sockaddr_storage address;
     socklen_t length;
-    if (!datagram_native_address(local, &address, &length)) return NULL;
+    if (!local_parse_numeric_addr(ip_addr, port, &address, &length)) { errno = EINVAL; return NULL; }
     int fd = socket(address.ss_family, SOCK_DGRAM, 0);
     if (fd < 0) return NULL;
-    if (local->family == 6) {
+    if (address.ss_family == AF_INET6) {
         const int v6_only = 1;
         if (setsockopt(fd, IPPROTO_IPV6, IPV6_V6ONLY, &v6_only, sizeof(v6_only)) < 0) goto fail;
     }
     const int flags = fcntl(fd, F_GETFD, 0);
     if (flags < 0 || fcntl(fd, F_SETFD, flags | FD_CLOEXEC) < 0 ||
-        pp_socket_set_nonblocking(fd, NULL) < 0) goto fail;
+        (!blocking && pp_socket_set_nonblocking(fd, NULL) < 0)) goto fail;
     if (configure && !configure(ctx, fd, reachability)) goto fail;
     if (bind(fd, (const struct sockaddr *)&address, length) < 0) goto fail;
     pp_socket result = pp_socket_create(fd);

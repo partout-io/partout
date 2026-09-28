@@ -27,7 +27,9 @@ typedef struct __pp_socket_struct *pp_socket;
 /* Close the owned socket and free the wrapper. */
 void pp_socket_free(pp_socket sock);
 
-/* Create socket to endpoint. */
+/* Create a connected socket, or bind unconnected UDP to a numeric local endpoint
+ * (POSIX only). Unconnected IPv6 is IPv6-only; configuration runs before bind.
+ * timeout_ms applies only to connected sockets. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,
                                     const pp_reachability *_Nullable reachability);
@@ -36,6 +38,7 @@ pp_socket _Nullable pp_socket_open(const char *ip_addr,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    bool blocking,
+                                   bool unconnected,
                                    int timeout_ms,
                                    const pp_reachability *_Nullable reachability,
                                    pp_socket_configure _Nullable configure,
@@ -62,10 +65,6 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int sendbuf_len);
 
 #if !PARTOUT_WINDOWS
-/* Unconnected, nonblocking UDP (POSIX). Configuration runs before bind. */
-pp_socket _Nullable pp_socket_open_datagram(const pp_socket_address *local,
-    const pp_reachability *_Nullable reachability,
-    pp_socket_configure _Nullable configure, void *_Nullable ctx);
 bool pp_socket_local_address(pp_socket sock, pp_socket_address *address);
 #endif
 

@@ -183,16 +183,13 @@ pub const SocketWrapper = struct {
     pub fn createDatagram(allocator: std.mem.Allocator, options: DatagramOptions) Error!*SocketWrapper {
         if (!options.ipv4 and !options.ipv6) return error.LibcFailure;
         var address = std.mem.zeroes(io.SocketAddress);
-        address.family = if (options.ipv4) 4 else 6;
-        address.port = options.port;
-        const socket = io_c.pp_socket_open_datagram(&address, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+        const socket = io_c.pp_socket_open(if (options.ipv4) "0.0.0.0" else "::", io_c.PPSocketProtoUDP, options.port, false, true, 0, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
         errdefer io_c.pp_socket_free(socket);
         var extra: ?io_c.pp_socket = null;
         errdefer if (extra) |value| io_c.pp_socket_free(value);
         if (options.ipv4 and options.ipv6) {
             if (!io_c.pp_socket_local_address(socket, &address)) return error.LibcFailure;
-            address.family = 6;
-            extra = io_c.pp_socket_open_datagram(&address, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
+            extra = io_c.pp_socket_open("::", io_c.PPSocketProtoUDP, address.port, false, true, 0, if (options.reachability) |*r| r else null, options.configure, options.context) orelse return error.LibcFailure;
         }
         const self = try allocator.create(SocketWrapper);
         self.* = .{ .allocator = allocator, .socket = socket, .extra_socket = extra, .datagram_family = if (options.ipv4) 4 else 6 };
@@ -255,6 +252,7 @@ pub const SocketWrapper = struct {
             c_address.ptr(),
             socketProto(options.endpoint),
             options.endpoint.proto.port,
+            false,
             false,
             options.timeout_ms,
             &reachability,
