@@ -340,7 +340,6 @@ const OpenVPNConnection = struct {
         var owned_endpoint = try endpoint.clone(self.allocator);
         errdefer owned_endpoint.deinit(self.allocator);
         log.writef(.notice, "Connect to {s}", .{owned_endpoint});
-        const destination = net.socketAddress(owned_endpoint) catch return error.LinkFailure;
         const descriptor = try self.factory.create(
             self.allocator,
             owned_endpoint,
@@ -351,7 +350,7 @@ const OpenVPNConnection = struct {
         log.writef(.info, "Link type is {s}", .{
             owned_endpoint.proto.socket_type.raw(),
         });
-        try session.setLink(descriptor, owned_endpoint, destination);
+        try session.setLink(descriptor, owned_endpoint);
         return owned_endpoint;
     }
 

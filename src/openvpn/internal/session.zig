@@ -232,7 +232,6 @@ pub const Session = struct {
         self: *Session,
         descriptor: Looper.LinkDescriptor,
         remote_endpoint: api.ExtendedEndpoint,
-        destination: net.SocketAddress,
     ) SetLinkError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
@@ -243,6 +242,7 @@ pub const Session = struct {
             return;
         }
 
+        const destination = net.socketAddress(remote_endpoint) catch return error.LinkFailure;
         const processor = try LinkProcessor.create(
             self.allocator,
             self.configuration.xor_method,

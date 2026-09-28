@@ -229,7 +229,7 @@ test "Session releases a link processor once when attach fails" {
         session.setLink(.{
             .fd = io.io_c.pp_fd_invalid(),
             .io = mock_io.interface(),
-        }, endpoint, try source.net.socketAddress(endpoint)),
+        }, endpoint),
     );
     try std.testing.expectEqual(@as(usize, 1), mock_io.cleanup_count);
 

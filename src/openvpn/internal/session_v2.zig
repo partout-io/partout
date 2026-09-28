@@ -145,7 +145,6 @@ pub const Session = struct {
         /// I/O strategy.
         looper: *Looper,
         remote_endpoint: api.ExtendedEndpoint,
-        destination: net.SocketAddress,
         events: SessionEvents,
         /// OpenVPN configuration.
         configuration: api.OpenVPNConfiguration,
@@ -164,6 +163,7 @@ pub const Session = struct {
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
         log.write(.notice, "Using OpenVPN Session v2");
 
+        const destination = net.socketAddress(init.remote_endpoint) catch return error.InvalidConfiguration;
         const remote_endpoint = try init.remote_endpoint.clone(allocator);
         errdefer remote_endpoint.deinit(allocator);
 
@@ -223,7 +223,7 @@ pub const Session = struct {
             .options = init.options,
             .looper = init.looper,
             .remote_endpoint = remote_endpoint,
-            .destination = init.destination,
+            .destination = destination,
             .events = init.events,
             .state = .{
                 .stopped = .{
