@@ -27,6 +27,18 @@ pub const POSIXDescriptor = struct {
     fd: FileDescriptor,
     io: POSIXInterface,
 
+    /// Returns one or two descriptors backed by caller-owned storage, primary first.
+    pub fn muxDescriptors(self: POSIXDescriptor, storage: *[2]FileDescriptor) []const FileDescriptor {
+        storage[0] = self.fd;
+        if (self.io == .socket) {
+            if (self.io.socket.extra_socket) |extra| {
+                storage[1] = io_c.pp_socket_get_watch_fd(extra);
+                return storage;
+            }
+        }
+        return storage[0..1];
+    }
+
     pub fn cleanup(self: POSIXDescriptor) void {
         self.io.cleanup();
     }
@@ -63,13 +75,6 @@ pub const POSIXInterface = union(enum) {
         return switch (self) {
             .socket => |socket| socket.isUnconnected(),
             else => false,
-        };
-    }
-
-    pub fn extraDescriptor(self: POSIXInterface) ?FileDescriptor {
-        return switch (self) {
-            .socket => |socket| if (socket.extra_socket) |extra| io_c.pp_socket_get_watch_fd(extra) else null,
-            else => null,
         };
     }
 

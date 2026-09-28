@@ -132,7 +132,11 @@ test "v2 one UDP link echoes several peers across both address families" {
     try std.testing.expect(server.remoteAddress() == null);
     const descriptor = server.linkDescriptor();
     try std.testing.expect(descriptor.io == .socket);
-    try std.testing.expect(descriptor.io.extraDescriptor().? != descriptor.fd);
+    var descriptor_storage: [2]io.FileDescriptor = undefined;
+    const descriptors = descriptor.muxDescriptors(&descriptor_storage);
+    try std.testing.expectEqual(@as(usize, 2), descriptors.len);
+    try std.testing.expectEqual(descriptor.fd, descriptors[0]);
+    try std.testing.expect(descriptors[1] != descriptors[0]);
     const v4 = try destination(server, 4);
     const v6 = try destination(server, 6);
     try std.testing.expectEqual(v4.port, v6.port);

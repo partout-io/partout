@@ -51,6 +51,10 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     defer native_socket.cleanup();
     const tun_descriptor = tun.tunDescriptor();
     const native_tun = tun_descriptor.io;
+    var descriptor_storage: [2]io.FileDescriptor = undefined;
+    try std.testing.expectEqualSlices(io.FileDescriptor, &.{tun_descriptor.fd}, tun_descriptor.muxDescriptors(&descriptor_storage));
+    const socket_descriptor = socket.linkDescriptor();
+    try std.testing.expectEqualSlices(io.FileDescriptor, &.{socket_descriptor.fd}, socket_descriptor.muxDescriptors(&descriptor_storage));
     defer tun.deinit();
     try std.testing.expect(native_tun.tun == &tun);
     try std.testing.expect(native_socket.socket == socket);
