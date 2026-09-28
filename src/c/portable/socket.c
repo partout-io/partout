@@ -177,13 +177,19 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
         /* Unconnected endpoints are local bind addresses, not remote peers. */
+        int attempt_result = -1;
         if (options->unconnected) {
-            if (bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen) < 0) goto failure;
-        } else if (local_connect_with_timeout(new_fd,
-                                       (const struct sockaddr *)&numeric_addr,
-                                       numeric_addrlen,
-                                       options->timeout_ms) != 0) {
-            local_print_error("connect()");
+            attempt_result = bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen);
+        } else {
+            attempt_result = local_connect_with_timeout(
+                new_fd,
+                (const struct sockaddr *)&numeric_addr,
+                numeric_addrlen,
+                options->timeout_ms
+            );
+        }
+        if (attempt_result < 0) {
+            local_print_error(options->unconnected ? "bind()" : "connect()");
             goto failure;
         }
         pp_socket sock = pp_socket_create(new_fd);
@@ -195,7 +201,10 @@ pp_socket pp_socket_open(const char *ip_addr,
     }
 
     /* Local bind addresses must be numeric; only peers use DNS resolution. */
-    if (options->unconnected) { local_set_error(LOCAL_SOCKET_ERROR(EINVAL)); goto failure; }
+    if (options->unconnected) {
+        local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
+        goto failure;
+    }
 
     pp_zero(&hints, sizeof(hints));
     hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
