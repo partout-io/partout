@@ -101,8 +101,7 @@ pub const Negotiator = struct {
     renegotiation: ?RenegotiationType,
     looper: *Looper,
     link_processor: *LinkProcessor,
-    remote_endpoint: *const api.ExtendedEndpoint,
-    destination: net_mod.SocketAddress,
+    remote_endpoint: *const net_mod.SocketEndpoint,
     channel: *ControlChannel,
     prng: PRNG,
     tls: ?*TLSWrapper,
@@ -122,8 +121,7 @@ pub const Negotiator = struct {
         renegotiation: ?RenegotiationType = null,
         looper: *Looper,
         link_processor: *LinkProcessor,
-        remote_endpoint: *const api.ExtendedEndpoint,
-        destination: net_mod.SocketAddress,
+        remote_endpoint: *const net_mod.SocketEndpoint,
         channel: *ControlChannel,
         prng: PRNG,
         tls: *TLSWrapper,
@@ -149,7 +147,6 @@ pub const Negotiator = struct {
             .looper = init.looper,
             .link_processor = init.link_processor,
             .remote_endpoint = init.remote_endpoint,
-            .destination = init.destination,
             .channel = init.channel,
             .prng = init.prng,
             .tls = init.tls,
@@ -204,7 +201,6 @@ pub const Negotiator = struct {
             .looper = self.looper,
             .link_processor = self.link_processor,
             .remote_endpoint = self.remote_endpoint,
-            .destination = self.destination,
             .channel = self.channel,
             .prng = self.prng,
             .tls = tls,
@@ -274,7 +270,7 @@ pub const Negotiator = struct {
             return error.Timeout;
 
         if (!self.isRenegotiating()) try self.pushRequest();
-        if (self.remote_endpoint.plainSocketType() == .udp) try self.flushControlQueue();
+        if (self.remote_endpoint.type == .udp) try self.flushControlQueue();
         if (self.state != .connected) {
             try self.options.schedule_negotiation_check(
                 self.options.callback_context,
@@ -371,7 +367,7 @@ pub const Negotiator = struct {
     fn writeLink(self: *const Negotiator, packets: []const []const u8) !void {
         var processed = try self.link_processor.processOutbound(packets);
         defer processed.deinit();
-        try self.looper.writeQueued(processed.packets(), .link, self.destination);
+        try self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address);
     }
 
     fn requestsWrappedKeyResend(payload: ?[]const u8) bool {

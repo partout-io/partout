@@ -29,3 +29,26 @@ test "resolved endpoints become socket addresses with host-order ports and IPv6 
         try std.testing.expectError(error.InvalidEndpoint, io.socketAddress(.{ .address = invalid, .proto = .init(.udp, 1194) }));
     }
 }
+
+test "SocketEndpoint preserves transport and formats owned-by-caller IP text" {
+    const api = @import("source").core.api;
+    const cases = [_]struct { text: []const u8, transport: api.IPSocketType, family: api.Address.Family }{
+        .{ .text = "192.0.2.1", .transport = .udp, .family = .v4 },
+        .{ .text = "2001:db8::1", .transport = .tcp6, .family = .v6 },
+        .{ .text = "fe80::1%12", .transport = .udp6, .family = .v6 },
+    };
+    for (cases) |case| {
+        const endpoint = try io.SocketEndpoint.init(.{ .address = case.text, .proto = .init(case.transport, 1194) });
+        try std.testing.expectEqual(if (case.transport == .tcp6) io.SocketType.tcp else .udp, endpoint.type);
+        var buffer: [64]u8 = undefined;
+        const address = try endpoint.ipAddress(&buffer);
+        try std.testing.expectEqualStrings(case.text, address.raw);
+        try std.testing.expectEqual(case.family, address.family);
+        try std.testing.expect(!address.owned);
+        const roundtrip = try io.SocketEndpoint.init(.{ .address = address.raw, .proto = .init(case.transport, endpoint.address.port) });
+        try std.testing.expectEqualDeep(endpoint, roundtrip);
+        var tiny: [1]u8 = undefined;
+        try std.testing.expectError(error.NoSpaceLeft, endpoint.ipAddress(&tiny));
+    }
+    try std.testing.expectError(error.InvalidEndpoint, io.SocketEndpoint.init(.{ .address = "vpn.example.com", .proto = .init(.udp, 1194) }));
+}

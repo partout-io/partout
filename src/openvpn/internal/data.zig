@@ -381,7 +381,7 @@ pub const DataLink = struct {
 
     allocator: std.mem.Allocator,
     looper: *Looper,
-    destination: net_mod.SocketAddress,
+    remote_endpoint: net_mod.SocketEndpoint,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
@@ -395,7 +395,7 @@ pub const DataLink = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         looper: *Looper,
-        destination: net_mod.SocketAddress,
+        remote_endpoint: net_mod.SocketEndpoint,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
         callbacks: Callbacks,
@@ -403,7 +403,7 @@ pub const DataLink = struct {
         return .{
             .allocator = allocator,
             .looper = looper,
-            .destination = destination,
+            .remote_endpoint = remote_endpoint,
             .link_processor = link_processor,
             .context = context,
             .callbacks = callbacks,
@@ -465,7 +465,7 @@ pub const DataLink = struct {
             const start = core_mod.concurrency.monotonicNs();
             const deadline = core_mod.concurrency.deadlineAfterMs(start, timeout);
             while (true) {
-                self.looper.writeOutOfBand(processed.packets(), .link, self.destination) catch |err| {
+                self.looper.writeOutOfBand(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                     const send_err: SendError = switch (err) {
                         error.WouldBlock, error.Backpressure => {
                             // This is a dumb busy-wait, but send() with timeout
@@ -492,7 +492,7 @@ pub const DataLink = struct {
                 return;
             }
         } else {
-            self.looper.writeQueued(processed.packets(), .link, self.destination) catch |err| {
+            self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                 log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
                     @errorName(err),
                 });

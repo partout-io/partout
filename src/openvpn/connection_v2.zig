@@ -321,21 +321,22 @@ const OpenVPNConnection = struct {
 
     fn handleSessionEstablished(
         self: *OpenVPNConnection,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         if (self.pending_failure != null) return;
         std.debug.assert(self.isSessionStarted());
         log.write(.notice, "Session established");
-        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
+        var address_buffer: [64]u8 = undefined;
+        const address = remote_endpoint.ipAddress(&address_buffer) catch {
             log.write(.fault, "Unable to parse remote endpoint");
             self.handleConnectionFailure(error.InvalidEndpoint);
             return;
         };
         log.writef(.info, "\tEndpoint: {s}", .{address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
-            remote_endpoint.proto.socket_type.raw(),
-            remote_endpoint.proto.port,
+            remote_endpoint.type.raw(),
+            remote_endpoint.address.port,
         });
         log.write(.notice, "Local options:");
         openvpn_log.logConfiguration(&self.configuration, true);
@@ -458,7 +459,7 @@ const OpenVPNConnection = struct {
 
 fn sessionEstablished(
     ctx: ?*anyopaque,
-    remote_endpoint: api.ExtendedEndpoint,
+    remote_endpoint: net.SocketEndpoint,
     remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ctx.?));

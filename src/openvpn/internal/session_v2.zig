@@ -101,7 +101,7 @@ pub const SessionEvents = struct {
     ctx: ?*anyopaque = null,
     established: *const fn (
         ?*anyopaque,
-        api.ExtendedEndpoint,
+        net.SocketEndpoint,
         *const api.OpenVPNConfiguration,
     ) void,
     failed: *const fn (?*anyopaque, SessionError) void,
@@ -130,8 +130,7 @@ pub const Session = struct {
 
     // Link interface.
     looper: *Looper,
-    remote_endpoint: api.ExtendedEndpoint,
-    destination: net.SocketAddress,
+    remote_endpoint: net.SocketEndpoint,
     events: SessionEvents,
 
     // Internal state.
@@ -144,7 +143,7 @@ pub const Session = struct {
     pub const Init = struct {
         /// I/O strategy.
         looper: *Looper,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         events: SessionEvents,
         /// OpenVPN configuration.
         configuration: api.OpenVPNConfiguration,
@@ -162,10 +161,6 @@ pub const Session = struct {
 
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
         log.write(.notice, "Using OpenVPN Session v2");
-
-        const destination = net.socketAddress(init.remote_endpoint) catch return error.InvalidConfiguration;
-        const remote_endpoint = try init.remote_endpoint.clone(allocator);
-        errdefer remote_endpoint.deinit(allocator);
 
         var owned_configuration = init.configuration.clone(allocator) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -202,7 +197,7 @@ pub const Session = struct {
         const link_processor = LinkProcessor.create(
             allocator,
             owned_configuration.xor_method,
-            init.remote_endpoint.plainSocketType() == .tcp,
+            init.remote_endpoint.type == .tcp,
         ) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.fault, "Unable to create link processor: {s}", .{@errorName(err)});
@@ -222,8 +217,7 @@ pub const Session = struct {
             .ca_filename = owned_ca_filename,
             .options = init.options,
             .looper = init.looper,
-            .remote_endpoint = remote_endpoint,
-            .destination = destination,
+            .remote_endpoint = init.remote_endpoint,
             .events = init.events,
             .state = .{
                 .stopped = .{
@@ -246,7 +240,6 @@ pub const Session = struct {
         }
         self.control_channel.destroy();
         self.link_processor.destroy();
-        self.remote_endpoint.deinit(self.allocator);
 
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
@@ -294,7 +287,7 @@ pub const Session = struct {
         const data_link = DataLink.init(
             self.allocator,
             self.looper,
-            self.destination,
+            self.remote_endpoint,
             self.link_processor,
             self,
             .{
@@ -454,7 +447,7 @@ pub const Session = struct {
 
     fn sendExitPacket(self: *Session) !void {
         const context = self.state.activeContext() orelse return;
-        if (context.remote_endpoint.plainSocketType() != .udp) return;
+        if (context.remote_endpoint.type != .udp) return;
         const pair = context.current_data_pair orelse return;
         log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();
@@ -595,7 +588,6 @@ pub const Session = struct {
             .looper = self.looper,
             .link_processor = self.link_processor,
             .remote_endpoint = &context.remote_endpoint,
-            .destination = context.data_link.destination,
             .channel = self.control_channel,
             .prng = self.prng,
             .tls = tls,

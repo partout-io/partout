@@ -100,7 +100,7 @@ pub const SessionEvents = struct {
     established: *const fn (
         ?*anyopaque,
         *anyopaque,
-        api.ExtendedEndpoint,
+        net.SocketEndpoint,
         *const api.OpenVPNConfiguration,
     ) void,
     failed: *const fn (?*anyopaque, *anyopaque, SessionError) void,
@@ -226,12 +226,10 @@ pub const Session = struct {
         allocator.destroy(self);
     }
 
-    const LinkRequest = struct { endpoint: api.ExtendedEndpoint, destination: net.SocketAddress };
-
     pub fn setLink(
         self: *Session,
         descriptor: Looper.LinkDescriptor,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
     ) SetLinkError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
@@ -242,11 +240,10 @@ pub const Session = struct {
             return;
         }
 
-        const destination = net.socketAddress(remote_endpoint) catch return error.LinkFailure;
         const processor = try LinkProcessor.create(
             self.allocator,
             self.configuration.xor_method,
-            remote_endpoint.plainSocketType() == .tcp,
+            remote_endpoint.type == .tcp,
         );
         var owns_processor = true;
         errdefer if (owns_processor) processor.destroy();
@@ -284,7 +281,7 @@ pub const Session = struct {
         errdefer self.looper.detach(.link) catch {};
 
         // Initiate the session on the attached link.
-        self.performOnQueue(void, LinkRequest{ .endpoint = remote_endpoint, .destination = destination }, SessionOnQueue.setLink) catch |err| {
+        self.performOnQueue(void, remote_endpoint, SessionOnQueue.setLink) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.fault, "Unable to set link: {s}", .{@errorName(err)});
             return error.LinkFailure;
@@ -571,8 +568,7 @@ const SessionOnQueue = struct {
         self.link_processor = null;
     }
 
-    fn setLink(self: *SessionOnQueue, request: Session.LinkRequest) !void {
-        const remote_endpoint = request.endpoint;
+    fn setLink(self: *SessionOnQueue, remote_endpoint: net.SocketEndpoint) !void {
         const idle = switch (self.state) {
             .stopped => |context| context,
             .active => {
@@ -588,7 +584,7 @@ const SessionOnQueue = struct {
         const data_link = DataLink.init(
             self.session.allocator,
             self.session.looper,
-            request.destination,
+            remote_endpoint,
             processor,
             self.session,
             .{
@@ -672,7 +668,7 @@ const SessionOnQueue = struct {
 
     fn sendExitPacket(self: *SessionOnQueue, timeout_ms: u64) !void {
         const context = self.state.activeContext() orelse return;
-        if (context.remote_endpoint.plainSocketType() != .udp) return;
+        if (context.remote_endpoint.type != .udp) return;
         const pair = context.current_data_pair orelse return;
         log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();
@@ -807,7 +803,6 @@ const SessionOnQueue = struct {
             .link_processor = self.link_processor orelse
                 @panic("Cannot start negotiation before the link processor is configured"),
             .remote_endpoint = &context.remote_endpoint,
-            .destination = context.data_link.destination,
             .channel = self.control_channel,
             .prng = self.session.prng,
             .tls = tls,

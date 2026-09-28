@@ -340,6 +340,7 @@ const OpenVPNConnection = struct {
         var owned_endpoint = try endpoint.clone(self.allocator);
         errdefer owned_endpoint.deinit(self.allocator);
         log.writef(.notice, "Connect to {s}", .{owned_endpoint});
+        const remote_endpoint = net.SocketEndpoint.init(owned_endpoint) catch return error.LinkFailure;
         const descriptor = try self.factory.create(
             self.allocator,
             owned_endpoint,
@@ -350,7 +351,7 @@ const OpenVPNConnection = struct {
         log.writef(.info, "Link type is {s}", .{
             owned_endpoint.proto.socket_type.raw(),
         });
-        try session.setLink(descriptor, owned_endpoint);
+        try session.setLink(descriptor, remote_endpoint);
         return owned_endpoint;
     }
 
@@ -359,20 +360,21 @@ const OpenVPNConnection = struct {
     fn handleSessionEstablished(
         self: *OpenVPNConnection,
         session: *Session,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         if (self.status != .connecting) return;
         log.write(.notice, "Session established");
-        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
+        var address_buffer: [64]u8 = undefined;
+        const address = remote_endpoint.ipAddress(&address_buffer) catch {
             log.write(.fault, "Unable to parse remote endpoint");
             self.failTunnelSetup(session, error.InvalidEndpoint);
             return;
         };
         log.writef(.info, "\tEndpoint: {s}", .{address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
-            remote_endpoint.proto.socket_type.raw(),
-            remote_endpoint.proto.port,
+            remote_endpoint.type.raw(),
+            remote_endpoint.address.port,
         });
         log.write(.notice, "Local options:");
         openvpn_log.logConfiguration(&self.configuration, true);
@@ -560,7 +562,7 @@ const OpenVPNConnection = struct {
 const SessionEvent = union(enum) {
     established: struct {
         session: *anyopaque,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         remote_options: api.OpenVPNConfiguration,
     },
     failed: struct {
@@ -590,7 +592,6 @@ const SessionEvent = union(enum) {
     fn deinit(self: *SessionEvent, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .established => |*payload| {
-                payload.remote_endpoint.deinit(allocator);
                 payload.remote_options.deinit(allocator);
             },
             .failed, .data_count => {},
@@ -684,19 +685,16 @@ fn handleSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
 fn sessionEstablished(
     raw: ?*anyopaque,
     session: *anyopaque,
-    remote_endpoint: api.ExtendedEndpoint,
+    remote_endpoint: net.SocketEndpoint,
     remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    const endpoint = remote_endpoint.clone(self.allocator) catch
-        @panic("Unable to retain required OpenVPN session event");
     const options = remote_options.clone(self.allocator) catch {
-        endpoint.deinit(self.allocator);
         @panic("Unable to retain required OpenVPN session event");
     };
     sendSessionEvent(self, .{ .established = .{
         .session = session,
-        .remote_endpoint = endpoint,
+        .remote_endpoint = remote_endpoint,
         .remote_options = options,
     } });
 }
