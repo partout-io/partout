@@ -293,6 +293,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_addre
         return -1;
     }
 
+    pp_assert(!sock->unconnected || source != NULL);
     if (source) memset(source, 0, sizeof(*source));
     while (true) {
         int read_len;
@@ -341,6 +342,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
         return -1;
     }
 
+    pp_assert(!sock->unconnected || destination != NULL);
     const bool datagram = sock->unconnected;
     struct sockaddr_storage address;
     os_socklen_t address_len;
