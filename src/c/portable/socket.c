@@ -581,7 +581,10 @@ static bool address_pp_to_native(
         v6->sin6_scope_id = address->scope_id;
         memcpy(&v6->sin6_addr, address->address, 16);
         *length = sizeof(*v6);
-    } else { local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT)); return false; }
+    } else {
+        local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT));
+        return false;
+    }
     return true;
 }
 
@@ -601,7 +604,10 @@ static bool address_native_to_pp(
         address->family = 6;
         address->scope_id = v6->sin6_scope_id;
         memcpy(address->address, &v6->sin6_addr, 16);
-    } else { local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT)); return false; }
+    } else {
+        local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT));
+        return false;
+    }
     return true;
 }
 
