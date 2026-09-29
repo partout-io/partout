@@ -157,9 +157,16 @@ pp_socket pp_socket_open(const char *ip_addr,
         }
         if (options->unconnected) {
             /* IPv6 stays separate from the IPv4 socket sharing the same port. */
-            const int v6_only = 1;
-            if (numeric_addr.ss_family == AF_INET6 &&
-                setsockopt(new_fd, IPPROTO_IPV6, IPV6_V6ONLY, (const char *)&v6_only, sizeof(v6_only)) < 0) goto failure;
+            if (numeric_addr.ss_family == AF_INET6) {
+                const int v6_only = 1;
+                if (setsockopt(
+                    new_fd,
+                    IPPROTO_IPV6,
+                    IPV6_V6ONLY,
+                    (const char *)&v6_only,
+                    sizeof(v6_only)
+                ) < 0) goto failure;
+            }
 #if PARTOUT_WINDOWS
             /* Match POSIX close-on-exec: child processes must not inherit the socket. */
             if (!SetHandleInformation((HANDLE)new_fd, HANDLE_FLAG_INHERIT, 0)) {
@@ -168,7 +175,8 @@ pp_socket pp_socket_open(const char *ip_addr,
             }
 #else
             const int flags = fcntl(new_fd, F_GETFD, 0);
-            if (flags < 0 || fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
+            if (flags < 0) goto failure;
+            if (fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
 #endif
             if (pp_socket_set_nonblocking(new_fd) < 0) goto failure;
         }
@@ -286,8 +294,10 @@ void pp_socket_free(pp_socket sock) {
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
 int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_address *source) {
-    if (dst_len > INT_MAX) { local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE)); return -1; }
-
+    if (dst_len > INT_MAX) {
+        local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+        return -1;
+    }
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
@@ -305,15 +315,28 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_addre
             read_len = recvfrom(sock->fd, (char *)dst, (int)dst_len, 0,
                                 (struct sockaddr *)&address, &address_len);
 #else
-            struct iovec iov = { .iov_base = dst, .iov_len = dst_len };
-            struct msghdr message = { .msg_name = &address, .msg_namelen = sizeof(address),
-                .msg_iov = &iov, .msg_iovlen = 1 };
+            struct iovec iov = {
+                .iov_base = dst,
+                .iov_len = dst_len
+            };
+            struct msghdr message = {
+                .msg_name = &address,
+                .msg_namelen = sizeof(address),
+                .msg_iov = &iov,
+                .msg_iovlen = 1
+            };
             read_len = (int)recvmsg(sock->fd, &message, 0);
-            if (read_len >= 0 && (message.msg_flags & MSG_TRUNC)) { errno = EMSGSIZE; return -1; }
+            if (read_len >= 0 && (message.msg_flags & MSG_TRUNC)) {
+                errno = EMSGSIZE;
+                return -1;
+            }
 #endif
-            if (read_len >= 0 && source && !datagram_address(&address, source)) return -1;
-        } else
-        read_len = local_recv_fd(sock->fd, dst, dst_len);
+            if (read_len >= 0) {
+                if (source && !datagram_address(&address, source)) return -1;
+            }
+        } else {
+            read_len = local_recv_fd(sock->fd, dst, dst_len);
+        }
         if (read_len < 0 && local_is_interrupted()) {
             continue;
         }
@@ -335,8 +358,10 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_addre
  * which may be partial on connected sockets, or < 0 on failure. */
 int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
                     const pp_socket_address *destination) {
-    if (src_len > INT_MAX) { local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE)); return -1; }
-
+    if (src_len > INT_MAX) {
+        local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+        return -1;
+    }
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
@@ -357,10 +382,18 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
         const size_t remaining = src_len - offset;
 
         int written_len;
-        if (datagram) written_len = (int)sendto(sock->fd, (const char *)current_src, (int)remaining, 0,
-                                               (const struct sockaddr *)&address, address_len);
-        else
-        written_len = local_send_fd(sock->fd, current_src, remaining);
+        if (datagram) {
+            written_len = (int)sendto(
+                sock->fd,
+                (const char *)current_src,
+                (int)remaining,
+                0,
+                (const struct sockaddr *)&address,
+                address_len
+            );
+        } else {
+            written_len = local_send_fd(sock->fd, current_src, remaining);
+        }
         if (written_len < 0) {
             if (local_is_interrupted()) {
                 continue;
@@ -376,7 +409,10 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
         }
         /* A datagram, including an empty one, is one atomic write, never a suffix retry. */
         if (datagram) {
-            if ((size_t)written_len != src_len) { local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE)); return -1; }
+            if ((size_t)written_len != src_len) {
+                local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+                return -1;
+            }
             return written_len;
         }
         if (written_len == 0) {
