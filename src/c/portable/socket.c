@@ -579,21 +579,23 @@ static bool address_pp_to_native(
     bool dual_stack
 ) {
     memset(storage, 0, sizeof(*storage));
-    if (address->family == 4 && dual_stack) {
-        /* A dual-stack descriptor sends IPv4 via an IPv4-mapped IPv6 address. */
-        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
-        v6->sin6_family = AF_INET6;
-        v6->sin6_port = htons(address->port);
-        v6->sin6_addr.s6_addr[10] = 0xff;
-        v6->sin6_addr.s6_addr[11] = 0xff;
-        memcpy(&v6->sin6_addr.s6_addr[12], address->address, 4);
-        *length = sizeof(*v6);
-    } else if (address->family == 4) {
-        struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
-        v4->sin_family = AF_INET;
-        v4->sin_port = htons(address->port);
-        memcpy(&v4->sin_addr, address->address, 4);
-        *length = sizeof(*v4);
+    if (address->family == 4) {
+        if (dual_stack) {
+            /* A dual-stack descriptor sends IPv4 via an IPv4-mapped IPv6 address. */
+            struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
+            v6->sin6_family = AF_INET6;
+            v6->sin6_port = htons(address->port);
+            v6->sin6_addr.s6_addr[10] = 0xff;
+            v6->sin6_addr.s6_addr[11] = 0xff;
+            memcpy(&v6->sin6_addr.s6_addr[12], address->address, 4);
+            *length = sizeof(*v6);
+        } else {
+            struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
+            v4->sin_family = AF_INET;
+            v4->sin_port = htons(address->port);
+            memcpy(&v4->sin_addr, address->address, 4);
+            *length = sizeof(*v4);
+        }
     } else if (address->family == 6) {
         struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
         v6->sin6_family = AF_INET6;
