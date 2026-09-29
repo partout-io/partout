@@ -37,8 +37,8 @@ static bool local_is_valid_socket(pp_socket sock);
 #if !PARTOUT_WINDOWS
 #include <sys/uio.h>
 #endif
-static bool datagram_native_address(const pp_socket_address *, struct sockaddr_storage *, os_socklen_t *);
-static bool datagram_address(const struct sockaddr_storage *, pp_socket_address *);
+static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *);
+static bool address_native_to_pp(pp_socket_address *, const struct sockaddr_storage *);
 
 static bool local_platform_init(void);
 static void local_print_error(const char *msg);
@@ -332,7 +332,7 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_addre
             }
 #endif
             if (read_len >= 0) {
-                if (source && !datagram_address(&address, source)) return -1;
+                if (source && !address_native_to_pp(source, &address)) return -1;
             }
         } else {
             read_len = local_recv_fd(sock->fd, dst, dst_len);
@@ -374,7 +374,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
     /* Connected sockets ignore destination; unconnected UDP requires one. */
     if (datagram) {
         if (!destination) { local_set_error(LOCAL_SOCKET_ERROR(EDESTADDRREQ)); return -1; }
-        if (!datagram_native_address(destination, &address, &address_len)) return -1;
+        if (!address_pp_to_native(&address, &address_len, destination)) return -1;
     }
     size_t offset = 0;
     while (offset < src_len || datagram) {
@@ -562,9 +562,11 @@ int local_connect_with_timeout(pp_socket_fd fd,
     return 0;
 }
 
-static bool datagram_native_address(const pp_socket_address *address,
-                                    struct sockaddr_storage *storage,
-                                    os_socklen_t *length) {
+static bool address_pp_to_native(
+    struct sockaddr_storage *storage,
+    os_socklen_t *length,
+    const pp_socket_address *address
+) {
     memset(storage, 0, sizeof(*storage));
     if (address->family == 4) {
         struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
@@ -583,8 +585,10 @@ static bool datagram_native_address(const pp_socket_address *address,
     return true;
 }
 
-static bool datagram_address(const struct sockaddr_storage *storage,
-                             pp_socket_address *address) {
+static bool address_native_to_pp(
+    pp_socket_address *address,
+    const struct sockaddr_storage *storage
+) {
     memset(address, 0, sizeof(*address));
     if (storage->ss_family == AF_INET) {
         const struct sockaddr_in *v4 = (const struct sockaddr_in *)storage;
@@ -605,5 +609,5 @@ bool pp_socket_local_address(pp_socket sock, pp_socket_address *address) {
     struct sockaddr_storage storage;
     os_socklen_t length = sizeof(storage);
     return getsockname(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
-           datagram_address(&storage, address);
+           address_native_to_pp(address, &storage);
 }
