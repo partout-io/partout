@@ -182,7 +182,7 @@ pub const SocketWrapper = struct {
         };
         if (remote_endpoint == null and options.ipv4 and options.ipv6) {
             var address: io.SocketAddress = undefined;
-            if (!io_c.pp_socket_local_address(socket, &address)) return null;
+            if (!io_c.pp_socket_get_address(socket, &address)) return null;
             extra = try open(allocator, .{
                 .address = "::",
                 .proto = .init(.udp, address.port),
@@ -214,7 +214,7 @@ pub const SocketWrapper = struct {
 
     pub fn localAddress(self: *const SocketWrapper, family: u8) Error!io.SocketAddress {
         var address: io.SocketAddress = undefined;
-        if (!io_c.pp_socket_local_address(try self.socketFor(family), &address)) return error.LibcFailure;
+        if (!io_c.pp_socket_get_address(try self.socketFor(family), &address)) return error.LibcFailure;
         return address;
     }
 

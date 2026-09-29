@@ -19,7 +19,7 @@ test "C socket I/O selects addressing by socket mode" {
         const server = io.io_c.pp_socket_open(ip, io.io_c.PPSocketProtoUDP, 0, &.{ .unconnected = true }) orelse return error.SocketFailed;
         defer io.io_c.pp_socket_free(server);
         var peer: io.SocketAddress = undefined;
-        try std.testing.expect(io.io_c.pp_socket_local_address(server, &peer));
+        try std.testing.expect(io.io_c.pp_socket_get_address(server, &peer));
         const client = io.io_c.pp_socket_open(ip, io.io_c.PPSocketProtoUDP, peer.port, &.{ .timeout_ms = 1000 }) orelse return error.SocketFailed;
         defer io.io_c.pp_socket_free(client);
         const invalid = std.mem.zeroes(io.SocketAddress);
@@ -56,11 +56,11 @@ test "C unconnected socket validates endpoints and binds both families to one po
     const v4 = io.io_c.pp_socket_open("0.0.0.0", io.io_c.PPSocketProtoUDP, 0, &options) orelse return error.SocketFailed;
     defer io.io_c.pp_socket_free(v4);
     var address: io.SocketAddress = undefined;
-    try std.testing.expect(io.io_c.pp_socket_local_address(v4, &address));
+    try std.testing.expect(io.io_c.pp_socket_get_address(v4, &address));
     const v6 = io.io_c.pp_socket_open("::", io.io_c.PPSocketProtoUDP, address.port, &options) orelse return error.SocketFailed;
     defer io.io_c.pp_socket_free(v6);
     var address6: io.SocketAddress = undefined;
-    try std.testing.expect(io.io_c.pp_socket_local_address(v6, &address6));
+    try std.testing.expect(io.io_c.pp_socket_get_address(v6, &address6));
     try std.testing.expectEqual(address.port, address6.port);
     var buf: [1]u8 = undefined;
     try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v4, &buf, buf.len, &address));

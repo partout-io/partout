@@ -67,7 +67,7 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int recvbuf_len,
                            int sendbuf_len);
 
-bool pp_socket_local_address(pp_socket sock, pp_socket_address *address);
+bool pp_socket_get_address(pp_socket sock, pp_socket_address *address);
 
 /* Native socket descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);

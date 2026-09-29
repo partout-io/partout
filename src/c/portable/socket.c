@@ -614,7 +614,7 @@ static bool address_native_to_pp(
     return true;
 }
 
-bool pp_socket_local_address(pp_socket sock, pp_socket_address *address) {
+bool pp_socket_get_address(pp_socket sock, pp_socket_address *address) {
     struct sockaddr_storage storage;
     os_socklen_t length = sizeof(storage);
     return getsockname(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
