@@ -302,8 +302,8 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_addre
         local_set_not_socket_error();
         return -1;
     }
-
     pp_assert(!sock->unconnected || source != NULL);
+
     if (source) memset(source, 0, sizeof(*source));
     while (true) {
         int read_len;
@@ -366,14 +366,17 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
         local_set_not_socket_error();
         return -1;
     }
-
+    /* Connected sockets ignore destination; unconnected UDP requires one. */
     pp_assert(!sock->unconnected || destination != NULL);
+
     const bool datagram = sock->unconnected;
     struct sockaddr_storage address;
     os_socklen_t address_len;
-    /* Connected sockets ignore destination; unconnected UDP requires one. */
     if (datagram) {
-        if (!destination) { local_set_error(LOCAL_SOCKET_ERROR(EDESTADDRREQ)); return -1; }
+        if (!destination) {
+            local_set_error(LOCAL_SOCKET_ERROR(EDESTADDRREQ));
+            return -1;
+        }
         if (!address_pp_to_native(&address, &address_len, destination)) return -1;
     }
     size_t offset = 0;
