@@ -37,7 +37,7 @@ static bool local_is_valid_socket(pp_socket sock);
 #if !PARTOUT_WINDOWS
 #include <sys/uio.h>
 #endif
-static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *);
+static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *, bool);
 static bool address_native_to_pp(pp_socket_address *, const struct sockaddr_storage *);
 
 static bool local_platform_init(void);
@@ -110,6 +110,7 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
     sock->fd = (pp_socket_fd)fd;
     sock->unconnected = false;
+    sock->dual_stack = false;
     if (!local_init_socket(sock)) {
         pp_free(sock);
         return NULL;
@@ -123,7 +124,8 @@ pp_socket pp_socket_open(const char *ip_addr,
                          pp_socket_proto proto,
                          uint16_t port,
                          const pp_socket_open_options *options) {
-    if (options->unconnected && proto != PPSocketProtoUDP) {
+    if ((options->unconnected && proto != PPSocketProtoUDP) ||
+        (options->dual_stack && !options->unconnected)) {
         local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
         return NULL;
     }
@@ -150,15 +152,19 @@ pp_socket pp_socket_open(const char *ip_addr,
     struct sockaddr_storage numeric_addr;
     os_socklen_t numeric_addrlen = 0;
     if (local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
+        if (options->dual_stack && numeric_addr.ss_family != AF_INET6) {
+            local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
+            goto failure;
+        }
         new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
         if (local_is_invalid_fd(new_fd)) {
             local_print_error("socket()");
             goto failure;
         }
         if (options->unconnected) {
-            /* IPv6 stays separate from the IPv4 socket sharing the same port. */
+            /* Explicitly select IPv6-only or dual-stack behavior on every platform. */
             if (numeric_addr.ss_family == AF_INET6) {
-                const int v6_only = 1;
+                const int v6_only = options->dual_stack ? 0 : 1;
                 if (setsockopt(
                     new_fd,
                     IPPROTO_IPV6,
@@ -205,6 +211,7 @@ pp_socket pp_socket_open(const char *ip_addr,
             goto failure;
         }
         sock->unconnected = options->unconnected;
+        sock->dual_stack = options->dual_stack;
         return sock;
     }
 
@@ -377,7 +384,7 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
             local_set_error(LOCAL_SOCKET_ERROR(EDESTADDRREQ));
             return -1;
         }
-        if (!address_pp_to_native(&address, &address_len, destination)) return -1;
+        if (!address_pp_to_native(&address, &address_len, destination, sock->dual_stack)) return -1;
     }
     size_t offset = 0;
     while (offset < src_len || datagram) {
@@ -568,10 +575,20 @@ int local_connect_with_timeout(pp_socket_fd fd,
 static bool address_pp_to_native(
     struct sockaddr_storage *storage,
     os_socklen_t *length,
-    const pp_socket_address *address
+    const pp_socket_address *address,
+    bool dual_stack
 ) {
     memset(storage, 0, sizeof(*storage));
-    if (address->family == 4) {
+    if (address->family == 4 && dual_stack) {
+        /* A dual-stack descriptor sends IPv4 via an IPv4-mapped IPv6 address. */
+        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
+        v6->sin6_family = AF_INET6;
+        v6->sin6_port = htons(address->port);
+        v6->sin6_addr.s6_addr[10] = 0xff;
+        v6->sin6_addr.s6_addr[11] = 0xff;
+        memcpy(&v6->sin6_addr.s6_addr[12], address->address, 4);
+        *length = sizeof(*v6);
+    } else if (address->family == 4) {
         struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
         v4->sin_family = AF_INET;
         v4->sin_port = htons(address->port);
@@ -604,9 +621,15 @@ static bool address_native_to_pp(
     } else if (storage->ss_family == AF_INET6) {
         const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)storage;
         address->port = ntohs(v6->sin6_port);
-        address->family = 6;
-        address->scope_id = v6->sin6_scope_id;
-        memcpy(address->address, &v6->sin6_addr, 16);
+        if (IN6_IS_ADDR_V4MAPPED(&v6->sin6_addr)) {
+            /* Keep the public address representation independent of socket mode. */
+            address->family = 4;
+            memcpy(address->address, &v6->sin6_addr.s6_addr[12], 4);
+        } else {
+            address->family = 6;
+            address->scope_id = v6->sin6_scope_id;
+            memcpy(address->address, &v6->sin6_addr, 16);
+        }
     } else {
         local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT));
         return false;

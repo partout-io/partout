@@ -28,7 +28,10 @@ fn wait(value: *const Atomic, expected: usize) !void {
     return error.Timeout;
 }
 fn destination(link: *io.SocketWrapper, family: u8) !io.SocketAddress {
-    var address = try link.localAddress(family);
+    const local = try link.localAddress();
+    var address = std.mem.zeroes(io.SocketAddress);
+    address.family = family;
+    address.port = local.port;
     if (family == 4) {
         address.address[0] = 127;
         address.address[3] = 1;
@@ -127,16 +130,11 @@ test "v2 one UDP link echoes several peers across both address families" {
     try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
     var configure_count: usize = 0;
     const server = (try io.SocketWrapper.create(allocator, null, .{ .configure = configured, .configure_ctx = &configure_count })) orelse return error.SocketFailed;
-    try std.testing.expectEqual(@as(usize, 2), configure_count);
+    try std.testing.expectEqual(@as(usize, 1), configure_count);
     try std.testing.expect(server.isUnconnected());
     try std.testing.expect(server.remoteAddress() == null);
     const descriptor = server.linkDescriptor();
     try std.testing.expect(descriptor.io == .socket);
-    var mux_storage: [2]io.FileDescriptor = undefined;
-    const descriptors = descriptor.muxDescriptors(&mux_storage);
-    try std.testing.expectEqual(@as(usize, 2), descriptors.len);
-    try std.testing.expectEqual(descriptor.fd, descriptors[0]);
-    try std.testing.expect(descriptors[1] != descriptors[0]);
     const v4 = try destination(server, 4);
     const v6 = try destination(server, 6);
     try std.testing.expectEqual(v4.port, v6.port);
@@ -336,4 +334,16 @@ test "connected socket wrapper does not retain endpoint text" {
     var source_address: io.SocketAddress = undefined;
     const n = try receive(peer, &buf, &source_address);
     try std.testing.expectEqualStrings("owned", buf[0..n]);
+}
+
+test "unconnected socket family restrictions remain explicit" {
+    try std.testing.expect((try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false, .ipv6 = false })) == null);
+    const v4 = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
+    defer v4.destroy();
+    const v6 = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
+    defer v6.destroy();
+    try std.testing.expectEqual(@as(u8, 4), (try v4.localAddress()).family);
+    try std.testing.expectEqual(@as(u8, 6), (try v6.localAddress()).family);
+    try std.testing.expectError(error.LibcFailure, v4.sendTo("wrong family", try destination(v6, 6)));
+    try std.testing.expectError(error.LibcFailure, v6.sendTo("wrong family", try destination(v4, 4)));
 }

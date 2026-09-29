@@ -60,7 +60,7 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const SocketOptions = struct {
-    /// Used only for unconnected UDP. Both families bind to the same local port.
+    /// Used only for unconnected UDP. Enabling both selects one dual-stack socket.
     ipv4: bool = true,
     ipv6: bool = true,
     port: u16 = 0,

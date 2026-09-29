@@ -17,6 +17,7 @@
 struct __pp_socket_struct {
     pp_socket_fd fd;
     bool unconnected;
+    bool dual_stack;
 };
 
 typedef socklen_t os_socklen_t;

@@ -10,6 +10,7 @@
 struct __pp_socket_struct {
     pp_socket_fd fd;
     bool unconnected;
+    bool dual_stack;
     pp_fd handle;
 };
 

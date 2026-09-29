@@ -66,3 +66,35 @@ test "C unconnected socket validates endpoints and binds both families to one po
     try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v4, &buf, buf.len, &address));
     try std.testing.expectEqual(io.io_c.PPIOErrorWouldBlock, io.io_c.pp_socket_read(v6, &buf, buf.len, &address6));
 }
+
+test "C dual-stack UDP normalizes IPv4 sources and replies through one socket" {
+    const options = io.io_c.pp_socket_open_options{ .unconnected = true, .dual_stack = true };
+    try std.testing.expect(io.io_c.pp_socket_open("127.0.0.1", io.io_c.PPSocketProtoUDP, 0, &options) == null);
+    try std.testing.expect(io.io_c.pp_socket_open("::", io.io_c.PPSocketProtoUDP, 0, &.{ .dual_stack = true }) == null);
+    const server = io.io_c.pp_socket_open("::", io.io_c.PPSocketProtoUDP, 0, &options) orelse return error.SocketFailed;
+    defer io.io_c.pp_socket_free(server);
+    var bound: io.SocketAddress = undefined;
+    try std.testing.expect(io.io_c.pp_socket_get_address(server, &bound));
+    try std.testing.expectEqual(@as(u8, 6), bound.family);
+    inline for (.{ "127.0.0.1", "::1" }, .{ 4, 6 }) |ip, family| {
+        const client = io.io_c.pp_socket_open(ip, io.io_c.PPSocketProtoUDP, bound.port, &.{ .timeout_ms = 1000 }) orelse return error.SocketFailed;
+        defer io.io_c.pp_socket_free(client);
+        var client_address: io.SocketAddress = undefined;
+        try std.testing.expect(io.io_c.pp_socket_get_address(client, &client_address));
+        var buf: [32]u8 = undefined;
+        var sender: io.SocketAddress = undefined;
+        try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client, "one", 3, null));
+        try std.testing.expectEqual(@as(c_int, 3), try receiveC(server, &buf, &sender));
+        try std.testing.expectEqual(@as(u8, family), sender.family);
+        try std.testing.expectEqualDeep(client_address, sender);
+        try std.testing.expectEqualStrings("one", buf[0..3]);
+        try std.testing.expectEqual(@as(c_int, 0), io.io_c.pp_socket_write(server, "", 0, &sender));
+        try std.testing.expectEqual(@as(c_int, 0), try receiveC(client, &buf, null));
+        try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client, "big", 3, null));
+        try std.testing.expectEqual(@as(c_int, -1), try receiveC(server, buf[0..1], &sender));
+        try std.testing.expectEqual(@as(c_int, 2), io.io_c.pp_socket_write(client, "ok", 2, null));
+        try std.testing.expectEqual(@as(c_int, 2), try receiveC(server, &buf, &sender));
+        try std.testing.expectEqualDeep(client_address, sender);
+        try std.testing.expectEqualStrings("ok", buf[0..2]);
+    }
+}

@@ -28,7 +28,7 @@ typedef struct __pp_socket_struct *pp_socket;
 void pp_socket_free(pp_socket sock);
 
 /* Create a nonblocking connected socket, or bind unconnected UDP to a numeric local endpoint
- * Unconnected IPv6 is IPv6-only; configuration runs before bind.
+ * Unconnected IPv6 is IPv6-only unless dual_stack is enabled; configuration runs before bind.
  * timeout_ms applies only to connected sockets. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,
@@ -36,6 +36,7 @@ typedef bool (*pp_socket_configure)(void *_Nullable ctx,
 
 typedef struct {
     bool unconnected;
+    bool dual_stack; /* Only for unconnected IPv6 UDP; accepts IPv4-mapped traffic. */
     int timeout_ms;
     const pp_reachability *_Nullable reachability;
     pp_socket_configure _Nullable configure;
@@ -56,7 +57,8 @@ typedef struct {
 } pp_socket_address;
 
 /* I/O. Returns PPIOErrorWouldBlock when a non-blocking operation would block.
- * Unconnected UDP writes require destination; reads optionally return source.
+ * Unconnected UDP writes require destination; reads require source.
+ * Dual-stack sockets expose IPv4 peers as family 4, without mapped IPv6 addresses.
  * Connected sockets ignore destination and clear source if supplied. */
 int pp_socket_read(pp_socket sock,
                    uint8_t *dst, size_t dst_len, pp_socket_address *_Nullable source);
