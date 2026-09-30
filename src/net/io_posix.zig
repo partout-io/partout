@@ -177,25 +177,6 @@ pub const SocketWrapper = struct {
         return self.remote_endpoint == null;
     }
 
-    pub fn localAddress(self: *const SocketWrapper) Error!io.SocketAddress {
-        var address: io.SocketAddress = undefined;
-        if (!io_c.pp_socket_get_address(self.socket, &address)) return error.LibcFailure;
-        return address;
-    }
-
-    pub fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
-        if (!self.isUnconnected()) return error.LibcFailure;
-        const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
-        if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
-        if (count < 0) return error.LibcFailure;
-        return @intCast(count);
-    }
-
-    pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
-        if (!self.isUnconnected()) return error.LibcFailure;
-        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
-    }
-
     pub fn destroy(self: *SocketWrapper) void {
         log.write(.debug, "Destroy SocketWrapper");
         self.free();
@@ -231,6 +212,12 @@ pub const SocketWrapper = struct {
         return socket;
     }
 
+    fn free(self: *SocketWrapper) void {
+        if (self.is_closed) return;
+        self.is_closed = true;
+        io_c.pp_socket_free(self.socket);
+    }
+
     fn nativeIO(self: *SocketWrapper) POSIXInterface {
         return .{ .socket = self };
     }
@@ -255,32 +242,36 @@ pub const SocketWrapper = struct {
         return mapWriteResult(.link, written, false);
     }
 
-    /// Releases native I/O and the wrapper itself.
     fn cleanup(self: *SocketWrapper) void {
         self.destroy();
     }
 
-    fn free(self: *SocketWrapper) void {
-        if (self.is_closed) return;
-        self.is_closed = true;
-        io_c.pp_socket_free(self.socket);
-    }
-
-    fn muxDescriptor(self: SocketWrapper) ?FileDescriptor {
-        const fd = io_c.pp_socket_get_watch_fd(self.socket);
-        return if (io_c.pp_fd_is_valid(fd)) fd else null;
-    }
-
-    fn socketDescriptor(self: SocketWrapper) SocketDescriptor {
-        return io_c.pp_socket_get_fd(self.socket);
-    }
-
-    pub fn remoteAddress(self: SocketWrapper) ?io.SocketAddress {
-        return (self.remote_endpoint orelse return null).address;
-    }
-
     fn lastErrorCode(_: SocketWrapper) c_int {
         return io_c.pp_socket_last_error_binding();
+    }
+
+    pub fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
+        if (!self.isUnconnected()) return error.LibcFailure;
+        const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
+        if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
+        if (count < 0) return error.LibcFailure;
+        return @intCast(count);
+    }
+
+    pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
+        if (!self.isUnconnected()) return error.LibcFailure;
+        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
+    }
+
+    pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
+        var address: io.SocketAddress = undefined;
+        if (!io_c.pp_socket_get_address(self.socket, &address)) return error.LibcFailure;
+        return address;
+    }
+
+    pub fn remoteAddress(self: *const SocketWrapper) ?io.SocketAddress {
+        const endpoint = self.remote_endpoint orelse return null;
+        return endpoint.address;
     }
 
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
@@ -322,7 +313,13 @@ pub const TunWrapper = struct {
         return io_c.pp_tun_open(c_uuid.ptr());
     }
 
-    // FIXME: ###, Drop pub after v2
+    fn free(self: *TunWrapper) void {
+        if (self.is_closed) return;
+        self.is_closed = true;
+        io_c.pp_tun_free(self.tun);
+    }
+
+    // FIXME: ###, Drop after v2
     pub fn nativeIO(self: *TunWrapper) POSIXInterface {
         return .{ .tun = self };
     }
@@ -346,12 +343,11 @@ pub const TunWrapper = struct {
         self.free();
     }
 
-    fn free(self: *TunWrapper) void {
-        if (self.is_closed) return;
-        self.is_closed = true;
-        io_c.pp_tun_free(self.tun);
+    fn lastErrorCode(_: TunWrapper) c_int {
+        return io_c.pp_io_last_error_binding();
     }
 
+    // FIXME: ###, Drop after v2
     pub fn muxDescriptor(self: TunWrapper) ?io_c.pp_fd {
         const fd = io_c.pp_tun_get_watch_fd(self.tun);
         return if (io_c.pp_fd_is_valid(fd)) fd else null;
@@ -361,10 +357,6 @@ pub const TunWrapper = struct {
         const tun = self.tun orelse return null;
         const c_name = io_c.pp_tun_name(tun) orelse return null;
         return std.mem.span(c_name);
-    }
-
-    fn lastErrorCode(_: TunWrapper) c_int {
-        return io_c.pp_io_last_error_binding();
     }
 
     pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {

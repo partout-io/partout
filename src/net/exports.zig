@@ -58,4 +58,3 @@ pub const TunnelController = sandbox.TunnelController;
 pub const TunWrapper = io.TunWrapper;
 
 pub const canChangeStatus = conn.canChangeStatus;
-pub const socketAddress = io.socketAddress;
