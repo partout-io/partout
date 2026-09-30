@@ -96,8 +96,14 @@ pub const SocketOptions = struct {
     configure_ctx: ?*anyopaque = null,
 };
 
+pub fn reachabilityNone() io_c.pp_reachability {
+    var reachability = std.mem.zeroes(io_c.pp_reachability);
+    reachability.reachable = false;
+    return reachability;
+}
+
 /// Converts a resolved endpoint; hostnames and named IPv6 zones must be resolved first.
-pub fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddress {
+fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddress {
     var text = endpoint.address;
     var scope: u32 = 0;
     if (std.mem.lastIndexOfScalar(u8, text, '%')) |index| {
@@ -122,12 +128,6 @@ pub fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAd
     return result;
 }
 
-pub fn reachabilityNone() io_c.pp_reachability {
-    var reachability = std.mem.zeroes(io_c.pp_reachability);
-    reachability.reachable = false;
-    return reachability;
-}
-
 pub const testing = struct {
     pub fn reachable(value: bool) ReachabilityInfo {
         var result = std.mem.zeroes(ReachabilityInfo);
@@ -135,4 +135,5 @@ pub const testing = struct {
         return result;
     }
     pub const reachabilityNone = io_mod.reachabilityNone;
+    pub const socketAddress = io_mod.socketAddress;
 };
