@@ -78,15 +78,15 @@ pub const Side = enum {
 };
 
 pub const Error = std.mem.Allocator.Error || error{
-    WouldBlock,
     Backpressure,
     EndOfStream,
-    InvalidSocketMode,
-    InvalidOffset,
     InvalidAddressFamily,
+    InvalidOffset,
+    InvalidSocketMode,
     /// A native operation failed; the corresponding last-error code is available.
     LibcFailure,
     MissingDestination,
+    WouldBlock,
 };
 
 pub const SocketOptions = struct {
