@@ -151,138 +151,136 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     struct sockaddr_storage numeric_addr;
     os_socklen_t numeric_addrlen = 0;
-    if (local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
-        if (options->dual_stack && numeric_addr.ss_family != AF_INET6) {
+
+    /* Perform DNS resolution if necessary. */
+    if (!local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
+        /* Local bind addresses must be numeric; only peers use DNS resolution. */
+        if (options->unconnected) {
             local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
             goto failure;
         }
-        new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
-        if (local_is_invalid_fd(new_fd)) {
-            local_print_error("socket()");
+
+        pp_zero(&hints, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
+        hints.ai_socktype = socktype;
+        switch (proto) {
+            case PPSocketProtoTCP:
+                ipproto = IPPROTO_TCP;
+                break;
+            case PPSocketProtoUDP:
+                ipproto = IPPROTO_UDP;
+                break;
+        }
+        hints.ai_protocol = ipproto;
+#ifdef AI_NUMERICSERV
+        hints.ai_flags = AI_NUMERICSERV;
+#endif
+
+        snprintf(port_str, sizeof(port_str), "%u", port);
+        const int ret = local_getaddrinfo(ip_addr,
+                                        port_str,
+                                        &hints,
+                                        options->reachability,
+                                        &resolved);
+        if (ret != 0) {
+            local_print_error("pp_dns_resolve()");
             goto failure;
         }
-        if (options->unconnected) {
-            /* Explicitly select IPv6-only or dual-stack behavior on every platform. */
-            if (numeric_addr.ss_family == AF_INET6) {
-                const int v6_only = options->dual_stack ? 0 : 1;
-                if (setsockopt(
-                    new_fd,
-                    IPPROTO_IPV6,
-                    IPV6_V6ONLY,
-                    (const char *)&v6_only,
-                    sizeof(v6_only)
-                ) < 0) goto failure;
+
+        // Loop through resolved to find first working socket
+        for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
+            new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+            if (local_is_invalid_fd(new_fd)) {
+                local_print_error("socket()");
+                continue;
             }
-#if PARTOUT_WINDOWS
-            /* Match POSIX close-on-exec: child processes must not inherit the socket. */
-            if (!SetHandleInformation((HANDLE)new_fd, HANDLE_FLAG_INHERIT, 0)) {
-                local_set_error(WSAEINVAL);
+            if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
+                local_print_error("configure()");
                 goto failure;
             }
-#else
-            const int flags = fcntl(new_fd, F_GETFD, 0);
-            if (flags < 0) goto failure;
-            if (fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
-#endif
-            if (pp_socket_set_nonblocking(new_fd) < 0) goto failure;
+            const int ret = local_connect_with_timeout(new_fd,
+                                                    p->ai_addr,
+                                                    (os_socklen_t)p->ai_addrlen,
+                                                    options->timeout_ms);
+            if (ret != 0) {
+                local_close_fd(new_fd);
+                new_fd = local_invalid_fd();
+                local_print_error("connect()");
+                continue;
+            }
+            // Exit loop on first success
+            break;
         }
-        if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
-            local_print_error("configure()");
+        freeaddrinfo(resolved);
+        resolved = NULL;
+        if (local_is_invalid_fd(new_fd)) {
             goto failure;
         }
-        /* Unconnected endpoints are local bind addresses, not remote peers. */
-        int attempt_result = -1;
-        if (options->unconnected) {
-            attempt_result = bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen);
-        } else {
-            attempt_result = local_connect_with_timeout(
-                new_fd,
-                (const struct sockaddr *)&numeric_addr,
-                numeric_addrlen,
-                options->timeout_ms
-            );
-        }
-        if (attempt_result < 0) {
-            local_print_error(options->unconnected ? "bind()" : "connect()");
-            goto failure;
-        }
+
+        // Success
         pp_socket sock = pp_socket_create(new_fd);
-        if (!sock) {
-            goto failure;
-        }
-        sock->unconnected = options->unconnected;
-        sock->dual_stack = options->dual_stack;
+        if (!sock) goto failure;
         return sock;
     }
 
-    /* Local bind addresses must be numeric; only peers use DNS resolution. */
-    if (options->unconnected) {
+    if (options->dual_stack && numeric_addr.ss_family != AF_INET6) {
         local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
         goto failure;
     }
-
-    pp_zero(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
-    hints.ai_socktype = socktype;
-    switch (proto) {
-        case PPSocketProtoTCP:
-            ipproto = IPPROTO_TCP;
-            break;
-        case PPSocketProtoUDP:
-            ipproto = IPPROTO_UDP;
-            break;
-    }
-    hints.ai_protocol = ipproto;
-#ifdef AI_NUMERICSERV
-    hints.ai_flags = AI_NUMERICSERV;
-#endif
-
-    snprintf(port_str, sizeof(port_str), "%u", port);
-    const int ret = local_getaddrinfo(ip_addr,
-                                      port_str,
-                                      &hints,
-                                      options->reachability,
-                                      &resolved);
-    if (ret != 0) {
-        local_print_error("pp_dns_resolve()");
+    new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
+    if (local_is_invalid_fd(new_fd)) {
+        local_print_error("socket()");
         goto failure;
     }
-
-    // Loop through resolved to find first working socket
-    for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
-        new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (local_is_invalid_fd(new_fd)) {
-            local_print_error("socket()");
-            continue;
+    if (options->unconnected) {
+        /* Explicitly select IPv6-only or dual-stack behavior on every platform. */
+        if (numeric_addr.ss_family == AF_INET6) {
+            const int v6_only = options->dual_stack ? 0 : 1;
+            if (setsockopt(
+                new_fd,
+                IPPROTO_IPV6,
+                IPV6_V6ONLY,
+                (const char *)&v6_only,
+                sizeof(v6_only)
+            ) < 0) goto failure;
         }
-        if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
-            local_print_error("configure()");
+#if PARTOUT_WINDOWS
+        /* Match POSIX close-on-exec: child processes must not inherit the socket. */
+        if (!SetHandleInformation((HANDLE)new_fd, HANDLE_FLAG_INHERIT, 0)) {
+            local_set_error(WSAEINVAL);
             goto failure;
         }
-        const int ret = local_connect_with_timeout(new_fd,
-                                                   p->ai_addr,
-                                                   (os_socklen_t)p->ai_addrlen,
-                                                   options->timeout_ms);
-        if (ret != 0) {
-            local_close_fd(new_fd);
-            new_fd = local_invalid_fd();
-            local_print_error("connect()");
-            continue;
-        }
-        // Exit loop on first success
-        break;
+#else
+        const int flags = fcntl(new_fd, F_GETFD, 0);
+        if (flags < 0) goto failure;
+        if (fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
+#endif
+        if (pp_socket_set_nonblocking(new_fd) < 0) goto failure;
     }
-    freeaddrinfo(resolved);
-    resolved = NULL;
-    if (local_is_invalid_fd(new_fd)) {
+    if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
+        local_print_error("configure()");
         goto failure;
     }
-
-    // Success
+    /* Unconnected endpoints are local bind addresses, not remote peers. */
+    int attempt_result = -1;
+    if (options->unconnected) {
+        attempt_result = bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen);
+    } else {
+        attempt_result = local_connect_with_timeout(
+            new_fd,
+            (const struct sockaddr *)&numeric_addr,
+            numeric_addrlen,
+            options->timeout_ms
+        );
+    }
+    if (attempt_result < 0) {
+        local_print_error(options->unconnected ? "bind()" : "connect()");
+        goto failure;
+    }
     pp_socket sock = pp_socket_create(new_fd);
-    if (!sock) {
-        goto failure;
-    }
+    if (!sock) goto failure;
+    sock->unconnected = options->unconnected;
+    sock->dual_stack = options->dual_stack;
     return sock;
 
 failure:
