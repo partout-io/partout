@@ -198,7 +198,7 @@ pub const Session = struct {
         const link_processor = LinkProcessor.create(
             allocator,
             owned_configuration.xor_method,
-            init.remote_endpoint.type == .tcp,
+            init.remote_endpoint.plainSocketType() == .tcp,
         ) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
             log.writef(.fault, "Unable to create link processor: {s}", .{@errorName(err)});
@@ -448,7 +448,7 @@ pub const Session = struct {
 
     fn sendExitPacket(self: *Session) !void {
         const context = self.state.activeContext() orelse return;
-        if (context.remote_endpoint.type != .udp) return;
+        if (context.remote_endpoint.plainSocketType() != .udp) return;
         const pair = context.current_data_pair orelse return;
         log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();

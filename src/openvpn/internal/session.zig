@@ -244,7 +244,7 @@ pub const Session = struct {
         const processor = try LinkProcessor.create(
             self.allocator,
             self.configuration.xor_method,
-            remote_endpoint.type == .tcp,
+            remote_endpoint.plainSocketType() == .tcp,
         );
         var owns_processor = true;
         errdefer if (owns_processor) processor.destroy();
@@ -669,7 +669,7 @@ const SessionOnQueue = struct {
 
     fn sendExitPacket(self: *SessionOnQueue, timeout_ms: u64) !void {
         const context = self.state.activeContext() orelse return;
-        if (context.remote_endpoint.type != .udp) return;
+        if (context.remote_endpoint.plainSocketType() != .udp) return;
         const pair = context.current_data_pair orelse return;
         log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();

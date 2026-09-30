@@ -23,10 +23,17 @@ pub const SocketType = api.SocketType;
 /// Resolved peer address and transport, copied by value across queue boundaries.
 pub const SocketEndpoint = struct {
     address: SocketAddress,
-    type: SocketType,
+    type: api.IPSocketType,
 
     pub fn init(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!SocketEndpoint {
-        return .{ .address = try socketAddress(endpoint), .type = endpoint.plainSocketType() };
+        return .{ .address = try socketAddress(endpoint), .type = endpoint.proto.socket_type };
+    }
+
+    pub fn plainSocketType(self: SocketEndpoint) SocketType {
+        return switch (self.type) {
+            .udp, .udp4, .udp6 => .udp,
+            .tcp, .tcp4, .tcp6 => .tcp,
+        };
     }
 
     /// Returns a textual IP borrowed from buffer, for tunnel settings and logging.

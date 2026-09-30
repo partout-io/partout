@@ -271,7 +271,7 @@ pub const Negotiator = struct {
             return error.Timeout;
 
         if (!self.isRenegotiating()) try self.pushRequest();
-        if (self.remote_endpoint.type == .udp) try self.flushControlQueue();
+        if (self.remote_endpoint.plainSocketType() == .udp) try self.flushControlQueue();
         if (self.state != .connected) {
             try self.options.schedule_negotiation_check(
                 self.options.callback_context,
