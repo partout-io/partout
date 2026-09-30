@@ -62,7 +62,7 @@ test "Session borrows an externally managed Looper" {
         fn established(
             _: ?*anyopaque,
             _: *anyopaque,
-            _: source.core.api.ExtendedEndpoint,
+            _: source.net.SocketEndpoint,
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
@@ -118,7 +118,7 @@ test "Session reports protocol failures without owning shutdown policy" {
         fn established(
             _: ?*anyopaque,
             _: *anyopaque,
-            _: source.core.api.ExtendedEndpoint,
+            _: source.net.SocketEndpoint,
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
@@ -180,7 +180,7 @@ test "Session releases a link processor once when attach fails" {
         fn established(
             _: ?*anyopaque,
             _: *anyopaque,
-            _: source.core.api.ExtendedEndpoint,
+            _: source.net.SocketEndpoint,
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
@@ -229,7 +229,7 @@ test "Session releases a link processor once when attach fails" {
         session.setLink(.{
             .fd = io.io_c.pp_fd_invalid(),
             .io = mock_io.interface(),
-        }, endpoint),
+        }, try source.net.SocketEndpoint.init(endpoint)),
     );
     try std.testing.expectEqual(@as(usize, 1), mock_io.cleanup_count);
 

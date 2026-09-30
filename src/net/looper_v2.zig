@@ -167,15 +167,18 @@ pub const Looper = struct {
         return self.impl.resumeReading(side);
     }
 
+    /// Copies one destination with every packet in the batch. Required for
+    /// unconnected UDP; ignored by connected sockets. Pass null for TUN writes.
     pub fn writeQueued(
         self: *Looper,
         packets: helpers.Packets,
         side: io.Side,
+        destination: ?io.SocketAddress,
     ) helpers.WriteError!void {
-        return self.impl.writeQueued(packets, side);
+        return self.impl.writeQueued(packets, side, destination);
     }
 
-    pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side) helpers.WriteOOBError!void {
-        return self.impl.writeOutOfBand(packets, side);
+    pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {
+        return self.impl.writeOutOfBand(packets, side, destination);
     }
 };

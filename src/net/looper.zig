@@ -655,6 +655,7 @@ pub const Looper = struct {
         self: *Looper,
         packets: Packets,
         side: io.Side,
+        destination: ?io.SocketAddress,
     ) WriteError!void {
         self.lock.lock();
         defer self.lock.unlock();
@@ -670,12 +671,12 @@ pub const Looper = struct {
         } });
         errdefer self.allocator.destroy(command);
 
-        try current.write_queue.append(packets);
+        try current.write_queue.append(packets, destination);
         self.commands.append(command);
         self.wakeLocked();
     }
 
-    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side) WriteOOBError!void {
+    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) WriteOOBError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
             return error.OOBOutsideQueue;
@@ -694,7 +695,7 @@ pub const Looper = struct {
         self.lock.unlock();
 
         for (packets) |packet| {
-            const written = side_io.native_io.write(packet, 0) catch |err| {
+            const written = side_io.native_io.writePacket(packet, 0, destination) catch |err| {
                 log.writef(.err, "{} write failed: {s}", .{
                     side,
                     @errorName(err),
@@ -814,6 +815,11 @@ pub const Looper = struct {
             .link => |value| value,
             .tun => |value| value,
         };
+        // Addressed UDP links are supported by v2 only.
+        if (descriptor.io.isUnconnected()) {
+            self.queueCompletionLocked(completion, error.MuxFailure);
+            return;
+        }
         if (!io_c.pp_mux_add(self.mux, descriptor.fd)) {
             log.writef(.err, "Unable to attach {} (fd={any})", .{ side, descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);
@@ -1005,7 +1011,7 @@ pub const Looper = struct {
 
         if (inbox.items.len > 0) {
             const action = if (side_io.on_read) |callback|
-                callback.call(inbox.items) catch |err| {
+                callback.call(inbox.items, null) catch |err| {
                     return .{ .side_failure = .{
                         .side = side_io.side,
                         .failure = .{ .user = err },

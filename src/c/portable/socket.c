@@ -15,6 +15,7 @@
 #endif
 
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,9 +28,17 @@ static bool local_is_valid_socket(pp_socket sock);
 
 #if PARTOUT_WINDOWS
 #include "portable/socket_windows.h"
+#define LOCAL_SOCKET_ERROR(code) WSA##code
 #else
 #include "portable/socket_posix.h"
+#define LOCAL_SOCKET_ERROR(code) code
 #endif
+
+#if !PARTOUT_WINDOWS
+#include <sys/uio.h>
+#endif
+static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *, bool);
+static bool address_native_to_pp(pp_socket_address *, const struct sockaddr_storage *);
 
 static bool local_platform_init(void);
 static void local_print_error(const char *msg);
@@ -55,7 +64,6 @@ static int local_getaddrinfo(const char *hostname,
 static int local_connect_with_timeout(pp_socket_fd fd,
                                       const struct sockaddr *addr,
                                       os_socklen_t addrlen,
-                                      bool blocking,
                                       int timeout_ms);
 static bool local_parse_numeric_addr(const char *ip_addr,
                                      uint16_t port,
@@ -101,6 +109,8 @@ int pp_socket_last_error_binding(void) {
 static pp_socket pp_socket_create(pp_socket_fd fd) {
     pp_socket sock = pp_alloc(sizeof(*sock));
     sock->fd = (pp_socket_fd)fd;
+    sock->unconnected = false;
+    sock->dual_stack = false;
     if (!local_init_socket(sock)) {
         pp_free(sock);
         return NULL;
@@ -108,17 +118,18 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
     return sock;
 }
 
-/* Open a socket to an IP address, an UDP/TCP protocol, and a port. Set
- * the non-blocking flag as an option, though the DNS resolution may
- * block regardless. */
-pp_socket pp_socket_open(const char *ip_addr,
+/* Open a nonblocking UDP/TCP socket. DNS resolution and connection setup
+ * may still wait; timeout_ms limits the connection wait. */
+pp_socket pp_socket_open(const char *hostname,
                          pp_socket_proto proto,
                          uint16_t port,
-                         bool blocking,
-                         int timeout_ms,
-                         const pp_reachability *reachability,
-                         pp_socket_configure configure,
-                         void *configure_ctx) {
+                         const pp_socket_open_options *options) {
+    if ((options->unconnected && proto != PPSocketProtoUDP) ||
+        (options->dual_stack && !options->unconnected)) {
+        local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
+        return NULL;
+    }
+
     int socktype = 0;
     struct addrinfo hints, *resolved = NULL;
     char port_str[16] = { 0 };
@@ -140,94 +151,140 @@ pp_socket pp_socket_open(const char *ip_addr,
 
     struct sockaddr_storage numeric_addr;
     os_socklen_t numeric_addrlen = 0;
-    if (local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
-        new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
+
+    /* Perform DNS resolution if necessary. */
+    if (!local_parse_numeric_addr(hostname, port, &numeric_addr, &numeric_addrlen)) {
+        /* Local bind addresses must be numeric; only peers use DNS resolution. */
+        if (options->unconnected) {
+            local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
+            goto failure;
+        }
+
+        pp_zero(&hints, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
+        hints.ai_socktype = socktype;
+        switch (proto) {
+            case PPSocketProtoTCP:
+                ipproto = IPPROTO_TCP;
+                break;
+            case PPSocketProtoUDP:
+                ipproto = IPPROTO_UDP;
+                break;
+        }
+        hints.ai_protocol = ipproto;
+#ifdef AI_NUMERICSERV
+        hints.ai_flags = AI_NUMERICSERV;
+#endif
+
+        snprintf(port_str, sizeof(port_str), "%u", port);
+        const int ret = local_getaddrinfo(
+            hostname,
+            port_str,
+            &hints,
+            options->reachability,
+            &resolved
+        );
+        if (ret != 0) {
+            local_print_error("pp_dns_resolve()");
+            goto failure;
+        }
+
+        // Loop through resolved to find first working socket
+        for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
+            new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
+            if (local_is_invalid_fd(new_fd)) {
+                local_print_error("socket()");
+                continue;
+            }
+            if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
+                local_print_error("configure()");
+                goto failure;
+            }
+            const int ret = local_connect_with_timeout(
+                new_fd,
+                p->ai_addr,
+                (os_socklen_t)p->ai_addrlen,
+                options->timeout_ms
+            );
+            if (ret != 0) {
+                local_close_fd(new_fd);
+                new_fd = local_invalid_fd();
+                local_print_error("connect()");
+                continue;
+            }
+            // Exit loop on first success
+            break;
+        }
+        freeaddrinfo(resolved);
+        resolved = NULL;
         if (local_is_invalid_fd(new_fd)) {
-            local_print_error("socket()");
             goto failure;
         }
-        if (configure && !configure(configure_ctx, new_fd, reachability)) {
-            local_print_error("configure()");
-            goto failure;
-        }
-        if (local_connect_with_timeout(new_fd,
-                                       (const struct sockaddr *)&numeric_addr,
-                                       numeric_addrlen,
-                                       blocking,
-                                       timeout_ms) != 0) {
-            local_print_error("connect()");
-            goto failure;
-        }
+
+        // Success
         pp_socket sock = pp_socket_create(new_fd);
-        if (!sock) {
-            goto failure;
-        }
+        if (!sock) goto failure;
         return sock;
     }
 
-    pp_zero(&hints, sizeof(hints));
-    hints.ai_family = AF_UNSPEC;   // IPv4 or IPv6
-    hints.ai_socktype = socktype;
-    switch (proto) {
-        case PPSocketProtoTCP:
-            ipproto = IPPROTO_TCP;
-            break;
-        case PPSocketProtoUDP:
-            ipproto = IPPROTO_UDP;
-            break;
-    }
-    hints.ai_protocol = ipproto;
-#ifdef AI_NUMERICSERV
-    hints.ai_flags = AI_NUMERICSERV;
-#endif
-
-    snprintf(port_str, sizeof(port_str), "%u", port);
-    const int ret = local_getaddrinfo(ip_addr,
-                                      port_str,
-                                      &hints,
-                                      reachability,
-                                      &resolved);
-    if (ret != 0) {
-        local_print_error("pp_dns_resolve()");
+    if (options->dual_stack && numeric_addr.ss_family != AF_INET6) {
+        local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
         goto failure;
     }
-
-    // Loop through resolved to find first working socket
-    for (struct addrinfo *p = resolved; p != NULL; p = p->ai_next) {
-        new_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-        if (local_is_invalid_fd(new_fd)) {
-            local_print_error("socket()");
-            continue;
+    new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
+    if (local_is_invalid_fd(new_fd)) {
+        local_print_error("socket()");
+        goto failure;
+    }
+    if (options->unconnected) {
+        /* Explicitly select IPv6-only or dual-stack behavior on every platform. */
+        if (numeric_addr.ss_family == AF_INET6) {
+            const int v6_only = options->dual_stack ? 0 : 1;
+            if (setsockopt(
+                new_fd,
+                IPPROTO_IPV6,
+                IPV6_V6ONLY,
+                (const char *)&v6_only,
+                sizeof(v6_only)
+            ) < 0) goto failure;
         }
-        if (configure && !configure(configure_ctx, new_fd, reachability)) {
-            local_print_error("configure()");
+#if PARTOUT_WINDOWS
+        /* Match POSIX close-on-exec: child processes must not inherit the socket. */
+        if (!SetHandleInformation((HANDLE)new_fd, HANDLE_FLAG_INHERIT, 0)) {
+            local_set_error(WSAEINVAL);
             goto failure;
         }
-        const int ret = local_connect_with_timeout(new_fd,
-                                                   p->ai_addr,
-                                                   (os_socklen_t)p->ai_addrlen,
-                                                   blocking,
-                                                   timeout_ms);
-        if (ret != 0) {
-            local_close_fd(new_fd);
-            new_fd = local_invalid_fd();
-            local_print_error("connect()");
-            continue;
-        }
-        // Exit loop on first success
-        break;
+#else
+        const int flags = fcntl(new_fd, F_GETFD, 0);
+        if (flags < 0) goto failure;
+        if (fcntl(new_fd, F_SETFD, flags | FD_CLOEXEC) < 0) goto failure;
+#endif
+        if (pp_socket_set_nonblocking(new_fd) < 0) goto failure;
     }
-    freeaddrinfo(resolved);
-    resolved = NULL;
-    if (local_is_invalid_fd(new_fd)) {
+    if (options->configure && !options->configure(options->configure_ctx, new_fd, options->reachability)) {
+        local_print_error("configure()");
         goto failure;
     }
-
-    // Success
+    /* Unconnected endpoints are local bind addresses, not remote peers. */
+    int attempt_result = -1;
+    if (options->unconnected) {
+        attempt_result = bind(new_fd, (const struct sockaddr *)&numeric_addr, numeric_addrlen);
+    } else {
+        attempt_result = local_connect_with_timeout(
+            new_fd,
+            (const struct sockaddr *)&numeric_addr,
+            numeric_addrlen,
+            options->timeout_ms
+        );
+    }
+    if (attempt_result < 0) {
+        local_print_error(options->unconnected ? "bind()" : "connect()");
+        goto failure;
+    }
     pp_socket sock = pp_socket_create(new_fd);
-    if (!sock) {
-        goto failure;
-    }
+    if (!sock) goto failure;
+    sock->unconnected = options->unconnected;
+    sock->dual_stack = options->dual_stack;
     return sock;
 
 failure:
@@ -245,14 +302,50 @@ void pp_socket_free(pp_socket sock) {
 
 /* Read up to dst_len bytes, and return the amount of the actually read
  * bytes. Returns < 0 on failure. */
-int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
+int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len, pp_socket_address *source) {
+    if (dst_len > INT_MAX) {
+        local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+        return -1;
+    }
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
+    pp_assert(!sock->unconnected || source != NULL);
 
+    if (source) memset(source, 0, sizeof(*source));
     while (true) {
-        const int read_len = local_recv_fd(sock->fd, dst, dst_len);
+        int read_len;
+        if (sock->unconnected) {
+            struct sockaddr_storage address;
+#if PARTOUT_WINDOWS
+            /* Winsock reports truncated UDP as WSAEMSGSIZE; POSIX needs MSG_TRUNC. */
+            os_socklen_t address_len = sizeof(address);
+            read_len = recvfrom(sock->fd, (char *)dst, (int)dst_len, 0,
+                                (struct sockaddr *)&address, &address_len);
+#else
+            struct iovec iov = {
+                .iov_base = dst,
+                .iov_len = dst_len
+            };
+            struct msghdr message = {
+                .msg_name = &address,
+                .msg_namelen = sizeof(address),
+                .msg_iov = &iov,
+                .msg_iovlen = 1
+            };
+            read_len = (int)recvmsg(sock->fd, &message, 0);
+            if (read_len >= 0 && (message.msg_flags & MSG_TRUNC)) {
+                errno = EMSGSIZE;
+                return -1;
+            }
+#endif
+            if (read_len >= 0) {
+                if (source && !address_native_to_pp(source, &address)) return -1;
+            }
+        } else {
+            read_len = local_recv_fd(sock->fd, dst, dst_len);
+        }
         if (read_len < 0 && local_is_interrupted()) {
             continue;
         }
@@ -270,20 +363,49 @@ int pp_socket_read(pp_socket sock, uint8_t *dst, size_t dst_len) {
     }
 }
 
-/* Write src_len bytes, and repeat until fully written. Returns the amount
- * of written bytes, expected to always be src_len. Returns < 0 on failure. */
-int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
+/* Write one datagram or advance a connected write. Returns the amount written,
+ * which may be partial on connected sockets, or < 0 on failure. */
+int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len,
+                    const pp_socket_address *destination) {
+    if (src_len > INT_MAX) {
+        local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+        return -1;
+    }
     if (!local_is_valid_socket(sock)) {
         local_set_not_socket_error();
         return -1;
     }
+    /* Connected sockets ignore destination; unconnected UDP requires one. */
+    pp_assert(!sock->unconnected || destination != NULL);
 
+    const bool datagram = sock->unconnected;
+    struct sockaddr_storage address;
+    os_socklen_t address_len;
+    if (datagram) {
+        if (!destination) {
+            local_set_error(LOCAL_SOCKET_ERROR(EDESTADDRREQ));
+            return -1;
+        }
+        if (!address_pp_to_native(&address, &address_len, destination, sock->dual_stack)) return -1;
+    }
     size_t offset = 0;
-    while (offset < src_len) {
+    while (offset < src_len || datagram) {
         const uint8_t *current_src = src + offset;
         const size_t remaining = src_len - offset;
 
-        const int written_len = local_send_fd(sock->fd, current_src, remaining);
+        int written_len;
+        if (datagram) {
+            written_len = (int)sendto(
+                sock->fd,
+                (const char *)current_src,
+                (int)remaining,
+                0,
+                (const struct sockaddr *)&address,
+                address_len
+            );
+        } else {
+            written_len = local_send_fd(sock->fd, current_src, remaining);
+        }
         if (written_len < 0) {
             if (local_is_interrupted()) {
                 continue;
@@ -295,6 +417,14 @@ int pp_socket_write(pp_socket sock, const uint8_t *src, size_t src_len) {
                 return offset > 0 ? (int)offset : PPIOErrorNoBufs;
             }
             local_print_error("send()");
+            return written_len;
+        }
+        /* A datagram, including an empty one, is one atomic write, never a suffix retry. */
+        if (datagram) {
+            if ((size_t)written_len != src_len) {
+                local_set_error(LOCAL_SOCKET_ERROR(EMSGSIZE));
+                return -1;
+            }
             return written_len;
         }
         if (written_len == 0) {
@@ -387,11 +517,9 @@ void local_close_impl(pp_socket sock) {
 int local_connect_with_timeout(pp_socket_fd fd,
                                const struct sockaddr *addr,
                                os_socklen_t addrlen,
-                               bool blocking,
                                int timeout_ms) {
     // Set non-blocking
-    int original_flags = 0;
-    if (pp_socket_set_nonblocking(fd, &original_flags) < 0) {
+    if (pp_socket_set_nonblocking(fd) < 0) {
         return -1;
     }
 
@@ -399,7 +527,7 @@ int local_connect_with_timeout(pp_socket_fd fd,
     int ret = connect(fd, addr, addrlen);
     if (ret == 0) {
         // Connected immediately
-        goto done;
+        return 0;
     }
     // Tell real errors from non-blocking pending states
     if (!local_is_connect_pending() && !local_is_interrupted()) {
@@ -442,14 +570,87 @@ int local_connect_with_timeout(pp_socket_fd fd,
         return -1;
     }
 
-done:
-    // Store/restore blocking mode as needed
-    if (blocking) {
-        if (pp_socket_restore_blocking(fd, original_flags) < 0) {
-            return -1;
-        }
-    }
-
     // Success
     return 0;
+}
+
+static bool address_pp_to_native(
+    struct sockaddr_storage *storage,
+    os_socklen_t *length,
+    const pp_socket_address *address,
+    bool dual_stack
+) {
+    memset(storage, 0, sizeof(*storage));
+    if (address->family == 4) {
+        if (dual_stack) {
+            /* A dual-stack descriptor sends IPv4 via an IPv4-mapped IPv6 address. */
+            struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
+            v6->sin6_family = AF_INET6;
+            v6->sin6_port = htons(address->port);
+            v6->sin6_addr.s6_addr[10] = 0xff;
+            v6->sin6_addr.s6_addr[11] = 0xff;
+            memcpy(&v6->sin6_addr.s6_addr[12], address->address, 4);
+            *length = sizeof(*v6);
+        } else {
+            struct sockaddr_in *v4 = (struct sockaddr_in *)storage;
+            v4->sin_family = AF_INET;
+            v4->sin_port = htons(address->port);
+            memcpy(&v4->sin_addr, address->address, 4);
+            *length = sizeof(*v4);
+        }
+    } else if (address->family == 6) {
+        struct sockaddr_in6 *v6 = (struct sockaddr_in6 *)storage;
+        v6->sin6_family = AF_INET6;
+        v6->sin6_port = htons(address->port);
+        v6->sin6_scope_id = address->scope_id;
+        memcpy(&v6->sin6_addr, address->address, 16);
+        *length = sizeof(*v6);
+    } else {
+        local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT));
+        return false;
+    }
+    return true;
+}
+
+static bool address_native_to_pp(
+    pp_socket_address *address,
+    const struct sockaddr_storage *storage
+) {
+    memset(address, 0, sizeof(*address));
+    if (storage->ss_family == AF_INET) {
+        const struct sockaddr_in *v4 = (const struct sockaddr_in *)storage;
+        address->family = 4;
+        address->port = ntohs(v4->sin_port);
+        memcpy(address->address, &v4->sin_addr, 4);
+    } else if (storage->ss_family == AF_INET6) {
+        const struct sockaddr_in6 *v6 = (const struct sockaddr_in6 *)storage;
+        address->port = ntohs(v6->sin6_port);
+        if (IN6_IS_ADDR_V4MAPPED(&v6->sin6_addr)) {
+            /* Keep the public address representation independent of socket mode. */
+            address->family = 4;
+            memcpy(address->address, &v6->sin6_addr.s6_addr[12], 4);
+        } else {
+            address->family = 6;
+            address->scope_id = v6->sin6_scope_id;
+            memcpy(address->address, &v6->sin6_addr, 16);
+        }
+    } else {
+        local_set_error(LOCAL_SOCKET_ERROR(EAFNOSUPPORT));
+        return false;
+    }
+    return true;
+}
+
+bool pp_socket_get_address(pp_socket sock, pp_socket_address *address) {
+    struct sockaddr_storage storage;
+    os_socklen_t length = sizeof(storage);
+    return getsockname(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
+           address_native_to_pp(address, &storage);
+}
+
+bool pp_socket_get_peer_address(pp_socket sock, pp_socket_address *address) {
+    struct sockaddr_storage storage;
+    os_socklen_t length = sizeof(storage);
+    return getpeername(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
+           address_native_to_pp(address, &storage);
 }

@@ -60,15 +60,19 @@ pub const SessionError = error{
     DataPathFailure,
     EndOfStream,
     InvalidAck,
+    InvalidAddressFamily,
     InvalidKey,
+    InvalidOffset,
     InvalidPacketId,
     InvalidPushReply,
     InvalidSessionId,
+    InvalidSocketMode,
     LibcFailure,
     LinkFailure,
     LooperTerminated,
     LooperUnavailable,
     MissingCA,
+    MissingDestination,
     MissingSessionId,
     NoRouting,
     OOBOutsideQueue,
@@ -101,7 +105,7 @@ pub const SessionEvents = struct {
     ctx: ?*anyopaque = null,
     established: *const fn (
         ?*anyopaque,
-        api.ExtendedEndpoint,
+        net.SocketEndpoint,
         *const api.OpenVPNConfiguration,
     ) void,
     failed: *const fn (?*anyopaque, SessionError) void,
@@ -130,7 +134,7 @@ pub const Session = struct {
 
     // Link interface.
     looper: *Looper,
-    remote_endpoint: api.ExtendedEndpoint,
+    remote_endpoint: net.SocketEndpoint,
     events: SessionEvents,
 
     // Internal state.
@@ -143,7 +147,7 @@ pub const Session = struct {
     pub const Init = struct {
         /// I/O strategy.
         looper: *Looper,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         events: SessionEvents,
         /// OpenVPN configuration.
         configuration: api.OpenVPNConfiguration,
@@ -161,9 +165,6 @@ pub const Session = struct {
 
     pub fn create(allocator: std.mem.Allocator, init: Init) CreateError!*Session {
         log.write(.notice, "Using OpenVPN Session v2");
-
-        const remote_endpoint = try init.remote_endpoint.clone(allocator);
-        errdefer remote_endpoint.deinit(allocator);
 
         var owned_configuration = init.configuration.clone(allocator) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
@@ -220,7 +221,7 @@ pub const Session = struct {
             .ca_filename = owned_ca_filename,
             .options = init.options,
             .looper = init.looper,
-            .remote_endpoint = remote_endpoint,
+            .remote_endpoint = init.remote_endpoint,
             .events = init.events,
             .state = .{
                 .stopped = .{
@@ -243,7 +244,6 @@ pub const Session = struct {
         }
         self.control_channel.destroy();
         self.link_processor.destroy();
-        self.remote_endpoint.deinit(self.allocator);
 
         self.configuration.deinit(self.allocator);
         if (self.credentials) |*credentials| credentials.deinit(self.allocator);
@@ -291,6 +291,7 @@ pub const Session = struct {
         const data_link = DataLink.init(
             self.allocator,
             self.looper,
+            self.remote_endpoint,
             self.link_processor,
             self,
             .{

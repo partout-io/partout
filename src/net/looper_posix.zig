@@ -21,7 +21,7 @@ const io_c = io.io_c;
 const log = core.logging;
 
 pub const PosixLooper = struct {
-    /// Max number of attached sides.
+    /// One link socket and one TUN.
     const number_of_descriptors = 2;
     /// Hardcoded delay on backpressure (ENOBUFS).
     const no_buf_retry_delay_ms = 10;
@@ -82,7 +82,7 @@ pub const PosixLooper = struct {
     link: ?*SideIO,
     tun: ?*SideIO,
     next_side_id: u64,
-    // The size of these follows `number_of_descriptors`.
+    // Retries are per logical side.
     read_retries: [2]bool,
     write_retries: [2]bool,
 
@@ -622,6 +622,7 @@ pub const PosixLooper = struct {
         self: *PosixLooper,
         packets: helpers.Packets,
         side: io.Side,
+        destination: ?io.SocketAddress,
     ) helpers.WriteError!void {
         self.lock.lock();
         defer self.lock.unlock();
@@ -631,18 +632,20 @@ pub const PosixLooper = struct {
             return;
         };
 
+        if (current.native_io.isUnconnected() and destination == null) return error.MissingDestination;
+
         const command = try self.createCommandNode(.{ .enable_write = .{
             .side = side,
             .id = current.id,
         } });
         errdefer self.allocator.destroy(command);
 
-        try current.write_queue.append(packets);
+        try current.write_queue.append(packets, destination);
         self.commands.append(command);
         self.wakeLocked();
     }
 
-    pub fn writeOutOfBand(self: *PosixLooper, packets: helpers.Packets, side: io.Side) helpers.WriteOOBError!void {
+    pub fn writeOutOfBand(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {
         if (!self.isOnQueue()) {
             log.writef(.err, "OOB writes must run on the looper queue", .{});
             return error.OOBOutsideQueue;
@@ -660,8 +663,10 @@ pub const PosixLooper = struct {
         };
         self.lock.unlock();
 
+        if (side_io.native_io.isUnconnected() and destination == null) return error.MissingDestination;
+
         for (packets) |packet| {
-            const written = side_io.native_io.write(packet, 0) catch |err| {
+            const written = side_io.native_io.writePacket(packet, 0, destination) catch |err| {
                 log.writef(.err, "{} write failed: {s}", .{
                     side,
                     @errorName(err),
@@ -781,6 +786,10 @@ pub const PosixLooper = struct {
             .link => |value| value,
             .tun => |value| value,
         };
+        if (descriptor.io.isUnconnected() and side != .link) {
+            self.queueCompletionLocked(completion, error.MuxFailure);
+            return;
+        }
         if (!io_c.pp_mux_add(self.mux, descriptor.fd)) {
             log.writef(.err, "Unable to attach {} (fd={any})", .{ side, descriptor.fd });
             self.queueCompletionLocked(completion, error.MuxFailure);
@@ -890,7 +899,7 @@ pub const PosixLooper = struct {
     ) ProcessOutcome {
         var watch_writes = false;
         while (self.pendingWrite(side_io)) |pending| {
-            const written = side_io.native_io.write(pending.data, pending.offset) catch |err| {
+            const written = side_io.native_io.writePacket(pending.data, pending.offset, pending.address) catch |err| {
                 switch (err) {
                     error.WouldBlock => {
                         watch_writes = true;
@@ -947,10 +956,13 @@ pub const PosixLooper = struct {
             inbox.deinit(self.allocator);
         }
 
+        var addresses: std.ArrayList(io.SocketAddress) = .empty;
+        defer addresses.deinit(self.allocator);
         var read_count: usize = 0;
         var read_size: usize = 0;
         while (read_count < self.options.max_read_count and read_size < self.options.max_read_size) {
-            const maybe_count = side_io.native_io.read(side_io.read_buf) catch |err| {
+            var address: io.SocketAddress = undefined;
+            const maybe_count = side_io.native_io.readPacket(side_io.read_buf, &address) catch |err| {
                 if (err == error.WouldBlock) break;
                 return .{ .side_failure = .{
                     .side = side_io.side,
@@ -965,6 +977,9 @@ pub const PosixLooper = struct {
                     self.allocator.free(packet);
                     return .{ .fatal = .{ .system = err } };
                 };
+                if (side_io.native_io.isUnconnected()) addresses.append(self.allocator, address) catch |err| {
+                    return .{ .fatal = .{ .system = err } };
+                };
                 read_size += count;
             }
             read_count += 1;
@@ -972,7 +987,7 @@ pub const PosixLooper = struct {
 
         if (inbox.items.len > 0) {
             const action = if (side_io.on_read) |callback|
-                callback.call(inbox.items) catch |err| {
+                callback.call(inbox.items, if (side_io.native_io.isUnconnected()) addresses.items else null) catch |err| {
                     return .{ .side_failure = .{
                         .side = side_io.side,
                         .failure = .{ .user = err },

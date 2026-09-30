@@ -10,6 +10,7 @@ comptime {
     _ = @import("abi/importer.zig");
     _ = @import("abi/runtime.zig");
     _ = @import("c/exports.zig");
+    _ = @import("c/socket.zig");
     if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL") or
         @hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS"))
     {
@@ -31,6 +32,7 @@ comptime {
     _ = @import("net/io.zig");
     if (@import("builtin").os.tag != .windows) {
         _ = @import("net/io_posix.zig");
+        _ = @import("net/socket_datagram.zig");
     }
     if (!source.runtime_policy.v2_only) {
         _ = @import("net/looper_legacy.zig");

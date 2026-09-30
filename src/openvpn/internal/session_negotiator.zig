@@ -35,6 +35,7 @@ const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PushReply = push_mod.PushReply;
 const SessionOptions = configuration_mod.SessionOptions;
+const SocketEndpoint = net_mod.SocketEndpoint;
 const TLSWrapper = tls_mod.TLSWrapper;
 
 pub const NegotiationResult = struct {
@@ -101,7 +102,7 @@ pub const Negotiator = struct {
     renegotiation: ?RenegotiationType,
     looper: *Looper,
     link_processor: *LinkProcessor,
-    remote_endpoint: *const api.ExtendedEndpoint,
+    remote_endpoint: *const SocketEndpoint,
     channel: *ControlChannel,
     prng: PRNG,
     tls: ?*TLSWrapper,
@@ -121,7 +122,7 @@ pub const Negotiator = struct {
         renegotiation: ?RenegotiationType = null,
         looper: *Looper,
         link_processor: *LinkProcessor,
-        remote_endpoint: *const api.ExtendedEndpoint,
+        remote_endpoint: *const SocketEndpoint,
         channel: *ControlChannel,
         prng: PRNG,
         tls: *TLSWrapper,
@@ -367,7 +368,7 @@ pub const Negotiator = struct {
     fn writeLink(self: *const Negotiator, packets: []const []const u8) !void {
         var processed = try self.link_processor.processOutbound(packets);
         defer processed.deinit();
-        try self.looper.writeQueued(processed.packets(), .link);
+        try self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address);
     }
 
     fn requestsWrappedKeyResend(payload: ?[]const u8) bool {

@@ -59,14 +59,18 @@ pub const SessionError = error{
     DataPathFailure,
     EndOfStream,
     InvalidAck,
+    InvalidAddressFamily,
     InvalidKey,
+    InvalidOffset,
     InvalidPacketId,
     InvalidPushReply,
     InvalidSessionId,
+    InvalidSocketMode,
     LibcFailure,
     LinkFailure,
     LooperTerminated,
     LooperUnavailable,
+    MissingDestination,
     MissingSessionId,
     NoRouting,
     OOBOutsideQueue,
@@ -100,7 +104,7 @@ pub const SessionEvents = struct {
     established: *const fn (
         ?*anyopaque,
         *anyopaque,
-        api.ExtendedEndpoint,
+        net.SocketEndpoint,
         *const api.OpenVPNConfiguration,
     ) void,
     failed: *const fn (?*anyopaque, *anyopaque, SessionError) void,
@@ -229,7 +233,7 @@ pub const Session = struct {
     pub fn setLink(
         self: *Session,
         descriptor: Looper.LinkDescriptor,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
     ) SetLinkError!void {
         var descriptor_transferred = false;
         defer if (!descriptor_transferred) descriptor.io.cleanup();
@@ -403,6 +407,7 @@ pub const Session = struct {
     fn onLinkRead(
         raw: ?*anyopaque,
         packets: Looper.Packets,
+        _: ?[]const net.SocketAddress,
     ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         const on_queue = self.onQueue();
@@ -421,6 +426,7 @@ pub const Session = struct {
     fn onTunnelRead(
         raw: ?*anyopaque,
         packets: Looper.Packets,
+        _: ?[]const net.SocketAddress,
     ) SessionError!Looper.ReadAction {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         try self.onQueue().receiveTunnel(packets);
@@ -566,7 +572,7 @@ const SessionOnQueue = struct {
         self.link_processor = null;
     }
 
-    fn setLink(self: *SessionOnQueue, remote_endpoint: api.ExtendedEndpoint) !void {
+    fn setLink(self: *SessionOnQueue, remote_endpoint: net.SocketEndpoint) !void {
         const idle = switch (self.state) {
             .stopped => |context| context,
             .active => {
@@ -582,6 +588,7 @@ const SessionOnQueue = struct {
         const data_link = DataLink.init(
             self.session.allocator,
             self.session.looper,
+            remote_endpoint,
             processor,
             self.session,
             .{

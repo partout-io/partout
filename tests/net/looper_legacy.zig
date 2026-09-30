@@ -366,7 +366,7 @@ test "work is rejected before start and after terminal cleanup" {
     try std.testing.expectError(error.LooperUnavailable, looper.detach(.link));
     try std.testing.expectError(
         error.LooperUnavailable,
-        looper.writeQueued(&.{"discarded"}, .link),
+        looper.writeQueued(&.{"discarded"}, .link, null),
     );
 }
 
@@ -376,7 +376,7 @@ const FinishProbe = struct {
 
     fn onFinish(raw: ?*anyopaque, _: ?Looper.Failure) void {
         const self: *FinishProbe = @ptrCast(@alignCast(raw.?));
-        self.looper.writeOutOfBand(&.{"discarded"}, .link) catch |err| {
+        self.looper.writeOutOfBand(&.{"discarded"}, .link, null) catch |err| {
             self.oob_got_looper_unavailable.store(err == error.LooperUnavailable, .release);
         };
     }
@@ -425,7 +425,7 @@ test "out-of-band write returns the underlying I/O error" {
     const WriteTask = struct {
         fn run(raw: ?*anyopaque) anyerror!void {
             const current: *Looper = @ptrCast(@alignCast(raw.?));
-            return current.writeOutOfBand(&.{"packet"}, .link);
+            return current.writeOutOfBand(&.{"packet"}, .link, null);
         }
     };
     try std.testing.expectError(

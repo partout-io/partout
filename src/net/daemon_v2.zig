@@ -441,20 +441,14 @@ const ConnectionDaemon = struct {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
         // The payload is borrowed only for this callback. Own it across the
         // asynchronous hop, including when stop overtakes its actor handler.
-        const endpoint = success.remote_endpoint.clone(self.daemon.allocator) catch {
-            onConnectionFailed(ctx, .{ .err_pair = .{ .code = .outOfMemory }, .disposition = .reconnect });
-            return;
-        };
         var info = success.info.clone(self.daemon.allocator) catch {
-            endpoint.deinit(self.daemon.allocator);
             onConnectionFailed(ctx, .{ .err_pair = .{ .code = .outOfMemory }, .disposition = .reconnect });
             return;
         };
         self.actor.schedule(.{ .onConnectionEstablished = .{
-            .remote_endpoint = endpoint,
+            .remote_endpoint = success.remote_endpoint,
             .info = info,
         } }) catch |err| {
-            endpoint.deinit(self.daemon.allocator);
             info.deinit(self.daemon.allocator);
             log.writef(.fault, "Unable to enqueue established connection: {s}", .{@errorName(err)});
         };
@@ -736,17 +730,11 @@ const ConnectionDaemon = struct {
         _ = self.gate.setEnabled(false);
 
         log.write(.notice, "Start connection");
-        const endpoint = self.setupLink() catch |err| {
+        const remote = self.setupLink() catch |err| {
             log.writef(.err, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(error.UnableToStart);
             self.scheduleResumeGate();
             return;
-        };
-        // EndpointResolver owns this endpoint; perform() keeps the borrow
-        // valid until Connection has consumed it on the looper.
-        const remote: RemoteDescriptor = .{
-            .endpoint = endpoint,
-            .looper = self.looper,
         };
         // Performs connection.start() on the looper thread. Remember to
         // detach the link on failure.
@@ -774,7 +762,7 @@ const ConnectionDaemon = struct {
         // Connection attempted on the looper in background.
     }
 
-    fn setupLink(self: *ConnectionDaemon) !api.ExtendedEndpoint {
+    fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         // FIXME: ###, Pick endpoint, resolve DNS, and connect link atomically in SocketFactory
@@ -784,6 +772,7 @@ const ConnectionDaemon = struct {
             reachability,
             self.daemon.options.connection_options.dns_timeout,
         );
+        const remote_endpoint = try net.SocketEndpoint.init(endpoint);
         log.writef(.notice, "Connect to {s}", .{endpoint});
         var descriptor = try self.factory.create(
             self.daemon.allocator,
@@ -811,7 +800,7 @@ const ConnectionDaemon = struct {
                 .callback = onLinkFailure,
             },
         });
-        return endpoint;
+        return .{ .endpoint = remote_endpoint, .looper = self.looper };
     }
 
     fn scheduleResumeGate(self: *ConnectionDaemon) void {
@@ -1045,7 +1034,7 @@ const ConnectionDaemon = struct {
     // run protocol work directly, but must never wait for the actor. Termination
     // finalizes protocol state here, then enqueues actor-owned recovery.
 
-    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets) !Looper.ReadAction {
+    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
         return conn.submitPackets(.link, packets);
@@ -1057,7 +1046,7 @@ const ConnectionDaemon = struct {
         conn.looperFailed(.link, failure);
     }
 
-    fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets) !Looper.ReadAction {
+    fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
         return conn.submitPackets(.tun, packets);
@@ -1123,7 +1112,6 @@ const ConnectionDaemon = struct {
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEstablished => |arg| {
                 var success = arg;
-                defer success.remote_endpoint.deinit(self.daemon.allocator);
                 defer success.info.deinit(self.daemon.allocator);
                 self.handleConnectionEstablished(success) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});

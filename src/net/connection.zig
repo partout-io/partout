@@ -169,7 +169,7 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 }
 
 pub const RemoteDescriptor = struct {
-    endpoint: core.api.ExtendedEndpoint,
+    endpoint: io.SocketEndpoint,
     looper: *Looper,
 };
 
@@ -190,7 +190,7 @@ pub const Connection = struct {
 
     pub const Events = struct {
         pub const Success = struct {
-            remote_endpoint: api.ExtendedEndpoint,
+            remote_endpoint: io.SocketEndpoint,
             info: api.TunnelRemoteInfoWrapper,
         };
         pub const FailureDisposition = enum {

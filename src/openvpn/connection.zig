@@ -89,7 +89,6 @@ const OpenVPNConnection = struct {
     events: ?net.Connection.Events,
     with_local_options: bool,
     current_session: ?*Session,
-    current_endpoint: ?api.ExtendedEndpoint,
     tunnel: ?net.TunWrapper,
 
     // MARK: - Public API
@@ -170,7 +169,6 @@ const OpenVPNConnection = struct {
             .events = null,
             .with_local_options = true,
             .current_session = null,
-            .current_endpoint = null,
             .tunnel = null,
         };
         const fnt = try api.cryptoFunctionTable(session_options.backend);
@@ -253,7 +251,7 @@ const OpenVPNConnection = struct {
 
         self.clearServerConfiguration();
         _ = self.sendStatus(.connecting, events);
-        const current_endpoint = self.setupLink(session) catch |err| {
+        self.setupLink(session) catch |err| {
             log.writef(.fault, "Unable to set up link: {s}", .{@errorName(err)});
             _ = self.sendStatus(.disconnected, events);
             session.shutdown(false, null) catch {};
@@ -263,7 +261,6 @@ const OpenVPNConnection = struct {
                 else => error.UnableToStart,
             };
         };
-        self.current_endpoint = current_endpoint;
         return true;
     }
 
@@ -327,7 +324,7 @@ const OpenVPNConnection = struct {
 
     // MARK: - Link setup
 
-    fn setupLink(self: *OpenVPNConnection, session: *Session) LinkSetupError!api.ExtendedEndpoint {
+    fn setupLink(self: *OpenVPNConnection, session: *Session) LinkSetupError!void {
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         const reachability = self.factory.currentReachability();
@@ -337,21 +334,19 @@ const OpenVPNConnection = struct {
             self.connection_options.dns_timeout,
         );
 
-        var owned_endpoint = try endpoint.clone(self.allocator);
-        errdefer owned_endpoint.deinit(self.allocator);
-        log.writef(.notice, "Connect to {s}", .{owned_endpoint});
+        log.writef(.notice, "Connect to {s}", .{endpoint});
+        const remote_endpoint = net.SocketEndpoint.init(endpoint) catch return error.LinkFailure;
         const descriptor = try self.factory.create(
             self.allocator,
-            owned_endpoint,
+            endpoint,
             reachability,
             self.connection_options.link_activity_timeout,
         );
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
-            owned_endpoint.proto.socket_type.raw(),
+            endpoint.proto.socket_type.raw(),
         });
-        try session.setLink(descriptor, owned_endpoint);
-        return owned_endpoint;
+        try session.setLink(descriptor, remote_endpoint);
     }
 
     // MARK: - Session events
@@ -359,20 +354,21 @@ const OpenVPNConnection = struct {
     fn handleSessionEstablished(
         self: *OpenVPNConnection,
         session: *Session,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
         if (self.status != .connecting) return;
         log.write(.notice, "Session established");
-        const address = api.Address.parseRaw(remote_endpoint.address) orelse {
+        var address_buffer: [64]u8 = undefined;
+        const address = remote_endpoint.ipAddress(&address_buffer) catch {
             log.write(.fault, "Unable to parse remote endpoint");
             self.failTunnelSetup(session, error.InvalidEndpoint);
             return;
         };
         log.writef(.info, "\tEndpoint: {s}", .{address});
         log.writef(.info, "\tProtocol: {s}:{d}", .{
-            remote_endpoint.proto.socket_type.raw(),
-            remote_endpoint.proto.port,
+            remote_endpoint.type.raw(),
+            remote_endpoint.address.port,
         });
         log.write(.notice, "Local options:");
         openvpn_log.logConfiguration(&self.configuration, true);
@@ -552,15 +548,13 @@ const OpenVPNConnection = struct {
     fn clearLink(self: *OpenVPNConnection) void {
         if (self.tunnel) |*tunnel| tunnel.deinit();
         self.tunnel = null;
-        if (self.current_endpoint) |*endpoint| endpoint.deinit(self.allocator);
-        self.current_endpoint = null;
     }
 };
 
 const SessionEvent = union(enum) {
     established: struct {
         session: *anyopaque,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
         remote_options: api.OpenVPNConfiguration,
     },
     failed: struct {
@@ -590,7 +584,6 @@ const SessionEvent = union(enum) {
     fn deinit(self: *SessionEvent, allocator: std.mem.Allocator) void {
         switch (self.*) {
             .established => |*payload| {
-                payload.remote_endpoint.deinit(allocator);
                 payload.remote_options.deinit(allocator);
             },
             .failed, .data_count => {},
@@ -684,19 +677,16 @@ fn handleSessionEvent(self: *OpenVPNConnection, event: SessionEvent) void {
 fn sessionEstablished(
     raw: ?*anyopaque,
     session: *anyopaque,
-    remote_endpoint: api.ExtendedEndpoint,
+    remote_endpoint: net.SocketEndpoint,
     remote_options: *const api.OpenVPNConfiguration,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(raw.?));
-    const endpoint = remote_endpoint.clone(self.allocator) catch
-        @panic("Unable to retain required OpenVPN session event");
     const options = remote_options.clone(self.allocator) catch {
-        endpoint.deinit(self.allocator);
         @panic("Unable to retain required OpenVPN session event");
     };
     sendSessionEvent(self, .{ .established = .{
         .session = session,
-        .remote_endpoint = endpoint,
+        .remote_endpoint = remote_endpoint,
         .remote_options = options,
     } });
 }
@@ -801,9 +791,13 @@ const SessionFinalizationFailure = struct {
         return switch (self.cause) {
             error.BadCredentials,
             error.CompressionMismatch,
+            error.InvalidAddressFamily,
+            error.InvalidOffset,
             error.InvalidPushReply,
+            error.InvalidSocketMode,
             error.NoRouting,
             error.TLSFailure,
+            error.MissingDestination,
             error.UnsupportedAlgorithm,
             error.UnsupportedCompression,
             error.UnsupportedCryptoBackend,
@@ -870,7 +864,12 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         error.CryptoHMAC,
         error.CryptoPRNG,
         => .{ .code = .crypto },
-        error.InvalidEndpoint => .{ .code = .invalidValue },
+        error.InvalidAddressFamily,
+        error.InvalidEndpoint,
+        error.InvalidOffset,
+        error.InvalidSocketMode,
+        error.MissingDestination,
+        => .{ .code = .invalidValue },
         error.ModulesAllocation => .{ .code = .unhandled },
         error.MuxFailure => .{ .code = .fdUnavailable },
         error.NetworkChanged => .{ .code = .networkChanged },

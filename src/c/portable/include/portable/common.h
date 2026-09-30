@@ -96,9 +96,9 @@ extern const int PPIOErrorWouldBlock;
 extern const int PPIOErrorNoBufs;
 extern const int PPIOErrorNoSpace;
 
-#if PARTOUT_WINDOWS
-
 #pragma clang assume_nonnull begin
+
+#if PARTOUT_WINDOWS
 
 /* ABI-compatible with the Windows SDK HANDLE and SOCKET definitions. */
 typedef void *_Nonnull pp_fd;
@@ -112,12 +112,7 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     return (intptr_t)fd != -1;
 }
 
-int pp_io_last_error_binding(void);
-#pragma clang assume_nonnull end
-
 #else
-
-#pragma clang assume_nonnull begin
 
 typedef int pp_fd;
 typedef pp_fd pp_socket_fd;
@@ -131,12 +126,12 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
 }
 
 int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
-int pp_fd_restore_blocking(pp_fd fd, int original_flags);
+
+#endif
+
 int pp_io_last_error_binding(void);
 
 #pragma clang assume_nonnull end
-
-#endif
 
 /* Android only. */
 

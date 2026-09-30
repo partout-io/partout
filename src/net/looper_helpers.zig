@@ -33,13 +33,15 @@ pub const ReadAction = enum {
     pause,
 };
 
-/// Invoked on read events from either looper side.
+/// Invoked on read events from either looper side. Payloads and addresses are
+/// borrowed until the callback returns. Unconnected UDP supplies one source
+/// address per packet, in the same order; connected sockets and TUN supply null.
 pub const OnRead = struct {
     context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, Packets) anyerror!ReadAction,
+    callback: *const fn (?*anyopaque, Packets, ?[]const io.SocketAddress) anyerror!ReadAction,
 
-    pub fn call(self: OnRead, packets: Packets) anyerror!ReadAction {
-        return self.callback(self.context, packets);
+    pub fn call(self: OnRead, packets: Packets, addresses: ?[]const io.SocketAddress) anyerror!ReadAction {
+        return self.callback(self.context, packets, addresses);
     }
 };
 
@@ -135,8 +137,8 @@ pub const AttachError = SubmissionError || error{
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 pub const ResumeReadingError = SubmissionError;
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
-pub const WriteError = SubmissionError;
-pub const WriteOOBError = SubmissionError || io.Error || error{
+pub const WriteError = SubmissionError || error{MissingDestination};
+pub const WriteOOBError = WriteError || io.Error || error{
     OOBOutsideQueue,
     WriteIncomplete,
 };
@@ -264,12 +266,14 @@ pub const CommandQueue = struct {
 /// Helps storing a pending write without copying the
 /// original buffer to a partial buffer.
 pub const PendingWrite = struct {
+    address: ?io.SocketAddress = null,
     data: []const u8,
     offset: usize,
 };
 
 /// A node in `WriteQueue`.
 const WriteNode = struct {
+    address: ?io.SocketAddress = null,
     data: []u8,
     next: ?*WriteNode = null,
 };
@@ -296,7 +300,7 @@ pub const WriteQueue = struct {
     }
 
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
-    pub fn append(self: *WriteQueue, packets: Packets) std.mem.Allocator.Error!void {
+    pub fn append(self: *WriteQueue, packets: Packets, destination: ?io.SocketAddress) std.mem.Allocator.Error!void {
         var new_head: ?*WriteNode = null;
         var new_tail: ?*WriteNode = null;
         errdefer destroyList(self.allocator, new_head);
@@ -305,7 +309,7 @@ pub const WriteQueue = struct {
             const copy = try self.allocator.dupe(u8, packet);
             errdefer self.allocator.free(copy);
             const node = try self.allocator.create(WriteNode);
-            node.* = .{ .data = copy };
+            node.* = .{ .data = copy, .address = destination };
             if (new_tail) |tail| {
                 tail.next = node;
             } else {
@@ -329,6 +333,7 @@ pub const WriteQueue = struct {
         const first = self.head orelse return null;
         return .{
             .data = first.data,
+            .address = first.address,
             .offset = self.offset,
         };
     }

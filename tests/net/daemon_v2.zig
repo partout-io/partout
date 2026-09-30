@@ -172,7 +172,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
                 .servers = &servers,
             } }};
             sink.established(sink.ctx, .{
-                .remote_endpoint = api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+                .remote_endpoint = net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?) catch unreachable,
                 .info = .{
                     .profile = self.profile.*,
                     .original_module_id = "11111111-1111-4111-8111-111111111111".*,

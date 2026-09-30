@@ -10,7 +10,7 @@ const helpers_mod = @import("helpers.zig");
 const push_mod = @import("push.zig");
 const session_negotiator_mod = @import("session_negotiator.zig");
 
-const api = core_mod.api;
+const net = @import("../../net/exports.zig");
 const log = core_mod.logging;
 
 const BidirectionalState = helpers_mod.BidirectionalState;
@@ -47,7 +47,7 @@ pub const ActiveContext = struct {
     allocator: std.mem.Allocator,
     data_link: DataLink,
     with_local_options: bool,
-    remote_endpoint: api.ExtendedEndpoint,
+    remote_endpoint: net.SocketEndpoint,
 
     negotiators: [ControlConstants.number_of_keys]?*Negotiator,
     data_channels: [ControlConstants.number_of_keys]?*DataChannel,
@@ -63,20 +63,14 @@ pub const ActiveContext = struct {
         allocator: std.mem.Allocator,
         data_link: DataLink,
         with_local_options: bool,
-        remote_endpoint: api.ExtendedEndpoint,
+        remote_endpoint: net.SocketEndpoint,
     ) !*ActiveContext {
-        const owned_address = try allocator.dupe(u8, remote_endpoint.address);
-        errdefer allocator.free(owned_address);
         const self = try allocator.create(ActiveContext);
         self.* = .{
             .allocator = allocator,
             .data_link = data_link,
             .with_local_options = with_local_options,
-            .remote_endpoint = .{
-                .address = owned_address,
-                .proto = remote_endpoint.proto,
-                .owned = true,
-            },
+            .remote_endpoint = remote_endpoint,
             .negotiators = [_]?*Negotiator{null} ** ControlConstants.number_of_keys,
             .data_channels = [_]?*DataChannel{null} ** ControlConstants.number_of_keys,
             .old_keys = .empty,
@@ -93,7 +87,6 @@ pub const ActiveContext = struct {
     pub fn destroy(self: *ActiveContext) void {
         self.reset();
         self.old_keys.deinit(self.allocator);
-        self.remote_endpoint.deinit(self.allocator);
         const allocator = self.allocator;
         allocator.destroy(self);
     }

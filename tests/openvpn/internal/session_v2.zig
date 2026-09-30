@@ -35,7 +35,7 @@ test "Session borrows an externally managed Looper" {
 
         fn established(
             _: ?*anyopaque,
-            _: source.core.api.ExtendedEndpoint,
+            _: source.net.SocketEndpoint,
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
@@ -57,7 +57,7 @@ test "Session borrows an externally managed Looper" {
     defer auth_token.deinit();
     const session = try Session.create(allocator, .{
         .looper = &looper,
-        .remote_endpoint = source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+        .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .events = .{
             .established = Callbacks.established,
             .failed = Callbacks.failed,
@@ -91,7 +91,7 @@ test "Session reports protocol failures without owning shutdown policy" {
 
         fn established(
             _: ?*anyopaque,
-            _: source.core.api.ExtendedEndpoint,
+            _: source.net.SocketEndpoint,
             _: *const source.core.api.OpenVPNConfiguration,
         ) void {}
 
@@ -126,7 +126,7 @@ test "Session reports protocol failures without owning shutdown policy" {
             .data_count = RecordingEvents.dataCount,
         },
         .looper = &looper,
-        .remote_endpoint = source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+        .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .configuration = .{},
         .credentials = null,
         .auth_token = &auth_token,

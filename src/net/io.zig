@@ -30,3 +30,8 @@ pub const DescriptorPair = union(Side) {
     link: LinkDescriptor,
     tun: TunDescriptor,
 };
+
+pub const SocketAddress = common.SocketAddress;
+pub const SocketEndpoint = common.SocketEndpoint;
+pub const SocketType = common.SocketType;
+pub const Datagram = common.Datagram;

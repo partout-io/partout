@@ -28,6 +28,7 @@ const Looper = net_mod.Looper;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PRNGError = crypto_mod.PRNGError;
+const SocketEndpoint = net_mod.SocketEndpoint;
 const ZeroingData = crypto_mod.ZeroingData;
 
 /// C-backed OpenVPN data path.
@@ -372,6 +373,9 @@ pub const DataLink = struct {
         Looper.WriteError ||
         error{
             EndOfStream,
+            InvalidAddressFamily,
+            InvalidOffset,
+            InvalidSocketMode,
             LibcFailure,
             OOBOutsideQueue,
             Timeout,
@@ -381,6 +385,7 @@ pub const DataLink = struct {
 
     allocator: std.mem.Allocator,
     looper: *Looper,
+    remote_endpoint: SocketEndpoint,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
@@ -394,6 +399,7 @@ pub const DataLink = struct {
     pub fn init(
         allocator: std.mem.Allocator,
         looper: *Looper,
+        remote_endpoint: SocketEndpoint,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
         callbacks: Callbacks,
@@ -401,6 +407,7 @@ pub const DataLink = struct {
         return .{
             .allocator = allocator,
             .looper = looper,
+            .remote_endpoint = remote_endpoint,
             .link_processor = link_processor,
             .context = context,
             .callbacks = callbacks,
@@ -427,7 +434,7 @@ pub const DataLink = struct {
             self.context,
             flatCount(decrypted),
         );
-        try self.looper.writeQueued(asConstPackets(decrypted), .tun);
+        try self.looper.writeQueued(asConstPackets(decrypted), .tun, null);
     }
 
     pub fn send(
@@ -462,7 +469,7 @@ pub const DataLink = struct {
             const start = core_mod.concurrency.monotonicNs();
             const deadline = core_mod.concurrency.deadlineAfterMs(start, timeout);
             while (true) {
-                self.looper.writeOutOfBand(processed.packets(), .link) catch |err| {
+                self.looper.writeOutOfBand(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                     const send_err: SendError = switch (err) {
                         error.WouldBlock, error.Backpressure => {
                             // This is a dumb busy-wait, but send() with timeout
@@ -475,8 +482,12 @@ pub const DataLink = struct {
                             return error.Timeout;
                         },
                         error.EndOfStream => error.EndOfStream,
+                        error.InvalidAddressFamily => error.InvalidAddressFamily,
+                        error.InvalidOffset => error.InvalidOffset,
+                        error.InvalidSocketMode => error.InvalidSocketMode,
                         error.LibcFailure => error.LibcFailure,
                         error.LooperUnavailable => error.LooperUnavailable,
+                        error.MissingDestination => error.MissingDestination,
                         error.OOBOutsideQueue => error.OOBOutsideQueue,
                         error.OutOfMemory => error.OutOfMemory,
                         error.WriteIncomplete => error.WriteIncomplete,
@@ -489,7 +500,7 @@ pub const DataLink = struct {
                 return;
             }
         } else {
-            self.looper.writeQueued(processed.packets(), .link) catch |err| {
+            self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                 log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
                     @errorName(err),
                 });
