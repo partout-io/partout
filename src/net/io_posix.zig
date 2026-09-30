@@ -135,7 +135,7 @@ pub const SocketWrapper = struct {
     is_closed: bool = false,
     allocator: std.mem.Allocator,
 
-    /// Creates a connected socket, or one unconnected UDP socket for the requested families.
+    /// Creates a connected socket (resolving hostnames in C), or one unconnected UDP socket for the requested families.
     /// A null endpoint selects unconnected UDP.
     /// Ownership transfers on successful looper_v2 attachment.
     pub fn create(
@@ -143,11 +143,7 @@ pub const SocketWrapper = struct {
         endpoint: ?api.ExtendedEndpoint,
         options: SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
-        const remote_endpoint = if (endpoint) |value|
-            io.SocketEndpoint.init(value) catch return null
-        else
-            null;
-        if (remote_endpoint == null and !options.ipv4 and !options.ipv6) return null;
+        if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
 
         const socket_endpoint = endpoint orelse api.ExtendedEndpoint{
             .address = if (options.ipv6) "::" else "0.0.0.0",
@@ -155,6 +151,18 @@ pub const SocketWrapper = struct {
         };
         const socket = try open(allocator, socket_endpoint, endpoint == null, options) orelse return null;
         errdefer io_c.pp_socket_free(socket);
+        const remote_endpoint: ?io.SocketEndpoint = if (endpoint) |value|
+            io.SocketEndpoint.init(value) catch blk: {
+                // Preserve the C resolver's selected peer without resolving again.
+                var address: io.SocketAddress = undefined;
+                if (!io_c.pp_socket_get_peer_address(socket, &address)) {
+                    io_c.pp_socket_free(socket);
+                    return null;
+                }
+                break :blk .{ .address = address, .type = value.proto.socket_type };
+            }
+        else
+            null;
         const wrapper = try allocator.create(SocketWrapper);
         wrapper.* = .{
             .socket = socket,

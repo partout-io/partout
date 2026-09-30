@@ -645,3 +645,14 @@ bool pp_socket_get_address(pp_socket sock, pp_socket_address *address) {
     return getsockname(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
            address_native_to_pp(address, &storage);
 }
+
+bool pp_socket_get_peer_address(pp_socket sock, pp_socket_address *address) {
+    if (!local_is_valid_socket(sock)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    struct sockaddr_storage storage;
+    os_socklen_t length = sizeof(storage);
+    return getpeername(sock->fd, (struct sockaddr *)&storage, &length) == 0 &&
+           address_native_to_pp(address, &storage);
+}

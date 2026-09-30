@@ -70,6 +70,8 @@ bool pp_socket_set_buffers(pp_socket sock,
                            int sendbuf_len);
 
 bool pp_socket_get_address(pp_socket sock, pp_socket_address *address);
+/* Returns the actual peer selected by connect(), including after DNS resolution. */
+bool pp_socket_get_peer_address(pp_socket sock, pp_socket_address *address);
 
 /* Native socket descriptor. */
 pp_socket_fd pp_socket_get_fd(pp_socket sock);
