@@ -70,7 +70,10 @@ pub const POSIXInterface = union(enum) {
     /// socket details to the looper. Streams and TUN retain their byte I/O path.
     pub fn readPacket(self: POSIXInterface, buf: []u8, address: *io.SocketAddress) Error!?usize {
         return switch (self) {
-            .socket => |socket| if (socket.isUnconnected()) try socket.receiveFrom(buf, address) else socket.read(buf),
+            .socket => |socket| if (socket.isUnconnected())
+                try socket.receiveFrom(buf, address)
+            else
+                socket.read(buf),
             else => self.read(buf),
         };
     }
