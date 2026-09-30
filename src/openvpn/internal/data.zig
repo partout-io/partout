@@ -373,9 +373,9 @@ pub const DataLink = struct {
         Looper.WriteError ||
         error{
             EndOfStream,
-            InvalidSocketMode,
-            InvalidOffset,
             InvalidAddressFamily,
+            InvalidOffset,
+            InvalidSocketMode,
             LibcFailure,
             OOBOutsideQueue,
             Timeout,
