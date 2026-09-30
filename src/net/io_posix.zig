@@ -81,7 +81,7 @@ pub const POSIXInterface = union(enum) {
     pub fn writePacket(self: POSIXInterface, data: []const u8, offset: usize, address: ?io.SocketAddress) Error!usize {
         return switch (self) {
             .socket => |socket| if (socket.isUnconnected())
-                socket.sendTo(data, address orelse return error.UnconnectedDestination)
+                socket.sendTo(data, address orelse return error.MissingDestination)
             else
                 socket.write(data, offset),
             else => self.write(data, offset),

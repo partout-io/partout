@@ -86,7 +86,7 @@ pub const Error = std.mem.Allocator.Error || error{
     InvalidAddressFamily,
     /// A native operation failed; the corresponding last-error code is available.
     LibcFailure,
-    UnconnectedDestination,
+    MissingDestination,
 };
 
 pub const SocketOptions = struct {

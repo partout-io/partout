@@ -86,7 +86,7 @@ pub const SessionError = error{
     TLSFailure,
     Timeout,
     TunnelFailure,
-    UnconnectedDestination,
+    MissingDestination,
     UnsupportedAlgorithm,
     UnsupportedCompression,
     UnsupportedCryptoBackend,

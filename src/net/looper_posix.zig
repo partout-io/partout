@@ -632,7 +632,7 @@ pub const PosixLooper = struct {
             return;
         };
 
-        if (current.native_io.isUnconnected() and destination == null) return error.UnconnectedDestination;
+        if (current.native_io.isUnconnected() and destination == null) return error.MissingDestination;
 
         const command = try self.createCommandNode(.{ .enable_write = .{
             .side = side,
@@ -663,7 +663,7 @@ pub const PosixLooper = struct {
         };
         self.lock.unlock();
 
-        if (side_io.native_io.isUnconnected() and destination == null) return error.UnconnectedDestination;
+        if (side_io.native_io.isUnconnected() and destination == null) return error.MissingDestination;
 
         for (packets) |packet| {
             const written = side_io.native_io.writePacket(packet, 0, destination) catch |err| {

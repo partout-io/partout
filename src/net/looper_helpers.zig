@@ -137,7 +137,7 @@ pub const AttachError = SubmissionError || error{
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 pub const ResumeReadingError = SubmissionError;
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
-pub const WriteError = SubmissionError || error{UnconnectedDestination};
+pub const WriteError = SubmissionError || error{MissingDestination};
 pub const WriteOOBError = WriteError || io.Error || error{
     OOBOutsideQueue,
     WriteIncomplete,

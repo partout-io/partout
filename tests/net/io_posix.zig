@@ -84,7 +84,7 @@ test "socket argument errors are rejected before native I/O" {
     socket.remote_endpoint = null;
     try std.testing.expectError(error.InvalidSocketMode, native.read(&buf));
     try std.testing.expectError(error.InvalidSocketMode, native.write("payload", 0));
-    try std.testing.expectError(error.UnconnectedDestination, native.writePacket("payload", 0, null));
+    try std.testing.expectError(error.MissingDestination, native.writePacket("payload", 0, null));
     for ([_]u8{ 0, 5, 255 }) |family| {
         var invalid_address = endpoint.address;
         invalid_address.family = family;
