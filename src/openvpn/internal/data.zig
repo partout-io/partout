@@ -487,9 +487,9 @@ pub const DataLink = struct {
                         error.InvalidAddressFamily => error.InvalidAddressFamily,
                         error.LibcFailure => error.LibcFailure,
                         error.LooperUnavailable => error.LooperUnavailable,
+                        error.MissingDestination => error.MissingDestination,
                         error.OOBOutsideQueue => error.OOBOutsideQueue,
                         error.OutOfMemory => error.OutOfMemory,
-                        error.MissingDestination => error.MissingDestination,
                         error.WriteIncomplete => error.WriteIncomplete,
                     };
                     log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
