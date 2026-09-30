@@ -482,9 +482,9 @@ pub const DataLink = struct {
                             return error.Timeout;
                         },
                         error.EndOfStream => error.EndOfStream,
-                        error.InvalidSocketMode => error.InvalidSocketMode,
-                        error.InvalidOffset => error.InvalidOffset,
                         error.InvalidAddressFamily => error.InvalidAddressFamily,
+                        error.InvalidOffset => error.InvalidOffset,
+                        error.InvalidSocketMode => error.InvalidSocketMode,
                         error.LibcFailure => error.LibcFailure,
                         error.LooperUnavailable => error.LooperUnavailable,
                         error.MissingDestination => error.MissingDestination,
