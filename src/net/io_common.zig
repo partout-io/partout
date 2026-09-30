@@ -16,8 +16,10 @@ const api = core.api;
 pub const io_c = ffi.io;
 
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
+pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };
 pub const ReachabilityInfo = io_c.pp_reachability;
 pub const SocketAddress = io_c.pp_socket_address;
+pub const SocketAddressError = error{InvalidEndpoint};
 pub const SocketType = api.SocketType;
 
 /// Resolved peer address and transport, copied by value across queue boundaries.
@@ -25,8 +27,11 @@ pub const SocketEndpoint = struct {
     address: SocketAddress,
     type: api.IPSocketType,
 
-    pub fn init(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!SocketEndpoint {
-        return .{ .address = try socketAddress(endpoint), .type = endpoint.proto.socket_type };
+    pub fn init(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketEndpoint {
+        return .{
+            .address = try socketAddress(endpoint),
+            .type = endpoint.proto.socket_type,
+        };
     }
 
     pub fn plainSocketType(self: SocketEndpoint) SocketType {
@@ -37,17 +42,30 @@ pub const SocketEndpoint = struct {
     }
 
     /// Returns a textual IP borrowed from buffer, for tunnel settings and logging.
-    pub fn ipAddress(self: SocketEndpoint, buffer: []u8) error{ InvalidEndpoint, NoSpaceLeft }!api.Address {
+    pub fn ipAddress(self: SocketEndpoint, buffer: []u8) IPAddressError!api.Address {
         const bytes = self.address.address;
         return switch (self.address.family) {
-            4 => .{ .raw = try std.fmt.bufPrint(buffer, "{d}.{d}.{d}.{d}", .{ bytes[0], bytes[1], bytes[2], bytes[3] }), .family = .v4 },
+            4 => .{
+                .raw = try std.fmt.bufPrint(
+                    buffer,
+                    "{d}.{d}.{d}.{d}",
+                    .{ bytes[0], bytes[1], bytes[2], bytes[3] },
+                ),
+                .family = .v4,
+            },
             6 => blk: {
-                const ip = std.Io.net.Ip6Address.Unresolved{ .bytes = bytes, .interface_name = null };
+                const ip = std.Io.net.Ip6Address.Unresolved{
+                    .bytes = bytes,
+                    .interface_name = null,
+                };
                 const text = if (self.address.scope_id == 0)
                     try std.fmt.bufPrint(buffer, "{f}", .{ip})
                 else
                     try std.fmt.bufPrint(buffer, "{f}%{d}", .{ ip, self.address.scope_id });
-                break :blk .{ .raw = text, .family = .v6 };
+                break :blk .{
+                    .raw = text,
+                    .family = .v6,
+                };
             },
             else => error.InvalidEndpoint,
         };
@@ -79,7 +97,7 @@ pub const SocketOptions = struct {
 };
 
 /// Converts a resolved endpoint; hostnames and named IPv6 zones must be resolved first.
-pub fn socketAddress(endpoint: api.ExtendedEndpoint) error{InvalidEndpoint}!SocketAddress {
+pub fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddress {
     var text = endpoint.address;
     var scope: u32 = 0;
     if (std.mem.lastIndexOfScalar(u8, text, '%')) |index| {

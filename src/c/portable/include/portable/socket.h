@@ -43,7 +43,7 @@ typedef struct {
     void *_Nullable configure_ctx;
 } pp_socket_open_options;
 
-pp_socket _Nullable pp_socket_open(const char *ip_addr,
+pp_socket _Nullable pp_socket_open(const char *hostname,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    const pp_socket_open_options *options);

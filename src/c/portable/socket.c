@@ -120,7 +120,7 @@ static pp_socket pp_socket_create(pp_socket_fd fd) {
 
 /* Open a nonblocking UDP/TCP socket. DNS resolution and connection setup
  * may still wait; timeout_ms limits the connection wait. */
-pp_socket pp_socket_open(const char *ip_addr,
+pp_socket pp_socket_open(const char *hostname,
                          pp_socket_proto proto,
                          uint16_t port,
                          const pp_socket_open_options *options) {
@@ -153,7 +153,7 @@ pp_socket pp_socket_open(const char *ip_addr,
     os_socklen_t numeric_addrlen = 0;
 
     /* Perform DNS resolution if necessary. */
-    if (!local_parse_numeric_addr(ip_addr, port, &numeric_addr, &numeric_addrlen)) {
+    if (!local_parse_numeric_addr(hostname, port, &numeric_addr, &numeric_addrlen)) {
         /* Local bind addresses must be numeric; only peers use DNS resolution. */
         if (options->unconnected) {
             local_set_error(LOCAL_SOCKET_ERROR(EINVAL));
@@ -177,11 +177,13 @@ pp_socket pp_socket_open(const char *ip_addr,
 #endif
 
         snprintf(port_str, sizeof(port_str), "%u", port);
-        const int ret = local_getaddrinfo(ip_addr,
-                                        port_str,
-                                        &hints,
-                                        options->reachability,
-                                        &resolved);
+        const int ret = local_getaddrinfo(
+            hostname,
+            port_str,
+            &hints,
+            options->reachability,
+            &resolved
+        );
         if (ret != 0) {
             local_print_error("pp_dns_resolve()");
             goto failure;
@@ -198,10 +200,12 @@ pp_socket pp_socket_open(const char *ip_addr,
                 local_print_error("configure()");
                 goto failure;
             }
-            const int ret = local_connect_with_timeout(new_fd,
-                                                    p->ai_addr,
-                                                    (os_socklen_t)p->ai_addrlen,
-                                                    options->timeout_ms);
+            const int ret = local_connect_with_timeout(
+                new_fd,
+                p->ai_addr,
+                (os_socklen_t)p->ai_addrlen,
+                options->timeout_ms
+            );
             if (ret != 0) {
                 local_close_fd(new_fd);
                 new_fd = local_invalid_fd();
