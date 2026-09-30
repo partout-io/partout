@@ -34,12 +34,16 @@ test "SocketEndpoint preserves transport and formats owned-by-caller IP text" {
     const api = @import("source").core.api;
     const cases = [_]struct { text: []const u8, transport: api.IPSocketType, family: api.Address.Family }{
         .{ .text = "192.0.2.1", .transport = .udp, .family = .v4 },
+        .{ .text = "192.0.2.1", .transport = .udp4, .family = .v4 },
+        .{ .text = "192.0.2.1", .transport = .tcp, .family = .v4 },
+        .{ .text = "192.0.2.1", .transport = .tcp4, .family = .v4 },
         .{ .text = "2001:db8::1", .transport = .tcp6, .family = .v6 },
         .{ .text = "fe80::1%12", .transport = .udp6, .family = .v6 },
     };
     for (cases) |case| {
         const endpoint = try io.SocketEndpoint.init(.{ .address = case.text, .proto = .init(case.transport, 1194) });
-        try std.testing.expectEqual(if (case.transport == .tcp6) io.SocketType.tcp else .udp, endpoint.type);
+        try std.testing.expectEqual(case.transport, endpoint.type);
+        try std.testing.expectEqual(if (case.transport == .tcp or case.transport == .tcp4 or case.transport == .tcp6) io.SocketType.tcp else .udp, endpoint.plainSocketType());
         var buffer: [64]u8 = undefined;
         const address = try endpoint.ipAddress(&buffer);
         try std.testing.expectEqualStrings(case.text, address.raw);

@@ -22,6 +22,9 @@ test "C socket I/O selects addressing by socket mode" {
         try std.testing.expect(io.io_c.pp_socket_get_address(server, &peer));
         const client = io.io_c.pp_socket_open(ip, io.io_c.PPSocketProtoUDP, peer.port, &.{ .timeout_ms = 1000 }) orelse return error.SocketFailed;
         defer io.io_c.pp_socket_free(client);
+        var connected_peer: io.SocketAddress = undefined;
+        try std.testing.expect(io.io_c.pp_socket_get_peer_address(client, &connected_peer));
+        try std.testing.expectEqualDeep(peer, connected_peer);
         const invalid = std.mem.zeroes(io.SocketAddress);
         // A connected socket ignores even an invalid destination.
         try std.testing.expectEqual(@as(c_int, 3), io.io_c.pp_socket_write(client, "one", 3, &invalid));

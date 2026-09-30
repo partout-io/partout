@@ -327,13 +327,45 @@ test "connected socket wrapper does not retain endpoint text" {
     defer socket.destroy();
     @memset(&text, 'x');
     try std.testing.expectEqualDeep(address, socket.remoteAddress().?);
-    try std.testing.expectEqual(io.SocketType.udp, socket.remote_endpoint.?.type);
+    try std.testing.expectEqual(source.core.api.IPSocketType.udp, socket.remote_endpoint.?.type);
     try std.testing.expect(!socket.isUnconnected());
     try std.testing.expectEqual(@as(usize, 5), try socket.linkDescriptor().io.writePacket("owned", 0, null));
     var buf: [32]u8 = undefined;
     var source_address: io.SocketAddress = undefined;
     const n = try receive(peer, &buf, &source_address);
     try std.testing.expectEqualStrings("owned", buf[0..n]);
+}
+
+test "connected socket wrapper resolves hostnames and retains the selected peer" {
+    const peer = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
+    defer peer.destroy();
+    const bound = try peer.localAddress();
+    var hostname = "localhost".*;
+    const socket = (try io.SocketWrapper.create(allocator, .{ .address = &hostname, .proto = .init(.udp, bound.port) }, .{
+        .timeout_ms = 1000,
+    })) orelse return error.SocketFailed;
+    defer socket.destroy();
+    @memset(&hostname, 'x');
+    try std.testing.expect(!socket.isUnconnected());
+    const remote = socket.remoteAddress().?;
+    try std.testing.expectEqualDeep(try destination(peer, remote.family), remote);
+    const native = socket.linkDescriptor().io;
+    try std.testing.expectEqual(@as(usize, 7), try native.writePacket("request", 0, null));
+    var buf: [32]u8 = undefined;
+    var sender: io.SocketAddress = undefined;
+    const n = try receive(peer, &buf, &sender);
+    try std.testing.expectEqualStrings("request", buf[0..n]);
+    _ = try peer.sendTo("reply", sender);
+    for (0..5000) |_| {
+        const count = native.read(&buf) catch |err| {
+            if (err != error.WouldBlock) return err;
+            _ = libc.usleep(1000);
+            continue;
+        };
+        try std.testing.expectEqualStrings("reply", buf[0..count.?]);
+        return;
+    }
+    return error.Timeout;
 }
 
 test "unconnected socket family restrictions remain explicit" {
