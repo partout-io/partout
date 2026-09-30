@@ -271,14 +271,6 @@ int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
     }
     return 0;
 }
-
-int pp_fd_restore_blocking(pp_fd fd, int original_flags) {
-    if (fcntl(fd, F_SETFL, original_flags) < 0) {
-        pp_clog(PPLogLevelFault, "fcntl(): restore");
-        return -1;
-    }
-    return 0;
-}
 #endif
 
 int pp_io_last_error_binding(void) {
