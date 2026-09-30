@@ -193,6 +193,12 @@ test "OpenVPN connection failure dispositions" {
     try std.testing.expect(isRecoverableError(error.OutOfMemory));
     try std.testing.expect(isRecoverableError(error.ServerShutdown));
     try std.testing.expect(isRecoverableError(error.TunNotAvailable));
+
+    inline for (.{ source.openvpn_connection_v2, connection }) |implementation| {
+        inline for (.{ error.InvalidSocketMode, error.InvalidOffset, error.InvalidAddressFamily, error.UnconnectedDestination }) |err| {
+            try std.testing.expect(!implementation.testing.isRecoverableError(err));
+        }
+    }
 }
 
 test "OpenVPN failures separate protocol subcodes from general codes" {
@@ -218,6 +224,10 @@ test "OpenVPN failures separate protocol subcodes from general codes" {
             .{ error.BadCredentials, api.PartoutErrorCode.authentication },
             .{ error.CryptoEncryption, api.PartoutErrorCode.crypto },
             .{ error.InvalidEndpoint, api.PartoutErrorCode.invalidValue },
+            .{ error.InvalidSocketMode, api.PartoutErrorCode.invalidValue },
+            .{ error.InvalidOffset, api.PartoutErrorCode.invalidValue },
+            .{ error.InvalidAddressFamily, api.PartoutErrorCode.invalidValue },
+            .{ error.UnconnectedDestination, api.PartoutErrorCode.invalidValue },
             .{ error.MuxFailure, api.PartoutErrorCode.fdUnavailable },
             .{ error.NetworkChanged, api.PartoutErrorCode.networkChanged },
             .{ error.Timeout, api.PartoutErrorCode.timeout },

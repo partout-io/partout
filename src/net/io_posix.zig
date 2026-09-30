@@ -81,7 +81,7 @@ pub const POSIXInterface = union(enum) {
     pub fn writePacket(self: POSIXInterface, data: []const u8, offset: usize, address: ?io.SocketAddress) Error!usize {
         return switch (self) {
             .socket => |socket| if (socket.isUnconnected())
-                socket.sendTo(data, address orelse return error.LibcFailure)
+                socket.sendTo(data, address orelse return error.UnconnectedDestination)
             else
                 socket.write(data, offset),
             else => self.write(data, offset),
@@ -234,13 +234,14 @@ pub const SocketWrapper = struct {
     }
 
     fn read(self: *const SocketWrapper, buf: []u8) Error!?usize {
-        if (self.isUnconnected()) return error.LibcFailure;
+        if (self.isUnconnected()) return error.InvalidSocketMode;
         const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, null);
         return mapReadResult(.link, read_count, self.closes_on_empty_read);
     }
 
     fn write(self: *const SocketWrapper, data: []const u8, offset: usize) Error!usize {
-        if (self.isUnconnected() or offset > data.len) return error.LibcFailure;
+        if (self.isUnconnected()) return error.InvalidSocketMode;
+        if (offset > data.len) return error.InvalidOffset;
         const written = io_c.pp_socket_write(self.socket, data.ptr + offset, data.len - offset, null);
         return mapWriteResult(.link, written, false);
     }
@@ -254,7 +255,7 @@ pub const SocketWrapper = struct {
     }
 
     pub fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
-        if (!self.isUnconnected()) return error.LibcFailure;
+        if (!self.isUnconnected()) return error.InvalidSocketMode;
         const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
         if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
         if (count < 0) return error.LibcFailure;
@@ -262,7 +263,8 @@ pub const SocketWrapper = struct {
     }
 
     pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
-        if (!self.isUnconnected()) return error.LibcFailure;
+        if (!self.isUnconnected()) return error.InvalidSocketMode;
+        if (address.family != 4 and address.family != 6) return error.InvalidAddressFamily;
         return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
     }
 
@@ -337,7 +339,7 @@ pub const TunWrapper = struct {
     }
 
     fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
-        if (offset > data.len) return error.LibcFailure;
+        if (offset > data.len) return error.InvalidOffset;
         const written = io_c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
         return mapWriteResult(.tun, written, true);
     }

@@ -81,7 +81,12 @@ pub const Error = std.mem.Allocator.Error || error{
     WouldBlock,
     Backpressure,
     EndOfStream,
+    InvalidSocketMode,
+    InvalidOffset,
+    InvalidAddressFamily,
+    /// A native operation failed; the corresponding last-error code is available.
     LibcFailure,
+    UnconnectedDestination,
 };
 
 pub const SocketOptions = struct {

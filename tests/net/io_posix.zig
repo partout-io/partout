@@ -59,9 +59,40 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     try native_tun.resetEvents();
     // Invalid offsets are rejected before reaching the native handles.
     for ([_]io_posix.POSIXInterface{ native_socket, native_tun }) |native| {
-        try std.testing.expectError(error.LibcFailure, native.write("", 1));
+        try std.testing.expectError(error.InvalidOffset, native.write("", 1));
     }
     native_tun.cleanup();
     native_tun.cleanup();
     try std.testing.expect(tun.is_closed);
+}
+
+test "socket argument errors are rejected before native I/O" {
+    const endpoint = try io.SocketEndpoint.init(.{ .address = "127.0.0.1", .proto = .init(.udp, 1194) });
+    var socket = io_posix.SocketWrapper{
+        .allocator = std.testing.allocator,
+        .socket = null,
+        .remote_endpoint = endpoint,
+    };
+    const native = io_posix.POSIXInterface{ .socket = &socket };
+    var buf: [8]u8 = undefined;
+    var address: io.SocketAddress = undefined;
+
+    try std.testing.expectError(error.InvalidSocketMode, socket.receiveFrom(&buf, &address));
+    try std.testing.expectError(error.InvalidSocketMode, socket.sendTo("payload", endpoint.address));
+    try std.testing.expectError(error.InvalidOffset, native.write("payload", 8));
+
+    socket.remote_endpoint = null;
+    try std.testing.expectError(error.InvalidSocketMode, native.read(&buf));
+    try std.testing.expectError(error.InvalidSocketMode, native.write("payload", 0));
+    try std.testing.expectError(error.UnconnectedDestination, native.writePacket("payload", 0, null));
+    for ([_]u8{ 0, 5, 255 }) |family| {
+        var invalid_address = endpoint.address;
+        invalid_address.family = family;
+        try std.testing.expectError(error.InvalidAddressFamily, socket.sendTo("payload", invalid_address));
+        try std.testing.expectError(error.InvalidAddressFamily, native.writePacket("payload", 0, invalid_address));
+    }
+
+    // Valid arguments reach the invalid native handle and retain its native error.
+    try std.testing.expectError(error.LibcFailure, socket.sendTo("payload", endpoint.address));
+    try std.testing.expectEqual(@as(c_int, @intFromEnum(std.c.E.BADF)), native.lastErrorCode());
 }
