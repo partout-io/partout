@@ -204,6 +204,11 @@ pub const SocketWrapper = struct {
         defer c_address.deinit();
 
         const reachability = options.reachability orelse reachabilityNone();
+        log.writef(.debug, "SocketWrapper: Opening POSIX socket, protocol={s}, mode={s}, dual_stack={}", .{
+            @tagName(endpoint.plainSocketType()),
+            if (unconnected) "unconnected (bind)" else "connected (connect)",
+            unconnected and options.ipv4 and options.ipv6,
+        });
         const socket = io_c.pp_socket_open(
             c_address.ptr(),
             socketProto(endpoint),
