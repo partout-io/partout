@@ -47,7 +47,7 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-OpenSSL and MbedTLS come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project. The WireGuard Go bridge lives in `src/wireguard/go` alongside its Zig/C consumers and is built from source. WireGuard builds require Go 1.24 or newer; Windows also requires LLVM-MinGW (`LLVM_MINGW_ROOT`).
+OpenSSL and MbedTLS come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project. The WireGuard Go bridge lives in `src/wireguard/go` alongside its Zig/C consumers and is built from source. WireGuard builds require Go 1.24 or newer. Windows uses `zig cc` for cgo and `zig dlltool` for import libraries, without requiring LLVM-MinGW. Apple, Android, and Linux retain their default C toolchains.
 
 #### Build
 

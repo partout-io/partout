@@ -18,3 +18,6 @@ scripts/build-wg-go-local.sh
 CMake and the Apple XCFramework builder compile this source automatically.
 Direct Zig builds accept the include and library paths printed by the local
 build script. Apple builds retain the sleep-aware Go runtime patch.
+
+Windows builds use `zig cc` for cgo and `zig dlltool` for import libraries.
+Apple, Android, and Linux retain their default C toolchains.

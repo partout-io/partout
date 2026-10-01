@@ -7,11 +7,11 @@ file(MAKE_DIRECTORY "${PARTOUT_WGGO_LIBRARY_DIR}")
 
 if(ARCH_NAME MATCHES "^(arm64|aarch64)$")
     set(wg_arch arm64)
-    set(wg_mingw aarch64)
+    set(wg_zig_arch aarch64)
     set(wg_machine arm64)
 elseif(ARCH_NAME MATCHES "^(x64|x86_64|amd64)$")
     set(wg_arch amd64)
-    set(wg_mingw x86_64)
+    set(wg_zig_arch x86_64)
     set(wg_machine i386:x86-64)
 else()
     message(FATAL_ERROR "Unsupported wg-go architecture: ${ARCH_NAME}")
@@ -55,15 +55,16 @@ else()
     set(wg_ldflags "-w -extldflags=-Wl,-soname,libwg-go.so")
     set(wg_library "${PARTOUT_WGGO_LIBRARY_DIR}/libwg-go.so")
     if(WIN32)
-        find_program(PARTOUT_WGGO_CC "${wg_mingw}-w64-mingw32-clang"
-            HINTS "$ENV{LLVM_MINGW_ROOT}/bin" REQUIRED)
-        find_program(PARTOUT_WGGO_DLLTOOL llvm-dlltool
-            HINTS "$ENV{LLVM_MINGW_ROOT}/bin" REQUIRED)
-        set(wg_env CGO_ENABLED=1 GOOS=windows "GOARCH=${wg_arch}" "CC=${PARTOUT_WGGO_CC}")
+        find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
+        # Go owns the final link; avoid requiring Zig's UBSan runtime.
+        set(wg_target "${wg_zig_arch}-windows-gnu")
+        set(wg_env CGO_ENABLED=1 GOOS=windows "GOARCH=${wg_arch}"
+            "CC=\"${PARTOUT_ZIG_EXECUTABLE}\" cc -fno-sanitize=undefined -target ${wg_target}"
+            "CXX=\"${PARTOUT_ZIG_EXECUTABLE}\" c++ -fno-sanitize=undefined -target ${wg_target}")
         set(wg_ldflags -w)
         set(wg_library "${PARTOUT_WGGO_LIBRARY_DIR}/wg-go.dll")
         set(wg_implib "${PARTOUT_WGGO_LIBRARY_DIR}/wg-go.lib")
-        set(wg_import_command COMMAND "${PARTOUT_WGGO_DLLTOOL}"
+        set(wg_import_command COMMAND "${PARTOUT_ZIG_EXECUTABLE}" dlltool
             -m "${wg_machine}" -d "${PARTOUT_WGGO_SOURCE}/exports.def" -l "${wg_implib}")
     elseif(ANDROID)
         list(APPEND wg_env GOOS=android)

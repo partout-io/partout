@@ -1,17 +1,13 @@
-@if "%PROCESSOR_ARCHITECTURE%"=="ARM64" set TARGET=aarch64-w64-mingw32
-@if "%PROCESSOR_ARCHITECTURE%"=="AMD64" set TARGET=x86_64-w64-mingw32
-@if not defined TARGET (
-    echo Unsupported GOARCH=%GOARCH%
+@echo off
+if "%PROCESSOR_ARCHITECTURE%"=="ARM64" set TARGET=aarch64-windows-gnu
+if "%PROCESSOR_ARCHITECTURE%"=="AMD64" set TARGET=x86_64-windows-gnu
+if not defined TARGET (
+    echo Unsupported PROCESSOR_ARCHITECTURE=%PROCESSOR_ARCHITECTURE%
     exit /b 1
 )
-@if not defined LLVM_MINGW_ROOT (
-    echo LLVM_MINGW_ROOT is required
+where zig >nul 2>nul
+if errorlevel 1 (
+    echo Zig is required
     exit /b 1
 )
-@set CC=%LLVM_MINGW_ROOT%\bin\%TARGET%-clang.exe
-@set CXX=%LLVM_MINGW_ROOT%\bin\%TARGET%-clang++.exe
-@if not exist "%CC%" (
-    echo Missing clang: %CC%
-    exit /b 1
-)
-nmake /f Makefile.windows DESTDIR=%~1 TARGET=%TARGET% CC=%CC% CXX=%CXX%
+nmake /f Makefile.windows DESTDIR="%~1" TARGET=%TARGET% "CC=zig cc -fno-sanitize=undefined" "CXX=zig c++ -fno-sanitize=undefined"
