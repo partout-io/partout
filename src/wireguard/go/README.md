@@ -21,3 +21,8 @@ build script. Apple builds retain the sleep-aware Go runtime patch.
 
 Windows builds use `zig cc` for cgo and `zig dlltool` for import libraries.
 Apple, Android, and Linux retain their default C toolchains.
+
+The Xcode XCFramework prebuild caches each Go archive under
+`.build/wg-go/xcframework`. Unchanged sources, headers, Go/compiler settings,
+SDK, and target reuse the archive without invoking Go. Source or build-input
+changes rebuild the affected slice automatically.

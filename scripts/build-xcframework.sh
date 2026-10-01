@@ -129,10 +129,26 @@ chmod 755 "$work" "$work/install" "$cache" "$global_cache"
 # Keep the patched runtime across builds; invalidate it when Go or the patch changes.
 wg_runtime_key=$( { go version; go env GOROOT; cat "$repo_dir"/src/wireguard/go/goruntime-*.diff; } | shasum -a 256 | cut -d ' ' -f 1)
 wg_runtime="$repo_dir/.build/wg-go/goroot-$wg_runtime_key"
+wg_cache="$repo_dir/.build/wg-go/xcframework"
+# Hash contents and names so edits, additions, and removals invalidate the archive.
+# Keep this outside the slice loop; the inputs are common to every Apple target.
+wg_source_key=$(
+    cd "$repo_dir/src/wireguard/go"
+    {
+        shasum -a 256 Makefile go.mod go.sum goruntime-*.diff
+        find src include cmake -type f -exec shasum -a 256 {} +
+    } | LC_ALL=C sort | shasum -a 256 | cut -d ' ' -f 1
+)
+# Do not hash all of `go env`: GOGCCFLAGS contains a fresh temporary path.
+wg_toolchain_key=$( {
+    go env -json CC CXX CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CGO_LDFLAGS \
+        GOFLAGS GOEXPERIMENT GOTOOLCHAIN GOWORK GOAMD64 GOARM64 GOFIPS140
+    xcrun clang --version
+} | shasum -a 256 | cut -d ' ' -f 1)
 
 build_slice() {
     local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
-    local sdk install vendor vendor_path library go_arch go_os
+    local sdk install vendor vendor_path library go_arch go_os wg_key wg_slice
     local vendor_args=() vendor_libraries=()
 
     [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
@@ -184,13 +200,32 @@ build_slice() {
     [[ $arch != x86_64 ]] || go_arch=amd64
     go_os=ios
     [[ $platform != macos ]] || go_os=darwin
-    make -C "$repo_dir/src/wireguard/go" install APPLE=1 \
-        "GOOS=$go_os" "GOARCH=$go_arch" \
-        "SDKROOT=$sdk" "TARGET=$clang_target" \
-        "TMPROOTDIR=$wg_runtime" \
-        "BUILDDIR=$work/go/$platform-$arch" "DESTDIR=$install/wg-go"
-    vendor_args+=("-Dwg-go-include=$install/wg-go/include" "-Dwg-go-lib=$install/wg-go/lib")
-    vendor_libraries+=("$install/wg-go/lib/libwg-go.a")
+    wg_key=$( {
+        printf '%s\n' "$wg_source_key" "$wg_toolchain_key" "$wg_runtime_key" \
+            "$go_os" "$go_arch" "$sdk" "$clang_target"
+        xcrun --sdk "$sdk_name" --show-sdk-build-version
+    } | shasum -a 256 | cut -d ' ' -f 1)
+    wg_slice="$wg_cache/$platform-$arch"
+    if [[ -f "$wg_slice/build-key" &&
+          $(cat "$wg_slice/build-key") == "$wg_key" &&
+          -f "$wg_slice/install/lib/libwg-go.a" &&
+          -f "$wg_slice/install/include/wg_go/wg_go.h" ]]; then
+        echo "Using cached wg-go for $platform $arch"
+    else
+        echo "Building wg-go for $platform $arch"
+        mkdir -p "$wg_slice"
+        # Do not consider an interrupted or failed rebuild a valid cache entry.
+        rm -f "$wg_slice/build-key"
+        rm -rf "$wg_slice/install"
+        make -C "$repo_dir/src/wireguard/go" install APPLE=1 \
+            "GOOS=$go_os" "GOARCH=$go_arch" \
+            "SDKROOT=$sdk" "TARGET=$clang_target" \
+            "TMPROOTDIR=$wg_runtime" \
+            "BUILDDIR=$wg_slice/build" "DESTDIR=$wg_slice/install"
+        printf '%s\n' "$wg_key" > "$wg_slice/build-key"
+    fi
+    vendor_args+=("-Dwg-go-include=$wg_slice/install/include" "-Dwg-go-lib=$wg_slice/install/lib")
+    vendor_libraries+=("$wg_slice/install/lib/libwg-go.a")
 
     echo "Building $platform $arch"
     (
