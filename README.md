@@ -47,7 +47,7 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-Partout consumes system libraries or artifacts published by the [prebuilts][github-prebuilts] project; it does not build vendor sources.
+OpenSSL and MbedTLS come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project. The WireGuard Go bridge lives in `src/wireguard/go` alongside its Zig/C consumers and is built from source. WireGuard builds require Go 1.24 or newer; Windows also requires LLVM-MinGW (`LLVM_MINGW_ROOT`).
 
 #### Build
 
@@ -63,7 +63,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-install <dir>`: Install the completed build artifacts into a directory
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
 - `-crypto (openssl|mbedtls[,openssl|mbedtls...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
-- `-wireguard`: Enable WireGuard
+- `-wireguard`: Enable WireGuard and build the local Go bridge
 - `-android`: Build for Android
 - `-prebuilts <version>`: Use vendor archives from the matching [`partout-io/prebuilts`][github-prebuilts] GitHub Release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
 
@@ -96,6 +96,22 @@ bin/windows-arm64/partout/bin/partout.dll
 Partout must be bundled with the enabled shared vendor libraries to work. Building for Android requires access to the Android NDK.
 
 Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
+
+### Developing the WireGuard Go bridge
+
+The Go module, C ABI headers, and upstream runtime patch live in
+`src/wireguard/go`. Keep changes to this ABI and its Zig/C callers in the same
+commit. The upstream WireGuard implementation remains pinned in `go.mod`.
+
+On macOS or Linux, run `scripts/build-wg-go-local.sh` to rebuild the bridge.
+It prints the include/library options to pass to a direct `zig build` invocation.
+CMake builds and `scripts/build-xcframework.sh` rebuild it automatically; Apple
+XCFramework builds download only the crypto dependencies from prebuilts.
+
+Check the Go package with `go -C src/wireguard/go test ./src/...`
+(the imported master bridge currently has no Go test files).
+`ci/test-zig-apple-vendors.sh prebuilts` builds the local bridge before testing
+its integration with Zig and the prebuilt crypto libraries.
 
 ## Demo
 

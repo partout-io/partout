@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Crypto backends default to all. WireGuard is always included.
-vendors=(wg-go)
+vendors=()
 if [[ -n $crypto_backends ]]; then
     [[ $crypto_backends != ,* && $crypto_backends != *, && $crypto_backends != *,,* ]] ||
         fail "invalid crypto backend list: $crypto_backends"
@@ -51,7 +51,7 @@ if [[ -n $crypto_backends ]]; then
             openssl|mbedtls) ;;
             *) fail "unknown crypto backend: $backend" ;;
         esac
-        [[ " ${vendors[*]} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
+        [[ " ${vendors[*]-} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
         vendors+=("$backend")
     done
 fi
@@ -60,7 +60,7 @@ fi
     fail "invalid prebuilts version: $prebuilts_version"
 [[ $output == *.xcframework ]] || fail "output must have an .xcframework extension"
 
-for tool in curl ditto lipo swift xcodebuild xcrun zig; do
+for tool in curl ditto go lipo make swift xcodebuild xcrun zig; do
     command -v "$tool" >/dev/null || fail "missing required tool: $tool"
 done
 
@@ -71,14 +71,14 @@ version=$(sed -nE 's/^pub const number = "([0-9A-Za-z.+-]+)";$/\1/p' "$repo_dir/
 [[ -n $version ]] || fail "unable to read the library version"
 
 download_prebuilts() {
+    [[ -n $crypto_backends ]] || return 0
     local repository=https://github.com/partout-io/prebuilts
     local base temp vendor archive checksum expected actual
 
     if [[ -f "$prebuilts/prebuilts-version.txt" &&
           $(cat "$prebuilts/prebuilts-version.txt") == "$prebuilts_version" &&
           -d "$prebuilts/openssl.xcframework" &&
-          -d "$prebuilts/mbedtls.xcframework" &&
-          -d "$prebuilts/wg-go.xcframework" ]]; then
+          -d "$prebuilts/mbedtls.xcframework" ]]; then
         echo "Using local prebuilts $prebuilts_version"
         return
     fi
@@ -88,7 +88,7 @@ download_prebuilts() {
     trap 'rm -rf "$temp"' EXIT
 
     echo "Using prebuilts $prebuilts_version"
-    for vendor in openssl mbedtls wg-go; do
+    for vendor in openssl mbedtls; do
         archive="$vendor.xcframework.zip"
         checksum="$archive.checksum"
         curl -fsSL --retry 3 -o "$temp/$checksum" "$base/$checksum"
@@ -126,9 +126,13 @@ rm -rf "$work"
 mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms" "$cache" "$global_cache"
 chmod 755 "$work" "$work/install" "$cache" "$global_cache"
 
+# Keep the patched runtime across builds; invalidate it when Go or the patch changes.
+wg_runtime_key=$( { go version; go env GOROOT; cat "$repo_dir"/src/wireguard/go/goruntime-*.diff; } | shasum -a 256 | cut -d ' ' -f 1)
+wg_runtime="$repo_dir/.build/wg-go/goroot-$wg_runtime_key"
+
 build_slice() {
     local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
-    local sdk install vendor vendor_path library
+    local sdk install vendor vendor_path library go_arch go_os
     local vendor_args=() vendor_libraries=()
 
     [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
@@ -168,13 +172,25 @@ build_slice() {
 
     sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
     install="$work/install/$platform-$arch"
-    for vendor in "${vendors[@]}"; do
+    for vendor in ${vendors[@]+"${vendors[@]}"}; do
         vendor_path="$prebuilts/$vendor.xcframework/$vendor_id"
         library="$vendor_path/lib$vendor.a"
         [[ -f $library ]] || fail "missing vendor library: $library"
         vendor_args+=("-D$vendor-include=$vendor_path/Headers" "-D$vendor-lib=$vendor_path")
         vendor_libraries+=("$library")
     done
+
+    go_arch=$arch
+    [[ $arch != x86_64 ]] || go_arch=amd64
+    go_os=ios
+    [[ $platform != macos ]] || go_os=darwin
+    make -C "$repo_dir/src/wireguard/go" install APPLE=1 \
+        "GOOS=$go_os" "GOARCH=$go_arch" \
+        "SDKROOT=$sdk" "TARGET=$clang_target" \
+        "TMPROOTDIR=$wg_runtime" \
+        "BUILDDIR=$work/go/$platform-$arch" "DESTDIR=$install/wg-go"
+    vendor_args+=("-Dwg-go-include=$install/wg-go/include" "-Dwg-go-lib=$install/wg-go/lib")
+    vendor_libraries+=("$install/wg-go/lib/libwg-go.a")
 
     echo "Building $platform $arch"
     (

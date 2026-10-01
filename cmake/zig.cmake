@@ -84,31 +84,7 @@ if(PP_BUILD_USE_OPENVPN)
 endif()
 
 if(PP_BUILD_USE_WIREGUARD)
-    if(PP_SYSTEM_VENDORS_AVAILABLE)
-        find_path(PARTOUT_WGGO_INCLUDE_DIR wg_go/wg_go.h)
-        find_library(PARTOUT_WGGO_LIBRARY wg-go)
-    endif()
-    if(PP_SYSTEM_VENDORS_AVAILABLE AND PARTOUT_WGGO_INCLUDE_DIR AND
-       PARTOUT_WGGO_LIBRARY)
-        get_filename_component(PARTOUT_WGGO_LIBRARY_DIR
-            "${PARTOUT_WGGO_LIBRARY}" DIRECTORY)
-        message(STATUS "Using system wg-go")
-        if(NOT PARTOUT_WGGO_LIBRARY MATCHES "\\.(a|lib)$")
-            add_library(partout_wg_go SHARED IMPORTED GLOBAL)
-            set_target_properties(partout_wg_go PROPERTIES
-                IMPORTED_LOCATION "${PARTOUT_WGGO_LIBRARY}")
-            list(APPEND PARTOUT_RUNTIME_LIBRARIES partout_wg_go)
-        endif()
-    else()
-        partout_use_prebuilt_vendor(wg-go WGGO_DIR)
-        set(PARTOUT_WGGO_INCLUDE_DIR "${WGGO_DIR}/include")
-        set(PARTOUT_WGGO_LIBRARY_DIR "${WGGO_DIR}/lib")
-        if(NOT APPLE)
-            include("${WGGO_DIR}/lib/cmake/WgGo/WgGoConfig.cmake")
-            set_property(TARGET WgGo::wg-go PROPERTY IMPORTED_GLOBAL TRUE)
-            list(APPEND PARTOUT_RUNTIME_LIBRARIES WgGo::wg-go)
-        endif()
-    endif()
+    include("${CMAKE_CURRENT_LIST_DIR}/wireguard-go.cmake")
     list(APPEND PARTOUT_ZIG_ARGS
         -Dwireguard=true
         "-Dwg-go-include=${PARTOUT_WGGO_INCLUDE_DIR}"
@@ -185,6 +161,9 @@ if(PP_BUILD_LIBRARY)
         COMMAND_EXPAND_LISTS
         VERBATIM
     )
+    if(PP_BUILD_USE_WIREGUARD)
+        add_dependencies(partout partout_wg_go_build)
+    endif()
     if(PP_BUILD_WINRT)
         add_dependencies(partout partout-winrt)
     endif()

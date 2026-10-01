@@ -1,0 +1,4 @@
+module wg_go {
+    header "wg_go/wg_go.h"
+    export *
+}

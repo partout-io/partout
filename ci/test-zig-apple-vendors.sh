@@ -24,14 +24,13 @@ prebuilts_dir=$(cd "$prebuilts_dir" && pwd -P)
 slice_identifier=macos-arm64_x86_64
 openssl_slice="$prebuilts_dir/openssl.xcframework/$slice_identifier"
 mbedtls_slice="$prebuilts_dir/mbedtls.xcframework/$slice_identifier"
-wg_go_slice="$prebuilts_dir/wg-go.xcframework/$slice_identifier"
+"$repo_root/scripts/build-wg-go-local.sh"
+wg_go_install="$repo_root/.build/local/wg-go/$(go env GOHOSTOS)-$(go env GOHOSTARCH)/install"
 
 [[ -f "$openssl_slice/libopenssl.a" ]] ||
     fail "missing OpenSSL macOS library"
 [[ -f "$mbedtls_slice/libmbedtls.a" ]] ||
     fail "missing MbedTLS macOS library"
-[[ -f "$wg_go_slice/libwg-go.a" ]] ||
-    fail "missing wg-go macOS library"
 
 case "$(uname -m)" in
     arm64|aarch64) target=aarch64-macos.13.0 ;;
@@ -56,5 +55,5 @@ zig build test \
     -Dopenssl-lib="$openssl_slice" \
     -Dmbedtls-include="$mbedtls_slice/Headers" \
     -Dmbedtls-lib="$mbedtls_slice" \
-    -Dwg-go-include="$wg_go_slice/Headers" \
-    -Dwg-go-lib="$wg_go_slice"
+    -Dwg-go-include="$wg_go_install/include" \
+    -Dwg-go-lib="$wg_go_install/lib"

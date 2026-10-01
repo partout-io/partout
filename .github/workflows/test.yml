@@ -20,6 +20,10 @@ jobs:
       fail-fast: true
       matrix:
         include:
+          - job_name: Check Go bridge
+            runner: macos-26
+            suite: go
+            timeout_minutes: 10
           - job_name: Run Zig tests
             runner: macos-26
             suite: zig
@@ -40,6 +44,14 @@ jobs:
         if: matrix.suite == 'apple'
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-go@v6
+        if: matrix.suite == 'go'
+        with:
+          go-version-file: src/wireguard/go/go.mod
+          cache-dependency-path: src/wireguard/go/go.sum
+      - name: Check Go bridge
+        if: matrix.suite == 'go'
+        run: go -C src/wireguard/go test ./src/...
       - name: Set up Zig
         uses: partout-io/setup-zig@v3
         if: matrix.suite == 'zig'
