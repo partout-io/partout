@@ -59,31 +59,19 @@ const WireGuardConnection = struct {
     interval_ms: u32,
     failed: bool = false,
 
-    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) !bool {
         if (self.bridge.handle >= 0) return false;
         const events = self.events orelse return error.UnableToStart;
         self.failed = false;
         self.resolver.reset(self.allocator);
-        self.resolver.cacheAll(self.allocator) catch |err| return startError(err);
-        const resolved = self.resolver.resolve(self.allocator, std.EnumSet(net.DNSResolver.Flag).initEmpty()) catch |err| return startError(err);
-        const settings = uapi.buildConfiguration(self.allocator, &self.configuration, resolved) catch |err| return startError(err);
+        try self.resolver.cacheAll(self.allocator);
+        const resolved = try self.resolver.resolve(self.allocator, std.EnumSet(net.DNSResolver.Flag).initEmpty());
+        const settings = try uapi.buildConfiguration(self.allocator, &self.configuration, resolved);
         defer self.allocator.free(settings);
         const builder = TunnelRemoteInfoBuilder.init(self.allocator, self.profile, self.module_id, &self.configuration);
-        var info = builder.build() catch |err| return startError(err);
+        var info = try builder.build();
         defer info.deinit(self.allocator);
-        const mtu: u32 = mtu: {
-            for (info.modules orelse &.{}) |module| {
-                if (module == .IP) {
-                    if (module.IP.mtu) |value| {
-                        if (value > 0) break :mtu @intCast(value);
-                    }
-                }
-            }
-            // Go's fallback applies only to the passive device. Preserve the
-            // builder's zero/unspecified MTU in the host tunnel settings.
-            break :mtu 1420;
-        };
-        self.bridge.start(remote, mtu, settings) catch |err| return startError(err);
+        try self.bridge.start(remote, passiveMTU(info), settings);
         errdefer self.stop();
         if (@import("builtin").os.tag == .ios) self.bridge.backend.disableRoaming(self.bridge.handle);
         try self.scheduleCount();
@@ -92,9 +80,9 @@ const WireGuardConnection = struct {
         return true;
     }
 
-    fn scheduleCount(self: *WireGuardConnection) net.ConnectionStartError!void {
-        const looper = self.bridge.looper orelse return;
-        looper.scheduleReplacing(&self.timer, @max(1, self.interval_ms), .{ .context = self, .callback = onCount }) catch |err| return startError(err);
+    fn scheduleCount(self: *WireGuardConnection) !void {
+        const looper = self.bridge.looper.?;
+        try looper.scheduleReplacing(&self.timer, @max(1, self.interval_ms), .{ .context = self, .callback = onCount });
     }
     fn onCount(raw: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw.?));
@@ -150,7 +138,7 @@ fn legacyStart(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError
     return error.UnableToStart;
 }
 fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
-    return cast(ptr).startV2(remote);
+    return cast(ptr).startV2(remote) catch |err| return startError(err);
 }
 fn shutdown(ptr: *anyopaque, _: net.Connection.ShutdownReason) void {
     cast(ptr).stop();
@@ -190,6 +178,17 @@ fn submitDatagrams(ptr: *anyopaque, packets: net.Looper.Packets, sources: []cons
     };
     return .keep;
 }
+fn passiveMTU(info: api.TunnelRemoteInfoWrapper) u32 {
+    for (info.modules orelse &.{}) |module| {
+        if (module != .IP) continue;
+        const mtu = module.IP.mtu orelse continue;
+        if (mtu > 0) return @intCast(mtu);
+    }
+    // Only the passive Go device needs a concrete fallback. Host settings keep
+    // the builder's zero/unspecified MTU and retain the native platform policy.
+    return 1420;
+}
+
 fn startError(err: anyerror) net.ConnectionStartError {
     return switch (err) {
         error.OutOfMemory => error.OutOfMemory,

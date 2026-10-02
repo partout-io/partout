@@ -767,59 +767,43 @@ const ConnectionDaemon = struct {
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         const connection = self.connection.?;
-        switch (connection.vtable.link(connection.ptr)) {
-            .connected => {},
-            .datagram => |port| {
+        var remote = RemoteDescriptor{ .looper = self.looper };
+        var descriptor = switch (connection.vtable.link(connection.ptr)) {
+            .connected => blk: {
+                log.write(.notice, "Cycle to next endpoint");
+                // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
+                const reachability = self.factory.currentReachability();
+                const endpoint = try self.endpoint_resolver.?.next(
+                    &self.resolver,
+                    reachability,
+                    self.daemon.options.connection_options.dns_timeout,
+                );
+                remote.endpoint = try net.SocketEndpoint.init(endpoint);
+                log.writef(.notice, "Connect to {s}", .{endpoint});
+                break :blk try self.factory.create(
+                    self.daemon.allocator,
+                    endpoint,
+                    reachability,
+                    self.daemon.options.connection_options.link_activity_timeout,
+                );
+            },
+            .datagram => |port| blk: {
                 const create_datagram = self.factory.vtable.create_datagram orelse return error.UnableToStart;
                 const socket = try create_datagram(self.factory.ptr, self.daemon.allocator, port);
                 errdefer socket.destroy();
-                const local = try socket.localAddress();
-                try self.looper.attach(.{
-                    .pair = .{ .link = socket.linkDescriptor() },
-                    .on_read = .{ .context = self, .callback = onLinkRead },
-                    .on_failure = .{ .context = self, .callback = onLinkFailure },
-                });
-                return .{ .looper = self.looper, .local_port = local.port };
+                remote.local_port = (try socket.localAddress()).port;
+                break :blk socket.linkDescriptor();
             },
-        }
-        log.write(.notice, "Create new link");
-        log.write(.notice, "Cycle to next endpoint");
-        // FIXME: ###, Pick endpoint, resolve DNS, and connect link atomically in SocketFactory
-        const reachability = self.factory.currentReachability();
-        const endpoint = try self.endpoint_resolver.?.next(
-            &self.resolver,
-            reachability,
-            self.daemon.options.connection_options.dns_timeout,
-        );
-        const remote_endpoint = try net.SocketEndpoint.init(endpoint);
-        log.writef(.notice, "Connect to {s}", .{endpoint});
-        var descriptor = try self.factory.create(
-            self.daemon.allocator,
-            endpoint,
-            reachability,
-            self.daemon.options.connection_options.link_activity_timeout,
-        );
-        // The looper takes ownership only after a successful attach.
+        };
+        // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
-        log.write(.notice, "Link is active");
-        log.writef(.info, "Link type is {s}", .{
-            endpoint.proto.socket_type.raw(),
-        });
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
-            .pair = .{
-                .link = descriptor,
-            },
-            .on_read = .{
-                .context = self,
-                .callback = onLinkRead,
-            },
-            .on_failure = .{
-                .context = self,
-                .callback = onLinkFailure,
-            },
+            .pair = .{ .link = descriptor },
+            .on_read = .{ .context = self, .callback = onLinkRead },
+            .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
-        return .{ .endpoint = remote_endpoint, .looper = self.looper };
+        return remote;
     }
 
     fn scheduleResumeGate(self: *ConnectionDaemon) void {

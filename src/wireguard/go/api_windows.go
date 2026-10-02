@@ -16,15 +16,8 @@ import (
 	"golang.zx2c4.com/wireguard/tun"
 )
 
-func init() {
-}
-
 //export wgTurnOn
 func wgTurnOn(settings *C.char, uuid *C.char) int32 {
-	return turnOnWithBind(settings, uuid, conn.NewStdNetBind())
-}
-
-func turnOnWithBind(settings *C.char, uuid *C.char, bind conn.Bind) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -42,7 +35,7 @@ func turnOnWithBind(settings *C.char, uuid *C.char, bind conn.Bind) int32 {
 		return -1
 	}
 	logger.Verbosef("Attaching to interface")
-	dev := device.NewDevice(tun, bind, logger)
+	dev := device.NewDevice(tun, conn.NewStdNetBind(), logger)
 	handle := wgTurnOnDevice(settings, dev, logger, nil)
 	if handle < 0 {
 		dev.Close()

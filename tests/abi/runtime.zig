@@ -335,16 +335,7 @@ test "daemon options reject unknown feature bits" {
 }
 
 test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only profiles" {
-    const Warning = struct {
-        seen: std.atomic.Value(bool) = .init(false),
-        fn log(raw: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            if (std.mem.indexOf(u8, std.mem.span(message), "Ignoring .experimentalDaemon,") != null) {
-                self.seen.store(true, .release);
-            }
-        }
-    };
-    const Case = struct { json: [:0]const u8, enabled: bool, supports_experimental: bool = true };
+    const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
         .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled },
@@ -363,9 +354,6 @@ test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only p
     for (cases) |case| {
         if (!case.enabled) continue;
         for ([_]bool{ false, true }) |requested| {
-            var warning = Warning{};
-            core.logging.init(false, Warning.log, &warning);
-            defer core.logging.deinit();
             var args = daemonStartArgs(case.json.ptr);
             args.options.cache_dir = cache_dir.ptr;
             args.options.feature_flags = if (requested) partout_c.PartoutDaemonFlagExperimentalDaemon else 0;
@@ -375,9 +363,8 @@ test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only p
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = if (source.runtime_policy.v2_only) true else requested and case.supports_experimental;
+            const experimental = source.runtime_policy.v2_only or requested;
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
-            try std.testing.expectEqual(!source.runtime_policy.v2_only and requested and !case.supports_experimental, warning.seen.load(.acquire));
             if (source.wireguard_enabled) {
                 const impl = runtime.registry.implementation(.WireGuard).?;
                 const expected = if (experimental) &source.wireguard_exports.connection_v2_vtable else &source.wireguard_exports.connection_vtable;

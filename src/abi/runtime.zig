@@ -192,26 +192,9 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        const experimental_requested = options.feature_flags.contains(.experimentalDaemon);
-        const module_type = if (api.findActiveConnectionModule(&options.profile)) |module|
-            api.moduleType(module)
-        else
-            null;
-        const supports_experimental = true;
         // The shared policy excludes legacy implementations at compile time.
-        const experimental = if (runtime_policy.v2_only) true else experimental_requested and supports_experimental;
-        if (experimental) {
-            log.write(.notice, "Using daemon v2 (experimental)");
-        } else {
-            log.write(.notice, "Using daemon v1 (legacy)");
-            if (experimental_requested) {
-                if (module_type) |mt| {
-                    log.writef(.err, "\tIgnoring .experimentalDaemon, not applied for {s}", .{mt.raw()});
-                } else {
-                    std.debug.assert(false);
-                }
-            }
-        }
+        const experimental = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
+        log.write(.notice, if (experimental) "Using daemon v2 (experimental)" else "Using daemon v1 (legacy)");
 
         // Register the known connection implementations
         self.contexts = .{};

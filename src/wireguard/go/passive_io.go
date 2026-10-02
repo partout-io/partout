@@ -18,12 +18,13 @@ import "C"
 import (
 	"errors"
 	"fmt"
-	"golang.zx2c4.com/wireguard/device"
 	"net"
 	"net/netip"
 	"os"
 	"strconv"
 	"unsafe"
+
+	"golang.zx2c4.com/wireguard/device"
 )
 
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {
@@ -113,17 +114,7 @@ func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, sou
 	if !ok {
 		return C.WG_IO_INVALID
 	}
-	err = bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address)
-	switch {
-	case err == nil:
-		return C.WG_IO_OK
-	case errors.Is(err, net.ErrClosed):
-		return C.WG_IO_CLOSED
-	case errors.Is(err, errPassiveQueueFull):
-		return C.WG_IO_QUEUE_FULL
-	default:
-		return C.WG_IO_INVALID
-	}
+	return passiveStatus(bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
 }
 
 //export wgTurnOnWithPassiveIO
@@ -164,11 +155,14 @@ func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.
 	if tunnel.passiveTun == nil {
 		return C.WG_IO_INVALID
 	}
-	err := tunnel.passiveTun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)))
+	return passiveStatus(tunnel.passiveTun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
+}
+
+func passiveStatus(err error) C.int32_t {
 	switch {
 	case err == nil:
 		return C.WG_IO_OK
-	case errors.Is(err, os.ErrClosed):
+	case errors.Is(err, net.ErrClosed), errors.Is(err, os.ErrClosed):
 		return C.WG_IO_CLOSED
 	case errors.Is(err, errPassiveQueueFull):
 		return C.WG_IO_QUEUE_FULL

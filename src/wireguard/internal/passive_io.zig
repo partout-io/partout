@@ -24,9 +24,11 @@ pub const PassiveIO = struct {
         self.active.store(true, .release);
         errdefer self.active.store(false, .release);
         const handle = try self.backend.turnOn(self.allocator, settings, .{
-            .passive_io = .{ .local_port = remote.local_port, .write = writeLink },
-            .passive_tun = .{ .mtu = mtu, .write = writeTun },
-            .passive_context = self,
+            .passive = .{
+                .link = .{ .local_port = remote.local_port, .write = writeLink },
+                .tun = .{ .mtu = mtu, .write = writeTun },
+                .context = self,
+            },
         });
         if (handle < 0) return error.TransportFailure;
         self.handle = handle;

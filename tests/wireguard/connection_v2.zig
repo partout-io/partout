@@ -92,7 +92,6 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     var probe = Probe{ .fd = fds[0] };
     Probe.current = &probe;
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
-    defer fake.deinit(allocator);
     var backend_table = fake_backend_vtable;
     backend_table.receive_datagram = Probe.receiveLink;
     backend_table.receive_tun_packet = Probe.receiveTun;
@@ -171,25 +170,7 @@ const FakeBackend = struct {
     counts: std.atomic.Value(usize) = .init(0),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
-    set_config_count: usize = 0,
-    bump_sockets_count: usize = 0,
-    disable_roaming_count: usize = 0,
     fail_turn_on_number: ?usize = null,
-    out_of_memory_turn_on_number: ?usize = null,
-    last_settings: ?[]u8 = null,
-    last_set_config: ?[]u8 = null,
-
-    fn deinit(self: *FakeBackend, allocator: std.mem.Allocator) void {
-        if (self.last_settings) |value| allocator.free(value);
-        if (self.last_set_config) |value| allocator.free(value);
-    }
-
-    fn backend(self: *FakeBackend) backend_mod.Backend {
-        return .{
-            .ptr = self,
-            .vtable = &fake_backend_vtable,
-        };
-    }
 };
 
 const fake_backend_vtable = backend_mod.Backend.VTable{
@@ -204,20 +185,16 @@ const fake_backend_vtable = backend_mod.Backend.VTable{
 
 fn fakeTurnOn(
     ptr: ?*anyopaque,
-    allocator: std.mem.Allocator,
-    settings: [:0]const u8,
+    _: std.mem.Allocator,
+    _: [:0]const u8,
     tunnel: backend_mod.StartTunnel,
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.turn_on_count += 1;
     std.debug.assert(tunnel.tun == null and tunnel.ifname == null);
-    self.link = tunnel.passive_io;
-    self.tun = tunnel.passive_tun;
-    self.context = tunnel.passive_context;
-    if (self.out_of_memory_turn_on_number == self.turn_on_count)
-        return error.OutOfMemory;
-    if (self.last_settings) |value| allocator.free(value);
-    self.last_settings = try allocator.dupe(u8, settings);
+    self.link = tunnel.passive.?.link;
+    self.tun = tunnel.passive.?.tun;
+    self.context = tunnel.passive.?.context;
     if (self.fail_turn_on_number == self.turn_on_count) return -1;
     return 7;
 }
@@ -237,24 +214,16 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
     );
 }
 
-fn fakeSetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
-    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
-    self.set_config_count += 1;
-    if (self.last_set_config) |value| allocator.free(value);
-    self.last_set_config = try allocator.dupe(u8, settings);
-    return 0;
+fn fakeSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) backend_mod.Error!i64 {
+    @panic("v2 reconfigures through daemon reconnection");
 }
 
-fn fakeSocketDescriptors(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error![]io.SocketDescriptor {
-    return try allocator.dupe(io.SocketDescriptor, &.{ 3, 4 });
+fn fakeSocketDescriptors(_: ?*anyopaque, _: std.mem.Allocator, _: i32) backend_mod.Error![]io.SocketDescriptor {
+    @panic("v2 must not access Go-owned sockets");
 }
 
-fn fakeBumpSockets(ptr: ?*anyopaque, _: i32, _: bool) void {
-    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
-    self.bump_sockets_count += 1;
+fn fakeBumpSockets(_: ?*anyopaque, _: i32, _: bool) void {
+    @panic("v2 must not recreate Go-owned sockets");
 }
 
-fn fakeDisableRoaming(ptr: ?*anyopaque, _: i32) void {
-    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
-    self.disable_roaming_count += 1;
-}
+fn fakeDisableRoaming(_: ?*anyopaque, _: i32) void {}

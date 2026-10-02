@@ -22,9 +22,11 @@ pub const Error = std.mem.Allocator.Error || error{
 pub const StartTunnel = struct {
     tun: ?net.TunWrapper = null,
     ifname: ?[]const u8 = null,
-    passive_io: ?wireguard_c.wg_passive_link = null,
-    passive_tun: ?wireguard_c.wg_passive_tun = null,
-    passive_context: ?*anyopaque = null,
+    passive: ?struct {
+        link: wireguard_c.wg_passive_link,
+        tun: wireguard_c.wg_passive_tun,
+        context: *anyopaque,
+    } = null,
 
     pub fn descriptor(self: StartTunnel) ?net.FileDescriptor {
         const tun = self.tun orelse return null;
@@ -120,11 +122,9 @@ fn cTurnOn(
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
     wireguard_c.pp_wg_set_logger(cLog, null);
 
-    if (tunnel.passive_tun) |tun_callbacks| {
-        const udp_callbacks = tunnel.passive_io orelse return error.TransportFailure;
-        return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &udp_callbacks, &tun_callbacks, tunnel.passive_context);
+    if (tunnel.passive) |passive| {
+        return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &passive.link, &passive.tun, passive.context);
     }
-    if (tunnel.passive_io != null) return error.TransportFailure;
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
         // Unix-family builds consume the already-created native TUN fd.
