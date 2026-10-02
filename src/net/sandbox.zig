@@ -273,6 +273,9 @@ pub const SerializedExecutor = core.SerializedExecutor;
 
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {
+    /// Whether UDP link sockets connect to the resolved remote endpoint.
+    connect_udp: bool = true,
+
     /// The DNS resolution timeout, in milliseconds.
     // FIXME: ###, Delete, it's a link concern
     dns_timeout: u32 = 3000,

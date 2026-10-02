@@ -780,17 +780,21 @@ const ConnectionDaemon = struct {
             log.writef(.notice, "Connect to {s}", .{endpoint});
             break :blk endpoint;
         } else null;
+        const socket_endpoint = if (remote.endpoint) |resolved|
+            if (resolved.plainSocketType() == .udp and !self.daemon.options.connection_options.connect_udp) null else endpoint
+        else
+            null;
         var factory = self.factory;
         factory.local_port = connection.local_port;
         var descriptor = try factory.create(
             self.daemon.allocator,
-            endpoint,
+            socket_endpoint,
             reachability,
             self.daemon.options.connection_options.link_activity_timeout,
         );
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
-        if (endpoint == null) remote.local_port = (try descriptor.localAddress()).port;
+        if (socket_endpoint == null) remote.local_port = (try descriptor.localAddress()).port;
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
             if (endpoint) |value| value.proto.socket_type.raw() else api.IPSocketType.udp.raw(),
