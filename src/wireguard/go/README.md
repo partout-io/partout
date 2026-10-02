@@ -14,28 +14,22 @@ From the Partout repository root:
 go -C src/wireguard/go test ./...
 ```
 
-CMake and the Apple XCFramework builder compile this source automatically.
-Apple builds retain the sleep-aware Go runtime patch.
-
-To build only the bridge locally:
+Zig owns compilation, caching, linking, and installation of the bridge:
 
 ```sh
-cmake -S . -B .build/wg-go-local -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_WIREGUARD=ON
-cmake --build .build/wg-go-local --target partout-wg-go-build
+zig build wg-go -Dwireguard=true
+zig build install -Dwireguard=true
 ```
 
-For direct Zig builds, use `-Dwg-go-include=src/wireguard/go/include` and
-`-Dwg-go-lib=.build/wg-go-local/wg-go/lib`.
+The build helper is `build/wireguard.zig`. It tracks Go sources, C ABI headers,
+module pins, toolchain settings, and the target SDK. Apple builds use a cached
+copy of Go with the sleep-aware runtime patch. Changes invalidate the relevant
+Zig build steps; unchanged builds reuse the generated library.
 
-Windows builds use `zig cc` for cgo and `zig dlltool` for import libraries.
-Apple, Android, and Linux retain their default C toolchains.
+Apple builds embed the Go archive in Partout's static or shared library.
+Windows uses `zig cc` and `zig dlltool`, installing `wg-go.dll` in `bin` and
+its import library in `lib`. Linux and Android install `libwg-go.so` in `lib`.
 
-The Xcode XCFramework prebuild caches each Go archive under
-`.build/wg-go/xcframework`. Unchanged sources, headers, Go/compiler settings,
-SDK, and target reuse the archive without invoking Go. Source or build-input
-changes rebuild the affected slice automatically.
-
-Go sources live at the module root; the C ABI header stays under `include/wg_go`.
-The Makefile supports Apple builds, including the patched Go runtime.
-Windows, Android, and Linux builds use `cmake/wireguard-go.cmake` from the
-repository root directly.
+For Android or Linux cross-compilation, pass the platform compiler executable
+with `-Dwg-go-cc` and its target/sysroot flags with `-Dwg-go-cflags`. CMake
+supplies these from its configured toolchain. Apple uses Clang and the Xcode SDK.

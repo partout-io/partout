@@ -45,7 +45,7 @@ jobs:
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - uses: actions/setup-go@v6
-        if: matrix.suite == 'go'
+        if: matrix.suite == 'go' || matrix.suite == 'zig'
         with:
           go-version-file: src/wireguard/go/go.mod
           cache-dependency-path: src/wireguard/go/go.sum

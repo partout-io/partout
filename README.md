@@ -103,8 +103,9 @@ The Go module, C ABI headers, and upstream runtime patch live in
 `src/wireguard/go`. Keep changes to this ABI and its Zig/C callers in the same
 commit. The upstream WireGuard implementation remains pinned in `go.mod`.
 
-CMake builds and `scripts/build-xcframework.sh` rebuild it automatically; Apple
-XCFramework builds download only the crypto dependencies from prebuilts.
+`zig build install -Dwireguard=true` builds and links the bridge automatically.
+`zig build wg-go -Dwireguard=true` builds only the bridge. CMake and the Apple
+XCFramework script delegate to Zig; only crypto dependencies come from prebuilts.
 
 Check the Go package with `go -C src/wireguard/go test ./...`
 (the imported master bridge currently has no Go test files).

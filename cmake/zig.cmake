@@ -84,12 +84,30 @@ if(PP_BUILD_USE_OPENVPN)
 endif()
 
 if(PP_BUILD_USE_WIREGUARD)
-    include("${CMAKE_CURRENT_LIST_DIR}/wireguard-go.cmake")
-    list(APPEND PARTOUT_ZIG_ARGS
-        -Dwireguard=true
-        "-Dwg-go-include=${PARTOUT_WGGO_INCLUDE_DIR}"
-        "-Dwg-go-lib=${PARTOUT_WGGO_LIBRARY_DIR}"
-    )
+    list(APPEND PARTOUT_ZIG_ARGS -Dwireguard=true)
+    if(NOT APPLE AND NOT WIN32)
+        set(wg_flags "${CMAKE_C_FLAGS}")
+        if(CMAKE_C_COMPILER_TARGET)
+            string(APPEND wg_flags " --target=${CMAKE_C_COMPILER_TARGET}")
+        endif()
+        if(CMAKE_SYSROOT)
+            string(APPEND wg_flags " --sysroot \"${CMAKE_SYSROOT}\"")
+        endif()
+        list(APPEND PARTOUT_ZIG_ARGS
+            "-Dwg-go-cc=${CMAKE_C_COMPILER}" "-Dwg-go-cflags=${wg_flags}")
+    endif()
+    if(NOT APPLE)
+        add_library(partout-wg-go SHARED IMPORTED GLOBAL)
+        if(WIN32)
+            set_target_properties(partout-wg-go PROPERTIES
+                IMPORTED_LOCATION "${PP_BUILD_OUTPUT}/partout/bin/wg-go.dll"
+                IMPORTED_IMPLIB "${PP_BUILD_OUTPUT}/partout/lib/wg-go.lib")
+        else()
+            set_property(TARGET partout-wg-go PROPERTY IMPORTED_LOCATION
+                "${PP_BUILD_OUTPUT}/partout/lib/libwg-go.so")
+        endif()
+        list(APPEND PARTOUT_RUNTIME_LIBRARIES partout-wg-go)
+    endif()
 endif()
 
 set(PARTOUT_ZIG_ARCH "${ARCH_NAME}")
@@ -153,6 +171,15 @@ if(PP_BUILD_LIBRARY)
         set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
     endif()
 
+    if(PP_BUILD_USE_WIREGUARD AND NOT APPLE)
+        get_target_property(wg_runtime partout-wg-go IMPORTED_LOCATION)
+        list(APPEND PARTOUT_ZIG_BYPRODUCTS "${wg_runtime}")
+        if(WIN32)
+            get_target_property(wg_implib partout-wg-go IMPORTED_IMPLIB)
+            list(APPEND PARTOUT_ZIG_BYPRODUCTS "${wg_implib}")
+        endif()
+    endif()
+
     add_custom_target(partout ALL
         COMMAND "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
         BYPRODUCTS ${PARTOUT_ZIG_BYPRODUCTS}
@@ -161,8 +188,8 @@ if(PP_BUILD_LIBRARY)
         COMMAND_EXPAND_LISTS
         VERBATIM
     )
-    if(PP_BUILD_USE_WIREGUARD)
-        add_dependencies(partout partout-wg-go-build)
+    if(PP_BUILD_USE_WIREGUARD AND NOT APPLE)
+        add_dependencies(partout-wg-go partout)
     endif()
     if(PP_BUILD_WINRT)
         add_dependencies(partout partout-winrt)

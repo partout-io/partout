@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const wireguard_build = @import("build/wireguard.zig");
 
 const c_flags = &.{
     "-W",
@@ -18,13 +19,11 @@ const c_flags = &.{
 const Vendor = enum {
     openssl,
     mbedtls,
-    wg_go,
 
     fn optionName(vendor: Vendor) []const u8 {
         return switch (vendor) {
             .openssl => "openssl",
             .mbedtls => "mbedtls",
-            .wg_go => "wg-go",
         };
     }
 
@@ -32,7 +31,6 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "OpenSSL",
             .mbedtls => "MbedTLS",
-            .wg_go => "wg-go",
         };
     }
 
@@ -40,7 +38,6 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "openssl",
             .mbedtls => "mbedtls",
-            .wg_go => "wg_go",
         };
     }
 
@@ -48,7 +45,6 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "libopenssl.a",
             .mbedtls => "libmbedtls.a",
-            .wg_go => "libwg-go.a",
         };
     }
 };
@@ -66,15 +62,10 @@ const VendorPaths = struct {
 const Vendors = struct {
     openssl: VendorPaths,
     mbedtls: VendorPaths,
-    wg_go: VendorPaths,
     openssl_config_include: ?[]const u8,
 
-    fn all(vendors: Vendors) [3]VendorPaths {
-        return .{ vendors.openssl, vendors.mbedtls, vendors.wg_go };
-    }
-
-    fn hasWireGuardBackend(vendors: Vendors) bool {
-        return vendors.wg_go.enabled();
+    fn all(vendors: Vendors) [2]VendorPaths {
+        return .{ vendors.openssl, vendors.mbedtls };
     }
 };
 
@@ -86,6 +77,7 @@ const BuildConfig = struct {
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
     winrt_library: ?std.Build.LazyPath,
+    wg_go: ?wireguard_build.Bridge,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -156,7 +148,6 @@ pub fn build(b: *std.Build) void {
     const vendors = Vendors{
         .openssl = vendorPathsOption(b, .openssl),
         .mbedtls = vendorPathsOption(b, .mbedtls),
-        .wg_go = vendorPathsOption(b, .wg_go),
         .openssl_config_include = pathOption(
             b,
             "openssl-config-include",
@@ -165,7 +156,7 @@ pub fn build(b: *std.Build) void {
         ),
     };
     const apple_sdk_path = if (target.result.os.tag.isDarwin())
-        b.option([]const u8, "apple-sdk-path", "Path to the Apple platform SDK.")
+        b.option([]const u8, "apple-sdk-path", "Path to the Apple platform SDK.") orelse if (use_wireguard) wireguard_build.appleSDK(b, target.result) else null
     else
         null;
 
@@ -198,6 +189,7 @@ pub fn build(b: *std.Build) void {
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .winrt_library = winrt_library,
+        .wg_go = if (use_wireguard) wireguard_build.build(b, target, apple_sdk_path) else null,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -207,6 +199,7 @@ pub fn build(b: *std.Build) void {
     const module = createPartoutModule(b, config, c_bindings, "src/partout.zig", true);
     if (shared) {
         linkVendorLibraries(module, b, config, false);
+        linkWireGuard(module, config, false);
         addRuntimeOrigin(module, target);
     }
 
@@ -216,6 +209,7 @@ pub fn build(b: *std.Build) void {
         .root_module = module,
     });
     if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
+    if (config.wg_go) |bridge| lib.step.dependOn(bridge.step);
     if (shared and winrt_library != null) {
         lib.forceUndefinedSymbol("pp_winrt_runtime_link");
     }
@@ -233,6 +227,7 @@ pub fn build(b: *std.Build) void {
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     linkVendorLibraries(test_module, b, config, true);
+    linkWireGuard(test_module, config, true);
     test_module.addImport("source", test_source_module);
 
     const unit_tests = b.addTest(.{
@@ -241,9 +236,13 @@ pub fn build(b: *std.Build) void {
     // The MSVC C++/WinRT bridge is built with /MD.
     if (winrt_library != null) unit_tests.linkage = .dynamic;
     if (winrt_build) |bridge| unit_tests.step.dependOn(bridge.step);
+    if (config.wg_go) |bridge| unit_tests.step.dependOn(bridge.step);
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
+    if (target.result.os.tag == .windows) {
+        if (config.wg_go) |bridge| run_unit_tests.setCwd(bridge.runtime.?.dirname());
+    }
 
     const test_step = b.step("test", "Run Zig tests");
     test_step.dependOn(&run_unit_tests.step);
@@ -252,7 +251,7 @@ pub fn build(b: *std.Build) void {
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 
     if (!shared and target.result.os.tag.isDarwin()) {
-        const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
+        const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin(), if (config.wg_go) |wg| wg.library else null);
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
@@ -261,6 +260,19 @@ pub fn build(b: *std.Build) void {
             lib.installHeader(b.path("cross/windows/runtime.h"), "runtime.h");
         }
         b.installArtifact(lib);
+    }
+
+    const wg_step = b.step("wg-go", "Build and install the WireGuard bridge (-Dwireguard=true)");
+    if (config.wg_go) |wg| {
+        const archive_name = if (target.result.os.tag == .windows) "wg-go.lib" else if (target.result.os.tag.isDarwin()) "libwg-go.a" else "libwg-go.so";
+        const install_wg = b.addInstallLibFile(wg.library, archive_name);
+        wg_step.dependOn(&install_wg.step);
+        if (wg.runtime) |runtime| {
+            const install_runtime = b.addInstallFileWithDir(runtime, if (target.result.os.tag == .windows) .bin else .lib, wg.runtime_name.?);
+            b.getInstallStep().dependOn(&install_runtime.step);
+            wg_step.dependOn(&install_runtime.step);
+            if (target.result.os.tag == .windows) b.getInstallStep().dependOn(&install_wg.step);
+        }
     }
 
     const install_docs = b.addInstallDirectory(.{
@@ -528,6 +540,7 @@ fn configureCHeadersAndMacros(
     }
     if (config.wireguard) {
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
+        consumer.addIncludePath(b.path("src/wireguard/go/include"));
     }
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);
@@ -543,7 +556,7 @@ fn configureCHeadersAndMacros(
     addCMacro(
         consumer,
         "PARTOUT_HAS_WIREGUARD_BACKEND",
-        if (config.vendors.hasWireGuardBackend()) "1" else "0",
+        if (config.wg_go != null) "1" else "0",
     );
 }
 
@@ -603,7 +616,6 @@ fn linkVendorLibraries(
 ) void {
     for (config.vendors.all()) |paths| {
         if (!paths.enabled()) continue;
-        if (paths.vendor == .wg_go and !config.wireguard) continue;
         const library_path = paths.library orelse unreachable;
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
@@ -650,7 +662,7 @@ fn linkSystemLibraryNames(
     target: std.Build.ResolvedTarget,
     vendor: Vendor,
 ) void {
-    var options: std.Build.Module.LinkSystemLibraryOptions = .{
+    const options: std.Build.Module.LinkSystemLibraryOptions = .{
         .use_pkg_config = .no,
     };
     switch (vendor) {
@@ -666,13 +678,16 @@ fn linkSystemLibraryNames(
             module.linkSystemLibrary("mbedx509", options);
             module.linkSystemLibrary("mbedcrypto", options);
         },
-        .wg_go => {
-            // Disambiguate import .lib from .dll.
-            if (target.result.os.tag == .windows) {
-                options.preferred_link_mode = .static;
-            }
-            module.linkSystemLibrary("wg-go", options);
-        },
+    }
+}
+
+fn linkWireGuard(module: *std.Build.Module, config: BuildConfig, testing: bool) void {
+    const wg = config.wg_go orelse return;
+    module.addObjectFile(wg.library);
+    if (testing) {
+        if (wg.runtime) |runtime| {
+            if (config.target.result.os.tag != .windows) module.addRPath(runtime.dirname());
+        }
     }
 }
 
@@ -690,6 +705,7 @@ fn addRuntimeOrigin(
 fn addDarwinStaticArchiveRepackStep(
     b: *std.Build,
     source: std.Build.LazyPath,
+    wg_go: ?std.Build.LazyPath,
 ) std.Build.LazyPath {
     const run = b.addSystemCommand(&.{
         "sh",
@@ -703,16 +719,23 @@ fn addDarwinStaticArchiveRepackStep(
         \\archive="$(cd "$archive_dir" && pwd)/$archive_base"
         \\rm -rf "$work" "$out"
         \\mkdir -p "$work"
+        \\wg=
+        \\if [ -n "${3:-}" ]; then wg="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"; fi
         \\cd "$work"
         \\ar -x "$archive"
         \\chmod u+r ./*.o
-        \\libtool -static -no_warning_for_no_symbols -o "$out" ./*.o
+        \\if [ -n "${3:-}" ]; then
+        \\    libtool -static -no_warning_for_no_symbols -o "$out" ./*.o "$wg"
+        \\else
+        \\    libtool -static -no_warning_for_no_symbols -o "$out" ./*.o
+        \\fi
         \\rm -rf "$work"
         ,
         "repack-darwin-static-archive",
     });
     run.addFileArg(source);
     const output = run.addOutputFileArg("libpartout.a");
+    if (wg_go) |wg| run.addFileArg(wg);
     run.setName("repack Darwin static archive");
     return output;
 }
