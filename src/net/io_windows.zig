@@ -75,11 +75,7 @@ pub const TunWrapper = struct {
 
     pub fn deinit(_: *TunWrapper) void {}
 
-    pub fn prepareForLooper(_: *TunWrapper) error{NotImplemented}!void {
+    pub fn tunDescriptor(_: *TunWrapper) error{NotImplemented}!TunDescriptor {
         return error.NotImplemented;
-    }
-
-    pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {
-        return .{ .tun = self };
     }
 };

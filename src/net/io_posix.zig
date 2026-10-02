@@ -384,13 +384,11 @@ pub const TunWrapper = struct {
         return std.mem.span(c_name);
     }
 
-    pub fn prepareForLooper(self: *TunWrapper) Error!void {
-        if (io_c.pp_fd_set_nonblocking(self.muxDescriptor() orelse return error.LibcFailure, null) != 0) return error.LibcFailure;
-    }
-
-    pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {
+    pub fn tunDescriptor(self: *TunWrapper) Error!TunDescriptor {
+        const fd = self.muxDescriptor() orelse return error.LibcFailure;
+        if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{
-            .fd = self.muxDescriptor() orelse -1,
+            .fd = fd,
             .io = self.nativeIO(),
         };
     }

@@ -884,8 +884,7 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        try self.tunnel.?.prepareForLooper();
-        const descriptor = self.tunnel.?.tunDescriptor();
+        const descriptor = try self.tunnel.?.tunDescriptor();
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
