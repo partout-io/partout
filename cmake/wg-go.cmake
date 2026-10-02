@@ -19,6 +19,10 @@ execute_process(COMMAND "${PARTOUT_GO_EXECUTABLE}" -C "${wg_source}" env -json
         CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CGO_LDFLAGS
     OUTPUT_VARIABLE wg_toolchain COMMAND_ERROR_IS_FATAL ANY)
 string(JSON wg_goroot GET "${wg_toolchain}" GOROOT)
+# Module/toolchain changes must also refresh the selected GOROOT and patch key.
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
+    "${wg_source}/go.mod" "${wg_source}/go.sum" "${wg_goroot}/VERSION"
+    "${PARTOUT_GO_EXECUTABLE}" "${wg_source}/goruntime-boottime-over-monotonic.diff")
 set(wg_env CGO_ENABLED=1 "GOARCH=${wg_arch}")
 set(wg_flags "${CMAKE_C_FLAGS}")
 set(wg_mode c-shared)
@@ -91,8 +95,10 @@ foreach(key CGO_CFLAGS CGO_CXXFLAGS CGO_LDFLAGS)
     list(APPEND wg_env "${key}=${value} ${wg_flags}")
 endforeach()
 
-file(GLOB_RECURSE wg_sources CONFIGURE_DEPENDS
-    "${wg_source}/*.go" "${wg_source}/*.c" "${wg_source}/*.h" "${wg_source}/*.s" "${wg_source}/go.*")
+# The bridge is flat. Never scan old .goroot/build directories as source input.
+file(GLOB wg_sources CONFIGURE_DEPENDS
+    "${wg_source}/*.go" "${wg_source}/*.c" "${wg_source}/*.h" "${wg_source}/*.s"
+    "${wg_source}/go.*" "${wg_source}/include/wg_go/*.h")
 # Reconfiguration updates this file only when settings or the source list change.
 # The output rule skips Go entirely on unchanged builds.
 file(CONFIGURE OUTPUT "${wg_work}/settings.txt"
@@ -119,16 +125,16 @@ if(NOT APPLE)
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${wg_runtime_destination}"
         COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_library}" "${wg_runtime_destination}/")
 endif()
-add_custom_target(partout-wg-go-build DEPENDS "${wg_library}" ${wg_implib}
+add_custom_target(partout-wg-go DEPENDS "${wg_library}" ${wg_implib}
     ${wg_copy_runtime} ${wg_copy_implib} VERBATIM)
 if(APPLE)
-    add_library(partout-wg-go STATIC IMPORTED GLOBAL)
+    add_library(Partout::WireGuard STATIC IMPORTED GLOBAL)
 else()
-    add_library(partout-wg-go SHARED IMPORTED GLOBAL)
-    list(APPEND PARTOUT_RUNTIME_LIBRARIES partout-wg-go)
+    add_library(Partout::WireGuard SHARED IMPORTED GLOBAL)
+    list(APPEND PARTOUT_RUNTIME_LIBRARIES Partout::WireGuard)
 endif()
-set_target_properties(partout-wg-go PROPERTIES IMPORTED_LOCATION "${wg_library}")
+set_target_properties(Partout::WireGuard PROPERTIES IMPORTED_LOCATION "${wg_library}")
 if(WIN32)
-    set_property(TARGET partout-wg-go PROPERTY IMPORTED_IMPLIB "${wg_implib}")
+    set_property(TARGET Partout::WireGuard PROPERTY IMPORTED_IMPLIB "${wg_implib}")
 endif()
-add_dependencies(partout-wg-go partout-wg-go-build)
+add_dependencies(Partout::WireGuard partout-wg-go)

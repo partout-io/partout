@@ -92,7 +92,7 @@ if(PP_BUILD_USE_OPENVPN)
 endif()
 
 if(PP_BUILD_USE_WIREGUARD)
-    list(APPEND PARTOUT_ZIG_ARGS -Dwireguard=true "-Dwg-go-lib=$<TARGET_LINKER_FILE:partout-wg-go>")
+    list(APPEND PARTOUT_ZIG_ARGS -Dwireguard=true "-Dwg-go-lib=$<TARGET_LINKER_FILE:Partout::WireGuard>")
 endif()
 if(PP_BUILD_WINRT)
     list(APPEND PARTOUT_ZIG_ARGS "-Dwinrt-lib=$<TARGET_FILE:partout-winrt>")

@@ -208,7 +208,7 @@ test "OpenVPN module importer rejects a wrong encrypted-key passphrase" {
     var parser_context = parser.Parser.Context{ .passphrase = "wrong" };
     try std.testing.expectError(
         error.Parsing,
-        exports.impl.module.importModule(
+        exports.module_implementation.importModule(
             allocator,
             tunnelbear_aes256_pkcs8,
             core.ImportContext.init(
@@ -223,7 +223,7 @@ test "OpenVPN module importer rejects a wrong encrypted-key passphrase" {
 
 fn expectDefaultImporterDecrypts(contents: []const u8) !void {
     const allocator = std.testing.allocator;
-    const module_implementation = exports.impl.module;
+    const module_implementation = exports.module_implementation;
     var parser_context = parser.Parser.Context{ .passphrase = "foobar" };
     var module = try module_implementation.importModule(
         allocator,

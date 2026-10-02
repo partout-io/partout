@@ -22,7 +22,7 @@ cmake --build .cmake
 cmake --build .cmake --target partout-test
 ```
 
-Use `--target partout-wg-go-build` to build only the bridge. The build rules in
+Use `--target partout-wg-go` to build only the bridge. The build rules in
 `cmake/wg-go.cmake` track source files, ABI headers, module pins, and
 configured compiler settings. Unchanged builds skip Go entirely. Reconfigure
 CMake after changing toolchains or Go environment settings.

@@ -12,7 +12,6 @@ option(PP_BUILD_USE_OPENVPN "Enable OpenVPN" OFF)
 option(PP_BUILD_USE_WIREGUARD "Enable WireGuard" OFF)
 
 include("cmake/platform.cmake")
-include("cmake/target.cmake")
 include("cmake/winrt.cmake")
 if(PP_BUILD_USE_WIREGUARD)
     include("cmake/wg-go.cmake")

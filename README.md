@@ -106,7 +106,7 @@ commit. The upstream WireGuard implementation remains pinned in `go.mod`.
 
 `cmake -S . -B .cmake -DPP_BUILD_USE_WIREGUARD=ON` configures the bridge.
 `cmake --build .cmake` builds Go first, then Zig/C and the final Partout library.
-Use `--target partout-wg-go-build` to build only the bridge, or
+Use `--target partout-wg-go` to build only the bridge, or
 `--target partout-test` to build the dependencies and run Zig tests.
 The XCFramework script uses the same CMake build for each Apple slice.
 
