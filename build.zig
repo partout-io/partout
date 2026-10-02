@@ -528,6 +528,7 @@ fn configureCHeadersAndMacros(
     }
     if (config.wireguard) {
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
+        consumer.addSystemIncludePath(b.path("src/wireguard/go/include"));
     }
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);

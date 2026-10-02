@@ -36,8 +36,10 @@ targets: [
 
 ### CMake
 
-CMake is a thin wrapper around the Zig build. It resolves the selected vendors,
-then invokes `zig build install` with their include and library paths.
+CMake orchestrates the complete native build. It resolves the selected vendors,
+builds the Go bridge when WireGuard is enabled, and invokes Zig with their include
+and library paths. On Apple platforms, CMake links the Zig archive and selected
+backends into the final shared library with the native linker.
 
 #### Requirements
 
@@ -47,7 +49,11 @@ then invokes `zig build install` with their include and library paths.
 - ninja
 - Android NDK (optional)
 
-Partout consumes system libraries or artifacts published by the [prebuilts][github-prebuilts] project; it does not build vendor sources.
+Crypto dependencies come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project.
+
+WireGuard builds require Go. CMake builds the local bridge in `src/wireguard/go`
+with the `partout-wg-go` target and passes its include and library directories to
+Zig. Windows uses `zig cc`; other platforms use the configured C compiler.
 
 #### Build
 
@@ -73,6 +79,20 @@ such as `SHA256=<digest>`.
 
 After the initial `-gen`, invoke the script without arguments to rebuild the
 existing configuration.
+
+For Apple distribution, `scripts/build-xcframework.sh <prebuilts-version> --full`
+configures, builds, and installs the complete library through CMake for each
+architecture of macOS, iOS, tvOS, and their simulators. It then packages those
+libraries and matching debug symbols into `PartoutNative.xcframework`. Omit
+`--full` to build only the active Xcode or host slice. `--crypto openssl,mbedtls`
+selects crypto backends (both by default); WireGuard is always enabled.
+
+Each Apple CMake configuration builds one `CMAKE_OSX_ARCHITECTURES` value.
+`PP_BUILD_APPLE_PREBUILTS` selects a local directory containing the vendor
+XCFrameworks and bypasses system libraries. CMake selects the matching platform
+slice. `PP_BUILD_APPLE_INSTALL_NAME` controls the linked library's install name;
+the packaging script sets it to `@rpath/PartoutNative.framework/PartoutNative`.
+
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 
