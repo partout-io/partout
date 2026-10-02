@@ -76,7 +76,7 @@ else()
     # Always invoke Go: its own cache tracks all sources, headers and dependencies.
     add_custom_target(partout_wg_go_build
         COMMAND "${CMAKE_COMMAND}" -E env ${wg_env}
-            "${PARTOUT_GO_EXECUTABLE}" build -C "${PARTOUT_WGGO_SOURCE}/src"
+            "${PARTOUT_GO_EXECUTABLE}" build -C "${PARTOUT_WGGO_SOURCE}"
             "-ldflags=${wg_ldflags}" -trimpath -buildmode=c-shared -o "${wg_library}"
         ${wg_import_command}
         BYPRODUCTS "${wg_library}" ${wg_implib}

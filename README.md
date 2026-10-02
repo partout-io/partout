@@ -108,7 +108,7 @@ It prints the include/library options to pass to a direct `zig build` invocation
 CMake builds and `scripts/build-xcframework.sh` rebuild it automatically; Apple
 XCFramework builds download only the crypto dependencies from prebuilts.
 
-Check the Go package with `go -C src/wireguard/go test ./src/...`
+Check the Go package with `go -C src/wireguard/go test ./...`
 (the imported master bridge currently has no Go test files).
 `ci/test-zig-apple-vendors.sh prebuilts` builds the local bridge before testing
 its integration with Zig and the prebuilt crypto libraries.

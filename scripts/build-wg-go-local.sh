@@ -38,8 +38,7 @@ case "${host_os}" in
         ;;
 esac
 
-# Invoke install explicitly: the default target cleans the Go runtime copy.
-# Go itself tracks source changes and caches compilation between invocations.
+# Preserve the patched runtime and let Go reuse its compilation cache.
 make -C "${repository_dir}/src/wireguard/go" install "${make_args[@]}"
 
 printf '\nUse these options with Partout’s zig build command:\n'

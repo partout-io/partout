@@ -51,7 +51,7 @@ jobs:
           cache-dependency-path: src/wireguard/go/go.sum
       - name: Check Go bridge
         if: matrix.suite == 'go'
-        run: go -C src/wireguard/go test ./src/...
+        run: go -C src/wireguard/go test ./...
       - name: Set up Zig
         uses: partout-io/setup-zig@v3
         if: matrix.suite == 'zig'

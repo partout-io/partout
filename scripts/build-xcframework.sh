@@ -135,8 +135,8 @@ wg_cache="$repo_dir/.build/wg-go/xcframework"
 wg_source_key=$(
     cd "$repo_dir/src/wireguard/go"
     {
-        shasum -a 256 Makefile go.mod go.sum goruntime-*.diff
-        find src include cmake -type f -exec shasum -a 256 {} +
+        find . -maxdepth 1 -type f ! -name .DS_Store -exec shasum -a 256 {} +
+        find include -type f -exec shasum -a 256 {} +
     } | LC_ALL=C sort | shasum -a 256 | cut -d ' ' -f 1
 )
 # Do not hash all of `go env`: GOGCCFLAGS contains a fresh temporary path.

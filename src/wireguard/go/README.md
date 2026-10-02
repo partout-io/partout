@@ -11,7 +11,7 @@ preserved.
 From the Partout repository root:
 
 ```sh
-go -C src/wireguard/go test ./src/...
+go -C src/wireguard/go test ./...
 scripts/build-wg-go-local.sh
 ```
 
@@ -26,3 +26,8 @@ The Xcode XCFramework prebuild caches each Go archive under
 `.build/wg-go/xcframework`. Unchanged sources, headers, Go/compiler settings,
 SDK, and target reuse the archive without invoking Go. Source or build-input
 changes rebuild the affected slice automatically.
+
+Go sources live at the module root; the C ABI header stays under `include/wg_go`.
+The Makefile supports Apple builds (including the patched Go runtime) and the
+local build helper. Windows and Android builds use `cmake/wireguard-go.cmake`
+from the repository root directly.
