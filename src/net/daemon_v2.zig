@@ -764,6 +764,7 @@ const ConnectionDaemon = struct {
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
+        log.write(.notice, "Create new link");
         const connection = self.connection.?;
         var remote = RemoteDescriptor{ .looper = self.looper };
         const reachability = self.factory.currentReachability();
@@ -790,6 +791,10 @@ const ConnectionDaemon = struct {
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
         if (endpoint == null) remote.local_port = (try descriptor.localAddress()).port;
+        log.write(.notice, "Link is active");
+        log.writef(.info, "Link type is {s}", .{
+            if (endpoint) |value| value.proto.socket_type.raw() else api.IPSocketType.udp.raw(),
+        });
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
             .pair = .{ .link = descriptor },
