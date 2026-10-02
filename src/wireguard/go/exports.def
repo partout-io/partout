@@ -11,3 +11,6 @@ wgBumpSockets
 wgBumpSocketsAndWait
 wgDisableSomeRoamingForBrokenMobileSemantics
 wgVersion
+wgTurnOnWithPassiveIO
+wgReceiveDatagram
+wgReceiveTunPacket

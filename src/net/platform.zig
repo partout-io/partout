@@ -404,7 +404,15 @@ fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair)
 const platform_socket_factory_vtable = SocketFactory.VTable{
     .current_reachability = socketFactoryCurrentReachability,
     .create = socketFactoryCreate,
+    .create_datagram = socketFactoryCreateDatagram,
 };
+
+fn socketFactoryCreateDatagram(ptr: ?*anyopaque, allocator: std.mem.Allocator, port: u16) SocketFactory.Error!*SocketWrapper {
+    const self: *Platform = @ptrCast(@alignCast(ptr.?));
+    var options = self.socketOptions(self.currentReachability(), 0);
+    options.port = port;
+    return try SocketWrapper.create(allocator, null, options) orelse error.LinkNotActive;
+}
 
 fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));

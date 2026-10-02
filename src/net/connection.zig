@@ -169,7 +169,8 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 }
 
 pub const RemoteDescriptor = struct {
-    endpoint: io.SocketEndpoint,
+    endpoint: ?io.SocketEndpoint = null,
+    local_port: u16 = 0,
     looper: *Looper,
 };
 
@@ -190,7 +191,7 @@ pub const Connection = struct {
 
     pub const Events = struct {
         pub const Success = struct {
-            remote_endpoint: io.SocketEndpoint,
+            remote_endpoint: ?io.SocketEndpoint = null,
             info: api.TunnelRemoteInfoWrapper,
         };
         pub const FailureDisposition = enum {
@@ -230,7 +231,20 @@ pub const Connection = struct {
         cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
     };
 
+    /// The daemon creates and owns the requested link on every v2 path.
+    pub const Link = union(enum) { connected, datagram: u16 };
+
     pub const VTable = struct {
+        link: *const fn (*anyopaque) Link = struct {
+            fn call(_: *anyopaque) Link {
+                return .connected;
+            }
+        }.call,
+        submit_datagrams: *const fn (*anyopaque, Looper.Packets, []const io.SocketAddress) Looper.ReadAction = struct {
+            fn call(_: *anyopaque, _: Looper.Packets, _: []const io.SocketAddress) Looper.ReadAction {
+                return .pause;
+            }
+        }.call,
         // FIXME: ###, New v2 callbacks, temporary noops
         endpoints: *const fn (*anyopaque) []const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) []const api.ExtendedEndpoint {

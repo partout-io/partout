@@ -16,11 +16,15 @@ const wireguard_c = @import("wireguard_c");
 pub const Error = std.mem.Allocator.Error || error{
     BackendUnavailable,
     CannotLocateTunnelFileDescriptor,
+    TransportFailure,
 };
 
 pub const StartTunnel = struct {
     tun: ?net.TunWrapper = null,
     ifname: ?[]const u8 = null,
+    passive_io: ?wireguard_c.wg_passive_link = null,
+    passive_tun: ?wireguard_c.wg_passive_tun = null,
+    passive_context: ?*anyopaque = null,
 
     pub fn descriptor(self: StartTunnel) ?net.FileDescriptor {
         const tun = self.tun orelse return null;
@@ -33,6 +37,8 @@ pub const Backend = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
+        receive_tun_packet: ?*const fn (i32, [*c]const u8, u32) callconv(.c) i32 = null,
+        receive_datagram: ?*const fn (i32, [*c]const u8, u32, [*c]const wireguard_c.wg_endpoint) callconv(.c) i32 = null,
         turn_on: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnel) Error!i32,
         turn_off: *const fn (?*anyopaque, i32) void,
         get_config: *const fn (?*anyopaque, std.mem.Allocator, i32) Error!?[]u8,
@@ -95,6 +101,8 @@ pub fn goBackend() Backend {
 
 const go_backend_vtable = Backend.VTable{
     .turn_on = cTurnOn,
+    .receive_datagram = wireguard_c.pp_wg_receive_datagram,
+    .receive_tun_packet = wireguard_c.pp_wg_receive_tun_packet,
     .turn_off = cTurnOff,
     .get_config = cGetConfig,
     .set_config = cSetConfig,
@@ -112,6 +120,11 @@ fn cTurnOn(
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
     wireguard_c.pp_wg_set_logger(cLog, null);
 
+    if (tunnel.passive_tun) |tun_callbacks| {
+        const udp_callbacks = tunnel.passive_io orelse return error.TransportFailure;
+        return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &udp_callbacks, &tun_callbacks, tunnel.passive_context);
+    }
+    if (tunnel.passive_io != null) return error.TransportFailure;
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
         // Unix-family builds consume the already-created native TUN fd.

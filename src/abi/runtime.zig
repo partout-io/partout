@@ -164,7 +164,10 @@ pub const DaemonRuntime = struct {
             experimental: openvpn.ConnectionContextV2,
         },
         Provider: void,
-        WireGuard: wireguard.ConnectionContext,
+        WireGuard: union(enum) {
+            legacy: if (runtime_policy.v2_only) void else wireguard.ConnectionContext,
+            experimental: wireguard.ConnectionContextV2,
+        },
         Undefined: void,
     };
 
@@ -194,9 +197,9 @@ pub const DaemonRuntime = struct {
             api.moduleType(module)
         else
             null;
-        const is_null_or_openvpn = module_type == null or module_type == .OpenVPN;
+        const supports_experimental = true;
         // The shared policy excludes legacy implementations at compile time.
-        const experimental = if (runtime_policy.v2_only) true else experimental_requested and is_null_or_openvpn;
+        const experimental = if (runtime_policy.v2_only) true else experimental_requested and supports_experimental;
         if (experimental) {
             log.write(.notice, "Using daemon v2 (experimental)");
         } else {
@@ -228,12 +231,12 @@ pub const DaemonRuntime = struct {
         }
         if (build_options.wireguard) {
             const ctx = self.contexts.putUninitialized(.WireGuard);
-            ctx.* = .{ .WireGuard = .{
-                .backend = wireguard.go_backend,
-            } };
-            const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx.WireGuard),
-                .vtable = &wireguard.connection_vtable,
+            const impl: net.ConnectionImplementation = if (experimental) blk: {
+                ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_backend } } };
+                break :blk .{ .ptr = &ctx.WireGuard.experimental, .vtable = &wireguard.connection_v2_vtable };
+            } else blk: {
+                ctx.* = .{ .WireGuard = .{ .legacy = .{ .backend = wireguard.go_backend } } };
+                break :blk .{ .ptr = &ctx.WireGuard.legacy, .vtable = &wireguard.connection_vtable };
             };
             try impls.append(allocator, impl);
         }

@@ -49,6 +49,15 @@ pub const SocketWrapper = struct {
         self.allocator.destroy(self);
     }
 
+    // FIXME: ###, Supply the bound address and native handle with Windows I/O.
+    pub fn localAddress(_: *const SocketWrapper) !io.SocketAddress {
+        return error.NotImplemented;
+    }
+
+    pub fn socketDescriptor(_: *const SocketWrapper) !SocketDescriptor {
+        return error.NotImplemented;
+    }
+
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
         return .{ .socket = self };
     }
@@ -61,6 +70,10 @@ pub const TunWrapper = struct {
     }
 
     pub fn deinit(_: *TunWrapper) void {}
+
+    pub fn prepareForLooper(_: *TunWrapper) error{NotImplemented}!void {
+        return error.NotImplemented;
+    }
 
     pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {
         return .{ .tun = self };

@@ -1,9 +1,10 @@
+//go:build !windows
+
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2026 Davide De Rosa. All Rights Reserved.
  */
 
-//go:build !windows
 package main
 
 // static void callLogger(void *func, void *ctx, int level, const char *msg);
@@ -40,6 +41,10 @@ func init() {
 
 //export wgTurnOn
 func wgTurnOn(settings *C.char, tunFd int32) int32 {
+	return turnOnWithBind(settings, tunFd, conn.NewStdNetBind())
+}
+
+func turnOnWithBind(settings *C.char, tunFd int32, bind conn.Bind) int32 {
 	logger := &device.Logger{
 		Verbosef: CLogger(0).Printf,
 		Errorf:   CLogger(1).Printf,
@@ -62,18 +67,10 @@ func wgTurnOn(settings *C.char, tunFd int32) int32 {
 		return -1
 	}
 	logger.Verbosef("Attaching to interface")
-	dev := device.NewDevice(tun, conn.NewStdNetBind(), logger)
-	err = dev.IpcSet(C.GoString(settings))
-	if err != nil {
-		logger.Errorf("Unable to set IPC settings: %v", err)
+	dev := device.NewDevice(tun, bind, logger)
+	handle := wgTurnOnDevice(settings, dev, logger, nil)
+	if handle < 0 {
 		dev.Close()
-		unix.Close(dupTunFd)
-		return -1
-	}
-	handle := wgTurnOnDevice(settings, dev, logger)
-	if handle == -1 {
-		dev.Close()
-		unix.Close(dupTunFd)
 	}
 	return handle
 }

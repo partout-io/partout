@@ -183,6 +183,8 @@ pub const SocketFactory = struct {
 
     pub const VTable = struct {
         current_reachability: *const fn (?*anyopaque) ?io.ReachabilityInfo,
+        /// Optional host-configured unconnected UDP transport for looper v2.
+        create_datagram: ?*const fn (?*anyopaque, std.mem.Allocator, u16) Error!*io.SocketWrapper = null,
         create: *const fn (
             ptr: ?*anyopaque,
             allocator: std.mem.Allocator,

@@ -221,7 +221,7 @@ const OpenVPNConnection = struct {
 
         const session = Session.create(self.allocator, .{
             .looper = remote.looper,
-            .remote_endpoint = remote.endpoint,
+            .remote_endpoint = remote.endpoint orelse return error.UnableToStart,
             .events = self.session_events,
             .configuration = self.configuration,
             .credentials = self.credentials,

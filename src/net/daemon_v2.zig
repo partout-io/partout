@@ -336,7 +336,7 @@ const ConnectionDaemon = struct {
     actor: *Actor,
     connection: ?Connection,
     // Valid while connection is non-null; only this class accesses them.
-    endpoint_resolver: EndpointResolver,
+    endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
     tunnel: ?net.TunWrapper,
     gate: ConnectionGate,
@@ -366,7 +366,7 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
-            .endpoint_resolver = undefined,
+            .endpoint_resolver = null,
             .looper = undefined,
             .tunnel = null,
             .gate = ConnectionGate.init(null),
@@ -644,6 +644,8 @@ const ConnectionDaemon = struct {
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
         looper.* = Looper.initExperimental(self.daemon.allocator, .{
+            .link_buf_size = 65535,
+            .tun_buf_size = 65535,
             .on_finish = .{ .context = self, .callback = onLooperTerminate },
         }) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -652,8 +654,8 @@ const ConnectionDaemon = struct {
         errdefer looper.deinit();
         self.connection = connection;
         errdefer self.connection = null;
-        self.endpoint_resolver = EndpointResolver.init(self.daemon.allocator, connection.endpoints());
-        errdefer self.endpoint_resolver.deinit();
+        self.endpoint_resolver = if (connection.vtable.link(connection.ptr) == .connected) EndpointResolver.init(self.daemon.allocator, connection.endpoints()) else null;
+        errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
         looper.start() catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -672,7 +674,8 @@ const ConnectionDaemon = struct {
         self.destroyTunnel();
         self.looper.deinit();
         self.daemon.allocator.destroy(self.looper);
-        self.endpoint_resolver.deinit();
+        if (self.endpoint_resolver) |*resolver| resolver.deinit();
+        self.endpoint_resolver = null;
         self.connection = null;
     }
 
@@ -763,11 +766,27 @@ const ConnectionDaemon = struct {
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
+        const connection = self.connection.?;
+        switch (connection.vtable.link(connection.ptr)) {
+            .connected => {},
+            .datagram => |port| {
+                const create_datagram = self.factory.vtable.create_datagram orelse return error.UnableToStart;
+                const socket = try create_datagram(self.factory.ptr, self.daemon.allocator, port);
+                errdefer socket.destroy();
+                const local = try socket.localAddress();
+                try self.looper.attach(.{
+                    .pair = .{ .link = socket.linkDescriptor() },
+                    .on_read = .{ .context = self, .callback = onLinkRead },
+                    .on_failure = .{ .context = self, .callback = onLinkFailure },
+                });
+                return .{ .looper = self.looper, .local_port = local.port };
+            },
+        }
         log.write(.notice, "Create new link");
         log.write(.notice, "Cycle to next endpoint");
         // FIXME: ###, Pick endpoint, resolve DNS, and connect link atomically in SocketFactory
         const reachability = self.factory.currentReachability();
-        const endpoint = try self.endpoint_resolver.next(
+        const endpoint = try self.endpoint_resolver.?.next(
             &self.resolver,
             reachability,
             self.daemon.options.connection_options.dns_timeout,
@@ -883,6 +902,7 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
+        try self.tunnel.?.prepareForLooper();
         const descriptor = self.tunnel.?.tunDescriptor();
 
         log.write(.info, "Attach TUN");
@@ -1034,9 +1054,10 @@ const ConnectionDaemon = struct {
     // run protocol work directly, but must never wait for the actor. Termination
     // finalizes protocol state here, then enqueues actor-owned recovery.
 
-    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
+    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
+        if (sources) |addresses| return conn.vtable.submit_datagrams(conn.ptr, packets, addresses);
         return conn.submitPackets(.link, packets);
     }
 

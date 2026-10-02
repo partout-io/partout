@@ -57,6 +57,7 @@ pub const openvpn_internal = if (openvpn_enabled) struct {
 } else struct {};
 pub const partout = @import("partout.zig");
 pub const wireguard_enabled = build_options.wireguard;
+pub const wireguard_connection_v2 = if (wireguard_enabled) @import("wireguard/connection_v2.zig") else struct {};
 pub const wireguard_connection = if (wireguard_enabled) @import("wireguard/connection.zig") else struct {};
 pub const wireguard_exports = if (wireguard_enabled) @import("wireguard/exports.zig") else struct {};
 pub const wireguard_parser = if (wireguard_enabled) @import("wireguard/parser.zig") else struct {};
@@ -64,6 +65,7 @@ pub const wireguard_serializer = if (wireguard_enabled) @import("wireguard/seria
 pub const wireguard_internal = if (wireguard_enabled) struct {
     pub const adapter = @import("wireguard/internal/adapter.zig");
     pub const backend = @import("wireguard/internal/backend.zig");
+    pub const passive_io = @import("wireguard/internal/passive_io.zig");
     pub const resolver = @import("wireguard/internal/resolver.zig");
     pub const tunnel_info = @import("wireguard/internal/tunnel_info.zig");
     pub const uapi = @import("wireguard/internal/uapi.zig");

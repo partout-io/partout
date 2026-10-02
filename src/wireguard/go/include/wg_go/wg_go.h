@@ -26,3 +26,27 @@ extern void wgBumpSockets(int handle);
 extern void wgBumpSocketsAndWait(int handle);
 extern void wgDisableSomeRoamingForBrokenMobileSemantics(int handle);
 extern const char *wgVersion(void);
+
+#include "passive_io.h"
+
+/* Fully host-owned UDP and TUN, on every platform. No native fd or interface
+ * name is consumed. Callbacks may run during startup; publish the returned
+ * handle before delivering reads. Context remains valid until wgTurnOff joins
+ * callbacks and host reads have been detached. Returns -1 on failure. */
+extern int32_t wgTurnOnWithPassiveIO(const char *settings,
+    const wg_passive_link *link, const wg_passive_tun *tun, void *context);
+
+/* Host -> Go: copy one UDP datagram and its source into a bounded queue.
+ * Thread-safe and never waits for queue space. Returns WG_IO_*; QUEUE_FULL
+ * means this datagram was dropped. At most 256 datagrams of up to 65535 bytes
+ * are queued. size zero permits a null packet. No pointers are retained.
+ * Detach/synchronize host reads before transport replacement; Close/Open
+ * discards queued packets but does not identify late reads from an old socket.
+ * Stop/join host producers before releasing their context during shutdown. */
+extern int32_t wgReceiveDatagram(int32_t handle, const uint8_t *packet,
+    uint32_t size, const wg_endpoint *source);
+
+/* Host -> Go: copy one raw IP packet read from the tunnel (1..65535 bytes).
+ * Bounded to 256 packets; nonblocking and thread-safe, returns WG_IO_*.
+ * QUEUE_FULL drops this packet. No pointers are retained. */
+extern int32_t wgReceiveTunPacket(int32_t handle, const uint8_t *packet, uint32_t size);

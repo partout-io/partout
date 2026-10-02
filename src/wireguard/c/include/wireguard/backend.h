@@ -29,3 +29,8 @@ void pp_wg_tweak_mobile_roaming(int handle);
 int pp_wg_get_socket_v4(int handle);
 int pp_wg_get_socket_v6(int handle);
 #endif
+
+#include "wg_go/passive_io.h"
+int32_t pp_wg_turn_on_passive(const char *, const wg_passive_link *, const wg_passive_tun *, void *);
+int32_t pp_wg_receive_datagram(int32_t, const uint8_t *, uint32_t, const wg_endpoint *);
+int32_t pp_wg_receive_tun_packet(int32_t, const uint8_t *, uint32_t);

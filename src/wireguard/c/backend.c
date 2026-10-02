@@ -74,6 +74,18 @@ int pp_wg_get_socket_v6(int handle) {
 }
 #endif
 
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+    return wgTurnOnWithPassiveIO(settings, link, tun, context);
+}
+
+int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {
+    return wgReceiveDatagram(handle, packet, size, source);
+}
+
+int32_t pp_wg_receive_tun_packet(int32_t handle, const uint8_t *packet, uint32_t size) {
+    return wgReceiveTunPacket(handle, packet, size);
+}
+
 #else
 
 int pp_wg_init(void) {
@@ -138,5 +150,20 @@ int pp_wg_get_socket_v6(int handle) {
     return -1;
 }
 #endif
+
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+    (void)settings; (void)link; (void)tun; (void)context;
+    return -1;
+}
+
+int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {
+    (void)handle; (void)packet; (void)size; (void)source;
+    return WG_IO_CLOSED;
+}
+
+int32_t pp_wg_receive_tun_packet(int32_t handle, const uint8_t *packet, uint32_t size) {
+    (void)handle; (void)packet; (void)size;
+    return WG_IO_CLOSED;
+}
 
 #endif
