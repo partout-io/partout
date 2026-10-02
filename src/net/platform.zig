@@ -426,9 +426,13 @@ fn socketFactoryCreate(
     log.write(.info, "Creating SocketWrapper");
     const wrapper = try SocketWrapper.create(allocator, endpoint, options) orelse
         return error.LinkNotActive;
-    if (endpoint) |remote| log.writef(.debug, "SocketFactory: Created socket for {s}", .{
-        log.sensitive(remote.address),
-    });
+    if (endpoint) |remote| {
+        log.writef(.debug, "SocketFactory: Created socket for {s}", .{
+            log.sensitive(remote.address),
+        });
+    } else {
+        log.write(.debug, "SocketFactory: Created unconnected UDP socket");
+    }
     return wrapper.linkDescriptor();
 }
 
