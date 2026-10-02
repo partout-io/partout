@@ -18,11 +18,13 @@ const c_flags = &.{
 const Vendor = enum {
     openssl,
     mbedtls,
+    wg_go,
 
     fn optionName(vendor: Vendor) []const u8 {
         return switch (vendor) {
             .openssl => "openssl",
             .mbedtls => "mbedtls",
+            .wg_go => "wg-go",
         };
     }
 
@@ -30,6 +32,7 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "OpenSSL",
             .mbedtls => "MbedTLS",
+            .wg_go => "wg-go",
         };
     }
 
@@ -37,6 +40,7 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "openssl",
             .mbedtls => "mbedtls",
+            .wg_go => "wg_go",
         };
     }
 
@@ -44,6 +48,7 @@ const Vendor = enum {
         return switch (vendor) {
             .openssl => "libopenssl.a",
             .mbedtls => "libmbedtls.a",
+            .wg_go => "libwg-go.a",
         };
     }
 };
@@ -61,10 +66,15 @@ const VendorPaths = struct {
 const Vendors = struct {
     openssl: VendorPaths,
     mbedtls: VendorPaths,
+    wg_go: VendorPaths,
     openssl_config_include: ?[]const u8,
 
-    fn all(vendors: Vendors) [2]VendorPaths {
-        return .{ vendors.openssl, vendors.mbedtls };
+    fn all(vendors: Vendors) [3]VendorPaths {
+        return .{ vendors.openssl, vendors.mbedtls, vendors.wg_go };
+    }
+
+    fn hasWireGuardBackend(vendors: Vendors) bool {
+        return vendors.wg_go.enabled();
     }
 };
 
@@ -76,7 +86,6 @@ const BuildConfig = struct {
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
     winrt_library: ?std.Build.LazyPath,
-    wg_go: ?std.Build.LazyPath,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -139,17 +148,15 @@ pub fn build(b: *std.Build) void {
         "openvpn",
         "Compile the OpenVPN library.",
     ) orelse false;
-    const wg_path = pathOption(b, "wg-go-lib", "CMake-built WireGuard Go library or Windows import library.", false);
     const use_wireguard = b.option(
         bool,
         "wireguard",
         "Compile the WireGuard library.",
-    ) orelse (wg_path != null);
-    if (!use_wireguard and wg_path != null)
-        std.debug.panic("-Dwg-go-lib cannot be combined with -Dwireguard=false", .{});
+    ) orelse false;
     const vendors = Vendors{
         .openssl = vendorPathsOption(b, .openssl),
         .mbedtls = vendorPathsOption(b, .mbedtls),
+        .wg_go = vendorPathsOption(b, .wg_go),
         .openssl_config_include = pathOption(
             b,
             "openssl-config-include",
@@ -166,14 +173,21 @@ pub fn build(b: *std.Build) void {
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
     const winrt_path = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
-    const use_winrt = b.option(bool, "winrt", "Link the CMake-built WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
+    const use_winrt = b.option(bool, "winrt", "Build and link the WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
     if (!use_winrt and winrt_path != null)
         std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
     if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
         std.debug.panic("WinRT requires a Windows MSVC target", .{});
-    if (use_winrt and winrt_path == null)
-        std.debug.panic("Build WinRT with CMake and supply -Dwinrt-lib", .{});
-    const winrt_library: ?std.Build.LazyPath = if (winrt_path) |path| .{ .cwd_relative = path } else null;
+    const winrt_build = if (use_winrt and winrt_path == null)
+        addWinRTBuild(b, target, optimize)
+    else
+        null;
+    const winrt_library: ?std.Build.LazyPath = if (winrt_path) |path|
+        .{ .cwd_relative = path }
+    else if (winrt_build) |bridge|
+        bridge.library
+    else
+        null;
     build_options.addOption(bool, "winrt", winrt_library != null);
 
     const config = BuildConfig{
@@ -184,7 +198,6 @@ pub fn build(b: *std.Build) void {
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .winrt_library = winrt_library,
-        .wg_go = if (wg_path) |path| .{ .cwd_relative = path } else null,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -192,24 +205,25 @@ pub fn build(b: *std.Build) void {
     const c_bindings = createCBindings(b, config);
 
     const module = createPartoutModule(b, config, c_bindings, "src/partout.zig", true);
-    if (shared and !target.result.os.tag.isDarwin()) {
+    if (shared) {
         linkVendorLibraries(module, b, config, false);
-        linkWireGuard(module, config, false);
         addRuntimeOrigin(module, target);
     }
 
     const lib = b.addLibrary(.{
-        .linkage = if (shared and !target.result.os.tag.isDarwin()) .dynamic else .static,
+        .linkage = if (shared) .dynamic else .static,
         .name = "partout",
         .root_module = module,
     });
+    if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
     if (shared and winrt_library != null) {
         lib.forceUndefinedSymbol("pp_winrt_runtime_link");
     }
-    if (install_name != null) {
+    if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
             std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
         }
+        lib.install_name = value;
     }
 
     const check = b.step("check", "Check if partout compiles");
@@ -219,7 +233,6 @@ pub fn build(b: *std.Build) void {
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     linkVendorLibraries(test_module, b, config, true);
-    linkWireGuard(test_module, config, true);
     test_module.addImport("source", test_source_module);
 
     const unit_tests = b.addTest(.{
@@ -227,6 +240,7 @@ pub fn build(b: *std.Build) void {
     });
     // The MSVC C++/WinRT bridge is built with /MD.
     if (winrt_library != null) unit_tests.linkage = .dynamic;
+    if (winrt_build) |bridge| unit_tests.step.dependOn(bridge.step);
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -237,10 +251,9 @@ pub fn build(b: *std.Build) void {
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 
-    if (target.result.os.tag.isDarwin()) {
-        const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin(), config.wg_go);
-        const output = if (shared) addAppleSharedLibrary(b, config, repacked_lib, install_name) else repacked_lib;
-        b.getInstallStep().dependOn(&b.addInstallLibFile(output, if (shared) "libpartout.dylib" else "libpartout.a").step);
+    if (!shared and target.result.os.tag.isDarwin()) {
+        const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
+        b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
@@ -257,6 +270,36 @@ pub fn build(b: *std.Build) void {
     });
     const docs_step = b.step("docs", "Install docs into zig-out/docs");
     docs_step.dependOn(&install_docs.step);
+}
+
+// CMake builds the C++/WinRT bridge with MSVC; Zig consumes the resulting archive.
+fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
+    library: std.Build.LazyPath,
+    step: *std.Build.Step,
+} {
+    if (builtin.os.tag != .windows)
+        std.debug.panic("Building WinRT requires a Windows host; supply -Dwinrt-lib when cross-compiling", .{});
+    const architecture = switch (target.result.cpu.arch) {
+        .aarch64 => "ARM64",
+        .x86_64 => "x64",
+        .x86 => "Win32",
+        else => std.debug.panic("Unsupported WinRT architecture", .{}),
+    };
+    const configuration = if (optimize == .Debug) "Debug" else "Release";
+    const configure = b.addSystemCommand(&.{ "cmake", "-G", "Visual Studio 17 2022", "-A", architecture, "-S" });
+    configure.addDirectoryArg(b.path("."));
+    configure.addArg("-B");
+    const directory = configure.addOutputDirectoryArg("winrt");
+    configure.addArgs(&.{ "-DPP_BUILD_WINRT=ON", "-DPP_BUILD_LIBRARY=OFF" });
+    configure.has_side_effects = true;
+    const compile = b.addSystemCommand(&.{ "cmake", "--build" });
+    compile.addDirectoryArg(directory);
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt" });
+    compile.has_side_effects = true;
+    return .{
+        .library = directory.path(b, b.fmt("{s}/partout-winrt.lib", .{configuration})),
+        .step = &compile.step,
+    };
 }
 
 fn parseLibCInstallation(
@@ -485,7 +528,7 @@ fn configureCHeadersAndMacros(
     }
     if (config.wireguard) {
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
-        consumer.addIncludePath(b.path("src/wireguard/go/include"));
+        consumer.addSystemIncludePath(b.path("src/wireguard/go/include"));
     }
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);
@@ -501,7 +544,7 @@ fn configureCHeadersAndMacros(
     addCMacro(
         consumer,
         "PARTOUT_HAS_WIREGUARD_BACKEND",
-        if (config.wg_go != null) "1" else "0",
+        if (config.vendors.hasWireGuardBackend()) "1" else "0",
     );
 }
 
@@ -561,6 +604,7 @@ fn linkVendorLibraries(
 ) void {
     for (config.vendors.all()) |paths| {
         if (!paths.enabled()) continue;
+        if (paths.vendor == .wg_go and !config.wireguard) continue;
         const library_path = paths.library orelse unreachable;
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
@@ -607,7 +651,7 @@ fn linkSystemLibraryNames(
     target: std.Build.ResolvedTarget,
     vendor: Vendor,
 ) void {
-    const options: std.Build.Module.LinkSystemLibraryOptions = .{
+    var options: std.Build.Module.LinkSystemLibraryOptions = .{
         .use_pkg_config = .no,
     };
     switch (vendor) {
@@ -623,13 +667,14 @@ fn linkSystemLibraryNames(
             module.linkSystemLibrary("mbedx509", options);
             module.linkSystemLibrary("mbedcrypto", options);
         },
+        .wg_go => {
+            // Disambiguate import .lib from .dll.
+            if (target.result.os.tag == .windows) {
+                options.preferred_link_mode = .static;
+            }
+            module.linkSystemLibrary("wg-go", options);
+        },
     }
-}
-
-fn linkWireGuard(module: *std.Build.Module, config: BuildConfig, testing: bool) void {
-    const wg = config.wg_go orelse return;
-    module.addObjectFile(wg);
-    if (testing and config.target.result.os.tag == .linux) module.addRPath(wg.dirname());
 }
 
 fn addRuntimeOrigin(
@@ -643,50 +688,9 @@ fn addRuntimeOrigin(
     }
 }
 
-// Apple dylibs use the native linker for export control and framework metadata.
-// Keep this Zig/C link step in the Zig build, including for XCFramework slices.
-fn addAppleSharedLibrary(b: *std.Build, config: BuildConfig, archive: std.Build.LazyPath, install_name: ?[]const u8) std.Build.LazyPath {
-    const t = config.target.result;
-    const arch = if (t.cpu.arch == .aarch64) "arm64" else @tagName(t.cpu.arch);
-    const triple = b.fmt("{s}-apple-{s}{f}{s}", .{ arch, @tagName(t.os.tag), t.os.version_range.semver.min, if (t.abi == .simulator) "-simulator" else "" });
-    const run = b.addSystemCommand(&.{ "xcrun", "clang", "-target", triple, "-dynamiclib", "-Wl,-compatibility_version,1.0.0", "-Wl,-current_version,1.0.0", "-Wl,-dead_strip", "-Wl,-rpath,@loader_path", "-Xlinker", "-install_name", "-Xlinker", install_name orelse "@rpath/libpartout.dylib" });
-    if (config.apple_sdk_path) |sdk| run.addArgs(&.{ "-isysroot", sdk });
-    run.addArgs(&.{ "-Xlinker", "-exported_symbols_list", "-Xlinker" });
-    run.addFileArg(b.path("src/partout.exports"));
-    run.addArgs(&.{ "-Xlinker", "-force_load", "-Xlinker" });
-    run.addFileArg(archive);
-    for (config.vendors.all()) |paths| {
-        if (!paths.enabled()) continue;
-        const directory = paths.library.?;
-        const framework = b.fmt("{s}/{s}.framework", .{ directory, paths.vendor.frameworkName() });
-        std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
-            const vendor_archive = b.fmt("{s}/{s}", .{ directory, paths.vendor.appleStaticArchiveName() });
-            std.Io.Dir.accessAbsolute(b.graph.io, vendor_archive, .{}) catch {
-                run.addArgs(&.{ "-L", directory });
-                switch (paths.vendor) {
-                    .openssl => run.addArgs(&.{ "-lssl", "-lcrypto" }),
-                    .mbedtls => run.addArgs(&.{ "-lmbedtls", "-lmbedx509", "-lmbedcrypto" }),
-                }
-                // The system linker resolves these files; recheck them each build.
-                run.has_side_effects = true;
-                continue;
-            };
-            run.addFileArg(.{ .cwd_relative = vendor_archive });
-            continue;
-        };
-        run.addArgs(&.{ "-F", directory, "-framework", paths.vendor.frameworkName() });
-        run.has_side_effects = true;
-    }
-    run.addArgs(&.{ "-framework", "CoreFoundation", "-framework", "Security", "-o" });
-    const output = run.addOutputFileArg("libpartout.dylib");
-    run.setName("link Apple shared library");
-    return output;
-}
-
 fn addDarwinStaticArchiveRepackStep(
     b: *std.Build,
     source: std.Build.LazyPath,
-    wg_go: ?std.Build.LazyPath,
 ) std.Build.LazyPath {
     const run = b.addSystemCommand(&.{
         "sh",
@@ -700,23 +704,16 @@ fn addDarwinStaticArchiveRepackStep(
         \\archive="$(cd "$archive_dir" && pwd)/$archive_base"
         \\rm -rf "$work" "$out"
         \\mkdir -p "$work"
-        \\wg=
-        \\if [ -n "${3:-}" ]; then wg="$(cd "$(dirname "$3")" && pwd)/$(basename "$3")"; fi
         \\cd "$work"
         \\ar -x "$archive"
         \\chmod u+r ./*.o
-        \\if [ -n "${3:-}" ]; then
-        \\    libtool -static -no_warning_for_no_symbols -o "$out" ./*.o "$wg"
-        \\else
-        \\    libtool -static -no_warning_for_no_symbols -o "$out" ./*.o
-        \\fi
+        \\libtool -static -no_warning_for_no_symbols -o "$out" ./*.o
         \\rm -rf "$work"
         ,
         "repack-darwin-static-archive",
     });
     run.addFileArg(source);
     const output = run.addOutputFileArg("libpartout.a");
-    if (wg_go) |wg| run.addFileArg(wg);
     run.setName("repack Darwin static archive");
     return output;
 }

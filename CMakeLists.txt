@@ -13,8 +13,5 @@ option(PP_BUILD_USE_WIREGUARD "Enable WireGuard" OFF)
 
 include("cmake/platform.cmake")
 include("cmake/winrt.cmake")
-if(PP_BUILD_USE_WIREGUARD)
-    include("cmake/wg-go.cmake")
-endif()
 include("cmake/zig.cmake")
 include("cmake/install.cmake")

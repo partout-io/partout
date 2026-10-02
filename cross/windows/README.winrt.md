@@ -22,8 +22,7 @@ addresses remain placeholders, and packet encapsulation and decapsulation are st
 ## Build the runtime bridge
 
 Windows Zig builds use a dummy tunnel controller by default and do not link WinRT.
-Enable `PP_BUILD_WINRT` in CMake to build and link the bridge.
-Use the `partout-test` CMake target to run Zig tests with WinRT.
+Pass `-Dwinrt=true` (for example, `zig build test -Dwinrt=true`) to build and link the WinRT bridge.
 This requires CMake 4.0+, Visual Studio 2022 with the target C++ tools, and the
 Windows SDK. Native Zig builds default to the MSVC ABI.
 

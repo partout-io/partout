@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Crypto backends default to all. WireGuard is always included.
-vendors=()
+vendors=(wg-go)
 if [[ -n $crypto_backends ]]; then
     [[ $crypto_backends != ,* && $crypto_backends != *, && $crypto_backends != *,,* ]] ||
         fail "invalid crypto backend list: $crypto_backends"
@@ -51,7 +51,7 @@ if [[ -n $crypto_backends ]]; then
             openssl|mbedtls) ;;
             *) fail "unknown crypto backend: $backend" ;;
         esac
-        [[ " ${vendors[*]-} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
+        [[ " ${vendors[*]} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
         vendors+=("$backend")
     done
 fi
@@ -60,7 +60,7 @@ fi
     fail "invalid prebuilts version: $prebuilts_version"
 [[ $output == *.xcframework ]] || fail "output must have an .xcframework extension"
 
-for tool in cmake curl ditto go lipo swift xcodebuild xcrun zig; do
+for tool in curl ditto lipo swift xcodebuild xcrun zig; do
     command -v "$tool" >/dev/null || fail "missing required tool: $tool"
 done
 
@@ -71,14 +71,14 @@ version=$(sed -nE 's/^pub const number = "([0-9A-Za-z.+-]+)";$/\1/p' "$repo_dir/
 [[ -n $version ]] || fail "unable to read the library version"
 
 download_prebuilts() {
-    [[ -n $crypto_backends ]] || return 0
     local repository=https://github.com/partout-io/prebuilts
     local base temp vendor archive checksum expected actual
 
     if [[ -f "$prebuilts/prebuilts-version.txt" &&
           $(cat "$prebuilts/prebuilts-version.txt") == "$prebuilts_version" &&
           -d "$prebuilts/openssl.xcframework" &&
-          -d "$prebuilts/mbedtls.xcframework" ]]; then
+          -d "$prebuilts/mbedtls.xcframework" &&
+          -d "$prebuilts/wg-go.xcframework" ]]; then
         echo "Using local prebuilts $prebuilts_version"
         return
     fi
@@ -88,7 +88,7 @@ download_prebuilts() {
     trap 'rm -rf "$temp"' EXIT
 
     echo "Using prebuilts $prebuilts_version"
-    for vendor in openssl mbedtls; do
+    for vendor in openssl mbedtls wg-go; do
         archive="$vendor.xcframework.zip"
         checksum="$archive.checksum"
         curl -fsSL --retry 3 -o "$temp/$checksum" "$base/$checksum"
@@ -121,49 +121,92 @@ download_prebuilts
 
 work="$repo_dir/zig-out/xcframework-build"
 cache="$repo_dir/zig-out/xcframework-cache"
+global_cache="$repo_dir/zig-out/xcframework-global-cache"
 rm -rf "$work"
-mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms" "$cache"
-chmod 755 "$work" "$work/install" "$cache"
+mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms" "$cache" "$global_cache"
+chmod 755 "$work" "$work/install" "$cache" "$global_cache"
 
 build_slice() {
-    local platform=$1 arch=$2 system minimum sdk_name vendor_id
-    local sdk install vendor vendor_path library build_dir
-    local vendor_args=(-DPP_BUILD_USE_OPENSSL=OFF -DPP_BUILD_USE_MBEDTLS=OFF)
+    local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
+    local sdk install vendor vendor_path library
+    local vendor_args=() vendor_libraries=()
+
+    [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
     case "$platform:$arch" in
-        macos:*) system=Darwin; minimum=$macos_min; sdk_name=macosx; vendor_id=macos-arm64_x86_64 ;;
-        ios:arm64) system=iOS; minimum=$ios_min; sdk_name=iphoneos; vendor_id=ios-arm64 ;;
-        ios-simulator:*) system=iOS; minimum=$ios_min; sdk_name=iphonesimulator; vendor_id=ios-arm64_x86_64-simulator ;;
-        tvos:arm64) system=tvOS; minimum=$tvos_min; sdk_name=appletvos; vendor_id=tvos-arm64 ;;
-        tvos-simulator:*) system=tvOS; minimum=$tvos_min; sdk_name=appletvsimulator; vendor_id=tvos-arm64_x86_64-simulator ;;
+        macos:*)
+            target="$zig_arch-macos.$macos_min"
+            clang_target="$arch-apple-macos$macos_min"
+            sdk_name=macosx
+            vendor_id=macos-arm64_x86_64
+            ;;
+        ios:arm64)
+            target="aarch64-ios.$ios_min"
+            clang_target="arm64-apple-ios$ios_min"
+            sdk_name=iphoneos
+            vendor_id=ios-arm64
+            ;;
+        ios-simulator:*)
+            target="$zig_arch-ios.$ios_min-simulator"
+            clang_target="$arch-apple-ios$ios_min-simulator"
+            sdk_name=iphonesimulator
+            vendor_id=ios-arm64_x86_64-simulator
+            ;;
+        tvos:arm64)
+            target="aarch64-tvos.$tvos_min"
+            clang_target="arm64-apple-tvos$tvos_min"
+            sdk_name=appletvos
+            vendor_id=tvos-arm64
+            ;;
+        tvos-simulator:*)
+            target="$zig_arch-tvos.$tvos_min-simulator"
+            clang_target="$arch-apple-tvos$tvos_min-simulator"
+            sdk_name=appletvsimulator
+            vendor_id=tvos-arm64_x86_64-simulator
+            ;;
         *) fail "unsupported slice: $platform $arch" ;;
     esac
+
     sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
-    build_dir="$cache/$platform-$arch"
     install="$work/install/$platform-$arch"
-    for vendor in ${vendors[@]+"${vendors[@]}"}; do
+    for vendor in "${vendors[@]}"; do
         vendor_path="$prebuilts/$vendor.xcframework/$vendor_id"
         library="$vendor_path/lib$vendor.a"
         [[ -f $library ]] || fail "missing vendor library: $library"
-        local key
-        key=$(echo "$vendor" | tr '[:lower:]' '[:upper:]')
-        vendor_args+=("-DPP_BUILD_USE_$key=ON" "-DPP_BUILD_${key}_INCLUDE=$vendor_path/Headers" "-DPP_BUILD_${key}_LIB=$vendor_path")
+        vendor_args+=("-D$vendor-include=$vendor_path/Headers" "-D$vendor-lib=$vendor_path")
+        vendor_libraries+=("$library")
     done
 
     echo "Building $platform $arch"
-    cmake -S "$repo_dir" -B "$build_dir" \
-        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
-        -DCMAKE_SYSTEM_NAME="$system" \
-        -DCMAKE_OSX_ARCHITECTURES="$arch" \
-        -DCMAKE_OSX_DEPLOYMENT_TARGET="$minimum" \
-        -DCMAKE_OSX_SYSROOT="$sdk" \
-        -DPP_BUILD_OUTPUT="$build_dir/output" \
-        -DPP_BUILD_GO_RUNTIME_CACHE="$cache/go-runtime" \
-        -DPP_BUILD_INSTALL_NAME="@rpath/$name.framework/$name" \
-        -DPP_BUILD_USE_OPENVPN=ON -DPP_BUILD_USE_WIREGUARD=ON \
-        "${vendor_args[@]}"
-    cmake --build "$build_dir" --target partout --parallel 1
-    mkdir -p "$install/lib"
-    cp "$build_dir/output/partout/lib/libpartout.dylib" "$install/lib/"
+    (
+        cd "$repo_dir"
+        zig build install -j1 \
+            --prefix "$install" \
+            --cache-dir "$cache" \
+            --global-cache-dir "$global_cache" \
+            --release=small \
+            -Dstrip=false \
+            -Dtarget="$target" \
+            -Dapple-sdk-path="$sdk" \
+            -Dopenvpn=true \
+            -Dwireguard=true \
+            "${vendor_args[@]}"
+    )
+
+    xcrun clang \
+        -target "$clang_target" \
+        -isysroot "$sdk" \
+        -dynamiclib \
+        -Wl,-install_name,"@rpath/$name.framework/$name" \
+        -Wl,-compatibility_version,1.0.0 \
+        -Wl,-current_version,1.0.0 \
+        -Wl,-dead_strip \
+        -Wl,-rpath,@loader_path \
+        -Wl,-exported_symbols_list,"$repo_dir/src/partout.exports" \
+        -Wl,-force_load,"$install/lib/libpartout.a" \
+        "${vendor_libraries[@]}" \
+        -framework CoreFoundation \
+        -framework Security \
+        -o "$install/lib/libpartout.dylib"
 }
 
 active_slice() {

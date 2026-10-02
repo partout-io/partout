@@ -36,9 +36,8 @@ targets: [
 
 ### CMake
 
-CMake orchestrates the build: Zig compiles Zig and C, Go builds the WireGuard
-bridge, and MSVC builds C++/WinRT. CMake resolves the selected crypto vendors
-and passes the completed bridge libraries to Zig for linking.
+CMake is a thin wrapper around the Zig build. It resolves the selected vendors,
+then invokes `zig build install` with their include and library paths.
 
 #### Requirements
 
@@ -48,7 +47,11 @@ and passes the completed bridge libraries to Zig for linking.
 - ninja
 - Android NDK (optional)
 
-OpenSSL and MbedTLS come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project. The WireGuard Go bridge lives in `src/wireguard/go` alongside its Zig/C consumers and is built from source. WireGuard builds require Go 1.24 or newer. Windows uses `zig cc` for cgo and `zig dlltool` for import libraries, without requiring LLVM-MinGW. Apple, Android, and Linux retain their default C toolchains.
+Crypto dependencies come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project.
+
+WireGuard builds require Go. CMake builds the local bridge in `src/wireguard/go`
+with the `partout-wg-go` target and passes its include and library directories to
+Zig. Windows uses `zig cc`; other platforms use the configured C compiler.
 
 #### Build
 
@@ -64,7 +67,7 @@ The script resolves the selected dependencies and accepts a few options:
 - `-install <dir>`: Install the completed build artifacts into a directory
 - `-config (Debug|Release)`: The CMake build type (`build.sh` only)
 - `-crypto (openssl|mbedtls[,openssl|mbedtls...])`: Pick one or more crypto subsystems between OpenSSL and Native/MbedTLS
-- `-wireguard`: Enable WireGuard and build the local Go bridge
+- `-wireguard`: Enable WireGuard
 - `-android`: Build for Android
 - `-prebuilts <version>`: Use vendor archives from the matching [`partout-io/prebuilts`][github-prebuilts] GitHub Release. CMake derives each archive name from the vendor, platform, and architecture. On macOS and Linux, CMake tries the system library first and uses the release only as a fallback.
 
@@ -97,23 +100,6 @@ bin/windows-arm64/partout/bin/partout.dll
 Partout must be bundled with the enabled shared vendor libraries to work. Building for Android requires access to the Android NDK.
 
 Check out `scripts/build.sh` and `scripts/build.ps1` for more details.
-
-### Developing the WireGuard Go bridge
-
-The Go module, C ABI headers, and upstream runtime patch live in
-`src/wireguard/go`. Keep changes to this ABI and its Zig/C callers in the same
-commit. The upstream WireGuard implementation remains pinned in `go.mod`.
-
-`cmake -S . -B .cmake -DPP_BUILD_USE_WIREGUARD=ON` configures the bridge.
-`cmake --build .cmake` builds Go first, then Zig/C and the final Partout library.
-Use `--target partout-wg-go` to build only the bridge, or
-`--target partout-test` to build the dependencies and run Zig tests.
-The XCFramework script uses the same CMake build for each Apple slice.
-
-Check the Go package with `go -C src/wireguard/go test ./...`
-(the imported master bridge currently has no Go test files).
-`ci/test-zig-apple-vendors.sh prebuilts` builds the local bridge before testing
-its integration with Zig and the prebuilt crypto libraries.
 
 ## Demo
 
