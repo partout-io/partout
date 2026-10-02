@@ -11,7 +11,7 @@ const log = core.logging;
 const impl = @import("internal/backend.zig");
 const PassiveIO = @import("internal/passive_io.zig").PassiveIO;
 const PeerEndpointResolver = @import("internal/resolver.zig").PeerEndpointResolver;
-const TunnelRemoteInfoBuilder = @import("internal/tunnel_info_v2.zig").TunnelRemoteInfoBuilder;
+const TunnelRemoteInfoBuilder = @import("internal/tunnel_info.zig").TunnelRemoteInfoBuilder;
 const uapi = @import("internal/uapi.zig");
 
 pub const ConnectionContext = struct {
@@ -71,7 +71,19 @@ const WireGuardConnection = struct {
         const builder = TunnelRemoteInfoBuilder.init(self.allocator, self.profile, self.module_id, &self.configuration);
         var info = builder.build() catch |err| return startError(err);
         defer info.deinit(self.allocator);
-        self.bridge.start(remote, @intCast(builder.defaultMTU()), settings) catch |err| return startError(err);
+        const mtu: u32 = mtu: {
+            for (info.modules orelse &.{}) |module| {
+                if (module == .IP) {
+                    if (module.IP.mtu) |value| {
+                        if (value > 0) break :mtu @intCast(value);
+                    }
+                }
+            }
+            // Go's fallback applies only to the passive device. Preserve the
+            // builder's zero/unspecified MTU in the host tunnel settings.
+            break :mtu 1420;
+        };
+        self.bridge.start(remote, mtu, settings) catch |err| return startError(err);
         errdefer self.stop();
         if (@import("builtin").os.tag == .ios) self.bridge.backend.disableRoaming(self.bridge.handle);
         try self.scheduleCount();
