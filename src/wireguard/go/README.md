@@ -12,12 +12,20 @@ From the Partout repository root:
 
 ```sh
 go -C src/wireguard/go test ./...
-scripts/build-wg-go-local.sh
 ```
 
 CMake and the Apple XCFramework builder compile this source automatically.
-Direct Zig builds accept the include and library paths printed by the local
-build script. Apple builds retain the sleep-aware Go runtime patch.
+Apple builds retain the sleep-aware Go runtime patch.
+
+To build only the bridge locally:
+
+```sh
+cmake -S . -B .build/wg-go-local -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_WIREGUARD=ON
+cmake --build .build/wg-go-local --target partout_wg_go_build
+```
+
+For direct Zig builds, use `-Dwg-go-include=src/wireguard/go/include` and
+`-Dwg-go-lib=.build/wg-go-local/wg-go/lib`.
 
 Windows builds use `zig cc` for cgo and `zig dlltool` for import libraries.
 Apple, Android, and Linux retain their default C toolchains.
@@ -28,6 +36,6 @@ SDK, and target reuse the archive without invoking Go. Source or build-input
 changes rebuild the affected slice automatically.
 
 Go sources live at the module root; the C ABI header stays under `include/wg_go`.
-The Makefile supports Apple builds (including the patched Go runtime) and the
-local build helper. Windows and Android builds use `cmake/wireguard-go.cmake`
-from the repository root directly.
+The Makefile supports Apple builds, including the patched Go runtime.
+Windows, Android, and Linux builds use `cmake/wireguard-go.cmake` from the
+repository root directly.

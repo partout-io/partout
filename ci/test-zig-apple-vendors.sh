@@ -11,7 +11,7 @@ if [[ $# -ne 1 ]]; then
     fail "usage: $0 <prebuilts-directory>"
 fi
 
-for tool in xcrun zig; do
+for tool in cmake go xcrun zig; do
     command -v "$tool" >/dev/null 2>&1 || fail "missing required tool: $tool"
 done
 
@@ -24,8 +24,6 @@ prebuilts_dir=$(cd "$prebuilts_dir" && pwd -P)
 slice_identifier=macos-arm64_x86_64
 openssl_slice="$prebuilts_dir/openssl.xcframework/$slice_identifier"
 mbedtls_slice="$prebuilts_dir/mbedtls.xcframework/$slice_identifier"
-"$repo_root/scripts/build-wg-go-local.sh"
-wg_go_install="$repo_root/.build/local/wg-go/$(go env GOHOSTOS)-$(go env GOHOSTARCH)/install"
 
 [[ -f "$openssl_slice/libopenssl.a" ]] ||
     fail "missing OpenSSL macOS library"
@@ -39,6 +37,10 @@ case "$(uname -m)" in
 esac
 
 sdk=$(xcrun --sdk macosx --show-sdk-path)
+wg_go_build="$repo_root/.build/wg-go-tests"
+cmake -S "$repo_root" -B "$wg_go_build" \
+    -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_WIREGUARD=ON
+cmake --build "$wg_go_build" --target partout_wg_go_build
 cache_dir="$repo_root/zig-out/vendor-test-cache"
 global_cache_dir="$repo_root/zig-out/vendor-test-global-cache"
 mkdir -p "$cache_dir" "$global_cache_dir"
@@ -55,5 +57,5 @@ zig build test \
     -Dopenssl-lib="$openssl_slice" \
     -Dmbedtls-include="$mbedtls_slice/Headers" \
     -Dmbedtls-lib="$mbedtls_slice" \
-    -Dwg-go-include="$wg_go_install/include" \
-    -Dwg-go-lib="$wg_go_install/lib"
+    -Dwg-go-include="$repo_root/src/wireguard/go/include" \
+    -Dwg-go-lib="$wg_go_build/wg-go/lib"

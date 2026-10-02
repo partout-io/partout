@@ -103,8 +103,6 @@ The Go module, C ABI headers, and upstream runtime patch live in
 `src/wireguard/go`. Keep changes to this ABI and its Zig/C callers in the same
 commit. The upstream WireGuard implementation remains pinned in `go.mod`.
 
-On macOS or Linux, run `scripts/build-wg-go-local.sh` to rebuild the bridge.
-It prints the include/library options to pass to a direct `zig build` invocation.
 CMake builds and `scripts/build-xcframework.sh` rebuild it automatically; Apple
 XCFramework builds download only the crypto dependencies from prebuilts.
 
