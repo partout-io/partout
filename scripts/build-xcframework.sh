@@ -41,7 +41,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 # Crypto backends default to all. WireGuard is always included.
-vendors=(wg-go)
+vendors=()
 if [[ -n $crypto_backends ]]; then
     [[ $crypto_backends != ,* && $crypto_backends != *, && $crypto_backends != *,,* ]] ||
         fail "invalid crypto backend list: $crypto_backends"
@@ -51,7 +51,7 @@ if [[ -n $crypto_backends ]]; then
             openssl|mbedtls) ;;
             *) fail "unknown crypto backend: $backend" ;;
         esac
-        [[ " ${vendors[*]} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
+        [[ " ${vendors[*]-} " != *" $backend "* ]] || fail "duplicate crypto backend: $backend"
         vendors+=("$backend")
     done
 fi
@@ -60,7 +60,7 @@ fi
     fail "invalid prebuilts version: $prebuilts_version"
 [[ $output == *.xcframework ]] || fail "output must have an .xcframework extension"
 
-for tool in curl ditto lipo swift xcodebuild xcrun zig; do
+for tool in cmake go curl ditto lipo swift xcodebuild xcrun zig; do
     command -v "$tool" >/dev/null || fail "missing required tool: $tool"
 done
 
@@ -77,8 +77,7 @@ download_prebuilts() {
     if [[ -f "$prebuilts/prebuilts-version.txt" &&
           $(cat "$prebuilts/prebuilts-version.txt") == "$prebuilts_version" &&
           -d "$prebuilts/openssl.xcframework" &&
-          -d "$prebuilts/mbedtls.xcframework" &&
-          -d "$prebuilts/wg-go.xcframework" ]]; then
+          -d "$prebuilts/mbedtls.xcframework" ]]; then
         echo "Using local prebuilts $prebuilts_version"
         return
     fi
@@ -88,7 +87,7 @@ download_prebuilts() {
     trap 'rm -rf "$temp"' EXIT
 
     echo "Using prebuilts $prebuilts_version"
-    for vendor in openssl mbedtls wg-go; do
+    for vendor in openssl mbedtls; do
         archive="$vendor.xcframework.zip"
         checksum="$archive.checksum"
         curl -fsSL --retry 3 -o "$temp/$checksum" "$base/$checksum"
@@ -122,13 +121,14 @@ download_prebuilts
 work="$repo_dir/zig-out/xcframework-build"
 cache="$repo_dir/zig-out/xcframework-cache"
 global_cache="$repo_dir/zig-out/xcframework-global-cache"
+wg_cache="$repo_dir/zig-out/xcframework-wg-go"
 rm -rf "$work"
 mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms" "$cache" "$global_cache"
 chmod 755 "$work" "$work/install" "$cache" "$global_cache"
 
 build_slice() {
     local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
-    local sdk install vendor vendor_path library
+    local sdk install vendor vendor_path library wg_build system minimum
     local vendor_args=() vendor_libraries=()
 
     [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
@@ -137,30 +137,40 @@ build_slice() {
             target="$zig_arch-macos.$macos_min"
             clang_target="$arch-apple-macos$macos_min"
             sdk_name=macosx
+            system=Darwin
+            minimum=$macos_min
             vendor_id=macos-arm64_x86_64
             ;;
         ios:arm64)
             target="aarch64-ios.$ios_min"
             clang_target="arm64-apple-ios$ios_min"
             sdk_name=iphoneos
+            system=iOS
+            minimum=$ios_min
             vendor_id=ios-arm64
             ;;
         ios-simulator:*)
             target="$zig_arch-ios.$ios_min-simulator"
             clang_target="$arch-apple-ios$ios_min-simulator"
             sdk_name=iphonesimulator
+            system=iOS
+            minimum=$ios_min
             vendor_id=ios-arm64_x86_64-simulator
             ;;
         tvos:arm64)
             target="aarch64-tvos.$tvos_min"
             clang_target="arm64-apple-tvos$tvos_min"
             sdk_name=appletvos
+            system=tvOS
+            minimum=$tvos_min
             vendor_id=tvos-arm64
             ;;
         tvos-simulator:*)
             target="$zig_arch-tvos.$tvos_min-simulator"
             clang_target="$arch-apple-tvos$tvos_min-simulator"
             sdk_name=appletvsimulator
+            system=tvOS
+            minimum=$tvos_min
             vendor_id=tvos-arm64_x86_64-simulator
             ;;
         *) fail "unsupported slice: $platform $arch" ;;
@@ -168,7 +178,22 @@ build_slice() {
 
     sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
     install="$work/install/$platform-$arch"
-    for vendor in "${vendors[@]}"; do
+    wg_build="$wg_cache/$platform-$arch"
+    cmake -S "$repo_dir" -B "$wg_build" \
+        -DPP_BUILD_LIBRARY=OFF \
+        -DPP_BUILD_USE_WIREGUARD=ON \
+        "-DPP_BUILD_GO_RUNTIME_CACHE=$wg_cache/go-runtime" \
+        "-DCMAKE_SYSTEM_NAME=$system" \
+        "-DCMAKE_OSX_ARCHITECTURES=$arch" \
+        "-DCMAKE_OSX_SYSROOT=$sdk" \
+        "-DCMAKE_OSX_DEPLOYMENT_TARGET=$minimum" \
+        "-DCMAKE_C_COMPILER_TARGET=$clang_target" \
+        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
+    cmake --build "$wg_build" --target partout-wg-go
+    vendor_args+=("-Dwg-go-include=$repo_dir/src/wireguard/go/include" "-Dwg-go-lib=$wg_build/wg-go/lib")
+    vendor_libraries+=("$wg_build/wg-go/lib/libwg-go.a")
+
+    for vendor in "${vendors[@]+"${vendors[@]}"}"; do
         vendor_path="$prebuilts/$vendor.xcframework/$vendor_id"
         library="$vendor_path/lib$vendor.a"
         [[ -f $library ]] || fail "missing vendor library: $library"
