@@ -404,15 +404,7 @@ fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair)
 const platform_socket_factory_vtable = SocketFactory.VTable{
     .current_reachability = socketFactoryCurrentReachability,
     .create = socketFactoryCreate,
-    .create_datagram = socketFactoryCreateDatagram,
 };
-
-fn socketFactoryCreateDatagram(ptr: ?*anyopaque, allocator: std.mem.Allocator, port: u16) SocketFactory.Error!*SocketWrapper {
-    const self: *Platform = @ptrCast(@alignCast(ptr.?));
-    var options = self.socketOptions(self.currentReachability(), 0);
-    options.port = port;
-    return try SocketWrapper.create(allocator, null, options) orelse error.LinkNotActive;
-}
 
 fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
@@ -422,18 +414,20 @@ fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
 fn socketFactoryCreate(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
-    endpoint: api.ExtendedEndpoint,
+    endpoint: ?api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
+    local_port: u16,
 ) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
-    const options = self.socketOptions(effective_reachability, timeout);
+    var options = self.socketOptions(effective_reachability, timeout);
+    if (endpoint == null) options.port = local_port;
     log.write(.info, "Creating SocketWrapper");
     const wrapper = try SocketWrapper.create(allocator, endpoint, options) orelse
         return error.LinkNotActive;
-    log.writef(.debug, "SocketFactory: Created socket for {s}", .{
-        log.sensitive(endpoint.address),
+    if (endpoint) |remote| log.writef(.debug, "SocketFactory: Created socket for {s}", .{
+        log.sensitive(remote.address),
     });
     return wrapper.linkDescriptor();
 }

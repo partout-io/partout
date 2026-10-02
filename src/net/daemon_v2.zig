@@ -654,7 +654,7 @@ const ConnectionDaemon = struct {
         errdefer looper.deinit();
         self.connection = connection;
         errdefer self.connection = null;
-        self.endpoint_resolver = if (connection.vtable.link(connection.ptr) == .connected) EndpointResolver.init(self.daemon.allocator, connection.endpoints()) else null;
+        self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
         errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
         looper.start() catch |err| return switch (err) {
@@ -768,35 +768,30 @@ const ConnectionDaemon = struct {
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         const connection = self.connection.?;
         var remote = RemoteDescriptor{ .looper = self.looper };
-        var descriptor = switch (connection.vtable.link(connection.ptr)) {
-            .connected => blk: {
-                log.write(.notice, "Cycle to next endpoint");
-                // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
-                const reachability = self.factory.currentReachability();
-                const endpoint = try self.endpoint_resolver.?.next(
-                    &self.resolver,
-                    reachability,
-                    self.daemon.options.connection_options.dns_timeout,
-                );
-                remote.endpoint = try net.SocketEndpoint.init(endpoint);
-                log.writef(.notice, "Connect to {s}", .{endpoint});
-                break :blk try self.factory.create(
-                    self.daemon.allocator,
-                    endpoint,
-                    reachability,
-                    self.daemon.options.connection_options.link_activity_timeout,
-                );
-            },
-            .datagram => |port| blk: {
-                const create_datagram = self.factory.vtable.create_datagram orelse return error.UnableToStart;
-                const socket = try create_datagram(self.factory.ptr, self.daemon.allocator, port);
-                errdefer socket.destroy();
-                remote.local_port = (try socket.localAddress()).port;
-                break :blk socket.linkDescriptor();
-            },
-        };
+        const reachability = self.factory.currentReachability();
+        const endpoint = if (self.endpoint_resolver) |*resolver| blk: {
+            log.write(.notice, "Cycle to next endpoint");
+            // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
+            const endpoint = try resolver.next(
+                &self.resolver,
+                reachability,
+                self.daemon.options.connection_options.dns_timeout,
+            );
+            remote.endpoint = try net.SocketEndpoint.init(endpoint);
+            log.writef(.notice, "Connect to {s}", .{endpoint});
+            break :blk endpoint;
+        } else null;
+        var factory = self.factory;
+        factory.local_port = connection.local_port;
+        var descriptor = try factory.create(
+            self.daemon.allocator,
+            endpoint,
+            reachability,
+            self.daemon.options.connection_options.link_activity_timeout,
+        );
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
+        if (endpoint == null) remote.local_port = (try descriptor.localAddress()).port;
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
             .pair = .{ .link = descriptor },
@@ -1041,8 +1036,7 @@ const ConnectionDaemon = struct {
     fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
-        if (sources) |addresses| return conn.vtable.submit_datagrams(conn.ptr, packets, addresses);
-        return conn.submitPackets(.link, packets);
+        return conn.submitPackets(.link, packets, sources);
     }
 
     fn onLinkFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {
@@ -1054,7 +1048,7 @@ const ConnectionDaemon = struct {
     fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
-        return conn.submitPackets(.tun, packets);
+        return conn.submitPackets(.tun, packets, null);
     }
 
     fn onTunnelFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {

@@ -15,6 +15,7 @@ const libc = struct {
 };
 const Probe = struct {
     fd: c_int,
+    requested_port: u16,
     tun_reads: std.atomic.Value(usize) = .init(0),
     link_reads: std.atomic.Value(usize) = .init(0),
     writes: std.atomic.Value(usize) = .init(0),
@@ -66,8 +67,11 @@ const Probe = struct {
         tun.test_descriptor = .{ .fd = current.fd, .io = .{ .mock = .{ .ptr = current, .vtable = &vtable } } };
         return tun;
     }
-    fn datagram(_: ?*anyopaque, allocator: std.mem.Allocator, port: u16) source.net_sandbox.SocketFactory.Error!*io.SocketWrapper {
-        return try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse error.LinkNotActive;
+    fn createSocket(_: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) source.net_sandbox.SocketFactory.Error!io.LinkDescriptor {
+        std.debug.assert(endpoint == null);
+        std.debug.assert(port == current.requested_port);
+        const socket = try io.SocketWrapper.create(allocator, endpoint, .{ .port = port }) orelse return error.LinkNotActive;
+        return socket.linkDescriptor();
     }
     fn barrier(_: ?*anyopaque) anyerror!void {}
 };
@@ -83,13 +87,16 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = source.mock;
+    const reservation = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    const requested_port = (try reservation.localAddress()).port;
+    reservation.destroy();
     var fds: [2]std.c.fd_t = undefined;
     if (std.c.pipe(&fds) != 0) return error.PipeFailed;
     defer {
         _ = libc.close(fds[0]);
         _ = libc.close(fds[1]);
     }
-    var probe = Probe{ .fd = fds[0] };
+    var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
     Probe.current = &probe;
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
     var backend_table = fake_backend_vtable;
@@ -104,7 +111,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     var monitor = mock.MockNetworkMonitor{};
     var factory = mock.noopSocketFactory();
     var factory_table = factory.vtable.*;
-    factory_table.create_datagram = Probe.datagram;
+    factory_table.create = Probe.createSocket;
     factory.vtable = &factory_table;
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -112,6 +119,8 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer profile.deinit(allocator);
+    const module = @constCast(api.findActiveConnectionModule(&profile).?);
+    module.WireGuard.configuration.?.interface.listen_port = requested_port;
     const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
         .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = mock.noopDNSResolver(), .factory = factory, .monitor = monitor.interface() },
         .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
@@ -120,6 +129,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     try sut.start();
     defer sut.stop();
     const owner = sut.implementation.connection;
+    try std.testing.expect(owner.endpoint_resolver == null);
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
     try std.testing.expect(!owner.looper.isLinkAttached());
     try owner.actor.perform(void, .evaluateConnection);
@@ -128,6 +138,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     try std.testing.expect(owner.tunnel != null and owner.looper.isTunAttached() and owner.looper.isLinkAttached());
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expect(fake.link != null and fake.tun != null);
+    try std.testing.expectEqual(requested_port, fake.link.?.local_port);
     try wait(&fake.counts, 2);
     _ = libc.write(fds[1], &.{ 0x45, 1, 2, 3 }, 4);
     try wait(&probe.tun_reads, 1);

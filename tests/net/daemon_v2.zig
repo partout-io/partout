@@ -24,7 +24,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
         };
 
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
 
@@ -375,7 +375,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         destroy_count: usize = 0,
         profile: ?*const api.Profile = null,
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
         fn create(ptr: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
@@ -551,7 +551,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             sink.stopped(sink.ctx);
         }
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
         const vtable = blk: {

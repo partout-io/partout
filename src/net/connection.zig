@@ -180,6 +180,8 @@ pub const RemoteDescriptor = struct {
 pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
+    /// Requested bind port for an unconnected link; zero selects an ephemeral port.
+    local_port: u16 = 0,
 
     pub const ShutdownReason = union(enum) {
         explicit_stop,
@@ -231,24 +233,11 @@ pub const Connection = struct {
         cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
     };
 
-    /// The daemon creates and owns the requested link on every v2 path.
-    pub const Link = union(enum) { connected, datagram: u16 };
-
     pub const VTable = struct {
-        link: *const fn (*anyopaque) Link = struct {
-            fn call(_: *anyopaque) Link {
-                return .connected;
-            }
-        }.call,
-        submit_datagrams: *const fn (*anyopaque, Looper.Packets, []const io.SocketAddress) Looper.ReadAction = struct {
-            fn call(_: *anyopaque, _: Looper.Packets, _: []const io.SocketAddress) Looper.ReadAction {
-                return .pause;
-            }
-        }.call,
-        // FIXME: ###, New v2 callbacks, temporary noops
-        endpoints: *const fn (*anyopaque) []const api.ExtendedEndpoint = struct {
-            fn call(_: *anyopaque) []const api.ExtendedEndpoint {
-                return &.{};
+        /// Null selects an unconnected UDP socket and skips endpoint resolution.
+        endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
+            fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+                return null;
             }
         }.call,
         start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
@@ -256,8 +245,9 @@ pub const Connection = struct {
                 return false;
             }
         }.call,
-        submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets) Looper.ReadAction = struct {
-            fn call(_: *anyopaque, _: io.Side, _: Looper.Packets) Looper.ReadAction {
+        /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
+        submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
                 return .pause;
             }
         }.call,
@@ -286,7 +276,7 @@ pub const Connection = struct {
         destroy: *const fn (*anyopaque) void,
     };
 
-    pub fn endpoints(self: Connection) []const api.ExtendedEndpoint {
+    pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {
         return self.vtable.endpoints(self.ptr);
     }
 
@@ -319,8 +309,9 @@ pub const Connection = struct {
         self: Connection,
         side: io.Side,
         packets: Looper.Packets,
+        sources: ?[]const io.SocketAddress,
     ) Looper.ReadAction {
-        return self.vtable.submit_packets(self.ptr, side, packets);
+        return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
     pub fn looperFailed(

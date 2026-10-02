@@ -166,9 +166,10 @@ fn noopSocketFactoryCurrentReachability(_: ?*anyopaque) ?net_io.ReachabilityInfo
 fn noopSocketFactoryCreate(
     _: ?*anyopaque,
     _: std.mem.Allocator,
-    _: api.ExtendedEndpoint,
+    _: ?api.ExtendedEndpoint,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
+    _: u16,
 ) net.SocketFactory.Error!Looper.LinkDescriptor {
     return error.LinkNotActive;
 }

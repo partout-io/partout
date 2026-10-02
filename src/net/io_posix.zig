@@ -30,6 +30,13 @@ pub const POSIXDescriptor = struct {
     pub fn cleanup(self: POSIXDescriptor) void {
         self.io.cleanup();
     }
+
+    pub fn localAddress(self: POSIXDescriptor) !io.SocketAddress {
+        return switch (self.io) {
+            .socket => |socket| socket.localAddress(),
+            else => error.InvalidSocketMode,
+        };
+    }
 };
 
 pub const LinkDescriptor = POSIXDescriptor;

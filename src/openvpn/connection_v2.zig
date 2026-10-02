@@ -480,7 +480,7 @@ fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
 
 // MARK: - Connection callbacks
 
-fn allEndpoints(ptr: *anyopaque) []const api.ExtendedEndpoint {
+fn allEndpoints(ptr: *anyopaque) ?[]const api.ExtendedEndpoint {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.allEndpoints();
 }
@@ -511,6 +511,7 @@ fn submitPackets(
     ptr: *anyopaque,
     side: net.Side,
     packets: Looper.Packets,
+    _: ?[]const net.SocketAddress,
 ) Looper.ReadAction {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.submitPackets(side, packets);

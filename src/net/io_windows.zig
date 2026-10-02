@@ -14,6 +14,10 @@ pub const SocketDescriptor = io_c.pp_socket_fd;
 pub const LinkDescriptor = struct {
     socket: *SocketWrapper,
 
+    pub fn localAddress(self: LinkDescriptor) !io.SocketAddress {
+        return self.socket.localAddress();
+    }
+
     pub fn cleanup(self: *LinkDescriptor) void {
         self.socket.destroy();
     }

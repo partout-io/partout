@@ -42,7 +42,7 @@ pub fn createConnection(raw: ?*anyopaque, allocator: std.mem.Allocator, module: 
         .interval_ms = sandbox.options.min_data_count_interval,
     };
     log.write(.notice, "Using WireGuardConnection v2");
-    return .{ .ptr = self, .vtable = &vtable };
+    return .{ .ptr = self, .vtable = &vtable, .local_port = owned.interface.listen_port orelse 0 };
 }
 
 /// Protocol state is confined to the daemon's looper. This object never creates,
@@ -118,22 +118,17 @@ fn cast(ptr: *anyopaque) *WireGuardConnection {
     return @ptrCast(@alignCast(ptr));
 }
 const vtable = net.Connection.VTable{
-    .link = link,
     .start_v2 = startV2,
     .start = legacyStart,
     .shutdown = shutdown,
     .stop = stop,
     .submit_packets = submitPackets,
-    .submit_datagrams = submitDatagrams,
     .looper_failed = looperFailed,
     .looper_terminated = looperTerminated,
     .network_change = networkChange,
     .better_path = betterPath,
     .destroy = destroy,
 };
-fn link(ptr: *anyopaque) net.Connection.Link {
-    return .{ .datagram = cast(ptr).configuration.interface.listen_port orelse 0 };
-}
 fn legacyStart(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
     return error.UnableToStart;
 }
@@ -161,18 +156,16 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
 fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
     cast(ptr).fail(.networkChanged);
 }
-fn submitPackets(ptr: *anyopaque, side: net.Side, packets: net.Looper.Packets) net.Looper.ReadAction {
+fn submitPackets(ptr: *anyopaque, side: net.Side, packets: net.Looper.Packets, sources: ?[]const net.SocketAddress) net.Looper.ReadAction {
     const self = cast(ptr);
-    if (side != .tun) return .pause;
-    self.bridge.receiveTun(packets) catch {
-        self.fail(.ioFailure);
-        return .pause;
+    const result = switch (side) {
+        .tun => self.bridge.receiveTun(packets),
+        .link => self.bridge.receiveLink(packets, sources orelse {
+            self.fail(.ioFailure);
+            return .pause;
+        }),
     };
-    return .keep;
-}
-fn submitDatagrams(ptr: *anyopaque, packets: net.Looper.Packets, sources: []const net.SocketAddress) net.Looper.ReadAction {
-    const self = cast(ptr);
-    self.bridge.receiveLink(packets, sources) catch {
+    result catch {
         self.fail(.ioFailure);
         return .pause;
     };
