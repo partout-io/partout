@@ -644,8 +644,6 @@ const ConnectionDaemon = struct {
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
         looper.* = Looper.initExperimental(self.daemon.allocator, .{
-            .link_buf_size = 65535,
-            .tun_buf_size = 65535,
             .on_finish = .{ .context = self, .callback = onLooperTerminate },
         }) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
