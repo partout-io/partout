@@ -275,11 +275,6 @@ pub const SocketWrapper = struct {
         return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
     }
 
-    /// The native socket handle used for host routing/protection.
-    pub fn socketDescriptor(self: *const SocketWrapper) !SocketDescriptor {
-        return io_c.pp_socket_get_fd(self.socket);
-    }
-
     pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
         var address: io.SocketAddress = undefined;
         if (!io_c.pp_socket_get_address(self.socket, &address)) return error.LibcFailure;

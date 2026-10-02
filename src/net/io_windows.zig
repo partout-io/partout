@@ -58,10 +58,6 @@ pub const SocketWrapper = struct {
         return error.NotImplemented;
     }
 
-    pub fn socketDescriptor(_: *const SocketWrapper) !SocketDescriptor {
-        return error.NotImplemented;
-    }
-
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
         return .{ .socket = self };
     }
