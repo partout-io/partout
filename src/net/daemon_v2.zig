@@ -765,7 +765,7 @@ const ConnectionDaemon = struct {
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         log.write(.notice, "Create new link");
-        const connection = self.connection.?;
+        const connection = self.connection orelse @panic("setupLink but no connection");
         var remote = RemoteDescriptor{ .looper = self.looper };
         const reachability = self.factory.currentReachability();
         const endpoint = if (self.endpoint_resolver) |*resolver| blk: {
