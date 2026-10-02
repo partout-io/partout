@@ -55,10 +55,9 @@ IPv4 addresses are normalized. Local source/interface stickiness is not provided
 `Bind.Open` activates a fresh queue and reports the host-selected port;
 `Bind.Close` wakes readers, discards pending packets, and waits for active send
 callbacks. Neither invokes host lifecycle operations or closes the host socket.
-A socket bump resets the queue, leaving host I/O untouched. Synchronize old host
-reads before replacing a transport: tunnel handles identify devices, not socket
-generations. Listen-port changes require a device restart. Nonzero fwmarks are
-rejected; the host configures routing and socket protection.
+Synchronize old host reads before replacing a transport: tunnel handles identify
+devices, not socket generations. Listen-port changes require a device restart.
+Nonzero fwmarks are rejected; the host configures routing and socket protection.
 
 For TUN input, the host calls `wgReceiveTunPacket` with a raw IP packet. Go
 copies it into a separate bounded 256-packet queue. For TUN output, Go invokes

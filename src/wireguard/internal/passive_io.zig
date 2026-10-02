@@ -5,8 +5,7 @@ const std = @import("std");
 const net = @import("../../net/exports.zig");
 const c = @import("wireguard_c");
 const backend = @import("backend.zig");
-pub const Endpoint = c.wg_endpoint;
-pub const Callbacks = c.wg_passive_link;
+const Endpoint = c.wg_endpoint;
 
 /// Go packet bridge only. The daemon owns every descriptor and attachment.
 /// Lifecycle and receive calls run on its looper; Go writes enqueue copies.
@@ -81,10 +80,10 @@ pub const PassiveIO = struct {
     }
 };
 
-pub fn toEndpoint(address: net.SocketAddress) Endpoint {
+fn toEndpoint(address: net.SocketAddress) Endpoint {
     return .{ .address = address.address, .scope_id = address.scope_id, .port = address.port, .family = address.family };
 }
-pub fn fromEndpoint(endpoint: Endpoint) !net.SocketAddress {
+fn fromEndpoint(endpoint: Endpoint) !net.SocketAddress {
     if (endpoint.family != 4 and endpoint.family != 6) return error.InvalidAddressFamily;
     if (endpoint.family == 4 and endpoint.scope_id != 0) return error.InvalidScope;
     var address = std.mem.zeroes(net.SocketAddress);
