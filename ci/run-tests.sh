@@ -15,7 +15,11 @@ if [[ $# -eq 2 && $1 == --apple-vendors ]]; then
 fi
 [[ $# -eq 0 ]] || fail "usage: $0 [--apple-vendors <prebuilts-directory>]"
 
-command -v zig >/dev/null 2>&1 || fail "missing required tool: zig"
+for tool in cmake go zig; do
+    command -v "$tool" >/dev/null 2>&1 || fail "missing required tool: $tool"
+done
 
 cd "$repo_root"
-exec zig build test -Dopenvpn=true -Dwireguard=true
+cmake -S . -B zig-out/test-cmake -DCMAKE_BUILD_TYPE=Debug \
+    -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_OPENVPN=ON -DPP_BUILD_USE_WIREGUARD=ON
+exec cmake --build zig-out/test-cmake --target partout-test

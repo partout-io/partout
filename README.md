@@ -36,8 +36,9 @@ targets: [
 
 ### CMake
 
-CMake is a thin wrapper around the Zig build. It resolves the selected vendors,
-then invokes `zig build install` with their include and library paths.
+CMake orchestrates the build: Zig compiles Zig and C, Go builds the WireGuard
+bridge, and MSVC builds C++/WinRT. CMake resolves the selected crypto vendors
+and passes the completed bridge libraries to Zig for linking.
 
 #### Requirements
 
@@ -103,9 +104,11 @@ The Go module, C ABI headers, and upstream runtime patch live in
 `src/wireguard/go`. Keep changes to this ABI and its Zig/C callers in the same
 commit. The upstream WireGuard implementation remains pinned in `go.mod`.
 
-`zig build install -Dwireguard=true` builds and links the bridge automatically.
-`zig build wg-go -Dwireguard=true` builds only the bridge. CMake and the Apple
-XCFramework script delegate to Zig; only crypto dependencies come from prebuilts.
+`cmake -S . -B .cmake -DPP_BUILD_USE_WIREGUARD=ON` configures the bridge.
+`cmake --build .cmake` builds Go first, then Zig/C and the final Partout library.
+Use `--target partout-wg-go-build` to build only the bridge, or
+`--target partout-test` to build the dependencies and run Zig tests.
+The XCFramework script uses the same CMake build for each Apple slice.
 
 Check the Go package with `go -C src/wireguard/go test ./...`
 (the imported master bridge currently has no Go test files).

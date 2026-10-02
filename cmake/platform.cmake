@@ -5,6 +5,13 @@ set(PP_BUILD_VENDOR_PREBUILT_URL "" CACHE STRING
 
 string(TOLOWER "${CMAKE_SYSTEM_NAME}" PLATFORM_NAME)
 string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" ARCH_NAME)
+if(APPLE AND CMAKE_OSX_ARCHITECTURES)
+    list(LENGTH CMAKE_OSX_ARCHITECTURES arch_count)
+    if(NOT arch_count EQUAL 1)
+        message(FATAL_ERROR "Build one Apple architecture at a time; combine slices with lipo")
+    endif()
+    set(ARCH_NAME "${CMAKE_OSX_ARCHITECTURES}")
+endif()
 if(WIN32)
     if(CMAKE_C_COMPILER_ARCHITECTURE_ID)
         string(TOLOWER "${CMAKE_C_COMPILER_ARCHITECTURE_ID}" ARCH_NAME)

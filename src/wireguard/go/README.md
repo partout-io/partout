@@ -14,22 +14,24 @@ From the Partout repository root:
 go -C src/wireguard/go test ./...
 ```
 
-Zig owns compilation, caching, linking, and installation of the bridge:
+CMake orchestrates the Go bridge and the Zig/C library:
 
 ```sh
-zig build wg-go -Dwireguard=true
-zig build install -Dwireguard=true
+cmake -S . -B .cmake -DPP_BUILD_USE_WIREGUARD=ON
+cmake --build .cmake
+cmake --build .cmake --target partout-test
 ```
 
-The build helper is `build/wireguard.zig`. It tracks Go sources, C ABI headers,
-module pins, toolchain settings, and the target SDK. Apple builds use a cached
-copy of Go with the sleep-aware runtime patch. Changes invalidate the relevant
-Zig build steps; unchanged builds reuse the generated library.
+Use `--target partout-wg-go-build` to build only the bridge. The build rules in
+`cmake/wg-go.cmake` track source files, ABI headers, module pins, and
+configured compiler settings. Unchanged builds skip Go entirely. Reconfigure
+CMake after changing toolchains or Go environment settings.
 
-Apple builds embed the Go archive in Partout's static or shared library.
-Windows uses `zig cc` and `zig dlltool`, installing `wg-go.dll` in `bin` and
-its import library in `lib`. Linux and Android install `libwg-go.so` in `lib`.
+Apple uses Clang and a cached copy of Go with the sleep-aware runtime patch.
+Zig embeds the resulting archive in Partout's static or shared library.
+Windows uses `zig cc` and `zig dlltool`; Android and Linux use CMake's configured
+C compiler. Their Go runtime libraries are installed alongside Partout.
 
-For Android or Linux cross-compilation, pass the platform compiler executable
-with `-Dwg-go-cc` and its target/sysroot flags with `-Dwg-go-cflags`. CMake
-supplies these from its configured toolchain. Apple uses Clang and the Xcode SDK.
+For direct Zig development, pass the CMake-built library with `-Dwg-go-lib`
+(the import `.lib` on Windows). Zig consumes that library without invoking Go
+or CMake. `-Dwireguard=true` alone compiles with the stub C backend.
