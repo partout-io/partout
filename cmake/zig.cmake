@@ -2,7 +2,7 @@ set(PARTOUT_ZIG_ARGS build install
     --prefix "${PP_BUILD_OUTPUT}/partout"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
     "-Dstrip=$<IF:$<CONFIG:Debug,RelWithDebInfo>,false,true>"
-    -Dshared=true
+    "-Dshared=$<IF:$<BOOL:${APPLE}>,false,true>"
 )
 
 if(PP_BUILD_USE_OPENSSL)
@@ -79,6 +79,25 @@ if(PP_BUILD_USE_MBEDTLS)
     )
 endif()
 
+if(APPLE)
+    # CMake's native linker combines the Zig archive and enabled backends.
+    if(PP_BUILD_USE_OPENSSL)
+        if(PARTOUT_OPENSSL_IS_PREBUILT)
+            list(APPEND PARTOUT_APPLE_LIBRARIES "${OPENSSL_DIR}/lib/libopenssl.a")
+        else()
+            list(APPEND PARTOUT_APPLE_LIBRARIES "${OPENSSL_SSL_LIBRARY}" "${OPENSSL_CRYPTO_LIBRARY}")
+        endif()
+    endif()
+    if(PP_BUILD_USE_MBEDTLS)
+        if(PARTOUT_MBEDTLS_IS_PREBUILT)
+            list(APPEND PARTOUT_APPLE_LIBRARIES "${MBEDTLS_DIR}/lib/libmbedtls.a")
+        else()
+            list(APPEND PARTOUT_APPLE_LIBRARIES "${PARTOUT_MBEDTLS_TLS_LIBRARY}"
+                "${PARTOUT_MBEDTLS_X509_LIBRARY}" "${PARTOUT_MBEDTLS_CRYPTO_LIBRARY}")
+        endif()
+    endif()
+endif()
+
 if(PP_BUILD_USE_OPENVPN)
     list(APPEND PARTOUT_ZIG_ARGS -Dopenvpn=true)
 endif()
@@ -113,7 +132,20 @@ gcc_dir=
 ")
     list(APPEND PARTOUT_ZIG_ARGS --libc "${PARTOUT_ZIG_LIBC}")
 elseif(APPLE)
-    set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-macos")
+    if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
+        set(PARTOUT_APPLE_OS ios)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "tvOS")
+        set(PARTOUT_APPLE_OS tvos)
+    else()
+        set(PARTOUT_APPLE_OS macos)
+    endif()
+    set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-${PARTOUT_APPLE_OS}")
+    if(CMAKE_OSX_DEPLOYMENT_TARGET)
+        string(APPEND PARTOUT_ZIG_TARGET ".${CMAKE_OSX_DEPLOYMENT_TARGET}")
+    endif()
+    if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
+        string(APPEND PARTOUT_ZIG_TARGET "-simulator")
+    endif()
     if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")
         set(PARTOUT_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
     else()
@@ -153,7 +185,12 @@ if(PP_BUILD_LIBRARY)
         set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
     endif()
 
-    add_custom_target(partout ALL
+    set(PARTOUT_COMPILE_TARGET partout)
+    if(APPLE)
+        set(PARTOUT_COMPILE_TARGET partout-zig)
+        set(PARTOUT_ZIG_BYPRODUCTS "${PP_BUILD_OUTPUT}/partout/lib/libpartout.a")
+    endif()
+    add_custom_target(${PARTOUT_COMPILE_TARGET} ALL
         COMMAND "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
         BYPRODUCTS ${PARTOUT_ZIG_BYPRODUCTS}
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -162,10 +199,38 @@ if(PP_BUILD_LIBRARY)
         VERBATIM
     )
     if(PP_BUILD_USE_WIREGUARD)
-        add_dependencies(partout partout-wg-go)
+        add_dependencies(${PARTOUT_COMPILE_TARGET} partout-wg-go)
     endif()
     if(PP_BUILD_WINRT)
-        add_dependencies(partout partout-winrt)
+        add_dependencies(${PARTOUT_COMPILE_TARGET} partout-winrt)
+    endif()
+
+    if(APPLE)
+        set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
+            "Install name for the Apple shared library")
+        set_source_files_properties(${PARTOUT_ZIG_BYPRODUCTS} PROPERTIES GENERATED TRUE)
+        add_library(partout SHARED ${PARTOUT_ZIG_BYPRODUCTS})
+        set_target_properties(partout PROPERTIES
+            LINKER_LANGUAGE C
+            LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib"
+            OUTPUT_NAME partout
+            NO_SONAME TRUE
+        )
+        add_dependencies(partout partout-zig)
+        target_link_options(partout PRIVATE
+            "LINKER:-install_name,${PP_BUILD_APPLE_INSTALL_NAME}"
+            "LINKER:-compatibility_version,1.0.0" "LINKER:-current_version,1.0.0"
+            "LINKER:-dead_strip" "LINKER:-rpath,@loader_path"
+            "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+            "LINKER:-force_load,${PP_BUILD_OUTPUT}/partout/lib/libpartout.a"
+        )
+        set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
+            "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" ${PARTOUT_ZIG_BYPRODUCTS})
+        target_link_libraries(partout PRIVATE ${PARTOUT_APPLE_LIBRARIES}
+            "-framework CoreFoundation" "-framework Security")
+        if(PP_BUILD_USE_WIREGUARD)
+            target_link_libraries(partout PRIVATE Partout::WireGuard)
+        endif()
     endif()
 
     file(MAKE_DIRECTORY "${PP_BUILD_OUTPUT}/partout/include")

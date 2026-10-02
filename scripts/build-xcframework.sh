@@ -119,119 +119,81 @@ download_prebuilts() {
 download_prebuilts
 
 work="$repo_dir/zig-out/xcframework-build"
-cache="$repo_dir/zig-out/xcframework-cache"
-global_cache="$repo_dir/zig-out/xcframework-global-cache"
-wg_cache="$repo_dir/zig-out/xcframework-wg-go"
+build_cache="$repo_dir/zig-out/xcframework-cmake"
 rm -rf "$work"
-mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms" "$cache" "$global_cache"
-chmod 755 "$work" "$work/install" "$cache" "$global_cache"
+mkdir -p "$work/install" "$work/frameworks" "$work/universal" "$work/dsyms"
+chmod 755 "$work" "$work/install"
 
 build_slice() {
-    local platform=$1 arch=$2 zig_arch target clang_target sdk_name vendor_id
-    local sdk install vendor vendor_path library wg_build system minimum
-    local vendor_args=() vendor_libraries=()
+    local platform=$1 arch=$2 clang_target sdk_name
+    local sdk install build system minimum vendor
+    local cmake_args=()
 
-    [[ $arch == arm64 ]] && zig_arch=aarch64 || zig_arch=x86_64
     case "$platform:$arch" in
         macos:*)
-            target="$zig_arch-macos.$macos_min"
             clang_target="$arch-apple-macos$macos_min"
             sdk_name=macosx
             system=Darwin
             minimum=$macos_min
-            vendor_id=macos-arm64_x86_64
             ;;
         ios:arm64)
-            target="aarch64-ios.$ios_min"
             clang_target="arm64-apple-ios$ios_min"
             sdk_name=iphoneos
             system=iOS
             minimum=$ios_min
-            vendor_id=ios-arm64
             ;;
         ios-simulator:*)
-            target="$zig_arch-ios.$ios_min-simulator"
             clang_target="$arch-apple-ios$ios_min-simulator"
             sdk_name=iphonesimulator
             system=iOS
             minimum=$ios_min
-            vendor_id=ios-arm64_x86_64-simulator
             ;;
         tvos:arm64)
-            target="aarch64-tvos.$tvos_min"
             clang_target="arm64-apple-tvos$tvos_min"
             sdk_name=appletvos
             system=tvOS
             minimum=$tvos_min
-            vendor_id=tvos-arm64
             ;;
         tvos-simulator:*)
-            target="$zig_arch-tvos.$tvos_min-simulator"
             clang_target="$arch-apple-tvos$tvos_min-simulator"
             sdk_name=appletvsimulator
             system=tvOS
             minimum=$tvos_min
-            vendor_id=tvos-arm64_x86_64-simulator
             ;;
         *) fail "unsupported slice: $platform $arch" ;;
     esac
 
     sdk=$(xcrun --sdk "$sdk_name" --show-sdk-path)
     install="$work/install/$platform-$arch"
-    wg_build="$wg_cache/$platform-$arch"
-    cmake -S "$repo_dir" -B "$wg_build" \
-        -DPP_BUILD_LIBRARY=OFF \
+    build="$build_cache/$platform-$arch"
+    cmake_args=(-DPP_BUILD_USE_OPENSSL=OFF -DPP_BUILD_USE_MBEDTLS=OFF)
+    for vendor in "${vendors[@]+"${vendors[@]}"}"; do
+        case "$vendor" in
+            openssl) cmake_args+=(-DPP_BUILD_USE_OPENSSL=ON) ;;
+            mbedtls) cmake_args+=(-DPP_BUILD_USE_MBEDTLS=ON) ;;
+        esac
+    done
+
+    echo "Building $platform $arch"
+    cmake -S "$repo_dir" -B "$build" \
+        -DCMAKE_BUILD_TYPE=RelWithDebInfo \
+        -DPP_BUILD_LIBRARY=ON \
+        -DPP_BUILD_USE_OPENVPN=ON \
         -DPP_BUILD_USE_WIREGUARD=ON \
-        "-DPP_BUILD_GO_RUNTIME_CACHE=$wg_cache/go-runtime" \
+        "-DPP_BUILD_OUTPUT=$work/install/$platform-$arch-build" \
+        "-DCMAKE_INSTALL_PREFIX=$install" \
+        "-DPP_BUILD_APPLE_PREBUILTS=$prebuilts" \
+        "-DPP_BUILD_APPLE_INSTALL_NAME=@rpath/$name.framework/$name" \
+        "-DPP_BUILD_GO_RUNTIME_CACHE=$build_cache/go-runtime" \
         "-DCMAKE_SYSTEM_NAME=$system" \
         "-DCMAKE_OSX_ARCHITECTURES=$arch" \
         "-DCMAKE_OSX_SYSROOT=$sdk" \
         "-DCMAKE_OSX_DEPLOYMENT_TARGET=$minimum" \
         "-DCMAKE_C_COMPILER_TARGET=$clang_target" \
-        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY
-    cmake --build "$wg_build" --target partout-wg-go
-    vendor_args+=("-Dwg-go-include=$repo_dir/src/wireguard/go/include" "-Dwg-go-lib=$wg_build/wg-go/lib")
-    vendor_libraries+=("$wg_build/wg-go/lib/libwg-go.a")
-
-    for vendor in "${vendors[@]+"${vendors[@]}"}"; do
-        vendor_path="$prebuilts/$vendor.xcframework/$vendor_id"
-        library="$vendor_path/lib$vendor.a"
-        [[ -f $library ]] || fail "missing vendor library: $library"
-        vendor_args+=("-D$vendor-include=$vendor_path/Headers" "-D$vendor-lib=$vendor_path")
-        vendor_libraries+=("$library")
-    done
-
-    echo "Building $platform $arch"
-    (
-        cd "$repo_dir"
-        zig build install -j1 \
-            --prefix "$install" \
-            --cache-dir "$cache" \
-            --global-cache-dir "$global_cache" \
-            --release=small \
-            -Dstrip=false \
-            -Dtarget="$target" \
-            -Dapple-sdk-path="$sdk" \
-            -Dopenvpn=true \
-            -Dwireguard=true \
-            "${vendor_args[@]}"
-    )
-
-    xcrun clang \
-        -target "$clang_target" \
-        -isysroot "$sdk" \
-        -dynamiclib \
-        -Wl,-install_name,"@rpath/$name.framework/$name" \
-        -Wl,-compatibility_version,1.0.0 \
-        -Wl,-current_version,1.0.0 \
-        -Wl,-dead_strip \
-        -Wl,-rpath,@loader_path \
-        -Wl,-exported_symbols_list,"$repo_dir/src/partout.exports" \
-        -Wl,-force_load,"$install/lib/libpartout.a" \
-        "${vendor_libraries[@]}" \
-        -framework CoreFoundation \
-        -framework Security \
-        -o "$install/lib/libpartout.dylib"
+        -DCMAKE_TRY_COMPILE_TARGET_TYPE=STATIC_LIBRARY \
+        "${cmake_args[@]}"
+    cmake --build "$build" --config RelWithDebInfo
+    cmake --install "$build" --config RelWithDebInfo
 }
 
 active_slice() {
