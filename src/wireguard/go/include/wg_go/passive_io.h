@@ -33,8 +33,8 @@ typedef int32_t (*wg_write_link_fn)(void *context,
     const uint8_t *packet, uint32_t size, const wg_endpoint *destination);
 
 /* Copied at startup. The context is host-owned and must remain valid through
- * wgTurnOff (and until host reads are detached). Go never opens/closes the host
- * socket. local_port must be the actual, nonzero bound port; listen_port must
+ * wgTurnOffWithPassiveIO (and until host reads are detached). Go never opens
+ * or closes the host socket. local_port must be the actual, nonzero bound port; listen_port must
  * be zero or match it. Port changes require a host-controlled device restart.
  * Nonzero fwmarks are unsupported; apply routing/protection in the host. */
 typedef struct wg_passive_link {
@@ -49,7 +49,7 @@ typedef int32_t (*wg_write_tun_fn)(void *context, const uint8_t *packet, uint32_
 
 /* Copied at startup. MTU is fixed for this device lifetime (1..65535).
  * Host interface/MTU changes require restarting the device. Go owns no TUN fd
- * and emits no interface events: wgTurnOn/wgTurnOff control device lifetime. */
+ * and emits no interface events: passive startup/shutdown control its lifetime. */
 typedef struct wg_passive_tun {
     uint32_t mtu;
     wg_write_tun_fn write;

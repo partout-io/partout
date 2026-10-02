@@ -3,6 +3,8 @@
  */
 #include <assert.h>
 #include <stddef.h>
+#include <stdlib.h>
+#include <string.h>
 #include <wg_go/wg_go.h>
 
 _Static_assert(sizeof(wg_endpoint) == 24, "endpoint ABI size");
@@ -38,8 +40,21 @@ int main(void) {
     assert(wgReceiveTunPacket(-1, packet, 0) == WG_IO_INVALID);
     const int32_t handle = wgTurnOnWithPassiveIO("", &link, &tun, NULL);
     assert(handle >= 0);
+    char *config = wgGetConfigWithPassiveIO(handle);
+    assert(config != NULL && strstr(config, "listen_port=51820") != NULL);
+    free(config);
+    wgDisableRoamingWithPassiveIO(handle);
+    assert(wgGetConfig(handle) == NULL);
+    wgTurnOff(handle); // The native registry has no device with this ID.
     assert(wgReceiveTunPacket(handle, packet, sizeof(packet)) == WG_IO_OK);
-    wgTurnOff(handle);
+    wgTurnOffWithPassiveIO(handle);
+    assert(wgGetConfigWithPassiveIO(handle) == NULL);
     assert(wgReceiveTunPacket(handle, packet, sizeof(packet)) == WG_IO_CLOSED);
+    const int32_t replacement = wgTurnOnWithPassiveIO("", &link, &tun, NULL);
+    assert(replacement >= 0 && replacement != handle);
+    wgTurnOffWithPassiveIO(handle);
+    assert(wgReceiveDatagram(handle, NULL, 0, &source) == WG_IO_CLOSED);
+    assert(wgReceiveTunPacket(replacement, packet, sizeof(packet)) == WG_IO_OK);
+    wgTurnOffWithPassiveIO(replacement);
     return 0;
 }

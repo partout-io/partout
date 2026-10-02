@@ -101,16 +101,30 @@ pub fn goBackend() Backend {
     return .{ .vtable = &go_backend_vtable };
 }
 
+pub fn goPassiveBackend() Backend {
+    return .{ .vtable = &go_passive_backend_vtable };
+}
+
 const go_backend_vtable = Backend.VTable{
     .turn_on = cTurnOn,
-    .receive_datagram = wireguard_c.pp_wg_receive_datagram,
-    .receive_tun_packet = wireguard_c.pp_wg_receive_tun_packet,
     .turn_off = cTurnOff,
     .get_config = cGetConfig,
     .set_config = cSetConfig,
     .socket_descriptors = cSocketDescriptors,
     .bump_sockets = cBumpSockets,
     .disable_roaming = cDisableRoaming,
+};
+
+const go_passive_backend_vtable = Backend.VTable{
+    .turn_on = cTurnOnPassive,
+    .turn_off = cTurnOffPassive,
+    .get_config = cGetConfigPassive,
+    .disable_roaming = cDisableRoamingPassive,
+    .receive_datagram = wireguard_c.pp_wg_receive_datagram,
+    .receive_tun_packet = wireguard_c.pp_wg_receive_tun_packet,
+    .set_config = passiveSetConfig,
+    .socket_descriptors = passiveSocketDescriptors,
+    .bump_sockets = passiveBumpSockets,
 };
 
 fn cTurnOn(
@@ -122,9 +136,6 @@ fn cTurnOn(
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
     wireguard_c.pp_wg_set_logger(cLog, null);
 
-    if (tunnel.passive) |passive| {
-        return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &passive.link, &passive.tun, passive.context);
-    }
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
         // Unix-family builds consume the already-created native TUN fd.
@@ -197,4 +208,38 @@ fn cBumpSockets(_: ?*anyopaque, handle: i32, sync: bool) void {
 
 fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
     wireguard_c.pp_wg_tweak_mobile_roaming(handle);
+}
+
+fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: StartTunnel) Error!i32 {
+    const passive = tunnel.passive orelse return error.TransportFailure;
+    if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
+    wireguard_c.pp_wg_set_logger(cLog, null);
+    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &passive.link, &passive.tun, passive.context);
+}
+
+fn cTurnOffPassive(_: ?*anyopaque, handle: i32) void {
+    wireguard_c.pp_wg_turn_off_passive(handle);
+}
+
+fn cGetConfigPassive(_: ?*anyopaque, allocator: std.mem.Allocator, handle: i32) Error!?[]u8 {
+    const config = wireguard_c.pp_wg_get_config_passive(handle) orelse return null;
+    defer portable_c.pp_free(config);
+    return try allocator.dupe(u8, std.mem.span(config));
+}
+
+fn cDisableRoamingPassive(_: ?*anyopaque, handle: i32) void {
+    wireguard_c.pp_wg_tweak_mobile_roaming_passive(handle);
+}
+
+// Passive devices are reconfigured by restarting; all transport belongs to the host.
+fn passiveSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) Error!i64 {
+    return error.TransportFailure;
+}
+
+fn passiveSocketDescriptors(_: ?*anyopaque, _: std.mem.Allocator, _: i32) Error![]net.SocketDescriptor {
+    return error.TransportFailure;
+}
+
+fn passiveBumpSockets(_: ?*anyopaque, _: i32, _: bool) void {
+    unreachable;
 }

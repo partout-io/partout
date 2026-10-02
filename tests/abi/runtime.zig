@@ -373,6 +373,9 @@ test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only p
                 try std.testing.expectEqual(experimental, ctx.WireGuard == .experimental);
                 const expected_context: *anyopaque = if (experimental) &ctx.WireGuard.experimental else &ctx.WireGuard.legacy;
                 try std.testing.expect(impl.ptr == expected_context);
+                const backend = if (experimental) ctx.WireGuard.experimental.backend else ctx.WireGuard.legacy.backend;
+                const expected_backend = if (experimental) source.wireguard_exports.go_passive_backend else source.wireguard_exports.go_backend;
+                try std.testing.expect(backend.vtable == expected_backend.vtable);
             }
             if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
                 const impl = runtime.registry.implementation(.OpenVPN).?;

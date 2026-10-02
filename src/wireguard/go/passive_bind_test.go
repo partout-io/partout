@@ -253,10 +253,10 @@ func TestPassiveReceiveABI(t *testing.T) {
 	<-tun.TUN().Events() // Keep the device down; exercise the bind queue directly.
 	dev := device.NewDevice(tun.TUN(), b, device.NewLogger(device.LogLevelSilent, ""))
 	const handle = 2147483646
-	tunnelHandlesMu.Lock()
-	tunnelHandles[handle] = tunnelHandle{Device: dev}
-	tunnelHandlesMu.Unlock()
-	defer wgTurnOff(handle)
+	passiveTunnels.Lock()
+	passiveTunnels.byHandle[handle] = passiveTunnel{Device: dev, bind: b}
+	passiveTunnels.Unlock()
+	defer wgTurnOffWithPassiveIO(handle)
 	fns, _, err := b.Open(0)
 	if err != nil {
 		t.Fatal(err)
@@ -282,7 +282,7 @@ func TestPassiveReceiveABI(t *testing.T) {
 	if status := wgReceiveDatagram(handle, nil, 0, &source); status != -2 {
 		t.Fatal(status)
 	}
-	wgTurnOff(handle)
+	wgTurnOffWithPassiveIO(handle)
 	if status := wgReceiveDatagram(handle, nil, 0, &source); status != -2 {
 		t.Fatal(status)
 	}

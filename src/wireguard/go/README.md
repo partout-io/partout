@@ -70,10 +70,17 @@ closing any host descriptor.
 
 Serialize startup, configuration, and shutdown on the host. Start receive
 submission only after publishing the handle returned by startup; send callbacks
-may occur during startup. Keep the callback context alive until `wgTurnOff`
-returns and host producers have been detached/joined. Receive calls may race with
-shutdown and return `WG_IO_CLOSED`. Handles are not reused during the process
+may occur during startup. Keep the callback context alive until
+`wgTurnOffWithPassiveIO` returns and host producers have been detached/joined.
+Receive calls may race with shutdown and return `WG_IO_CLOSED`. Handles are not reused during the process
 lifetime, so late packets cannot enter a replacement device.
+
+The passive API has a separate handle registry from the native v1 API. Use
+`wgGetConfigWithPassiveIO` for statistics/configuration reads and
+`wgDisableRoamingWithPassiveIO` for the mobile roaming policy. Never pass passive
+handles to native lifecycle/configuration functions (or vice versa): their
+numeric values can overlap. The legacy Go implementation remains unchanged;
+only logging and the underlying WireGuard dependency are shared.
 
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain

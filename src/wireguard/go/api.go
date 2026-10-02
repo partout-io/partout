@@ -18,7 +18,6 @@ import (
 	"math"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 	"unsafe"
 
@@ -32,21 +31,9 @@ var loggerCtx unsafe.Pointer
 type tunnelHandle struct {
 	*device.Device
 	*device.Logger
-	passiveTun *passiveTun
 }
 
 var tunnelHandles = make(map[int32]tunnelHandle)
-var tunnelHandlesMu sync.RWMutex
-
-// Never reuse an ID: late host datagrams cannot enter a replacement device.
-var nextTunnelHandle int64
-
-func lookupTunnel(handle int32) (tunnelHandle, bool) {
-	tunnelHandlesMu.RLock()
-	defer tunnelHandlesMu.RUnlock()
-	tunnel, ok := tunnelHandles[handle]
-	return tunnel, ok
-}
 
 //export wgSetLogger
 func wgSetLogger(context, loggerFn uintptr) {
@@ -54,33 +41,32 @@ func wgSetLogger(context, loggerFn uintptr) {
 	loggerFunc = unsafe.Pointer(loggerFn)
 }
 
-func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger, passive *passiveTun) int32 {
+func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger) int32 {
 	err := dev.IpcSet(C.GoString(settings))
 	if err != nil {
 		logger.Errorf("Unable to set IPC settings: %v", err)
 		return -1
 	}
 
-	if err := dev.Up(); err != nil {
-		logger.Errorf("Unable to start device: %v", err)
-		return -1
-	}
+	dev.Up()
 	logger.Verbosef("Device started")
 
-	tunnelHandlesMu.Lock()
-	defer tunnelHandlesMu.Unlock()
-	if nextTunnelHandle > math.MaxInt32 {
+	var i int32
+	for i = 0; i < math.MaxInt32; i++ {
+		if _, exists := tunnelHandles[i]; !exists {
+			break
+		}
+	}
+	if i == math.MaxInt32 {
 		return -1
 	}
-	handle := int32(nextTunnelHandle)
-	nextTunnelHandle++
-	tunnelHandles[handle] = tunnelHandle{dev, logger, passive}
-	return handle
+	tunnelHandles[i] = tunnelHandle{dev, logger}
+	return i
 }
 
 //export wgGetSocketV4
 func wgGetSocketV4(tunnelHandle int32) int32 {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return -1
 	}
@@ -97,7 +83,7 @@ func wgGetSocketV4(tunnelHandle int32) int32 {
 
 //export wgGetSocketV6
 func wgGetSocketV6(tunnelHandle int32) int32 {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return -1
 	}
@@ -113,19 +99,18 @@ func wgGetSocketV6(tunnelHandle int32) int32 {
 }
 
 //export wgTurnOff
-func wgTurnOff(handle int32) {
-	tunnelHandlesMu.Lock()
-	dev, ok := tunnelHandles[handle]
-	delete(tunnelHandles, handle)
-	tunnelHandlesMu.Unlock()
-	if ok {
-		dev.Close()
+func wgTurnOff(tunnelHandle int32) {
+	dev, ok := tunnelHandles[tunnelHandle]
+	if !ok {
+		return
 	}
+	delete(tunnelHandles, tunnelHandle)
+	dev.Close()
 }
 
 //export wgSetConfig
 func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return 0
 	}
@@ -142,7 +127,7 @@ func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
 
 //export wgGetConfig
 func wgGetConfig(tunnelHandle int32) *C.char {
-	device, ok := lookupTunnel(tunnelHandle)
+	device, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return nil
 	}
@@ -155,7 +140,7 @@ func wgGetConfig(tunnelHandle int32) *C.char {
 
 //export wgBumpSockets
 func wgBumpSockets(tunnelHandle int32) {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return
 	}
@@ -175,7 +160,7 @@ func wgBumpSockets(tunnelHandle int32) {
 
 //export wgBumpSocketsAndWait
 func wgBumpSocketsAndWait(tunnelHandle int32) {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return
 	}
@@ -193,7 +178,7 @@ func wgBumpSocketsAndWait(tunnelHandle int32) {
 
 //export wgDisableSomeRoamingForBrokenMobileSemantics
 func wgDisableSomeRoamingForBrokenMobileSemantics(tunnelHandle int32) {
-	dev, ok := lookupTunnel(tunnelHandle)
+	dev, ok := tunnelHandles[tunnelHandle]
 	if !ok {
 		return
 	}

@@ -23,8 +23,6 @@ import (
 	"os"
 	"strconv"
 	"unsafe"
-
-	"golang.zx2c4.com/wireguard/device"
 )
 
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {
@@ -106,15 +104,11 @@ func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, sou
 	if err != nil {
 		return C.WG_IO_INVALID
 	}
-	tunnel, ok := lookupTunnel(int32(handle))
+	tunnel, ok := lookupPassiveTunnel(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
-	bind, ok := tunnel.Bind().(*passiveBind)
-	if !ok {
-		return C.WG_IO_INVALID
-	}
-	return passiveStatus(bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
+	return passiveStatus(tunnel.bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
 }
 
 //export wgTurnOnWithPassiveIO
@@ -134,13 +128,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 		}
 		return nil
 	})
-	logger := &device.Logger{Verbosef: CLogger(0).Printf, Errorf: CLogger(1).Printf}
-	dev := device.NewDevice(passive, bind, logger)
-	handle := wgTurnOnDevice(settings, dev, logger, passive)
-	if handle < 0 {
-		dev.Close()
-	}
-	return handle
+	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
 }
 
 //export wgReceiveTunPacket
@@ -148,14 +136,11 @@ func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.
 	if size == 0 || size > passiveMaxDatagram || packet == nil {
 		return C.WG_IO_INVALID
 	}
-	tunnel, ok := lookupTunnel(int32(handle))
+	tunnel, ok := lookupPassiveTunnel(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
-	if tunnel.passiveTun == nil {
-		return C.WG_IO_INVALID
-	}
-	return passiveStatus(tunnel.passiveTun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
+	return passiveStatus(tunnel.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
 }
 
 func passiveStatus(err error) C.int32_t {

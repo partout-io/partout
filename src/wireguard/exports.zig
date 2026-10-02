@@ -36,6 +36,7 @@ const module_vtable: core.ModuleImplementation.VTable = .{
 pub const ConnectionContext = connection.ConnectionContext;
 pub const ConnectionContextV2 = connection_v2.ConnectionContext;
 pub const go_backend = backend.goBackend();
+pub const go_passive_backend = backend.goPassiveBackend();
 pub const connection_vtable: net.ConnectionImplementation.VTable = .{
     .module_type = moduleType,
     .create_connection = connection.createConnection,

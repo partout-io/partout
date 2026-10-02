@@ -78,6 +78,18 @@ int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link,
     return wgTurnOnWithPassiveIO(settings, link, tun, context);
 }
 
+void pp_wg_turn_off_passive(int32_t handle) {
+    wgTurnOffWithPassiveIO(handle);
+}
+
+char *pp_wg_get_config_passive(int32_t handle) {
+    return wgGetConfigWithPassiveIO(handle);
+}
+
+void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
+    wgDisableRoamingWithPassiveIO(handle);
+}
+
 int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {
     return wgReceiveDatagram(handle, packet, size, source);
 }
@@ -154,6 +166,19 @@ int pp_wg_get_socket_v6(int handle) {
 int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
     (void)settings; (void)link; (void)tun; (void)context;
     return -1;
+}
+
+void pp_wg_turn_off_passive(int32_t handle) {
+    (void)handle;
+}
+
+char *pp_wg_get_config_passive(int32_t handle) {
+    (void)handle;
+    return NULL;
+}
+
+void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
+    (void)handle;
 }
 
 int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {

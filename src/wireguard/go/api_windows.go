@@ -9,12 +9,14 @@ import "C"
 
 import (
 	"fmt"
-
 	"golang.org/x/sys/windows"
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
 )
+
+func init() {
+}
 
 //export wgTurnOn
 func wgTurnOn(settings *C.char, uuid *C.char) int32 {
@@ -36,9 +38,11 @@ func wgTurnOn(settings *C.char, uuid *C.char) int32 {
 	}
 	logger.Verbosef("Attaching to interface")
 	dev := device.NewDevice(tun, conn.NewStdNetBind(), logger)
-	handle := wgTurnOnDevice(settings, dev, logger, nil)
-	if handle < 0 {
+	err = dev.IpcSet(C.GoString(settings))
+	if err != nil {
+		logger.Errorf("Unable to set IPC settings: %v", err)
 		dev.Close()
+		return -1
 	}
-	return handle
+	return wgTurnOnDevice(settings, dev, logger)
 }
