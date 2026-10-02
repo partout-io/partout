@@ -21,7 +21,7 @@ To build only the bridge locally:
 
 ```sh
 cmake -S . -B .build/wg-go-local -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_WIREGUARD=ON
-cmake --build .build/wg-go-local --target partout_wg_go_build
+cmake --build .build/wg-go-local --target partout-wg-go-build
 ```
 
 For direct Zig builds, use `-Dwg-go-include=src/wireguard/go/include` and

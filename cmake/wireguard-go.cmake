@@ -35,7 +35,7 @@ if(APPLE)
     if(CMAKE_OSX_DEPLOYMENT_TARGET)
         string(APPEND wg_target "${CMAKE_OSX_DEPLOYMENT_TARGET}")
     endif()
-    add_custom_target(partout_wg_go_build
+    add_custom_target(partout-wg-go-build
         COMMAND "${PARTOUT_MAKE_EXECUTABLE}" -C "${PARTOUT_WGGO_SOURCE}" install
             APPLE=1 GOOS=darwin "GOARCH=${wg_arch}" "TARGET=${wg_target}"
             "BUILDDIR=${CMAKE_CURRENT_BINARY_DIR}/wg-go/build"
@@ -74,18 +74,18 @@ else()
         message(FATAL_ERROR "Unsupported wg-go platform: ${CMAKE_SYSTEM_NAME}")
     endif()
     # Always invoke Go: its own cache tracks all sources, headers and dependencies.
-    add_custom_target(partout_wg_go_build
+    add_custom_target(partout-wg-go-build
         COMMAND "${CMAKE_COMMAND}" -E env ${wg_env}
             "${PARTOUT_GO_EXECUTABLE}" build -C "${PARTOUT_WGGO_SOURCE}"
             "-ldflags=${wg_ldflags}" -trimpath -buildmode=c-shared -o "${wg_library}"
         ${wg_import_command}
         BYPRODUCTS "${wg_library}" ${wg_implib}
         VERBATIM USES_TERMINAL)
-    add_library(partout_wg_go SHARED IMPORTED GLOBAL)
-    set_target_properties(partout_wg_go PROPERTIES IMPORTED_LOCATION "${wg_library}")
+    add_library(partout-wg-go SHARED IMPORTED GLOBAL)
+    set_target_properties(partout-wg-go PROPERTIES IMPORTED_LOCATION "${wg_library}")
     if(WIN32)
-        set_property(TARGET partout_wg_go PROPERTY IMPORTED_IMPLIB "${wg_implib}")
+        set_property(TARGET partout-wg-go PROPERTY IMPORTED_IMPLIB "${wg_implib}")
     endif()
-    add_dependencies(partout_wg_go partout_wg_go_build)
-    list(APPEND PARTOUT_RUNTIME_LIBRARIES partout_wg_go)
+    add_dependencies(partout-wg-go partout-wg-go-build)
+    list(APPEND PARTOUT_RUNTIME_LIBRARIES partout-wg-go)
 endif()

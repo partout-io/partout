@@ -40,7 +40,7 @@ sdk=$(xcrun --sdk macosx --show-sdk-path)
 wg_go_build="$repo_root/.build/wg-go-tests"
 cmake -S "$repo_root" -B "$wg_go_build" \
     -DPP_BUILD_LIBRARY=OFF -DPP_BUILD_USE_WIREGUARD=ON
-cmake --build "$wg_go_build" --target partout_wg_go_build
+cmake --build "$wg_go_build" --target partout-wg-go-build
 cache_dir="$repo_root/zig-out/vendor-test-cache"
 global_cache_dir="$repo_root/zig-out/vendor-test-global-cache"
 mkdir -p "$cache_dir" "$global_cache_dir"

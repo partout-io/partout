@@ -162,7 +162,7 @@ if(PP_BUILD_LIBRARY)
         VERBATIM
     )
     if(PP_BUILD_USE_WIREGUARD)
-        add_dependencies(partout partout_wg_go_build)
+        add_dependencies(partout partout-wg-go-build)
     endif()
     if(PP_BUILD_WINRT)
         add_dependencies(partout partout-winrt)
