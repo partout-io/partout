@@ -22,6 +22,7 @@ pub const Error = std.mem.Allocator.Error || error{
 pub const StartTunnel = struct {
     tun: ?net.TunWrapper = null,
     ifname: ?[]const u8 = null,
+    // FIXME: ###, Make this non-null and the only requirement after v2
     passive: ?struct {
         link: wireguard_c.wg_passive_link,
         tun: wireguard_c.wg_passive_tun,
