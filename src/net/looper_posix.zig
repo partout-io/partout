@@ -522,7 +522,7 @@ pub const PosixLooper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *PosixLooper, arguments: helpers.BorrowedAttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
         var completion = helpers.Completion{};
@@ -534,7 +534,7 @@ pub const PosixLooper = struct {
             return error.LooperUnavailable;
         }
         var node = helpers.CommandNode{ .command = .{ .attach = .{
-            .arguments = .{ .pair = arguments.pair, .on_failure = arguments.on_failure },
+            .arguments = arguments,
             .completion = &completion,
         } } };
         self.commands.append(&node);
@@ -632,7 +632,7 @@ pub const PosixLooper = struct {
 
     /// Queues the caller's packet slice directly. Completion releases it, including
     /// after cancellation. Empty batches are rejected; empty datagrams are valid.
-    pub fn writeQueued(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress, completion: helpers.OnIOComplete) helpers.BorrowedWriteError!void {
+    pub fn writeQueued(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress, completion: helpers.OnIOComplete) helpers.WriteError!void {
         if (packets.len == 0) return error.InvalidBuffers;
         self.lock.lock();
         defer self.lock.unlock();
@@ -1389,7 +1389,7 @@ pub const PosixLooper = struct {
         // User callbacks.
         on_failure: ?helpers.OnFailure,
 
-        // Borrowed I/O requests.
+        // I/O requests.
         read_queue: core.Fifo(helpers.ReadRequest) = .{},
         write_queue: core.Fifo(helpers.WriteRequest) = .{},
 

@@ -122,6 +122,7 @@ pub const Timer = struct {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
+    /// Used by v1; v2 reads are submitted through readQueued().
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };
@@ -137,7 +138,11 @@ pub const AttachError = SubmissionError || error{
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 pub const ResumeReadingError = SubmissionError;
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
-pub const WriteError = SubmissionError || error{MissingDestination};
+pub const ReadError = SubmissionError || error{
+    SideNotAttached,
+    InvalidBuffers,
+};
+pub const WriteError = ReadError || error{MissingDestination};
 pub const WriteOOBError = WriteError || io.Error || error{
     OOBOutsideQueue,
     WriteIncomplete,
@@ -324,7 +329,7 @@ pub const WriteQueue = struct {
     }
 };
 
-// Borrowed I/O requests used by looper v2.
+// I/O requests used by looper v2.
 
 /// Caller-owned storage. Only entries in the completed prefix have valid output.
 pub const ReadBuffer = struct {
@@ -355,17 +360,6 @@ pub const OnIOComplete = struct {
     pub fn call(self: OnIOComplete, result: IOResult) void {
         self.callback(self.context, result);
     }
-};
-
-pub const ReadError = SubmissionError || error{
-    SideNotAttached,
-    InvalidBuffers,
-};
-pub const BorrowedWriteError = ReadError || error{MissingDestination};
-
-pub const BorrowedAttachArguments = struct {
-    pair: io.DescriptorPair,
-    on_failure: ?OnFailure = null,
 };
 
 pub const ReadRequest = struct {

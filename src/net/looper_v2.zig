@@ -40,7 +40,7 @@ pub const Looper = struct {
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
-    pub const AttachArguments = helpers.BorrowedAttachArguments;
+    pub const AttachArguments = helpers.AttachArguments;
     pub const InitError = helpers.InitError;
     pub const StartError = helpers.StartError;
     pub const StopError = helpers.StopError;
@@ -48,7 +48,7 @@ pub const Looper = struct {
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
     pub const SubmissionError = helpers.SubmissionError;
-    pub const WriteError = helpers.BorrowedWriteError;
+    pub const WriteError = helpers.WriteError;
     pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,

@@ -75,7 +75,7 @@ pub const WindowsLooper = struct {
         // FIXME: ###, Implement timers
     }
 
-    pub fn attach(self: *WindowsLooper, arguments: helpers.BorrowedAttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *WindowsLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         _ = self;
         _ = arguments;
         // if (udp) {
@@ -92,7 +92,7 @@ pub const WindowsLooper = struct {
         return error.LooperUnavailable;
     }
 
-    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.BorrowedWriteError!void {
+    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.WriteError!void {
         return error.LooperUnavailable;
     }
 
