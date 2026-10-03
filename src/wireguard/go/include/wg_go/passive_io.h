@@ -54,3 +54,18 @@ typedef struct wg_passive_tun {
     uint32_t mtu;
     wg_write_tun_fn write;
 } wg_passive_tun;
+
+static inline int32_t wg_passive_link_write(
+    wg_write_link_fn write, void *context,
+    const uint8_t *packet, uint32_t size,
+    const wg_endpoint *destination
+) {
+    return write(context, packet, size, destination);
+}
+
+static inline int32_t wg_passive_tun_write(
+    wg_write_tun_fn write, void *context,
+    const uint8_t *packet, uint32_t size
+) {
+    return write(context, packet, size);
+}

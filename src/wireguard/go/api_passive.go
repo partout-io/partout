@@ -5,13 +5,6 @@ package main
 
 /*
 #include "include/wg_go/passive_io.h"
-static int32_t passiveWrite(wg_write_tun_fn write, void *context, const uint8_t *packet, uint32_t size) {
- return write(context, packet, size);
-}
-static int32_t passiveWriteLink(wg_write_link_fn write, void *context,
-    const uint8_t *packet, uint32_t size, const wg_endpoint *destination) {
-    return write(context, packet, size, destination);
-}
 */
 import "C"
 
@@ -61,7 +54,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 	}
 	write := tun.write
 	passive := newPassiveTun(int(tun.mtu), func(packet []byte) error {
-		status := C.passiveWrite(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
+		status := C.wg_passive_tun_write(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
 		if status != 0 {
 			return fmt.Errorf("host TUN write failed: %d", status)
 		}
@@ -163,7 +156,7 @@ func passiveBindFromC(callbacks *C.wg_passive_link, context unsafe.Pointer) (*pa
 	write := callbacks.write
 	return newPassiveBind(uint16(callbacks.local_port), func(packet []byte, destination netip.AddrPort) error {
 		address := endpointToC(destination)
-		status := C.passiveWriteLink(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
+		status := C.wg_passive_link_write(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
 		if status != 0 {
 			return fmt.Errorf("host link write failed: %d", status)
 		}
