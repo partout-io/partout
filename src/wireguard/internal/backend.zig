@@ -39,8 +39,6 @@ pub const Backend = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        receive_tun_packet: ?*const fn (i32, [*c]const u8, u32) callconv(.c) i32 = null,
-        receive_datagram: ?*const fn (i32, [*c]const u8, u32, [*c]const wireguard_c.wg_endpoint) callconv(.c) i32 = null,
         turn_on: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnel) Error!i32,
         turn_off: *const fn (?*anyopaque, i32) void,
         get_config: *const fn (?*anyopaque, std.mem.Allocator, i32) Error!?[]u8,
@@ -48,6 +46,8 @@ pub const Backend = struct {
         socket_descriptors: *const fn (?*anyopaque, std.mem.Allocator, i32) Error![]net.SocketDescriptor,
         bump_sockets: *const fn (?*anyopaque, i32, bool) void,
         disable_roaming: *const fn (?*anyopaque, i32) void,
+        receive_datagram: ?*const fn (i32, [*c]const u8, u32, [*c]const wireguard_c.wg_endpoint) callconv(.c) i32 = null,
+        receive_tun_packet: ?*const fn (i32, [*c]const u8, u32) callconv(.c) i32 = null,
     };
 
     pub fn turnOn(
