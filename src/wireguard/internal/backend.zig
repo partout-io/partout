@@ -119,12 +119,12 @@ const go_passive_backend_vtable = Backend.VTable{
     .turn_on = cTurnOnPassive,
     .turn_off = cTurnOffPassive,
     .get_config = cGetConfigPassive,
+    .set_config = cSetConfigPassive,
+    .socket_descriptors = cSocketDescriptorsPassive,
+    .bump_sockets = cBumpSocketsPassive,
     .disable_roaming = cDisableRoamingPassive,
     .receive_datagram = wireguard_c.pp_wg_receive_datagram,
     .receive_tun_packet = wireguard_c.pp_wg_receive_tun_packet,
-    .set_config = passiveSetConfig,
-    .socket_descriptors = passiveSocketDescriptors,
-    .bump_sockets = passiveBumpSockets,
 };
 
 fn cTurnOn(
@@ -227,19 +227,21 @@ fn cGetConfigPassive(_: ?*anyopaque, allocator: std.mem.Allocator, handle: i32) 
     return try allocator.dupe(u8, std.mem.span(config));
 }
 
+// FIXME: ###, Passive devices are reconfigured by restarting; all transport belongs to the host.
+fn cSetConfigPassive(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) Error!i64 {
+    return error.TransportFailure;
+}
+
+// FIXME: ###
+fn cSocketDescriptorsPassive(_: ?*anyopaque, _: std.mem.Allocator, _: i32) Error![]net.SocketDescriptor {
+    return error.TransportFailure;
+}
+
+// FIXME: ###
+fn cBumpSocketsPassive(_: ?*anyopaque, _: i32, _: bool) void {
+    unreachable;
+}
+
 fn cDisableRoamingPassive(_: ?*anyopaque, handle: i32) void {
     wireguard_c.pp_wg_tweak_mobile_roaming_passive(handle);
-}
-
-// Passive devices are reconfigured by restarting; all transport belongs to the host.
-fn passiveSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) Error!i64 {
-    return error.TransportFailure;
-}
-
-fn passiveSocketDescriptors(_: ?*anyopaque, _: std.mem.Allocator, _: i32) Error![]net.SocketDescriptor {
-    return error.TransportFailure;
-}
-
-fn passiveBumpSockets(_: ?*anyopaque, _: i32, _: bool) void {
-    unreachable;
 }
