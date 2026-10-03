@@ -7,14 +7,14 @@
 //! `PosixLooper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). Packet slices passed to callbacks are borrowed
-//! for the duration of the callback. `writeQueued()` copies packet slices before
-//! queuing them.
+//! looper itself for `OnFinish`). All queued reads and writes borrow the caller's
+//! descriptors and buffers until completion. No packet data is copied.
 
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
+const borrowed = @import("looper_borrowed.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
 const io_c = io.io_c;
@@ -99,15 +99,10 @@ pub const PosixLooper = struct {
             return error.MuxFailure;
         };
         errdefer io_c.pp_mux_free(mux);
-        var resolved_options = options;
-        resolved_options.max_read_size = @max(
-            options.max_read_size,
-            @max(options.link_buf_size, options.tun_buf_size),
-        );
         const self = try allocator.create(PosixLooper);
         self.* = .{
             .allocator = allocator,
-            .options = resolved_options,
+            .options = options,
             .lock = .{},
             .condition = .{},
             .state = .idle,
@@ -528,7 +523,7 @@ pub const PosixLooper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *PosixLooper, arguments: borrowed.AttachArguments) helpers.AttachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
         var completion = helpers.Completion{};
@@ -540,7 +535,7 @@ pub const PosixLooper = struct {
             return error.LooperUnavailable;
         }
         var node = helpers.CommandNode{ .command = .{ .attach = .{
-            .arguments = arguments,
+            .arguments = .{ .pair = arguments.pair, .on_failure = arguments.on_failure },
             .completion = &completion,
         } } };
         self.commands.append(&node);
@@ -618,29 +613,38 @@ pub const PosixLooper = struct {
         self.wakeLocked();
     }
 
-    pub fn writeQueued(
-        self: *PosixLooper,
-        packets: helpers.Packets,
-        side: io.Side,
-        destination: ?io.SocketAddress,
-    ) helpers.WriteError!void {
+    /// Reads into caller-owned buffers, completing after at least one packet
+    /// becomes available (or on failure/cancellation).
+    pub fn readQueued(self: *PosixLooper, buffers: []borrowed.ReadBuffer, side: io.Side, completion: borrowed.Completion) borrowed.SubmissionError!void {
+        if (buffers.len == 0) return error.InvalidBuffers;
+        for (buffers) |buffer| if (buffer.data.len == 0) return error.InvalidBuffers;
         self.lock.lock();
         defer self.lock.unlock();
         if (self.state != .started) return error.LooperUnavailable;
-        const current = self.sideIO(side) orelse {
-            log.writef(.err, "Ignoring {} packets, not attached", .{side});
-            return;
-        };
-
-        if (current.native_io.isUnconnected() and destination == null) return error.MissingDestination;
-
-        const command = try self.createCommandNode(.{ .enable_write = .{
-            .side = side,
-            .id = current.id,
-        } });
+        const current = self.sideIO(side) orelse return error.SideNotAttached;
+        const command = try self.createCommandNode(.{ .enable_read = .{ .side = side, .id = current.id } });
         errdefer self.allocator.destroy(command);
+        const request = try self.allocator.create(borrowed.ReadRequest);
+        request.* = .{ .buffers = buffers, .completion = completion };
+        current.read_queue.append(request);
+        self.commands.append(command);
+        self.wakeLocked();
+    }
 
-        try current.write_queue.append(packets, destination);
+    /// Queues the caller's packet slice directly. Completion releases it, including
+    /// after cancellation. Empty batches are rejected; empty datagrams are valid.
+    pub fn writeQueued(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress, completion: borrowed.Completion) borrowed.WriteError!void {
+        if (packets.len == 0) return error.InvalidBuffers;
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.state != .started) return error.LooperUnavailable;
+        const current = self.sideIO(side) orelse return error.SideNotAttached;
+        if (current.native_io.isUnconnected() and destination == null) return error.MissingDestination;
+        const command = try self.createCommandNode(.{ .enable_write = .{ .side = side, .id = current.id } });
+        errdefer self.allocator.destroy(command);
+        const request = try self.allocator.create(borrowed.WriteRequest);
+        request.* = .{ .packets = packets, .destination = destination, .completion = completion };
+        current.write_queue.append(request);
         self.commands.append(command);
         self.wakeLocked();
     }
@@ -804,7 +808,6 @@ pub const PosixLooper = struct {
             id,
             side,
             descriptor,
-            self.readBufferSize(side),
             arguments,
         ) catch |err| {
             _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
@@ -836,6 +839,7 @@ pub const PosixLooper = struct {
 
     fn handleEnableReadLocked(self: *const PosixLooper, side: io.Side) io.Error!void {
         if (self.sideIO(side)) |side_io| {
+            if (side_io.read_queue.head == null) return;
             try side_io.setRead(self.mux, true);
         } else {
             log.writef(.err, "Ignoring enableRead({}), not attached", .{side});
@@ -930,16 +934,23 @@ pub const PosixLooper = struct {
                         watch_writes = false;
                         break;
                     },
-                    else => return .{ .side_failure = .{
-                        .side = side_io.side,
-                        .failure = side_io.ioFailure(err),
-                    } },
+                    else => {
+                        self.lock.lock();
+                        const failed = side_io.write_queue.take().?;
+                        self.lock.unlock();
+                        failed.complete(self.allocator, err);
+                        return .{ .side_failure = .{
+                            .side = side_io.side,
+                            .failure = side_io.ioFailure(err),
+                        } };
+                    },
                 }
             };
             self.lock.lock();
-            const did_complete = side_io.write_queue.advance(written);
+            const completed = if (side_io.write_queue.head.?.advance(written)) side_io.write_queue.take() else null;
             self.lock.unlock();
-            watch_writes = !did_complete;
+            if (completed) |request| request.complete(self.allocator, null);
+            watch_writes = written != pending.data.len - pending.offset;
         }
 
         side_io.setWrite(self.mux, watch_writes) catch |err| {
@@ -949,58 +960,40 @@ pub const PosixLooper = struct {
         return .ok;
     }
 
-    fn processRead(self: *const PosixLooper, side_io: *SideIO) ProcessOutcome {
-        var inbox: std.ArrayList(helpers.Packet) = .empty;
-        defer {
-            for (inbox.items) |packet| self.allocator.free(@constCast(packet));
-            inbox.deinit(self.allocator);
-        }
-
-        var addresses: std.ArrayList(io.SocketAddress) = .empty;
-        defer addresses.deinit(self.allocator);
-        var read_count: usize = 0;
-        var read_size: usize = 0;
-        while (read_count < self.options.max_read_count and read_size < self.options.max_read_size) {
-            var address: io.SocketAddress = undefined;
-            const maybe_count = side_io.native_io.readPacket(side_io.read_buf, &address) catch |err| {
-                if (err == error.WouldBlock) break;
-                return .{ .side_failure = .{
-                    .side = side_io.side,
-                    .failure = side_io.ioFailure(err),
-                } };
-            };
-            if (maybe_count) |count| {
-                const packet = self.allocator.dupe(u8, side_io.read_buf[0..count]) catch |err| {
-                    return .{ .fatal = .{ .system = err } };
-                };
-                inbox.append(self.allocator, packet) catch |err| {
-                    self.allocator.free(packet);
-                    return .{ .fatal = .{ .system = err } };
-                };
-                if (side_io.native_io.isUnconnected()) addresses.append(self.allocator, address) catch |err| {
-                    return .{ .fatal = .{ .system = err } };
-                };
-                read_size += count;
+    fn processRead(self: *PosixLooper, side_io: *SideIO) ProcessOutcome {
+        self.lock.lock();
+        const request = side_io.read_queue.head;
+        self.lock.unlock();
+        var result = borrowed.Result{};
+        if (request) |pending| {
+            var size: usize = 0;
+            for (pending.buffers) |*buffer| {
+                var address: io.SocketAddress = undefined;
+                const count = side_io.native_io.readPacket(buffer.data, &address) catch |err| {
+                    if (err != error.WouldBlock) result.failure = err;
+                    break;
+                } orelse break;
+                buffer.size = count;
+                buffer.source = if (side_io.native_io.isUnconnected()) address else null;
+                result.count += 1;
+                size += count;
+                if (result.count >= self.options.max_read_count or size >= self.options.max_read_size) break;
             }
-            read_count += 1;
-        }
-
-        if (inbox.items.len > 0) {
-            const action = if (side_io.on_read) |callback|
-                callback.call(inbox.items, if (side_io.native_io.isUnconnected()) addresses.items else null) catch |err| {
-                    return .{ .side_failure = .{
-                        .side = side_io.side,
-                        .failure = .{ .user = err },
-                    } };
-                }
-            else
-                helpers.ReadAction.keep;
-            if (action == .pause) {
-                side_io.setRead(self.mux, false) catch |err| {
-                    return .{ .fatal = .{ .system = err } };
-                };
+            if (result.count > 0 or result.failure != null) {
+                self.lock.lock();
+                _ = side_io.read_queue.take();
+                self.lock.unlock();
+                pending.complete(self.allocator, result);
             }
         }
+        if (result.failure) |err| return .{ .side_failure = .{
+            .side = side_io.side,
+            .failure = side_io.ioFailure(@errorCast(err)),
+        } };
+        self.lock.lock();
+        const has_requests = side_io.read_queue.head != null;
+        self.lock.unlock();
+        if (!has_requests) side_io.setRead(self.mux, false) catch |err| return .{ .fatal = .{ .system = err } };
         return .ok;
     }
 
@@ -1188,7 +1181,9 @@ pub const PosixLooper = struct {
         const should_cleanup = side_io.detachFromMux(self.mux);
         self.lock.unlock();
         if (should_cleanup) callNativeCleanup(side_io);
+        borrowed_callback_depth += 1;
         side_io.destroyStorage(self.allocator);
+        borrowed_callback_depth -= 1;
         self.lock.lock();
     }
 
@@ -1230,13 +1225,6 @@ pub const PosixLooper = struct {
         }
     }
 
-    fn readBufferSize(self: PosixLooper, side: io.Side) usize {
-        return switch (side) {
-            .link => self.options.link_buf_size,
-            .tun => self.options.tun_buf_size,
-        };
-    }
-
     fn isOutdatedLocked(self: *const PosixLooper, identity: helpers.SideIdentity) bool {
         const id = identity.id orelse return false;
         const side_io = self.sideIO(identity.side) orelse return true;
@@ -1246,7 +1234,8 @@ pub const PosixLooper = struct {
     fn pendingWrite(self: *PosixLooper, side_io: *SideIO) ?helpers.PendingWrite {
         self.lock.lock();
         defer self.lock.unlock();
-        return side_io.write_queue.pending();
+        const request = side_io.write_queue.head orelse return null;
+        return request.pending();
     }
 
     fn createCommandNode(self: *const PosixLooper, command: helpers.Command) std.mem.Allocator.Error!*helpers.CommandNode {
@@ -1399,12 +1388,11 @@ pub const PosixLooper = struct {
         native_io: io_posix.POSIXInterface,
 
         // User callbacks.
-        on_read: ?helpers.OnRead,
         on_failure: ?helpers.OnFailure,
 
-        // Buffered packet state.
-        read_buf: []u8,
-        write_queue: helpers.WriteQueue,
+        // Borrowed I/O requests.
+        read_queue: core.Fifo(borrowed.ReadRequest) = .{},
+        write_queue: core.Fifo(borrowed.WriteRequest) = .{},
 
         // Mux event and cleanup state.
         is_reading: bool,
@@ -1416,22 +1404,16 @@ pub const PosixLooper = struct {
             id: u64,
             side: io.Side,
             descriptor: io_posix.POSIXDescriptor,
-            read_buf_size: usize,
             arguments: helpers.AttachArguments,
         ) std.mem.Allocator.Error!*SideIO {
             const self = try allocator.create(SideIO);
-            errdefer allocator.destroy(self);
-            const read_buf = try allocator.alloc(u8, read_buf_size);
             self.* = .{
                 .id = id,
                 .side = side,
                 .fd = descriptor.fd,
                 .native_io = descriptor.io,
-                .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
-                .read_buf = read_buf,
-                .write_queue = helpers.WriteQueue.init(allocator),
-                .is_reading = true,
+                .is_reading = false,
                 .is_writing = false,
                 .did_cleanup = false,
             };
@@ -1439,8 +1421,8 @@ pub const PosixLooper = struct {
         }
 
         fn destroyStorage(self: *SideIO, allocator: std.mem.Allocator) void {
-            self.write_queue.deinit();
-            allocator.free(self.read_buf);
+            while (self.read_queue.take()) |request| request.complete(allocator, .{ .failure = error.Cancelled });
+            while (self.write_queue.take()) |request| request.complete(allocator, error.Cancelled);
             allocator.destroy(self);
         }
 

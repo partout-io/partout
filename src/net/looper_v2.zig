@@ -7,15 +7,15 @@
 //! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). Packet slices passed to callbacks are borrowed
-//! for the duration of the callback. `writeQueued()` copies packet slices before
-//! queuing them.
+//! looper itself for `OnFinish`). All queued reads and writes borrow the caller's
+//! descriptors and buffers until completion. No packet data is copied.
 
 const std = @import("std");
 const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
+const borrowed = @import("looper_borrowed.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
@@ -26,10 +26,12 @@ pub const Looper = struct {
         @import("looper_posix.zig").PosixLooper;
 
     pub const Options = helpers.Options;
+    pub const ReadBuffer = borrowed.ReadBuffer;
+    pub const IOResult = borrowed.Result;
+    pub const OnIOComplete = borrowed.Completion;
+    pub const ReadError = borrowed.SubmissionError;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
-    pub const ReadAction = helpers.ReadAction;
-    pub const OnRead = helpers.OnRead;
     pub const Failure = helpers.Failure;
     pub const OnFailure = helpers.OnFailure;
     pub const OnFinish = helpers.OnFinish;
@@ -39,7 +41,7 @@ pub const Looper = struct {
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
-    pub const AttachArguments = helpers.AttachArguments;
+    pub const AttachArguments = borrowed.AttachArguments;
     pub const InitError = helpers.InitError;
     pub const StartError = helpers.StartError;
     pub const StopError = helpers.StopError;
@@ -47,14 +49,14 @@ pub const Looper = struct {
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
     pub const SubmissionError = helpers.SubmissionError;
-    pub const WriteError = helpers.WriteError;
+    pub const WriteError = borrowed.WriteError;
     pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
 
     /// Allocates a looper whose storage is released by `destroy()`.
-    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*Looper {
+    pub fn create(allocator: std.mem.Allocator, options: Options) helpers.InitError!*Looper {
         const self = try allocator.create(Looper);
         errdefer allocator.destroy(self);
         self.* = try init(allocator, options);
@@ -68,7 +70,7 @@ pub const Looper = struct {
         allocator.destroy(self);
     }
 
-    pub fn init(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!Looper {
+    pub fn init(allocator: std.mem.Allocator, options: Options) helpers.InitError!Looper {
         return .{
             .allocator = allocator,
             .impl = try Impl.create(allocator, options),
@@ -146,7 +148,7 @@ pub const Looper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *Looper, arguments: helpers.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *Looper, arguments: AttachArguments) helpers.AttachError!void {
         return self.impl.attach(arguments);
     }
 
@@ -167,15 +169,21 @@ pub const Looper = struct {
         return self.impl.resumeReading(side);
     }
 
-    /// Copies one destination with every packet in the batch. Required for
-    /// unconnected UDP; ignored by connected sockets. Pass null for TUN writes.
-    pub fn writeQueued(
-        self: *Looper,
-        packets: helpers.Packets,
-        side: io.Side,
-        destination: ?io.SocketAddress,
-    ) helpers.WriteError!void {
-        return self.impl.writeQueued(packets, side, destination);
+    /// Reads directly into caller-owned buffers. Completes with
+    /// the available prefix, without waiting to fill the batch. Buffer sizes
+    /// must be nonzero; empty UDP datagrams are valid completed packets.
+    /// See OnIOComplete for lifetime and cancellation rules.
+    pub fn readQueued(self: *Looper, buffers: []ReadBuffer, side: io.Side, completion: OnIOComplete) ReadError!void {
+        return self.impl.readQueued(buffers, side, completion);
+    }
+
+    /// Writes borrowed packets in FIFO order.
+    /// Borrows the entire packet slice, including descriptors, until completion.
+    /// The destination is stored by value.
+    /// Requires a nonempty batch and a destination for unconnected UDP.
+    /// See OnIOComplete for lifetime and cancellation rules.
+    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress, completion: OnIOComplete) WriteError!void {
+        return self.impl.writeQueued(packets, side, destination, completion);
     }
 
     pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {

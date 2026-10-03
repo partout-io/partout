@@ -38,6 +38,7 @@ comptime {
         _ = @import("net/looper_legacy.zig");
     }
     _ = @import("net/looper_v2.zig");
+    _ = @import("net/looper_borrowed.zig");
     _ = @import("net/looper_helpers.zig");
     _ = @import("net/mux.zig");
     _ = @import("net/platform.zig");
