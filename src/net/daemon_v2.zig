@@ -766,6 +766,7 @@ const ConnectionDaemon = struct {
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         log.write(.notice, "Create new link");
         const connection = self.connection orelse @panic("setupLink but no connection");
+        const conn_options = self.daemon.options.connection_options;
         var remote = RemoteDescriptor{ .looper = self.looper };
         const reachability = self.factory.currentReachability();
         const endpoint = if (self.endpoint_resolver) |*resolver| blk: {
@@ -774,14 +775,14 @@ const ConnectionDaemon = struct {
             const endpoint = try resolver.next(
                 &self.resolver,
                 reachability,
-                self.daemon.options.connection_options.dns_timeout,
+                conn_options.dns_timeout,
             );
             remote.endpoint = try net.SocketEndpoint.init(endpoint);
             log.writef(.notice, "Connect to {s}", .{endpoint});
             break :blk endpoint;
         } else null;
         const socket_endpoint = if (remote.endpoint) |resolved|
-            if (resolved.plainSocketType() == .udp and !self.daemon.options.connection_options.connect_udp) null else endpoint
+            if (resolved.plainSocketType() == .udp and !conn_options.connect_udp) null else endpoint
         else
             null;
         var factory = self.factory;
@@ -790,7 +791,7 @@ const ConnectionDaemon = struct {
             self.daemon.allocator,
             socket_endpoint,
             reachability,
-            self.daemon.options.connection_options.link_activity_timeout,
+            conn_options.link_activity_timeout,
         );
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
