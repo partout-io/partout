@@ -6,7 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
-const io = @import("io_common.zig");
+const io = @import("io.zig");
 const io_c = io.io_c;
 const log = core.logging;
 
@@ -88,6 +88,10 @@ pub const WindowsLooper = struct {
         return error.LooperUnavailable;
     }
 
+    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.WriteError!void {
+        return error.LooperUnavailable;
+    }
+
     pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
         _ = self;
         _ = side;
@@ -103,16 +107,6 @@ pub const WindowsLooper = struct {
     }
 
     pub fn resumeReading(_: *WindowsLooper, _: io.Side) helpers.ResumeReadingError!void {
-        return error.LooperUnavailable;
-    }
-
-    pub fn writeQueued(
-        _: *WindowsLooper,
-        _: helpers.Packets,
-        _: io.Side,
-        _: ?io.SocketAddress,
-    ) helpers.WriteError!void {
-        // FIXME: ###, Implement socket write
         return error.LooperUnavailable;
     }
 
