@@ -7,8 +7,9 @@
 //! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). All queued reads and writes borrow the caller's
-//! descriptors and buffers until completion. No packet data is copied.
+//! looper itself for `OnFinish`). Reads acquire caller-owned buffers on readiness
+//! and release them after on_read returns. Queued writes borrow descriptors and
+//! payloads until completion. No packet data is copied.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -28,7 +29,9 @@ pub const Looper = struct {
     pub const ReadBuffer = helpers.ReadBuffer;
     pub const IOResult = helpers.IOResult;
     pub const OnIOComplete = helpers.OnIOComplete;
-    pub const ReadError = helpers.ReadError;
+    pub const ReadBuffers = helpers.ReadBuffers;
+    pub const OnRead = helpers.OnRead;
+    pub const ReadAction = helpers.ReadAction;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
     pub const Failure = helpers.Failure;
@@ -166,14 +169,6 @@ pub const Looper = struct {
 
     pub fn resumeReading(self: *Looper, side: io.Side) helpers.ResumeReadingError!void {
         return self.impl.resumeReading(side);
-    }
-
-    /// Reads directly into caller-owned buffers. Completes with
-    /// the available prefix, without waiting to fill the batch. Buffer sizes
-    /// must be nonzero; empty UDP datagrams are valid completed packets.
-    /// See OnIOComplete for lifetime and cancellation rules.
-    pub fn readQueued(self: *Looper, buffers: []ReadBuffer, side: io.Side, completion: OnIOComplete) ReadError!void {
-        return self.impl.readQueued(buffers, side, completion);
     }
 
     /// Writes borrowed packets in FIFO order.

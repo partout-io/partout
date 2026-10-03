@@ -88,10 +88,6 @@ pub const WindowsLooper = struct {
         return error.LooperUnavailable;
     }
 
-    pub fn readQueued(_: *WindowsLooper, _: []helpers.ReadBuffer, _: io.Side, _: helpers.OnIOComplete) helpers.ReadError!void {
-        return error.LooperUnavailable;
-    }
-
     pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.WriteError!void {
         return error.LooperUnavailable;
     }

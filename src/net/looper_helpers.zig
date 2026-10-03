@@ -122,7 +122,8 @@ pub const Timer = struct {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
-    /// Used by v1; v2 reads are submitted through readQueued().
+    /// Required by v2 when on_read is set; ignored by v1.
+    read_buffers: ?ReadBuffers = null,
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };
@@ -131,6 +132,7 @@ pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
 pub const AttachError = SubmissionError || error{
+    InvalidBuffers,
     MuxFailure,
     SideAlreadyAttached,
     ReentrantCall,
@@ -138,11 +140,11 @@ pub const AttachError = SubmissionError || error{
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 pub const ResumeReadingError = SubmissionError;
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
-pub const ReadError = SubmissionError || error{
+pub const WriteError = SubmissionError || error{
     SideNotAttached,
     InvalidBuffers,
+    MissingDestination,
 };
-pub const WriteError = ReadError || error{MissingDestination};
 pub const WriteOOBError = WriteError || io.Error || error{
     OOBOutsideQueue,
     WriteIncomplete,
@@ -342,10 +344,10 @@ pub const ReadBuffer = struct {
 /// stream write is not counted; cancellation does not undo bytes already sent.
 pub const IOResult = struct {
     count: usize = 0,
-    failure: ?(io.Error || error{Cancelled}) = null,
+    failure: ?(io.Error || error{ Cancelled, InvalidBuffers }) = null,
 };
 
-/// Called exactly once for an accepted request, on the looper without its lock.
+/// Called exactly once for an accepted write request, on the looper without its lock.
 /// Completion may run before submission returns. Rejected submissions never
 /// invoke the callback. The entire buffer slice (descriptors and payloads)
 /// must stay valid and exclusively loaned until completion; the callback context
@@ -362,16 +364,18 @@ pub const OnIOComplete = struct {
     }
 };
 
-pub const ReadRequest = struct {
-    buffers: []ReadBuffer,
-    completion: OnIOComplete,
-    next: ?*ReadRequest = null,
-
-    pub fn complete(self: *ReadRequest, allocator: std.mem.Allocator, result: IOResult) void {
-        const completion = self.completion;
-        allocator.destroy(self);
-        completion.call(result);
-    }
+/// Storage provider for spontaneous v2 reads. Both callbacks run on the looper
+/// without its lock, using this provider's context. Each acquisition is released
+/// exactly once after on_read returns, including unused buffers and read errors.
+/// Descriptors and payloads must remain exclusively loaned until release. Only
+/// the completed prefix has valid size/source fields. Empty acquisitions pause
+/// reading until resumeReading(); each supplied buffer must have nonzero capacity.
+/// Callbacks may submit writes, but must not attach, detach, stop, or deinit.
+/// The provider and on_read contexts must outlive the attachment.
+pub const ReadBuffers = struct {
+    context: ?*anyopaque = null,
+    acquire: *const fn (?*anyopaque) []ReadBuffer,
+    release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
 };
 
 pub const WriteRequest = struct {
