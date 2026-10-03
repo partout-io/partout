@@ -769,36 +769,36 @@ const ConnectionDaemon = struct {
         const conn_options = self.daemon.options.connection_options;
         var remote = RemoteDescriptor{ .looper = self.looper };
         const reachability = self.factory.currentReachability();
-        const endpoint = if (self.endpoint_resolver) |*resolver| blk: {
+        var endpoint: ?api.ExtendedEndpoint = null;
+        if (self.endpoint_resolver) |*resolver| {
             log.write(.notice, "Cycle to next endpoint");
             // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
-            const endpoint = try resolver.next(
+            endpoint = try resolver.next(
                 &self.resolver,
                 reachability,
                 conn_options.dns_timeout,
             );
-            remote.endpoint = try net.SocketEndpoint.init(endpoint);
-            log.writef(.notice, "Connect to {s}", .{endpoint});
-            break :blk endpoint;
-        } else null;
-        const socket_endpoint = if (remote.endpoint) |resolved|
-            if (resolved.plainSocketType() == .udp and !conn_options.connect_udp) null else endpoint
+            log.writef(.notice, "Connect to {s}", .{endpoint.?});
+        }
+        remote.endpoint = if (endpoint) |resolved| try net.SocketEndpoint.init(resolved) else null;
+        const unconnected = if (remote.endpoint) |resolved|
+            resolved.plainSocketType() == .udp and !conn_options.connect_udp
         else
-            null;
+            true;
         var factory = self.factory;
         factory.local_port = connection.local_port;
         var descriptor = try factory.create(
             self.daemon.allocator,
-            socket_endpoint,
+            if (unconnected) null else endpoint,
             reachability,
             conn_options.link_activity_timeout,
         );
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
-        if (socket_endpoint == null) remote.local_port = (try descriptor.localAddress()).port;
+        if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
-            if (endpoint) |value| value.proto.socket_type.raw() else api.IPSocketType.udp.raw(),
+            if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
         });
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
