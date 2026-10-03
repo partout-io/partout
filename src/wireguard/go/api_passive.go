@@ -12,7 +12,7 @@ import (
 	"golang.zx2c4.com/wireguard/device"
 )
 
-type passiveTunnel struct {
+type passiveBackend struct {
 	*device.Device
 	bind *passiveBind
 	tun  *passiveTun
@@ -20,16 +20,16 @@ type passiveTunnel struct {
 
 // Passive handles belong to a separate registry and must only be passed to
 // passive ABI functions. Never reuse IDs: late reads must not reach a new device.
-var passiveTunnels = struct {
+var passiveBackends = struct {
 	sync.RWMutex
 	next     int64
-	byHandle map[int32]passiveTunnel
-}{byHandle: make(map[int32]passiveTunnel)}
+	byHandle map[int32]passiveBackend
+}{byHandle: make(map[int32]passiveBackend)}
 
-func lookupPassiveTunnel(handle int32) (passiveTunnel, bool) {
-	passiveTunnels.RLock()
-	defer passiveTunnels.RUnlock()
-	tunnel, ok := passiveTunnels.byHandle[handle]
+func lookupPassiveBackend(handle int32) (passiveBackend, bool) {
+	passiveBackends.RLock()
+	defer passiveBackends.RUnlock()
+	tunnel, ok := passiveBackends.byHandle[handle]
 	return tunnel, ok
 }
 
@@ -48,24 +48,24 @@ func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) in
 	}
 	logger.Verbosef("Device started")
 
-	passiveTunnels.Lock()
-	defer passiveTunnels.Unlock()
-	if passiveTunnels.next > math.MaxInt32 {
+	passiveBackends.Lock()
+	defer passiveBackends.Unlock()
+	if passiveBackends.next > math.MaxInt32 {
 		dev.Close()
 		return -1
 	}
-	handle := int32(passiveTunnels.next)
-	passiveTunnels.next++
-	passiveTunnels.byHandle[handle] = passiveTunnel{dev, bind, tun}
+	handle := int32(passiveBackends.next)
+	passiveBackends.next++
+	passiveBackends.byHandle[handle] = passiveBackend{dev, bind, tun}
 	return handle
 }
 
 //export wgTurnOffWithPassiveIO
 func wgTurnOffWithPassiveIO(handle int32) {
-	passiveTunnels.Lock()
-	tunnel, ok := passiveTunnels.byHandle[handle]
-	delete(passiveTunnels.byHandle, handle)
-	passiveTunnels.Unlock()
+	passiveBackends.Lock()
+	tunnel, ok := passiveBackends.byHandle[handle]
+	delete(passiveBackends.byHandle, handle)
+	passiveBackends.Unlock()
 	if ok {
 		tunnel.Close()
 	}
@@ -73,7 +73,7 @@ func wgTurnOffWithPassiveIO(handle int32) {
 
 //export wgGetConfigWithPassiveIO
 func wgGetConfigWithPassiveIO(handle int32) *C.char {
-	tunnel, ok := lookupPassiveTunnel(handle)
+	tunnel, ok := lookupPassiveBackend(handle)
 	if !ok {
 		return nil
 	}
@@ -86,7 +86,7 @@ func wgGetConfigWithPassiveIO(handle int32) *C.char {
 
 //export wgDisableRoamingWithPassiveIO
 func wgDisableRoamingWithPassiveIO(handle int32) {
-	if tunnel, ok := lookupPassiveTunnel(handle); ok {
+	if tunnel, ok := lookupPassiveBackend(handle); ok {
 		tunnel.DisableSomeRoamingForBrokenMobileSemantics()
 	}
 }

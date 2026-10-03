@@ -24,7 +24,7 @@ func startPassiveTestDevice(t *testing.T) int32 {
 
 func TestPassiveLifecycleIsolatedFromLegacy(t *testing.T) {
 	handle := startPassiveTestDevice(t)
-	passive, _ := lookupPassiveTunnel(handle)
+	passive, _ := lookupPassiveBackend(handle)
 	logger := device.NewLogger(device.LogLevelSilent, "")
 	legacy := device.NewDevice(newPassiveTun(1400, func([]byte) error { return nil }), testBind(), logger)
 	// Deliberately overlap IDs to verify that each ABI uses its own registry.
@@ -51,7 +51,7 @@ func TestPassiveLifecycleIsolatedFromLegacy(t *testing.T) {
 	t.Cleanup(func() { wgTurnOff(replacement) })
 	wgTurnOff(replacement)
 	wgTurnOffWithPassiveIO(handle) // A late shutdown cannot close the replacement.
-	current, ok := lookupPassiveTunnel(replacement)
+	current, ok := lookupPassiveBackend(replacement)
 	if !ok || current.tun.enqueue([]byte{1}) != nil {
 		t.Fatal("legacy or stale shutdown closed the passive replacement")
 	}
@@ -65,7 +65,7 @@ func TestPassiveRegistryConcurrentShutdown(t *testing.T) {
 		go func() {
 			defer workers.Done()
 			for j := 0; j < 100; j++ {
-				if tunnel, ok := lookupPassiveTunnel(handle); ok {
+				if tunnel, ok := lookupPassiveBackend(handle); ok {
 					tunnel.tun.enqueue([]byte{1})
 				}
 			}
@@ -73,7 +73,7 @@ func TestPassiveRegistryConcurrentShutdown(t *testing.T) {
 	}
 	wgTurnOffWithPassiveIO(handle)
 	workers.Wait()
-	if _, ok := lookupPassiveTunnel(handle); ok {
+	if _, ok := lookupPassiveBackend(handle); ok {
 		t.Fatal("closed passive device is still registered")
 	}
 }

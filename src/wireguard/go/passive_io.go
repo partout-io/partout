@@ -104,7 +104,7 @@ func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, sou
 	if err != nil {
 		return C.WG_IO_INVALID
 	}
-	tunnel, ok := lookupPassiveTunnel(int32(handle))
+	tunnel, ok := lookupPassiveBackend(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
@@ -136,7 +136,7 @@ func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.
 	if size == 0 || size > passiveMaxDatagram || packet == nil {
 		return C.WG_IO_INVALID
 	}
-	tunnel, ok := lookupPassiveTunnel(int32(handle))
+	tunnel, ok := lookupPassiveBackend(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
