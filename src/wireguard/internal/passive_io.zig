@@ -81,8 +81,14 @@ pub const PassiveIO = struct {
 };
 
 fn toEndpoint(address: net.SocketAddress) Endpoint {
-    return .{ .address = address.address, .scope_id = address.scope_id, .port = address.port, .family = address.family };
+    return .{
+        .address = address.address,
+        .scope_id = address.scope_id,
+        .port = address.port,
+        .family = address.family,
+    };
 }
+
 fn fromEndpoint(endpoint: Endpoint) !net.SocketAddress {
     if (endpoint.family != 4 and endpoint.family != 6) return error.InvalidAddressFamily;
     if (endpoint.family == 4 and endpoint.scope_id != 0) return error.InvalidScope;
