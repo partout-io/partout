@@ -414,19 +414,25 @@ fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
 fn socketFactoryCreate(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
-    endpoint: api.ExtendedEndpoint,
+    endpoint: ?api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
+    local_port: u16,
 ) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
-    const options = self.socketOptions(effective_reachability, timeout);
+    var options = self.socketOptions(effective_reachability, timeout);
+    if (endpoint == null) options.port = local_port;
     log.write(.info, "Creating SocketWrapper");
     const wrapper = try SocketWrapper.create(allocator, endpoint, options) orelse
         return error.LinkNotActive;
-    log.writef(.debug, "SocketFactory: Created socket for {s}", .{
-        log.sensitive(endpoint.address),
-    });
+    if (endpoint) |remote| {
+        log.writef(.debug, "SocketFactory: Created socket for {s}", .{
+            log.sensitive(remote.address),
+        });
+    } else {
+        log.write(.debug, "SocketFactory: Created unconnected UDP socket");
+    }
     return wrapper.linkDescriptor();
 }
 

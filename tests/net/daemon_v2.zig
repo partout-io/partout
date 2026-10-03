@@ -24,7 +24,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
         };
 
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
 
@@ -375,7 +375,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         destroy_count: usize = 0,
         profile: ?*const api.Profile = null,
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
         fn create(ptr: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
@@ -551,7 +551,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             sink.stopped(sink.ctx);
         }
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-        fn endpoints(_: *anyopaque) []const api.ExtendedEndpoint {
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
         const vtable = blk: {
@@ -628,4 +628,70 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     try actor.perform(void, .resumeGate);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
+}
+
+test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadata" {
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const io = @import("source").net_io;
+    const Probe = struct {
+        endpoint: api.ExtendedEndpoint,
+        socket_connected: ?bool = null,
+        remote: ?net.RemoteDescriptor = null,
+        fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            return @as([*]const api.ExtendedEndpoint, @ptrCast(&self.endpoint))[0..1];
+        }
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            return .{ .ptr = raw.?, .vtable = &vtable };
+        }
+        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.remote = remote;
+            return false;
+        }
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) net.SocketFactory.Error!Looper.LinkDescriptor {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.socket_connected = endpoint != null;
+            // The factory probe records the requested mode; use a real local UDP
+            // descriptor so daemon attachment and cleanup also execute.
+            const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
+            return wrapper.linkDescriptor();
+        }
+        const vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.endpoints = endpoints;
+            table.start_v2 = start;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const allocator = std.testing.allocator;
+    for ([_]api.IPSocketType{ .udp, .udp4, .udp6, .tcp, .tcp4, .tcp6 }) |proto| {
+        for ([_]bool{ true, false }) |connect_udp| {
+            var probe = Probe{ .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+            var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+            defer registry.deinit(allocator);
+            var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+            defer profile.deinit(allocator);
+            var controller = mock_mod.MockTunnelController{};
+            var monitor = mock_mod.MockNetworkMonitor{};
+            var factory_table = mock_mod.noopSocketFactory().vtable.*;
+            factory_table.create = Probe.socket;
+            const sut = try Daemon.create(allocator, &profile, .{
+                .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
+            });
+            defer sut.destroy();
+            try sut.start();
+            defer sut.stop();
+            const peer = probe.remote.?.endpoint.?;
+            try std.testing.expectEqual(proto, peer.type);
+            try std.testing.expectEqual(@as(u16, 1194), peer.address.port);
+            try std.testing.expectEqual(connect_udp or peer.plainSocketType() == .tcp, probe.socket_connected.?);
+            if (!probe.socket_connected.?) try std.testing.expect(probe.remote.?.local_port != 0);
+        }
+    }
 }

@@ -240,3 +240,23 @@ test "OpenVPN failures separate protocol subcodes from general codes" {
         }
     }
 }
+
+test "v2 unconnected OpenVPN accepts only the selected IPv4 or scoped IPv6 peer" {
+    const matches = source.openvpn_connection_v2.testing.peerSourceMatches;
+    for ([_][]const u8{ "192.0.2.1", "fe80::1%7" }) |address| {
+        const peer = (try net.SocketEndpoint.init(.{ .address = address, .proto = .init(.udp, 1194) })).address;
+        try std.testing.expect(matches(peer, peer));
+        var other = peer;
+        other.port += 1;
+        try std.testing.expect(!matches(other, peer));
+        other = peer;
+        other.address[0] ^= 1;
+        try std.testing.expect(!matches(other, peer));
+        other = peer;
+        other.family = if (peer.family == 4) 6 else 4;
+        try std.testing.expect(!matches(other, peer));
+        other = peer;
+        other.scope_id += 1;
+        try std.testing.expect(!matches(other, peer));
+    }
+}

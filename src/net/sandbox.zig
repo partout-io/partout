@@ -181,14 +181,18 @@ pub const SocketFactory = struct {
     ptr: ?*anyopaque = null,
     vtable: *const VTable,
 
+    /// Requested bind port when creating an unconnected UDP socket.
+    local_port: u16 = 0,
+
     pub const VTable = struct {
         current_reachability: *const fn (?*anyopaque) ?io.ReachabilityInfo,
         create: *const fn (
             ptr: ?*anyopaque,
             allocator: std.mem.Allocator,
-            endpoint: api.ExtendedEndpoint,
+            endpoint: ?api.ExtendedEndpoint,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
+            local_port: u16,
         ) Error!Looper.LinkDescriptor,
     };
 
@@ -199,7 +203,7 @@ pub const SocketFactory = struct {
     pub fn create(
         self: SocketFactory,
         allocator: std.mem.Allocator,
-        endpoint: api.ExtendedEndpoint,
+        endpoint: ?api.ExtendedEndpoint,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
     ) Error!Looper.LinkDescriptor {
@@ -213,6 +217,7 @@ pub const SocketFactory = struct {
             endpoint,
             reachability,
             native_timeout,
+            self.local_port,
         );
     }
 };
@@ -268,6 +273,9 @@ pub const SerializedExecutor = core.SerializedExecutor;
 
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {
+    /// Whether UDP link sockets connect to the resolved remote endpoint.
+    connect_udp: bool = true,
+
     /// The DNS resolution timeout, in milliseconds.
     // FIXME: ###, Delete, it's a link concern
     dns_timeout: u32 = 3000,

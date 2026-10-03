@@ -221,7 +221,7 @@ const OpenVPNConnection = struct {
 
         const session = Session.create(self.allocator, .{
             .looper = remote.looper,
-            .remote_endpoint = remote.endpoint,
+            .remote_endpoint = remote.endpoint orelse return error.UnableToStart,
             .events = self.session_events,
             .configuration = self.configuration,
             .credentials = self.credentials,
@@ -275,9 +275,21 @@ const OpenVPNConnection = struct {
         self: *OpenVPNConnection,
         side: net.Side,
         packets: Looper.Packets,
+        sources: ?[]const net.SocketAddress,
     ) Looper.ReadAction {
         const session = self.current_session orelse return .pause;
         if (self.pending_failure != null) return .pause;
+        if (side == .link) if (sources) |addresses| {
+            if (addresses.len != packets.len) {
+                self.handleConnectionFailure(error.LinkFailure);
+                return .pause;
+            }
+            for (packets, addresses) |packet, source| {
+                if (!isPeerSource(source, session.remote_endpoint.address)) continue;
+                if (session.submitPackets(side, &.{packet}) == .pause) return .pause;
+            }
+            return .keep;
+        };
         return session.submitPackets(side, packets);
     }
 
@@ -480,7 +492,7 @@ fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
 
 // MARK: - Connection callbacks
 
-fn allEndpoints(ptr: *anyopaque) []const api.ExtendedEndpoint {
+fn allEndpoints(ptr: *anyopaque) ?[]const api.ExtendedEndpoint {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.allEndpoints();
 }
@@ -511,9 +523,20 @@ fn submitPackets(
     ptr: *anyopaque,
     side: net.Side,
     packets: Looper.Packets,
+    sources: ?[]const net.SocketAddress,
 ) Looper.ReadAction {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    return self.submitPackets(side, packets);
+    return self.submitPackets(side, packets, sources);
+}
+
+fn isPeerSource(source: net.SocketAddress, peer: net.SocketAddress) bool {
+    if (source.family != peer.family or source.port != peer.port or source.scope_id != peer.scope_id) return false;
+    const size: usize = switch (peer.family) {
+        4 => 4,
+        6 => 16,
+        else => return false,
+    };
+    return std.mem.eql(u8, source.address[0..size], peer.address[0..size]);
 }
 
 fn looperFailed(
@@ -639,6 +662,7 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
 }
 
 pub const testing = struct {
+    pub const peerSourceMatches = isPeerSource;
     pub const Implementation = OpenVPNConnection;
 
     pub fn isRecoverableError(cause: ConnectionError) bool {

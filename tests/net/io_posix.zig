@@ -48,8 +48,8 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     var tun = io_posix.TunWrapper.init(null);
     const native_socket = socket.linkDescriptor().io;
     defer native_socket.cleanup();
-    const tun_descriptor = tun.tunDescriptor();
-    const native_tun = tun_descriptor.io;
+    try std.testing.expectError(error.LibcFailure, tun.tunDescriptor());
+    const native_tun = tun.nativeIO();
     defer tun.deinit();
     try std.testing.expect(native_tun.tun == &tun);
     try std.testing.expect(native_socket.socket == socket);
@@ -64,6 +64,27 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     native_tun.cleanup();
     native_tun.cleanup();
     try std.testing.expect(tun.is_closed);
+}
+
+test "TUN looper descriptor is made nonblocking by the wrapper" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const libc = struct {
+        extern "c" fn close(c_int) c_int;
+    };
+    var fds: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+    defer _ = libc.close(fds[0]);
+    defer _ = libc.close(fds[1]);
+    const before: std.c.O = @bitCast(@as(u32, @intCast(std.c.fcntl(fds[0], std.c.F.GETFL))));
+    try std.testing.expect(!before.NONBLOCK);
+    var tun = io_posix.TunWrapper.init(null);
+    // Borrow the pipe solely to exercise descriptor preparation, without a native TUN.
+    tun.test_descriptor = .{ .fd = fds[0], .io = tun.nativeIO() };
+    const descriptor = try tun.tunDescriptor();
+    try std.testing.expectEqual(fds[0], descriptor.fd);
+    try std.testing.expect(descriptor.io.tun == &tun);
+    const after: std.c.O = @bitCast(@as(u32, @intCast(std.c.fcntl(fds[0], std.c.F.GETFL))));
+    try std.testing.expect(after.NONBLOCK);
 }
 
 test "socket argument errors are rejected before native I/O" {
