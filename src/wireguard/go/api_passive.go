@@ -50,6 +50,26 @@ func lookupPassiveBackend(handle int32) (passiveBackend, bool) {
 	return tunnel, ok
 }
 
+//export wgTurnOnWithPassiveIO
+func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_passive_tun, context unsafe.Pointer) int32 {
+	if settings == nil || tun == nil || tun.write == nil || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
+		return -1
+	}
+	bind, err := passiveBindFromC(link, context)
+	if err != nil {
+		return -1
+	}
+	write := tun.write
+	passive := newPassiveTun(int(tun.mtu), func(packet []byte) error {
+		status := C.passiveWrite(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
+		if status != 0 {
+			return fmt.Errorf("host TUN write failed: %d", status)
+		}
+		return nil
+	})
+	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
+}
+
 func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {
 	logger := &device.Logger{Verbosef: CLogger(0).Printf, Errorf: CLogger(1).Printf}
 	dev := device.NewDevice(tun, bind, logger)
@@ -108,6 +128,49 @@ func wgDisableRoamingWithPassiveIO(handle int32) {
 	}
 }
 
+//export wgReceiveDatagram
+func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, source *C.wg_endpoint) C.int32_t {
+	if size > passiveMaxDatagram || (size != 0 && packet == nil) {
+		return C.WG_IO_INVALID
+	}
+	address, err := endpointFromC(source)
+	if err != nil {
+		return C.WG_IO_INVALID
+	}
+	tunnel, ok := lookupPassiveBackend(int32(handle))
+	if !ok {
+		return C.WG_IO_CLOSED
+	}
+	return passiveStatus(tunnel.bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
+}
+
+//export wgReceiveTunPacket
+func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.int32_t {
+	if size == 0 || size > passiveMaxDatagram || packet == nil {
+		return C.WG_IO_INVALID
+	}
+	tunnel, ok := lookupPassiveBackend(int32(handle))
+	if !ok {
+		return C.WG_IO_CLOSED
+	}
+	return passiveStatus(tunnel.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
+}
+
+func passiveBindFromC(callbacks *C.wg_passive_link, context unsafe.Pointer) (*passiveBind, error) {
+	if callbacks == nil || callbacks.write == nil || callbacks.local_port == 0 {
+		return nil, errPassivePacket
+	}
+	write := callbacks.write
+	return newPassiveBind(uint16(callbacks.local_port), func(packet []byte, destination netip.AddrPort) error {
+		address := endpointToC(destination)
+		status := C.passiveWriteLink(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
+		if status != 0 {
+			return fmt.Errorf("host link write failed: %d", status)
+		}
+		return nil
+	}), nil
+}
+
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {
 	if endpoint == nil {
 		return netip.AddrPort{}, errPassivePacket
@@ -161,69 +224,6 @@ func endpointToC(address netip.AddrPort) C.wg_endpoint {
 		endpoint.scope_id = C.uint32_t(scope)
 	}
 	return endpoint
-}
-
-func passiveBindFromC(callbacks *C.wg_passive_link, context unsafe.Pointer) (*passiveBind, error) {
-	if callbacks == nil || callbacks.write == nil || callbacks.local_port == 0 {
-		return nil, errPassivePacket
-	}
-	write := callbacks.write
-	return newPassiveBind(uint16(callbacks.local_port), func(packet []byte, destination netip.AddrPort) error {
-		address := endpointToC(destination)
-		status := C.passiveWriteLink(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
-		if status != 0 {
-			return fmt.Errorf("host link write failed: %d", status)
-		}
-		return nil
-	}), nil
-}
-
-//export wgReceiveDatagram
-func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, source *C.wg_endpoint) C.int32_t {
-	if size > passiveMaxDatagram || (size != 0 && packet == nil) {
-		return C.WG_IO_INVALID
-	}
-	address, err := endpointFromC(source)
-	if err != nil {
-		return C.WG_IO_INVALID
-	}
-	tunnel, ok := lookupPassiveBackend(int32(handle))
-	if !ok {
-		return C.WG_IO_CLOSED
-	}
-	return passiveStatus(tunnel.bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
-}
-
-//export wgTurnOnWithPassiveIO
-func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_passive_tun, context unsafe.Pointer) int32 {
-	if settings == nil || tun == nil || tun.write == nil || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
-		return -1
-	}
-	bind, err := passiveBindFromC(link, context)
-	if err != nil {
-		return -1
-	}
-	write := tun.write
-	passive := newPassiveTun(int(tun.mtu), func(packet []byte) error {
-		status := C.passiveWrite(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
-		if status != 0 {
-			return fmt.Errorf("host TUN write failed: %d", status)
-		}
-		return nil
-	})
-	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
-}
-
-//export wgReceiveTunPacket
-func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.int32_t {
-	if size == 0 || size > passiveMaxDatagram || packet == nil {
-		return C.WG_IO_INVALID
-	}
-	tunnel, ok := lookupPassiveBackend(int32(handle))
-	if !ok {
-		return C.WG_IO_CLOSED
-	}
-	return passiveStatus(tunnel.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
 }
 
 func passiveStatus(err error) C.int32_t {
