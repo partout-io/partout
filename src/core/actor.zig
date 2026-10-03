@@ -15,7 +15,9 @@
 const std = @import("std");
 
 const concurrency = @import("concurrency.zig");
-const Fifo = @import("fifo.zig").Fifo;
+const util = @import("util.zig");
+
+const Fifo = util.Fifo;
 
 pub fn Actor(
     comptime Context: type,
