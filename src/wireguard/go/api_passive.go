@@ -15,6 +15,7 @@ import (
 	"net"
 	"net/netip"
 	"os"
+	"runtime"
 	"strconv"
 	"sync"
 	"unsafe"
@@ -52,22 +53,42 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 		return -1
 	}
 	linkWrite, tunWrite := link.write, tun.write
-	bind := newPassiveBind(uint16(link.local_port), func(packet []byte, destination netip.AddrPort) error {
+	bind := newPassiveBind(uint16(link.local_port), func(packets [][]byte, destination netip.AddrPort) error {
+		var batch [passiveBatchSize]C.wg_packet
+		var pins runtime.Pinner
+		defer pins.Unpin()
+		passiveOutputBatch(&batch, packets, 0, &pins)
 		address := endpointToC(destination)
-		status := C.wg_passive_link_write(linkWrite, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
+		status := C.wg_passive_link_write(linkWrite, context, &batch[0], C.uint32_t(len(packets)), &address)
 		if status != 0 {
 			return fmt.Errorf("host link write failed: %d", status)
 		}
 		return nil
 	})
-	passive := newPassiveTun(int(tun.mtu), func(packet []byte) error {
-		status := C.wg_passive_tun_write(tunWrite, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
+	passive := newPassiveTun(int(tun.mtu), func(packets [][]byte, offset int) error {
+		var batch [passiveBatchSize]C.wg_packet
+		var pins runtime.Pinner
+		defer pins.Unpin()
+		passiveOutputBatch(&batch, packets, offset, &pins)
+		status := C.wg_passive_tun_write(tunWrite, context, &batch[0], C.uint32_t(len(packets)))
 		if status != 0 {
 			return fmt.Errorf("host TUN write failed: %d", status)
 		}
 		return nil
 	})
 	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
+}
+
+// Pin payloads while C reads the Go descriptor array containing their pointers.
+// The host copies them before returning; no payload copy is needed here.
+func passiveOutputBatch(batch *[passiveBatchSize]C.wg_packet, packets [][]byte, offset int, pins *runtime.Pinner) {
+	for i, packet := range packets {
+		data := unsafe.SliceData(packet[offset:])
+		if data != nil {
+			pins.Pin(data)
+		}
+		batch[i] = C.wg_packet{data: (*C.uint8_t)(unsafe.Pointer(data)), size: C.uint32_t(len(packet) - offset)}
+	}
 }
 
 func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {

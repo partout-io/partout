@@ -21,7 +21,7 @@ import (
 )
 
 func testBind() *passiveBind {
-	return newPassiveBind(51820, func([]byte, netip.AddrPort) error { return nil })
+	return newPassiveBind(51820, func([][]byte, netip.AddrPort) error { return nil })
 }
 func readOne(fn conn.ReceiveFunc) ([]byte, conn.Endpoint, error) {
 	packets := [][]byte{make([]byte, passiveMaxDatagram)}
@@ -72,13 +72,17 @@ func TestPassiveReceiveCopiesAndPreservesEndpoints(t *testing.T) {
 
 func TestPassiveBindBatches(t *testing.T) {
 	var sent [][]byte
+	calls := 0
 	failAfter := passiveBatchSize + 1
 	sentinel := errors.New("host write failed")
-	b := newPassiveBind(51820, func(packet []byte, _ netip.AddrPort) error {
-		if len(sent) == failAfter {
+	b := newPassiveBind(51820, func(packets [][]byte, _ netip.AddrPort) error {
+		calls++
+		if len(packets) > failAfter {
 			return sentinel
 		}
-		sent = append(sent, append([]byte(nil), packet...))
+		for _, packet := range packets {
+			sent = append(sent, append([]byte(nil), packet...))
+		}
 		return nil
 	})
 	defer b.Close()
@@ -105,7 +109,7 @@ func TestPassiveBindBatches(t *testing.T) {
 		}
 	}
 	ep, _ := b.ParseEndpoint("192.0.2.1:1")
-	if err := b.Send(bufs, ep); err != nil || len(sent) != len(bufs) {
+	if err := b.Send(bufs, ep); err != nil || len(sent) != len(bufs) || calls != 1 {
 		t.Fatal("full send batch", len(sent), err)
 	}
 	for i, packet := range sent {
@@ -125,11 +129,11 @@ func TestPassiveBindBatches(t *testing.T) {
 		done <- err
 	}()
 	awaitError(t, done, nil)
-	if err := b.Send([][]byte{{1}, {2}, {3}, {4}}, ep); !errors.Is(err, sentinel) || len(sent) != 2 || sent[0][0] != 1 || sent[1][0] != 2 {
-		t.Fatal("send prefix", sent, err)
+	if err := b.Send([][]byte{{1}, {2}, {3}, {4}}, ep); !errors.Is(err, sentinel) || len(sent) != 0 || calls != 2 {
+		t.Fatal("failed send accepted a prefix", sent, err)
 	}
 	sent = nil
-	if err := b.Send([][]byte{{1}, make([]byte, passiveMaxDatagram+1)}, ep); !errors.Is(err, errPassivePacket) || len(sent) != 0 {
+	if err := b.Send([][]byte{{1}, make([]byte, passiveMaxDatagram+1)}, ep); !errors.Is(err, errPassivePacket) || len(sent) != 0 || calls != 2 {
 		t.Fatal("invalid batch sent a prefix", err)
 	}
 	if _, err := fns[0](bufs, sizes[:1], endpoints); !errors.Is(err, errPassivePacket) {
@@ -206,7 +210,8 @@ func TestPassiveSendAndCloseWaitsForCallback(t *testing.T) {
 	entered := make(chan struct{})
 	release := make(chan struct{})
 	sentinel := errors.New("host send failed")
-	b := newPassiveBind(51820, func(data []byte, ep netip.AddrPort) error {
+	b := newPassiveBind(51820, func(packets [][]byte, ep netip.AddrPort) error {
+		data := packets[0]
 		if string(data) != "udp" || ep.String() != "192.0.2.1:99" {
 			return errPassivePacket
 		}
@@ -391,11 +396,16 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 			var binds [2]*passiveBind
 			for i := range binds {
 				i := i
-				binds[i] = newPassiveBind(addresses[i].Port(), func(packet []byte, dst netip.AddrPort) error {
+				binds[i] = newPassiveBind(addresses[i].Port(), func(packets [][]byte, dst netip.AddrPort) error {
 					if dst != addresses[1-i] {
 						return fmt.Errorf("wrong destination: %v", dst)
 					}
-					return binds[1-i].enqueue(packet, addresses[i])
+					for _, packet := range packets {
+						if err := binds[1-i].enqueue(packet, addresses[i]); err != nil {
+							return err
+						}
+					}
+					return nil
 				})
 			}
 			keys := [2][32]byte{{1, 1}, {2, 2}}
@@ -407,8 +417,10 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 			var tuns [2]*passiveTun
 			for i := range tuns {
 				i := i
-				tuns[i] = newPassiveTun(1400, func(packet []byte) error {
-					receivedPackets[i] <- append([]byte(nil), packet...)
+				tuns[i] = newPassiveTun(1400, func(packets [][]byte, offset int) error {
+					for _, packet := range packets {
+						receivedPackets[i] <- append([]byte(nil), packet[offset:]...)
+					}
 					return nil
 				})
 			}

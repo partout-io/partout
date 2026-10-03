@@ -24,20 +24,21 @@ enum {
     WG_IO_QUEUE_FULL = -3
 };
 
-/* Borrowed input payload; no pointer is retained after receive returns. */
+/* Borrowed payload; no pointer is retained after receive/callback returns. */
 typedef struct wg_packet {
     const uint8_t *data;
     uint32_t size;
 } wg_packet;
 
-/* Go -> host: transmit one UDP datagram. Return zero once copied/accepted,
+/* Go -> host: transmit 1..WG_IO_MAX_BATCH UDP datagrams to one destination.
+ * Return zero once the entire batch is copied/accepted, without partial writes;
  * nonzero on failure. The callback may run concurrently on Go worker threads.
- * packet and destination are borrowed only until return. Copy both if queued.
+ * packets, payloads and destination are borrowed only until return. Copy if queued.
  * It must return promptly and must not call back into the WireGuard API or
  * wait for the host's lifecycle thread. No packet delivery is implied by zero.
  * Empty datagrams have size zero and may have a null packet pointer. */
 typedef int32_t (*wg_write_link_fn)(void *context,
-    const uint8_t *packet, uint32_t size, const wg_endpoint *destination);
+    const wg_packet *packets, uint32_t count, const wg_endpoint *destination);
 
 /* Copied at startup. The context is host-owned and must remain valid through
  * wgTurnOffWithPassiveIO (and until host reads are detached). Go never opens
@@ -49,10 +50,11 @@ typedef struct wg_passive_link {
     wg_write_link_fn write;
 } wg_passive_link;
 
-/* Go -> host: write one decrypted raw IP packet to the tunnel. Same lifetime,
+/* Go -> host: write 1..WG_IO_MAX_BATCH decrypted raw IP packets to the tunnel.
+ * Same all-or-nothing acceptance, lifetime,
  * concurrency and non-reentrancy requirements as wg_write_link_fn. No AF or
  * virtio header is included; the host handles platform framing. */
-typedef int32_t (*wg_write_tun_fn)(void *context, const uint8_t *packet, uint32_t size);
+typedef int32_t (*wg_write_tun_fn)(void *context, const wg_packet *packets, uint32_t count);
 
 /* Copied at startup. MTU is fixed for this device lifetime (1..65535).
  * Host interface/MTU changes require restarting the device. Go owns no TUN fd
@@ -64,15 +66,15 @@ typedef struct wg_passive_tun {
 
 static inline int32_t wg_passive_link_write(
     wg_write_link_fn write, void *context,
-    const uint8_t *packet, uint32_t size,
+    const wg_packet *packets, uint32_t count,
     const wg_endpoint *destination
 ) {
-    return write(context, packet, size, destination);
+    return write(context, packets, count, destination);
 }
 
 static inline int32_t wg_passive_tun_write(
     wg_write_tun_fn write, void *context,
-    const uint8_t *packet, uint32_t size
+    const wg_packet *packets, uint32_t count
 ) {
-    return write(context, packet, size);
+    return write(context, packets, count);
 }

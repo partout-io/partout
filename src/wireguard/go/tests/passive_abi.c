@@ -5,6 +5,8 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdatomic.h>
+#include <unistd.h>
 #include <wg_go/wg_go.h>
 
 _Static_assert(sizeof(wg_endpoint) == 24, "endpoint ABI size");
@@ -12,15 +14,28 @@ _Static_assert(offsetof(wg_endpoint, scope_id) == 16, "scope offset");
 _Static_assert(offsetof(wg_endpoint, port) == 20, "port offset");
 _Static_assert(offsetof(wg_endpoint, family) == 22, "family offset");
 
-static int32_t write_link(void *context, const uint8_t *packet,
-        uint32_t size, const wg_endpoint *destination) {
-    (void)context; (void)packet; (void)size; (void)destination;
+typedef struct output_probe {
+    atomic_uint calls;
+} output_probe;
+
+static int32_t write_link(void *context, const wg_packet *packets,
+        uint32_t count, const wg_endpoint *destination) {
+    if (context != NULL) {
+        assert(count > 0 && count <= WG_IO_MAX_BATCH);
+        assert(destination->family == 4 && destination->port == 51821);
+        for (uint32_t i = 0; i < count; ++i) {
+            assert(packets[i].data != NULL && packets[i].size == 148);
+            assert(packets[i].data[0] == 1); // Handshake initiation.
+        }
+        atomic_fetch_add(&((output_probe *)context)->calls, 1);
+        return WG_IO_OK;
+    }
     assert(0 && "invalid startup must not transmit");
     return -1;
 }
 
-static int32_t write_tun(void *context, const uint8_t *packet, uint32_t size) {
-    (void)context; (void)packet; (void)size;
+static int32_t write_tun(void *context, const wg_packet *packets, uint32_t count) {
+    (void)context; (void)packets; (void)count;
     assert(0 && "no peer can deliver decrypted data");
     return -1;
 }
@@ -74,5 +89,23 @@ int main(void) {
     wgTurnOffWithPassiveIO(handle);
     assert(wgReceiveTunPackets(replacement, packets, 1) == WG_IO_OK);
     wgTurnOffWithPassiveIO(replacement);
+
+    // Exercise a real Go -> C callback with pinned Go payload pointers.
+    output_probe probe = {0};
+    const int32_t outbound = wgTurnOnWithPassiveIO(
+        "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
+        "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
+        "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.2/32\n",
+        &link, &tun, &probe);
+    assert(outbound >= 0);
+    uint8_t ip[20] = {0x45, 0, 0, 20};
+    ip[12] = ip[16] = 10;
+    ip[15] = 1;
+    ip[19] = 2;
+    wg_packet input = {ip, sizeof(ip)};
+    assert(wgReceiveTunPackets(outbound, &input, 1) == WG_IO_OK);
+    for (int i = 0; i < 3000 && atomic_load(&probe.calls) == 0; ++i) usleep(1000);
+    assert(atomic_load(&probe.calls) > 0);
+    wgTurnOffWithPassiveIO(outbound);
     return 0;
 }

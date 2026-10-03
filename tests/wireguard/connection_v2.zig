@@ -164,11 +164,42 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     _ = libc.write(fds[1], &.{ 0x45, 1, 2, 3 }, 4);
     try wait(&probe.tun_reads, c.WG_IO_MAX_BATCH + 2);
     var packet = [_]u8{ 0x60, 4, 5, 6 };
-    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &packet, packet.len));
+    var output = [_]c.wg_packet{.{ .data = &packet, .size = packet.len }} ** c.WG_IO_MAX_BATCH;
+    // Validate the entire batch before queueing any write.
+    output[1].data = null;
+    try std.testing.expectEqual(@as(i32, c.WG_IO_INVALID), fake.tun.?.write.?(fake.context, &output, output.len));
+    try owner.looper.perform(void, null, Probe.barrier);
+    try std.testing.expectEqual(@as(usize, 0), probe.writes.load(.acquire));
+    output[1].data = &packet;
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &output, output.len));
     packet[0] = 0;
-    try wait(&probe.writes, 1);
+    try wait(&probe.writes, output.len);
     const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
     defer peer.destroy();
+    const peer_port = (try peer.localAddress()).port;
+    const destination = c.wg_endpoint{ .family = 4, .port = peer_port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
+    var first = [_]u8{ 7, 8, 9 };
+    var second = [_]u8{ 10, 11, 12 };
+    const datagrams = [_]c.wg_packet{ .{ .data = &first, .size = first.len }, .{ .data = &second, .size = second.len } };
+    try std.testing.expectEqual(@as(i32, 0), fake.link.?.write.?(fake.context, &datagrams, datagrams.len, &destination));
+    first[0] = 0;
+    second[0] = 0;
+    for ([_][]const u8{ &.{ 7, 8, 9 }, &.{ 10, 11, 12 } }) |expected| {
+        var received: [16]u8 = undefined;
+        var sender: io.SocketAddress = undefined;
+        var size: ?usize = null;
+        for (0..1000) |_| {
+            size = peer.receiveFrom(&received, &sender) catch |err| {
+                if (err != error.WouldBlock) return err;
+                _ = libc.usleep(1000);
+                continue;
+            };
+            break;
+        }
+        try std.testing.expect(size != null);
+        try std.testing.expectEqualSlices(u8, expected, received[0..size.?]);
+        try std.testing.expectEqual(fake.link.?.local_port, sender.port);
+    }
     var address = std.mem.zeroes(io.SocketAddress);
     address.family = 4;
     address.port = fake.link.?.local_port;

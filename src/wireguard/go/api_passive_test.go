@@ -14,7 +14,7 @@ import (
 
 func startPassiveTestDevice(t *testing.T) int32 {
 	t.Helper()
-	handle := turnOnPassiveDevice("", testBind(), newPassiveTun(1400, func([]byte) error { return nil }))
+	handle := turnOnPassiveDevice("", testBind(), newPassiveTun(1400, func([][]byte, int) error { return nil }))
 	if handle < 0 {
 		t.Fatal("passive startup failed")
 	}
@@ -26,7 +26,7 @@ func TestPassiveLifecycleIsolatedFromLegacy(t *testing.T) {
 	handle := startPassiveTestDevice(t)
 	passive, _ := lookupPassiveBackend(handle)
 	logger := device.NewLogger(device.LogLevelSilent, "")
-	legacy := device.NewDevice(newPassiveTun(1400, func([]byte) error { return nil }), testBind(), logger)
+	legacy := device.NewDevice(newPassiveTun(1400, func([][]byte, int) error { return nil }), testBind(), logger)
 	// Deliberately overlap IDs to verify that each ABI uses its own registry.
 	tunnelHandles[handle] = tunnelHandle{legacy, logger}
 	t.Cleanup(func() { wgTurnOff(handle) })
@@ -80,7 +80,7 @@ func TestPassiveRegistryConcurrentShutdown(t *testing.T) {
 
 func TestPassiveStartupFailureClosesIO(t *testing.T) {
 	bind := testBind()
-	tun := newPassiveTun(1400, func([]byte) error { return nil })
+	tun := newPassiveTun(1400, func([][]byte, int) error { return nil })
 	// The host bound 51820; a conflicting requested port must fail at Up.
 	if handle := turnOnPassiveDevice("listen_port=1234\n", bind, tun); handle != -1 {
 		wgTurnOffWithPassiveIO(handle)

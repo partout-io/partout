@@ -41,13 +41,13 @@ type passiveSession struct {
 type passiveBind struct {
 	mu      sync.RWMutex
 	port    uint16
-	send    func([]byte, netip.AddrPort) error
+	send    func([][]byte, netip.AddrPort) error
 	session *passiveSession
 }
 
 var _ conn.Bind = (*passiveBind)(nil)
 
-func newPassiveBind(port uint16, send func([]byte, netip.AddrPort) error) *passiveBind {
+func newPassiveBind(port uint16, send func([][]byte, netip.AddrPort) error) *passiveBind {
 	return &passiveBind{port: port, send: send}
 }
 
@@ -148,12 +148,7 @@ func (b *passiveBind) Send(bufs [][]byte, endpoint conn.Endpoint) error {
 	}
 	// Close waits for an in-flight callback. The callback must enqueue/copy and
 	// return promptly, and must not reenter the WireGuard API.
-	for _, packet := range bufs {
-		if err := b.send(packet, ep.addr); err != nil {
-			return err
-		}
-	}
-	return nil
+	return b.send(bufs, ep.addr)
 }
 
 func (b *passiveBind) enqueue(packet []byte, address netip.AddrPort) error {

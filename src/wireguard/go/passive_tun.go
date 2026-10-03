@@ -17,7 +17,7 @@ type passiveTun struct {
 	mu      sync.RWMutex
 	closed  bool
 	mtu     int
-	write   func([]byte) error
+	write   func([][]byte, int) error
 	packets chan []byte
 	done    chan struct{}
 	events  chan tun.Event
@@ -25,7 +25,7 @@ type passiveTun struct {
 
 var _ tun.Device = (*passiveTun)(nil)
 
-func newPassiveTun(mtu int, write func([]byte) error) *passiveTun {
+func newPassiveTun(mtu int, write func([][]byte, int) error) *passiveTun {
 	return &passiveTun{mtu: mtu, write: write, packets: make(chan []byte, passiveQueueSize), done: make(chan struct{}), events: make(chan tun.Event)}
 }
 func (*passiveTun) File() *os.File             { return nil }
@@ -114,10 +114,8 @@ func (t *passiveTun) Write(bufs [][]byte, offset int) (int, error) {
 	if t.closed {
 		return 0, os.ErrClosed
 	}
-	for i, buf := range bufs {
-		if err := t.write(buf[offset:]); err != nil {
-			return i, err
-		}
+	if err := t.write(bufs, offset); err != nil {
+		return 0, err
 	}
 	return len(bufs), nil
 }

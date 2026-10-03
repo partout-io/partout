@@ -41,8 +41,9 @@ TUN descriptor. The ABI is declared by `include/wg_go/wg_go.h` and its included
 
 The host creates/configures its UDP socket first and supplies its actual bound
 port plus a `wg_write_link_fn` callback. Go calls that callback with encrypted
-outgoing datagrams and binary destinations. The host copies/enqueues both before
-returning. The callback can run concurrently on Go workers; it must not wait for
+outgoing datagram batches and one binary destination per batch. The host
+copies/enqueues the entire batch before returning. The callback can run
+concurrently on Go workers; it must not wait for
 the looper or call back into WireGuard.
 
 For incoming UDP, the host calls `wgReceiveDatagrams` with the tunnel handle,
@@ -58,9 +59,12 @@ endpoint per UDP packet. Each call accepts up to `WG_IO_MAX_BATCH` (256) packets
 larger looper batches are split without allocating staging buffers. Validation
 covers the whole batch before any enqueue. `WG_IO_QUEUE_FULL` or `WG_IO_CLOSED`
 can accept a prefix and discard the remainder: never retry a batch. Empty batches
-are no-ops. One-element batches handle individual packets. This batches ABI ingress;
-Go Bind/TUN reads drain available packets up to 256, waiting only for the first
-packet. Writes accept batches but still invoke the host callback per packet.
+are no-ops. One-element batches handle individual packets. Both ABI directions
+use batches. Go Bind/TUN reads drain available packets up to 256, waiting only for the first
+packet. Each Send/Write invokes one host callback for the whole batch. The
+host accepts all packets or none; TUN Write returns zero on callback failure.
+Go pins output payloads until the callback returns, without copying them.
+Zig queues each output batch with one looper write command and wakeup.
 
 `Bind.Open` activates a fresh queue and reports the host-selected port;
 `Bind.Close` wakes readers, discards pending packets, and waits for active send
@@ -70,8 +74,8 @@ devices, not socket generations. Listen-port changes require a device restart.
 Nonzero fwmarks are rejected; the host configures routing and socket protection.
 
 For TUN input, the host calls `wgReceiveTunPackets` with raw IP packet descriptors. Go
-copies it into a separate bounded 256-packet queue. For TUN output, Go invokes
-`wg_passive_tun.write`; the host copies the decrypted packet before returning.
+copies them into a separate bounded 256-packet queue. For TUN output, Go invokes
+`wg_passive_tun.write`; the host copies the decrypted batch before returning.
 Both directions omit platform headers. TUN also uses `BatchSize() == 256`.
 The host supplies the effective MTU at startup; changing it requires restarting
 the device. Closing the Go device wakes readers and joins callbacks without

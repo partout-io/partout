@@ -78,21 +78,28 @@ pub const PassiveIO = struct {
         }
     }
 
-    fn writeLink(raw: ?*anyopaque, packet: [*c]const u8, size: u32, destination: [*c]const Endpoint) callconv(.c) i32 {
+    fn writeLink(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const Endpoint) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
-        if (destination == null or (size != 0 and packet == null) or size > 65535) return c.WG_IO_INVALID;
+        if (destination == null) return c.WG_IO_INVALID;
         if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
         const address = fromEndpoint(destination.*) catch return c.WG_IO_INVALID;
-        const data: []const u8 = if (size == 0) &.{} else packet[0..size];
-        self.looper.?.writeQueued(&.{data}, .link, address) catch return c.WG_IO_CLOSED;
-        return c.WG_IO_OK;
+        return self.writeBatch(packets, count, .link, address);
     }
 
-    fn writeTun(raw: ?*anyopaque, packet: [*c]const u8, size: u32) callconv(.c) i32 {
+    fn writeTun(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
-        if (size == 0 or size > 65535 or packet == null) return c.WG_IO_INVALID;
         if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
-        self.looper.?.writeQueued(&.{packet[0..size]}, .tun, null) catch return c.WG_IO_CLOSED;
+        return self.writeBatch(packets, count, .tun, null);
+    }
+
+    fn writeBatch(self: *PassiveIO, packets: [*c]const c.wg_packet, count: u32, side: net.Side, destination: ?net.SocketAddress) i32 {
+        if (count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
+        var batch: [c.WG_IO_MAX_BATCH][]const u8 = undefined;
+        for (packets[0..count], batch[0..count]) |packet, *entry| {
+            if (packet.size > 65535 or (packet.size != 0 and packet.data == null) or (side == .tun and packet.size == 0)) return c.WG_IO_INVALID;
+            entry.* = if (packet.size == 0) &.{} else packet.data[0..packet.size];
+        }
+        self.looper.?.writeQueued(batch[0..count], side, destination) catch return c.WG_IO_CLOSED;
         return c.WG_IO_OK;
     }
 };
