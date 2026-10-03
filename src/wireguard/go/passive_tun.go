@@ -31,7 +31,7 @@ func newPassiveTun(mtu int, write func([]byte) error) *passiveTun {
 func (*passiveTun) File() *os.File             { return nil }
 func (*passiveTun) Name() (string, error)      { return "host", nil }
 func (t *passiveTun) MTU() (int, error)        { return t.mtu, nil }
-func (*passiveTun) BatchSize() int             { return 1 }
+func (*passiveTun) BatchSize() int             { return passiveBatchSize }
 func (t *passiveTun) Events() <-chan tun.Event { return t.events }
 func (t *passiveTun) Close() error {
 	t.mu.Lock()
@@ -67,8 +67,13 @@ func (t *passiveTun) enqueue(packet []byte) error {
 	}
 }
 func (t *passiveTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
-	if len(bufs) != 1 || len(sizes) < 1 || offset < 0 || offset > len(bufs[0]) {
+	if len(bufs) == 0 || len(bufs) > passiveBatchSize || len(sizes) < len(bufs) || offset < 0 {
 		return 0, errPassivePacket
+	}
+	for _, buf := range bufs {
+		if offset > len(buf) {
+			return 0, errPassivePacket
+		}
 	}
 	select {
 	case <-t.done:
@@ -79,24 +84,40 @@ func (t *passiveTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 		if t.closed {
 			return 0, os.ErrClosed
 		}
-		if len(bufs[0])-offset < len(packet) {
-			return 0, io.ErrShortBuffer
+		for i := 0; ; i++ {
+			if len(bufs[i])-offset < len(packet) {
+				return i, io.ErrShortBuffer
+			}
+			sizes[i] = copy(bufs[i][offset:], packet)
+			if i+1 == len(bufs) {
+				return i + 1, nil
+			}
+			select {
+			case packet = <-t.packets:
+			default:
+				return i + 1, nil
+			}
 		}
-		sizes[0] = copy(bufs[0][offset:], packet)
-		return 1, nil
 	}
 }
 func (t *passiveTun) Write(bufs [][]byte, offset int) (int, error) {
-	if len(bufs) != 1 || offset < 0 || offset >= len(bufs[0]) || len(bufs[0])-offset > passiveMaxDatagram {
+	if len(bufs) == 0 || len(bufs) > passiveBatchSize || offset < 0 {
 		return 0, errPassivePacket
+	}
+	for _, buf := range bufs {
+		if offset >= len(buf) || len(buf)-offset > passiveMaxDatagram {
+			return 0, errPassivePacket
+		}
 	}
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 	if t.closed {
 		return 0, os.ErrClosed
 	}
-	if err := t.write(bufs[0][offset:]); err != nil {
-		return 0, err
+	for i, buf := range bufs {
+		if err := t.write(buf[offset:]); err != nil {
+			return i, err
+		}
 	}
-	return 1, nil
+	return len(bufs), nil
 }

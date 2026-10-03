@@ -6,6 +6,7 @@ package main
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"sync"
@@ -13,11 +14,78 @@ import (
 	"time"
 )
 
+func TestPassiveTunBatches(t *testing.T) {
+	var written [][]byte
+	failAfter := passiveBatchSize + 1
+	sentinel := errors.New("host write failed")
+	tun := newPassiveTun(1400, func(packet []byte) error {
+		if len(written) == failAfter {
+			return sentinel
+		}
+		written = append(written, append([]byte(nil), packet...))
+		return nil
+	})
+	defer tun.Close()
+	if tun.BatchSize() != 256 {
+		t.Fatal(tun.BatchSize())
+	}
+	bufs := make([][]byte, tun.BatchSize())
+	sizes := make([]int, len(bufs))
+	for i := range bufs {
+		bufs[i] = make([]byte, 4)
+		if err := tun.enqueue([]byte{0x45, byte(i)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := tun.Read(bufs, sizes, 2); n != len(bufs) || err != nil {
+		t.Fatal(n, err)
+	}
+	for i, buf := range bufs {
+		if sizes[i] != 2 || !bytes.Equal(buf, []byte{0, 0, 0x45, byte(i)}) {
+			t.Fatal("batch order or offset lost", i, buf)
+		}
+	}
+	if n, err := tun.Write(bufs, 2); n != len(bufs) || err != nil || len(written) != len(bufs) {
+		t.Fatal("full write batch", n, err)
+	}
+	for i, packet := range written {
+		if !bytes.Equal(packet, []byte{0x45, byte(i)}) {
+			t.Fatal("write order or offset lost", i, packet)
+		}
+	}
+	written, failAfter = nil, 2
+	tun.enqueue([]byte{0x45})
+	done := make(chan error, 1)
+	go func() {
+		n, err := tun.Read(bufs, sizes, 2)
+		if err == nil && (n != 1 || sizes[0] != 1) {
+			err = fmt.Errorf("sparse batch: %d %v", n, sizes)
+		}
+		done <- err
+	}()
+	awaitError(t, done, nil)
+	if n, err := tun.Write(bufs[:4], 2); n != 2 || !errors.Is(err, sentinel) || len(written) != 2 || written[1][1] != 1 {
+		t.Fatal("write prefix", n, written, err)
+	}
+	written = nil
+	if n, err := tun.Write([][]byte{{0, 0, 0x45}, {0}}, 2); n != 0 || !errors.Is(err, errPassivePacket) || len(written) != 0 {
+		t.Fatal("invalid batch wrote a prefix", n, err)
+	}
+	tun.enqueue([]byte{0x45})
+	tun.enqueue([]byte{0x45, 1, 2})
+	if n, err := tun.Read([][]byte{make([]byte, 3), make([]byte, 3)}, make([]int, 2), 1); n != 1 || !errors.Is(err, io.ErrShortBuffer) {
+		t.Fatal("short-buffer prefix", n, err)
+	}
+	if _, err := tun.Read(bufs, sizes[:1], 0); !errors.Is(err, errPassivePacket) {
+		t.Fatal("short sizes accepted", err)
+	}
+}
+
 func TestPassiveTunPacketsAndOffsets(t *testing.T) {
 	var written []byte
 	tun := newPassiveTun(1400, func(packet []byte) error { written = append([]byte(nil), packet...); return nil })
 	defer tun.Close()
-	if tun.File() != nil || tun.BatchSize() != 1 {
+	if tun.File() != nil || tun.BatchSize() != passiveBatchSize {
 		t.Fatal("native TUN or batch")
 	}
 	if mtu, _ := tun.MTU(); mtu != 1400 {

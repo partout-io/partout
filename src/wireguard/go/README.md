@@ -48,7 +48,7 @@ the looper or call back into WireGuard.
 For incoming UDP, the host calls `wgReceiveDatagrams` with the tunnel handle,
 payload descriptors, and source endpoints. The bridge copies them into a 256-packet queue and
 returns immediately. `WG_IO_QUEUE_FULL` means the unaccepted suffix was dropped. Go's one
-receive function serves both address families, with `BatchSize() == 1` initially.
+receive function serves both address families, with `BatchSize() == 256`.
 The endpoint ABI uses IP bytes, host-order port/scope, and family 4 or 6; mapped
 IPv4 addresses are normalized. Local source/interface stickiness is not provided.
 
@@ -59,7 +59,8 @@ larger looper batches are split without allocating staging buffers. Validation
 covers the whole batch before any enqueue. `WG_IO_QUEUE_FULL` or `WG_IO_CLOSED`
 can accept a prefix and discard the remainder: never retry a batch. Empty batches
 are no-ops. One-element batches handle individual packets. This batches ABI ingress;
-Go Bind/TUN reads and output callbacks still process one packet at a time.
+Go Bind/TUN reads drain available packets up to 256, waiting only for the first
+packet. Writes accept batches but still invoke the host callback per packet.
 
 `Bind.Open` activates a fresh queue and reports the host-selected port;
 `Bind.Close` wakes readers, discards pending packets, and waits for active send
@@ -71,7 +72,7 @@ Nonzero fwmarks are rejected; the host configures routing and socket protection.
 For TUN input, the host calls `wgReceiveTunPackets` with raw IP packet descriptors. Go
 copies it into a separate bounded 256-packet queue. For TUN output, Go invokes
 `wg_passive_tun.write`; the host copies the decrypted packet before returning.
-Both directions omit platform headers. TUN also uses `BatchSize() == 1`.
+Both directions omit platform headers. TUN also uses `BatchSize() == 256`.
 The host supplies the effective MTU at startup; changing it requires restarting
 the device. Closing the Go device wakes readers and joins callbacks without
 closing any host descriptor.

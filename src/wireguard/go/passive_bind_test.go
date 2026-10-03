@@ -70,6 +70,73 @@ func TestPassiveReceiveCopiesAndPreservesEndpoints(t *testing.T) {
 	}
 }
 
+func TestPassiveBindBatches(t *testing.T) {
+	var sent [][]byte
+	failAfter := passiveBatchSize + 1
+	sentinel := errors.New("host write failed")
+	b := newPassiveBind(51820, func(packet []byte, _ netip.AddrPort) error {
+		if len(sent) == failAfter {
+			return sentinel
+		}
+		sent = append(sent, append([]byte(nil), packet...))
+		return nil
+	})
+	defer b.Close()
+	fns, _, _ := b.Open(0)
+	if b.BatchSize() != 256 {
+		t.Fatal(b.BatchSize())
+	}
+	bufs := make([][]byte, b.BatchSize())
+	sizes := make([]int, len(bufs))
+	endpoints := make([]conn.Endpoint, len(bufs))
+	for i := range bufs {
+		bufs[i] = make([]byte, 2)
+		source := netip.AddrPortFrom(netip.MustParseAddr("192.0.2.1"), uint16(i+1))
+		if err := b.enqueue([]byte{byte(i)}, source); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := fns[0](bufs, sizes, endpoints); n != len(bufs) || err != nil {
+		t.Fatal(n, err)
+	}
+	for i := range bufs {
+		if sizes[i] != 1 || bufs[i][0] != byte(i) || endpoints[i].(*passiveEndpoint).addr.Port() != uint16(i+1) {
+			t.Fatal("batch order or source lost", i)
+		}
+	}
+	ep, _ := b.ParseEndpoint("192.0.2.1:1")
+	if err := b.Send(bufs, ep); err != nil || len(sent) != len(bufs) {
+		t.Fatal("full send batch", len(sent), err)
+	}
+	for i, packet := range sent {
+		if packet[0] != byte(i) {
+			t.Fatal("send order lost", i)
+		}
+	}
+	sent, failAfter = nil, 2
+	// A sparse queue must return immediately instead of waiting for 256 packets.
+	b.enqueue(nil, netip.MustParseAddrPort("192.0.2.1:1"))
+	done := make(chan error, 1)
+	go func() {
+		n, err := fns[0](bufs, sizes, endpoints)
+		if err == nil && (n != 1 || sizes[0] != 0) {
+			err = fmt.Errorf("sparse batch: %d %v", n, sizes)
+		}
+		done <- err
+	}()
+	awaitError(t, done, nil)
+	if err := b.Send([][]byte{{1}, {2}, {3}, {4}}, ep); !errors.Is(err, sentinel) || len(sent) != 2 || sent[0][0] != 1 || sent[1][0] != 2 {
+		t.Fatal("send prefix", sent, err)
+	}
+	sent = nil
+	if err := b.Send([][]byte{{1}, make([]byte, passiveMaxDatagram+1)}, ep); !errors.Is(err, errPassivePacket) || len(sent) != 0 {
+		t.Fatal("invalid batch sent a prefix", err)
+	}
+	if _, err := fns[0](bufs, sizes[:1], endpoints); !errors.Is(err, errPassivePacket) {
+		t.Fatal("short sizes accepted", err)
+	}
+}
+
 func TestPassiveQueueBoundsAndShortBuffers(t *testing.T) {
 	b := testBind()
 	defer b.Close()
@@ -196,7 +263,7 @@ func TestPassiveEndpointAndInvalidArguments(t *testing.T) {
 		t.Fatal("nil endpoint")
 	}
 	ep, _ := b.ParseEndpoint("127.0.0.1:1")
-	if !errors.Is(b.Send([][]byte{nil, nil}, ep), errPassivePacket) {
+	if !errors.Is(b.Send(make([][]byte, passiveBatchSize+1), ep), errPassivePacket) {
 		t.Fatal("oversize batch")
 	}
 	native := endpointToC(netip.MustParseAddrPort("127.0.0.1:1"))

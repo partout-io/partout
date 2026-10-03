@@ -16,6 +16,7 @@ import (
 )
 
 const passiveQueueSize = 256
+const passiveBatchSize = 256
 const passiveMaxDatagram = 65535
 
 var (
@@ -67,7 +68,7 @@ func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 			return 0, net.ErrClosed
 		default:
 		}
-		if len(packets) != 1 || len(sizes) < 1 || len(endpoints) < 1 {
+		if len(packets) == 0 || len(packets) > passiveBatchSize || len(sizes) < len(packets) || len(endpoints) < len(packets) {
 			return 0, errPassivePacket
 		}
 		select {
@@ -79,12 +80,21 @@ func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 			if b.session != s {
 				return 0, net.ErrClosed
 			}
-			if len(packets[0]) < len(packet.data) {
-				return 0, io.ErrShortBuffer
+			for i := 0; ; i++ {
+				if len(packets[i]) < len(packet.data) {
+					return i, io.ErrShortBuffer
+				}
+				sizes[i] = copy(packets[i], packet.data)
+				endpoints[i] = packet.endpoint
+				if i+1 == len(packets) {
+					return i + 1, nil
+				}
+				select {
+				case packet = <-s.packets:
+				default:
+					return i + 1, nil
+				}
 			}
-			sizes[0] = copy(packets[0], packet.data)
-			endpoints[0] = packet.endpoint
-			return 1, nil
 		}
 	}
 	return []conn.ReceiveFunc{receive}, b.port, nil
@@ -116,15 +126,20 @@ func (b *passiveBind) SetMark(mark uint32) error {
 	return nil
 }
 
-func (*passiveBind) BatchSize() int { return 1 }
+func (*passiveBind) BatchSize() int { return passiveBatchSize }
 
 func (b *passiveBind) Send(bufs [][]byte, endpoint conn.Endpoint) error {
 	ep, ok := endpoint.(*passiveEndpoint)
 	if !ok || ep == nil {
 		return conn.ErrWrongEndpointType
 	}
-	if len(bufs) != 1 || len(bufs[0]) > passiveMaxDatagram {
+	if len(bufs) == 0 || len(bufs) > passiveBatchSize {
 		return errPassivePacket
+	}
+	for _, packet := range bufs {
+		if len(packet) > passiveMaxDatagram {
+			return errPassivePacket
+		}
 	}
 	b.mu.RLock()
 	defer b.mu.RUnlock()
@@ -133,7 +148,12 @@ func (b *passiveBind) Send(bufs [][]byte, endpoint conn.Endpoint) error {
 	}
 	// Close waits for an in-flight callback. The callback must enqueue/copy and
 	// return promptly, and must not reenter the WireGuard API.
-	return b.send(bufs[0], ep.addr)
+	for _, packet := range bufs {
+		if err := b.send(packet, ep.addr); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func (b *passiveBind) enqueue(packet []byte, address netip.AddrPort) error {
