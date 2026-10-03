@@ -19,6 +19,7 @@ comptime {
         _ = @import("c/crypto/ctr.zig");
     }
     _ = @import("core/actor.zig");
+    _ = @import("core/fifo.zig");
     _ = @import("core/concurrency.zig");
     _ = @import("core/logging.zig");
     _ = @import("core/api.zig");
