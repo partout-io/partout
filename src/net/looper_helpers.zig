@@ -145,7 +145,8 @@ pub const WriteError = SubmissionError || error{
     InvalidBuffers,
     MissingDestination,
 };
-pub const WriteOOBError = WriteError || io.Error || error{
+pub const WriteOOBError = SubmissionError || io.Error || error{
+    MissingDestination,
     OOBOutsideQueue,
     WriteIncomplete,
 };

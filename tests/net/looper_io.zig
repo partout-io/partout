@@ -115,6 +115,8 @@ const Mock = struct {
     block_writes: bool = false,
     backpressure_once: bool = false,
     fail_read: bool = false,
+    fail_read_after: ?usize = null,
+    reads: usize = 0,
     partial_once: bool = false,
     fail_after: ?usize = null,
     writes: usize = 0,
@@ -125,8 +127,10 @@ const Mock = struct {
     fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
         const self: *Mock = @ptrCast(@alignCast(raw));
         if (self.fail_read) return error.LibcFailure;
+        if (self.fail_read_after) |count| if (self.reads >= count) return error.LibcFailure;
         var byte: [1]u8 = undefined;
         if (std.c.read(self.fd, &byte, 1) != 1) return error.WouldBlock;
+        self.reads += 1;
         self.read_matched = data.ptr == self.expected_read;
         data[0] = byte[0];
         return 1;
@@ -278,15 +282,17 @@ test "v2 detach stop and deinit cancel pending writes without acquiring idle rea
 
 test "v2 read failures and callback failures release buffers before detaching" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    for ([_]bool{ false, true }) |fail_callback| {
+    const Failure = enum { io, partial, callback, invalid_buffer };
+    for (std.enums.values(Failure)) |failure| {
         const fds = try pipe();
         defer closePipe(fds);
-        var mock = Mock{ .fd = fds[0], .fail_read = !fail_callback };
+        var mock = Mock{ .fd = fds[0], .fail_read = failure == .io, .fail_read_after = if (failure == .partial) 1 else null };
         var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         var bytes: [16]u8 = undefined;
-        var buffers = [_]Looper.ReadBuffer{.{ .data = &bytes }};
-        var read = ReadProbe{ .loop = &loop, .buffers = &buffers, .fail_callback = fail_callback };
+        var other: [16]u8 = undefined;
+        var buffers = [_]Looper.ReadBuffer{ .{ .data = if (failure == .invalid_buffer) &.{} else &bytes }, .{ .data = &other } };
+        var read = ReadProbe{ .loop = &loop, .buffers = &buffers, .fail_callback = failure == .callback };
         try loop.start();
         try loop.attach(read.attach(mock.pair()));
         try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "x", 1));
@@ -297,10 +303,12 @@ test "v2 read failures and callback failures release buffers before detaching" {
         try std.testing.expectEqual(@as(usize, 1), read.acquired);
         try std.testing.expectEqual(@as(usize, 1), read.released.load(.acquire));
         try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
-        if (fail_callback) {
-            try std.testing.expectEqual(@as(usize, 1), read.result.count);
-        } else {
-            try std.testing.expect(read.result.failure.? == error.LibcFailure);
+        try std.testing.expectEqual(@as(usize, if (failure == .partial or failure == .callback) 1 else 0), read.result.count);
+        try std.testing.expectEqual(@as(usize, if (failure == .partial or failure == .callback) 1 else 0), read.delivered);
+        switch (failure) {
+            .io, .partial => try std.testing.expect(read.result.failure.? == error.LibcFailure),
+            .invalid_buffer => try std.testing.expect(read.result.failure.? == error.InvalidBuffers),
+            .callback => try std.testing.expect(read.result.failure == null),
         }
     }
 }
@@ -321,6 +329,11 @@ test "v2 rejected requests and Windows stubs do not invoke completions" {
         const fds = try pipe();
         defer closePipe(fds);
         var mock = Mock{ .fd = fds[0] };
+        try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
+            .pair = mock.pair(),
+            .on_read = .{ .callback = ReadProbe.read },
+        }));
+        try std.testing.expect(!loop.isTunAttached());
         try loop.attach(.{ .pair = mock.pair() });
         try loop.detach(.tun);
     }
@@ -516,4 +529,58 @@ test "v2 write failure reports the completed prefix and cancels later requests" 
     try std.testing.expect(second.result.failure.? == error.Cancelled);
     try std.testing.expectEqual(@as(usize, 1), first.calls.load(.acquire));
     try std.testing.expectEqual(@as(usize, 1), second.calls.load(.acquire));
+}
+
+test "v2 spontaneous reads honor packet and byte limits without rearming" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    for ([_]bool{ false, true }) |limit_bytes| {
+        const fds = try pipe();
+        defer closePipe(fds);
+        var first: [16]u8 = undefined;
+        var second: [16]u8 = undefined;
+        var buffers = [_]Looper.ReadBuffer{ .{ .data = &first }, .{ .data = &second } };
+        var mock = Mock{ .fd = fds[0], .expected_read = &first };
+        var loop = try Looper.init(allocator, .{
+            .on_finish = .{ .callback = finish },
+            .max_read_count = if (limit_bytes) 2 else 1,
+            .max_read_size = if (limit_bytes) 1 else 1024,
+        });
+        defer loop.deinit();
+        var read = ReadProbe{ .loop = &loop, .buffers = &buffers };
+        try loop.start();
+        try loop.attach(read.attach(mock.pair()));
+        try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "xy", 2));
+        try read.wait(2);
+        try loop.stop();
+        try std.testing.expectEqual(@as(usize, 2), read.delivered);
+        try std.testing.expectEqual(@as(usize, 1), read.result.count);
+        try std.testing.expectEqual(@as(u8, 'y'), first[0]);
+    }
+}
+
+test "v2 read attachment allocation failures return descriptor ownership" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    for (0..2) |successful_allocations| {
+        const fds = try pipe();
+        defer closePipe(fds);
+        var mock = Mock{ .fd = fds[0] };
+        var failing = std.testing.FailingAllocator.init(allocator, .{});
+        var loop = try Looper.init(failing.allocator(), .{ .on_finish = .{ .callback = finish } });
+        defer loop.deinit();
+        var bytes: [16]u8 = undefined;
+        var buffers = [_]Looper.ReadBuffer{.{ .data = &bytes }};
+        var read = ReadProbe{ .loop = &loop, .buffers = &buffers, .pause = true };
+        try loop.start();
+        failing.fail_index = failing.alloc_index + successful_allocations;
+        try std.testing.expectError(error.OutOfMemory, loop.attach(read.attach(mock.pair())));
+        try std.testing.expect(!loop.isTunAttached());
+        try std.testing.expectEqual(@as(usize, 0), mock.cleaned);
+        try std.testing.expectEqual(@as(usize, 0), read.acquired);
+        failing.fail_index = std.math.maxInt(usize);
+        try loop.attach(read.attach(mock.pair()));
+        try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "x", 1));
+        try read.wait(1);
+        try loop.stop();
+        try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
+    }
 }
