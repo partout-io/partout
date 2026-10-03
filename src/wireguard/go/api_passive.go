@@ -48,13 +48,20 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 	if settings == nil || tun == nil || tun.write == nil || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
 		return -1
 	}
-	bind, err := passiveBindFromC(link, context)
-	if err != nil {
+	if link == nil || link.write == nil || link.local_port == 0 {
 		return -1
 	}
-	write := tun.write
+	linkWrite, tunWrite := link.write, tun.write
+	bind := newPassiveBind(uint16(link.local_port), func(packet []byte, destination netip.AddrPort) error {
+		address := endpointToC(destination)
+		status := C.wg_passive_link_write(linkWrite, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
+		if status != 0 {
+			return fmt.Errorf("host link write failed: %d", status)
+		}
+		return nil
+	})
 	passive := newPassiveTun(int(tun.mtu), func(packet []byte) error {
-		status := C.wg_passive_tun_write(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
+		status := C.wg_passive_tun_write(tunWrite, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)))
 		if status != 0 {
 			return fmt.Errorf("host TUN write failed: %d", status)
 		}
@@ -149,21 +156,6 @@ func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.
 	return passiveStatus(tunnel.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
 }
 
-func passiveBindFromC(callbacks *C.wg_passive_link, context unsafe.Pointer) (*passiveBind, error) {
-	if callbacks == nil || callbacks.write == nil || callbacks.local_port == 0 {
-		return nil, errPassivePacket
-	}
-	write := callbacks.write
-	return newPassiveBind(uint16(callbacks.local_port), func(packet []byte, destination netip.AddrPort) error {
-		address := endpointToC(destination)
-		status := C.wg_passive_link_write(write, context, (*C.uint8_t)(unsafe.Pointer(unsafe.SliceData(packet))), C.uint32_t(len(packet)), &address)
-		if status != 0 {
-			return fmt.Errorf("host link write failed: %d", status)
-		}
-		return nil
-	}), nil
-}
-
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {
 	if endpoint == nil {
 		return netip.AddrPort{}, errPassivePacket
@@ -203,18 +195,13 @@ func endpointToC(address netip.AddrPort) C.wg_endpoint {
 	ip := address.Addr()
 	if ip.Is4() {
 		endpoint.family = 4
-		bytes := ip.As4()
-		for i, value := range bytes {
-			endpoint.address[i] = C.uint8_t(value)
-		}
 	} else {
 		endpoint.family = 6
-		bytes := ip.As16()
-		for i, value := range bytes {
-			endpoint.address[i] = C.uint8_t(value)
-		}
 		scope, _ := strconv.ParseUint(ip.Zone(), 10, 32)
 		endpoint.scope_id = C.uint32_t(scope)
+	}
+	for i, value := range ip.AsSlice() {
+		endpoint.address[i] = C.uint8_t(value)
 	}
 	return endpoint
 }
