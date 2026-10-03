@@ -323,3 +323,90 @@ pub const WriteQueue = struct {
         }
     }
 };
+
+// Borrowed I/O requests used by looper v2.
+
+/// Caller-owned storage. Only entries in the completed prefix have valid output.
+pub const ReadBuffer = struct {
+    data: []u8,
+    size: usize = 0,
+    source: ?io.SocketAddress = null,
+};
+
+/// Number of whole packets processed, plus an optional failure. A partial
+/// stream write is not counted; cancellation does not undo bytes already sent.
+pub const IOResult = struct {
+    count: usize = 0,
+    failure: ?(io.Error || error{Cancelled}) = null,
+};
+
+/// Called exactly once for an accepted request, on the looper without its lock.
+/// Completion may run before submission returns. Rejected submissions never
+/// invoke the callback. The entire buffer slice (descriptors and payloads)
+/// must stay valid and exclusively loaned until completion; the callback context
+/// must also remain valid. The destination is stored by value.
+/// The callback may submit I/O, but must not call
+/// attach, detach, stop, or deinit. Pending requests are cancelled before
+/// detach, stop, or deinit returns; shutdown does not wait for I/O to drain.
+pub const OnIOComplete = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque, IOResult) void,
+
+    pub fn call(self: OnIOComplete, result: IOResult) void {
+        self.callback(self.context, result);
+    }
+};
+
+pub const ReadError = SubmissionError || error{
+    SideNotAttached,
+    InvalidBuffers,
+};
+pub const BorrowedWriteError = ReadError || error{MissingDestination};
+
+pub const BorrowedAttachArguments = struct {
+    pair: io.DescriptorPair,
+    on_failure: ?OnFailure = null,
+};
+
+pub const ReadRequest = struct {
+    buffers: []ReadBuffer,
+    completion: OnIOComplete,
+    next: ?*ReadRequest = null,
+
+    pub fn complete(self: *ReadRequest, allocator: std.mem.Allocator, result: IOResult) void {
+        const completion = self.completion;
+        allocator.destroy(self);
+        completion.call(result);
+    }
+};
+
+pub const WriteRequest = struct {
+    packets: Packets,
+    destination: ?io.SocketAddress,
+    completion: OnIOComplete,
+    count: usize = 0,
+    offset: usize = 0,
+    next: ?*WriteRequest = null,
+
+    pub fn pending(self: *const WriteRequest) PendingWrite {
+        return .{ .data = self.packets[self.count], .offset = self.offset, .address = self.destination };
+    }
+
+    /// Advances this write, returning whether all packets have been written.
+    pub fn advance(self: *WriteRequest, written: usize) bool {
+        const remaining = self.packets[self.count].len - self.offset;
+        std.debug.assert(written <= remaining);
+        self.offset += written;
+        if (written != remaining) return false;
+        self.offset = 0;
+        self.count += 1;
+        return self.count == self.packets.len;
+    }
+
+    pub fn complete(self: *WriteRequest, allocator: std.mem.Allocator, failure: ?(io.Error || error{Cancelled})) void {
+        const completion = self.completion;
+        const result = IOResult{ .count = self.count, .failure = failure };
+        allocator.destroy(self);
+        completion.call(result);
+    }
+};

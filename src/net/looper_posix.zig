@@ -14,7 +14,6 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
-const borrowed = @import("looper_borrowed.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
 const io_c = io.io_c;
@@ -523,7 +522,7 @@ pub const PosixLooper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *PosixLooper, arguments: borrowed.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *PosixLooper, arguments: helpers.BorrowedAttachArguments) helpers.AttachError!void {
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
         var completion = helpers.Completion{};
@@ -615,7 +614,7 @@ pub const PosixLooper = struct {
 
     /// Reads into caller-owned buffers, completing after at least one packet
     /// becomes available (or on failure/cancellation).
-    pub fn readQueued(self: *PosixLooper, buffers: []borrowed.ReadBuffer, side: io.Side, completion: borrowed.Completion) borrowed.SubmissionError!void {
+    pub fn readQueued(self: *PosixLooper, buffers: []helpers.ReadBuffer, side: io.Side, completion: helpers.OnIOComplete) helpers.ReadError!void {
         if (buffers.len == 0) return error.InvalidBuffers;
         for (buffers) |buffer| if (buffer.data.len == 0) return error.InvalidBuffers;
         self.lock.lock();
@@ -624,7 +623,7 @@ pub const PosixLooper = struct {
         const current = self.sideIO(side) orelse return error.SideNotAttached;
         const command = try self.createCommandNode(.{ .enable_read = .{ .side = side, .id = current.id } });
         errdefer self.allocator.destroy(command);
-        const request = try self.allocator.create(borrowed.ReadRequest);
+        const request = try self.allocator.create(helpers.ReadRequest);
         request.* = .{ .buffers = buffers, .completion = completion };
         current.read_queue.append(request);
         self.commands.append(command);
@@ -633,7 +632,7 @@ pub const PosixLooper = struct {
 
     /// Queues the caller's packet slice directly. Completion releases it, including
     /// after cancellation. Empty batches are rejected; empty datagrams are valid.
-    pub fn writeQueued(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress, completion: borrowed.Completion) borrowed.WriteError!void {
+    pub fn writeQueued(self: *PosixLooper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress, completion: helpers.OnIOComplete) helpers.BorrowedWriteError!void {
         if (packets.len == 0) return error.InvalidBuffers;
         self.lock.lock();
         defer self.lock.unlock();
@@ -642,7 +641,7 @@ pub const PosixLooper = struct {
         if (current.native_io.isUnconnected() and destination == null) return error.MissingDestination;
         const command = try self.createCommandNode(.{ .enable_write = .{ .side = side, .id = current.id } });
         errdefer self.allocator.destroy(command);
-        const request = try self.allocator.create(borrowed.WriteRequest);
+        const request = try self.allocator.create(helpers.WriteRequest);
         request.* = .{ .packets = packets, .destination = destination, .completion = completion };
         current.write_queue.append(request);
         self.commands.append(command);
@@ -964,7 +963,7 @@ pub const PosixLooper = struct {
         self.lock.lock();
         const request = side_io.read_queue.head;
         self.lock.unlock();
-        var result = borrowed.Result{};
+        var result = helpers.IOResult{};
         if (request) |pending| {
             var size: usize = 0;
             for (pending.buffers) |*buffer| {
@@ -1391,8 +1390,8 @@ pub const PosixLooper = struct {
         on_failure: ?helpers.OnFailure,
 
         // Borrowed I/O requests.
-        read_queue: core.Fifo(borrowed.ReadRequest) = .{},
-        write_queue: core.Fifo(borrowed.WriteRequest) = .{},
+        read_queue: core.Fifo(helpers.ReadRequest) = .{},
+        write_queue: core.Fifo(helpers.WriteRequest) = .{},
 
         // Mux event and cleanup state.
         is_reading: bool,

@@ -15,7 +15,6 @@ const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
-const borrowed = @import("looper_borrowed.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
@@ -26,10 +25,10 @@ pub const Looper = struct {
         @import("looper_posix.zig").PosixLooper;
 
     pub const Options = helpers.Options;
-    pub const ReadBuffer = borrowed.ReadBuffer;
-    pub const IOResult = borrowed.Result;
-    pub const OnIOComplete = borrowed.Completion;
-    pub const ReadError = borrowed.SubmissionError;
+    pub const ReadBuffer = helpers.ReadBuffer;
+    pub const IOResult = helpers.IOResult;
+    pub const OnIOComplete = helpers.OnIOComplete;
+    pub const ReadError = helpers.ReadError;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
     pub const Failure = helpers.Failure;
@@ -41,7 +40,7 @@ pub const Looper = struct {
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
-    pub const AttachArguments = borrowed.AttachArguments;
+    pub const AttachArguments = helpers.BorrowedAttachArguments;
     pub const InitError = helpers.InitError;
     pub const StartError = helpers.StartError;
     pub const StopError = helpers.StopError;
@@ -49,7 +48,7 @@ pub const Looper = struct {
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
     pub const SubmissionError = helpers.SubmissionError;
-    pub const WriteError = borrowed.WriteError;
+    pub const WriteError = helpers.BorrowedWriteError;
     pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,

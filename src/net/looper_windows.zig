@@ -6,7 +6,6 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
-const borrowed = @import("looper_borrowed.zig");
 const io = @import("io.zig");
 const io_c = io.io_c;
 const log = core.logging;
@@ -76,7 +75,7 @@ pub const WindowsLooper = struct {
         // FIXME: ###, Implement timers
     }
 
-    pub fn attach(self: *WindowsLooper, arguments: borrowed.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *WindowsLooper, arguments: helpers.BorrowedAttachArguments) helpers.AttachError!void {
         _ = self;
         _ = arguments;
         // if (udp) {
@@ -89,11 +88,11 @@ pub const WindowsLooper = struct {
         return error.LooperUnavailable;
     }
 
-    pub fn readQueued(_: *WindowsLooper, _: []borrowed.ReadBuffer, _: io.Side, _: borrowed.Completion) borrowed.SubmissionError!void {
+    pub fn readQueued(_: *WindowsLooper, _: []helpers.ReadBuffer, _: io.Side, _: helpers.OnIOComplete) helpers.ReadError!void {
         return error.LooperUnavailable;
     }
 
-    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: borrowed.Completion) borrowed.WriteError!void {
+    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.BorrowedWriteError!void {
         return error.LooperUnavailable;
     }
 
