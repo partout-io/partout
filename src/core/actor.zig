@@ -15,6 +15,9 @@
 const std = @import("std");
 
 const concurrency = @import("concurrency.zig");
+const util = @import("util.zig");
+
+const Fifo = util.Fifo;
 
 pub fn Actor(
     comptime Context: type,
@@ -67,8 +70,7 @@ pub fn ActorWithFinish(
         thread: ?std.Thread,
         thread_id: ?std.Thread.Id,
         accepting: bool,
-        head: ?*Job,
-        tail: ?*Job,
+        jobs: Fifo(Job),
 
         pub fn create(allocator: std.mem.Allocator, context: *Context) CreateError!*Self {
             const self = try allocator.create(Self);
@@ -80,8 +82,7 @@ pub fn ActorWithFinish(
                 .thread = null,
                 .thread_id = null,
                 .accepting = true,
-                .head = null,
-                .tail = null,
+                .jobs = .{},
             };
             errdefer {
                 self.cond.deinit();
@@ -195,13 +196,7 @@ pub fn ActorWithFinish(
 
         /// Pushes to the queue while inside the mutex.
         fn pushLocked(self: *Self, job: *Job) void {
-            job.next = null;
-            if (self.tail) |tail| {
-                tail.next = job;
-            } else {
-                self.head = job;
-            }
-            self.tail = job;
+            self.jobs.append(job);
             self.cond.broadcast();
         }
 
@@ -209,16 +204,10 @@ pub fn ActorWithFinish(
             self.mutex.lock();
             defer self.mutex.unlock();
 
-            while (self.head == null) {
+            while (self.jobs.head == null) {
                 self.cond.wait(&self.mutex);
             }
-            const job = self.head.?;
-            self.head = job.next;
-            if (self.head == null) {
-                self.tail = null;
-            }
-            job.next = null;
-            return job;
+            return self.jobs.take().?;
         }
 
         fn run(self: *Self) void {

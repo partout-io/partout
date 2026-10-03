@@ -161,34 +161,15 @@ pub const Completion = struct {
 /// Intrusive FIFO of synchronous command completions.
 /// The queue is not thread-safe; callers must synchronize access.
 pub const CompletionQueue = struct {
-    head: ?*Completion = null,
-    tail: ?*Completion = null,
+    pending: core.Fifo(Completion) = .{},
 
-    pub fn append(
-        self: *CompletionQueue,
-        completion: *Completion,
-        failure: ?CompletionError,
-    ) void {
+    pub fn append(self: *CompletionQueue, completion: *Completion, failure: ?CompletionError) void {
         completion.failure = failure;
-        completion.next = null;
-        if (self.tail) |tail| {
-            tail.next = completion;
-        } else {
-            self.head = completion;
-        }
-        self.tail = completion;
+        self.pending.append(completion);
     }
 
     pub fn releaseAll(self: *CompletionQueue) void {
-        var current = self.head;
-        while (current) |completion| {
-            const next = completion.next;
-            completion.next = null;
-            completion.done = true;
-            current = next;
-        }
-        self.head = null;
-        self.tail = null;
+        while (self.pending.take()) |completion| completion.done = true;
     }
 };
 
@@ -242,24 +223,14 @@ pub const CommandNode = struct {
 
 /// A plain FIFO for the pending worker commands. Not thread-safe.
 pub const CommandQueue = struct {
-    head: ?*CommandNode = null,
-    tail: ?*CommandNode = null,
+    pending: core.Fifo(CommandNode) = .{},
 
     pub fn append(self: *CommandQueue, node: *CommandNode) void {
-        node.next = null;
-        if (self.tail) |tail| {
-            tail.next = node;
-        } else {
-            self.head = node;
-        }
-        self.tail = node;
+        self.pending.append(node);
     }
 
     pub fn takeReady(self: *CommandQueue) ?*CommandNode {
-        const pending = self.head;
-        self.head = null;
-        self.tail = null;
-        return pending;
+        return self.pending.takeAll();
     }
 };
 
@@ -284,8 +255,7 @@ pub const WriteQueue = struct {
     allocator: std.mem.Allocator,
 
     // Owned FIFO and partial head progress.
-    head: ?*WriteNode = null,
-    tail: ?*WriteNode = null,
+    packets: core.Fifo(WriteNode) = .{},
     offset: usize = 0,
 
     pub fn init(allocator: std.mem.Allocator) WriteQueue {
@@ -293,44 +263,28 @@ pub const WriteQueue = struct {
     }
 
     pub fn deinit(self: *WriteQueue) void {
-        destroyList(self.allocator, self.head);
-        self.head = null;
-        self.tail = null;
+        destroyList(self.allocator, self.packets.takeAll());
         self.offset = 0;
     }
 
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
     pub fn append(self: *WriteQueue, packets: Packets, destination: ?io.SocketAddress) std.mem.Allocator.Error!void {
-        var new_head: ?*WriteNode = null;
-        var new_tail: ?*WriteNode = null;
-        errdefer destroyList(self.allocator, new_head);
+        var batch = core.Fifo(WriteNode){};
+        errdefer destroyList(self.allocator, batch.takeAll());
 
         for (packets) |packet| {
             const copy = try self.allocator.dupe(u8, packet);
             errdefer self.allocator.free(copy);
             const node = try self.allocator.create(WriteNode);
             node.* = .{ .data = copy, .address = destination };
-            if (new_tail) |tail| {
-                tail.next = node;
-            } else {
-                new_head = node;
-            }
-            new_tail = node;
+            batch.append(node);
         }
-
-        if (new_head) |head| {
-            if (self.tail) |tail| {
-                tail.next = head;
-            } else {
-                self.head = head;
-            }
-            self.tail = new_tail;
-        }
+        self.packets.appendQueue(&batch);
     }
 
     /// Returns a borrowed view of the head packet and its current offset.
     pub fn pending(self: *const WriteQueue) ?PendingWrite {
-        const first = self.head orelse return null;
+        const first = self.packets.head orelse return null;
         return .{
             .data = first.data,
             .address = first.address,
@@ -340,7 +294,7 @@ pub const WriteQueue = struct {
 
     /// Advances the head packet and returns whether it was fully consumed.
     pub fn advance(self: *WriteQueue, written: usize) bool {
-        const first = self.head orelse {
+        const first = self.packets.head orelse {
             log.writeAndFailDebug("Ignoring advance on an empty WriteQueue");
             return true;
         };
@@ -352,8 +306,7 @@ pub const WriteQueue = struct {
             return false;
         }
 
-        self.head = first.next;
-        if (self.head == null) self.tail = null;
+        _ = self.packets.take();
         self.offset = 0;
         self.allocator.free(first.data);
         self.allocator.destroy(first);
