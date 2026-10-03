@@ -18,6 +18,8 @@ const Probe = struct {
     requested_port: u16,
     tun_reads: std.atomic.Value(usize) = .init(0),
     link_reads: std.atomic.Value(usize) = .init(0),
+    tun_calls: std.atomic.Value(usize) = .init(0),
+    link_calls: std.atomic.Value(usize) = .init(0),
     writes: std.atomic.Value(usize) = .init(0),
     cleaned: usize = 0,
     var current: *Probe = undefined;
@@ -50,15 +52,32 @@ const Probe = struct {
         .cleanup = cleanup,
         .last_error_code = lastError,
     };
-    fn receiveTun(_: i32, packet: [*c]const u8, size: u32) callconv(.c) i32 {
-        std.debug.assert(size == 4 and packet[0] == 0x45);
-        _ = current.tun_reads.fetchAdd(1, .release);
+    fn receiveTun(_: i32, packets: [*c]const c.wg_packet, count: u32) callconv(.c) i32 {
+        std.debug.assert(count > 0 and count <= c.WG_IO_MAX_BATCH);
+        for (packets[0..count]) |packet| std.debug.assert(packet.size == 4 and packet.data[0] == 0x45);
+        _ = current.tun_reads.fetchAdd(count, .release);
+        _ = current.tun_calls.fetchAdd(1, .release);
         return 0;
     }
-    fn receiveLink(_: i32, packet: [*c]const u8, size: u32, endpoint: [*c]const c.wg_endpoint) callconv(.c) i32 {
-        std.debug.assert(size == 3 and packet[0] == 1 and endpoint.*.port != 0);
-        _ = current.link_reads.fetchAdd(1, .release);
+    fn receiveLink(_: i32, packets: [*c]const c.wg_packet, endpoints: [*c]const c.wg_endpoint, count: u32) callconv(.c) i32 {
+        std.debug.assert(count > 0 and count <= c.WG_IO_MAX_BATCH);
+        for (packets[0..count], endpoints[0..count]) |packet, endpoint| std.debug.assert(packet.size == 3 and packet.data[0] == 1 and endpoint.port != 0);
+        _ = current.link_reads.fetchAdd(count, .release);
+        _ = current.link_calls.fetchAdd(1, .release);
         return 0;
+    }
+    fn submitBatches(raw: ?*anyopaque) anyerror!void {
+        const connection: *source.net_connection.Connection = @ptrCast(@alignCast(raw.?));
+        const count = c.WG_IO_MAX_BATCH + 1;
+        const tun_packets = [_][]const u8{&.{ 0x45, 1, 2, 3 }} ** count;
+        const link_packets = [_][]const u8{&.{ 1, 2, 3 }} ** count;
+        const addresses = [_]io.SocketAddress{.{ .family = 4, .port = 51820, .address = .{ 192, 0, 2, 1 } ++ .{0} ** 12 }} ** count;
+        try std.testing.expectEqual(.keep, connection.submitPackets(.tun, &tun_packets, null));
+        try std.testing.expectEqual(.keep, connection.submitPackets(.link, &link_packets, &addresses));
+        try std.testing.expectEqual(count, current.tun_reads.load(.acquire));
+        try std.testing.expectEqual(count, current.link_reads.load(.acquire));
+        try std.testing.expectEqual(@as(usize, 2), current.tun_calls.load(.acquire));
+        try std.testing.expectEqual(@as(usize, 2), current.link_calls.load(.acquire));
     }
     fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) source.net_sandbox.TunnelController.Error!io.TunWrapper {
         const ctrl: *source.mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
@@ -100,8 +119,8 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     Probe.current = &probe;
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
     var backend_table = fake_backend_vtable;
-    backend_table.receive_datagram = Probe.receiveLink;
-    backend_table.receive_tun_packet = Probe.receiveTun;
+    backend_table.receive_datagrams = Probe.receiveLink;
+    backend_table.receive_tun_packets = Probe.receiveTun;
     var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &backend_table });
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
@@ -140,8 +159,10 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     try std.testing.expect(fake.link != null and fake.tun != null);
     try std.testing.expectEqual(requested_port, fake.link.?.local_port);
     try wait(&fake.counts, 2);
+    var connection = owner.connection.?;
+    try owner.looper.perform(void, &connection, Probe.submitBatches);
     _ = libc.write(fds[1], &.{ 0x45, 1, 2, 3 }, 4);
-    try wait(&probe.tun_reads, 1);
+    try wait(&probe.tun_reads, c.WG_IO_MAX_BATCH + 2);
     var packet = [_]u8{ 0x60, 4, 5, 6 };
     try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &packet, packet.len));
     packet[0] = 0;
@@ -154,7 +175,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     address.address[0] = 127;
     address.address[3] = 1;
     _ = try peer.sendTo(&.{ 1, 2, 3 }, address);
-    try wait(&probe.link_reads, 1);
+    try wait(&probe.link_reads, c.WG_IO_MAX_BATCH + 2);
     monitor.onBetterPath();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());

@@ -47,8 +47,8 @@ pub const Backend = struct {
         socket_descriptors: *const fn (?*anyopaque, std.mem.Allocator, i32) Error![]net.SocketDescriptor,
         bump_sockets: *const fn (?*anyopaque, i32, bool) void,
         disable_roaming: *const fn (?*anyopaque, i32) void,
-        receive_datagram: ?*const fn (i32, [*c]const u8, u32, [*c]const wireguard_c.wg_endpoint) callconv(.c) i32 = null,
-        receive_tun_packet: ?*const fn (i32, [*c]const u8, u32) callconv(.c) i32 = null,
+        receive_datagrams: ?*const fn (i32, [*c]const wireguard_c.wg_packet, [*c]const wireguard_c.wg_endpoint, u32) callconv(.c) i32 = null,
+        receive_tun_packets: ?*const fn (i32, [*c]const wireguard_c.wg_packet, u32) callconv(.c) i32 = null,
     };
 
     pub fn turnOn(
@@ -124,8 +124,8 @@ const go_passive_backend_vtable = Backend.VTable{
     .socket_descriptors = cSocketDescriptorsPassive,
     .bump_sockets = cBumpSocketsPassive,
     .disable_roaming = cDisableRoamingPassive,
-    .receive_datagram = wireguard_c.pp_wg_receive_datagram,
-    .receive_tun_packet = wireguard_c.pp_wg_receive_tun_packet,
+    .receive_datagrams = wireguard_c.pp_wg_receive_datagrams,
+    .receive_tun_packets = wireguard_c.pp_wg_receive_tun_packets,
 };
 
 fn cTurnOn(

@@ -208,19 +208,29 @@ func TestPassiveEndpointAndInvalidArguments(t *testing.T) {
 	if _, err := endpointFromC(&native); err == nil {
 		t.Fatal("invalid family accepted")
 	}
-	if wgReceiveDatagram(-1, nil, 0, nil) != -1 {
+	if wgReceiveDatagrams(-1, nil, nil, 1) != -1 {
 		t.Fatal("invalid endpoint status")
 	}
 	native = endpointToC(netip.MustParseAddrPort("127.0.0.1:1"))
-	if wgReceiveDatagram(-1, nil, 0, &native) != -2 {
+	packets, sources := newDatagramBatch(wgReceiveDatagrams, 1)
+	sources[0] = native
+	if wgReceiveDatagrams(-1, &packets[0], &sources[0], 1) != -2 {
 		t.Fatal("stale handle status")
 	}
-	if wgReceiveDatagram(-1, nil, 1, &native) != -1 {
+	packets[0].size = 1
+	if wgReceiveDatagrams(-1, &packets[0], &sources[0], 1) != -1 {
 		t.Fatal("null payload accepted")
 	}
-	if wgReceiveDatagram(-1, nil, 65536, &native) != -1 {
+	packets[0].size = 65536
+	if wgReceiveDatagrams(-1, &packets[0], &sources[0], 1) != -1 {
 		t.Fatal("oversize payload accepted")
 	}
+}
+
+// Infer C descriptor types from the exported signature: Go test files cannot
+// import C directly.
+func newDatagramBatch[H, P, E, N, R any](_ func(H, *P, *E, N) R, count int) ([]P, []E) {
+	return make([]P, count), make([]E, count)
 }
 
 func TestPassiveConcurrentLifecycle(t *testing.T) {
@@ -262,28 +272,44 @@ func TestPassiveReceiveABI(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := endpointToC(netip.MustParseAddrPort("192.0.2.1:51820"))
-	if status := wgReceiveDatagram(handle, &source.address[0], 4, &source); status != 0 {
+	packets, sources := newDatagramBatch(wgReceiveDatagrams, 2)
+	packets[0].data, packets[0].size = &source.address[0], 4
+	sources[0], sources[1] = source, source
+	// A malformed later entry must not enqueue the valid first packet.
+	packets[1].size = 1
+	if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 2); status != -1 || len(b.session.packets) != 0 {
+		t.Fatal("invalid batch was partially accepted", status)
+	}
+	packets[1].size = 0
+	if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 2); status != 0 {
 		t.Fatal(status)
 	}
 	source.address[0] = 0
+	sources[0].address[0] = 0
 	got, ep, err := readOne(fns[0])
 	if err != nil || !bytes.Equal(got, []byte{192, 0, 2, 1}) || ep.DstToString() != "192.0.2.1:51820" {
 		t.Fatal(got, ep, err)
 	}
-	for i := 0; i < passiveQueueSize; i++ {
-		if status := wgReceiveDatagram(handle, nil, 0, &source); status != 0 {
+	got, _, err = readOne(fns[0])
+	if err != nil || len(got) != 0 {
+		t.Fatal("empty datagram lost", got, err)
+	}
+	packets[0].data, packets[0].size = nil, 0
+	for i := 0; i < passiveQueueSize-1; i++ {
+		if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 1); status != 0 {
 			t.Fatal(status)
 		}
 	}
-	if status := wgReceiveDatagram(handle, nil, 0, &source); status != -3 {
+	// Only one slot remains: accept the prefix and drop the suffix.
+	if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 2); status != -3 || len(b.session.packets) != passiveQueueSize {
 		t.Fatal(status)
 	}
 	b.Close()
-	if status := wgReceiveDatagram(handle, nil, 0, &source); status != -2 {
+	if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 2); status != -2 {
 		t.Fatal(status)
 	}
 	wgTurnOffWithPassiveIO(handle)
-	if status := wgReceiveDatagram(handle, nil, 0, &source); status != -2 {
+	if status := wgReceiveDatagrams(handle, &packets[0], &sources[0], 2); status != -2 {
 		t.Fatal(status)
 	}
 }

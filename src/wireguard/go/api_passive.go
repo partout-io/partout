@@ -128,32 +128,63 @@ func wgDisableRoamingWithPassiveIO(handle int32) {
 	}
 }
 
-//export wgReceiveDatagram
-func wgReceiveDatagram(handle C.int32_t, packet *C.uint8_t, size C.uint32_t, source *C.wg_endpoint) C.int32_t {
-	if size > passiveMaxDatagram || (size != 0 && packet == nil) {
+//export wgReceiveDatagrams
+func wgReceiveDatagrams(handle C.int32_t, packets *C.wg_packet, sources *C.wg_endpoint, count C.uint32_t) C.int32_t {
+	if count > C.WG_IO_MAX_BATCH || (count != 0 && (packets == nil || sources == nil)) {
 		return C.WG_IO_INVALID
 	}
-	address, err := endpointFromC(source)
-	if err != nil {
-		return C.WG_IO_INVALID
+	if count == 0 {
+		return C.WG_IO_OK
 	}
-	tunnel, ok := lookupPassiveBackend(int32(handle))
+	batch := unsafe.Slice(packets, int(count))
+	endpoints := unsafe.Slice(sources, int(count))
+	var addresses [C.WG_IO_MAX_BATCH]netip.AddrPort
+	for i, packet := range batch {
+		if packet.size > passiveMaxDatagram || (packet.size != 0 && packet.data == nil) {
+			return C.WG_IO_INVALID
+		}
+		address, err := endpointFromC(&endpoints[i])
+		if err != nil {
+			return C.WG_IO_INVALID
+		}
+		addresses[i] = address
+	}
+	backend, ok := lookupPassiveBackend(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
-	return passiveStatus(tunnel.bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size)), address))
+	for i, packet := range batch {
+		if err := backend.bind.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet.data)), int(packet.size)), addresses[i]); err != nil {
+			return passiveStatus(err)
+		}
+	}
+	return C.WG_IO_OK
 }
 
-//export wgReceiveTunPacket
-func wgReceiveTunPacket(handle C.int32_t, packet *C.uint8_t, size C.uint32_t) C.int32_t {
-	if size == 0 || size > passiveMaxDatagram || packet == nil {
+//export wgReceiveTunPackets
+func wgReceiveTunPackets(handle C.int32_t, packets *C.wg_packet, count C.uint32_t) C.int32_t {
+	if count > C.WG_IO_MAX_BATCH || (count != 0 && packets == nil) {
 		return C.WG_IO_INVALID
 	}
-	tunnel, ok := lookupPassiveBackend(int32(handle))
+	if count == 0 {
+		return C.WG_IO_OK
+	}
+	batch := unsafe.Slice(packets, int(count))
+	for _, packet := range batch {
+		if packet.size == 0 || packet.size > passiveMaxDatagram || packet.data == nil {
+			return C.WG_IO_INVALID
+		}
+	}
+	backend, ok := lookupPassiveBackend(int32(handle))
 	if !ok {
 		return C.WG_IO_CLOSED
 	}
-	return passiveStatus(tunnel.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet)), int(size))))
+	for _, packet := range batch {
+		if err := backend.tun.enqueue(unsafe.Slice((*byte)(unsafe.Pointer(packet.data)), int(packet.size))); err != nil {
+			return passiveStatus(err)
+		}
+	}
+	return C.WG_IO_OK
 }
 
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {

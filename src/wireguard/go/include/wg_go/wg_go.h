@@ -45,17 +45,16 @@ extern void wgTurnOffWithPassiveIO(int32_t handle);
 extern char *wgGetConfigWithPassiveIO(int32_t handle);
 extern void wgDisableRoamingWithPassiveIO(int32_t handle);
 
-/* Host -> Go: copy one UDP datagram and its source into a bounded queue.
- * Thread-safe and never waits for queue space. Returns WG_IO_*; QUEUE_FULL
- * means this datagram was dropped. At most 256 datagrams of up to 65535 bytes
- * are queued. size zero permits a null packet. No pointers are retained.
- * Detach/synchronize host reads before transport replacement; Close/Open
- * discards queued packets but does not identify late reads from an old socket.
- * Stop/join host producers before releasing their context during shutdown. */
-extern int32_t wgReceiveDatagram(int32_t handle, const uint8_t *packet,
-    uint32_t size, const wg_endpoint *source);
-
-/* Host -> Go: copy one raw IP packet read from the tunnel (1..65535 bytes).
- * Bounded to 256 packets; nonblocking and thread-safe, returns WG_IO_*.
- * QUEUE_FULL drops this packet. No pointers are retained. */
-extern int32_t wgReceiveTunPacket(int32_t handle, const uint8_t *packet, uint32_t size);
+/* Host -> Go: copy UDP datagrams (0..65535 bytes) or raw IP packets
+ * (1..65535 bytes) into bounded 256-packet queues. Empty UDP payloads may
+ * have null data pointers. Thread-safe; never waits for queue space.
+ * count must be 0..WG_IO_MAX_BATCH; zero is a no-op. Nonempty batches require
+ * packet arrays and, for UDP, one source per packet. All inputs are validated
+ * before enqueueing. INVALID accepts nothing. Enqueueing preserves order;
+ * QUEUE_FULL/CLOSED may accept a prefix and discard the remainder. Do not retry
+ * the batch. OK means every packet was accepted, not necessarily delivered.
+ * Payloads are copied; arrays and payloads are borrowed only until return.
+ * Synchronize host reads before transport replacement or shutdown. */
+extern int32_t wgReceiveDatagrams(int32_t handle, const wg_packet *packets,
+    const wg_endpoint *sources, uint32_t count);
+extern int32_t wgReceiveTunPackets(int32_t handle, const wg_packet *packets, uint32_t count);

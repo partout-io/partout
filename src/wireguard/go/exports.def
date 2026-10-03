@@ -15,5 +15,5 @@ wgTurnOnWithPassiveIO
 wgTurnOffWithPassiveIO
 wgGetConfigWithPassiveIO
 wgDisableRoamingWithPassiveIO
-wgReceiveDatagram
-wgReceiveTunPacket
+wgReceiveDatagrams
+wgReceiveTunPackets

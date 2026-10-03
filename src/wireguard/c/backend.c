@@ -90,12 +90,12 @@ void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
     wgDisableRoamingWithPassiveIO(handle);
 }
 
-int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {
-    return wgReceiveDatagram(handle, packet, size, source);
+int32_t pp_wg_receive_datagrams(int32_t handle, const wg_packet *packets, const wg_endpoint *sources, uint32_t count) {
+    return wgReceiveDatagrams(handle, packets, sources, count);
 }
 
-int32_t pp_wg_receive_tun_packet(int32_t handle, const uint8_t *packet, uint32_t size) {
-    return wgReceiveTunPacket(handle, packet, size);
+int32_t pp_wg_receive_tun_packets(int32_t handle, const wg_packet *packets, uint32_t count) {
+    return wgReceiveTunPackets(handle, packets, count);
 }
 
 #else
@@ -181,13 +181,13 @@ void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
     (void)handle;
 }
 
-int32_t pp_wg_receive_datagram(int32_t handle, const uint8_t *packet, uint32_t size, const wg_endpoint *source) {
-    (void)handle; (void)packet; (void)size; (void)source;
+int32_t pp_wg_receive_datagrams(int32_t handle, const wg_packet *packets, const wg_endpoint *sources, uint32_t count) {
+    (void)handle; (void)packets; (void)sources; (void)count;
     return WG_IO_CLOSED;
 }
 
-int32_t pp_wg_receive_tun_packet(int32_t handle, const uint8_t *packet, uint32_t size) {
-    (void)handle; (void)packet; (void)size;
+int32_t pp_wg_receive_tun_packets(int32_t handle, const wg_packet *packets, uint32_t count) {
+    (void)handle; (void)packets; (void)count;
     return WG_IO_CLOSED;
 }
 

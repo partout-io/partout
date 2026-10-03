@@ -17,11 +17,18 @@ typedef struct wg_endpoint {
 } wg_endpoint;
 
 enum {
+    WG_IO_MAX_BATCH = 256,
     WG_IO_OK = 0,
     WG_IO_INVALID = -1,
     WG_IO_CLOSED = -2,
     WG_IO_QUEUE_FULL = -3
 };
+
+/* Borrowed input payload; no pointer is retained after receive returns. */
+typedef struct wg_packet {
+    const uint8_t *data;
+    uint32_t size;
+} wg_packet;
 
 /* Go -> host: transmit one UDP datagram. Return zero once copied/accepted,
  * nonzero on failure. The callback may run concurrently on Go worker threads.

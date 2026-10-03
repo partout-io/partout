@@ -18,7 +18,7 @@ pub const PassiveIO = struct {
 
     pub fn start(self: *PassiveIO, remote: net.RemoteDescriptor, mtu: u32, settings: [:0]const u8) !void {
         if (self.handle >= 0 or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
-        if (self.backend.vtable.receive_datagram == null or self.backend.vtable.receive_tun_packet == null) return error.TransportFailure;
+        if (self.backend.vtable.receive_datagrams == null or self.backend.vtable.receive_tun_packets == null) return error.TransportFailure;
         self.looper = remote.looper;
         self.active.store(true, .release);
         errdefer self.active.store(false, .release);
@@ -42,15 +42,32 @@ pub const PassiveIO = struct {
 
     pub fn receiveTun(self: *PassiveIO, packets: net.Looper.Packets) !void {
         if (!self.active.load(.acquire)) return;
-        for (packets) |packet| try checkStatus(self.backend.vtable.receive_tun_packet.?(self.handle, packet.ptr, @intCast(packet.len)));
+        var batch: [c.WG_IO_MAX_BATCH]c.wg_packet = undefined;
+        var offset: usize = 0;
+        while (offset < packets.len) {
+            const count = @min(batch.len, packets.len - offset);
+            for (packets[offset..][0..count], batch[0..count]) |packet, *entry| {
+                entry.* = .{ .data = packet.ptr, .size = @intCast(packet.len) };
+            }
+            try checkStatus(self.backend.vtable.receive_tun_packets.?(self.handle, &batch, @intCast(count)));
+            offset += count;
+        }
     }
 
     pub fn receiveLink(self: *PassiveIO, packets: net.Looper.Packets, sources: []const net.SocketAddress) !void {
         if (!self.active.load(.acquire)) return;
         if (packets.len != sources.len) return error.TransportFailure;
-        for (packets, sources) |packet, source| {
-            const endpoint = toEndpoint(source);
-            try checkStatus(self.backend.vtable.receive_datagram.?(self.handle, packet.ptr, @intCast(packet.len), &endpoint));
+        var batch: [c.WG_IO_MAX_BATCH]c.wg_packet = undefined;
+        var endpoints: [c.WG_IO_MAX_BATCH]Endpoint = undefined;
+        var offset: usize = 0;
+        while (offset < packets.len) {
+            const count = @min(batch.len, packets.len - offset);
+            for (packets[offset..][0..count], sources[offset..][0..count], batch[0..count], endpoints[0..count]) |packet, source, *entry, *endpoint| {
+                entry.* = .{ .data = packet.ptr, .size = @intCast(packet.len) };
+                endpoint.* = toEndpoint(source);
+            }
+            try checkStatus(self.backend.vtable.receive_datagrams.?(self.handle, &batch, &endpoints, @intCast(count)));
+            offset += count;
         }
     }
 
