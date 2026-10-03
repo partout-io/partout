@@ -1383,8 +1383,8 @@ pub const PosixLooper = struct {
         native_io: io_posix.POSIXInterface,
 
         // User callbacks.
-        on_failure: ?helpers.OnFailure,
         on_read: ?helpers.OnRead,
+        on_failure: ?helpers.OnFailure,
         read_buffers: ?helpers.ReadBuffers,
         read_packets: []helpers.Packet,
         read_addresses: []io.SocketAddress,
