@@ -41,7 +41,7 @@ pub const Looper = struct {
     pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,
-    read_storage: [2]?*ReadStorage = .{ null, null },
+    read_storage: [2]?*LegacyReadStorage = .{ null, null },
 
     implementation: if (runtime_policy.v2_only) union(enum) {
         experimental: experimental.Looper,
@@ -56,9 +56,9 @@ pub const Looper = struct {
     }
 
     pub fn initExperimental(allocator: std.mem.Allocator, options: Options) InitError!Looper {
-        const link = try ReadStorage.create(allocator, options, options.link_buf_size);
+        const link = try LegacyReadStorage.create(allocator, options, options.link_buf_size);
         errdefer link.destroy();
-        const tun = try ReadStorage.create(allocator, options, options.tun_buf_size);
+        const tun = try LegacyReadStorage.create(allocator, options, options.tun_buf_size);
         errdefer tun.destroy();
         return .{
             .allocator = allocator,
@@ -157,8 +157,8 @@ pub const Looper = struct {
             };
             if (self.read_storage[index]) |storage| resolved.read_buffers = .{
                 .context = storage,
-                .acquire = ReadStorage.acquire,
-                .release = ReadStorage.release,
+                .acquire = LegacyReadStorage.acquire,
+                .release = LegacyReadStorage.release,
             };
         }
         return switch (self.implementation) {
@@ -198,11 +198,11 @@ pub const Looper = struct {
             inline else => |*impl| {
                 if (@TypeOf(impl.*) == experimental.Looper) {
                     if (packets.len == 0) return;
-                    const copy = try WriteCopy.create(self.allocator, packets);
+                    const copy = try LegacyWriteCopy.create(self.allocator, packets);
                     errdefer copy.destroy();
                     impl.writeQueued(copy.packets, side, destination, .{
                         .context = copy,
-                        .callback = WriteCopy.complete,
+                        .callback = LegacyWriteCopy.complete,
                     }) catch |err| switch (err) {
                         error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
                         else => |failure| return failure,
@@ -230,12 +230,12 @@ pub const Looper = struct {
 
 // Compatibility storage for callers that still use the copying facade. The v2
 // looper itself only borrows these buffers; they outlive its worker and callbacks.
-const ReadStorage = struct {
+const LegacyReadStorage = struct {
     allocator: std.mem.Allocator,
     bytes: []u8,
     buffers: []helpers.ReadBuffer,
 
-    fn create(allocator: std.mem.Allocator, options: helpers.Options, buffer_size: usize) std.mem.Allocator.Error!*ReadStorage {
+    fn create(allocator: std.mem.Allocator, options: helpers.Options, buffer_size: usize) std.mem.Allocator.Error!*LegacyReadStorage {
         const size = @max(1, buffer_size);
         const count = @min(options.max_read_count, @max(1, options.max_read_size / size));
         const bytes = try allocator.alloc(u8, std.math.mul(usize, count, size) catch return error.OutOfMemory);
@@ -243,12 +243,12 @@ const ReadStorage = struct {
         const buffers = try allocator.alloc(helpers.ReadBuffer, count);
         errdefer allocator.free(buffers);
         for (buffers, 0..) |*buffer, index| buffer.* = .{ .data = bytes[index * size ..][0..size] };
-        const self = try allocator.create(ReadStorage);
+        const self = try allocator.create(LegacyReadStorage);
         self.* = .{ .allocator = allocator, .bytes = bytes, .buffers = buffers };
         return self;
     }
 
-    fn destroy(self: *ReadStorage) void {
+    fn destroy(self: *LegacyReadStorage) void {
         const allocator = self.allocator;
         allocator.free(self.buffers);
         allocator.free(self.bytes);
@@ -256,18 +256,18 @@ const ReadStorage = struct {
     }
 
     fn acquire(raw: ?*anyopaque) []helpers.ReadBuffer {
-        const self: *ReadStorage = @ptrCast(@alignCast(raw.?));
+        const self: *LegacyReadStorage = @ptrCast(@alignCast(raw.?));
         return self.buffers;
     }
 
     fn release(_: ?*anyopaque, _: []helpers.ReadBuffer, _: helpers.IOResult) void {}
 };
 
-const WriteCopy = struct {
+const LegacyWriteCopy = struct {
     allocator: std.mem.Allocator,
     packets: []helpers.Packet,
 
-    fn create(allocator: std.mem.Allocator, packets: helpers.Packets) std.mem.Allocator.Error!*WriteCopy {
+    fn create(allocator: std.mem.Allocator, packets: helpers.Packets) std.mem.Allocator.Error!*LegacyWriteCopy {
         const copies = try allocator.alloc(helpers.Packet, packets.len);
         errdefer allocator.free(copies);
         var copied: usize = 0;
@@ -276,12 +276,12 @@ const WriteCopy = struct {
             copy.* = try allocator.dupe(u8, packet);
             copied += 1;
         }
-        const self = try allocator.create(WriteCopy);
+        const self = try allocator.create(LegacyWriteCopy);
         self.* = .{ .allocator = allocator, .packets = copies };
         return self;
     }
 
-    fn destroy(self: *WriteCopy) void {
+    fn destroy(self: *LegacyWriteCopy) void {
         const allocator = self.allocator;
         for (self.packets) |packet| allocator.free(packet);
         allocator.free(self.packets);
@@ -289,7 +289,7 @@ const WriteCopy = struct {
     }
 
     fn complete(raw: ?*anyopaque, _: helpers.IOResult) void {
-        const self: *WriteCopy = @ptrCast(@alignCast(raw.?));
+        const self: *LegacyWriteCopy = @ptrCast(@alignCast(raw.?));
         self.destroy();
     }
 };
