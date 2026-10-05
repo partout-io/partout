@@ -6,7 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
-const io = @import("io_common.zig");
+const io = @import("io.zig");
 const io_c = io.io_c;
 const log = core.logging;
 
@@ -17,7 +17,10 @@ pub const WindowsLooper = struct {
     // Worker thread.
     actor: *Actor,
 
-    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
+    pub fn create(
+        allocator: std.mem.Allocator,
+        options: helpers.Options,
+    ) helpers.InitError!*WindowsLooper {
         const self = try allocator.create(WindowsLooper);
         errdefer allocator.destroy(self);
         const actor = Actor.create(allocator, self) catch return error.OutOfMemory;
@@ -50,7 +53,10 @@ pub const WindowsLooper = struct {
         callback: *const fn (?*anyopaque) anyerror!Result,
     ) anyerror!Result {
         var task = Task(Result){ .context = context, .callback = callback };
-        return self.actor.perform(Result, .{ .perform = &task }) catch |err| switch (err) {
+        return self.actor.perform(
+            Result,
+            .{ .perform = &task },
+        ) catch |err| switch (err) {
             error.Closed => error.LooperUnavailable,
             else => err,
         };
@@ -75,9 +81,13 @@ pub const WindowsLooper = struct {
         // FIXME: ###, Implement timers
     }
 
-    pub fn attach(self: *WindowsLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
-        _ = self;
-        _ = arguments;
+    pub fn attach(
+        self: *WindowsLooper,
+        arguments: helpers.AttachArguments,
+    ) helpers.AttachError!void {
+        if (arguments.read_buffers == null or self.options.max_read_count == 0) {
+            return error.InvalidBuffers;
+        }
         // if (udp) {
         //     udp.MessageReceived() {
         //         self.actor.schedule(side.onLinkRead)
@@ -85,6 +95,16 @@ pub const WindowsLooper = struct {
         // } else if tcp {
         //     tcp.readAsync(onComplete: onTCP)
         // }
+        return error.LooperUnavailable;
+    }
+
+    pub fn writeQueued(
+        _: *WindowsLooper,
+        _: helpers.Packets,
+        _: io.Side,
+        _: ?io.SocketAddress,
+        _: helpers.OnWriteComplete,
+    ) helpers.WriteError!void {
         return error.LooperUnavailable;
     }
 
@@ -103,16 +123,6 @@ pub const WindowsLooper = struct {
     }
 
     pub fn resumeReading(_: *WindowsLooper, _: io.Side) helpers.ResumeReadingError!void {
-        return error.LooperUnavailable;
-    }
-
-    pub fn writeQueued(
-        _: *WindowsLooper,
-        _: helpers.Packets,
-        _: io.Side,
-        _: ?io.SocketAddress,
-    ) helpers.WriteError!void {
-        // FIXME: ###, Implement socket write
         return error.LooperUnavailable;
     }
 

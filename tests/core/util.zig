@@ -6,6 +6,48 @@ const std = @import("std");
 
 const util = @import("source").core.util;
 
+test "FIFO preserves order, unlinks popped nodes, and supports reuse" {
+    const Node = struct { next: ?*@This() = null };
+    var queue = util.Fifo(Node){};
+    var first = Node{};
+    var second = Node{};
+    try std.testing.expect(queue.take() == null);
+    queue.append(&first);
+    queue.append(&second);
+    try std.testing.expect(queue.take() == &first);
+    try std.testing.expect(first.next == null);
+    queue.append(&first);
+    try std.testing.expect(queue.take() == &second);
+    try std.testing.expect(queue.take() == &first);
+    try std.testing.expect(queue.head == null and queue.tail == null);
+}
+
+test "FIFO detaches chains and moves queues without sharing ownership" {
+    const Node = struct { next: ?*@This() = null };
+    var queue = util.Fifo(Node){};
+    var pending = util.Fifo(Node){};
+    var first = Node{};
+    var second = Node{};
+    var third = Node{};
+    queue.appendQueue(&pending);
+    pending.append(&first);
+    queue.appendQueue(&pending);
+    try std.testing.expect(pending.head == null and pending.tail == null);
+    pending.append(&second);
+    pending.append(&third);
+    queue.appendQueue(&pending);
+    try std.testing.expect(pending.head == null and pending.tail == null);
+    const chain = queue.takeAll().?;
+    try std.testing.expect(chain == &first);
+    try std.testing.expect(chain.next == &second);
+    try std.testing.expect(chain.next.?.next == &third);
+    try std.testing.expect(third.next == null);
+    try std.testing.expect(queue.head == null and queue.tail == null);
+    queue.append(&first);
+    try std.testing.expect(queue.take() == &first);
+    try std.testing.expect(queue.takeAll() == null);
+}
+
 test "parses JSON without coercing numbers" {
     const allocator = std.testing.allocator;
     var parsed = try util.parseJsonValue(allocator,
