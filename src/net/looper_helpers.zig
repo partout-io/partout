@@ -161,11 +161,6 @@ pub const WriteOOBError = SubmissionError || io.Error || error{
     WriteIncomplete,
 };
 
-pub const IOError = io.Error || error{
-    Cancelled,
-    InvalidBuffers,
-};
-
 pub const CompletionError = std.mem.Allocator.Error || error{
     LooperUnavailable,
     MuxFailure,
@@ -357,11 +352,9 @@ pub const WriteQueue = struct {
 
 // I/O requests used by looper v2.
 
-/// Caller-owned storage. Only entries in the completed prefix have valid output.
-pub const ReadBuffer = struct {
-    data: []u8,
-    size: usize = 0,
-    source: ?io.SocketAddress = null,
+pub const IOError = io.Error || error{
+    Cancelled,
+    InvalidBuffers,
 };
 
 /// Number of whole packets processed, plus an optional failure. A partial
@@ -369,6 +362,13 @@ pub const ReadBuffer = struct {
 pub const IOResult = struct {
     count: usize = 0,
     failure: ?IOError = null,
+};
+
+/// Caller-owned storage. Only entries in the completed prefix have valid output.
+pub const ReadBuffer = struct {
+    data: []u8,
+    size: usize = 0,
+    source: ?io.SocketAddress = null,
 };
 
 /// Called exactly once for an accepted write request, on the looper without its lock.
