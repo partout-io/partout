@@ -55,7 +55,7 @@ pub const SocketWrapper = struct {
 
     // FIXME: ###, Supply the bound address and native handle with Windows I/O.
     pub fn localAddress(_: *const SocketWrapper) !io.SocketAddress {
-        return error.NotImplemented;
+        @panic("Windows SocketWrapper.localAddress is not implemented");
     }
 
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
@@ -71,7 +71,7 @@ pub const TunWrapper = struct {
 
     pub fn deinit(_: *TunWrapper) void {}
 
-    pub fn tunDescriptor(_: *TunWrapper) error{NotImplemented}!TunDescriptor {
-        return error.NotImplemented;
+    pub fn tunDescriptor(_: *TunWrapper) !TunDescriptor {
+        @panic("Windows TunWrapper.tunDescriptor is not implemented");
     }
 };

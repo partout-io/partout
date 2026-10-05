@@ -270,7 +270,7 @@ pub const Looper = struct {
             inline else => |*impl| {
                 if (@TypeOf(impl.*) == experimental.Looper)
                     return impl.writeQueued(packets, side, destination, completion);
-                return error.LooperUnavailable;
+                @panic("Borrowed writes require looper v2");
             },
         }
     }

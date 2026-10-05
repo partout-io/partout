@@ -429,44 +429,32 @@ test "v2 read failures and callback failures release buffers before detaching" {
     }
 }
 
-test "v2 rejected requests and Windows stubs do not invoke completions" {
+test "v2 rejected requests do not invoke completions" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     var completion = CompletionProbe{};
     var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try std.testing.expectError(error.LooperUnavailable, loop.writeQueued(&.{"x"}, .tun, null, completion.callback()));
     try loop.start();
-    if (builtin.os.tag == .windows) {
-        // Instantiate the additional ABI even before native Windows I/O exists.
-        var tun = io.TunWrapper{};
-        var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
-        try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
-            .pair = .{ .tun = .{ .tun = &tun } },
-        }));
-        try std.testing.expectError(error.LooperUnavailable, loop.attach(.{
-            .pair = .{ .tun = .{ .tun = &tun } },
-            .read_buffers = read.provider(),
-        }));
-    } else {
-        try std.testing.expectError(error.SideNotAttached, loop.writeQueued(&.{"x"}, .tun, null, completion.callback()));
-        try std.testing.expectError(error.InvalidBuffers, loop.writeQueued(&.{}, .tun, null, completion.callback()));
-        const fds = try pipe();
-        defer closePipe(fds);
-        var mock = Mock{ .fd = fds[0] };
-        try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
-            .pair = mock.pair(),
-        }));
-        try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
-            .pair = mock.pair(),
-            .on_read = .{ .callback = ReadProbe.read },
-        }));
-        try std.testing.expect(!loop.isTunAttached());
-        var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
-        try loop.attach(.{
-            .pair = mock.pair(),
-            .read_buffers = read.provider(),
-        });
-        try loop.detach(.tun);
-    }
+    try std.testing.expectError(error.SideNotAttached, loop.writeQueued(&.{"x"}, .tun, null, completion.callback()));
+    try std.testing.expectError(error.InvalidBuffers, loop.writeQueued(&.{}, .tun, null, completion.callback()));
+    const fds = try pipe();
+    defer closePipe(fds);
+    var mock = Mock{ .fd = fds[0] };
+    try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
+        .pair = mock.pair(),
+    }));
+    try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
+        .pair = mock.pair(),
+        .on_read = .{ .callback = ReadProbe.read },
+    }));
+    try std.testing.expect(!loop.isTunAttached());
+    var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
+    try loop.attach(.{
+        .pair = mock.pair(),
+        .read_buffers = read.provider(),
+    });
+    try loop.detach(.tun);
     try loop.stop();
     try std.testing.expectEqual(@as(usize, 0), completion.calls.load(.acquire));
 }

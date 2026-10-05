@@ -74,7 +74,7 @@ pub const WindowsLooper = struct {
         _: helpers.TimedTask,
     ) helpers.SubmissionError!void {
         // FIXME: ###, Implement timers
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.scheduleReplacing is not implemented");
     }
 
     pub fn cancelTimer(_: *WindowsLooper, _: *helpers.Timer) void {
@@ -95,7 +95,7 @@ pub const WindowsLooper = struct {
         // } else if tcp {
         //     tcp.readAsync(onComplete: onTCP)
         // }
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.attach is not implemented");
     }
 
     pub fn writeQueued(
@@ -105,13 +105,13 @@ pub const WindowsLooper = struct {
         _: ?io.SocketAddress,
         _: helpers.OnWriteComplete,
     ) helpers.WriteError!void {
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.writeQueued is not implemented");
     }
 
     pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
         _ = self;
         _ = side;
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.detach is not implemented");
     }
 
     pub fn isLinkAttached(_: *WindowsLooper) bool {
@@ -123,7 +123,7 @@ pub const WindowsLooper = struct {
     }
 
     pub fn resumeReading(_: *WindowsLooper, _: io.Side) helpers.ResumeReadingError!void {
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.resumeReading is not implemented");
     }
 
     pub fn writeOutOfBand(
@@ -133,7 +133,7 @@ pub const WindowsLooper = struct {
         _: ?io.SocketAddress,
     ) helpers.WriteOOBError!void {
         // FIXME: ###, Implement socket write
-        return error.LooperUnavailable;
+        @panic("WindowsLooper.writeOutOfBand is not implemented");
     }
 
     //#region Event loop
