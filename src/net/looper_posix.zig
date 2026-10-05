@@ -995,60 +995,20 @@ pub const PosixLooper = struct {
 
     fn processRead(self: *PosixLooper, side_io: *SideIO) ProcessOutcome {
         if (!side_io.is_reading) return .ok;
-        const provider = side_io.read_buffers;
 
         // Borrow storage only for this read attempt and the on_read callback.
-        const buffers = provider.acquire(provider.context);
-        var result = helpers.IOResult{};
-        defer provider.release(provider.context, buffers, result);
+        const buffers = side_io.acquireReadBuffers();
+        const result = side_io.readPackets(buffers, self.options.max_read_size);
+        defer side_io.releaseReadBuffers(buffers, result);
 
         var action: helpers.ReadAction = if (buffers.len == 0) .pause else .keep;
-        var size: usize = 0;
-        const limit = @min(buffers.len, side_io.read_packets.len);
-        for (buffers[0..limit]) |*buffer| {
-            if (buffer.data.len == 0) {
-                result.failure = error.InvalidBuffers;
-                break;
-            }
-            var address: io.SocketAddress = undefined;
-            const count = side_io.native_io.readPacket(
-                buffer.data,
-                &address,
-            ) catch |err| {
-                if (err != error.WouldBlock) {
-                    result.failure = err;
-                }
-                break;
-            } orelse break;
-
-            buffer.size = count;
-            buffer.source = null;
-            side_io.read_packets[result.count] = buffer.data[0..count];
-            if (side_io.read_addresses) |addresses| {
-                buffer.source = address;
-                addresses[result.count] = address;
-            }
-            result.count += 1;
-            size += count;
-            if (size >= self.options.max_read_size) break;
-        }
-
         if (result.count > 0) {
-            const addresses = if (side_io.read_addresses) |values|
-                values[0..result.count]
-            else
-                null;
-            if (side_io.on_read) |callback| {
-                action = callback.call(
-                    side_io.read_packets[0..result.count],
-                    addresses,
-                ) catch |err| return .{
-                    .side_failure = .{
-                        .side = side_io.side,
-                        .failure = .{ .user = err },
-                    },
-                };
-            }
+            action = side_io.notifyRead(result.count) catch |err| return .{
+                .side_failure = .{
+                    .side = side_io.side,
+                    .failure = .{ .user = err },
+                },
+            };
         }
         if (result.failure) |err| {
             return .{
@@ -1544,6 +1504,65 @@ pub const PosixLooper = struct {
                 request.complete(allocator, error.Cancelled);
             }
             allocator.destroy(self);
+        }
+
+        fn acquireReadBuffers(self: *const SideIO) []helpers.ReadBuffer {
+            return self.read_buffers.acquire(self.read_buffers.context);
+        }
+
+        fn releaseReadBuffers(
+            self: *const SideIO,
+            buffers: []helpers.ReadBuffer,
+            result: helpers.IOResult,
+        ) void {
+            self.read_buffers.release(self.read_buffers.context, buffers, result);
+        }
+
+        fn readPackets(
+            self: *SideIO,
+            buffers: []helpers.ReadBuffer,
+            max_size: usize,
+        ) helpers.IOResult {
+            var result = helpers.IOResult{};
+            var size: usize = 0;
+            const limit = @min(buffers.len, self.read_packets.len);
+            for (buffers[0..limit]) |*buffer| {
+                if (buffer.data.len == 0) {
+                    result.failure = error.InvalidBuffers;
+                    break;
+                }
+                var address: io.SocketAddress = undefined;
+                const count = self.native_io.readPacket(
+                    buffer.data,
+                    &address,
+                ) catch |err| {
+                    if (err != error.WouldBlock) {
+                        result.failure = err;
+                    }
+                    break;
+                } orelse break;
+
+                buffer.size = count;
+                buffer.source = null;
+                self.read_packets[result.count] = buffer.data[0..count];
+                if (self.read_addresses) |addresses| {
+                    buffer.source = address;
+                    addresses[result.count] = address;
+                }
+                result.count += 1;
+                size += count;
+                if (size >= max_size) break;
+            }
+            return result;
+        }
+
+        fn notifyRead(self: *const SideIO, count: usize) anyerror!helpers.ReadAction {
+            const callback = self.on_read orelse return .keep;
+            const addresses = if (self.read_addresses) |values|
+                values[0..count]
+            else
+                null;
+            return callback.call(self.read_packets[0..count], addresses);
         }
 
         fn resetEvents(self: *const SideIO) io.Error!void {
