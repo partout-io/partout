@@ -884,7 +884,7 @@ const ConnectionDaemon = struct {
     ) !void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
-        if (self.connection == null) return;
+        const connection = self.connection orelse return;
 
         self.tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
@@ -897,7 +897,7 @@ const ConnectionDaemon = struct {
             .pair = .{
                 .tun = descriptor,
             },
-            .read_buffers = self.connection.?.readBuffers(.tun),
+            .read_buffers = connection.readBuffers(.tun),
             .on_read = .{
                 .context = self,
                 .callback = onTunnelRead,
