@@ -131,8 +131,9 @@ pub const Timer = struct {
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
-    /// Required by v2 when on_read is set; ignored by v1.
+    /// Required by v2, including when on_read is null; ignored by v1.
     read_buffers: ?ReadBuffers = null,
+    /// If absent, incoming data is read and discarded.
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
 };

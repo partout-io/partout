@@ -180,13 +180,8 @@ pub const Looper = struct {
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
     pub fn attach(self: *Looper, arguments: AttachArguments) AttachError!void {
         var resolved = arguments;
-        // The original facade also drained input when no observer was installed.
-        if (self.implementation == .experimental and resolved.on_read == null) {
-            resolved.on_read = .{ .callback = discardRead };
-        }
-        // Keep this for compatibility until consumers don't provide the
-        // .read_buffers field themselves.
-        if (resolved.on_read != null and resolved.read_buffers == null) {
+        // Keep this for compatibility until consumers provide read_buffers.
+        if (resolved.read_buffers == null) {
             const index: usize = switch (resolved.pair) {
                 .link => 0,
                 .tun => 1,
@@ -262,14 +257,6 @@ pub const Looper = struct {
                 }
             },
         }
-    }
-
-    fn discardRead(
-        _: ?*anyopaque,
-        _: Packets,
-        _: ?[]const io.SocketAddress,
-    ) anyerror!ReadAction {
-        return .keep;
     }
 
     pub fn writeOutOfBand(

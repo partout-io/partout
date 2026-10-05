@@ -530,10 +530,8 @@ pub const PosixLooper = struct {
         self: *PosixLooper,
         arguments: helpers.AttachArguments,
     ) helpers.AttachError!void {
-        if (arguments.on_read != null) {
-            if (arguments.read_buffers == null or self.options.max_read_count == 0) {
-                return error.InvalidBuffers;
-            }
+        if (arguments.read_buffers == null or self.options.max_read_count == 0) {
+            return error.InvalidBuffers;
         }
         if (self.isReentrantLifecycleCall()) return error.ReentrantCall;
 
@@ -836,7 +834,7 @@ pub const PosixLooper = struct {
             self.queueCompletionLocked(completion, err);
             return;
         };
-        side_io.setRead(self.mux, side_io.on_read != null) catch {
+        side_io.syncEventMask() catch {
             log.writef(.err, "Unable to retain {}", .{side});
             _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
             side_io.destroyStorage(self.allocator);
@@ -861,7 +859,6 @@ pub const PosixLooper = struct {
 
     fn handleEnableReadLocked(self: *const PosixLooper, side: io.Side) io.Error!void {
         if (self.sideIO(side)) |side_io| {
-            if (side_io.on_read == null) return;
             try side_io.setRead(self.mux, true);
         } else {
             log.writef(.err, "Ignoring enableRead({}), not attached", .{side});
@@ -995,8 +992,7 @@ pub const PosixLooper = struct {
 
     fn processRead(self: *PosixLooper, side_io: *SideIO) ProcessOutcome {
         if (!side_io.is_reading) return .ok;
-        const on_read = side_io.on_read orelse return .ok;
-        const provider = side_io.read_buffers.?;
+        const provider = side_io.read_buffers;
 
         // Borrow storage only for this read attempt and the on_read callback.
         const buffers = provider.acquire(provider.context);
@@ -1039,15 +1035,17 @@ pub const PosixLooper = struct {
                 values[0..result.count]
             else
                 null;
-            action = on_read.call(
-                side_io.read_packets[0..result.count],
-                addresses,
-            ) catch |err| return .{
-                .side_failure = .{
-                    .side = side_io.side,
-                    .failure = .{ .user = err },
-                },
-            };
+            if (side_io.on_read) |callback| {
+                action = callback.call(
+                    side_io.read_packets[0..result.count],
+                    addresses,
+                ) catch |err| return .{
+                    .side_failure = .{
+                        .side = side_io.side,
+                        .failure = .{ .user = err },
+                    },
+                };
+            }
         }
         if (result.failure) |err| {
             return .{
@@ -1486,7 +1484,7 @@ pub const PosixLooper = struct {
         on_failure: ?helpers.OnFailure,
 
         // Borrowed payload provider and owned views for on_read.
-        read_buffers: ?helpers.ReadBuffers,
+        read_buffers: helpers.ReadBuffers,
         read_packets: []helpers.Packet,
         read_addresses: ?[]io.SocketAddress,
 
@@ -1506,11 +1504,10 @@ pub const PosixLooper = struct {
             arguments: helpers.AttachArguments,
             max_read_count: usize,
         ) std.mem.Allocator.Error!*SideIO {
-            const count = if (arguments.on_read != null) max_read_count else 0;
-            const packets = try allocator.alloc(helpers.Packet, count);
+            const packets = try allocator.alloc(helpers.Packet, max_read_count);
             errdefer allocator.free(packets);
             const addresses = if (descriptor.io.isUnconnected())
-                try allocator.alloc(io.SocketAddress, count)
+                try allocator.alloc(io.SocketAddress, max_read_count)
             else
                 null;
             errdefer {
@@ -1526,10 +1523,10 @@ pub const PosixLooper = struct {
                 .native_io = descriptor.io,
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
-                .read_buffers = arguments.read_buffers,
+                .read_buffers = arguments.read_buffers.?,
                 .read_packets = packets,
                 .read_addresses = addresses,
-                .is_reading = false,
+                .is_reading = true,
                 .is_writing = false,
                 .did_cleanup = false,
             };

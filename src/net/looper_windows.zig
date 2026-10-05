@@ -85,8 +85,9 @@ pub const WindowsLooper = struct {
         self: *WindowsLooper,
         arguments: helpers.AttachArguments,
     ) helpers.AttachError!void {
-        _ = self;
-        _ = arguments;
+        if (arguments.read_buffers == null or self.options.max_read_count == 0) {
+            return error.InvalidBuffers;
+        }
         // if (udp) {
         //     udp.MessageReceived() {
         //         self.actor.schedule(side.onLinkRead)
