@@ -284,7 +284,8 @@ const LegacyReadStorage = struct {
         buffer_size: usize,
     ) std.mem.Allocator.Error!*LegacyReadStorage {
         const size = @max(1, buffer_size);
-        const count = @min(options.max_read_count, @max(1, options.max_read_size / size));
+        // The byte limit applies to payload read, not reserved buffer capacity.
+        const count = options.max_read_count;
         const total_size = std.math.mul(
             usize,
             count,

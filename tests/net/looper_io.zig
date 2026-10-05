@@ -193,6 +193,60 @@ fn closePipe(fds: [2]std.c.fd_t) void {
     _ = libc.close(fds[1]);
 }
 
+test "v2 compatibility reads batch by packet count and actual bytes" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const RuntimeLooper = source.net_looper.Looper;
+    const Probe = struct {
+        count: Atomic = .init(0),
+
+        fn read(
+            raw: ?*anyopaque,
+            packets: RuntimeLooper.Packets,
+            _: ?[]const io.SocketAddress,
+        ) anyerror!RuntimeLooper.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.count.store(packets.len, .release);
+            return .pause;
+        }
+    };
+    for ([_]io.Side{ .link, .tun }) |side| {
+        for ([_]usize{ 256 * 1024, 32 }) |max_read_size| {
+            const fds = try pipe();
+            defer closePipe(fds);
+            var mock = Mock{ .fd = fds[0] };
+            var probe = Probe{};
+            var loop = try RuntimeLooper.initExperimental(allocator, .{
+                .on_finish = .{ .callback = finish },
+                .max_read_size = max_read_size,
+            });
+            defer loop.deinit();
+            try loop.start();
+            const payload = [_]u8{'x'} ** 128;
+            try std.testing.expectEqual(
+                @as(isize, payload.len),
+                std.c.write(fds[1], &payload, payload.len),
+            );
+            const descriptor = mock.pair().tun;
+            try loop.attach(.{
+                .pair = switch (side) {
+                    .link => .{ .link = descriptor },
+                    .tun => .{ .tun = descriptor },
+                },
+                .on_read = .{ .context = &probe, .callback = Probe.read },
+            });
+            for (0..5000) |_| {
+                if (probe.count.load(.acquire) != 0) break;
+                _ = libc.usleep(1000);
+            }
+            try loop.stop();
+            try std.testing.expectEqual(
+                @min(payload.len, max_read_size),
+                probe.count.load(.acquire),
+            );
+        }
+    }
+}
+
 test "v2 spontaneous reads reuse caller storage without submissions or allocations" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
