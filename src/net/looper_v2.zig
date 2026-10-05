@@ -7,9 +7,9 @@
 //! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
 //! at a stable address from `start()` until `stop()`/`deinit()` has completed.
 //! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). Packet slices passed to callbacks are borrowed
-//! for the duration of the callback. `writeQueued()` copies packet slices before
-//! queuing them.
+//! looper itself for `OnFinish`). Reads acquire caller-owned buffers on readiness
+//! and release them after on_read returns. Queued writes borrow descriptors and
+//! payloads until completion. No packet data is copied.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -26,10 +26,14 @@ pub const Looper = struct {
         @import("looper_posix.zig").PosixLooper;
 
     pub const Options = helpers.Options;
+    pub const ReadBuffer = helpers.ReadBuffer;
+    pub const IOResult = helpers.IOResult;
+    pub const OnWriteComplete = helpers.OnWriteComplete;
+    pub const ReadBuffers = helpers.ReadBuffers;
+    pub const OnRead = helpers.OnRead;
+    pub const ReadAction = helpers.ReadAction;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
-    pub const ReadAction = helpers.ReadAction;
-    pub const OnRead = helpers.OnRead;
     pub const Failure = helpers.Failure;
     pub const OnFailure = helpers.OnFailure;
     pub const OnFinish = helpers.OnFinish;
@@ -54,7 +58,10 @@ pub const Looper = struct {
     impl: *Impl,
 
     /// Allocates a looper whose storage is released by `destroy()`.
-    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*Looper {
+    pub fn create(
+        allocator: std.mem.Allocator,
+        options: Options,
+    ) helpers.InitError!*Looper {
         const self = try allocator.create(Looper);
         errdefer allocator.destroy(self);
         self.* = try init(allocator, options);
@@ -68,7 +75,7 @@ pub const Looper = struct {
         allocator.destroy(self);
     }
 
-    pub fn init(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!Looper {
+    pub fn init(allocator: std.mem.Allocator, options: Options) helpers.InitError!Looper {
         return .{
             .allocator = allocator,
             .impl = try Impl.create(allocator, options),
@@ -146,7 +153,7 @@ pub const Looper = struct {
     }
 
     /// Ownership of `arguments.pair.io` transfers only after successful attach.
-    pub fn attach(self: *Looper, arguments: helpers.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *Looper, arguments: AttachArguments) helpers.AttachError!void {
         return self.impl.attach(arguments);
     }
 
@@ -167,18 +174,27 @@ pub const Looper = struct {
         return self.impl.resumeReading(side);
     }
 
-    /// Copies one destination with every packet in the batch. Required for
-    /// unconnected UDP; ignored by connected sockets. Pass null for TUN writes.
+    /// Writes borrowed packets in FIFO order.
+    /// Borrows the entire packet slice, including descriptors, until completion.
+    /// The destination is stored by value.
+    /// Requires a nonempty batch and a destination for unconnected UDP.
+    /// See OnWriteComplete for lifetime and cancellation rules.
     pub fn writeQueued(
+        self: *Looper,
+        packets: Packets,
+        side: io.Side,
+        destination: ?io.SocketAddress,
+        completion: OnWriteComplete,
+    ) WriteError!void {
+        return self.impl.writeQueued(packets, side, destination, completion);
+    }
+
+    pub fn writeOutOfBand(
         self: *Looper,
         packets: helpers.Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
-    ) helpers.WriteError!void {
-        return self.impl.writeQueued(packets, side, destination);
-    }
-
-    pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {
+    ) helpers.WriteOOBError!void {
         return self.impl.writeOutOfBand(packets, side, destination);
     }
 };
