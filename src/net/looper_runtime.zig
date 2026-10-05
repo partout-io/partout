@@ -274,6 +274,8 @@ pub const Looper = struct {
 // Compatibility storage for callers that still use the copying facade. The v2
 // looper itself only borrows these buffers; they outlive its worker and callbacks.
 const LegacyReadStorage = struct {
+    const byte_budget = 1024 * 1024;
+
     allocator: std.mem.Allocator,
     bytes: []u8,
     buffers: []helpers.ReadBuffer,
@@ -284,8 +286,9 @@ const LegacyReadStorage = struct {
         buffer_size: usize,
     ) std.mem.Allocator.Error!*LegacyReadStorage {
         const size = @max(1, buffer_size);
-        // The byte limit applies to payload read, not reserved buffer capacity.
-        const count = options.max_read_count;
+        // Limit each side's pool, while retaining at least one full-size buffer.
+        // max_read_size separately limits actual payload read in each batch.
+        const count = @min(options.max_read_count, @max(1, byte_budget / size));
         const total_size = std.math.mul(
             usize,
             count,

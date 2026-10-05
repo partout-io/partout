@@ -121,6 +121,7 @@ const Mock = struct {
     fail_read: bool = false,
     fail_read_after: ?usize = null,
     reads: usize = 0,
+    read_capacity: usize = 0,
     partial_once: bool = false,
     fail_after: ?usize = null,
     writes: usize = 0,
@@ -135,6 +136,7 @@ const Mock = struct {
         var byte: [1]u8 = undefined;
         if (std.c.read(self.fd, &byte, 1) != 1) return error.WouldBlock;
         self.reads += 1;
+        self.read_capacity = data.len;
         self.read_matched = data.ptr == self.expected_read;
         data[0] = byte[0];
         return 1;
@@ -193,11 +195,12 @@ fn closePipe(fds: [2]std.c.fd_t) void {
     _ = libc.close(fds[1]);
 }
 
-test "v2 compatibility reads batch by packet count and actual bytes" {
+test "v2 compatibility reads bound batches and drain remaining packets" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const RuntimeLooper = source.net_looper.Looper;
     const Probe = struct {
-        count: Atomic = .init(0),
+        total: Atomic = .init(0),
+        first_count: usize = 0,
 
         fn read(
             raw: ?*anyopaque,
@@ -205,45 +208,96 @@ test "v2 compatibility reads batch by packet count and actual bytes" {
             _: ?[]const io.SocketAddress,
         ) anyerror!RuntimeLooper.ReadAction {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.count.store(packets.len, .release);
-            return .pause;
+            for (packets) |packet| {
+                try std.testing.expectEqualStrings("x", packet);
+            }
+            if (self.first_count == 0) self.first_count = packets.len;
+            _ = self.total.fetchAdd(packets.len, .release);
+            return .keep;
         }
     };
     for ([_]io.Side{ .link, .tun }) |side| {
-        for ([_]usize{ 256 * 1024, 32 }) |max_read_size| {
-            const fds = try pipe();
-            defer closePipe(fds);
-            var mock = Mock{ .fd = fds[0] };
-            var probe = Probe{};
-            var loop = try RuntimeLooper.initExperimental(allocator, .{
+        for ([_]usize{ 256 * 1024, 8 }) |max_read_size| {
+            for ([_]usize{ 128, 7 }) |max_read_count| {
+                const fds = try pipe();
+                defer closePipe(fds);
+                var mock = Mock{ .fd = fds[0] };
+                var probe = Probe{};
+                var loop = try RuntimeLooper.initExperimental(allocator, .{
+                    .on_finish = .{ .callback = finish },
+                    .max_read_size = max_read_size,
+                    .max_read_count = max_read_count,
+                });
+                defer loop.deinit();
+                try loop.start();
+                const payload = [_]u8{'x'} ** 128;
+                try std.testing.expectEqual(
+                    @as(isize, payload.len),
+                    std.c.write(fds[1], &payload, payload.len),
+                );
+                const descriptor = mock.pair().tun;
+                try loop.attach(.{
+                    .pair = switch (side) {
+                        .link => .{ .link = descriptor },
+                        .tun => .{ .tun = descriptor },
+                    },
+                    .on_read = .{ .context = &probe, .callback = Probe.read },
+                });
+                for (0..5000) |_| {
+                    if (probe.total.load(.acquire) == payload.len) break;
+                    _ = libc.usleep(1000);
+                }
+                try loop.stop();
+                const batch_limit: usize = if (side == .link) 16 else 64;
+                try std.testing.expectEqual(
+                    @min(batch_limit, max_read_count, max_read_size),
+                    probe.first_count,
+                );
+                try std.testing.expectEqual(payload.len, probe.total.load(.acquire));
+                try std.testing.expectEqual(
+                    @as(usize, if (side == .link) 64 * 1024 else 16 * 1024),
+                    mock.read_capacity,
+                );
+            }
+        }
+    }
+}
+
+test "v2 compatibility initialization cleans up allocation failures" {
+    const Scenario = struct {
+        fn run(test_allocator: std.mem.Allocator) !void {
+            var loop = try source.net_looper.Looper.initExperimental(test_allocator, .{
                 .on_finish = .{ .callback = finish },
-                .max_read_size = max_read_size,
             });
             defer loop.deinit();
-            try loop.start();
-            const payload = [_]u8{'x'} ** 128;
-            try std.testing.expectEqual(
-                @as(isize, payload.len),
-                std.c.write(fds[1], &payload, payload.len),
-            );
-            const descriptor = mock.pair().tun;
-            try loop.attach(.{
-                .pair = switch (side) {
-                    .link => .{ .link = descriptor },
-                    .tun => .{ .tun = descriptor },
-                },
-                .on_read = .{ .context = &probe, .callback = Probe.read },
-            });
-            for (0..5000) |_| {
-                if (probe.count.load(.acquire) != 0) break;
-                _ = libc.usleep(1000);
-            }
-            try loop.stop();
-            try std.testing.expectEqual(
-                @min(payload.len, max_read_size),
-                probe.count.load(.acquire),
-            );
         }
+    };
+    try std.testing.checkAllAllocationFailures(allocator, Scenario.run, .{});
+}
+
+test "v2 compatibility writes clean up copies when allocation fails" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    // Packet descriptors, two payloads, copy owner, command, and write request.
+    for (0..6) |successful_allocations| {
+        const fds = try pipe();
+        defer closePipe(fds);
+        var mock = Mock{ .fd = fds[0], .block_writes = true };
+        var failing = std.testing.FailingAllocator.init(allocator, .{});
+        var loop = try source.net_looper.Looper.initExperimental(failing.allocator(), .{
+            .on_finish = .{ .callback = finish },
+        });
+        defer loop.deinit();
+        try loop.start();
+        try loop.attach(.{ .pair = mock.pair() });
+        failing.fail_index = failing.alloc_index + successful_allocations;
+        try std.testing.expectError(
+            error.OutOfMemory,
+            loop.writeQueued(&.{ "one", "two" }, .tun, null),
+        );
+        failing.fail_index = std.math.maxInt(usize);
+        try loop.stop();
+        try std.testing.expectEqual(@as(usize, 0), mock.writes);
+        try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
     }
 }
 
