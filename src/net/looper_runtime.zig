@@ -3,8 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Shared looper API. The compile-time runtime policy may force v2.
-//! The implementation remains fixed for its lifetime. Keep this object at a stable address from
-//! start() until stop()/deinit() completes; callbacks borrow their contexts.
+//! The implementation remains fixed for its lifetime. Keep this object at a
+//! stable address from start() until stop()/deinit() completes; callbacks borrow
+//! their contexts.
 
 const std = @import("std");
 const runtime_policy = @import("../runtime_policy.zig");
@@ -52,25 +53,47 @@ pub const Looper = struct {
 
     pub fn init(allocator: std.mem.Allocator, options: Options) InitError!Looper {
         if (runtime_policy.v2_only) return initExperimental(allocator, options);
-        return .{ .allocator = allocator, .implementation = .{ .legacy = try legacy.Looper.init(allocator, options) } };
+        return .{
+            .allocator = allocator,
+            .implementation = .{
+                .legacy = try legacy.Looper.init(allocator, options),
+            },
+        };
     }
 
-    pub fn initExperimental(allocator: std.mem.Allocator, options: Options) InitError!Looper {
-        const link = try LegacyReadStorage.create(allocator, options, options.link_buf_size);
+    pub fn initExperimental(
+        allocator: std.mem.Allocator,
+        options: Options,
+    ) InitError!Looper {
+        const link = try LegacyReadStorage.create(
+            allocator,
+            options,
+            options.link_buf_size,
+        );
         errdefer link.destroy();
-        const tun = try LegacyReadStorage.create(allocator, options, options.tun_buf_size);
+        const tun = try LegacyReadStorage.create(
+            allocator,
+            options,
+            options.tun_buf_size,
+        );
         errdefer tun.destroy();
         return .{
             .allocator = allocator,
             .read_storage = .{ link, tun },
-            .implementation = .{ .experimental = try experimental.Looper.init(allocator, options) },
+            .implementation = .{
+                .experimental = try experimental.Looper.init(allocator, options),
+            },
         };
     }
 
     pub fn deinit(self: *Looper) void {
-        defer for (self.read_storage) |storage| {
-            if (storage) |value| value.destroy();
-        };
+        defer {
+            for (self.read_storage) |storage| {
+                if (storage) |value| {
+                    value.destroy();
+                }
+            }
+        }
         return switch (self.implementation) {
             inline else => |*impl| impl.deinit(),
         };
@@ -113,7 +136,12 @@ pub const Looper = struct {
 
     /// Performs a task synchronously with the worker. Runs inline
     /// if on the same queue to prevent deadlock. Submission does not allocate.
-    pub fn perform(self: *Looper, comptime Result: type, context: ?*anyopaque, callback: *const fn (?*anyopaque) anyerror!Result) anyerror!Result {
+    pub fn perform(
+        self: *Looper,
+        comptime Result: type,
+        context: ?*anyopaque,
+        callback: *const fn (?*anyopaque) anyerror!Result,
+    ) anyerror!Result {
         return switch (self.implementation) {
             inline else => |*impl| impl.perform(Result, context, callback),
         };
@@ -129,7 +157,12 @@ pub const Looper = struct {
     ///
     /// This operation is queue-confined. The looper owns the internal command;
     /// `timer` is only an identity token and its address is never retained.
-    pub fn scheduleReplacing(self: *Looper, timer: *Timer, delay_ms: u64, task: TimedTask) SubmissionError!void {
+    pub fn scheduleReplacing(
+        self: *Looper,
+        timer: *Timer,
+        delay_ms: u64,
+        task: TimedTask,
+    ) SubmissionError!void {
         return switch (self.implementation) {
             inline else => |*impl| impl.scheduleReplacing(timer, delay_ms, task),
         };
@@ -148,18 +181,21 @@ pub const Looper = struct {
     pub fn attach(self: *Looper, arguments: AttachArguments) AttachError!void {
         var resolved = arguments;
         // The original facade also drained input when no observer was installed.
-        if (self.implementation == .experimental and resolved.on_read == null)
+        if (self.implementation == .experimental and resolved.on_read == null) {
             resolved.on_read = .{ .callback = discardRead };
+        }
         if (resolved.on_read != null and resolved.read_buffers == null) {
             const index: usize = switch (resolved.pair) {
                 .link => 0,
                 .tun => 1,
             };
-            if (self.read_storage[index]) |storage| resolved.read_buffers = .{
-                .context = storage,
-                .acquire = LegacyReadStorage.acquire,
-                .release = LegacyReadStorage.release,
-            };
+            if (self.read_storage[index]) |storage| {
+                resolved.read_buffers = .{
+                    .context = storage,
+                    .acquire = LegacyReadStorage.acquire,
+                    .release = LegacyReadStorage.release,
+                };
+            }
         }
         return switch (self.implementation) {
             inline else => |*impl| impl.attach(resolved),
@@ -193,7 +229,12 @@ pub const Looper = struct {
 
     /// Copies one destination with every packet in the batch. Required for
     /// unconnected UDP; ignored by connected sockets. Pass null for TUN writes.
-    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) WriteError!void {
+    pub fn writeQueued(
+        self: *Looper,
+        packets: Packets,
+        side: io.Side,
+        destination: ?io.SocketAddress,
+    ) WriteError!void {
         switch (self.implementation) {
             inline else => |*impl| {
                 if (@TypeOf(impl.*) == experimental.Looper) {
@@ -208,7 +249,11 @@ pub const Looper = struct {
                         else => |failure| return failure,
                     };
                 } else {
-                    impl.writeQueued(packets, side, destination) catch |err| switch (err) {
+                    impl.writeQueued(
+                        packets,
+                        side,
+                        destination,
+                    ) catch |err| switch (err) {
                         error.SideNotAttached, error.InvalidBuffers => {},
                         else => |failure| return failure,
                     };
@@ -217,11 +262,20 @@ pub const Looper = struct {
         }
     }
 
-    fn discardRead(_: ?*anyopaque, _: Packets, _: ?[]const io.SocketAddress) anyerror!ReadAction {
+    fn discardRead(
+        _: ?*anyopaque,
+        _: Packets,
+        _: ?[]const io.SocketAddress,
+    ) anyerror!ReadAction {
         return .keep;
     }
 
-    pub fn writeOutOfBand(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) WriteOOBError!void {
+    pub fn writeOutOfBand(
+        self: *Looper,
+        packets: Packets,
+        side: io.Side,
+        destination: ?io.SocketAddress,
+    ) WriteOOBError!void {
         return switch (self.implementation) {
             inline else => |*impl| impl.writeOutOfBand(packets, side, destination),
         };
@@ -235,16 +289,31 @@ const LegacyReadStorage = struct {
     bytes: []u8,
     buffers: []helpers.ReadBuffer,
 
-    fn create(allocator: std.mem.Allocator, options: helpers.Options, buffer_size: usize) std.mem.Allocator.Error!*LegacyReadStorage {
+    fn create(
+        allocator: std.mem.Allocator,
+        options: helpers.Options,
+        buffer_size: usize,
+    ) std.mem.Allocator.Error!*LegacyReadStorage {
         const size = @max(1, buffer_size);
         const count = @min(options.max_read_count, @max(1, options.max_read_size / size));
-        const bytes = try allocator.alloc(u8, std.math.mul(usize, count, size) catch return error.OutOfMemory);
+        const total_size = std.math.mul(
+            usize,
+            count,
+            size,
+        ) catch return error.OutOfMemory;
+        const bytes = try allocator.alloc(u8, total_size);
         errdefer allocator.free(bytes);
         const buffers = try allocator.alloc(helpers.ReadBuffer, count);
         errdefer allocator.free(buffers);
-        for (buffers, 0..) |*buffer, index| buffer.* = .{ .data = bytes[index * size ..][0..size] };
+        for (buffers, 0..) |*buffer, index| {
+            buffer.* = .{ .data = bytes[index * size ..][0..size] };
+        }
         const self = try allocator.create(LegacyReadStorage);
-        self.* = .{ .allocator = allocator, .bytes = bytes, .buffers = buffers };
+        self.* = .{
+            .allocator = allocator,
+            .bytes = bytes,
+            .buffers = buffers,
+        };
         return self;
     }
 
@@ -267,11 +336,18 @@ const LegacyWriteCopy = struct {
     allocator: std.mem.Allocator,
     packets: []helpers.Packet,
 
-    fn create(allocator: std.mem.Allocator, packets: helpers.Packets) std.mem.Allocator.Error!*LegacyWriteCopy {
+    fn create(
+        allocator: std.mem.Allocator,
+        packets: helpers.Packets,
+    ) std.mem.Allocator.Error!*LegacyWriteCopy {
         const copies = try allocator.alloc(helpers.Packet, packets.len);
         errdefer allocator.free(copies);
         var copied: usize = 0;
-        errdefer for (copies[0..copied]) |packet| allocator.free(packet);
+        errdefer {
+            for (copies[0..copied]) |packet| {
+                allocator.free(packet);
+            }
+        }
         for (packets, copies) |packet, *copy| {
             copy.* = try allocator.dupe(u8, packet);
             copied += 1;
@@ -283,7 +359,9 @@ const LegacyWriteCopy = struct {
 
     fn destroy(self: *LegacyWriteCopy) void {
         const allocator = self.allocator;
-        for (self.packets) |packet| allocator.free(packet);
+        for (self.packets) |packet| {
+            allocator.free(packet);
+        }
         allocator.free(self.packets);
         allocator.destroy(self);
     }

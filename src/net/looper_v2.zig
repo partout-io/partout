@@ -58,7 +58,10 @@ pub const Looper = struct {
     impl: *Impl,
 
     /// Allocates a looper whose storage is released by `destroy()`.
-    pub fn create(allocator: std.mem.Allocator, options: Options) helpers.InitError!*Looper {
+    pub fn create(
+        allocator: std.mem.Allocator,
+        options: Options,
+    ) helpers.InitError!*Looper {
         const self = try allocator.create(Looper);
         errdefer allocator.destroy(self);
         self.* = try init(allocator, options);
@@ -176,11 +179,22 @@ pub const Looper = struct {
     /// The destination is stored by value.
     /// Requires a nonempty batch and a destination for unconnected UDP.
     /// See OnIOComplete for lifetime and cancellation rules.
-    pub fn writeQueued(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress, completion: OnIOComplete) WriteError!void {
+    pub fn writeQueued(
+        self: *Looper,
+        packets: Packets,
+        side: io.Side,
+        destination: ?io.SocketAddress,
+        completion: OnIOComplete,
+    ) WriteError!void {
         return self.impl.writeQueued(packets, side, destination, completion);
     }
 
-    pub fn writeOutOfBand(self: *Looper, packets: helpers.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteOOBError!void {
+    pub fn writeOutOfBand(
+        self: *Looper,
+        packets: helpers.Packets,
+        side: io.Side,
+        destination: ?io.SocketAddress,
+    ) helpers.WriteOOBError!void {
         return self.impl.writeOutOfBand(packets, side, destination);
     }
 };

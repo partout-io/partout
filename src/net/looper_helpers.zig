@@ -38,9 +38,17 @@ pub const ReadAction = enum {
 /// address per packet, in the same order; connected sockets and TUN supply null.
 pub const OnRead = struct {
     context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, Packets, ?[]const io.SocketAddress) anyerror!ReadAction,
+    callback: *const fn (
+        ?*anyopaque,
+        Packets,
+        ?[]const io.SocketAddress,
+    ) anyerror!ReadAction,
 
-    pub fn call(self: OnRead, packets: Packets, addresses: ?[]const io.SocketAddress) anyerror!ReadAction {
+    pub fn call(
+        self: OnRead,
+        packets: Packets,
+        addresses: ?[]const io.SocketAddress,
+    ) anyerror!ReadAction {
         return self.callback(self.context, packets, addresses);
     }
 };
@@ -130,7 +138,9 @@ pub const AttachArguments = struct {
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
-pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{AlreadyStarted};
+pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
+    AlreadyStarted,
+};
 pub const AttachError = SubmissionError || error{
     InvalidBuffers,
     MuxFailure,
@@ -171,7 +181,11 @@ pub const Completion = struct {
 pub const CompletionQueue = struct {
     pending: core.Fifo(Completion) = .{},
 
-    pub fn append(self: *CompletionQueue, completion: *Completion, failure: ?CompletionError) void {
+    pub fn append(
+        self: *CompletionQueue,
+        completion: *Completion,
+        failure: ?CompletionError,
+    ) void {
         completion.failure = failure;
         self.pending.append(completion);
     }
@@ -276,7 +290,11 @@ pub const WriteQueue = struct {
     }
 
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
-    pub fn append(self: *WriteQueue, packets: Packets, destination: ?io.SocketAddress) std.mem.Allocator.Error!void {
+    pub fn append(
+        self: *WriteQueue,
+        packets: Packets,
+        destination: ?io.SocketAddress,
+    ) std.mem.Allocator.Error!void {
         var batch = core.Fifo(WriteNode){};
         errdefer destroyList(self.allocator, batch.takeAll());
 
@@ -365,17 +383,21 @@ pub const OnIOComplete = struct {
     }
 };
 
-/// Storage provider for spontaneous v2 reads. Both callbacks run on the looper
-/// without its lock, using this provider's context. Each acquisition is released
-/// exactly once after on_read returns, including unused buffers and read errors.
-/// Descriptors and payloads must remain exclusively loaned until release. Only
-/// the completed prefix has valid size/source fields. Empty acquisitions pause
-/// reading until resumeReading(); each supplied buffer must have nonzero capacity.
-/// Callbacks may submit writes, but must not attach, detach, stop, or deinit.
-/// The provider and on_read contexts must outlive the attachment.
+/// Lends payload storage to spontaneous v2 reads. The looper owns neither the
+/// descriptors nor their payloads. Both callbacks run on the looper without its
+/// lock and must not call attach, detach, stop, or deinit. The provider context
+/// must outlive the attachment.
 pub const ReadBuffers = struct {
     context: ?*anyopaque = null,
+
+    /// Lend writable buffers for one read attempt. Each buffer must have nonzero
+    /// capacity. An empty slice pauses reading until resumeReading() is called.
     acquire: *const fn (?*anyopaque) []ReadBuffer,
+
+    /// Return the entire loan after the read attempt and any on_read callback.
+    /// Called once per acquisition, even when nothing was read or a read failed.
+    /// Only result.count entries have valid size/source fields; the rest are unused.
+    /// The owner may now reuse or recycle the storage. Release does not imply free.
     release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
 };
 
@@ -388,7 +410,11 @@ pub const WriteRequest = struct {
     next: ?*WriteRequest = null,
 
     pub fn pending(self: *const WriteRequest) PendingWrite {
-        return .{ .data = self.packets[self.count], .offset = self.offset, .address = self.destination };
+        return .{
+            .data = self.packets[self.count],
+            .offset = self.offset,
+            .address = self.destination,
+        };
     }
 
     /// Advances this write, returning whether all packets have been written.
@@ -402,7 +428,11 @@ pub const WriteRequest = struct {
         return self.count == self.packets.len;
     }
 
-    pub fn complete(self: *WriteRequest, allocator: std.mem.Allocator, failure: ?(io.Error || error{Cancelled})) void {
+    pub fn complete(
+        self: *WriteRequest,
+        allocator: std.mem.Allocator,
+        failure: ?(io.Error || error{Cancelled}),
+    ) void {
         const completion = self.completion;
         const result = IOResult{ .count = self.count, .failure = failure };
         allocator.destroy(self);

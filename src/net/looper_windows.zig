@@ -17,7 +17,10 @@ pub const WindowsLooper = struct {
     // Worker thread.
     actor: *Actor,
 
-    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
+    pub fn create(
+        allocator: std.mem.Allocator,
+        options: helpers.Options,
+    ) helpers.InitError!*WindowsLooper {
         const self = try allocator.create(WindowsLooper);
         errdefer allocator.destroy(self);
         const actor = Actor.create(allocator, self) catch return error.OutOfMemory;
@@ -50,7 +53,10 @@ pub const WindowsLooper = struct {
         callback: *const fn (?*anyopaque) anyerror!Result,
     ) anyerror!Result {
         var task = Task(Result){ .context = context, .callback = callback };
-        return self.actor.perform(Result, .{ .perform = &task }) catch |err| switch (err) {
+        return self.actor.perform(
+            Result,
+            .{ .perform = &task },
+        ) catch |err| switch (err) {
             error.Closed => error.LooperUnavailable,
             else => err,
         };
@@ -75,7 +81,10 @@ pub const WindowsLooper = struct {
         // FIXME: ###, Implement timers
     }
 
-    pub fn attach(self: *WindowsLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
+    pub fn attach(
+        self: *WindowsLooper,
+        arguments: helpers.AttachArguments,
+    ) helpers.AttachError!void {
         _ = self;
         _ = arguments;
         // if (udp) {
@@ -88,7 +97,13 @@ pub const WindowsLooper = struct {
         return error.LooperUnavailable;
     }
 
-    pub fn writeQueued(_: *WindowsLooper, _: helpers.Packets, _: io.Side, _: ?io.SocketAddress, _: helpers.OnIOComplete) helpers.WriteError!void {
+    pub fn writeQueued(
+        _: *WindowsLooper,
+        _: helpers.Packets,
+        _: io.Side,
+        _: ?io.SocketAddress,
+        _: helpers.OnIOComplete,
+    ) helpers.WriteError!void {
         return error.LooperUnavailable;
     }
 
