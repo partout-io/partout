@@ -15,6 +15,10 @@ const legacy = runtime_policy.legacy_looper;
 const experimental = @import("looper_v2.zig");
 
 pub const Looper = struct {
+    pub const ReadBuffer = helpers.ReadBuffer;
+    pub const ReadBuffers = helpers.ReadBuffers;
+    pub const IOResult = helpers.IOResult;
+    pub const OnWriteComplete = helpers.OnWriteComplete;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
     pub const ReadAction = helpers.ReadAction;
@@ -255,6 +259,18 @@ pub const Looper = struct {
                         else => |failure| return failure,
                     };
                 }
+            },
+        }
+    }
+
+    /// V2 only: lend payloads and descriptors until completion. Rejection does
+    /// not invoke completion. The legacy copying API remains available above.
+    pub fn writeBorrowed(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress, completion: OnWriteComplete) helpers.WriteError!void {
+        switch (self.implementation) {
+            inline else => |*impl| {
+                if (@TypeOf(impl.*) == experimental.Looper)
+                    return impl.writeQueued(packets, side, destination, completion);
+                return error.LooperUnavailable;
             },
         }
     }

@@ -1515,6 +1515,8 @@ pub const PosixLooper = struct {
             buffers: []helpers.ReadBuffer,
             result: helpers.IOResult,
         ) void {
+            // Drop borrowed views before the provider can unpin/recycle storage.
+            @memset(self.read_packets[0..result.count], &.{});
             self.read_buffers.release(self.read_buffers.context, buffers, result);
         }
 

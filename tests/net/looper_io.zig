@@ -248,14 +248,14 @@ test "v2 compatibility reads bound batches and drain remaining packets" {
                     _ = libc.usleep(1000);
                 }
                 try loop.stop();
-                const batch_limit: usize = if (side == .link) 16 else 64;
+                const batch_limit: usize = 16;
                 try std.testing.expectEqual(
                     @min(batch_limit, max_read_count, max_read_size),
                     probe.first_count,
                 );
                 try std.testing.expectEqual(payload.len, probe.total.load(.acquire));
                 try std.testing.expectEqual(
-                    @as(usize, if (side == .link) 64 * 1024 else 16 * 1024),
+                    @as(usize, 64 * 1024),
                     mock.read_capacity,
                 );
             }
@@ -440,10 +440,10 @@ test "v2 rejected requests and Windows stubs do not invoke completions" {
         var tun = io.TunWrapper{};
         var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
         try std.testing.expectError(error.InvalidBuffers, loop.attach(.{
-            .pair = .{ .tun = tun.tunDescriptor() },
+            .pair = .{ .tun = .{ .tun = &tun } },
         }));
         try std.testing.expectError(error.LooperUnavailable, loop.attach(.{
-            .pair = .{ .tun = tun.tunDescriptor() },
+            .pair = .{ .tun = .{ .tun = &tun } },
             .read_buffers = read.provider(),
         }));
     } else {
