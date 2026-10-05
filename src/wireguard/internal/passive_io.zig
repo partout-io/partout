@@ -20,14 +20,14 @@ pub const PassiveIO = struct {
 
     pub fn start(self: *PassiveIO, remote: net.RemoteDescriptor, mtu: u32, settings: [:0]const u8) !void {
         if (self.handle >= 0 or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
-        if (self.backend.vtable.complete_io == null and (self.backend.vtable.receive_datagrams == null or self.backend.vtable.receive_tun_packets == null)) return error.TransportFailure;
+        if (self.backend.vtable.complete_io == null) return error.TransportFailure;
         self.looper = remote.looper;
         self.active.store(true, .release);
         errdefer self.active.store(false, .release);
         const handle = try self.backend.turnOn(self.allocator, settings, .{
             .passive = .{
-                .link = .{ .local_port = remote.local_port, .write = writeLink, .read = if (self.backend.vtable.complete_io != null) readLink else null, .write_async = if (self.backend.vtable.complete_io != null) writeLinkAsync else null },
-                .tun = .{ .mtu = mtu, .write = writeTun, .read = if (self.backend.vtable.complete_io != null) readTun else null, .write_async = if (self.backend.vtable.complete_io != null) writeTunAsync else null },
+                .link = .{ .local_port = remote.local_port, .read = readLink, .write = writeLink },
+                .tun = .{ .mtu = mtu, .read = readTun, .write = writeTun },
                 .context = self,
             },
         });
@@ -63,70 +63,7 @@ pub const PassiveIO = struct {
         self.handle = -1;
     }
 
-    pub fn receiveTun(self: *PassiveIO, packets: net.Looper.Packets) !void {
-        if (!self.active.load(.acquire)) return;
-        var batch: [c.WG_IO_MAX_BATCH]c.wg_packet = undefined;
-        var offset: usize = 0;
-        while (offset < packets.len) {
-            const count = @min(batch.len, packets.len - offset);
-            for (packets[offset..][0..count], batch[0..count]) |packet, *entry| {
-                entry.* = .{ .data = packet.ptr, .size = @intCast(packet.len) };
-            }
-            try checkStatus(self.backend.vtable.receive_tun_packets.?(self.handle, &batch, @intCast(count)));
-            offset += count;
-        }
-    }
-
-    pub fn receiveLink(self: *PassiveIO, packets: net.Looper.Packets, sources: []const net.SocketAddress) !void {
-        if (!self.active.load(.acquire)) return;
-        if (packets.len != sources.len) return error.TransportFailure;
-        var batch: [c.WG_IO_MAX_BATCH]c.wg_packet = undefined;
-        var endpoints: [c.WG_IO_MAX_BATCH]Endpoint = undefined;
-        var offset: usize = 0;
-        while (offset < packets.len) {
-            const count = @min(batch.len, packets.len - offset);
-            for (packets[offset..][0..count], sources[offset..][0..count], batch[0..count], endpoints[0..count]) |packet, source, *entry, *endpoint| {
-                entry.* = .{ .data = packet.ptr, .size = @intCast(packet.len) };
-                endpoint.* = toEndpoint(source);
-            }
-            try checkStatus(self.backend.vtable.receive_datagrams.?(self.handle, &batch, &endpoints, @intCast(count)));
-            offset += count;
-        }
-    }
-
-    fn checkStatus(status: i32) !void {
-        switch (status) {
-            c.WG_IO_OK, c.WG_IO_QUEUE_FULL => {},
-            else => return error.TransportFailure,
-        }
-    }
-
-    fn writeLink(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const Endpoint) callconv(.c) i32 {
-        const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
-        if (destination == null) return c.WG_IO_INVALID;
-        if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
-        const address = fromEndpoint(destination.*) catch return c.WG_IO_INVALID;
-        return self.writeBatch(packets, count, .link, address);
-    }
-
-    fn writeTun(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32) callconv(.c) i32 {
-        const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
-        if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
-        return self.writeBatch(packets, count, .tun, null);
-    }
-
-    fn writeBatch(self: *PassiveIO, packets: [*c]const c.wg_packet, count: u32, side: net.Side, destination: ?net.SocketAddress) i32 {
-        if (count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
-        var batch: [c.WG_IO_MAX_BATCH][]const u8 = undefined;
-        for (packets[0..count], batch[0..count]) |packet, *entry| {
-            if (packet.size > 65535 or (packet.size != 0 and packet.data == null) or (side == .tun and packet.size == 0)) return c.WG_IO_INVALID;
-            entry.* = if (packet.size == 0) &.{} else packet.data[0..packet.size];
-        }
-        self.looper.?.writeQueued(batch[0..count], side, destination) catch return c.WG_IO_CLOSED;
-        return c.WG_IO_OK;
-    }
-    pub fn readBuffers(self: *PassiveIO, side: net.Side) ?net.Looper.ReadBuffers {
-        if (self.backend.vtable.complete_io == null) return null;
+    pub fn readBuffers(self: *PassiveIO, side: net.Side) net.Looper.ReadBuffers {
         const slot = &self.reads[if (side == .link) @as(usize, 0) else 1];
         slot.owner = self;
         return .{ .context = slot, .acquire = ReadSlot.acquire, .release = ReadSlot.release };
@@ -220,13 +157,13 @@ pub const PassiveIO = struct {
         if (result.failure) |err| return if (err == error.Cancelled) c.WG_IO_CLOSED else c.WG_IO_INVALID;
         return c.WG_IO_OK;
     }
-    fn writeLinkAsync(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const Endpoint, request: usize) callconv(.c) i32 {
+    fn writeLink(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const Endpoint, request: usize) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
         if (destination == null) return c.WG_IO_INVALID;
         const address = fromEndpoint(destination.*) catch return c.WG_IO_INVALID;
         return self.writeBorrowed(packets, count, .link, address, request);
     }
-    fn writeTunAsync(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, request: usize) callconv(.c) i32 {
+    fn writeTun(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, request: usize) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
         return self.writeBorrowed(packets, count, .tun, null, request);
     }

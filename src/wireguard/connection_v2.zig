@@ -165,20 +165,8 @@ fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
 fn readBuffers(ptr: *anyopaque, side: net.Side) ?net.Looper.ReadBuffers {
     return cast(ptr).bridge.readBuffers(side);
 }
-fn submitPackets(ptr: *anyopaque, side: net.Side, packets: net.Looper.Packets, sources: ?[]const net.SocketAddress) net.Looper.ReadAction {
-    const self = cast(ptr);
-    if (self.bridge.backend.vtable.complete_io != null) return .keep; // Read release completes Go directly.
-    const result = switch (side) {
-        .tun => self.bridge.receiveTun(packets),
-        .link => self.bridge.receiveLink(packets, sources orelse {
-            self.fail(.ioFailure);
-            return .pause;
-        }),
-    };
-    result catch {
-        self.fail(.ioFailure);
-        return .pause;
-    };
+fn submitPackets(_: *anyopaque, _: net.Side, _: net.Looper.Packets, _: ?[]const net.SocketAddress) net.Looper.ReadAction {
+    // The read-buffer provider completes Go requests after this callback.
     return .keep;
 }
 fn passiveMTU(info: api.TunnelRemoteInfoWrapper) u32 {

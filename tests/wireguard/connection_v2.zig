@@ -16,10 +16,6 @@ const libc = struct {
 const Probe = struct {
     fd: c_int,
     requested_port: u16,
-    tun_reads: std.atomic.Value(usize) = .init(0),
-    link_reads: std.atomic.Value(usize) = .init(0),
-    tun_calls: std.atomic.Value(usize) = .init(0),
-    link_calls: std.atomic.Value(usize) = .init(0),
     writes: std.atomic.Value(usize) = .init(0),
     cleaned: usize = 0,
     borrowed_read_ptr: ?[*]u8 = null,
@@ -76,33 +72,6 @@ const Probe = struct {
         const previous = current.completed.fetchOr(bit, .release);
         std.debug.assert(previous & bit == 0);
     }
-    fn receiveTun(_: i32, packets: [*c]const c.wg_packet, count: u32) callconv(.c) i32 {
-        std.debug.assert(count > 0 and count <= c.WG_IO_MAX_BATCH);
-        for (packets[0..count]) |packet| std.debug.assert(packet.size == 4 and packet.data[0] == 0x45);
-        _ = current.tun_reads.fetchAdd(count, .release);
-        _ = current.tun_calls.fetchAdd(1, .release);
-        return 0;
-    }
-    fn receiveLink(_: i32, packets: [*c]const c.wg_packet, endpoints: [*c]const c.wg_endpoint, count: u32) callconv(.c) i32 {
-        std.debug.assert(count > 0 and count <= c.WG_IO_MAX_BATCH);
-        for (packets[0..count], endpoints[0..count]) |packet, endpoint| std.debug.assert(packet.size == 3 and packet.data[0] == 1 and endpoint.port != 0);
-        _ = current.link_reads.fetchAdd(count, .release);
-        _ = current.link_calls.fetchAdd(1, .release);
-        return 0;
-    }
-    fn submitBatches(raw: ?*anyopaque) anyerror!void {
-        const connection: *source.net_connection.Connection = @ptrCast(@alignCast(raw.?));
-        const count = c.WG_IO_MAX_BATCH + 1;
-        const tun_packets = [_][]const u8{&.{ 0x45, 1, 2, 3 }} ** count;
-        const link_packets = [_][]const u8{&.{ 1, 2, 3 }} ** count;
-        const addresses = [_]io.SocketAddress{.{ .family = 4, .port = 51820, .address = .{ 192, 0, 2, 1 } ++ .{0} ** 12 }} ** count;
-        try std.testing.expectEqual(.keep, connection.submitPackets(.tun, &tun_packets, null));
-        try std.testing.expectEqual(.keep, connection.submitPackets(.link, &link_packets, &addresses));
-        try std.testing.expectEqual(count, current.tun_reads.load(.acquire));
-        try std.testing.expectEqual(count, current.link_reads.load(.acquire));
-        try std.testing.expectEqual(@as(usize, 2), current.tun_calls.load(.acquire));
-        try std.testing.expectEqual(@as(usize, 2), current.link_calls.load(.acquire));
-    }
     fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) source.net_sandbox.TunnelController.Error!io.TunWrapper {
         const ctrl: *source.mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
         _ = try ctrl.interface().setTunnelSettings(info);
@@ -116,7 +85,6 @@ const Probe = struct {
         const socket = try io.SocketWrapper.create(allocator, endpoint, .{ .port = port }) orelse return error.LinkNotActive;
         return socket.linkDescriptor();
     }
-    fn barrier(_: ?*anyopaque) anyerror!void {}
 };
 fn wait(counter: *const std.atomic.Value(usize), target: usize) !void {
     for (0..1000) |_| {
@@ -126,7 +94,7 @@ fn wait(counter: *const std.atomic.Value(usize), target: usize) !void {
     return error.Timeout;
 }
 
-test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes and termination" {
+test "WireGuard v2 daemon owns link and TUN across retry, path changes and termination" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = source.mock;
@@ -142,10 +110,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
     Probe.current = &probe;
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
-    var backend_table = fake_backend_vtable;
-    backend_table.receive_datagrams = Probe.receiveLink;
-    backend_table.receive_tun_packets = Probe.receiveTun;
-    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &backend_table });
+    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
@@ -183,54 +148,6 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     try std.testing.expect(fake.link != null and fake.tun != null);
     try std.testing.expectEqual(requested_port, fake.link.?.local_port);
     try wait(&fake.counts, 2);
-    var connection = owner.connection.?;
-    try owner.looper.perform(void, &connection, Probe.submitBatches);
-    _ = libc.write(fds[1], &.{ 0x45, 1, 2, 3 }, 4);
-    try wait(&probe.tun_reads, c.WG_IO_MAX_BATCH + 2);
-    var packet = [_]u8{ 0x60, 4, 5, 6 };
-    var output = [_]c.wg_packet{.{ .data = &packet, .size = packet.len }} ** c.WG_IO_MAX_BATCH;
-    // Validate the entire batch before queueing any write.
-    output[1].data = null;
-    try std.testing.expectEqual(@as(i32, c.WG_IO_INVALID), fake.tun.?.write.?(fake.context, &output, output.len));
-    try owner.looper.perform(void, null, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 0), probe.writes.load(.acquire));
-    output[1].data = &packet;
-    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &output, output.len));
-    packet[0] = 0;
-    try wait(&probe.writes, output.len);
-    const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
-    defer peer.destroy();
-    const peer_port = (try peer.localAddress()).port;
-    const destination = c.wg_endpoint{ .family = 4, .port = peer_port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
-    var first = [_]u8{ 7, 8, 9 };
-    var second = [_]u8{ 10, 11, 12 };
-    const datagrams = [_]c.wg_packet{ .{ .data = &first, .size = first.len }, .{ .data = &second, .size = second.len } };
-    try std.testing.expectEqual(@as(i32, 0), fake.link.?.write.?(fake.context, &datagrams, datagrams.len, &destination));
-    first[0] = 0;
-    second[0] = 0;
-    for ([_][]const u8{ &.{ 7, 8, 9 }, &.{ 10, 11, 12 } }) |expected| {
-        var received: [16]u8 = undefined;
-        var sender: io.SocketAddress = undefined;
-        var size: ?usize = null;
-        for (0..1000) |_| {
-            size = peer.receiveFrom(&received, &sender) catch |err| {
-                if (err != error.WouldBlock) return err;
-                _ = libc.usleep(1000);
-                continue;
-            };
-            break;
-        }
-        try std.testing.expect(size != null);
-        try std.testing.expectEqualSlices(u8, expected, received[0..size.?]);
-        try std.testing.expectEqual(fake.link.?.local_port, sender.port);
-    }
-    var address = std.mem.zeroes(io.SocketAddress);
-    address.family = 4;
-    address.port = fake.link.?.local_port;
-    address.address[0] = 127;
-    address.address[3] = 1;
-    _ = try peer.sendTo(&.{ 1, 2, 3 }, address);
-    try wait(&probe.link_reads, c.WG_IO_MAX_BATCH + 2);
     monitor.onBetterPath();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
@@ -266,11 +183,7 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
     Probe.current = &probe;
     var fake = FakeBackend{};
-    var backend_table = fake_backend_vtable;
-    backend_table.complete_io = Probe.completeIO;
-    backend_table.receive_datagrams = Probe.receiveLink;
-    backend_table.receive_tun_packets = Probe.receiveTun;
-    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &backend_table });
+    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
@@ -317,9 +230,14 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     const output_bytes = [_]u8{ 0x60, 4, 5, 6 };
     const output = [_]c.wg_packet{.{ .data = &output_bytes, .size = output_bytes.len }};
     probe.borrowed_write_ptr = &output_bytes;
-    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write_async.?(fake.context, &output, 1, 3));
+    // Reject an invalid suffix before borrowing or writing any valid prefix.
+    const invalid_output = [_]c.wg_packet{ output[0], .{ .data = null, .size = 4 } };
+    try std.testing.expectEqual(@as(i32, c.WG_IO_INVALID), fake.tun.?.write.?(fake.context, &invalid_output, 2, 3));
+    try std.testing.expectEqual(@as(usize, 0), probe.writes.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 3), probe.completed.load(.acquire));
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &output, 1, 3));
     const destination = c.wg_endpoint{ .family = 4, .port = (try peer.localAddress()).port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
-    try std.testing.expectEqual(@as(i32, 0), fake.link.?.write_async.?(fake.context, &output, 1, &destination, 4));
+    try std.testing.expectEqual(@as(i32, 0), fake.link.?.write.?(fake.context, &output, 1, &destination, 4));
     try wait(&probe.completed, 15);
     var received: [64]u8 = undefined;
     var sender: io.SocketAddress = undefined;
@@ -330,7 +248,7 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     try std.testing.expectEqual(@as(i32, 0), fake.tun.?.read.?(fake.context, &tun_input, 1, 5));
     try std.testing.expectEqual(@as(i32, 0), fake.link.?.read.?(fake.context, &link_input, 1, 6));
     probe.block_writes.store(true, .release);
-    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write_async.?(fake.context, &output, 1, 7));
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write.?(fake.context, &output, 1, 7));
     try wait(&probe.blocked_writes, 1);
     fake.required_completions = 127;
     sut.stop();
@@ -441,6 +359,7 @@ const FakeBackend = struct {
 };
 
 const fake_backend_vtable = backend_mod.Backend.VTable{
+    .complete_io = Probe.completeIO,
     .turn_on = fakeTurnOn,
     .turn_off = fakeTurnOff,
     .get_config = fakeGetConfig,

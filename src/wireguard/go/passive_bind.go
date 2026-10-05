@@ -6,7 +6,6 @@ package main
 
 import (
 	"errors"
-	"io"
 	"net"
 	"net/netip"
 	"strconv"
@@ -15,26 +14,14 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 )
 
-const passiveQueueSize = 256
 const passiveBatchSize = 256
 const passiveMaxDatagram = 65535
 
 var (
-	errPassiveQueueFull = errors.New("passive receive queue full")
-	errPassivePacket    = errors.New("invalid passive datagram")
-	errPassivePort      = errors.New("passive bind requires the host-selected port")
-	errPassiveMark      = errors.New("passive bind does not support nonzero marks")
+	errPassivePacket = errors.New("invalid passive datagram")
+	errPassivePort   = errors.New("passive bind requires the host-selected port")
+	errPassiveMark   = errors.New("passive bind does not support nonzero marks")
 )
-
-type passivePacket struct {
-	data     []byte
-	endpoint *passiveEndpoint
-}
-
-type passiveSession struct {
-	packets chan passivePacket
-	done    chan struct{}
-}
 
 // passiveBind never creates or operates a socket. The host owns the transport
 // throughout close/reopen and must keep its port fixed for this device lifetime.
@@ -44,13 +31,13 @@ type passiveBind struct {
 	mu      sync.RWMutex
 	port    uint16
 	send    func([][]byte, netip.AddrPort) error
-	session *passiveSession
+	session chan struct{}
 }
 
 var _ conn.Bind = (*passiveBind)(nil)
 
-func newPassiveBind(port uint16, send func([][]byte, netip.AddrPort) error) *passiveBind {
-	return &passiveBind{port: port, send: send}
+func newPassiveBind(port uint16, read func([][]byte, []int, []conn.Endpoint, <-chan struct{}) (int, error), send func([][]byte, netip.AddrPort) error) *passiveBind {
+	return &passiveBind{port: port, read: read, send: send}
 }
 
 func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
@@ -62,45 +49,18 @@ func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 	if b.port == 0 || (port != 0 && port != b.port) {
 		return nil, 0, errPassivePort
 	}
-	s := &passiveSession{packets: make(chan passivePacket, passiveQueueSize), done: make(chan struct{})}
-	b.session = s
+	done := make(chan struct{})
+	b.session = done
 	receive := func(packets [][]byte, sizes []int, endpoints []conn.Endpoint) (int, error) {
 		select {
-		case <-s.done:
+		case <-done:
 			return 0, net.ErrClosed
 		default:
 		}
 		if len(packets) == 0 || len(packets) > passiveBatchSize || len(sizes) < len(packets) || len(endpoints) < len(packets) {
 			return 0, errPassivePacket
 		}
-		if b.read != nil {
-			return b.read(packets, sizes, endpoints, s.done)
-		}
-		select {
-		case <-s.done:
-			return 0, net.ErrClosed
-		case packet := <-s.packets:
-			b.mu.RLock()
-			defer b.mu.RUnlock()
-			if b.session != s {
-				return 0, net.ErrClosed
-			}
-			for i := 0; ; i++ {
-				if len(packets[i]) < len(packet.data) {
-					return i, io.ErrShortBuffer
-				}
-				sizes[i] = copy(packets[i], packet.data)
-				endpoints[i] = packet.endpoint
-				if i+1 == len(packets) {
-					return i + 1, nil
-				}
-				select {
-				case packet = <-s.packets:
-				default:
-					return i + 1, nil
-				}
-			}
-		}
+		return b.read(packets, sizes, endpoints, done)
 	}
 	return []conn.ReceiveFunc{receive}, b.port, nil
 }
@@ -108,20 +68,11 @@ func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 func (b *passiveBind) Close() error {
 	b.mu.Lock()
 	defer b.mu.Unlock()
-	s := b.session
-	if s == nil {
-		return nil
+	if b.session != nil {
+		close(b.session)
+		b.session = nil
 	}
-	b.session = nil
-	close(s.done)
-	// Release queued payloads even when a caller retains an old receive function.
-	for {
-		select {
-		case <-s.packets:
-		default:
-			return nil
-		}
-	}
+	return nil
 }
 
 func (b *passiveBind) SetMark(mark uint32) error {
@@ -153,24 +104,6 @@ func (b *passiveBind) Send(bufs [][]byte, endpoint conn.Endpoint) error {
 	}
 	// The host must cancel borrowed requests before Close joins in-flight sends.
 	return b.send(bufs, ep.addr)
-}
-
-func (b *passiveBind) enqueue(packet []byte, address netip.AddrPort) error {
-	if b.read != nil || len(packet) > passiveMaxDatagram || !address.IsValid() {
-		return errPassivePacket
-	}
-	b.mu.RLock()
-	defer b.mu.RUnlock()
-	if b.session == nil {
-		return net.ErrClosed
-	}
-	p := passivePacket{data: append([]byte(nil), packet...), endpoint: &passiveEndpoint{addr: canonicalEndpoint(address)}}
-	select {
-	case b.session.packets <- p:
-		return nil
-	default:
-		return errPassiveQueueFull
-	}
 }
 
 type passiveEndpoint struct{ addr netip.AddrPort }

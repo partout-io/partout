@@ -48,8 +48,6 @@ pub const Backend = struct {
         bump_sockets: *const fn (?*anyopaque, i32, bool) void,
         disable_roaming: *const fn (?*anyopaque, i32) void,
         complete_io: ?*const fn (usize, u32, i32) callconv(.c) void = null,
-        receive_datagrams: ?*const fn (i32, [*c]const wireguard_c.wg_packet, [*c]const wireguard_c.wg_endpoint, u32) callconv(.c) i32 = null,
-        receive_tun_packets: ?*const fn (i32, [*c]const wireguard_c.wg_packet, u32) callconv(.c) i32 = null,
     };
 
     pub fn turnOn(
@@ -126,8 +124,6 @@ const go_passive_backend_vtable = Backend.VTable{
     .bump_sockets = cBumpSocketsPassive,
     .disable_roaming = cDisableRoamingPassive,
     .complete_io = wireguard_c.pp_wg_complete_io,
-    .receive_datagrams = wireguard_c.pp_wg_receive_datagrams,
-    .receive_tun_packets = wireguard_c.pp_wg_receive_tun_packets,
 };
 
 fn cTurnOn(

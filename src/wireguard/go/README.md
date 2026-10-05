@@ -47,7 +47,7 @@ The host supplies the effective TUN MTU, without AF or virtio packet headers.
 Changing MTU or listen port requires a device restart. Nonzero fwmarks are
 rejected; the host configures routing and socket protection.
 
-Partout v2 uses the borrowed-buffer callbacks `read` and `write_async` in both
+Partout v2 uses the borrowed-buffer callbacks required `read` and `write` in both
 `wg_passive_link` and `wg_passive_tun`. A read callback supplies writable
 `wg_read_packet` descriptors pointing directly into WireGuard's Go buffers.
 A write callback supplies `wg_packet` descriptors pointing into its output
@@ -64,13 +64,6 @@ complete. `count` is the completed prefix; only those read descriptors have
 valid `size` and, for UDP, `source` fields. All pointers become invalid at
 completion. An empty readiness read retains the request for the next attempt.
 
-The copying ABI remains available to other hosts: leave `read`/`write_async`
-null, use synchronous `write` callbacks, and deliver ingress through
-`wgReceiveDatagrams`/`wgReceiveTunPackets`. These calls copy into bounded
-256-packet queues. A full queue may accept a prefix; do not retry the batch.
-Do not mix copying ingress with borrowed reads on the same interface. The
-borrowed write callback takes precedence over the synchronous callback.
-
 Serialize lifecycle on the host. Borrowed submissions begin only after Go
 startup succeeds, but may run before the startup call returns. On shutdown:
 
@@ -80,8 +73,8 @@ startup succeeds, but may run before the startup call returns. On shutdown:
 
 Do not join Go on the looper while its workers are waiting for looper I/O.
 Failed Go startup publishes no borrowed requests. A failure after startup uses
-the same quiesce/detach/join sequence. Handles are never reused, so late copying
-ingress cannot enter a replacement device.
+the same quiesce/detach/join sequence. Handles are never reused, so stale lifecycle calls cannot affect a replacement
+device.
 
 The passive API has a separate handle registry from the native v1 API. Use
 `wgGetConfigWithPassiveIO` for statistics/configuration reads and
@@ -103,8 +96,7 @@ requests. With no available Go buffers, reads pause until the next batch is
 published. Outgoing batches use the runtime's completion-based `writeBorrowed`
 API. Shutdown quiesces submissions, detaches I/O, then joins Go. Better-path
 and I/O failures use normal daemon reconnection. Windows selects the same v2
-implementation; unfinished native I/O reports activation failure instead of
-falling back to Go-owned transport. The runtime log identifies this
+implementation; unfinished native I/O panics when invoked. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
 Validation:
@@ -113,8 +105,8 @@ Validation:
 go -C src/wireguard/go test -race ./...
 ```
 
-The tests include queue ownership/overflow, close/reopen, concurrency, binary
-endpoints, C receive entry points, and real encrypted round trips through two Go
+The tests include borrowed buffer lifetime, cancellation, close/reopen,
+concurrency, binary endpoints, C callbacks, and real encrypted round trips through two Go
 devices using passive IPv4 and IPv6 transports. On macOS, after building the
 CMake `partout-wg-go` target, compile/run the C ABI smoke test (replace `.cmake`
 with your CMake build directory):

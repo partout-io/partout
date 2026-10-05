@@ -30,8 +30,7 @@ extern const char *wgVersion(void);
 #include "passive_io.h"
 
 /* Fully host-owned UDP and TUN, on every platform. No native fd or interface
- * name is consumed. Callbacks may run during startup; publish the returned
- * handle before delivering copying ingress. Borrowed callbacks start only
+ * name is consumed. Borrowed callbacks start only
  * after successful Go initialization; they may run before startup returns.
  * Before turn-off, reject new borrowed requests and complete/cancel all accepted
  * requests, then join Go. Context remains valid until
@@ -47,20 +46,6 @@ extern int32_t wgTurnOnWithPassiveIO(const char *settings,
 extern void wgTurnOffWithPassiveIO(int32_t handle);
 extern char *wgGetConfigWithPassiveIO(int32_t handle);
 extern void wgDisableRoamingWithPassiveIO(int32_t handle);
-
-/* Host -> Go: copy UDP datagrams (0..65535 bytes) or raw IP packets
- * (1..65535 bytes) into bounded 256-packet queues. Empty UDP payloads may
- * have null data pointers. Thread-safe; never waits for queue space.
- * count must be 0..WG_IO_MAX_BATCH; zero is a no-op. Nonempty batches require
- * packet arrays and, for UDP, one source per packet. All inputs are validated
- * before enqueueing. INVALID accepts nothing. Enqueueing preserves order;
- * QUEUE_FULL/CLOSED may accept a prefix and discard the remainder. Do not retry
- * the batch. OK means every packet was accepted, not necessarily delivered.
- * Payloads are copied; arrays and payloads are borrowed only until return.
- * Synchronize host reads before transport replacement or shutdown. */
-extern int32_t wgReceiveDatagrams(int32_t handle, const wg_packet *packets,
-    const wg_endpoint *sources, uint32_t count);
-extern int32_t wgReceiveTunPackets(int32_t handle, const wg_packet *packets, uint32_t count);
 
 /* Completes one accepted borrowed I/O request; not a device handle. */
 extern void wgCompleteIO(uintptr_t request, uint32_t count, int32_t status);
