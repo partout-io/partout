@@ -273,6 +273,7 @@ const WriteNode = struct {
 
 /// Owned FIFO of packet buffers with partial consumption of the head packet.
 /// The queue is not thread-safe; callers must synchronize access.
+/// FIXME: ###, Unused in v2
 pub const WriteQueue = struct {
     allocator: std.mem.Allocator,
 
