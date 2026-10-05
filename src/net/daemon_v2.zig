@@ -749,14 +749,14 @@ const ConnectionDaemon = struct {
                 else => error.UnableToStart,
             });
             self.trackConnectionStatus(.disconnected);
-            self.detachLooperSides() catch {};
+            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
             self.scheduleResumeGate();
             return;
         };
         if (!did_start) {
             log.write(.err, "Connection could not start");
             self.trackConnectionStatus(.disconnected);
-            self.detachLooperSides() catch {};
+            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
             self.scheduleResumeGate();
             return;
         }
