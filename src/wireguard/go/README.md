@@ -40,53 +40,48 @@ TUN descriptor. The ABI is declared by `include/wg_go/wg_go.h` and its included
 `passive_io.h`. Existing `wgTurnOn` retains native Go I/O.
 
 The host creates/configures its UDP socket first and supplies its actual bound
-port plus a `wg_write_link_fn` callback. Go calls that callback with encrypted
-outgoing datagram batches and one binary destination per batch. The host
-copies/enqueues the entire batch before returning. The callback can run
-concurrently on Go workers; it must not wait for
-the looper or call back into WireGuard.
+port. Both passive interfaces use `BatchSize() == 256`; UDP batches carry a
+binary source per packet or one destination per output batch. Mapped IPv4
+addresses are normalized. Local source/interface stickiness is not provided.
+The host supplies the effective TUN MTU, without AF or virtio packet headers.
+Changing MTU or listen port requires a device restart. Nonzero fwmarks are
+rejected; the host configures routing and socket protection.
 
-For incoming UDP, the host calls `wgReceiveDatagrams` with the tunnel handle,
-payload descriptors, and source endpoints. The bridge copies them into a 256-packet queue and
-returns immediately. `WG_IO_QUEUE_FULL` means the unaccepted suffix was dropped. Go's one
-receive function serves both address families, with `BatchSize() == 256`.
-The endpoint ABI uses IP bytes, host-order port/scope, and family 4 or 6; mapped
-IPv4 addresses are normalized. Local source/interface stickiness is not provided.
+Partout v2 uses the borrowed-buffer callbacks `read` and `write_async` in both
+`wg_passive_link` and `wg_passive_tun`. A read callback supplies writable
+`wg_read_packet` descriptors pointing directly into WireGuard's Go buffers.
+A write callback supplies `wg_packet` descriptors pointing into its output
+buffers. The host retains these descriptors and payloads until completion;
+Go pins their storage and waits before returning from Bind/TUN Read/Write.
+There are no intermediate payload copies or receive queues on this path.
+The bridge still allocates request metadata and synchronizes worker handoffs.
 
-The looper submits ingress through `wgReceiveDatagrams` and
-`wgReceiveTunPackets`, using `wg_packet` pointer/length arrays and one source
-endpoint per UDP packet. Each call accepts up to `WG_IO_MAX_BATCH` (256) packets;
-larger looper batches are split without allocating staging buffers. Validation
-covers the whole batch before any enqueue. `WG_IO_QUEUE_FULL` or `WG_IO_CLOSED`
-can accept a prefix and discard the remainder: never retry a batch. Empty batches
-are no-ops. One-element batches handle individual packets. Both ABI directions
-use batches. Go Bind/TUN reads drain available packets up to 256, waiting only for the first
-packet. Each Send/Write invokes one host callback for the whole batch. The
-host accepts all packets or none; TUN Write returns zero on callback failure.
-Go pins output payloads until the callback returns, without copying them.
-Zig queues each output batch with one looper write command and wakeup.
+Submission callbacks return promptly and never wait for the looper. Returning
+`WG_IO_OK` accepts the request and obliges the host to call
+`wgCompleteIO(request, count, status)` exactly once, including on cancellation.
+Completion may run before submission returns. A rejected submission must never
+complete. `count` is the completed prefix; only those read descriptors have
+valid `size` and, for UDP, `source` fields. All pointers become invalid at
+completion. An empty readiness read retains the request for the next attempt.
 
-`Bind.Open` activates a fresh queue and reports the host-selected port;
-`Bind.Close` wakes readers, discards pending packets, and waits for active send
-callbacks. Neither invokes host lifecycle operations or closes the host socket.
-Synchronize old host reads before replacing a transport: tunnel handles identify
-devices, not socket generations. Listen-port changes require a device restart.
-Nonzero fwmarks are rejected; the host configures routing and socket protection.
+The copying ABI remains available to other hosts: leave `read`/`write_async`
+null, use synchronous `write` callbacks, and deliver ingress through
+`wgReceiveDatagrams`/`wgReceiveTunPackets`. These calls copy into bounded
+256-packet queues. A full queue may accept a prefix; do not retry the batch.
+Do not mix copying ingress with borrowed reads on the same interface. The
+borrowed write callback takes precedence over the synchronous callback.
 
-For TUN input, the host calls `wgReceiveTunPackets` with raw IP packet descriptors. Go
-copies them into a separate bounded 256-packet queue. For TUN output, Go invokes
-`wg_passive_tun.write`; the host copies the decrypted batch before returning.
-Both directions omit platform headers. TUN also uses `BatchSize() == 256`.
-The host supplies the effective MTU at startup; changing it requires restarting
-the device. Closing the Go device wakes readers and joins callbacks without
-closing any host descriptor.
+Serialize lifecycle on the host. Borrowed submissions begin only after Go
+startup succeeds, but may run before the startup call returns. On shutdown:
 
-Serialize startup, configuration, and shutdown on the host. Start receive
-submission only after publishing the handle returned by startup; send callbacks
-may occur during startup. Keep the callback context alive until
-`wgTurnOffWithPassiveIO` returns and host producers have been detached/joined.
-Receive calls may race with shutdown and return `WG_IO_CLOSED`. Handles are not reused during the process
-lifetime, so late packets cannot enter a replacement device.
+1. Reject new requests and complete outstanding reads with `WG_IO_CLOSED`.
+2. Detach native I/O, completing/cancelling all accepted writes.
+3. Call `wgTurnOffWithPassiveIO` to join Go workers, then release the context.
+
+Do not join Go on the looper while its workers are waiting for looper I/O.
+Failed Go startup publishes no borrowed requests. A failure after startup uses
+the same quiesce/detach/join sequence. Handles are never reused, so late copying
+ingress cannot enter a replacement device.
 
 The passive API has a separate handle registry from the native v1 API. Use
 `wgGetConfigWithPassiveIO` for statistics/configuration reads and
@@ -102,15 +97,15 @@ unconnected UDP link, and the daemon creates/configures the socket, applies
 reported tunnel settings, and attaches both descriptors to its looper. It also
 owns detachment and native resource cleanup.
 
-The passive bridge only converts packets and queues writes. Daemon link reads
-include source endpoints; tunnel reads contain raw IP bytes. Protocol lifecycle
-and receive calls execute on the looper, while callbacks from Go workers copy
-outgoing packets into looper writes. Shutdown joins Go callbacks before the
-daemon detaches I/O. Better-path and I/O failures use normal daemon reconnection,
-which replaces/protects the host socket and rebuilds peer endpoint resolution.
-Windows selects the same v2 implementation; unfinished native I/O reports an
-activation failure instead of falling back to Go-owned transport. The runtime
-log identifies this implementation with `Using WireGuardConnection v2`.
+The daemon attaches the bridge's read-buffer providers. Go workers publish
+buffer batches; looper reads fill them and release callbacks complete the Go
+requests. With no available Go buffers, reads pause until the next batch is
+published. Outgoing batches use the runtime's completion-based `writeBorrowed`
+API. Shutdown quiesces submissions, detaches I/O, then joins Go. Better-path
+and I/O failures use normal daemon reconnection. Windows selects the same v2
+implementation; unfinished native I/O reports activation failure instead of
+falling back to Go-owned transport. The runtime log identifies this
+implementation with `Using WireGuardConnection v2`.
 
 Validation:
 

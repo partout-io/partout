@@ -98,6 +98,10 @@ int32_t pp_wg_receive_tun_packets(int32_t handle, const wg_packet *packets, uint
     return wgReceiveTunPackets(handle, packets, count);
 }
 
+void pp_wg_complete_io(uintptr_t request, uint32_t count, int32_t status) {
+    wgCompleteIO(request, count, status);
+}
+
 #else
 
 int pp_wg_init(void) {
@@ -189,6 +193,10 @@ int32_t pp_wg_receive_datagrams(int32_t handle, const wg_packet *packets, const 
 int32_t pp_wg_receive_tun_packets(int32_t handle, const wg_packet *packets, uint32_t count) {
     (void)handle; (void)packets; (void)count;
     return WG_IO_CLOSED;
+}
+
+void pp_wg_complete_io(uintptr_t request, uint32_t count, int32_t status) {
+    (void)request; (void)count; (void)status;
 }
 
 #endif

@@ -72,7 +72,7 @@ const WireGuardConnection = struct {
         var info = try builder.build();
         defer info.deinit(self.allocator);
         try self.bridge.start(remote, passiveMTU(info), settings);
-        errdefer self.stop();
+        errdefer self.quiesce();
         if (@import("builtin").os.tag == .ios) self.bridge.backend.disableRoaming(self.bridge.handle);
         try self.scheduleCount();
         events.established(events.ctx, .{ .info = info });
@@ -96,8 +96,12 @@ const WireGuardConnection = struct {
         defer self.allocator.free(text);
         if (uapi.parseRuntimeDataCount(text)) |count| events.data_count(events.ctx, count);
     }
-    fn stop(self: *WireGuardConnection) void {
+    fn quiesce(self: *WireGuardConnection) void {
         if (self.bridge.looper) |looper| looper.cancelTimer(&self.timer);
+        self.bridge.quiesce();
+    }
+    fn stop(self: *WireGuardConnection) void {
+        self.quiesce();
         self.bridge.stop();
     }
     fn fail(self: *WireGuardConnection, code: api.PartoutErrorCode) void {
@@ -108,6 +112,7 @@ const WireGuardConnection = struct {
     fn destroy(self: *WireGuardConnection) void {
         // The owner quiesces us on the looper before destroying on its actor.
         std.debug.assert(self.bridge.handle < 0 and self.timer.id == null);
+        self.bridge.lock.deinit();
         self.resolver.deinit(self.allocator);
         self.configuration.deinit(self.allocator);
         self.allocator.destroy(self);
@@ -119,6 +124,7 @@ fn cast(ptr: *anyopaque) *WireGuardConnection {
 }
 const vtable = net.Connection.VTable{
     .start_v2 = startV2,
+    .read_buffers = readBuffers,
     .start = legacyStart,
     .shutdown = shutdown,
     .stop = stop,
@@ -136,7 +142,7 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     return cast(ptr).startV2(remote) catch |err| return startError(err);
 }
 fn shutdown(ptr: *anyopaque, _: net.Connection.ShutdownReason) void {
-    cast(ptr).stop();
+    cast(ptr).quiesce();
 }
 fn stop(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
     cast(ptr).stop();
@@ -156,8 +162,12 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
 fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
     cast(ptr).fail(.networkChanged);
 }
+fn readBuffers(ptr: *anyopaque, side: net.Side) ?net.Looper.ReadBuffers {
+    return cast(ptr).bridge.readBuffers(side);
+}
 fn submitPackets(ptr: *anyopaque, side: net.Side, packets: net.Looper.Packets, sources: ?[]const net.SocketAddress) net.Looper.ReadAction {
     const self = cast(ptr);
+    if (self.bridge.backend.vtable.complete_io != null) return .keep; // Read release completes Go directly.
     const result = switch (side) {
         .tun => self.bridge.receiveTun(packets),
         .link => self.bridge.receiveLink(packets, sources orelse {

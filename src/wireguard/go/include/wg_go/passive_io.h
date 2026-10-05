@@ -24,11 +24,30 @@ enum {
     WG_IO_QUEUE_FULL = -3
 };
 
-/* Borrowed payload; no pointer is retained after receive/callback returns. */
+/* Payload view. Synchronous APIs borrow until return; asynchronous writes
+ * borrow descriptors and payloads until completion. */
 typedef struct wg_packet {
     const uint8_t *data;
     uint32_t size;
 } wg_packet;
+
+/* Asynchronous borrowed I/O. Zero accepts the request and requires exactly one
+ * wgCompleteIO(request, completed_count, status), possibly before return.
+ * Nonzero rejects it and MUST NOT complete it. The host must release all
+ * descriptors/payloads before completion. Cancellation completes with CLOSED.
+ * Callbacks only submit work; they never wait for the looper. Before turn-off,
+ * reject new requests and complete/cancel every accepted request.
+ * Go pins all borrowed storage until completion and waits before reusing it. */
+typedef struct wg_read_packet {
+    uint8_t *data;
+    uint32_t capacity;
+    uint32_t size;
+    wg_endpoint source;
+} wg_read_packet;
+typedef int32_t (*wg_read_fn)(void *, wg_read_packet *, uint32_t, uintptr_t);
+typedef int32_t (*wg_write_link_async_fn)(void *, const wg_packet *, uint32_t,
+    const wg_endpoint *, uintptr_t);
+typedef int32_t (*wg_write_tun_async_fn)(void *, const wg_packet *, uint32_t, uintptr_t);
 
 /* Go -> host: transmit 1..WG_IO_MAX_BATCH UDP datagrams to one destination.
  * Return zero once the entire batch is copied/accepted, without partial writes;
@@ -48,6 +67,9 @@ typedef int32_t (*wg_write_link_fn)(void *context,
 typedef struct wg_passive_link {
     uint16_t local_port;
     wg_write_link_fn write;
+    /* Optional borrowed I/O; null retains the copying ingress/write API. */
+    wg_read_fn read;
+    wg_write_link_async_fn write_async;
 } wg_passive_link;
 
 /* Go -> host: write 1..WG_IO_MAX_BATCH decrypted raw IP packets to the tunnel.
@@ -62,6 +84,9 @@ typedef int32_t (*wg_write_tun_fn)(void *context, const wg_packet *packets, uint
 typedef struct wg_passive_tun {
     uint32_t mtu;
     wg_write_tun_fn write;
+    /* Optional borrowed I/O; null retains the copying ingress/write API. */
+    wg_read_fn read;
+    wg_write_tun_async_fn write_async;
 } wg_passive_tun;
 
 static inline int32_t wg_passive_link_write(
@@ -77,4 +102,18 @@ static inline int32_t wg_passive_tun_write(
     const wg_packet *packets, uint32_t count
 ) {
     return write(context, packets, count);
+}
+
+static inline int32_t wg_passive_read(wg_read_fn read, void *context,
+    wg_read_packet *packets, uint32_t count, uintptr_t request) {
+    return read(context, packets, count, request);
+}
+static inline int32_t wg_passive_link_write_async(wg_write_link_async_fn write,
+    void *context, const wg_packet *packets, uint32_t count,
+    const wg_endpoint *destination, uintptr_t request) {
+    return write(context, packets, count, destination, request);
+}
+static inline int32_t wg_passive_tun_write_async(wg_write_tun_async_fn write,
+    void *context, const wg_packet *packets, uint32_t count, uintptr_t request) {
+    return write(context, packets, count, request);
 }

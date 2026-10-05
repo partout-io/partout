@@ -16,10 +16,12 @@ import (
 	"net/netip"
 	"os"
 	"runtime"
+	"runtime/cgo"
 	"strconv"
 	"sync"
 	"unsafe"
 
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 )
 
@@ -46,20 +48,38 @@ func lookupPassiveBackend(handle int32) (passiveBackend, bool) {
 
 //export wgTurnOnWithPassiveIO
 func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_passive_tun, context unsafe.Pointer) int32 {
-	if settings == nil || tun == nil || tun.write == nil || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
+	if settings == nil || tun == nil || (tun.write == nil && tun.write_async == nil) || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
 		return -1
 	}
-	if link == nil || link.write == nil || link.local_port == 0 {
+	if link == nil || (link.write == nil && link.write_async == nil) || link.local_port == 0 {
 		return -1
 	}
-	linkWrite, tunWrite := link.write, tun.write
+	linkIO, tunIO := *link, *tun
+	host := &passiveHost{ready: make(chan struct{}), aborted: make(chan struct{})}
+	linkWrite, tunWrite := linkIO.write, tunIO.write
 	bind := newPassiveBind(uint16(link.local_port), func(packets [][]byte, destination netip.AddrPort) error {
 		var batch [passiveBatchSize]C.wg_packet
 		var pins runtime.Pinner
 		defer pins.Unpin()
 		passiveOutputBatch(&batch, packets, 0, &pins)
 		address := endpointToC(destination)
-		status := C.wg_passive_link_write(linkWrite, context, &batch[0], C.uint32_t(len(packets)), &address)
+		var status C.int32_t
+		if linkIO.write_async != nil {
+			if !host.waitReady(host.aborted) {
+				return net.ErrClosed
+			}
+			pins.Pin(&batch[0])
+			pins.Pin(&address)
+			result := passiveRequest(func(request C.uintptr_t) C.int32_t {
+				return C.wg_passive_link_write_async(linkIO.write_async, context, &batch[0], C.uint32_t(len(packets)), &address, request)
+			})
+			status = result.status
+			if status == 0 && result.count != len(packets) {
+				status = C.WG_IO_INVALID
+			}
+		} else {
+			status = C.wg_passive_link_write(linkWrite, context, &batch[0], C.uint32_t(len(packets)), &address)
+		}
 		if status != 0 {
 			return fmt.Errorf("host link write failed: %d", status)
 		}
@@ -70,17 +90,49 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 		var pins runtime.Pinner
 		defer pins.Unpin()
 		passiveOutputBatch(&batch, packets, offset, &pins)
-		status := C.wg_passive_tun_write(tunWrite, context, &batch[0], C.uint32_t(len(packets)))
+		var status C.int32_t
+		written := 0
+		if tunIO.write_async != nil {
+			if !host.waitReady(host.aborted) {
+				return os.ErrClosed
+			}
+			pins.Pin(&batch[0])
+			result := passiveRequest(func(request C.uintptr_t) C.int32_t {
+				return C.wg_passive_tun_write_async(tunIO.write_async, context, &batch[0], C.uint32_t(len(packets)), request)
+			})
+			status = result.status
+			if result.count >= 0 && result.count <= len(packets) {
+				written = result.count
+			} else {
+				status = C.WG_IO_INVALID
+			}
+			if status == 0 && result.count != len(packets) {
+				status = C.WG_IO_INVALID
+			}
+		} else {
+			status = C.wg_passive_tun_write(tunWrite, context, &batch[0], C.uint32_t(len(packets)))
+		}
 		if status != 0 {
-			return fmt.Errorf("host TUN write failed: %d", status)
+			return &passiveWriteError{count: written, err: fmt.Errorf("host TUN write failed: %d", status)}
 		}
 		return nil
 	})
+	bind.host = host
+	if linkIO.read != nil {
+		bind.read = func(packets [][]byte, sizes []int, endpoints []conn.Endpoint, done <-chan struct{}) (int, error) {
+			return host.read(linkIO.read, context, packets, sizes, endpoints, 0, done)
+		}
+	}
+	if tunIO.read != nil {
+		passive.read = func(packets [][]byte, sizes []int, offset int) (int, error) {
+			return host.read(tunIO.read, context, packets, sizes, nil, offset, passive.done)
+		}
+	}
 	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
 }
 
 // Pin payloads while C reads the Go descriptor array containing their pointers.
-// The host copies them before returning; no payload copy is needed here.
+// Borrowed requests also pin descriptors and wait for completion before unpinning.
 func passiveOutputBatch(batch *[passiveBatchSize]C.wg_packet, packets [][]byte, offset int, pins *runtime.Pinner) {
 	for i, packet := range packets {
 		data := unsafe.SliceData(packet[offset:])
@@ -94,14 +146,20 @@ func passiveOutputBatch(batch *[passiveBatchSize]C.wg_packet, packets [][]byte, 
 func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {
 	logger := &device.Logger{Verbosef: CLogger(0).Printf, Errorf: CLogger(1).Printf}
 	dev := device.NewDevice(tun, bind, logger)
+	closeDevice := func() {
+		if bind.host != nil {
+			close(bind.host.aborted)
+		}
+		dev.Close()
+	}
 	if err := dev.IpcSet(settings); err != nil {
 		logger.Errorf("Unable to set IPC settings: %v", err)
-		dev.Close()
+		closeDevice()
 		return -1
 	}
 	if err := dev.Up(); err != nil {
 		logger.Errorf("Unable to start device: %v", err)
-		dev.Close()
+		closeDevice()
 		return -1
 	}
 	logger.Verbosef("Device started")
@@ -109,12 +167,15 @@ func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) in
 	passiveBackends.Lock()
 	defer passiveBackends.Unlock()
 	if passiveBackends.next > math.MaxInt32 {
-		dev.Close()
+		closeDevice()
 		return -1
 	}
 	handle := int32(passiveBackends.next)
 	passiveBackends.next++
 	passiveBackends.byHandle[handle] = passiveBackend{dev, bind, tun}
+	if bind.host != nil {
+		close(bind.host.ready)
+	}
 	return handle
 }
 
@@ -269,4 +330,83 @@ func passiveStatus(err error) C.int32_t {
 	default:
 		return C.WG_IO_INVALID
 	}
+}
+
+// An accepted request retains all pinned storage until the host completes it.
+// The integer token crosses C; no Go object pointer is stored as a context.
+type passiveResult struct {
+	count  int
+	status C.int32_t
+}
+
+func passiveRequest(submit func(C.uintptr_t) C.int32_t) passiveResult {
+	done := make(chan passiveResult, 1)
+	handle := cgo.NewHandle(done)
+	defer handle.Delete()
+	if status := submit(C.uintptr_t(handle)); status != 0 {
+		return passiveResult{status: status}
+	}
+	return <-done
+}
+
+//export wgCompleteIO
+func wgCompleteIO(request C.uintptr_t, count C.uint32_t, status C.int32_t) {
+	cgo.Handle(request).Value().(chan passiveResult) <- passiveResult{int(count), status}
+}
+
+type passiveHost struct{ ready, aborted chan struct{} }
+
+func (h *passiveHost) waitReady(done <-chan struct{}) bool {
+	select {
+	case <-done:
+		return false
+	case <-h.aborted:
+		return false
+	case <-h.ready:
+		return true
+	}
+}
+func (h *passiveHost) read(read C.wg_read_fn, context unsafe.Pointer, packets [][]byte,
+	sizes []int, endpoints []conn.Endpoint, offset int, done <-chan struct{}) (int, error) {
+	if !h.waitReady(done) {
+		return 0, net.ErrClosed
+	}
+	var batch [passiveBatchSize]C.wg_read_packet
+	var pins runtime.Pinner
+	defer pins.Unpin()
+	for i, packet := range packets {
+		if len(packet) <= offset {
+			return 0, errPassivePacket
+		}
+		data := unsafe.SliceData(packet[offset:])
+		pins.Pin(data)
+		batch[i] = C.wg_read_packet{data: (*C.uint8_t)(unsafe.Pointer(data)), capacity: C.uint32_t(len(packet) - offset)}
+	}
+	pins.Pin(&batch[0])
+	result := passiveRequest(func(request C.uintptr_t) C.int32_t {
+		return C.wg_passive_read(read, context, &batch[0], C.uint32_t(len(packets)), request)
+	})
+	if result.count < 0 || result.count > len(packets) {
+		return 0, errPassivePacket
+	}
+	for i := 0; i < result.count; i++ {
+		if batch[i].size > batch[i].capacity {
+			return 0, errPassivePacket
+		}
+		sizes[i] = int(batch[i].size)
+		if endpoints != nil {
+			address, err := endpointFromC(&batch[i].source)
+			if err != nil {
+				return 0, err
+			}
+			endpoints[i] = &passiveEndpoint{addr: address}
+		}
+	}
+	if result.status == C.WG_IO_CLOSED {
+		return result.count, net.ErrClosed
+	}
+	if result.status != 0 {
+		return result.count, errPassivePacket
+	}
+	return result.count, nil
 }

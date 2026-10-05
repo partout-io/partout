@@ -37,3 +37,5 @@ char *pp_wg_get_config_passive(int32_t);
 void pp_wg_tweak_mobile_roaming_passive(int32_t);
 int32_t pp_wg_receive_datagrams(int32_t, const wg_packet *, const wg_endpoint *, uint32_t);
 int32_t pp_wg_receive_tun_packets(int32_t, const wg_packet *, uint32_t);
+
+void pp_wg_complete_io(uintptr_t, uint32_t, int32_t);

@@ -179,3 +179,14 @@ func TestPassiveTunCloseWakesReadAndJoinsWrite(t *testing.T) {
 		t.Fatal("read blocked")
 	}
 }
+
+func TestPassiveTunWritePreservesCompletedPrefix(t *testing.T) {
+	tun := newPassiveTun(1400, func([][]byte, int) error {
+		return &passiveWriteError{count: 1, err: os.ErrClosed}
+	})
+	defer tun.Close()
+	n, err := tun.Write([][]byte{{0x45}, {0x60}}, 0)
+	if n != 1 || !errors.Is(err, os.ErrClosed) {
+		t.Fatalf("partially cancelled write = %d, %v; want 1, closed", n, err)
+	}
+}

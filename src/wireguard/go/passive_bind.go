@@ -39,6 +39,8 @@ type passiveSession struct {
 // passiveBind never creates or operates a socket. The host owns the transport
 // throughout close/reopen and must keep its port fixed for this device lifetime.
 type passiveBind struct {
+	host    *passiveHost
+	read    func([][]byte, []int, []conn.Endpoint, <-chan struct{}) (int, error)
 	mu      sync.RWMutex
 	port    uint16
 	send    func([][]byte, netip.AddrPort) error
@@ -70,6 +72,9 @@ func (b *passiveBind) Open(port uint16) ([]conn.ReceiveFunc, uint16, error) {
 		}
 		if len(packets) == 0 || len(packets) > passiveBatchSize || len(sizes) < len(packets) || len(endpoints) < len(packets) {
 			return 0, errPassivePacket
+		}
+		if b.read != nil {
+			return b.read(packets, sizes, endpoints, s.done)
 		}
 		select {
 		case <-s.done:
@@ -146,13 +151,12 @@ func (b *passiveBind) Send(bufs [][]byte, endpoint conn.Endpoint) error {
 	if b.session == nil {
 		return net.ErrClosed
 	}
-	// Close waits for an in-flight callback. The callback must enqueue/copy and
-	// return promptly, and must not reenter the WireGuard API.
+	// The host must cancel borrowed requests before Close joins in-flight sends.
 	return b.send(bufs, ep.addr)
 }
 
 func (b *passiveBind) enqueue(packet []byte, address netip.AddrPort) error {
-	if len(packet) > passiveMaxDatagram || !address.IsValid() {
+	if b.read != nil || len(packet) > passiveMaxDatagram || !address.IsValid() {
 		return errPassivePacket
 	}
 	b.mu.RLock()

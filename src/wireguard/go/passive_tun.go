@@ -14,6 +14,7 @@ import (
 // passiveTun owns only packet queues. The host owns the interface and its MTU.
 // Close joins writes, wakes reads and closes Events without closing a host fd.
 type passiveTun struct {
+	read    func([][]byte, []int, int) (int, error)
 	mu      sync.RWMutex
 	closed  bool
 	mtu     int
@@ -51,7 +52,7 @@ func (t *passiveTun) Close() error {
 	}
 }
 func (t *passiveTun) enqueue(packet []byte) error {
-	if len(packet) == 0 || len(packet) > passiveMaxDatagram {
+	if t.read != nil || len(packet) == 0 || len(packet) > passiveMaxDatagram {
 		return errPassivePacket
 	}
 	t.mu.RLock()
@@ -74,6 +75,9 @@ func (t *passiveTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 		if offset > len(buf) {
 			return 0, errPassivePacket
 		}
+	}
+	if t.read != nil {
+		return t.read(bufs, sizes, offset)
 	}
 	select {
 	case <-t.done:
@@ -115,7 +119,20 @@ func (t *passiveTun) Write(bufs [][]byte, offset int) (int, error) {
 		return 0, os.ErrClosed
 	}
 	if err := t.write(bufs, offset); err != nil {
+		if failure, ok := err.(*passiveWriteError); ok {
+			return failure.count, err
+		}
 		return 0, err
 	}
 	return len(bufs), nil
 }
+
+// Completion reports whole packets already written even when the remaining
+// batch is cancelled or fails. Preserve that prefix in tun.Device.Write.
+type passiveWriteError struct {
+	count int
+	err   error
+}
+
+func (e *passiveWriteError) Error() string { return e.err.Error() }
+func (e *passiveWriteError) Unwrap() error { return e.err }

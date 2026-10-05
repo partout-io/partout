@@ -31,7 +31,10 @@ extern const char *wgVersion(void);
 
 /* Fully host-owned UDP and TUN, on every platform. No native fd or interface
  * name is consumed. Callbacks may run during startup; publish the returned
- * handle before delivering reads. Context remains valid until
+ * handle before delivering copying ingress. Borrowed callbacks start only
+ * after successful Go initialization; they may run before startup returns.
+ * Before turn-off, reject new borrowed requests and complete/cancel all accepted
+ * requests, then join Go. Context remains valid until
  * wgTurnOffWithPassiveIO joins callbacks and host reads have been detached.
  * Returns -1 on failure. */
 extern int32_t wgTurnOnWithPassiveIO(const char *settings,
@@ -58,3 +61,6 @@ extern void wgDisableRoamingWithPassiveIO(int32_t handle);
 extern int32_t wgReceiveDatagrams(int32_t handle, const wg_packet *packets,
     const wg_endpoint *sources, uint32_t count);
 extern int32_t wgReceiveTunPackets(int32_t handle, const wg_packet *packets, uint32_t count);
+
+/* Completes one accepted borrowed I/O request; not a device handle. */
+extern void wgCompleteIO(uintptr_t request, uint32_t count, int32_t status);

@@ -22,17 +22,29 @@ const Probe = struct {
     link_calls: std.atomic.Value(usize) = .init(0),
     writes: std.atomic.Value(usize) = .init(0),
     cleaned: usize = 0,
+    borrowed_read_ptr: ?[*]u8 = null,
+    borrowed_write_ptr: ?[*]const u8 = null,
+    block_writes: std.atomic.Value(bool) = .init(false),
+    blocked_writes: std.atomic.Value(usize) = .init(0),
+    completed: std.atomic.Value(usize) = .init(0),
+    cancelled: std.atomic.Value(usize) = .init(0),
     var current: *Probe = undefined;
     fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
     fn reset(_: *anyopaque) io.Error!void {}
     fn read(raw: *anyopaque, buf: []u8) io.Error!?usize {
         const self: *Probe = @ptrCast(@alignCast(raw));
+        if (self.borrowed_read_ptr) |ptr| std.debug.assert(ptr == buf.ptr);
         const size = libc.read(self.fd, buf.ptr, buf.len);
         if (size < 0) return error.WouldBlock;
         return @intCast(size);
     }
     fn write(raw: *anyopaque, bytes: []const u8, offset: usize) io.Error!usize {
         const self: *Probe = @ptrCast(@alignCast(raw));
+        if (self.borrowed_write_ptr) |ptr| std.debug.assert(ptr == bytes.ptr);
+        if (self.block_writes.load(.acquire)) {
+            _ = self.blocked_writes.fetchAdd(1, .release);
+            return error.Backpressure;
+        }
         std.debug.assert(std.mem.eql(u8, bytes[offset..], &.{ 0x60, 4, 5, 6 }));
         _ = self.writes.fetchAdd(1, .release);
         return bytes.len - offset;
@@ -52,6 +64,18 @@ const Probe = struct {
         .cleanup = cleanup,
         .last_error_code = lastError,
     };
+    fn completeIO(request: usize, count: u32, status: i32) callconv(.c) void {
+        std.debug.assert(request > 0 and request <= 7);
+        const bit = @as(usize, 1) << @intCast(request - 1);
+        if (status == c.WG_IO_CLOSED) {
+            std.debug.assert(count == 0);
+            _ = current.cancelled.fetchOr(bit, .release);
+        } else {
+            std.debug.assert(status == c.WG_IO_OK and count == 1);
+        }
+        const previous = current.completed.fetchOr(bit, .release);
+        std.debug.assert(previous & bit == 0);
+    }
     fn receiveTun(_: i32, packets: [*c]const c.wg_packet, count: u32) callconv(.c) i32 {
         std.debug.assert(count > 0 and count <= c.WG_IO_MAX_BATCH);
         for (packets[0..count]) |packet| std.debug.assert(packet.size == 4 and packet.data[0] == 0x45);
@@ -226,6 +250,185 @@ test "WireGuard v2 daemon owns link and TUN across retry, packets, path changes 
     try std.testing.expectEqual(@as(usize, 3), probe.cleaned);
 }
 
+test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    const mock = source.mock;
+    const reservation = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    const requested_port = (try reservation.localAddress()).port;
+    reservation.destroy();
+    var fds: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+    defer {
+        _ = libc.close(fds[0]);
+        _ = libc.close(fds[1]);
+    }
+    var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
+    Probe.current = &probe;
+    var fake = FakeBackend{};
+    var backend_table = fake_backend_vtable;
+    backend_table.complete_io = Probe.completeIO;
+    backend_table.receive_datagrams = Probe.receiveLink;
+    backend_table.receive_tun_packets = Probe.receiveTun;
+    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &backend_table });
+    var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var controller_table = controller.interface().vtable.*;
+    controller_table.set_tunnel_settings = Probe.setTunnel;
+    var monitor = mock.MockNetworkMonitor{};
+    var factory = mock.noopSocketFactory();
+    var factory_table = factory.vtable.*;
+    factory_table.create = Probe.createSocket;
+    factory.vtable = &factory_table;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer profile.deinit(allocator);
+    const module = @constCast(api.findActiveConnectionModule(&profile).?);
+    module.WireGuard.configuration.?.interface.listen_port = requested_port;
+    const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
+        .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = mock.noopDNSResolver(), .factory = factory, .monitor = monitor.interface() },
+        .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    var tun_bytes: [64]u8 = undefined;
+    var link_bytes: [64]u8 = undefined;
+    var tun_input = [_]c.wg_read_packet{.{ .data = &tun_bytes, .capacity = tun_bytes.len }};
+    var link_input = [_]c.wg_read_packet{.{ .data = &link_bytes, .capacity = link_bytes.len }};
+    probe.borrowed_read_ptr = &tun_bytes;
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.read.?(fake.context, &tun_input, 1, 1));
+    try std.testing.expectEqual(@as(i32, 0), fake.link.?.read.?(fake.context, &link_input, 1, 2));
+    _ = libc.write(fds[1], &.{ 0x45, 1, 2, 3 }, 4);
+    const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    defer peer.destroy();
+    const local = io.SocketAddress{ .family = 4, .port = fake.link.?.local_port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
+    _ = try peer.sendTo(&.{ 1, 2, 3 }, local);
+    try wait(&probe.completed, 3);
+    try std.testing.expectEqualSlices(u8, &.{ 0x45, 1, 2, 3 }, tun_bytes[0..tun_input[0].size]);
+    try std.testing.expectEqualSlices(u8, &.{ 1, 2, 3 }, link_bytes[0..link_input[0].size]);
+    try std.testing.expectEqual((try peer.localAddress()).port, link_input[0].source.port);
+    const output_bytes = [_]u8{ 0x60, 4, 5, 6 };
+    const output = [_]c.wg_packet{.{ .data = &output_bytes, .size = output_bytes.len }};
+    probe.borrowed_write_ptr = &output_bytes;
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write_async.?(fake.context, &output, 1, 3));
+    const destination = c.wg_endpoint{ .family = 4, .port = (try peer.localAddress()).port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
+    try std.testing.expectEqual(@as(i32, 0), fake.link.?.write_async.?(fake.context, &output, 1, &destination, 4));
+    try wait(&probe.completed, 15);
+    var received: [64]u8 = undefined;
+    var sender: io.SocketAddress = undefined;
+    try std.testing.expectEqual(@as(usize, 4), try peer.receiveFrom(&received, &sender));
+    try std.testing.expectEqualSlices(u8, &output_bytes, received[0..4]);
+    // Empty read attempts retain the loan. Outstanding loans and queued writes
+    // must complete exactly once before fakeTurnOff can join the Go workers.
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.read.?(fake.context, &tun_input, 1, 5));
+    try std.testing.expectEqual(@as(i32, 0), fake.link.?.read.?(fake.context, &link_input, 1, 6));
+    probe.block_writes.store(true, .release);
+    try std.testing.expectEqual(@as(i32, 0), fake.tun.?.write_async.?(fake.context, &output, 1, 7));
+    try wait(&probe.blocked_writes, 1);
+    fake.required_completions = 127;
+    sut.stop();
+    try std.testing.expectEqual(@as(usize, 127), probe.completed.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 112), probe.cancelled.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 1), fake.turn_off_count);
+}
+
+test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    if (c.pp_wg_init() != 0) return error.SkipZigTest;
+    // Zig stack unwinding cannot traverse Go callback stacks on Darwin.
+    const allocator = std.heap.c_allocator;
+    const mock = source.mock;
+    const reservation = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    const requested_port = (try reservation.localAddress()).port;
+    reservation.destroy();
+    var fds: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+    defer {
+        _ = libc.close(fds[0]);
+        _ = libc.close(fds[1]);
+    }
+    var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
+    Probe.current = &probe;
+    var ctx = source.wireguard_connection_v2.ConnectionContext.init(backend_mod.goPassiveBackend());
+    var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var controller_table = controller.interface().vtable.*;
+    controller_table.set_tunnel_settings = Probe.setTunnel;
+    var monitor = mock.MockNetworkMonitor{};
+    var factory = mock.noopSocketFactory();
+    var factory_table = factory.vtable.*;
+    factory_table.create = Probe.createSocket;
+    factory.vtable = &factory_table;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"CQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","endpoint":"127.0.0.1:51821","allowedIPs":["10.0.0.1/32"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer profile.deinit(allocator);
+    const module = @constCast(api.findActiveConnectionModule(&profile).?);
+    module.WireGuard.configuration.?.interface.listen_port = requested_port;
+    const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    defer peer.destroy();
+    @constCast(module.WireGuard.configuration.?.peers)[0].endpoint.?.port = (try peer.localAddress()).port;
+    const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
+        .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = mock.noopDNSResolver(), .factory = factory, .monitor = monitor.interface() },
+        .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    // Trigger a handshake through a native TUN read into a Go-supplied buffer.
+    // The encrypted output crosses back through the borrowed write completion.
+    var ip = [_]u8{0} ** 20;
+    ip[0] = 0x45;
+    ip[3] = 20;
+    ip[12] = 10;
+    ip[15] = 2;
+    ip[16] = 10;
+    ip[19] = 1;
+    for (0..2) |iteration| {
+        _ = libc.write(fds[1], &ip, ip.len);
+        var received: [512]u8 = undefined;
+        var sender: io.SocketAddress = undefined;
+        var size: ?usize = null;
+        for (0..3000) |_| {
+            size = peer.receiveFrom(&received, &sender) catch |err| {
+                if (err != error.WouldBlock) return err;
+                _ = libc.usleep(1000);
+                continue;
+            };
+            break;
+        }
+        try std.testing.expectEqual(@as(?usize, 148), size);
+        try std.testing.expectEqual(@as(u8, 1), received[0]);
+        // Exercise the borrowed UDP receive path as well. An unauthenticated
+        // packet is consumed and dropped by WireGuard without killing reads.
+        _ = try peer.sendTo(&.{ 1, 2, 3 }, sender);
+        if (iteration == 0) {
+            monitor.onBetterPath();
+            try std.testing.expectError(error.AlreadyStarted, sut.start());
+            try std.testing.expectError(error.AlreadyStarted, sut.start());
+            try sut.implementation.connection.actor.perform(void, .resumeGate);
+            try std.testing.expectError(error.AlreadyStarted, sut.start());
+            try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+        }
+    }
+    // The workers now await more read buffers/data. Finish must cancel their
+    // requests before joining Go, including the unexpected-looper-exit path.
+    try sut.implementation.connection.looper.stop();
+    sut.stop();
+}
+
 const FakeBackend = struct {
     link: ?@import("wireguard_c").wg_passive_link = null,
     tun: ?@import("wireguard_c").wg_passive_tun = null,
@@ -234,6 +437,7 @@ const FakeBackend = struct {
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
     fail_turn_on_number: ?usize = null,
+    required_completions: ?usize = null,
 };
 
 const fake_backend_vtable = backend_mod.Backend.VTable{
@@ -264,6 +468,7 @@ fn fakeTurnOn(
 
 fn fakeTurnOff(ptr: ?*anyopaque, handle: i32) void {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    if (self.required_completions) |mask| std.debug.assert(Probe.current.completed.load(.acquire) == mask);
     self.turn_off_count += 1;
     std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
 }
