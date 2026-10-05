@@ -234,6 +234,8 @@ pub const Connection = struct {
     };
 
     pub const VTable = struct {
+        /// Optional caller-owned buffers for v2 reads; released after on_read.
+        read_buffers: ?*const fn (*anyopaque, io.Side) ?Looper.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
         endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -275,6 +277,11 @@ pub const Connection = struct {
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
+
+    pub fn readBuffers(self: Connection, side: io.Side) ?Looper.ReadBuffers {
+        const callback = self.vtable.read_buffers orelse return null;
+        return callback(self.ptr, side);
+    }
 
     pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {
         return self.vtable.endpoints(self.ptr);

@@ -803,6 +803,7 @@ const ConnectionDaemon = struct {
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
             .pair = .{ .link = descriptor },
+            .read_buffers = connection.readBuffers(.link),
             .on_read = .{ .context = self, .callback = onLinkRead },
             .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
@@ -896,6 +897,7 @@ const ConnectionDaemon = struct {
             .pair = .{
                 .tun = descriptor,
             },
+            .read_buffers = self.connection.?.readBuffers(.tun),
             .on_read = .{
                 .context = self,
                 .callback = onTunnelRead,
