@@ -184,6 +184,8 @@ pub const Looper = struct {
         if (self.implementation == .experimental and resolved.on_read == null) {
             resolved.on_read = .{ .callback = discardRead };
         }
+        // Keep this for compatibility until consumers don't provide the
+        // .read_buffers field themselves.
         if (resolved.on_read != null and resolved.read_buffers == null) {
             const index: usize = switch (resolved.pair) {
                 .link => 0,
