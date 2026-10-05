@@ -417,7 +417,7 @@ pub const WriteRequest = struct {
     offset: usize = 0,
     next: ?*WriteRequest = null,
 
-    pub fn pending(self: *const WriteRequest) PendingWrite {
+    pub fn pendingWrite(self: *const WriteRequest) PendingWrite {
         return .{
             .data = self.packets[self.count],
             .offset = self.offset,

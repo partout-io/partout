@@ -921,11 +921,12 @@ pub const PosixLooper = struct {
         fd_set: *DescriptorSet,
     ) ProcessOutcome {
         var watch_writes = false;
-        while (self.pendingWrite(side_io)) |pending| {
+        while (self.pendingWriteRequest(side_io)) |pending_req| {
+            const pending_write = pending_req.pendingWrite();
             const written = side_io.native_io.writePacket(
-                pending.data,
-                pending.offset,
-                pending.address,
+                pending_write.data,
+                pending_write.offset,
+                pending_write.address,
             ) catch |err| {
                 switch (err) {
                     error.WouldBlock => {
@@ -961,9 +962,10 @@ pub const PosixLooper = struct {
                     },
                     else => {
                         self.lock.lock();
-                        const failed = side_io.write_queue.take().?;
+                        const failed_req = side_io.write_queue.take();
+                        std.debug.assert(failed_req == pending_req);
                         self.lock.unlock();
-                        failed.complete(self.allocator, err);
+                        pending_req.complete(self.allocator, err);
                         return .{ .side_failure = .{
                             .side = side_io.side,
                             .failure = side_io.ioFailure(err),
@@ -972,15 +974,16 @@ pub const PosixLooper = struct {
                 }
             };
             self.lock.lock();
-            const completed = if (side_io.write_queue.head.?.advance(written))
-                side_io.write_queue.take()
-            else
-                null;
-            self.lock.unlock();
-            if (completed) |request| {
-                request.complete(self.allocator, null);
+            const is_complete = pending_req.advance(written);
+            if (is_complete) {
+                const removed_req = side_io.write_queue.take();
+                std.debug.assert(removed_req == pending_req);
             }
-            watch_writes = written != pending.data.len - pending.offset;
+            self.lock.unlock();
+            watch_writes = written != pending_write.data.len - pending_write.offset;
+            if (is_complete) {
+                pending_req.complete(self.allocator, null);
+            }
         }
 
         side_io.setWrite(self.mux, watch_writes) catch |err| {
@@ -1308,11 +1311,10 @@ pub const PosixLooper = struct {
         return id != side_io.id;
     }
 
-    fn pendingWrite(self: *PosixLooper, side_io: *SideIO) ?helpers.PendingWrite {
+    fn pendingWriteRequest(self: *PosixLooper, side_io: *SideIO) ?*helpers.WriteRequest {
         self.lock.lock();
         defer self.lock.unlock();
-        const request = side_io.write_queue.head orelse return null;
-        return request.pending();
+        return side_io.write_queue.head;
     }
 
     fn createCommandNode(

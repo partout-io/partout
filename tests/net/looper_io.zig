@@ -384,10 +384,10 @@ test "v2 write requests retain borrowed slices and report partial progress" {
     queue.take().?.complete(allocator, null);
     try std.testing.expectEqual(@as(usize, 1), first_completion.calls.load(.acquire));
     try std.testing.expect(queue.head.?.packets.ptr == &packets);
-    try std.testing.expect(request.pending().data.ptr == payload.ptr);
-    try std.testing.expectEqual(@as(u16, 123), request.pending().address.?.port);
+    try std.testing.expect(request.pendingWrite().data.ptr == payload.ptr);
+    try std.testing.expectEqual(@as(u16, 123), request.pendingWrite().address.?.port);
     try std.testing.expect(!request.advance(1));
-    try std.testing.expectEqual(@as(usize, 1), request.pending().offset);
+    try std.testing.expectEqual(@as(usize, 1), request.pendingWrite().offset);
     try std.testing.expect(!request.advance(payload.len - 1));
     queue.take().?.complete(allocator, error.Cancelled);
     try std.testing.expectEqual(@as(usize, 1), completion.calls.load(.acquire));
