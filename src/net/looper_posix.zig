@@ -634,7 +634,7 @@ pub const PosixLooper = struct {
         packets: helpers.Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
-        completion: helpers.OnIOComplete,
+        completion: helpers.OnWriteComplete,
     ) helpers.WriteError!void {
         if (packets.len == 0) return error.InvalidBuffers;
         self.lock.lock();

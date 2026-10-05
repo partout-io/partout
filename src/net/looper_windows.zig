@@ -102,7 +102,7 @@ pub const WindowsLooper = struct {
         _: helpers.Packets,
         _: io.Side,
         _: ?io.SocketAddress,
-        _: helpers.OnIOComplete,
+        _: helpers.OnWriteComplete,
     ) helpers.WriteError!void {
         return error.LooperUnavailable;
     }

@@ -28,7 +28,7 @@ pub const Looper = struct {
     pub const Options = helpers.Options;
     pub const ReadBuffer = helpers.ReadBuffer;
     pub const IOResult = helpers.IOResult;
-    pub const OnIOComplete = helpers.OnIOComplete;
+    pub const OnWriteComplete = helpers.OnWriteComplete;
     pub const ReadBuffers = helpers.ReadBuffers;
     pub const OnRead = helpers.OnRead;
     pub const ReadAction = helpers.ReadAction;
@@ -178,13 +178,13 @@ pub const Looper = struct {
     /// Borrows the entire packet slice, including descriptors, until completion.
     /// The destination is stored by value.
     /// Requires a nonempty batch and a destination for unconnected UDP.
-    /// See OnIOComplete for lifetime and cancellation rules.
+    /// See OnWriteComplete for lifetime and cancellation rules.
     pub fn writeQueued(
         self: *Looper,
         packets: Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
-        completion: OnIOComplete,
+        completion: OnWriteComplete,
     ) WriteError!void {
         return self.impl.writeQueued(packets, side, destination, completion);
     }

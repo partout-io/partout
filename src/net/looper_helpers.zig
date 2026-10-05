@@ -161,6 +161,11 @@ pub const WriteOOBError = SubmissionError || io.Error || error{
     WriteIncomplete,
 };
 
+pub const IOError = io.Error || error{
+    Cancelled,
+    InvalidBuffers,
+};
+
 pub const CompletionError = std.mem.Allocator.Error || error{
     LooperUnavailable,
     MuxFailure,
@@ -363,7 +368,7 @@ pub const ReadBuffer = struct {
 /// stream write is not counted; cancellation does not undo bytes already sent.
 pub const IOResult = struct {
     count: usize = 0,
-    failure: ?(io.Error || error{ Cancelled, InvalidBuffers }) = null,
+    failure: ?IOError = null,
 };
 
 /// Called exactly once for an accepted write request, on the looper without its lock.
@@ -374,11 +379,11 @@ pub const IOResult = struct {
 /// The callback may submit I/O, but must not call
 /// attach, detach, stop, or deinit. Pending requests are cancelled before
 /// detach, stop, or deinit returns; shutdown does not wait for I/O to drain.
-pub const OnIOComplete = struct {
+pub const OnWriteComplete = struct {
     context: ?*anyopaque = null,
     callback: *const fn (?*anyopaque, IOResult) void,
 
-    pub fn call(self: OnIOComplete, result: IOResult) void {
+    pub fn call(self: OnWriteComplete, result: IOResult) void {
         self.callback(self.context, result);
     }
 };
@@ -404,7 +409,7 @@ pub const ReadBuffers = struct {
 pub const WriteRequest = struct {
     packets: Packets,
     destination: ?io.SocketAddress,
-    completion: OnIOComplete,
+    completion: OnWriteComplete,
     count: usize = 0,
     offset: usize = 0,
     next: ?*WriteRequest = null,
@@ -431,7 +436,7 @@ pub const WriteRequest = struct {
     pub fn complete(
         self: *WriteRequest,
         allocator: std.mem.Allocator,
-        failure: ?(io.Error || error{Cancelled}),
+        failure: ?IOError,
     ) void {
         const completion = self.completion;
         const result = IOResult{ .count = self.count, .failure = failure };

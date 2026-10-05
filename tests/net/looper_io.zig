@@ -32,7 +32,7 @@ const CompletionProbe = struct {
         _ = self.calls.fetchAdd(1, .release);
     }
 
-    fn callback(self: *CompletionProbe) Looper.OnIOComplete {
+    fn callback(self: *CompletionProbe) Looper.OnWriteComplete {
         return .{ .context = self, .callback = completed };
     }
 
