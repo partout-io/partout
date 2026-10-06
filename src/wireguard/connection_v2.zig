@@ -167,11 +167,12 @@ const WireGuardConnection = struct {
     fn onActivation(raw: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw.?));
         if (self.state != .activating) return;
-        if (!self.activation.?.done.load(.acquire)) {
+        const activation = self.activation orelse @panic("onActivation with null self.activation");
+        if (!activation.done.load(.acquire)) {
             self.scheduleActivation() catch self.fail(.unhandled);
             return;
         }
-        const operation = self.activation.?.operation;
+        const operation = activation.operation;
         self.joinActivation() catch {
             self.fail(.unhandled);
             return;
