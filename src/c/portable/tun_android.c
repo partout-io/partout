@@ -146,7 +146,7 @@ static bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *
     jintArray j_fds = NULL;
     bool success = false;
 
-    if (info && info->network_handle > 0) {
+    if (info && info->reachable && info->network_handle > 0) {
         for (size_t i = 0; i < fds_len; ++i) {
             if (android_setsocknetwork(info->network_handle, fds[i]) != 0) {
                 pp_clog_v(PPLogLevelFault, "tun_android: ctrl_configure_sockets(), android_setsocknetwork(%d)", fds[i]);
@@ -419,10 +419,12 @@ Java_io_partout_vpn_PartoutTunnelController_onNativeReachabilityUpdate(JNIEnv *e
     (void)thiz;
     pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
-    const pp_reachability reachability = {
-        .reachable = net_handle != -1,
-        .network_handle = net_handle
-    };
+    // Kotlin uses -1 for an unavailable network; native code uses zero.
+    pp_reachability reachability = pp_reachability_none();
+    if (net_handle != -1) {
+        reachability.reachable = true;
+        reachability.network_handle = net_handle;
+    }
     ctrl_delegate->on_reachability(ctrl_delegate->ctx, &reachability);
 }
 
