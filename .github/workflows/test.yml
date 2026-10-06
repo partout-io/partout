@@ -41,7 +41,7 @@ jobs:
         with:
           access-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Zig
-        uses: partout-io/setup-zig@v3
+        uses: partout-io/setup-zig@main
         if: matrix.suite == 'zig'
       - name: Run Zig tests
         if: matrix.suite == 'zig'
