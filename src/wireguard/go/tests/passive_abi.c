@@ -21,6 +21,7 @@ typedef struct borrowed_probe {
     int closing;
     wg_read_packet *reads[2];
     uintptr_t read_requests[2];
+    uint32_t read_counts[2];
     const wg_packet *writes;
     uint32_t write_count;
     uintptr_t write_request;
@@ -33,6 +34,7 @@ static int32_t borrow_read(borrowed_probe *p, unsigned side,
     if (p->closing) { pthread_mutex_unlock(&p->mutex); return WG_IO_CLOSED; }
     assert(p->read_requests[side] == 0);
     p->reads[side] = packets;
+    p->read_counts[side] = count;
     p->read_requests[side] = request;
     pthread_mutex_unlock(&p->mutex);
     return WG_IO_OK;
@@ -61,6 +63,36 @@ static int32_t borrow_write_tun(void *p, const wg_packet *packets, uint32_t n, u
     wgCompleteIO(r, n, WG_IO_OK);
     return WG_IO_OK;
 }
+static void test_read_batch_growth(borrowed_probe *p) {
+    for (unsigned round = 0; round < 6; ++round) {
+        uintptr_t request = 0;
+        uint32_t completed = 0;
+        for (int attempt = 0; attempt < 3000 && !request; ++attempt) {
+            pthread_mutex_lock(&p->mutex);
+            request = p->read_requests[0];
+            if (request) {
+                uint32_t count = p->read_counts[0];
+                if (round < 4) assert(count == (2U << round));
+                if (round == 5) assert(count == 2);
+                completed = round < 4 ? count : 1;
+                for (uint32_t i = 0; i < completed; ++i) {
+                    wg_read_packet *packet = &p->reads[0][i];
+                    memset(packet->data, 0, 3); /* Unauthenticated, safely ignored. */
+                    packet->size = 3;
+                    packet->source = (wg_endpoint){.family = 4, .port = 51821};
+                    packet->source.address[0] = 127;
+                    packet->source.address[3] = 1;
+                }
+                p->read_requests[0] = 0;
+            }
+            pthread_mutex_unlock(&p->mutex);
+            if (!request) usleep(1000);
+        }
+        assert(request != 0);
+        wgCompleteIO(request, completed, WG_IO_OK);
+    }
+}
+
 static void test_borrowed_io(void) {
     borrowed_probe p = {.mutex = PTHREAD_MUTEX_INITIALIZER};
     wg_passive_link link = {.local_port = 51820, .read = borrow_link, .write = borrow_write};
@@ -93,6 +125,7 @@ static void test_borrowed_io(void) {
     wgDisableRoamingWithPassiveIO(handle);
     assert(wgGetConfig(handle) == NULL);
     wgTurnOff(handle); // Passive and native registries are isolated.
+    test_read_batch_growth(&p);
     uintptr_t input = 0;
     for (int i = 0; i < 3000 && !input; ++i) {
         pthread_mutex_lock(&p.mutex);
