@@ -132,8 +132,9 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     factory.vtable = &factory_table;
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
-        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[]}}}
-        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"mtu":1400},"peers":[]}}},
+        \\{"type":"IP","value":{"id":"44444444-4444-4444-8444-444444444444","mtu":1380}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333","44444444-4444-4444-8444-444444444444"]}
     );
     defer profile.deinit(allocator);
     const module = @constCast(api.findActiveConnectionModule(&profile).?);
@@ -156,6 +157,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expect(fake.link != null and fake.tun != null);
     try std.testing.expectEqual(requested_port, fake.link.?.local_port);
+    try std.testing.expectEqual(@as(u32, 1380), fake.tun.?.mtu);
     try wait(&fake.counts, 2);
     // A same/worse path can remain reachable and never emit betterPath.
     // Duplicate notifications during failure must coalesce into one restart.
@@ -396,6 +398,36 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
     // requests before joining Go, including the unexpected-looper-exit path.
     try sut.implementation.connection.looper.stop();
     sut.stop();
+}
+
+test "WireGuard v2 MTU follows host module precedence" {
+    const before = "11111111-1111-4111-8111-111111111111".*;
+    const wg = "33333333-3333-4333-8333-333333333333".*;
+    const after = "44444444-4444-4444-8444-444444444444".*;
+    const inactive = "55555555-5555-4555-8555-555555555555".*;
+    var modules = [_]api.TaggedModule{
+        .{ .IP = .{ .id = before, .mtu = 1600 } },
+        .{ .WireGuard = .{ .id = wg } },
+        .{ .IP = .{ .id = after, .mtu = 1380 } },
+        .{ .IP = .{ .id = inactive, .mtu = 1280 } },
+    };
+    var info = api.TunnelRemoteInfoWrapper{
+        .profile = .{ .modules = &modules, .active_modules_ids = &.{ before, wg, after } },
+        .original_module_id = wg,
+        .modules = &.{.{ .IP = .{ .mtu = 1400 } }},
+    };
+    const effectiveMTU = source.wireguard_connection_v2.testing.effectiveMTU;
+    try std.testing.expectEqual(@as(u32, 1380), effectiveMTU(info));
+    // Only positive MTUs override. An inactive module never wins.
+    for ([_]?i32{ null, 0, -1 }) |mtu| {
+        modules[2].IP.mtu = mtu;
+        try std.testing.expectEqual(@as(u32, 1400), effectiveMTU(info));
+    }
+    // An unspecified generated MTU preserves an earlier active override.
+    info.modules = &.{.{ .IP = .{ .mtu = 0 } }};
+    try std.testing.expectEqual(@as(u32, 1600), effectiveMTU(info));
+    info.profile.active_modules_ids = &.{wg};
+    try std.testing.expectEqual(@as(u32, 1420), effectiveMTU(info));
 }
 
 test "WireGuard v2 preserves active routes and allocation ownership" {

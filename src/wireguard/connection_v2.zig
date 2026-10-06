@@ -301,14 +301,24 @@ fn submitPackets(_: *anyopaque, _: net.Side, _: net.Looper.Packets, _: ?[]const 
     return .keep;
 }
 fn passiveMTU(info: api.TunnelRemoteInfoWrapper) u32 {
-    for (info.modules orelse &.{}) |module| {
-        if (module != .IP) continue;
-        const mtu = module.IP.mtu orelse continue;
-        if (mtu > 0) return @intCast(mtu);
+    // Match host settings: active profile modules in order, with generated
+    // modules inserted immediately after the originating WireGuard module.
+    var mtu: u32 = 1420;
+    for (info.profile.modules) |module| {
+        const id = api.moduleId(&module);
+        if (!api.isActiveProfileModule(&info.profile, id)) continue;
+        mtu = moduleMTU(module) orelse mtu;
+        if (std.mem.eql(u8, &id, &info.original_module_id)) {
+            for (info.modules orelse &.{}) |remote| mtu = moduleMTU(remote) orelse mtu;
+        }
     }
-    // Only the passive Go device needs a concrete fallback. Host settings keep
-    // the builder's zero/unspecified MTU and retain the native platform policy.
-    return 1420;
+    return mtu;
+}
+
+fn moduleMTU(module: api.TaggedModule) ?u32 {
+    if (module != .IP) return null;
+    const mtu = module.IP.mtu orelse return null;
+    return if (mtu > 0) @intCast(mtu) else null;
 }
 
 fn startError(err: anyerror) net.ConnectionStartError {
@@ -413,5 +423,6 @@ fn cloneSubnet(
 
 // Expose the pure configuration transform for ownership and route parity tests.
 pub const testing = struct {
+    pub const effectiveMTU = passiveMTU;
     pub const configurationWithActiveModules = configurationApplyingActiveModules;
 };
