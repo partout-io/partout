@@ -157,7 +157,10 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expect(fake.link != null and fake.tun != null);
     try std.testing.expectEqual(requested_port, fake.link.?.local_port);
     try wait(&fake.counts, 2);
-    monitor.onBetterPath();
+    // A same/worse path can remain reachable and never emit betterPath.
+    // Duplicate notifications during failure must coalesce into one restart.
+    monitor.setReachable(true);
+    monitor.setReachable(true);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .disconnected);
@@ -166,14 +169,21 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try owner.actor.perform(void, .resumeGate);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
+    monitor.setReachable(false);
+    try waitStatus(sut, .disconnected);
+    // Rearm while offline, then let reachability itself start activation. Its
+    // forwarded notification must not invalidate that freshly created socket.
+    try owner.actor.perform(void, .resumeGate);
+    monitor.setReachable(true);
+    try waitStatus(sut, .connected);
     try owner.looper.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
     sut.stop();
-    try std.testing.expectEqual(@as(usize, 3), fake.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 3), probe.cleaned);
+    try std.testing.expectEqual(@as(usize, 4), fake.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 4), probe.cleaned);
 }
 
 test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
@@ -347,7 +357,8 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
         // packet is consumed and dropped by WireGuard without killing reads.
         _ = try peer.sendTo(&.{ 1, 2, 3 }, sender);
         if (iteration == 0) {
-            monitor.onBetterPath();
+            // Real Go also reconnects after a usable-to-usable path update.
+            monitor.setReachable(true);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
             try std.testing.expectError(error.AlreadyStarted, sut.start());
             try sut.implementation.connection.actor.perform(void, .resumeGate);

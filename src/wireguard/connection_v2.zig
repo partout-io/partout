@@ -173,7 +173,14 @@ fn looperFailed(ptr: *anyopaque, _: net.Side, _: net.Looper.Failure) void {
     cast(ptr).fail(.ioFailure);
 }
 fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.Events) void {
-    if (!info.reachable) cast(ptr).fail(.networkChanged);
+    const self = cast(ptr);
+    // The daemon may just have started activation in response to this same
+    // reachable notification. That fresh socket already uses the new path.
+    if (info.reachable and self.bridge.handle < 0) return;
+    // Reachability callbacks also announce usable-to-usable path changes.
+    // Rebuild the host socket and resolve endpoints again (including DNS64)
+    // even when availability stays true. Better-path events are only a subset.
+    self.fail(.networkChanged);
 }
 fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
     cast(ptr).fail(.networkChanged);
