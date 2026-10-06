@@ -13,100 +13,47 @@ pub const PassiveIO = struct {
     lock: @import("../../core/exports.zig").Mutex = .{},
     reads: [2]ReadSlot = .{ .{}, .{} },
     allocator: std.mem.Allocator,
-    backend: backend.Backend,
+    complete: *const fn (usize, u32, i32) callconv(.c) void,
     looper: ?*net.Looper = null,
-    handle: i32 = -1,
-    startup: ?*Startup = null,
-    state: std.atomic.Value(State) = .init(.closed),
+    state: State = .closed, // Protected by lock, including Go callback threads.
 
     const State = enum(u8) { closed, paused, active };
 
-    pub fn start(self: *PassiveIO, remote: net.RemoteDescriptor, mtu: u32, settings: [:0]const u8) !void {
-        if (self.startup != null or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
-        if (self.backend.vtable.complete_io == null) return error.TransportFailure;
-        self.looper = remote.looper;
-        self.state.store(.active, .release);
-        errdefer self.state.store(.closed, .release);
-        const pending = try self.allocator.create(Startup);
-        errdefer self.allocator.destroy(pending);
-        const owned_settings = try self.allocator.dupeZ(u8, settings);
-        errdefer self.allocator.free(owned_settings);
-        pending.* = .{ .owner = self, .settings = owned_settings, .port = remote.local_port, .mtu = mtu };
-        pending.thread = try std.Thread.spawn(.{}, Startup.run, .{pending});
-        self.startup = pending;
+    pub fn activate(self: *PassiveIO, looper: *net.Looper) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.looper = looper;
+        self.state = .active;
     }
 
-    // Only the blocking Go activation runs off-queue. Its result is consumed on
-    // the looper, or after detachment when stop joins the worker.
-    const Startup = struct {
-        owner: *PassiveIO,
-        settings: [:0]const u8,
-        port: u16,
-        mtu: u32,
-        thread: std.Thread = undefined,
-        done: std.atomic.Value(bool) = .init(false),
-        result: backend.Error!i32 = undefined,
-
-        fn run(self: *Startup) void {
-            defer self.done.store(true, .release);
-            const owner = self.owner;
-            if (owner.handle >= 0) {
-                self.result = if ((owner.backend.setConfig(owner.allocator, owner.handle, self.settings) catch -1) == 0) owner.handle else error.TransportFailure;
-                return;
-            }
-            self.result = owner.backend.turnOn(owner.allocator, self.settings, .{ .passive = .{
-                .link = .{ .local_port = self.port, .read = readLink, .write = writeLink },
-                .tun = .{ .mtu = self.mtu, .read = readTun, .write = writeTun },
-                .context = owner,
-            } });
-        }
-    };
-
-    pub fn pollStart(self: *PassiveIO) !bool {
-        const pending = self.startup orelse return self.handle >= 0;
-        if (!pending.done.load(.acquire)) return false;
-        try self.joinStart();
-        return true;
+    /// Retain pending reads across replacement of the daemon-owned transport.
+    pub fn pause(self: *PassiveIO) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.state = .paused;
     }
 
-    fn joinStart(self: *PassiveIO) !void {
-        const pending = self.startup orelse return;
-        pending.thread.join();
-        defer self.allocator.destroy(pending);
-        defer self.allocator.free(pending.settings);
-        self.startup = null;
-        const handle = try pending.result;
-        if (handle < 0) return error.TransportFailure;
-        self.handle = handle;
+    pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnel {
+        return .{ .passive = .{
+            .link = .{ .local_port = port, .read = readLink, .write = writeLink },
+            .tun = .{ .mtu = mtu, .read = readTun, .write = writeTun },
+            .context = self,
+        } };
     }
 
     /// Runs on the looper. Stop admission before the daemon detaches native I/O.
     /// Read loans cannot be active here: acquire/release also run on this queue.
     pub fn quiesce(self: *PassiveIO) void {
         self.lock.lock();
-        self.state.store(.closed, .release);
+        self.state = .closed;
         var requests: [2]usize = .{ 0, 0 };
         for (&self.reads, &requests) |*slot, *request| {
-            request.* = slot.request;
-            for (slot.buffers[0..slot.count]) |*buffer| buffer.* = .{ .data = &.{} };
-            slot.request = 0;
-            slot.packets = null;
-            slot.count = 0;
+            request.* = slot.takeRequest();
         }
         self.lock.unlock();
-        if (self.backend.vtable.complete_io) |complete| {
-            for (requests) |request| if (request != 0) {
-                complete(request, 0, c.WG_IO_CLOSED);
-            };
-        }
-    }
-
-    /// Joins Go only after the daemon has detached I/O and completed writes.
-    pub fn stop(self: *PassiveIO) void {
-        self.quiesce();
-        self.joinStart() catch {};
-        if (self.handle >= 0) self.backend.turnOff(self.handle);
-        self.handle = -1;
+        for (requests) |request| if (request != 0) {
+            self.complete(request, 0, c.WG_IO_CLOSED);
+        };
     }
 
     pub fn readBuffers(self: *PassiveIO, side: net.Side) net.Looper.ReadBuffers {
@@ -121,6 +68,16 @@ pub const PassiveIO = struct {
         packets: [*c]c.wg_read_packet = null,
         count: usize = 0,
         buffers: [c.WG_IO_MAX_BATCH]net.Looper.ReadBuffer = undefined,
+
+        // Caller holds the bridge lock and completes the returned request
+        // after unlocking. No buffers may be accessed after completion.
+        fn takeRequest(self: *ReadSlot) usize {
+            const request = self.request;
+            self.request = 0;
+            self.packets = null;
+            self.count = 0;
+            return request;
+        }
 
         fn acquire(raw: ?*anyopaque) []net.Looper.ReadBuffer {
             const slot: *ReadSlot = @ptrCast(@alignCast(raw.?));
@@ -140,13 +97,9 @@ pub const PassiveIO = struct {
                 packet.size = @intCast(buffer.size);
                 if (buffer.source) |source| packet.source = toEndpoint(source);
             }
-            const request = slot.request;
-            for (slot.buffers[0..slot.count]) |*buffer| buffer.* = .{ .data = &.{} };
-            slot.request = 0;
-            slot.packets = null;
-            slot.count = 0;
+            const request = slot.takeRequest();
             owner.lock.unlock();
-            owner.backend.vtable.complete_io.?(request, @intCast(result.count), ioStatus(result));
+            owner.complete(request, @intCast(result.count), ioStatus(result));
         }
     };
 
@@ -165,7 +118,7 @@ pub const PassiveIO = struct {
         };
         self.lock.lock();
         defer self.lock.unlock();
-        if (self.state.load(.acquire) == .closed) return c.WG_IO_CLOSED;
+        if (self.state == .closed) return c.WG_IO_CLOSED;
         const slot = &self.reads[if (side == .link) @as(usize, 0) else 1];
         if (slot.request != 0) return c.WG_IO_INVALID;
         for (packets[0..count], slot.buffers[0..count]) |packet, *buffer| {
@@ -176,11 +129,8 @@ pub const PassiveIO = struct {
         slot.count = count;
         const looper = self.looper.?;
         const attached = if (side == .link) looper.isLinkAttached() else looper.isTunAttached();
-        if (attached and self.state.load(.acquire) == .active) looper.resumeReading(side) catch {
-            for (slot.buffers[0..slot.count]) |*buffer| buffer.* = .{ .data = &.{} };
-            slot.request = 0;
-            slot.packets = null;
-            slot.count = 0;
+        if (attached and self.state == .active) looper.resumeReading(side) catch {
+            _ = slot.takeRequest();
             return c.WG_IO_CLOSED;
         };
         return c.WG_IO_OK;
@@ -217,13 +167,13 @@ pub const PassiveIO = struct {
         if (request == 0 or count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
         self.lock.lock();
         defer self.lock.unlock();
-        switch (self.state.load(.acquire)) {
+        switch (self.state) {
             .closed => return c.WG_IO_CLOSED,
             .paused => return c.WG_IO_INVALID,
             .active => {},
         }
         const loan = self.allocator.create(WriteLoan) catch return c.WG_IO_INVALID;
-        loan.* = .{ .allocator = self.allocator, .complete = self.backend.vtable.complete_io.?, .request = request };
+        loan.* = .{ .allocator = self.allocator, .complete = self.complete, .request = request };
         for (packets[0..count], loan.packets[0..count]) |packet, *entry| {
             if (packet.size > 65535 or (packet.size != 0 and packet.data == null) or (side == .tun and packet.size == 0)) {
                 self.allocator.destroy(loan);

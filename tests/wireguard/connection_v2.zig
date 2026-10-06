@@ -183,9 +183,33 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
-    sut.stop();
+    // Endpoint refresh failure must close the retained backend; the next
+    // attempt starts a fresh device rather than retrying a half-updated one.
+    fake.fail_set_config.store(true, .release);
+    monitor.setReachable(true);
+    try waitStatus(sut, .disconnected);
+    try owner.actor.perform(void, .resumeGate);
+    try wait(&fake.set_config_failures, 1);
+    try waitStatus(sut, .disconnected);
     try std.testing.expectEqual(@as(usize, 2), fake.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 4), probe.cleaned);
+    // Interrupt the next activation while its worker awaits a borrowed read.
+    // Shutdown must cancel the read before joining that worker and closing Go.
+    fake.await_startup_cancellation.store(true, .release);
+    try owner.actor.perform(void, .resumeGate);
+    try wait(&fake.startup_waiting, 1);
+    monitor.onBetterPath();
+    try waitStatus(sut, .disconnected);
+    try std.testing.expectEqual(@as(usize, 64), probe.cancelled.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 3), fake.turn_off_count);
+    try owner.actor.perform(void, .resumeGate);
+    try waitStatus(sut, .connected);
+    try std.testing.expectEqual(@as(usize, 5), fake.turn_on_count);
+    // Explicit stop also closes a backend parked between transports.
+    monitor.setReachable(true);
+    try waitStatus(sut, .disconnected);
+    sut.stop();
+    try std.testing.expectEqual(@as(usize, 4), fake.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 5), probe.cleaned);
 }
 
 test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
@@ -374,6 +398,58 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
     sut.stop();
 }
 
+test "WireGuard v2 preserves active routes and allocation ownership" {
+    const allocator = std.testing.allocator;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":[]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","allowedIPs":["192.168.0.0/16"]},{"publicKey":"4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=","allowedIPs":[]}]}}},
+        \\{"type":"DNS","value":{"id":"11111111-1111-4111-8111-111111111111","protocolType":{"type":"cleartext"},"servers":["1.1.1.1","2606:4700:4700::1111","resolver.example"],"routesThroughVPN":true}},
+        \\{"type":"DNS","value":{"id":"22222222-2222-4222-8222-222222222222","protocolType":{"type":"cleartext"},"servers":["9.9.9.9"],"routesThroughVPN":false}},
+        \\{"type":"IP","value":{"id":"44444444-4444-4444-8444-444444444444","ipv4":{"subnets":[],"includedRoutes":[{"destination":"10.20.0.0/16"},{}],"excludedRoutes":[]},"ipv6":{"subnets":[],"includedRoutes":[{"destination":"fd00::/64"},{}],"excludedRoutes":[]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333","11111111-1111-4111-8111-111111111111","22222222-2222-4222-8222-222222222222","44444444-4444-4444-8444-444444444444"]}
+    );
+    defer profile.deinit(allocator);
+    try std.testing.checkAllAllocationFailures(allocator, checkActiveRoutes, .{&profile});
+}
+
+fn checkActiveRoutes(allocator: std.mem.Allocator, profile: *const api.Profile) !void {
+    const source_configuration = switch (profile.modules[0]) {
+        .WireGuard => |wireguard| wireguard.configuration,
+        else => unreachable,
+    };
+
+    var merged = try source.wireguard_connection_v2.testing.configurationWithActiveModules(
+        allocator,
+        &source_configuration.?,
+        profile,
+    );
+    defer merged.deinit(allocator);
+
+    const expected_extras = [_][]const u8{
+        "10.20.0.0/16",
+        "0.0.0.0/0",
+        "fd00::/64",
+        "::/0",
+        "1.1.1.1/32",
+        "2606:4700:4700::1111/128",
+    };
+    try std.testing.expectEqual(@as(usize, 2), merged.peers.len);
+    for (merged.peers, 0..) |peer, peer_index| {
+        const original_count: usize = if (peer_index == 0) 1 else 0;
+        try std.testing.expectEqual(original_count + expected_extras.len, peer.allowed_ips.len);
+        if (peer_index == 0) {
+            const original = try peer.allowed_ips[0].rawAlloc(allocator);
+            defer allocator.free(original);
+            try std.testing.expectEqualStrings("192.168.0.0/16", original);
+        }
+        for (expected_extras, 0..) |expected, index| {
+            const raw = try peer.allowed_ips[original_count + index].rawAlloc(allocator);
+            defer allocator.free(raw);
+            try std.testing.expectEqualStrings(expected, raw);
+        }
+    }
+}
+
 const FakeBackend = struct {
     link: ?@import("wireguard_c").wg_passive_link = null,
     tun: ?@import("wireguard_c").wg_passive_tun = null,
@@ -383,6 +459,10 @@ const FakeBackend = struct {
     turn_off_count: usize = 0,
     fail_turn_on_number: ?usize = null,
     required_completions: ?usize = null,
+    fail_set_config: std.atomic.Value(bool) = .init(false),
+    set_config_failures: std.atomic.Value(usize) = .init(0),
+    await_startup_cancellation: std.atomic.Value(bool) = .init(false),
+    startup_waiting: std.atomic.Value(usize) = .init(0),
 };
 
 const fake_backend_vtable = backend_mod.Backend.VTable{
@@ -409,6 +489,13 @@ fn fakeTurnOn(
     self.tun = tunnel.passive.?.tun;
     self.context = tunnel.passive.?.context;
     if (self.fail_turn_on_number == self.turn_on_count) return -1;
+    if (self.await_startup_cancellation.swap(false, .acq_rel)) {
+        var bytes: [64]u8 = undefined;
+        var packets = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+        std.debug.assert(self.link.?.read.?(self.context, &packets, 1, 7) == c.WG_IO_OK);
+        self.startup_waiting.store(1, .release);
+        while (Probe.current.cancelled.load(.acquire) & 64 == 0) _ = libc.usleep(1000);
+    }
     return 7;
 }
 
@@ -428,8 +515,13 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
     );
 }
 
-fn fakeSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
+fn fakeSetConfig(ptr: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
+    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(std.mem.indexOf(u8, settings, "replace_peers") == null);
+    if (self.fail_set_config.swap(false, .acq_rel)) {
+        _ = self.set_config_failures.fetchAdd(1, .release);
+        return -1;
+    }
     return 0;
 }
 

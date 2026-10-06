@@ -66,10 +66,15 @@ complete. `count` is the completed prefix; only those read descriptors have
 valid `size` and, for UDP, `source` fields. All pointers become invalid at
 completion. An empty readiness read retains the request for the next attempt.
 
-Serialize lifecycle on the host. Run Go startup on a worker while the looper
-services borrowed writes: persistent keepalive can send synchronously during
-`Up`. Reads begin after initialization succeeds. Publish connection success
-only when activation returns. On shutdown:
+`connection_v2.zig` owns the Go handle, activation worker, and lifecycle state
+on the daemon's looper. `internal/passive_io.zig` only manages borrowed requests;
+its mutex serializes Go submission callbacks with looper admission changes.
+The daemon owns all native transport.
+
+Startup and endpoint refresh run on a worker while the looper services borrowed
+writes: persistent keepalive and UAPI updates can send synchronously. An
+activation timer waits for that worker before publishing connection success;
+the statistics timer runs only while active. On shutdown:
 
 1. Reject new requests and complete outstanding reads with `WG_IO_CLOSED`.
 2. Detach native I/O, completing/cancelling all accepted writes.
@@ -98,8 +103,7 @@ The daemon attaches the bridge's read-buffer providers. Go workers publish
 buffer batches; looper reads fill them and release callbacks complete the Go
 requests. With no available Go buffers, reads pause until the next batch is
 published. Outgoing batches use the runtime's completion-based `writeBorrowed`
-API. Shutdown quiesces submissions, detaches I/O, then joins Go. Better-path
-and I/O failures use normal daemon reconnection. Windows selects the same v2
+API. Shutdown quiesces submissions, detaches I/O, then joins Go. Windows selects the same v2
 implementation; unfinished native I/O panics when invoked. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
@@ -122,9 +126,13 @@ cc -Isrc/wireguard/go/include src/wireguard/go/tests/passive_abi.c \
 /tmp/passive-abi
 ```
 
-On network path changes the daemon replaces native I/O while retaining the Go
-device. Pending reads remain parked across detachment, and writes are rejected
+The connection transitions from stopped to activating to active. A network
+path change requests daemon reconnection and suspends the Go device while the
+daemon replaces native I/O. Pending reads remain parked across detachment, and writes are rejected
 until reattachment. The replacement socket keeps the selected local port. Only
 peer endpoints are updated (including fresh DNS64 resolution), on the activation
 worker because UAPI can flush staged sends. Peer sessions and counters survive;
-explicit stop and terminal looper failure still cancel requests and close Go.
+reattachment transitions through activating to active again. Activation or I/O
+failure, explicit stop, and terminal looper failure instead transition through
+stopping to stopped, cancelling requests and closing Go. A failed endpoint
+refresh also closes Go, so the next attempt starts a fresh device.

@@ -263,9 +263,6 @@ func wgCompleteIO(request C.uintptr_t, count C.uint32_t, status C.int32_t) {
 
 type passiveHost struct {
 	ready, aborted chan struct{}
-	// Bind and TUN each have one reader. Start small for interactive traffic,
-	// then grow completed full batches up to the device's advertised maximum.
-	readLimit [2]int
 }
 
 func (h *passiveHost) waitReady(done <-chan struct{}) bool {
@@ -283,15 +280,6 @@ func (h *passiveHost) read(read C.wg_read_fn, context unsafe.Pointer, packets []
 	if !h.waitReady(done) {
 		return 0, net.ErrClosed
 	}
-	side := 0
-	if endpoints == nil {
-		side = 1
-	}
-	limit := h.readLimit[side]
-	if limit == 0 {
-		limit = 2
-	}
-	packets = packets[:min(limit, len(packets))]
 	batch := passiveReads.Get().(*[passiveBatchSize]C.wg_read_packet)
 	defer func() { clear(batch[:]); passiveReads.Put(batch) }()
 	var pins runtime.Pinner
@@ -310,9 +298,6 @@ func (h *passiveHost) read(read C.wg_read_fn, context unsafe.Pointer, packets []
 	})
 	if result.count < 0 || result.count > len(packets) {
 		return 0, errPassivePacket
-	}
-	if result.status == C.WG_IO_OK {
-		h.readLimit[side] = min(passiveBatchSize, max(2, result.count*2))
 	}
 	for i := 0; i < result.count; i++ {
 		if batch[i].size > batch[i].capacity {
