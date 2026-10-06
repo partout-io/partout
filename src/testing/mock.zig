@@ -514,13 +514,17 @@ fn daemonMockStop(
 fn daemonMockBetterPath(
     _: *anyopaque,
     _: net_conn.Connection.Events,
-) void {}
+) net_conn.Connection.NetworkAction {
+    return .none;
+}
 
 fn daemonMockNetworkChange(
     _: *anyopaque,
     _: net_io.ReachabilityInfo,
     _: net_conn.Connection.Events,
-) void {}
+) net_conn.Connection.NetworkAction {
+    return .none;
+}
 
 fn daemonMockDestroy(ptr: *anyopaque) void {
     const self: *DaemonMockConnection = @ptrCast(@alignCast(ptr));
@@ -594,12 +598,15 @@ fn blockingStop(
     events.status(events.ctx, .disconnected);
 }
 
-fn blockingBetterPath(ptr: *anyopaque, _: net_conn.Connection.Events) void {
+fn blockingBetterPath(ptr: *anyopaque, _: net_conn.Connection.Events) net_conn.Connection.NetworkAction {
     const self: *BlockingStopConnection = @ptrCast(@alignCast(ptr));
     self.better_path_count += 1;
+    return .none;
 }
 
-fn blockingNetworkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connection.Events) void {}
+fn blockingNetworkChange(_: *anyopaque, _: net_io.ReachabilityInfo, _: net_conn.Connection.Events) net_conn.Connection.NetworkAction {
+    return .none;
+}
 
 fn blockingDestroy(_: *anyopaque) void {}
 

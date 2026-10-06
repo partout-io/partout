@@ -263,7 +263,6 @@ fn cast(ptr: *anyopaque) *WireGuardConnection {
 // start_v2 starts a fresh session or resumes a requested link refresh. A live
 // refresh never publishes established again: TUN and settings remain in place.
 const vtable = net.Connection.VTable{
-    .link_refresh_requested = linkRefreshRequested,
     .start_v2 = startV2,
     .read_buffers = readBuffers,
     .start = legacyStart,
@@ -276,9 +275,6 @@ const vtable = net.Connection.VTable{
     .better_path = betterPath,
     .destroy = destroy,
 };
-fn linkRefreshRequested(ptr: *anyopaque) bool {
-    return cast(ptr).state == .refresh_requested;
-}
 fn legacyStart(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
     return error.UnableToStart;
 }
@@ -311,7 +307,7 @@ fn looperFailed(ptr: *anyopaque, side: net.Side, failure: net.Looper.Failure) vo
     log.writef(.err, "WireGuard v2 {s} I/O failed: {any}", .{ @tagName(side), failure });
     cast(ptr).fail(.ioFailure);
 }
-fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.Events) void {
+fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
     const self = cast(ptr);
     log.writef(.debug, "WireGuard v2 network changed, reachable: {}, state: {s}", .{ info.reachable, @tagName(self.state) });
     switch (self.state) {
@@ -320,10 +316,13 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
         .activating => if (!info.reachable and self.handle < 0) self.fail(.networkChanged),
         else => {},
     }
+    return if (self.state == .refresh_requested) .refresh_link else .none;
 }
-fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
+fn betterPath(ptr: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
     log.write(.debug, "WireGuard v2 better path detected");
-    cast(ptr).requestRefresh();
+    const self = cast(ptr);
+    self.requestRefresh();
+    return if (self.state == .refresh_requested) .refresh_link else .none;
 }
 fn readBuffers(ptr: *anyopaque, side: net.Side) ?net.Looper.ReadBuffers {
     return cast(ptr).bridge.readBuffers(side);

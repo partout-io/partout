@@ -945,9 +945,13 @@ const DelayedConnection = struct {
         events.status(events.ctx, .disconnected);
     }
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
     fn destroy(ptr: *anyopaque) void {
         const self: *DelayedConnection = @ptrCast(@alignCast(ptr));
@@ -1005,9 +1009,13 @@ const FailingStartConnection = struct {
 
     fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
     fn destroy(_: *anyopaque) void {}
 
@@ -1113,9 +1121,13 @@ const SandboxCapture = struct {
         self.serialized_before_deinit = self.deinit_count == 0;
     }
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
     fn looperTerminated(ptr: *anyopaque, _: ?Looper.Failure) void {
         const self: *SandboxCapture = @ptrCast(@alignCast(ptr));

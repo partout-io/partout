@@ -1217,14 +1217,8 @@ const ConnectionDaemon = struct {
                 .start => |remote| return request.connection.startV2(remote),
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
-                .reachability => |info| {
-                    request.connection.networkChange(info, request.events);
-                    return request.connection.linkRefreshRequested();
-                },
-                .better_path => {
-                    request.connection.betterPath(request.events);
-                    return request.connection.linkRefreshRequested();
-                },
+                .reachability => |info| return request.connection.networkChange(info, request.events) == .refresh_link,
+                .better_path => return request.connection.betterPath(request.events) == .refresh_link,
             }
             return true;
         }

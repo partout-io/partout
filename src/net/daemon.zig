@@ -647,7 +647,7 @@ pub const Daemon = struct {
         if (self.state != .started) return;
         const runtime = self.connection_runtime orelse return;
         const conn = runtime.connection;
-        conn.networkChange(reachability, self.events());
+        _ = conn.networkChange(reachability, self.events());
     }
 
     // Forwards the event to the underlying connection
@@ -655,7 +655,7 @@ pub const Daemon = struct {
         if (self.state != .started) return;
         const runtime = self.connection_runtime orelse return;
         const conn = runtime.connection;
-        conn.betterPath(self.events());
+        _ = conn.betterPath(self.events());
     }
 
     fn handleConnectionStatus(self: *Daemon, status: api.ConnectionStatus) void {

@@ -188,6 +188,9 @@ pub const Connection = struct {
         failure: Events.FailureDisposition,
     };
 
+    /// Requested daemon action after handling a network event.
+    pub const NetworkAction = enum { none, refresh_link };
+
     // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
     // FIXME: ###, Connections must not know about looper
 
@@ -234,14 +237,6 @@ pub const Connection = struct {
     };
 
     pub const VTable = struct {
-        /// V2 only, queried on the looper after reachability/better-path events.
-        /// A pending refresh pauses link submissions and receives a replacement
-        /// through start_v2, retaining TUN without re-establishing the connection.
-        link_refresh_requested: *const fn (*anyopaque) bool = struct {
-            fn call(_: *anyopaque) bool {
-                return false;
-            }
-        }.call,
         /// Optional caller-owned buffers for v2 reads; released after on_read.
         read_buffers: ?*const fn (*anyopaque, io.Side) ?Looper.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
@@ -279,9 +274,10 @@ pub const Connection = struct {
         }.call,
         stop: *const fn (*anyopaque, u32, Events) void,
 
-        /// Network reachability.
-        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
-        better_path: *const fn (*anyopaque, Events) void,
+        /// A refresh pauses link submissions and receives a replacement through
+        /// start_v2, retaining TUN without re-establishing the connection.
+        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) NetworkAction,
+        better_path: *const fn (*anyopaque, Events) NetworkAction,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
@@ -289,10 +285,6 @@ pub const Connection = struct {
     pub fn readBuffers(self: Connection, side: io.Side) ?Looper.ReadBuffers {
         const callback = self.vtable.read_buffers orelse return null;
         return callback(self.ptr, side);
-    }
-
-    pub fn linkRefreshRequested(self: Connection) bool {
-        return self.vtable.link_refresh_requested(self.ptr);
     }
 
     pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {
@@ -352,12 +344,12 @@ pub const Connection = struct {
         self: Connection,
         reachability: io.ReachabilityInfo,
         events: Events,
-    ) void {
-        self.vtable.network_change(self.ptr, reachability, events);
+    ) NetworkAction {
+        return self.vtable.network_change(self.ptr, reachability, events);
     }
 
-    pub fn betterPath(self: Connection, events: Events) void {
-        self.vtable.better_path(self.ptr, events);
+    pub fn betterPath(self: Connection, events: Events) NetworkAction {
+        return self.vtable.better_path(self.ptr, events);
     }
 
     pub fn destroy(self: Connection) void {
