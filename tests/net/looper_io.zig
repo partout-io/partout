@@ -755,3 +755,34 @@ test "v2 drains and resumes reads without an observer and still reports read fai
         }
     }
 }
+
+test "v2 UDP packet errors complete the request without detaching other peers" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const socket = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    defer peer.destroy();
+    const remote = try destination(peer, 6);
+    var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
+    defer loop.deinit();
+    try loop.start();
+    var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
+    try loop.attach(read.attach(.{ .link = socket.linkDescriptor() }));
+    var rejected = CompletionProbe{ .looper = &loop };
+    var accepted = CompletionProbe{ .looper = &loop };
+    const oversized = [_]u8{0} ** 65535;
+    const invalid = [_][]const u8{&oversized};
+    try loop.writeQueued(&invalid, .link, remote, rejected.callback());
+    try rejected.wait();
+    try std.testing.expectEqual(@as(usize, 0), rejected.result.count);
+    try std.testing.expect(rejected.result.failure.? == error.DatagramDropped);
+    try std.testing.expect(loop.isLinkAttached());
+    try loop.writeQueued(&.{"valid"}, .link, remote, accepted.callback());
+    try accepted.wait();
+    try std.testing.expectEqual(@as(usize, 1), accepted.result.count);
+    try std.testing.expect(accepted.result.failure == null);
+    var bytes: [64]u8 = undefined;
+    var sender: io.SocketAddress = undefined;
+    const size = try peer.receiveFrom(&bytes, &sender);
+    try std.testing.expectEqualStrings("valid", bytes[0..size]);
+    try loop.stop();
+}

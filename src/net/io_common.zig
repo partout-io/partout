@@ -79,6 +79,8 @@ pub const Side = enum {
 
 pub const Error = std.mem.Allocator.Error || error{
     Backpressure,
+    /// An unconnected UDP packet failed; the socket remains usable.
+    DatagramDropped,
     EndOfStream,
     InvalidAddressFamily,
     InvalidOffset,

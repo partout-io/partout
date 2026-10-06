@@ -270,14 +270,29 @@ pub const SocketWrapper = struct {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
         if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
-        if (count < 0) return error.LibcFailure;
+        if (count < 0) return datagramError();
         return @intCast(count);
     }
 
     pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         if (address.family != 4 and address.family != 6) return error.InvalidAddressFamily;
-        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
+        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false) catch |err| {
+            return if (err == error.LibcFailure) datagramError() else err;
+        };
+    }
+
+    fn datagramError() Error {
+        // Truncation and per-destination errors (including asynchronous ICMP)
+        // do not invalidate a shared UDP socket or its other peers.
+        return switch (io_c.pp_socket_last_error_binding()) {
+            @intFromEnum(std.c.E.MSGSIZE),
+            @intFromEnum(std.c.E.NETUNREACH),
+            @intFromEnum(std.c.E.HOSTUNREACH),
+            @intFromEnum(std.c.E.CONNREFUSED),
+            => error.DatagramDropped,
+            else => error.LibcFailure,
+        };
     }
 
     pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {

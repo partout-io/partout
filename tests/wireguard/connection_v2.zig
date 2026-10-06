@@ -231,6 +231,10 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
     defer peer.destroy();
     const local = io.SocketAddress{ .family = 4, .port = fake.link.?.local_port, .address = .{ 127, 0, 0, 1 } ++ .{0} ** 12 };
+    // Repeated oversized unauthenticated datagrams must not detach the link,
+    // complete the Go loan with an error, or starve the following valid packet.
+    const oversized = [_]u8{0} ** 1800;
+    for (0..8) |_| _ = try peer.sendTo(&oversized, local);
     _ = try peer.sendTo(&.{ 1, 2, 3 }, local);
     try wait(&probe.completed, 3);
     try std.testing.expectEqualSlices(u8, &.{ 0x45, 1, 2, 3 }, tun_bytes[0..tun_input[0].size]);

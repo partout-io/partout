@@ -966,6 +966,7 @@ pub const PosixLooper = struct {
                         std.debug.assert(failed_req == pending_req);
                         self.lock.unlock();
                         pending_req.complete(self.allocator, err);
+                        if (err == error.DatagramDropped) continue;
                         return .{ .side_failure = .{
                             .side = side_io.side,
                             .failure = side_io.ioFailure(err),
@@ -1528,7 +1529,10 @@ pub const PosixLooper = struct {
             var result = helpers.IOResult{};
             var size: usize = 0;
             const limit = @min(buffers.len, self.read_packets.len);
-            for (buffers[0..limit]) |*buffer| {
+            // Count discarded packets against the attempt budget too, so an
+            // oversized-packet flood cannot monopolize the looper.
+            for (0..limit) |_| {
+                const buffer = &buffers[result.count];
                 if (buffer.data.len == 0) {
                     result.failure = error.InvalidBuffers;
                     break;
@@ -1538,6 +1542,7 @@ pub const PosixLooper = struct {
                     buffer.data,
                     &address,
                 ) catch |err| {
+                    if (err == error.DatagramDropped) continue;
                     if (err != error.WouldBlock) {
                         result.failure = err;
                     }
