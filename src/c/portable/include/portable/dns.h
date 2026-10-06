@@ -17,7 +17,7 @@
 typedef struct {
     bool reachable;
 #if PARTOUT_ANDROID
-    uint64_t network_handle;
+    int64_t network_handle;
 #endif
 } pp_reachability;
 static inline pp_reachability pp_reachability_none(void) {
