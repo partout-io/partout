@@ -68,6 +68,7 @@ const WireGuardConnection = struct {
     interval_ms: u32,
     handle: i32 = -1,
     activation: ?*Activation = null,
+    pending_refresh: ?net.RemoteDescriptor = null,
     state: State = .stopped,
 
     // A network refresh replaces only LINK and preserves Go and TUN. Failures,
@@ -82,6 +83,15 @@ const WireGuardConnection = struct {
 
     fn refresh(self: *WireGuardConnection, remote: net.RemoteDescriptor) !void {
         std.debug.assert(self.state == .refresh_requested and self.handle >= 0);
+        if (self.activation != null) {
+            // The daemon has already replaced LINK. Resume I/O immediately,
+            // then update endpoints again after the current Go call finishes.
+            self.pending_refresh = remote;
+            try self.scheduleActivation();
+            self.bridge.activate(remote.looper);
+            self.state = .activating;
+            return;
+        }
         try self.activate(remote, .refresh);
     }
 
@@ -179,6 +189,14 @@ const WireGuardConnection = struct {
         };
         if (@import("builtin").os.tag == .ios) self.backend.disableRoaming(self.handle);
         self.state = .active;
+        if (self.pending_refresh) |remote| {
+            self.pending_refresh = null;
+            self.activate(remote, .refresh) catch {
+                self.prepareStop();
+                self.events.failed(self.events.ctx, .{ .err_pair = .{ .code = .unhandled }, .disposition = .reconnect });
+            };
+            return;
+        }
         if (operation == .start) self.events.established(self.events.ctx, .{ .info = self.info });
         self.reportCount();
         self.scheduleCount() catch self.fail(.unhandled);
@@ -204,13 +222,9 @@ const WireGuardConnection = struct {
     }
 
     fn requestRefresh(self: *WireGuardConnection) void {
-        // Coalesce updates during a live refresh. An unfinished initial
-        // activation has no established session to retain for a new path.
-        if (self.state == .activating) {
-            if (self.handle < 0) self.fail(.networkChanged);
-            return;
-        }
-        if (self.state != .active) return;
+        // An unfinished initial activation has no session to retain.
+        if (self.state == .activating and self.handle < 0) return self.fail(.networkChanged);
+        if (self.state != .active and self.state != .activating) return;
         log.writef(.debug, "Refresh WireGuard v2 transport, retaining wg-go handle: {d}", .{self.handle});
         if (self.looper) |looper| looper.cancelTimer(&self.timer);
         self.bridge.pauseLink();
@@ -226,6 +240,7 @@ const WireGuardConnection = struct {
     /// Called before native detachment. Close admission and cancel reads;
     /// the daemon cancels writes on detach before stop joins Go.
     fn prepareStop(self: *WireGuardConnection) void {
+        self.pending_refresh = null;
         if (self.looper) |looper| looper.cancelTimer(&self.timer);
         if (self.state != .stopping and self.state != .stopped) log.write(.debug, "Close WireGuard v2 I/O admission");
         self.bridge.quiesce();
@@ -314,7 +329,7 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
     switch (self.state) {
         .active => self.requestRefresh(),
         // A reachable notification may have just started this activation.
-        .activating => if (!info.reachable and self.handle < 0) self.fail(.networkChanged),
+        .activating => if (self.handle >= 0) self.requestRefresh() else if (!info.reachable) self.fail(.networkChanged),
         else => {},
     }
     return if (self.state == .refresh_requested) .refresh_link else .none;

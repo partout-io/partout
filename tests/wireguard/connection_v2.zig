@@ -212,6 +212,25 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try waitRefresh(sut, &fake, 6);
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
+    // A newer path during a blocked endpoint update must refresh LINK and
+    // replay the latest endpoints once Go finishes, without replacing TUN.
+    const refreshes = fake.refreshes.load(.acquire);
+    fake.block_refresh.store(true, .release);
+    defer fake.block_refresh.store(false, .release);
+    try owner.actor.perform(void, .onBetterPath);
+    try wait(&fake.refresh_entered, 1);
+    const sockets = probe.sockets.load(.acquire);
+    dns.dns64.store(false, .release);
+    try owner.actor.perform(void, .onBetterPath);
+    try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
+    fake.block_refresh.store(false, .release);
+    try waitRefresh(sut, &fake, refreshes + 2);
+    try std.testing.expectEqual(refreshes + 2, fake.refreshes.load(.acquire));
+    try std.testing.expect(probe.sockets.load(.acquire) > sockets);
+    try std.testing.expect(!fake.refreshed_dns64.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+    try std.testing.expectEqual(cleared_before_refresh, controller.clear_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 0), probe.cleaned);
     try owner.looper.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
@@ -556,6 +575,8 @@ const FakeBackend = struct {
     context: ?*anyopaque = null,
     counts: std.atomic.Value(usize) = .init(0),
     refreshes: std.atomic.Value(usize) = .init(0),
+    block_refresh: std.atomic.Value(bool) = .init(false),
+    refresh_entered: std.atomic.Value(usize) = .init(0),
     refreshed_dns64: std.atomic.Value(bool) = .init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
@@ -620,6 +641,10 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
 fn fakeSetConfig(ptr: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     defer _ = self.refreshes.fetchAdd(1, .release);
+    if (self.block_refresh.load(.acquire)) {
+        _ = self.refresh_entered.fetchAdd(1, .release);
+        while (self.block_refresh.load(.acquire)) _ = libc.usleep(1000);
+    }
     std.debug.assert(std.mem.indexOf(u8, settings, "replace_peers") == null);
     self.refreshed_dns64.store(std.mem.indexOf(u8, settings, "endpoint=[64:ff9b::c000:201]:51820") != null, .release);
     if (self.fail_set_config.swap(false, .acq_rel)) {
