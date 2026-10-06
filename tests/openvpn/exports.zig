@@ -55,6 +55,46 @@ test "OpenVPN module exports import tagged module" {
     try std.testing.expect(std.mem.indexOf(u8, encoded, "\"remotes\":[\"vpn.example.com:UDP:1194\"]") != null);
 }
 
+test "OpenVPN module importer releases inline credentials on allocation failure" {
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, importInlineCredentials, .{});
+}
+
+fn importInlineCredentials(allocator: std.mem.Allocator) !void {
+    var module = try exports.module_implementation.importModule(
+        allocator,
+        "client\nremote vpn.example.com\n<ca>\ncertificate\n</ca>\n" ++
+            "<auth-user-pass>\nold\nsecret\n</auth-user-pass>\n" ++
+            "<auth-user-pass>\nusername\npassword\n</auth-user-pass>",
+        null,
+    );
+    defer module.deinit(allocator);
+    try std.testing.expectEqualStrings("username", module.OpenVPN.credentials.?.username);
+    try std.testing.expectEqualStrings("password", module.OpenVPN.credentials.?.password);
+}
+
+test "OpenVPN module importer releases inline credentials for incomplete profiles" {
+    try std.testing.expectError(
+        error.Parsing,
+        exports.module_implementation.importModule(
+            std.testing.allocator,
+            "client\n<auth-user-pass>\nusername\npassword\n</auth-user-pass>",
+            null,
+        ),
+    );
+}
+
+test "OpenVPN module importer accepts empty inline credentials for interactive authentication" {
+    const allocator = std.testing.allocator;
+    var module = try exports.module_implementation.importModule(
+        allocator,
+        "client\nremote vpn.example.com\n<ca>\ncertificate\n</ca>\n<auth-user-pass>\n</auth-user-pass>",
+        null,
+    );
+    defer module.deinit(allocator);
+    try std.testing.expect(module.OpenVPN.configuration.?.auth_user_pass.?);
+    try std.testing.expect(module.OpenVPN.credentials == null);
+}
+
 test "OpenVPN module importer requires CA and at least one remote" {
     const allocator = std.testing.allocator;
     const module_implementation = exports.module_implementation;

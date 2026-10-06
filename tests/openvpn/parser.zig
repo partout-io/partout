@@ -325,14 +325,24 @@ test "OpenVPNParser rejects connection blocks" {
     );
 }
 
-test "OpenVPNParser rejects embedded and external auth-user-pass credentials" {
-    try std.testing.expectError(
-        error.UnsupportedConfiguration,
-        OpenVPNParser.parse(
-            std.testing.allocator,
-            "<auth-user-pass>\nusername\npassword\n</auth-user-pass>",
-        ),
+test "OpenVPNParser accepts embedded auth-user-pass credentials" {
+    const allocator = std.testing.allocator;
+    var configuration = try OpenVPNParser.parse(
+        allocator,
+        "<auth-user-pass>\nusername\npassword\n</auth-user-pass>",
     );
+    defer configuration.deinit(allocator);
+    try std.testing.expect(configuration.auth_user_pass.?);
+}
+
+test "OpenVPNParser rejects unterminated auth-user-pass blocks" {
+    try std.testing.expectError(
+        error.MalformedOption,
+        OpenVPNParser.parse(std.testing.allocator, "client\n<auth-user-pass>\nusername\npassword"),
+    );
+}
+
+test "OpenVPNParser rejects external auth-user-pass credentials" {
     try std.testing.expectError(
         error.UnsupportedConfiguration,
         OpenVPNParser.parse(
