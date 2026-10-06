@@ -796,6 +796,8 @@ const ConnectionDaemon = struct {
         // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
         if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
+        // Passive protocols retain their bind across host socket replacement.
+        if (self.endpoint_resolver == null) self.connection.?.local_port = remote.local_port;
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
             if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),

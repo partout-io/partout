@@ -17,14 +17,16 @@ pub const PassiveIO = struct {
     looper: ?*net.Looper = null,
     handle: i32 = -1,
     startup: ?*Startup = null,
-    active: std.atomic.Value(bool) = .init(false),
+    state: std.atomic.Value(State) = .init(.closed),
+
+    const State = enum(u8) { closed, paused, active };
 
     pub fn start(self: *PassiveIO, remote: net.RemoteDescriptor, mtu: u32, settings: [:0]const u8) !void {
-        if (self.handle >= 0 or self.startup != null or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
+        if (self.startup != null or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
         if (self.backend.vtable.complete_io == null) return error.TransportFailure;
         self.looper = remote.looper;
-        self.active.store(true, .release);
-        errdefer self.active.store(false, .release);
+        self.state.store(.active, .release);
+        errdefer self.state.store(.closed, .release);
         const pending = try self.allocator.create(Startup);
         errdefer self.allocator.destroy(pending);
         const owned_settings = try self.allocator.dupeZ(u8, settings);
@@ -46,13 +48,17 @@ pub const PassiveIO = struct {
         result: backend.Error!i32 = undefined,
 
         fn run(self: *Startup) void {
+            defer self.done.store(true, .release);
             const owner = self.owner;
+            if (owner.handle >= 0) {
+                self.result = if ((owner.backend.setConfig(owner.allocator, owner.handle, self.settings) catch -1) == 0) owner.handle else error.TransportFailure;
+                return;
+            }
             self.result = owner.backend.turnOn(owner.allocator, self.settings, .{ .passive = .{
                 .link = .{ .local_port = self.port, .read = readLink, .write = writeLink },
                 .tun = .{ .mtu = self.mtu, .read = readTun, .write = writeTun },
                 .context = owner,
             } });
-            self.done.store(true, .release);
         }
     };
 
@@ -78,7 +84,7 @@ pub const PassiveIO = struct {
     /// Read loans cannot be active here: acquire/release also run on this queue.
     pub fn quiesce(self: *PassiveIO) void {
         self.lock.lock();
-        self.active.store(false, .release);
+        self.state.store(.closed, .release);
         var requests: [2]usize = .{ 0, 0 };
         for (&self.reads, &requests) |*slot, *request| {
             request.* = slot.request;
@@ -159,7 +165,7 @@ pub const PassiveIO = struct {
         };
         self.lock.lock();
         defer self.lock.unlock();
-        if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
+        if (self.state.load(.acquire) == .closed) return c.WG_IO_CLOSED;
         const slot = &self.reads[if (side == .link) @as(usize, 0) else 1];
         if (slot.request != 0) return c.WG_IO_INVALID;
         for (packets[0..count], slot.buffers[0..count]) |packet, *buffer| {
@@ -170,7 +176,7 @@ pub const PassiveIO = struct {
         slot.count = count;
         const looper = self.looper.?;
         const attached = if (side == .link) looper.isLinkAttached() else looper.isTunAttached();
-        if (attached) looper.resumeReading(side) catch {
+        if (attached and self.state.load(.acquire) == .active) looper.resumeReading(side) catch {
             for (slot.buffers[0..slot.count]) |*buffer| buffer.* = .{ .data = &.{} };
             slot.request = 0;
             slot.packets = null;
@@ -211,7 +217,11 @@ pub const PassiveIO = struct {
         if (request == 0 or count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
         self.lock.lock();
         defer self.lock.unlock();
-        if (!self.active.load(.acquire)) return c.WG_IO_CLOSED;
+        switch (self.state.load(.acquire)) {
+            .closed => return c.WG_IO_CLOSED,
+            .paused => return c.WG_IO_INVALID,
+            .active => {},
+        }
         const loan = self.allocator.create(WriteLoan) catch return c.WG_IO_INVALID;
         loan.* = .{ .allocator = self.allocator, .complete = self.backend.vtable.complete_io.?, .request = request };
         for (packets[0..count], loan.packets[0..count]) |packet, *entry| {

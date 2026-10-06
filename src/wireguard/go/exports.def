@@ -16,3 +16,4 @@ wgTurnOffWithPassiveIO
 wgGetConfigWithPassiveIO
 wgDisableRoamingWithPassiveIO
 wgCompleteIO
+wgSetEndpointsWithPassiveIO

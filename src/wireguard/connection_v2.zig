@@ -58,16 +58,21 @@ const WireGuardConnection = struct {
     timer: net.Looper.Timer = .{},
     interval_ms: u32,
     failed: bool = false,
+    retain_backend: bool = false,
     pending_info: ?api.TunnelRemoteInfoWrapper = null,
 
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) !bool {
-        if (self.bridge.handle >= 0 or self.bridge.startup != null) return false;
+        if (self.bridge.startup != null or (self.bridge.handle >= 0 and !self.retain_backend)) return false;
+        self.retain_backend = false;
         if (self.events == null) return error.UnableToStart;
         self.failed = false;
         self.resolver.reset(self.allocator);
         try self.resolver.cacheAll(self.allocator);
         const resolved = try self.resolver.resolve(self.allocator, std.EnumSet(net.DNSResolver.Flag).initEmpty());
-        const settings = try uapi.buildConfiguration(self.allocator, &self.configuration, resolved);
+        const settings = if (self.bridge.handle >= 0)
+            try uapi.buildEndpointConfiguration(self.allocator, &self.configuration, resolved)
+        else
+            try uapi.buildConfiguration(self.allocator, &self.configuration, resolved);
         defer self.allocator.free(settings);
         const builder = TunnelRemoteInfoBuilder.init(self.allocator, self.profile, self.module_id, &self.configuration);
         var info = try builder.build();
@@ -123,6 +128,7 @@ const WireGuardConnection = struct {
     fn fail(self: *WireGuardConnection, code: api.PartoutErrorCode) void {
         if (self.failed or (self.bridge.handle < 0 and self.pending_info == null)) return;
         self.failed = true;
+        self.retain_backend = code == .networkChanged and self.bridge.handle >= 0 and self.bridge.startup == null;
         if (self.events) |events| events.failed(events.ctx, .{ .err_pair = .{ .code = code }, .disposition = .reconnect });
     }
     fn destroy(self: *WireGuardConnection) void {
@@ -157,11 +163,21 @@ fn legacyStart(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError
 fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
     return cast(ptr).startV2(remote) catch |err| return startError(err);
 }
-fn shutdown(ptr: *anyopaque, _: net.Connection.ShutdownReason) void {
-    cast(ptr).quiesce();
+fn shutdown(ptr: *anyopaque, reason: net.Connection.ShutdownReason) void {
+    const self = cast(ptr);
+    self.retain_backend = self.retain_backend and switch (reason) {
+        .explicit_stop => false,
+        .failure => |disposition| disposition == .reconnect,
+    };
+    if (self.retain_backend) {
+        if (self.bridge.looper) |looper| looper.cancelTimer(&self.timer);
+        // Keep borrowed reads parked until the daemon attaches replacement I/O.
+        self.bridge.state.store(.paused, .release);
+    } else self.quiesce();
 }
 fn stop(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
-    cast(ptr).stop();
+    const self = cast(ptr);
+    if (!self.retain_backend) self.stop();
 }
 fn destroy(ptr: *anyopaque) void {
     cast(ptr).destroy();
@@ -176,7 +192,7 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
     const self = cast(ptr);
     // The daemon may just have started activation in response to this same
     // reachable notification. That fresh socket already uses the new path.
-    if (info.reachable and self.bridge.handle < 0) return;
+    if (info.reachable and (self.bridge.handle < 0 or self.bridge.startup != null)) return;
     // Reachability callbacks also announce usable-to-usable path changes.
     // Rebuild the host socket and resolve endpoints again (including DNS64)
     // even when availability stays true. Better-path events are only a subset.

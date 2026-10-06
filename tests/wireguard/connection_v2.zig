@@ -169,6 +169,8 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try owner.actor.perform(void, .resumeGate);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
+    try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
     monitor.setReachable(false);
     try waitStatus(sut, .disconnected);
     // Rearm while offline, then let reachability itself start activation. Its
@@ -182,7 +184,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
     sut.stop();
-    try std.testing.expectEqual(@as(usize, 4), fake.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 2), fake.turn_off_count);
     try std.testing.expectEqual(@as(usize, 4), probe.cleaned);
 }
 
@@ -343,7 +345,7 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
         var received: [512]u8 = undefined;
         var sender: io.SocketAddress = undefined;
         var size: ?usize = null;
-        for (0..3000) |_| {
+        for (0..7000) |_| {
             size = peer.receiveFrom(&received, &sender) catch |err| {
                 if (err != error.WouldBlock) return err;
                 _ = libc.usleep(1000);
@@ -426,8 +428,9 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
     );
 }
 
-fn fakeSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) backend_mod.Error!i64 {
-    @panic("v2 reconfigures through daemon reconnection");
+fn fakeSetConfig(_: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
+    std.debug.assert(std.mem.indexOf(u8, settings, "replace_peers") == null);
+    return 0;
 }
 
 fn fakeSocketDescriptors(_: ?*anyopaque, _: std.mem.Allocator, _: i32) backend_mod.Error![]io.SocketDescriptor {

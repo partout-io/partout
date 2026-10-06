@@ -121,3 +121,10 @@ cc -Isrc/wireguard/go/include src/wireguard/go/tests/passive_abi.c \
   -framework CoreFoundation -framework Security -o /tmp/passive-abi
 /tmp/passive-abi
 ```
+
+On network path changes the daemon replaces native I/O while retaining the Go
+device. Pending reads remain parked across detachment, and writes are rejected
+until reattachment. The replacement socket keeps the selected local port. Only
+peer endpoints are updated (including fresh DNS64 resolution), on the activation
+worker because UAPI can flush staged sends. Peer sessions and counters survive;
+explicit stop and terminal looper failure still cancel requests and close Go.

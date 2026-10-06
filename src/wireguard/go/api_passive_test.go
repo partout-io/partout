@@ -5,6 +5,7 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"net"
 	"net/netip"
 	"os"
@@ -127,5 +128,40 @@ func TestPassiveIdlePayloadBudget(t *testing.T) {
 	budget := 2 << 20
 	if total := <-capacity + <-capacity; total > budget {
 		t.Fatalf("idle payload storage = %d bytes, budget = %d", total, budget)
+	}
+}
+
+func TestPassiveEndpointRefreshPreservesPeer(t *testing.T) {
+	handle := startPassiveTestDevice(t)
+	backend, _ := lookupPassiveBackend(handle)
+	var key device.NoisePublicKey
+	key[0] = 1
+	settings := fmt.Sprintf("public_key=%x\nendpoint=127.0.0.1:1234\nallowed_ip=10.0.0.1/32\n", key)
+	if err := backend.IpcSet(settings); err != nil {
+		t.Fatal(err)
+	}
+	peer := backend.LookupPeer(key)
+	if peer == nil {
+		t.Fatal("missing peer")
+	}
+	if err := peer.SendBuffers([][]byte{make([]byte, 123)}); err != nil {
+		t.Fatal(err)
+	}
+	session := backend.bind.session
+	if setPassiveEndpoints(handle, fmt.Sprintf("public_key=%x\nendpoint=127.0.0.1:5678\n", key)) != 0 {
+		t.Fatal("refresh failed")
+	}
+	if backend.LookupPeer(key) != peer || backend.bind.session != session {
+		t.Fatal("refresh replaced peer or bind")
+	}
+
+	config, err := backend.IpcGet()
+	if err != nil || (!strings.Contains(config, "endpoint=127.0.0.1:5678") || !strings.Contains(config, "tx_bytes=123")) {
+		t.Fatalf("endpoint not updated: %v, %s", err, config)
+	}
+	for _, invalid := range []string{"replace_peers=true\n", "listen_port=99\n", "private_key=00\n"} {
+		if setPassiveEndpoints(handle, invalid) == 0 {
+			t.Fatalf("accepted destructive update %q", invalid)
+		}
 	}
 }

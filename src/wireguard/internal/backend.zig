@@ -226,9 +226,9 @@ fn cGetConfigPassive(_: ?*anyopaque, allocator: std.mem.Allocator, handle: i32) 
     return try allocator.dupe(u8, std.mem.span(config));
 }
 
-// FIXME: ###, Passive devices are reconfigured by restarting; all transport belongs to the host.
-fn cSetConfigPassive(_: ?*anyopaque, _: std.mem.Allocator, _: i32, _: [:0]const u8) Error!i64 {
-    return error.TransportFailure;
+// Passive updates are restricted to peer endpoints; the host owns transport.
+fn cSetConfigPassive(_: ?*anyopaque, _: std.mem.Allocator, handle: i32, settings: [:0]const u8) Error!i64 {
+    return wireguard_c.pp_wg_set_endpoints_passive(handle, settings.ptr);
 }
 
 // FIXME: ###

@@ -46,6 +46,8 @@ extern int32_t wgTurnOnWithPassiveIO(const char *settings,
  * The config string is caller-owned and must be freed with free(). */
 extern void wgTurnOffWithPassiveIO(int32_t handle);
 extern char *wgGetConfigWithPassiveIO(int32_t handle);
+/* Endpoint-only UAPI update. Run off the I/O queue; retains peers and sessions. */
+extern int64_t wgSetEndpointsWithPassiveIO(int32_t handle, const char *settings);
 extern void wgDisableRoamingWithPassiveIO(int32_t handle);
 
 /* Completes one accepted borrowed I/O request; not a device handle. */

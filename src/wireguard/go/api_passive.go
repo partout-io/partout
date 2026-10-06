@@ -16,6 +16,7 @@ import (
 	"runtime"
 	"runtime/cgo"
 	"strconv"
+	"strings"
 	"sync"
 	"unsafe"
 
@@ -143,6 +144,38 @@ func wgGetConfigWithPassiveIO(handle int32) *C.char {
 		return nil
 	}
 	return C.CString(settings)
+}
+
+//export wgSetEndpointsWithPassiveIO
+func wgSetEndpointsWithPassiveIO(handle int32, settings *C.char) int64 {
+	if settings == nil {
+		return -1
+	}
+	return setPassiveEndpoints(handle, C.GoString(settings))
+}
+
+// Endpoint-only updates cannot reopen Bind or replace peers and their sessions.
+// The caller runs this off its I/O queue: IpcSet can flush staged packets.
+func setPassiveEndpoints(handle int32, settings string) int64 {
+	tunnel, ok := lookupPassiveBackend(handle)
+	if !ok {
+		return -1
+	}
+	lines := strings.Split(settings, "\n")
+	for i, line := range lines {
+		switch {
+		case line == "", strings.HasPrefix(line, "endpoint="):
+		case strings.HasPrefix(line, "public_key="):
+			// A stale endpoint update must not create a peer.
+			lines[i] += "\nupdate_only=true"
+		default:
+			return -1
+		}
+	}
+	if err := tunnel.IpcSet(strings.Join(lines, "\n")); err != nil {
+		return -1
+	}
+	return 0
 }
 
 //export wgDisableRoamingWithPassiveIO
