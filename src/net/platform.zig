@@ -155,6 +155,11 @@ pub const Platform = struct {
         };
     }
 
+    /// V2 can operate an unconnected UDP link with either available family.
+    pub fn socketFactoryV2(self: *Platform) SocketFactory {
+        return .{ .ptr = self, .vtable = &platform_socket_factory_v2_vtable };
+    }
+
     pub fn networkMonitor(self: *Platform) NetworkMonitor {
         return .{
             .ptr = self,
@@ -406,6 +411,11 @@ const platform_socket_factory_vtable = SocketFactory.VTable{
     .create = socketFactoryCreate,
 };
 
+const platform_socket_factory_v2_vtable = SocketFactory.VTable{
+    .current_reachability = socketFactoryCurrentReachability,
+    .create = socketFactoryCreateV2,
+};
+
 fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     return self.currentReachability();
@@ -414,20 +424,49 @@ fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
 fn socketFactoryCreate(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
-    endpoint: api.ExtendedEndpoint,
+    endpoint: ?api.ExtendedEndpoint,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
+    local_port: u16,
 ) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
-    const options = self.socketOptions(effective_reachability, timeout);
+    var options = self.socketOptions(effective_reachability, timeout);
+    if (endpoint == null) options.port = local_port;
     log.write(.info, "Creating SocketWrapper");
     const wrapper = try SocketWrapper.create(allocator, endpoint, options) orelse
         return error.LinkNotActive;
-    log.writef(.debug, "SocketFactory: Created socket for {s}", .{
-        log.sensitive(endpoint.address),
-    });
+    if (endpoint) |remote| {
+        log.writef(.debug, "SocketFactory: Created socket for {s}", .{
+            log.sensitive(remote.address),
+        });
+    } else {
+        log.write(.debug, "SocketFactory: Created unconnected UDP socket");
+    }
     return wrapper.linkDescriptor();
+}
+
+fn socketFactoryCreateV2(
+    ptr: ?*anyopaque,
+    allocator: std.mem.Allocator,
+    endpoint: ?api.ExtendedEndpoint,
+    reachability: ?ReachabilityInfo,
+    timeout: c_int,
+    local_port: u16,
+) SocketFactory.Error!Looper.LinkDescriptor {
+    return socketFactoryCreate(ptr, allocator, endpoint, reachability, timeout, local_port) catch |err| {
+        if (err != error.LinkNotActive or endpoint != null) return err;
+        // The portable API reports native open failures as null. Retry the
+        // unconnected link with IPv4, preserving port and host configuration.
+        const self: *Platform = @ptrCast(@alignCast(ptr.?));
+        var options = self.socketOptions(reachability orelse self.currentReachability(), timeout);
+        options.port = local_port;
+        options.ipv6 = false;
+        log.write(.info, "Retry unconnected UDP socket with IPv4");
+        const wrapper = try SocketWrapper.create(allocator, null, options) orelse return error.LinkNotActive;
+        log.write(.debug, "SocketFactory: Created unconnected IPv4 UDP socket");
+        return wrapper.linkDescriptor();
+    };
 }
 
 //#endregion

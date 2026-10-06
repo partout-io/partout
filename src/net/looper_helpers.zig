@@ -14,7 +14,7 @@ const log = core.logging;
 pub const Options = struct {
     // FIXME: ###, *_buf_size unused by v2
     link_buf_size: usize = 64 * 1024,
-    tun_buf_size: usize = 16 * 1024,
+    tun_buf_size: usize = 64 * 1024,
     max_read_size: usize = 256 * 1024,
     max_read_count: usize = 128,
     on_finish: OnFinish,

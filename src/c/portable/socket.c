@@ -70,6 +70,7 @@ static bool local_parse_numeric_addr(const char *ip_addr,
                                      struct sockaddr_storage *addr,
                                      os_socklen_t *addrlen);
 static void local_close_impl(pp_socket sock);
+static void local_log_opened_socket(pp_socket sock, int socktype);
 
 static bool local_is_invalid_fd(pp_socket_fd fd) {
     return fd == local_invalid_fd();
@@ -224,6 +225,7 @@ pp_socket pp_socket_open(const char *hostname,
         // Success
         pp_socket sock = pp_socket_create(new_fd);
         if (!sock) goto failure;
+        local_log_opened_socket(sock, socktype);
         return sock;
     }
 
@@ -285,12 +287,30 @@ pp_socket pp_socket_open(const char *hostname,
     if (!sock) goto failure;
     sock->unconnected = options->unconnected;
     sock->dual_stack = options->dual_stack;
+    local_log_opened_socket(sock, socktype);
     return sock;
 
 failure:
     if (resolved) freeaddrinfo(resolved);
     if (!local_is_invalid_fd(new_fd)) local_close_fd(new_fd);
     return NULL;
+}
+
+static void local_log_opened_socket(pp_socket sock, int socktype) {
+    struct sockaddr_storage address;
+    os_socklen_t address_len = sizeof(address);
+    const char *family = "unknown";
+    if (getsockname(sock->fd, (struct sockaddr *)&address, &address_len) == 0) {
+        family = address.ss_family == AF_INET6 ? "AF_INET6" :
+                 address.ss_family == AF_INET ? "AF_INET" : "other";
+    }
+    pp_clog_v(PPLogLevelDebug,
+              "Socket: Opened native socket fd=%llu, family=%s, type=%s, mode=%s, dual_stack=%s",
+              (unsigned long long)sock->fd,
+              family,
+              socktype == SOCK_DGRAM ? "SOCK_DGRAM (UDP)" : "SOCK_STREAM (TCP)",
+              sock->unconnected ? "unconnected (bound)" : "connected",
+              sock->dual_stack ? "true" : "false");
 }
 
 /* Close the owned socket and free the wrapper. */

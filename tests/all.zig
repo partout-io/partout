@@ -73,6 +73,7 @@ comptime {
     }
     if (source.wireguard_enabled) {
         _ = @import("wireguard/connection.zig");
+        _ = @import("wireguard/connection_v2.zig");
         _ = @import("wireguard/exports.zig");
         _ = @import("wireguard/parser.zig");
         _ = @import("wireguard/serializer.zig");

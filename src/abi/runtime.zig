@@ -164,7 +164,10 @@ pub const DaemonRuntime = struct {
             experimental: openvpn.ConnectionContextV2,
         },
         Provider: void,
-        WireGuard: wireguard.ConnectionContext,
+        WireGuard: union(enum) {
+            legacy: if (runtime_policy.v2_only) void else wireguard.ConnectionContext,
+            experimental: wireguard.ConnectionContextV2,
+        },
         Undefined: void,
     };
 
@@ -189,26 +192,9 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        const experimental_requested = options.feature_flags.contains(.experimentalDaemon);
-        const module_type = if (api.findActiveConnectionModule(&options.profile)) |module|
-            api.moduleType(module)
-        else
-            null;
-        const is_null_or_openvpn = module_type == null or module_type == .OpenVPN;
         // The shared policy excludes legacy implementations at compile time.
-        const experimental = if (runtime_policy.v2_only) true else experimental_requested and is_null_or_openvpn;
-        if (experimental) {
-            log.write(.notice, "Using daemon v2 (experimental)");
-        } else {
-            log.write(.notice, "Using daemon v1 (legacy)");
-            if (experimental_requested) {
-                if (module_type) |mt| {
-                    log.writef(.err, "\tIgnoring .experimentalDaemon, not applied for {s}", .{mt.raw()});
-                } else {
-                    std.debug.assert(false);
-                }
-            }
-        }
+        const experimental = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
+        log.write(.notice, if (experimental) "Using daemon v2 (experimental)" else "Using daemon v1 (legacy)");
 
         // Register the known connection implementations
         self.contexts = .{};
@@ -228,12 +214,12 @@ pub const DaemonRuntime = struct {
         }
         if (build_options.wireguard) {
             const ctx = self.contexts.putUninitialized(.WireGuard);
-            ctx.* = .{ .WireGuard = .{
-                .backend = wireguard.go_backend,
-            } };
-            const impl: net.ConnectionImplementation = .{
-                .ptr = @constCast(&ctx.WireGuard),
-                .vtable = &wireguard.connection_vtable,
+            const impl: net.ConnectionImplementation = if (experimental) blk: {
+                ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_passive_backend } } };
+                break :blk .{ .ptr = &ctx.WireGuard.experimental, .vtable = &wireguard.connection_v2_vtable };
+            } else blk: {
+                ctx.* = .{ .WireGuard = .{ .legacy = .{ .backend = wireguard.go_backend } } };
+                break :blk .{ .ptr = &ctx.WireGuard.legacy, .vtable = &wireguard.connection_vtable };
             };
             try impls.append(allocator, impl);
         }
@@ -254,7 +240,7 @@ pub const DaemonRuntime = struct {
                     .registry = &self.registry,
                     .controller = self.platform.tunnelController(),
                     .resolver = self.platform.dnsResolver(),
-                    .factory = self.platform.socketFactory(),
+                    .factory = if (experimental) self.platform.socketFactoryV2() else self.platform.socketFactory(),
                     .monitor = self.platform.networkMonitor(),
                 },
                 .options = .{

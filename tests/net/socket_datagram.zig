@@ -221,34 +221,27 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     try loop.stop();
 }
 
-test "v2 UDP truncation fails the link and permits replacement" {
+test "v2 UDP truncation drops the packet and retains the link" {
     var loop = try Looper.initExperimental(allocator, .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
     var echo = Echo{ .looper = &loop };
     const server = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     const address = try destination(server, 4);
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_failure = .{ .context = &echo, .callback = Echo.failed } }) catch |err| {
+    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_failure = .{ .context = &echo, .callback = Echo.failed }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer peer.destroy();
     _ = try peer.sendTo("oversized", address);
-    try wait(&echo.failures, 1);
-    try loop.performTask(.{ .callback = barrier });
-    try std.testing.expect(!loop.isLinkAttached());
-    const replacement = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
-    const new_address = try destination(replacement, 4);
-    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
-        replacement.destroy();
-        return err;
-    };
-    _ = try peer.sendTo("ok", new_address);
+    _ = try peer.sendTo("ok", address);
     var buf: [4]u8 = undefined;
     var from: io.SocketAddress = undefined;
     try std.testing.expectEqual(@as(usize, 2), try receive(peer, &buf, &from));
     try std.testing.expectEqualStrings("ok", buf[0..2]);
+    try std.testing.expect(loop.isLinkAttached());
+    try std.testing.expectEqual(@as(usize, 0), echo.failures.load(.acquire));
     try loop.stop();
 }
 

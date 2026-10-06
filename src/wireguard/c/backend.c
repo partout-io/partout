@@ -74,6 +74,30 @@ int pp_wg_get_socket_v6(int handle) {
 }
 #endif
 
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+    return wgTurnOnWithPassiveIO(settings, link, tun, context);
+}
+
+void pp_wg_turn_off_passive(int32_t handle) {
+    wgTurnOffWithPassiveIO(handle);
+}
+
+char *pp_wg_get_config_passive(int32_t handle) {
+    return wgGetConfigWithPassiveIO(handle);
+}
+
+int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
+    return wgSetEndpointsWithPassiveIO(handle, settings);
+}
+
+void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
+    wgDisableRoamingWithPassiveIO(handle);
+}
+
+void pp_wg_complete_io(uintptr_t request, uint32_t count, int32_t status) {
+    wgCompleteIO(request, count, status);
+}
+
 #else
 
 int pp_wg_init(void) {
@@ -138,5 +162,32 @@ int pp_wg_get_socket_v6(int handle) {
     return -1;
 }
 #endif
+
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+    (void)settings; (void)link; (void)tun; (void)context;
+    return -1;
+}
+
+void pp_wg_turn_off_passive(int32_t handle) {
+    (void)handle;
+}
+
+char *pp_wg_get_config_passive(int32_t handle) {
+    (void)handle;
+    return NULL;
+}
+
+int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
+    (void)handle; (void)settings;
+    return -1;
+}
+
+void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
+    (void)handle;
+}
+
+void pp_wg_complete_io(uintptr_t request, uint32_t count, int32_t status) {
+    (void)request; (void)count; (void)status;
+}
 
 #endif

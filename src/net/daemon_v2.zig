@@ -336,7 +336,7 @@ const ConnectionDaemon = struct {
     actor: *Actor,
     connection: ?Connection,
     // Valid while connection is non-null; only this class accesses them.
-    endpoint_resolver: EndpointResolver,
+    endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
     tunnel: ?net.TunWrapper,
     gate: ConnectionGate,
@@ -366,7 +366,7 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
-            .endpoint_resolver = undefined,
+            .endpoint_resolver = null,
             .looper = undefined,
             .tunnel = null,
             .gate = ConnectionGate.init(null),
@@ -652,8 +652,8 @@ const ConnectionDaemon = struct {
         errdefer looper.deinit();
         self.connection = connection;
         errdefer self.connection = null;
-        self.endpoint_resolver = EndpointResolver.init(self.daemon.allocator, connection.endpoints());
-        errdefer self.endpoint_resolver.deinit();
+        self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
+        errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
         looper.start() catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -672,7 +672,8 @@ const ConnectionDaemon = struct {
         self.destroyTunnel();
         self.looper.deinit();
         self.daemon.allocator.destroy(self.looper);
-        self.endpoint_resolver.deinit();
+        if (self.endpoint_resolver) |*resolver| resolver.deinit();
+        self.endpoint_resolver = null;
         self.connection = null;
     }
 
@@ -748,14 +749,14 @@ const ConnectionDaemon = struct {
                 else => error.UnableToStart,
             });
             self.trackConnectionStatus(.disconnected);
-            self.detachLooperSides() catch {};
+            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
             self.scheduleResumeGate();
             return;
         };
         if (!did_start) {
             log.write(.err, "Connection could not start");
             self.trackConnectionStatus(.disconnected);
-            self.detachLooperSides() catch {};
+            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
             self.scheduleResumeGate();
             return;
         }
@@ -764,43 +765,51 @@ const ConnectionDaemon = struct {
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         log.write(.notice, "Create new link");
-        log.write(.notice, "Cycle to next endpoint");
-        // FIXME: ###, Pick endpoint, resolve DNS, and connect link atomically in SocketFactory
+        const connection = self.connection orelse @panic("setupLink but no connection");
+        const conn_options = self.daemon.options.connection_options;
+        var remote = RemoteDescriptor{ .looper = self.looper };
         const reachability = self.factory.currentReachability();
-        const endpoint = try self.endpoint_resolver.next(
-            &self.resolver,
-            reachability,
-            self.daemon.options.connection_options.dns_timeout,
-        );
-        const remote_endpoint = try net.SocketEndpoint.init(endpoint);
-        log.writef(.notice, "Connect to {s}", .{endpoint});
-        var descriptor = try self.factory.create(
+        var endpoint: ?api.ExtendedEndpoint = null;
+        if (self.endpoint_resolver) |*resolver| {
+            log.write(.notice, "Cycle to next endpoint");
+            // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
+            endpoint = try resolver.next(
+                &self.resolver,
+                reachability,
+                conn_options.dns_timeout,
+            );
+            log.writef(.notice, "Connect to {s}", .{endpoint.?});
+        }
+        remote.endpoint = if (endpoint) |resolved| try net.SocketEndpoint.init(resolved) else null;
+        const unconnected = if (remote.endpoint) |resolved|
+            resolved.plainSocketType() == .udp and !conn_options.connect_udp
+        else
+            true;
+        var factory = self.factory;
+        factory.local_port = connection.local_port;
+        var descriptor = try factory.create(
             self.daemon.allocator,
-            endpoint,
+            if (unconnected) null else endpoint,
             reachability,
-            self.daemon.options.connection_options.link_activity_timeout,
+            conn_options.link_activity_timeout,
         );
-        // The looper takes ownership only after a successful attach.
+        // Both link kinds transfer ownership only after a successful attach.
         errdefer descriptor.cleanup();
+        if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
+        // Passive protocols retain their bind across host socket replacement.
+        if (self.endpoint_resolver == null) self.connection.?.local_port = remote.local_port;
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
-            endpoint.proto.socket_type.raw(),
+            if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
         });
         log.write(.info, "Attach LINK");
         try self.looper.attach(.{
-            .pair = .{
-                .link = descriptor,
-            },
-            .on_read = .{
-                .context = self,
-                .callback = onLinkRead,
-            },
-            .on_failure = .{
-                .context = self,
-                .callback = onLinkFailure,
-            },
+            .pair = .{ .link = descriptor },
+            .read_buffers = connection.readBuffers(.link),
+            .on_read = .{ .context = self, .callback = onLinkRead },
+            .on_failure = .{ .context = self, .callback = onLinkFailure },
         });
-        return .{ .endpoint = remote_endpoint, .looper = self.looper };
+        return remote;
     }
 
     fn scheduleResumeGate(self: *ConnectionDaemon) void {
@@ -877,19 +886,20 @@ const ConnectionDaemon = struct {
     ) !void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
-        if (self.connection == null) return;
+        const connection = self.connection orelse return;
 
         self.tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        const descriptor = self.tunnel.?.tunDescriptor();
+        const descriptor = try self.tunnel.?.tunDescriptor();
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
             .pair = .{
                 .tun = descriptor,
             },
+            .read_buffers = connection.readBuffers(.tun),
             .on_read = .{
                 .context = self,
                 .callback = onTunnelRead,
@@ -1034,10 +1044,10 @@ const ConnectionDaemon = struct {
     // run protocol work directly, but must never wait for the actor. Termination
     // finalizes protocol state here, then enqueues actor-owned recovery.
 
-    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
+    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
-        return conn.submitPackets(.link, packets);
+        return conn.submitPackets(.link, packets, sources);
     }
 
     fn onLinkFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {
@@ -1049,7 +1059,7 @@ const ConnectionDaemon = struct {
     fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
-        return conn.submitPackets(.tun, packets);
+        return conn.submitPackets(.tun, packets, null);
     }
 
     fn onTunnelFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {

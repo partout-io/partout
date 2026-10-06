@@ -30,6 +30,13 @@ pub const POSIXDescriptor = struct {
     pub fn cleanup(self: POSIXDescriptor) void {
         self.io.cleanup();
     }
+
+    pub fn localAddress(self: POSIXDescriptor) !io.SocketAddress {
+        return switch (self.io) {
+            .socket => |socket| socket.localAddress(),
+            else => error.InvalidSocketMode,
+        };
+    }
 };
 
 pub const LinkDescriptor = POSIXDescriptor;
@@ -197,6 +204,11 @@ pub const SocketWrapper = struct {
         defer c_address.deinit();
 
         const reachability = options.reachability orelse reachabilityNone();
+        log.writef(.debug, "SocketWrapper: Opening POSIX socket, protocol={s}, mode={s}, dual_stack={}", .{
+            @tagName(endpoint.plainSocketType()),
+            if (unconnected) "unconnected (bind)" else "connected (connect)",
+            unconnected and options.ipv4 and options.ipv6,
+        });
         const socket = io_c.pp_socket_open(
             c_address.ptr(),
             socketProto(endpoint),
@@ -258,14 +270,29 @@ pub const SocketWrapper = struct {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
         if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
-        if (count < 0) return error.LibcFailure;
+        if (count < 0) return datagramError();
         return @intCast(count);
     }
 
     pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         if (address.family != 4 and address.family != 6) return error.InvalidAddressFamily;
-        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false);
+        return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false) catch |err| {
+            return if (err == error.LibcFailure) datagramError() else err;
+        };
+    }
+
+    fn datagramError() Error {
+        // Truncation and per-destination errors (including asynchronous ICMP)
+        // do not invalidate a shared UDP socket or its other peers.
+        return switch (io_c.pp_socket_last_error_binding()) {
+            @intFromEnum(std.c.E.MSGSIZE),
+            @intFromEnum(std.c.E.NETUNREACH),
+            @intFromEnum(std.c.E.HOSTUNREACH),
+            @intFromEnum(std.c.E.CONNREFUSED),
+            => error.DatagramDropped,
+            else => error.LibcFailure,
+        };
     }
 
     pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
@@ -297,6 +324,7 @@ fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
 pub const TunWrapper = struct {
     tun: io_c.pp_tun,
     is_closed: bool = false,
+    test_descriptor: if (builtin.is_test) ?POSIXDescriptor else void = if (builtin.is_test) null else {},
 
     pub fn init(tun: io_c.pp_tun) TunWrapper {
         return .{ .tun = tun };
@@ -321,6 +349,10 @@ pub const TunWrapper = struct {
     fn free(self: *TunWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
+        if (builtin.is_test) if (self.test_descriptor) |descriptor| {
+            descriptor.cleanup();
+            return;
+        };
         io_c.pp_tun_free(self.tun);
     }
 
@@ -334,12 +366,14 @@ pub const TunWrapper = struct {
     fn resetEvents(_: *TunWrapper) Error!void {}
 
     fn read(self: *const TunWrapper, buf: []u8) Error!?usize {
+        if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.io.read(buf);
         const read_count = io_c.pp_tun_read(self.tun, buf.ptr, buf.len);
         return mapReadResult(.tun, read_count, false);
     }
 
     fn write(self: *const TunWrapper, data: []const u8, offset: usize) Error!usize {
         if (offset > data.len) return error.InvalidOffset;
+        if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.io.write(data, offset);
         const written = io_c.pp_tun_write(self.tun, data.ptr + offset, data.len - offset);
         return mapWriteResult(.tun, written, true);
     }
@@ -354,6 +388,7 @@ pub const TunWrapper = struct {
 
     // FIXME: ###, Drop after v2
     pub fn muxDescriptor(self: TunWrapper) ?io_c.pp_fd {
+        if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.fd;
         const fd = io_c.pp_tun_get_watch_fd(self.tun);
         return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
@@ -364,9 +399,11 @@ pub const TunWrapper = struct {
         return std.mem.span(c_name);
     }
 
-    pub fn tunDescriptor(self: *TunWrapper) TunDescriptor {
+    pub fn tunDescriptor(self: *TunWrapper) Error!TunDescriptor {
+        const fd = self.muxDescriptor() orelse return error.LibcFailure;
+        if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{
-            .fd = io_c.pp_tun_get_watch_fd(self.tun),
+            .fd = fd,
             .io = self.nativeIO(),
         };
     }
