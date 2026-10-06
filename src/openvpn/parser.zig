@@ -24,7 +24,7 @@ pub fn importModule(
         Parser.init(null)
     else
         Parser{};
-    var configuration = parser.parseWithContext(allocator, contents, importParserContext(context)) catch |err| {
+    var parsed = parser.parseProfileWithContext(allocator, contents, importParserContext(context)) catch |err| {
         return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.InvalidFormat => error.UnknownImportedModule,
@@ -40,18 +40,18 @@ pub fn importModule(
             },
         };
     };
+    errdefer parsed.deinit(allocator);
     setRecognizedType(context);
-    if (!isCompleteClientConfiguration(&configuration)) {
-        configuration.deinit(allocator);
+    if (!isCompleteClientConfiguration(&parsed.configuration)) {
         return error.Parsing;
     }
     const module_id = core.newId() catch {
-        configuration.deinit(allocator);
         return error.Parsing;
     };
     const module = api.TaggedModule{ .OpenVPN = .{
         .id = module_id,
-        .configuration = configuration,
+        .configuration = parsed.configuration,
+        .credentials = parsed.credentials,
     } };
     return module;
 }
@@ -129,6 +129,27 @@ pub const Parser = struct {
         contents: []const u8,
         context: Context,
     ) ParseError!api.OpenVPNConfiguration {
+        var parsed = try self.parseProfileWithContext(allocator, contents, context);
+        if (parsed.credentials) |*credentials| credentials.deinit(allocator);
+        return parsed.configuration;
+    }
+
+    const ParsedProfile = struct {
+        configuration: api.OpenVPNConfiguration,
+        credentials: ?api.OpenVPNCredentials,
+
+        fn deinit(self: *ParsedProfile, allocator: std.mem.Allocator) void {
+            self.configuration.deinit(allocator);
+            if (self.credentials) |*credentials| credentials.deinit(allocator);
+        }
+    };
+
+    fn parseProfileWithContext(
+        self: Parser,
+        allocator: std.mem.Allocator,
+        contents: []const u8,
+        context: Context,
+    ) ParseError!ParsedProfile {
         var builder = Builder.init(
             context,
             self.decrypt_key_ctx,
@@ -139,14 +160,21 @@ pub const Parser = struct {
         var lines = std.mem.splitScalar(u8, contents, '\n');
         while (lines.next()) |raw_line| {
             const line = util.trim(raw_line);
-            if (line.len == 0 or line[0] == '#' or line[0] == ';') continue;
+            const in_credentials = if (builder.current_block_name) |name|
+                std.ascii.eqlIgnoreCase(name, "auth-user-pass")
+            else
+                false;
+            if (!in_credentials and (line.len == 0 or line[0] == '#' or line[0] == ';')) continue;
             builder.putLine(allocator, line) catch |err| {
                 builder.context.setLineParseErrorInfo(allocator, line, err);
                 return err;
             };
         }
 
-        return try builder.build(allocator);
+        const configuration = try builder.build(allocator);
+        const credentials = builder.credentials;
+        builder.credentials = null;
+        return .{ .configuration = configuration, .credentials = credentials };
     }
 };
 
@@ -210,6 +238,7 @@ fn decryptKeyWithBackend(comptime backend: CryptoBackend) Parser.DecryptKey {
 
 const Builder = struct {
     configuration: api.OpenVPNConfiguration,
+    credentials: ?api.OpenVPNCredentials,
     legacy_cipher: ?api.OpenVPNCipher,
     data_ciphers_fallback: ?api.OpenVPNCipher,
     data_ciphers: std.ArrayList(api.OpenVPNCipher),
@@ -244,6 +273,7 @@ const Builder = struct {
     ) Builder {
         return .{
             .configuration = .{},
+            .credentials = null,
             .legacy_cipher = null,
             .data_ciphers_fallback = null,
             .data_ciphers = .empty,
@@ -275,6 +305,7 @@ const Builder = struct {
 
     fn deinit(self: *Builder, allocator: std.mem.Allocator) void {
         self.configuration.deinit(allocator);
+        if (self.credentials) |*credentials| credentials.deinit(allocator);
         self.data_ciphers.deinit(allocator);
         self.remotes.deinit(allocator);
         util.deinitList(api.Route, allocator, &self.routes4);
@@ -306,9 +337,7 @@ const Builder = struct {
         }
 
         if (blockBeginName(line)) |name| {
-            if (std.ascii.eqlIgnoreCase(name, "connection") or
-                std.ascii.eqlIgnoreCase(name, "auth-user-pass"))
-            {
+            if (std.ascii.eqlIgnoreCase(name, "connection")) {
                 self.context.setParseErrorInfo(allocator, name, line);
                 return error.UnsupportedConfiguration;
             }
@@ -583,7 +612,22 @@ const Builder = struct {
         allocator: std.mem.Allocator,
         block_name: []const u8,
     ) ParseError!void {
-        if (std.ascii.eqlIgnoreCase(block_name, "ca")) {
+        if (std.ascii.eqlIgnoreCase(block_name, "auth-user-pass")) {
+            self.found_option = true;
+            self.configuration.auth_user_pass = true;
+            const lines = self.current_block_lines.items;
+            if (lines.len > 0) {
+                const username = try allocator.dupe(u8, lines[0]);
+                errdefer allocator.free(username);
+                const password = try allocator.dupe(u8, if (lines.len > 1) lines[1] else "");
+                if (self.credentials) |*credentials| credentials.deinit(allocator);
+                self.credentials = .{
+                    .username = username,
+                    .password = password,
+                    .otp_method = .none,
+                };
+            }
+        } else if (std.ascii.eqlIgnoreCase(block_name, "ca")) {
             replaceOpenVPNCryptoContainer(allocator, &self.configuration.ca, try std.mem.join(allocator, "\n", self.current_block_lines.items));
         } else if (std.ascii.eqlIgnoreCase(block_name, "cert")) {
             replaceOpenVPNCryptoContainer(allocator, &self.configuration.client_certificate, try std.mem.join(allocator, "\n", self.current_block_lines.items));
@@ -751,6 +795,9 @@ const Builder = struct {
     }
 
     fn build(self: *Builder, allocator: std.mem.Allocator) ParseError!api.OpenVPNConfiguration {
+        if (self.current_block_name) |name| {
+            if (std.ascii.eqlIgnoreCase(name, "auth-user-pass")) return error.MalformedOption;
+        }
         if (!self.found_option) return error.InvalidFormat;
 
         // The explicit compatibility fallback is distinct from deprecated

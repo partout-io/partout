@@ -45,6 +45,41 @@ test "ABI registry imports raw OpenVPN profile through parser implementation" {
     try std.testing.expect(!std.mem.eql(u8, module_id[0..], "openvpn"));
 }
 
+test "ABI registry preserves inline OpenVPN credentials in imported profiles" {
+    const allocator = std.testing.allocator;
+    var importer = try Importer.init(allocator);
+    defer importer.deinit(allocator);
+    const cases = .{
+        .{ "<auth-user-pass>\nusername\npassword\n</auth-user-pass>", "username", "password" },
+        .{ "<AUTH-USER-PASS>\nusername\n</Auth-User-Pass>", "username", "" },
+        .{ "<auth-user-pass>\n#username\n;password\n</auth-user-pass>", "#username", ";password" },
+        .{ "<auth-user-pass>\nusername\n\n</auth-user-pass>", "username", "" },
+        .{ "<auth-user-pass>\nold\nsecret\n</auth-user-pass>\n<auth-user-pass>\nnew\npassword\n</auth-user-pass>", "new", "password" },
+    };
+    inline for (cases) |entry| {
+        const contents = "client\nremote vpn.example.com 1194 udp\n<ca>\n-----BEGIN CERTIFICATE-----\nabc\n-----END CERTIFICATE-----\n</ca>\n" ++ entry[0];
+        const imported = try importer.importProfile(
+            allocator,
+            contents,
+            "Inline credentials",
+            core.ImportContext.init(null, null),
+        );
+        defer allocator.free(imported);
+        var profile = try api.Profile.parse(allocator, imported);
+        defer profile.deinit(allocator);
+        const module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
+        const openvpn = switch (module.module.*) {
+            .OpenVPN => |value| value,
+            else => return error.TestUnexpectedResult,
+        };
+        try std.testing.expect(openvpn.configuration.?.auth_user_pass.?);
+        const credentials = openvpn.credentials orelse return error.TestUnexpectedResult;
+        try std.testing.expectEqualStrings(entry[1], credentials.username);
+        try std.testing.expectEqualStrings(entry[2], credentials.password);
+        try std.testing.expectEqual(api.OpenVPNCredentialsOTPMethod.none, credentials.otp_method);
+    }
+}
+
 test "ABI registry imports raw WireGuard profile through parser implementation" {
     const allocator = std.testing.allocator;
 
