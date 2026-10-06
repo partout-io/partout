@@ -94,6 +94,15 @@ fn wait(counter: *const std.atomic.Value(usize), target: usize) !void {
     return error.Timeout;
 }
 
+fn waitStatus(sut: *source.net_daemon_v2.Daemon, status: api.ConnectionStatus) !void {
+    for (0..3000) |_| {
+        try std.testing.expectError(error.AlreadyStarted, sut.start());
+        if (sut.snapshot_publisher.environment.connection_status == status) return;
+        _ = libc.usleep(1000);
+    }
+    return error.Timeout;
+}
+
 test "WireGuard v2 daemon owns link and TUN across retry, path changes and termination" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
@@ -138,11 +147,11 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     defer sut.stop();
     const owner = sut.implementation.connection;
     try std.testing.expect(owner.endpoint_resolver == null);
-    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .disconnected);
     try std.testing.expect(!owner.looper.isLinkAttached());
     try owner.actor.perform(void, .evaluateConnection);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .connected);
     try std.testing.expect(owner.tunnel != null and owner.looper.isTunAttached() and owner.looper.isLinkAttached());
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expect(fake.link != null and fake.tun != null);
@@ -151,17 +160,17 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     monitor.onBetterPath();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .disconnected);
     try std.testing.expectEqual(@as(usize, 1), probe.cleaned);
     try std.testing.expect(!owner.looper.isTunAttached() and !owner.looper.isLinkAttached());
     try owner.actor.perform(void, .resumeGate);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .connected);
     try owner.looper.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .connected);
     sut.stop();
     try std.testing.expectEqual(@as(usize, 3), fake.turn_off_count);
     try std.testing.expectEqual(@as(usize, 3), probe.cleaned);
@@ -210,7 +219,7 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     try sut.start();
     defer sut.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .connected);
     var tun_bytes: [64]u8 = undefined;
     var link_bytes: [64]u8 = undefined;
     var tun_input = [_]c.wg_read_packet{.{ .data = &tun_bytes, .capacity = tun_bytes.len }};
@@ -296,6 +305,7 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
     const peer = (try io.SocketWrapper.create(allocator, null, .{})).?;
     defer peer.destroy();
     @constCast(module.WireGuard.configuration.?.peers)[0].endpoint.?.port = (try peer.localAddress()).port;
+    @constCast(module.WireGuard.configuration.?.peers)[0].keep_alive = 25;
     const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
         .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = mock.noopDNSResolver(), .factory = factory, .monitor = monitor.interface() },
         .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
@@ -304,7 +314,7 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
     try sut.start();
     defer sut.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try waitStatus(sut, .connected);
     // Trigger a handshake through a native TUN read into a Go-supplied buffer.
     // The encrypted output crosses back through the borrowed write completion.
     var ip = [_]u8{0} ** 20;
@@ -338,7 +348,7 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
             try std.testing.expectError(error.AlreadyStarted, sut.start());
             try sut.implementation.connection.actor.perform(void, .resumeGate);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
-            try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+            try waitStatus(sut, .connected);
         }
     }
     // The workers now await more read buffers/data. Finish must cancel their

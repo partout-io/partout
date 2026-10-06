@@ -132,7 +132,55 @@ static void test_borrowed_io(void) {
     pthread_mutex_destroy(&p.mutex);
 }
 
+
+typedef struct startup_probe {
+    borrowed_probe io;
+    int32_t handle;
+} startup_probe;
+static void *start_keepalive(void *raw) {
+    startup_probe *p = raw;
+    wg_passive_link link = {.local_port = 51820, .read = borrow_link, .write = borrow_write};
+    wg_passive_tun tun = {.mtu = 1400, .read = borrow_tun, .write = borrow_write_tun};
+    p->handle = wgTurnOnWithPassiveIO(
+        "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
+        "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
+        "endpoint=127.0.0.1:51821\npersistent_keepalive_interval=25\n", &link, &tun, &p->io);
+    return NULL;
+}
+static void test_keepalive_startup(int cancel) {
+    startup_probe p = {.io = {.mutex = PTHREAD_MUTEX_INITIALIZER}, .handle = -1};
+    pthread_t worker;
+    assert(pthread_create(&worker, NULL, start_keepalive, &p) == 0);
+    uintptr_t request = 0;
+    for (int i = 0; i < 3000 && !request; ++i) {
+        pthread_mutex_lock(&p.io.mutex);
+        request = p.io.write_request;
+        pthread_mutex_unlock(&p.io.mutex);
+        if (!request) usleep(1000);
+    }
+    assert(request != 0); // Up must publish its handshake before returning.
+    pthread_mutex_lock(&p.io.mutex);
+    assert(p.io.writes[0].size == 148 && p.io.writes[0].data[0] == 1);
+    if (cancel) p.io.closing = 1;
+    pthread_mutex_unlock(&p.io.mutex);
+    wgCompleteIO(request, cancel ? 0 : 1, cancel ? WG_IO_CLOSED : WG_IO_OK);
+    assert(pthread_join(worker, NULL) == 0);
+    assert(p.handle >= 0);
+    char *config = wgGetConfigWithPassiveIO(p.handle);
+    assert(config && strstr(config, "persistent_keepalive_interval=25"));
+    free(config);
+    pthread_mutex_lock(&p.io.mutex);
+    p.io.closing = 1;
+    uintptr_t reads[2] = {p.io.read_requests[0], p.io.read_requests[1]};
+    pthread_mutex_unlock(&p.io.mutex);
+    for (unsigned i = 0; i < 2; ++i) if (reads[i]) wgCompleteIO(reads[i], 0, WG_IO_CLOSED);
+    wgTurnOffWithPassiveIO(p.handle);
+    pthread_mutex_destroy(&p.io.mutex);
+}
+
 int main(void) {
     test_borrowed_io();
+    test_keepalive_startup(0);
+    test_keepalive_startup(1);
     return 0;
 }

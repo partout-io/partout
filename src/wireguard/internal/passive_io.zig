@@ -16,21 +16,60 @@ pub const PassiveIO = struct {
     backend: backend.Backend,
     looper: ?*net.Looper = null,
     handle: i32 = -1,
+    startup: ?*Startup = null,
     active: std.atomic.Value(bool) = .init(false),
 
     pub fn start(self: *PassiveIO, remote: net.RemoteDescriptor, mtu: u32, settings: [:0]const u8) !void {
-        if (self.handle >= 0 or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
+        if (self.handle >= 0 or self.startup != null or remote.local_port == 0 or remote.looper.implementation != .experimental) return error.TransportFailure;
         if (self.backend.vtable.complete_io == null) return error.TransportFailure;
         self.looper = remote.looper;
         self.active.store(true, .release);
         errdefer self.active.store(false, .release);
-        const handle = try self.backend.turnOn(self.allocator, settings, .{
-            .passive = .{
-                .link = .{ .local_port = remote.local_port, .read = readLink, .write = writeLink },
-                .tun = .{ .mtu = mtu, .read = readTun, .write = writeTun },
-                .context = self,
-            },
-        });
+        const pending = try self.allocator.create(Startup);
+        errdefer self.allocator.destroy(pending);
+        const owned_settings = try self.allocator.dupeZ(u8, settings);
+        errdefer self.allocator.free(owned_settings);
+        pending.* = .{ .owner = self, .settings = owned_settings, .port = remote.local_port, .mtu = mtu };
+        pending.thread = try std.Thread.spawn(.{}, Startup.run, .{pending});
+        self.startup = pending;
+    }
+
+    // Only the blocking Go activation runs off-queue. Its result is consumed on
+    // the looper, or after detachment when stop joins the worker.
+    const Startup = struct {
+        owner: *PassiveIO,
+        settings: [:0]const u8,
+        port: u16,
+        mtu: u32,
+        thread: std.Thread = undefined,
+        done: std.atomic.Value(bool) = .init(false),
+        result: backend.Error!i32 = undefined,
+
+        fn run(self: *Startup) void {
+            const owner = self.owner;
+            self.result = owner.backend.turnOn(owner.allocator, self.settings, .{ .passive = .{
+                .link = .{ .local_port = self.port, .read = readLink, .write = writeLink },
+                .tun = .{ .mtu = self.mtu, .read = readTun, .write = writeTun },
+                .context = owner,
+            } });
+            self.done.store(true, .release);
+        }
+    };
+
+    pub fn pollStart(self: *PassiveIO) !bool {
+        const pending = self.startup orelse return self.handle >= 0;
+        if (!pending.done.load(.acquire)) return false;
+        try self.joinStart();
+        return true;
+    }
+
+    fn joinStart(self: *PassiveIO) !void {
+        const pending = self.startup orelse return;
+        pending.thread.join();
+        defer self.allocator.destroy(pending);
+        defer self.allocator.free(pending.settings);
+        self.startup = null;
+        const handle = try pending.result;
         if (handle < 0) return error.TransportFailure;
         self.handle = handle;
     }
@@ -59,6 +98,7 @@ pub const PassiveIO = struct {
     /// Joins Go only after the daemon has detached I/O and completed writes.
     pub fn stop(self: *PassiveIO) void {
         self.quiesce();
+        self.joinStart() catch {};
         if (self.handle >= 0) self.backend.turnOff(self.handle);
         self.handle = -1;
     }

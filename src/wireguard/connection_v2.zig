@@ -58,10 +58,11 @@ const WireGuardConnection = struct {
     timer: net.Looper.Timer = .{},
     interval_ms: u32,
     failed: bool = false,
+    pending_info: ?api.TunnelRemoteInfoWrapper = null,
 
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) !bool {
-        if (self.bridge.handle >= 0) return false;
-        const events = self.events orelse return error.UnableToStart;
+        if (self.bridge.handle >= 0 or self.bridge.startup != null) return false;
+        if (self.events == null) return error.UnableToStart;
         self.failed = false;
         self.resolver.reset(self.allocator);
         try self.resolver.cacheAll(self.allocator);
@@ -70,23 +71,36 @@ const WireGuardConnection = struct {
         defer self.allocator.free(settings);
         const builder = TunnelRemoteInfoBuilder.init(self.allocator, self.profile, self.module_id, &self.configuration);
         var info = try builder.build();
-        defer info.deinit(self.allocator);
+        errdefer info.deinit(self.allocator);
         try self.bridge.start(remote, passiveMTU(info), settings);
         errdefer self.quiesce();
-        if (@import("builtin").os.tag == .ios) self.bridge.backend.disableRoaming(self.bridge.handle);
         try self.scheduleCount();
-        events.established(events.ctx, .{ .info = info });
-        self.reportCount();
+        self.pending_info = info;
         return true;
     }
 
     fn scheduleCount(self: *WireGuardConnection) !void {
         const looper = self.bridge.looper.?;
-        try looper.scheduleReplacing(&self.timer, @max(1, self.interval_ms), .{ .context = self, .callback = onCount });
+        try looper.scheduleReplacing(&self.timer, if (self.bridge.startup != null) 1 else @max(1, self.interval_ms), .{ .context = self, .callback = onCount });
     }
     fn onCount(raw: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw.?));
-        if (self.bridge.handle < 0 or self.failed) return;
+        if (self.failed) return;
+        if (self.pending_info) |info| {
+            const started = self.bridge.pollStart() catch {
+                self.fail(.unhandled);
+                return;
+            };
+            if (!started) {
+                self.scheduleCount() catch self.fail(.unhandled);
+                return;
+            }
+            if (@import("builtin").os.tag == .ios) self.bridge.backend.disableRoaming(self.bridge.handle);
+            self.pending_info = null;
+            defer info.deinit(self.allocator);
+            if (self.events) |events| events.established(events.ctx, .{ .info = info });
+        }
+        if (self.bridge.handle < 0) return;
         self.reportCount();
         self.scheduleCount() catch self.fail(.unhandled);
     }
@@ -103,15 +117,17 @@ const WireGuardConnection = struct {
     fn stop(self: *WireGuardConnection) void {
         self.quiesce();
         self.bridge.stop();
+        if (self.pending_info) |*info| info.deinit(self.allocator);
+        self.pending_info = null;
     }
     fn fail(self: *WireGuardConnection, code: api.PartoutErrorCode) void {
-        if (self.failed or self.bridge.handle < 0) return;
+        if (self.failed or (self.bridge.handle < 0 and self.pending_info == null)) return;
         self.failed = true;
         if (self.events) |events| events.failed(events.ctx, .{ .err_pair = .{ .code = code }, .disposition = .reconnect });
     }
     fn destroy(self: *WireGuardConnection) void {
         // The owner quiesces us on the looper before destroying on its actor.
-        std.debug.assert(self.bridge.handle < 0 and self.timer.id == null);
+        std.debug.assert(self.bridge.handle < 0 and self.bridge.startup == null and self.pending_info == null and self.timer.id == null);
         self.bridge.lock.deinit();
         self.resolver.deinit(self.allocator);
         self.configuration.deinit(self.allocator);

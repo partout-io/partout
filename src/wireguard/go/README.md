@@ -64,15 +64,17 @@ complete. `count` is the completed prefix; only those read descriptors have
 valid `size` and, for UDP, `source` fields. All pointers become invalid at
 completion. An empty readiness read retains the request for the next attempt.
 
-Serialize lifecycle on the host. Borrowed submissions begin only after Go
-startup succeeds, but may run before the startup call returns. On shutdown:
+Serialize lifecycle on the host. Run Go startup on a worker while the looper
+services borrowed writes: persistent keepalive can send synchronously during
+`Up`. Reads begin after initialization succeeds. Publish connection success
+only when activation returns. On shutdown:
 
 1. Reject new requests and complete outstanding reads with `WG_IO_CLOSED`.
 2. Detach native I/O, completing/cancelling all accepted writes.
-3. Call `wgTurnOffWithPassiveIO` to join Go workers, then release the context.
+3. Join any activation worker, then call `wgTurnOffWithPassiveIO` to join Go workers, then release the context.
 
 Do not join Go on the looper while its workers are waiting for looper I/O.
-Failed Go startup publishes no borrowed requests. A failure after startup uses
+Configuration and bind failures publish no borrowed requests. A failure after startup uses
 the same quiesce/detach/join sequence. Handles are never reused, so stale lifecycle calls cannot affect a replacement
 device.
 

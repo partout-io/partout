@@ -30,8 +30,9 @@ extern const char *wgVersion(void);
 #include "passive_io.h"
 
 /* Fully host-owned UDP and TUN, on every platform. No native fd or interface
- * name is consumed. Borrowed callbacks start only
- * after successful Go initialization; they may run before startup returns.
+ * name is consumed. Run startup off the I/O queue: Up may synchronously send
+ * keepalive handshakes and wait for their completion. Read callbacks start
+ * after successful initialization; write callbacks may run during startup.
  * Before turn-off, reject new borrowed requests and complete/cancel all accepted
  * requests, then join Go. Context remains valid until
  * wgTurnOffWithPassiveIO joins callbacks and host reads have been detached.

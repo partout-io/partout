@@ -95,21 +95,25 @@ func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) in
 		closeDevice()
 		return -1
 	}
+	// Reserve a handle before Up can publish writes: no fallible registration
+	// work may remain after the host has accepted borrowed requests.
+	passiveBackends.Lock()
+	if passiveBackends.next > math.MaxInt32 {
+		passiveBackends.Unlock()
+		closeDevice()
+		return -1
+	}
+	handle := int32(passiveBackends.next)
+	passiveBackends.next++
+	passiveBackends.Unlock()
 	if err := dev.Up(); err != nil {
 		logger.Errorf("Unable to start device: %v", err)
 		closeDevice()
 		return -1
 	}
 	logger.Verbosef("Device started")
-
 	passiveBackends.Lock()
 	defer passiveBackends.Unlock()
-	if passiveBackends.next > math.MaxInt32 {
-		closeDevice()
-		return -1
-	}
-	handle := int32(passiveBackends.next)
-	passiveBackends.next++
 	passiveBackends.byHandle[handle] = passiveBackend{dev, bind, tun}
 	if bind.host != nil {
 		close(bind.host.ready)
@@ -284,9 +288,8 @@ func (r passiveResult) err() error {
 
 func (h *passiveHost) write(packets [][]byte, offset int,
 	submit func(*C.wg_packet, C.uint32_t, C.uintptr_t) C.int32_t) (int, error) {
-	if !h.waitReady(h.aborted) {
-		return 0, net.ErrClosed
-	}
+	// Up may synchronously send a keepalive handshake. The host must service
+	// writes while startup runs; waiting for ready here would deadlock Up.
 	var batch [passiveBatchSize]C.wg_packet
 	var pins runtime.Pinner
 	defer pins.Unpin()
