@@ -240,7 +240,7 @@ pub const DaemonRuntime = struct {
                     .registry = &self.registry,
                     .controller = self.platform.tunnelController(),
                     .resolver = self.platform.dnsResolver(),
-                    .factory = self.platform.socketFactory(),
+                    .factory = if (experimental) self.platform.socketFactoryV2() else self.platform.socketFactory(),
                     .monitor = self.platform.networkMonitor(),
                 },
                 .options = .{

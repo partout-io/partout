@@ -309,3 +309,55 @@ test "platform cancellation formats extended errors only at the C boundary" {
     try std.testing.expect(recorder.len == null);
     try std.testing.expectEqual(@as(usize, 3), recorder.calls);
 }
+
+test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    const Policy = struct {
+        calls: usize = 0,
+        ipv4_calls: usize = 0,
+        allow_ipv4: bool = true,
+
+        fn configure(raw: ?*anyopaque, info: [*c]const io_c.pp_reachability, fds: [*c]const SocketDescriptor, count: usize) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            std.debug.assert(count == 1 and info != null and info[0].reachable);
+            self.calls += 1;
+            var address: std.c.sockaddr.storage = undefined;
+            var len: std.c.socklen_t = @sizeOf(@TypeOf(address));
+            std.debug.assert(std.c.getsockname(fds[0], @ptrCast(&address), &len) == 0);
+            if (address.family != std.c.AF.INET) return false;
+            self.ipv4_calls += 1;
+            return self.allow_ipv4;
+        }
+    };
+    var policy = Policy{};
+    var functions = io_c.pp_tun_ctrl_fnt_current();
+    functions.configure_sockets = Policy.configure;
+    var platform = try Platform.init(.{ .ref = &policy, .fnt = functions });
+    defer platform.deinit();
+    const reservation = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })).?;
+    const port = (try reservation.localAddress()).port;
+    reservation.destroy();
+
+    var factory = platform.socketFactoryV2();
+    factory.local_port = port;
+    var descriptor = try factory.create(allocator, null, reachable(true), 100);
+    defer descriptor.cleanup();
+    const local = try descriptor.localAddress();
+    try std.testing.expectEqual(@as(u8, 4), local.family);
+    try std.testing.expectEqual(port, local.port);
+    try std.testing.expectEqual(@as(usize, 1), policy.ipv4_calls);
+
+    // Both failures propagate; fallback must still pass host configuration.
+    policy.allow_ipv4 = false;
+    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, null, reachable(true), 100));
+    try std.testing.expectEqual(@as(usize, 2), policy.ipv4_calls);
+
+    // V1 gets no fallback, and a connected v2 socket is attempted only once.
+    const before_legacy = policy.ipv4_calls;
+    try std.testing.expectError(error.LinkNotActive, platform.socketFactory().create(allocator, null, reachable(true), 100));
+    try std.testing.expectEqual(before_legacy, policy.ipv4_calls);
+    const before_connected = policy.calls;
+    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, 51820) }, reachable(true), 100));
+    try std.testing.expectEqual(before_connected + 1, policy.calls);
+}
