@@ -234,6 +234,14 @@ pub const Connection = struct {
     };
 
     pub const VTable = struct {
+        /// V2 only, queried on the looper after reachability/better-path events.
+        /// A pending refresh pauses link submissions and receives a replacement
+        /// through start_v2, retaining TUN without re-establishing the connection.
+        link_refresh_requested: *const fn (*anyopaque) bool = struct {
+            fn call(_: *anyopaque) bool {
+                return false;
+            }
+        }.call,
         /// Optional caller-owned buffers for v2 reads; released after on_read.
         read_buffers: ?*const fn (*anyopaque, io.Side) ?Looper.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
@@ -281,6 +289,10 @@ pub const Connection = struct {
     pub fn readBuffers(self: Connection, side: io.Side) ?Looper.ReadBuffers {
         const callback = self.vtable.read_buffers orelse return null;
         return callback(self.ptr, side);
+    }
+
+    pub fn linkRefreshRequested(self: Connection) bool {
+        return self.vtable.link_refresh_requested(self.ptr);
     }
 
     pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {

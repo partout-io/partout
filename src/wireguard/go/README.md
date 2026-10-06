@@ -127,12 +127,15 @@ cc -Isrc/wireguard/go/include src/wireguard/go/tests/passive_abi.c \
 ```
 
 The connection transitions from stopped to activating to active. A network
-path change requests daemon reconnection and suspends the Go device while the
-daemon replaces native I/O. Pending reads remain parked across detachment, and writes are rejected
-until reattachment. The replacement socket keeps the selected local port. Only
-peer endpoints are updated (including fresh DNS64 resolution), on the activation
-worker because UAPI can flush staged sends. Peer sessions and counters survive;
-reattachment transitions through activating to active again. Activation or I/O
-failure, explicit stop, and terminal looper failure instead transition through
-stopping to stopped, cancelling requests and closing Go. A failed endpoint
-refresh also closes Go, so the next attempt starts a fresh device.
+path change requests replacement of only the daemon-owned UDP link. TUN,
+tunnel settings and the connected status remain in place, so a path notification
+caused by applying settings cannot trigger a settings/reconnect loop. Link reads
+remain parked across detachment; link writes are rejected until reattachment,
+while TUN I/O remains active. The replacement socket keeps the selected local
+port. Only peer endpoints are updated (including fresh DNS64 resolution), on
+the activation worker because UAPI can flush staged sends. Peer sessions and
+counters survive; refresh transitions through activating to active without
+publishing another established event. Activation, link replacement or I/O
+failure, explicit stop, and terminal looper failure transition through stopping
+to stopped, cancelling requests and closing Go. A failed refresh uses the normal
+daemon reconnect path, so the next attempt starts a fresh device.

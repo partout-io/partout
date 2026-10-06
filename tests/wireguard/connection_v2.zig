@@ -17,6 +17,9 @@ const Probe = struct {
     fd: c_int,
     requested_port: u16,
     writes: std.atomic.Value(usize) = .init(0),
+    sockets: std.atomic.Value(usize) = .init(0),
+    fail_socket_create: std.atomic.Value(bool) = .init(false),
+    path_monitor: ?*source.mock.MockNetworkMonitor = null,
     cleaned: usize = 0,
     borrowed_read_ptr: ?[*]u8 = null,
     borrowed_write_ptr: ?[*]const u8 = null,
@@ -75,6 +78,8 @@ const Probe = struct {
     fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) source.net_sandbox.TunnelController.Error!io.TunWrapper {
         const ctrl: *source.mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
         _ = try ctrl.interface().setTunnelSettings(info);
+        // Apple can report the new path while applying our tunnel settings.
+        if (current.path_monitor) |monitor| monitor.setReachable(true);
         var tun = io.TunWrapper.init(null);
         tun.test_descriptor = .{ .fd = current.fd, .io = .{ .mock = .{ .ptr = current, .vtable = &vtable } } };
         return tun;
@@ -82,7 +87,9 @@ const Probe = struct {
     fn createSocket(_: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) source.net_sandbox.SocketFactory.Error!io.LinkDescriptor {
         std.debug.assert(endpoint == null);
         std.debug.assert(port == current.requested_port);
+        if (current.fail_socket_create.swap(false, .acq_rel)) return error.LinkNotActive;
         const socket = try io.SocketWrapper.create(allocator, endpoint, .{ .port = port }) orelse return error.LinkNotActive;
+        _ = current.sockets.fetchAdd(1, .release);
         return socket.linkDescriptor();
     }
 };
@@ -101,6 +108,14 @@ fn waitStatus(sut: *source.net_daemon_v2.Daemon, status: api.ConnectionStatus) !
         _ = libc.usleep(1000);
     }
     return error.Timeout;
+}
+
+fn waitRefresh(sut: *source.net_daemon_v2.Daemon, fake: *FakeBackend, count: usize) !void {
+    try wait(&fake.refreshes, count);
+    // Statistics resume only after the endpoint worker has joined.
+    try wait(&fake.counts, fake.counts.load(.acquire) + 1);
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
 }
 
 test "WireGuard v2 daemon owns link and TUN across retry, path changes and termination" {
@@ -161,34 +176,42 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectEqual(@as(u32, 1380), fake.tun.?.mtu);
     try wait(&fake.counts, 2);
     try std.testing.expectEqual(@as(usize, 2), dns.queries.load(.acquire));
+    const cleared_before_refresh = controller.clear_tunnel_settings_count;
     // DNS is unavailable during transport replacement, but numeric bases must
     // survive and still be remapped onto the new network's DNS64 prefix.
     dns.unavailable.store(true, .release);
     dns.dns64.store(true, .release);
     // A same/worse path can remain reachable and never emit betterPath.
-    // Duplicate notifications during failure must coalesce into one restart.
+    // Duplicate notifications during refresh must coalesce into one update.
     monitor.setReachable(true);
     monitor.setReachable(true);
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try waitStatus(sut, .disconnected);
-    try std.testing.expectEqual(@as(usize, 1), probe.cleaned);
-    try std.testing.expect(!owner.looper.isTunAttached() and !owner.looper.isLinkAttached());
-    try owner.actor.perform(void, .resumeGate);
-    try std.testing.expectError(error.AlreadyStarted, sut.start());
-    try waitStatus(sut, .connected);
+    try waitRefresh(sut, &fake, 1);
+    try std.testing.expectEqual(@as(usize, 0), probe.cleaned);
+    try std.testing.expect(owner.looper.isTunAttached() and owner.looper.isLinkAttached());
+    try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+    try std.testing.expectEqual(cleared_before_refresh, controller.clear_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
     try std.testing.expectEqual(@as(usize, 2), dns.queries.load(.acquire));
     try std.testing.expect(fake.refreshed_dns64.load(.acquire));
+    // A route/settings-induced reachable notification must not reapply the
+    // settings and generate an endless connect/disconnect feedback loop.
+    for (2..5) |count| {
+        if (count == 4) monitor.onBetterPath() else monitor.setReachable(true);
+        try waitRefresh(sut, &fake, count);
+        try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+        try std.testing.expectEqual(cleared_before_refresh, controller.clear_tunnel_settings_count);
+        try std.testing.expectEqual(@as(usize, 0), probe.cleaned);
+    }
     dns.unavailable.store(false, .release);
     monitor.setReachable(false);
-    try waitStatus(sut, .disconnected);
-    // Rearm while offline, then let reachability itself start activation. Its
-    // forwarded notification must not invalidate that freshly created socket.
-    try owner.actor.perform(void, .resumeGate);
+    try waitRefresh(sut, &fake, 5);
     monitor.setReachable(true);
-    try waitStatus(sut, .connected);
+    try waitRefresh(sut, &fake, 6);
+    try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
     try owner.looper.stop();
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
@@ -200,8 +223,6 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     // attempt starts a fresh device rather than retrying a half-updated one.
     fake.fail_set_config.store(true, .release);
     monitor.setReachable(true);
-    try waitStatus(sut, .disconnected);
-    try owner.actor.perform(void, .resumeGate);
     try wait(&fake.set_config_failures, 1);
     try waitStatus(sut, .disconnected);
     try std.testing.expectEqual(@as(usize, 2), fake.turn_off_count);
@@ -217,12 +238,21 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try owner.actor.perform(void, .resumeGate);
     try waitStatus(sut, .connected);
     try std.testing.expectEqual(@as(usize, 5), fake.turn_on_count);
-    // Explicit stop also closes a backend parked between transports.
+    // A failed socket replacement must release the retained TUN/backend and
+    // enter the ordinary retry path rather than leaving a paused connection.
+    probe.fail_socket_create.store(true, .release);
     monitor.setReachable(true);
     try waitStatus(sut, .disconnected);
-    sut.stop();
+    try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
     try std.testing.expectEqual(@as(usize, 4), fake.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 5), probe.cleaned);
+    try owner.actor.perform(void, .resumeGate);
+    try waitStatus(sut, .connected);
+    try std.testing.expectEqual(@as(usize, 6), fake.turn_on_count);
+    // Explicit stop can overtake a queued link refresh.
+    monitor.setReachable(true);
+    sut.stop();
+    try std.testing.expectEqual(@as(usize, 5), fake.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 4), probe.cleaned);
 }
 
 test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
@@ -319,7 +349,7 @@ test "WireGuard v2 borrows payloads and cancels I/O before joining backend" {
     try std.testing.expectEqual(@as(usize, 1), fake.turn_off_count);
 }
 
-test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
+test "WireGuard v2 real Go workers retain TUN across settings-induced path updates" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     if (c.pp_wg_init() != 0) return error.SkipZigTest;
     // Zig stack unwinding cannot traverse Go callback stacks on Darwin.
@@ -343,6 +373,7 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
     var controller_table = controller.interface().vtable.*;
     controller_table.set_tunnel_settings = Probe.setTunnel;
     var monitor = mock.MockNetworkMonitor{};
+    probe.path_monitor = &monitor;
     var factory = mock.noopSocketFactory();
     var factory_table = factory.vtable.*;
     factory_table.create = Probe.createSocket;
@@ -396,13 +427,13 @@ test "WireGuard v2 real Go workers use borrowed I/O and stop across reconnect" {
         // packet is consumed and dropped by WireGuard without killing reads.
         _ = try peer.sendTo(&.{ 1, 2, 3 }, sender);
         if (iteration == 0) {
-            // Real Go also reconnects after a usable-to-usable path update.
-            monitor.setReachable(true);
-            try std.testing.expectError(error.AlreadyStarted, sut.start());
-            try std.testing.expectError(error.AlreadyStarted, sut.start());
-            try sut.implementation.connection.actor.perform(void, .resumeGate);
+            // Applying settings itself emitted a reachable update. Wait for
+            // its replacement socket before exercising the retained Go device.
+            try wait(&probe.sockets, 2);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
             try waitStatus(sut, .connected);
+            try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+            try std.testing.expectEqual(@as(usize, 0), probe.cleaned);
         }
     }
     // The workers now await more read buffers/data. Finish must cancel their
@@ -524,6 +555,7 @@ const FakeBackend = struct {
     tun: ?@import("wireguard_c").wg_passive_tun = null,
     context: ?*anyopaque = null,
     counts: std.atomic.Value(usize) = .init(0),
+    refreshes: std.atomic.Value(usize) = .init(0),
     refreshed_dns64: std.atomic.Value(bool) = .init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
@@ -587,6 +619,7 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
 
 fn fakeSetConfig(ptr: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    defer _ = self.refreshes.fetchAdd(1, .release);
     std.debug.assert(std.mem.indexOf(u8, settings, "replace_peers") == null);
     self.refreshed_dns64.store(std.mem.indexOf(u8, settings, "endpoint=[64:ff9b::c000:201]:51820") != null, .release);
     if (self.fail_set_config.swap(false, .acq_rel)) {

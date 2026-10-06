@@ -17,7 +17,7 @@ pub const PassiveIO = struct {
     looper: ?*net.Looper = null,
     state: State = .closed, // Protected by lock, including Go callback threads.
 
-    const State = enum(u8) { closed, paused, active };
+    const State = enum(u8) { closed, link_paused, active };
 
     pub fn activate(self: *PassiveIO, looper: *net.Looper) void {
         self.lock.lock();
@@ -26,11 +26,11 @@ pub const PassiveIO = struct {
         self.state = .active;
     }
 
-    /// Retain pending reads across replacement of the daemon-owned transport.
-    pub fn pause(self: *PassiveIO) void {
+    /// Retain pending link reads during socket replacement; TUN stays live.
+    pub fn pauseLink(self: *PassiveIO) void {
         self.lock.lock();
         defer self.lock.unlock();
-        self.state = .paused;
+        self.state = .link_paused;
     }
 
     pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnel {
@@ -129,7 +129,7 @@ pub const PassiveIO = struct {
         slot.count = count;
         const looper = self.looper.?;
         const attached = if (side == .link) looper.isLinkAttached() else looper.isTunAttached();
-        if (attached and self.state == .active) looper.resumeReading(side) catch {
+        if (attached and (self.state == .active or side == .tun)) looper.resumeReading(side) catch {
             _ = slot.takeRequest();
             return c.WG_IO_CLOSED;
         };
@@ -169,7 +169,7 @@ pub const PassiveIO = struct {
         defer self.lock.unlock();
         switch (self.state) {
             .closed => return c.WG_IO_CLOSED,
-            .paused => return c.WG_IO_INVALID,
+            .link_paused => if (side == .link) return c.WG_IO_INVALID,
             .active => {},
         }
         const loan = self.allocator.create(WriteLoan) catch return c.WG_IO_INVALID;

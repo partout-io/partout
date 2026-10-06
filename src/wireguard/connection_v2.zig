@@ -70,9 +70,9 @@ const WireGuardConnection = struct {
     activation: ?*Activation = null,
     state: State = .stopped,
 
-    // A daemon reconnect detaches native I/O. A network refresh preserves Go;
-    // all other failures, explicit stop and looper termination close it.
-    const State = enum { stopped, activating, active, refresh_requested, suspended, stopping };
+    // A network refresh replaces only LINK and preserves Go and TUN. Failures,
+    // explicit stop and looper termination close the backend after detachment.
+    const State = enum { stopped, activating, active, refresh_requested, stopping };
     const Operation = enum { start, refresh };
 
     fn start(self: *WireGuardConnection, remote: net.RemoteDescriptor) !void {
@@ -81,7 +81,7 @@ const WireGuardConnection = struct {
     }
 
     fn refresh(self: *WireGuardConnection, remote: net.RemoteDescriptor) !void {
-        std.debug.assert(self.state == .suspended and self.handle >= 0);
+        std.debug.assert(self.state == .refresh_requested and self.handle >= 0);
         try self.activate(remote, .refresh);
     }
 
@@ -91,9 +91,9 @@ const WireGuardConnection = struct {
         if (remote.local_port == 0 or remote.looper.implementation != .experimental) return error.UnableToStart;
         self.looper = remote.looper;
         self.state = .activating;
-        errdefer self.prepareStop(.explicit_stop);
-        // A live refresh keeps numeric bases: DNS may itself use the detached
-        // tunnel. resolve() still remaps them for the current DNS64 network.
+        errdefer self.prepareStop();
+        // A live refresh retains numeric bases and remaps them for the current
+        // DNS64 network. Hostname lookup is reserved for a fresh backend.
         if (operation == .start) self.resolver.reset(self.allocator);
         try self.resolver.cacheAll(self.allocator);
         const resolved = try self.resolver.resolve(self.allocator, std.EnumSet(net.DNSResolver.Flag).initEmpty());
@@ -171,13 +171,14 @@ const WireGuardConnection = struct {
             self.scheduleActivation() catch self.fail(.unhandled);
             return;
         }
+        const operation = self.activation.?.operation;
         self.joinActivation() catch {
             self.fail(.unhandled);
             return;
         };
         if (@import("builtin").os.tag == .ios) self.backend.disableRoaming(self.handle);
         self.state = .active;
-        self.events.established(self.events.ctx, .{ .info = self.info });
+        if (operation == .start) self.events.established(self.events.ctx, .{ .info = self.info });
         self.reportCount();
         self.scheduleCount() catch self.fail(.unhandled);
     }
@@ -202,44 +203,38 @@ const WireGuardConnection = struct {
     }
 
     fn requestRefresh(self: *WireGuardConnection) void {
-        // An unfinished activation cannot be retained for a new path.
-        if (self.state == .activating) return self.fail(.networkChanged);
+        // Coalesce updates during a live refresh. An unfinished initial
+        // activation has no established session to retain for a new path.
+        if (self.state == .activating) {
+            if (self.handle < 0) self.fail(.networkChanged);
+            return;
+        }
         if (self.state != .active) return;
         log.writef(.debug, "Refresh WireGuard v2 transport, retaining wg-go handle: {d}", .{self.handle});
         if (self.looper) |looper| looper.cancelTimer(&self.timer);
+        self.bridge.pauseLink();
         self.state = .refresh_requested;
-        self.events.failed(self.events.ctx, .{ .err_pair = .{ .code = .networkChanged }, .disposition = .reconnect });
     }
     fn fail(self: *WireGuardConnection, code: api.PartoutErrorCode) void {
-        if (self.state != .active and self.state != .activating) return;
+        if (self.state != .active and self.state != .activating and self.state != .refresh_requested) return;
         log.writef(.err, "WireGuard v2 failed: {s}, state: {s}", .{ @tagName(code), @tagName(self.state) });
-        self.prepareStop(.explicit_stop);
+        self.prepareStop();
         self.events.failed(self.events.ctx, .{ .err_pair = .{ .code = code }, .disposition = .reconnect });
     }
 
-    /// Called before native detachment. Pause a requested refresh, otherwise
-    /// close admission and cancel reads. The daemon cancels writes on detach.
-    fn prepareStop(self: *WireGuardConnection, reason: net.Connection.ShutdownReason) void {
+    /// Called before native detachment. Close admission and cancel reads;
+    /// the daemon cancels writes on detach before stop joins Go.
+    fn prepareStop(self: *WireGuardConnection) void {
         if (self.looper) |looper| looper.cancelTimer(&self.timer);
-        const refreshing = self.state == .refresh_requested and switch (reason) {
-            .failure => |disposition| disposition == .reconnect,
-            .explicit_stop => false,
-        };
-        if (refreshing) {
-            log.write(.debug, "Pause WireGuard v2 I/O for transport refresh");
-            self.bridge.pause();
-            self.state = .suspended;
-        } else {
-            if (self.state != .stopping and self.state != .stopped) log.write(.debug, "Close WireGuard v2 I/O admission");
-            self.bridge.quiesce();
-            self.state = .stopping;
-        }
+        if (self.state != .stopping and self.state != .stopped) log.write(.debug, "Close WireGuard v2 I/O admission");
+        self.bridge.quiesce();
+        self.state = .stopping;
     }
 
     /// Native I/O must already be detached and all writes completed/cancelled.
     /// This always closes Go, including activation in flight.
     fn stop(self: *WireGuardConnection) void {
-        self.prepareStop(.explicit_stop);
+        self.prepareStop();
         self.joinActivation() catch {};
         if (self.handle >= 0) {
             log.writef(.info, "Stop passive wg-go backend, handle: {d}", .{self.handle});
@@ -265,9 +260,10 @@ fn cast(ptr: *anyopaque) *WireGuardConnection {
 }
 
 // Adapt the daemon's transport lifecycle to WireGuard's backend lifecycle.
-// start_v2 attaches a fresh session or resumes a suspended one; stop finalizes
-// native detachment, retaining Go only for an explicitly requested refresh.
+// start_v2 starts a fresh session or resumes a requested link refresh. A live
+// refresh never publishes established again: TUN and settings remain in place.
 const vtable = net.Connection.VTable{
+    .link_refresh_requested = linkRefreshRequested,
     .start_v2 = startV2,
     .read_buffers = readBuffers,
     .start = legacyStart,
@@ -280,6 +276,9 @@ const vtable = net.Connection.VTable{
     .better_path = betterPath,
     .destroy = destroy,
 };
+fn linkRefreshRequested(ptr: *anyopaque) bool {
+    return cast(ptr).state == .refresh_requested;
+}
 fn legacyStart(_: *anyopaque, _: net.Connection.Events) net.ConnectionStartError!bool {
     return error.UnableToStart;
 }
@@ -287,7 +286,7 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     const self = cast(ptr);
     switch (self.state) {
         .stopped => self.start(remote) catch |err| return startError(err),
-        .suspended => self.refresh(remote) catch |err| return startError(err),
+        .refresh_requested => self.refresh(remote) catch |err| return startError(err),
         else => {
             log.writef(.debug, "WireGuard v2 start ignored, state: {s}", .{@tagName(self.state)});
             return false;
@@ -295,12 +294,11 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     }
     return true;
 }
-fn shutdown(ptr: *anyopaque, reason: net.Connection.ShutdownReason) void {
-    cast(ptr).prepareStop(reason);
+fn shutdown(ptr: *anyopaque, _: net.Connection.ShutdownReason) void {
+    cast(ptr).prepareStop();
 }
 fn transportDetached(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
-    const self = cast(ptr);
-    if (self.state != .suspended) self.stop();
+    cast(ptr).stop();
 }
 fn destroy(ptr: *anyopaque) void {
     cast(ptr).destroy();
@@ -319,7 +317,7 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
     switch (self.state) {
         .active => self.requestRefresh(),
         // A reachable notification may have just started this activation.
-        .activating => if (!info.reachable) self.fail(.networkChanged),
+        .activating => if (!info.reachable and self.handle < 0) self.fail(.networkChanged),
         else => {},
     }
 }

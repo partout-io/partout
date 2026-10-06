@@ -870,14 +870,18 @@ const ConnectionDaemon = struct {
     fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        _ = self.callOnLooper(.{ .reachability = reachability }) catch return;
+        if (self.callOnLooper(.{ .reachability = reachability }) catch return) {
+            self.refreshLink() catch |err| self.linkRefreshFailed(err);
+        }
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        _ = self.callOnLooper(.better_path) catch return;
+        if (self.callOnLooper(.better_path) catch return) {
+            self.refreshLink() catch |err| self.linkRefreshFailed(err);
+        }
     }
 
     fn handleConnectionEstablished(
@@ -931,6 +935,33 @@ const ConnectionDaemon = struct {
             .reconnect => self.trackConnectionStatus(.disconnected),
             .cancel => self.cancelConnection(failure.err_pair),
         }
+    }
+
+    fn refreshLink(self: *ConnectionDaemon) !void {
+        if (self.daemon.state != .started or self.connection == null) return;
+        // Go may have established while its success event is still queued on
+        // this actor. Refresh must also finish in that connecting interval.
+        switch (self.daemon.snapshot_publisher.environment.connection_status) {
+            .connecting, .connected => {},
+            else => return,
+        }
+        log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
+        if (self.looper.isLinkAttached()) try self.looper.detach(.link);
+        const remote = try self.setupLink();
+        if (!try self.callOnLooper(.{ .start = remote })) return error.UnableToStart;
+    }
+
+    fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
+        log.writef(.err, "Unable to refresh connection link: {s}", .{@errorName(err)});
+        self.handleConnectionFailed(.{
+            .err_pair = .{ .code = switch (err) {
+                error.OutOfMemory => .outOfMemory,
+                error.DNSResolutionFailure => .dnsFailure,
+                error.Timeout => .timeout,
+                else => .ioFailure,
+            } },
+            .disposition = .reconnect,
+        });
     }
 
     fn handleConnectionStopped(self: *ConnectionDaemon) void {
@@ -1186,8 +1217,14 @@ const ConnectionDaemon = struct {
                 .start => |remote| return request.connection.startV2(remote),
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
-                .reachability => |info| request.connection.networkChange(info, request.events),
-                .better_path => request.connection.betterPath(request.events),
+                .reachability => |info| {
+                    request.connection.networkChange(info, request.events);
+                    return request.connection.linkRefreshRequested();
+                },
+                .better_path => {
+                    request.connection.betterPath(request.events);
+                    return request.connection.linkRefreshRequested();
+                },
             }
             return true;
         }
