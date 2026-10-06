@@ -86,6 +86,8 @@ const WireGuardConnection = struct {
     }
 
     fn activate(self: *WireGuardConnection, remote: net.RemoteDescriptor, operation: Operation) !void {
+        log.writef(.info, "WireGuard v2 {s}, local port: {d}, MTU: {d}", .{ @tagName(operation), remote.local_port, passiveMTU(self.info) });
+        errdefer |err| log.writef(.err, "Unable to prepare WireGuard v2 {s}: {s}", .{ @tagName(operation), @errorName(err) });
         if (remote.local_port == 0 or remote.looper.implementation != .experimental) return error.UnableToStart;
         self.looper = remote.looper;
         self.state = .activating;
@@ -129,7 +131,11 @@ const WireGuardConnection = struct {
             switch (self.operation) {
                 .start => return owner.backend.turnOn(owner.allocator, self.settings, owner.bridge.transport(self.port, passiveMTU(owner.info))),
                 .refresh => {
-                    if (try owner.backend.setConfig(owner.allocator, owner.handle, self.settings) != 0) return error.TransportFailure;
+                    const result = try owner.backend.setConfig(owner.allocator, owner.handle, self.settings);
+                    if (result != 0) {
+                        log.writef(.err, "Updating wg-go peer endpoints returned {d}, handle: {d}", .{ result, owner.handle });
+                        return error.TransportFailure;
+                    }
                     return owner.handle;
                 },
             }
@@ -144,12 +150,18 @@ const WireGuardConnection = struct {
             self.allocator.destroy(pending);
         }
         self.activation = null;
+        errdefer |err| log.writef(.err, "WireGuard v2 {s} failed: {s}", .{ @tagName(pending.operation), @errorName(err) });
         const handle = try pending.result;
-        if (handle < 0) return error.TransportFailure;
+        if (handle < 0) {
+            log.writef(.err, "Starting passive wg-go backend returned {d}", .{handle});
+            return error.TransportFailure;
+        }
         self.handle = handle;
+        log.writef(.debug, "Passive wg-go backend {s} completed, handle: {d}", .{ @tagName(pending.operation), handle });
     }
 
     fn scheduleActivation(self: *WireGuardConnection) !void {
+        errdefer |err| log.writef(.err, "Unable to schedule WireGuard v2 activation timer: {s}", .{@errorName(err)});
         try self.looper.?.scheduleReplacing(&self.timer, 1, .{ .context = self, .callback = onActivation });
     }
     fn onActivation(raw: ?*anyopaque) void {
@@ -171,6 +183,7 @@ const WireGuardConnection = struct {
     }
 
     fn scheduleCount(self: *WireGuardConnection) !void {
+        errdefer |err| log.writef(.err, "Unable to schedule WireGuard v2 data count timer: {s}", .{@errorName(err)});
         try self.looper.?.scheduleReplacing(&self.timer, @max(1, self.interval_ms), .{ .context = self, .callback = onCount });
     }
     fn onCount(raw: ?*anyopaque) void {
@@ -180,7 +193,10 @@ const WireGuardConnection = struct {
         self.scheduleCount() catch self.fail(.unhandled);
     }
     fn reportCount(self: *WireGuardConnection) void {
-        const text = (self.backend.getConfig(self.allocator, self.handle) catch return) orelse return;
+        const text = (self.backend.getConfig(self.allocator, self.handle) catch |err| {
+            log.writef(.debug, "Unable to fetch WireGuard v2 runtime configuration: {s}", .{@errorName(err)});
+            return;
+        }) orelse return;
         defer self.allocator.free(text);
         if (uapi.parseRuntimeDataCount(text)) |count| self.events.data_count(self.events.ctx, count);
     }
@@ -189,12 +205,14 @@ const WireGuardConnection = struct {
         // An unfinished activation cannot be retained for a new path.
         if (self.state == .activating) return self.fail(.networkChanged);
         if (self.state != .active) return;
+        log.writef(.debug, "Refresh WireGuard v2 transport, retaining wg-go handle: {d}", .{self.handle});
         if (self.looper) |looper| looper.cancelTimer(&self.timer);
         self.state = .refresh_requested;
         self.events.failed(self.events.ctx, .{ .err_pair = .{ .code = .networkChanged }, .disposition = .reconnect });
     }
     fn fail(self: *WireGuardConnection, code: api.PartoutErrorCode) void {
         if (self.state != .active and self.state != .activating) return;
+        log.writef(.err, "WireGuard v2 failed: {s}, state: {s}", .{ @tagName(code), @tagName(self.state) });
         self.prepareStop(.explicit_stop);
         self.events.failed(self.events.ctx, .{ .err_pair = .{ .code = code }, .disposition = .reconnect });
     }
@@ -208,9 +226,11 @@ const WireGuardConnection = struct {
             .explicit_stop => false,
         };
         if (refreshing) {
+            log.write(.debug, "Pause WireGuard v2 I/O for transport refresh");
             self.bridge.pause();
             self.state = .suspended;
         } else {
+            if (self.state != .stopping and self.state != .stopped) log.write(.debug, "Close WireGuard v2 I/O admission");
             self.bridge.quiesce();
             self.state = .stopping;
         }
@@ -221,12 +241,17 @@ const WireGuardConnection = struct {
     fn stop(self: *WireGuardConnection) void {
         self.prepareStop(.explicit_stop);
         self.joinActivation() catch {};
-        if (self.handle >= 0) self.backend.turnOff(self.handle);
+        if (self.handle >= 0) {
+            log.writef(.info, "Stop passive wg-go backend, handle: {d}", .{self.handle});
+            self.backend.turnOff(self.handle);
+            log.write(.debug, "Passive wg-go backend stopped");
+        }
         self.handle = -1;
         self.state = .stopped;
     }
     fn destroy(self: *WireGuardConnection) void {
         std.debug.assert(self.state == .stopped and self.activation == null and self.timer.id == null);
+        log.write(.debug, "Deinit WireGuardConnection v2");
         self.bridge.lock.deinit();
         self.resolver.deinit(self.allocator);
         self.info.deinit(self.allocator);
@@ -263,7 +288,10 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     switch (self.state) {
         .stopped => self.start(remote) catch |err| return startError(err),
         .suspended => self.refresh(remote) catch |err| return startError(err),
-        else => return false,
+        else => {
+            log.writef(.debug, "WireGuard v2 start ignored, state: {s}", .{@tagName(self.state)});
+            return false;
+        },
     }
     return true;
 }
@@ -277,14 +305,17 @@ fn transportDetached(ptr: *anyopaque, _: u32, _: net.Connection.Events) void {
 fn destroy(ptr: *anyopaque) void {
     cast(ptr).destroy();
 }
-fn looperTerminated(ptr: *anyopaque, _: ?net.Looper.Failure) void {
+fn looperTerminated(ptr: *anyopaque, failure: ?net.Looper.Failure) void {
+    if (failure) |cause| log.writef(.err, "WireGuard v2 looper terminated: {any}", .{cause});
     cast(ptr).stop();
 }
-fn looperFailed(ptr: *anyopaque, _: net.Side, _: net.Looper.Failure) void {
+fn looperFailed(ptr: *anyopaque, side: net.Side, failure: net.Looper.Failure) void {
+    log.writef(.err, "WireGuard v2 {s} I/O failed: {any}", .{ @tagName(side), failure });
     cast(ptr).fail(.ioFailure);
 }
 fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.Events) void {
     const self = cast(ptr);
+    log.writef(.debug, "WireGuard v2 network changed, reachable: {}, state: {s}", .{ info.reachable, @tagName(self.state) });
     switch (self.state) {
         .active => self.requestRefresh(),
         // A reachable notification may have just started this activation.
@@ -293,6 +324,7 @@ fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.
     }
 }
 fn betterPath(ptr: *anyopaque, _: net.Connection.Events) void {
+    log.write(.debug, "WireGuard v2 better path detected");
     cast(ptr).requestRefresh();
 }
 fn readBuffers(ptr: *anyopaque, side: net.Side) ?net.Looper.ReadBuffers {
