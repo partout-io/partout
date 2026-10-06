@@ -90,7 +90,9 @@ const WireGuardConnection = struct {
         self.looper = remote.looper;
         self.state = .activating;
         errdefer self.prepareStop(.explicit_stop);
-        self.resolver.reset(self.allocator);
+        // A live refresh keeps numeric bases: DNS may itself use the detached
+        // tunnel. resolve() still remaps them for the current DNS64 network.
+        if (operation == .start) self.resolver.reset(self.allocator);
         try self.resolver.cacheAll(self.allocator);
         const resolved = try self.resolver.resolve(self.allocator, std.EnumSet(net.DNSResolver.Flag).initEmpty());
         const settings = try switch (operation) {

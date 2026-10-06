@@ -119,6 +119,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
     Probe.current = &probe;
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
+    var dns = RefreshDNS{};
     var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
@@ -132,7 +133,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     factory.vtable = &factory_table;
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
-        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"mtu":1400},"peers":[]}}},
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"mtu":1400},"peers":[{"publicKey":"CQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","endpoint":"vpn.example:51820","allowedIPs":[]}]}}},
         \\{"type":"IP","value":{"id":"44444444-4444-4444-8444-444444444444","mtu":1380}}
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333","44444444-4444-4444-8444-444444444444"]}
     );
@@ -140,7 +141,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     const module = @constCast(api.findActiveConnectionModule(&profile).?);
     module.WireGuard.configuration.?.interface.listen_port = requested_port;
     const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
-        .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = mock.noopDNSResolver(), .factory = factory, .monitor = monitor.interface() },
+        .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = dns.interface(), .factory = factory, .monitor = monitor.interface() },
         .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
     });
     defer sut.destroy();
@@ -159,6 +160,11 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectEqual(requested_port, fake.link.?.local_port);
     try std.testing.expectEqual(@as(u32, 1380), fake.tun.?.mtu);
     try wait(&fake.counts, 2);
+    try std.testing.expectEqual(@as(usize, 2), dns.queries.load(.acquire));
+    // DNS is unavailable during transport replacement, but numeric bases must
+    // survive and still be remapped onto the new network's DNS64 prefix.
+    dns.unavailable.store(true, .release);
+    dns.dns64.store(true, .release);
     // A same/worse path can remain reachable and never emit betterPath.
     // Duplicate notifications during failure must coalesce into one restart.
     monitor.setReachable(true);
@@ -173,6 +179,9 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try waitStatus(sut, .connected);
     try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 2), dns.queries.load(.acquire));
+    try std.testing.expect(fake.refreshed_dns64.load(.acquire));
+    dns.unavailable.store(false, .release);
     monitor.setReachable(false);
     try waitStatus(sut, .disconnected);
     // Rearm while offline, then let reachability itself start activation. Its
@@ -185,6 +194,8 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try std.testing.expectError(error.AlreadyStarted, sut.start());
     try waitStatus(sut, .connected);
+    // A genuinely new backend must perform a fresh hostname lookup.
+    try std.testing.expectEqual(@as(usize, 3), dns.queries.load(.acquire));
     // Endpoint refresh failure must close the retained backend; the next
     // attempt starts a fresh device rather than retrying a half-updated one.
     fake.fail_set_config.store(true, .release);
@@ -482,11 +493,38 @@ fn checkActiveRoutes(allocator: std.mem.Allocator, profile: *const api.Profile) 
     }
 }
 
+const RefreshDNS = struct {
+    queries: std.atomic.Value(usize) = .init(0),
+    unavailable: std.atomic.Value(bool) = .init(false),
+    dns64: std.atomic.Value(bool) = .init(false),
+
+    fn interface(self: *RefreshDNS) source.net_sandbox.DNSResolver {
+        return .{ .ptr = self, .resolve_block = resolve, .resolve_address_block = remap };
+    }
+    fn resolve(raw: ?*anyopaque, allocator: std.mem.Allocator, hostname: []const u8, _: std.EnumSet(source.net_sandbox.DNSResolver.Flag), _: ?io.ReachabilityInfo, _: u32) source.net_sandbox.DNSResolver.Error![]source.net_sandbox.DNSRecord {
+        const self: *RefreshDNS = @ptrCast(@alignCast(raw.?));
+        std.debug.assert(std.mem.eql(u8, hostname, "vpn.example"));
+        _ = self.queries.fetchAdd(1, .release);
+        if (self.unavailable.load(.acquire)) return error.ResolutionFailure;
+        const address = try allocator.dupe(u8, "192.0.2.1");
+        errdefer allocator.free(address);
+        const records = try allocator.alloc(source.net_sandbox.DNSRecord, 1);
+        records[0] = .init(address, false);
+        return records;
+    }
+    fn remap(raw: ?*anyopaque, allocator: std.mem.Allocator, address: []const u8, _: ?io.ReachabilityInfo, _: u32) source.net_sandbox.DNSResolver.Error![]u8 {
+        const self: *RefreshDNS = @ptrCast(@alignCast(raw.?));
+        std.debug.assert(std.mem.eql(u8, address, "192.0.2.1"));
+        return allocator.dupe(u8, if (self.dns64.load(.acquire)) "64:ff9b::c000:201" else address);
+    }
+};
+
 const FakeBackend = struct {
     link: ?@import("wireguard_c").wg_passive_link = null,
     tun: ?@import("wireguard_c").wg_passive_tun = null,
     context: ?*anyopaque = null,
     counts: std.atomic.Value(usize) = .init(0),
+    refreshed_dns64: std.atomic.Value(bool) = .init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
     fail_turn_on_number: ?usize = null,
@@ -550,6 +588,7 @@ fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend
 fn fakeSetConfig(ptr: ?*anyopaque, _: std.mem.Allocator, _: i32, settings: [:0]const u8) backend_mod.Error!i64 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     std.debug.assert(std.mem.indexOf(u8, settings, "replace_peers") == null);
+    self.refreshed_dns64.store(std.mem.indexOf(u8, settings, "endpoint=[64:ff9b::c000:201]:51820") != null, .release);
     if (self.fail_set_config.swap(false, .acq_rel)) {
         _ = self.set_config_failures.fetchAdd(1, .release);
         return -1;
