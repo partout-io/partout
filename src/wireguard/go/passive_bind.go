@@ -14,7 +14,7 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 )
 
-const passiveBatchSize = 256
+const passiveBatchSize = 16
 const passiveMaxDatagram = 65535
 
 var (

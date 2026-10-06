@@ -40,7 +40,9 @@ TUN descriptor. The ABI is declared by `include/wg_go/wg_go.h` and its included
 `passive_io.h`. Existing `wgTurnOn` retains native Go I/O.
 
 The host creates/configures its UDP socket first and supplies its actual bound
-port. Both passive interfaces use `BatchSize() == 256`; UDP batches carry a
+port. Both passive interfaces use batches of 16 on every platform.
+This caps idle payload storage at 2 MiB while still
+amortizing host handoffs. The ABI accepts up to 256 descriptors. UDP batches carry a
 binary source per packet or one destination per output batch. Mapped IPv4
 addresses are normalized. Local source/interface stickiness is not provided.
 The host supplies the effective TUN MTU, without AF or virtio packet headers.

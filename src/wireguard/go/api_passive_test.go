@@ -5,10 +5,14 @@ package main
 
 import (
 	"errors"
+	"net"
+	"net/netip"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 
+	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 )
 
@@ -91,5 +95,37 @@ func TestPassiveStartupFailureClosesIO(t *testing.T) {
 	}
 	if _, err := tun.Write([][]byte{{1}}, 0); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("failed startup left TUN open: %v", err)
+	}
+}
+
+func TestPassiveIdlePayloadBudget(t *testing.T) {
+	// Observe the actual buffers allocated by WireGuard's two readers, rather
+	// than only checking BatchSize. Readers remain blocked until cleanup.
+	capacity := make(chan int, 2)
+	read := func(bufs [][]byte, done <-chan struct{}) (int, error) {
+		total := 0
+		for _, buf := range bufs {
+			total += cap(buf)
+		}
+		capacity <- total
+		<-done
+		return 0, net.ErrClosed
+	}
+	bind := newPassiveBind(51820,
+		func(bufs [][]byte, _ []int, _ []conn.Endpoint, done <-chan struct{}) (int, error) {
+			return read(bufs, done)
+		},
+		func([][]byte, netip.AddrPort) error { return nil })
+	tun := newPassiveTun(1400,
+		func(bufs [][]byte, _ []int, _ int, done <-chan struct{}) (int, error) { return read(bufs, done) },
+		func(bufs [][]byte, _ int) (int, error) { return len(bufs), nil })
+	handle := turnOnPassiveDevice("", bind, tun)
+	if handle < 0 {
+		t.Fatal("startup failed")
+	}
+	defer wgTurnOffWithPassiveIO(handle)
+	budget := 2 << 20
+	if total := <-capacity + <-capacity; total > budget {
+		t.Fatalf("idle payload storage = %d bytes, budget = %d", total, budget)
 	}
 }

@@ -141,7 +141,7 @@ func TestPassiveBindBatches(t *testing.T) {
 	})
 	defer b.Close()
 	fns, _, _ := b.Open(0)
-	if b.BatchSize() != 256 {
+	if b.BatchSize() != passiveBatchSize {
 		t.Fatal(b.BatchSize())
 	}
 	bufs := make([][]byte, b.BatchSize())

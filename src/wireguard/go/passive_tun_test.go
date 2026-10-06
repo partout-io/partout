@@ -31,7 +31,7 @@ func TestPassiveTunBatches(t *testing.T) {
 		return len(packets), nil
 	})
 	defer tun.Close()
-	if tun.BatchSize() != 256 {
+	if tun.BatchSize() != passiveBatchSize {
 		t.Fatal(tun.BatchSize())
 	}
 	bufs := make([][]byte, tun.BatchSize())
