@@ -52,10 +52,14 @@ components:
     DaemonFeatureFlag:
       enum:
         - 1
+        - 2
+        - 4
       type: integer
       x-enum-varnames:
         - experimentalDaemon
-      description: A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field.
+        - experimentalOpenVPN
+        - experimentalWireGuard
+      description: A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. experimentalDaemon enables daemon v2. experimentalOpenVPN and experimentalWireGuard enable their respective v2 implementations and require experimentalDaemon.
     DNSModule:
       additionalProperties: false
       properties:

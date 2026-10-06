@@ -37,14 +37,18 @@ import kotlinx.serialization.encoding.Encoder
 
 
 /**
- * A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field.
+ * A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. experimentalDaemon enables daemon v2. experimentalOpenVPN and experimentalWireGuard enable their respective v2 implementations and require experimentalDaemon.
  *
- * Values: experimentalDaemon
+ * Values: experimentalDaemon,experimentalOpenVPN,experimentalWireGuard
  */
 @Serializable(with = DaemonFeatureFlagSerializer::class)
 enum class DaemonFeatureFlag(val value: kotlin.Int) {
 
-    experimentalDaemon(1);
+    experimentalDaemon(1),
+
+    experimentalOpenVPN(2),
+
+    experimentalWireGuard(4);
 
     /**
      * Override [toString()] to avoid using the enum variable name as the value, and instead use

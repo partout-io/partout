@@ -382,6 +382,8 @@ pub const CryptoBackend = enum(i32) {
 
 pub const DaemonFeatureFlag = enum(i32) {
     experimentalDaemon = 1,
+    experimentalOpenVPN = 2,
+    experimentalWireGuard = 4,
 
     pub fn parseValue(_: std.mem.Allocator, value: std.json.Value) DecodeError!@This() {
         const raw_value = try parseInteger(i32, value);
@@ -391,6 +393,8 @@ pub const DaemonFeatureFlag = enum(i32) {
     pub fn parseFromRaw(raw_value: i32) ?@This() {
         return switch (raw_value) {
             1 => .experimentalDaemon,
+            2 => .experimentalOpenVPN,
+            4 => .experimentalWireGuard,
             else => null,
         };
     }
@@ -398,6 +402,8 @@ pub const DaemonFeatureFlag = enum(i32) {
     pub fn raw(self: @This()) i32 {
         return switch (self) {
             .experimentalDaemon => 1,
+            .experimentalOpenVPN => 2,
+            .experimentalWireGuard => 4,
         };
     }
 

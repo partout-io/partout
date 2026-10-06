@@ -138,10 +138,11 @@ test "daemon runtime owns options during lifecycle" {
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            try std.testing.expectEqual(expected_experimental, ctx.OpenVPN == .experimental);
-            const expected_vtable = if (expected_experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
+            const expected_openvpn = source.runtime_policy.v2_only;
+            try std.testing.expectEqual(expected_openvpn, ctx.OpenVPN == .experimental);
+            const expected_vtable = if (expected_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
             try std.testing.expect(impl.vtable == expected_vtable);
-            const expected_context: *anyopaque = if (expected_experimental) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
+            const expected_context: *anyopaque = if (expected_openvpn) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
             try std.testing.expect(impl.ptr == expected_context);
         }
         try runtime.start();
@@ -316,14 +317,18 @@ fn blockingConnectionRegistry(
     return conn.ConnectionRegistry.init(allocator, &implementations);
 }
 
-test "daemon options decode experimental daemon feature flag" {
+test "daemon options decode experimental feature flags" {
     const allocator = std.testing.allocator;
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
-    args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
+    args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon |
+        partout_c.PartoutDaemonFlagExperimentalOpenVPN |
+        partout_c.PartoutDaemonFlagExperimentalWireGuard;
     var options = try abi_runtime.DaemonOptions.init(allocator, args, null);
     defer options.deinit(allocator);
 
     try std.testing.expect(options.feature_flags.contains(.experimentalDaemon));
+    try std.testing.expect(options.feature_flags.contains(.experimentalOpenVPN));
+    try std.testing.expect(options.feature_flags.contains(.experimentalWireGuard));
 }
 
 test "daemon options reject unknown feature bits" {
@@ -334,7 +339,7 @@ test "daemon options reject unknown feature bits" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
 
-test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only profiles" {
+test "experimental protocol flags require daemon v2 and select implementations independently" {
     const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
@@ -353,33 +358,35 @@ test "experimental daemon flag applies to OpenVPN, WireGuard and settings-only p
     defer allocator.free(cache_dir);
     for (cases) |case| {
         if (!case.enabled) continue;
-        for ([_]bool{ false, true }) |requested| {
+        for (0..8) |flags| {
             var args = daemonStartArgs(case.json.ptr);
             args.options.cache_dir = cache_dir.ptr;
-            args.options.feature_flags = if (requested) partout_c.PartoutDaemonFlagExperimentalDaemon else 0;
+            args.options.feature_flags = flags;
             const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
             const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
                 options.deinit(allocator);
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = source.runtime_policy.v2_only or requested;
+            const experimental = source.runtime_policy.v2_only or (flags & partout_c.PartoutDaemonFlagExperimentalDaemon != 0);
+            const experimental_openvpn = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalOpenVPN != 0);
+            const experimental_wireguard = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalWireGuard != 0);
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
             if (source.wireguard_enabled) {
                 const impl = runtime.registry.implementation(.WireGuard).?;
-                const expected = if (experimental) &source.wireguard_exports.connection_v2_vtable else &source.wireguard_exports.connection_vtable;
+                const expected = if (experimental_wireguard) &source.wireguard_exports.connection_v2_vtable else &source.wireguard_exports.connection_vtable;
                 try std.testing.expect(impl.vtable == expected);
                 const ctx = runtime.contexts.getPtr(.WireGuard).?;
-                try std.testing.expectEqual(experimental, ctx.WireGuard == .experimental);
-                const expected_context: *anyopaque = if (experimental) &ctx.WireGuard.experimental else &ctx.WireGuard.legacy;
+                try std.testing.expectEqual(experimental_wireguard, ctx.WireGuard == .experimental);
+                const expected_context: *anyopaque = if (experimental_wireguard) &ctx.WireGuard.experimental else &ctx.WireGuard.legacy;
                 try std.testing.expect(impl.ptr == expected_context);
-                const backend = if (experimental) ctx.WireGuard.experimental.backend else ctx.WireGuard.legacy.backend;
-                const expected_backend = if (experimental) source.wireguard_exports.go_passive_backend else source.wireguard_exports.go_backend;
+                const backend = if (experimental_wireguard) ctx.WireGuard.experimental.backend else ctx.WireGuard.legacy.backend;
+                const expected_backend = if (experimental_wireguard) source.wireguard_exports.go_passive_backend else source.wireguard_exports.go_backend;
                 try std.testing.expect(backend.vtable == expected_backend.vtable);
             }
             if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
                 const impl = runtime.registry.implementation(.OpenVPN).?;
-                const expected = if (experimental) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
+                const expected = if (experimental_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
                 try std.testing.expect(impl.vtable == expected);
             }
         }

@@ -5,7 +5,9 @@
 // https://openapi-generator.tech
 //
 
-/** A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. */
+/** A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. experimentalDaemon enables daemon v2. experimentalOpenVPN and experimentalWireGuard enable their respective v2 implementations and require experimentalDaemon. */
 public enum DaemonFeatureFlag: Int, Sendable, Codable, CaseIterable {
     case experimentalDaemon = 1
+    case experimentalOpenVPN = 2
+    case experimentalWireGuard = 4
 }

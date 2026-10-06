@@ -80,6 +80,9 @@ typedef enum {
 
 /* Daemon feature flags (DaemonFeatureFlag bit values). */
 #define PartoutDaemonFlagExperimentalDaemon (UINT64_C(1) << 0)
+/* Protocol v2 flags require PartoutDaemonFlagExperimentalDaemon. */
+#define PartoutDaemonFlagExperimentalOpenVPN (UINT64_C(1) << 1)
+#define PartoutDaemonFlagExperimentalWireGuard (UINT64_C(1) << 2)
 
 /* Daemon options. */
 typedef struct {
