@@ -8,11 +8,58 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
+
+	"golang.zx2c4.com/wireguard/device"
 )
+
+func TestPassiveTunHostCancellationLogging(t *testing.T) {
+	for _, hostErr := range []error{net.ErrClosed, errors.New("host read failed")} {
+		t.Run(hostErr.Error(), func(t *testing.T) {
+			cancel := make(chan struct{})
+			messages := make(chan string, 8)
+			tun := newPassiveTun(1400, func([][]byte, []int, int, <-chan struct{}) (int, error) {
+				<-cancel
+				return 0, hostErr
+			}, func(bufs [][]byte, _ int) (int, error) { return len(bufs), nil })
+			dev := device.NewDevice(tun, testBind(), &device.Logger{
+				Verbosef: func(string, ...any) {},
+				Errorf: func(format string, args ...any) {
+					messages <- fmt.Sprintf(format, args...)
+				},
+			})
+			defer dev.Close()
+			// The host quiesces borrowed reads before calling device.Close.
+			close(cancel)
+			select {
+			case <-dev.Wait():
+			case <-time.After(3 * time.Second):
+				t.Fatal("host cancellation did not stop the device")
+			}
+			if hostErr == net.ErrClosed {
+				select {
+				case message := <-messages:
+					t.Fatalf("normal host cancellation logged an error: %s", message)
+				default:
+				}
+			} else {
+				select {
+				case message := <-messages:
+					if !strings.Contains(message, "Failed to read packet from TUN device: host read failed") {
+						t.Fatal(message)
+					}
+				default:
+					t.Fatal("unexpected read failure was not logged")
+				}
+			}
+		})
+	}
+}
 
 func TestPassiveTunBatches(t *testing.T) {
 	var written [][]byte
@@ -165,7 +212,7 @@ func TestPassiveTunCloseWakesReadAndJoinsWrite(t *testing.T) {
 
 func TestPassiveTunWritePreservesCompletedPrefix(t *testing.T) {
 	tun := newPassiveTun(1400, testInput(nil).readTun, func([][]byte, int) (int, error) {
-		return 1, os.ErrClosed
+		return 1, net.ErrClosed
 	})
 	defer tun.Close()
 	n, err := tun.Write([][]byte{{0x45}, {0x60}}, 0)

@@ -4,6 +4,8 @@
 package main
 
 import (
+	"errors"
+	"net"
 	"os"
 	"sync"
 
@@ -57,7 +59,8 @@ func (t *passiveTun) Read(bufs [][]byte, sizes []int, offset int) (int, error) {
 		return 0, os.ErrClosed
 	default:
 	}
-	return t.read(bufs, sizes, offset, t.done)
+	n, err := t.read(bufs, sizes, offset, t.done)
+	return n, passiveTunError(err)
 }
 func (t *passiveTun) Write(bufs [][]byte, offset int) (int, error) {
 	if len(bufs) == 0 || len(bufs) > passiveBatchSize || offset < 0 {
@@ -73,5 +76,15 @@ func (t *passiveTun) Write(bufs [][]byte, offset int) (int, error) {
 	if t.closed {
 		return 0, os.ErrClosed
 	}
-	return t.write(bufs, offset)
+	n, err := t.write(bufs, offset)
+	return n, passiveTunError(err)
+}
+
+func passiveTunError(err error) error {
+	// The shared host bridge uses the socket sentinel. WireGuard's TUN reader
+	// recognizes os.ErrClosed as normal shutdown when the host quiesces first.
+	if errors.Is(err, net.ErrClosed) {
+		return os.ErrClosed
+	}
+	return err
 }
