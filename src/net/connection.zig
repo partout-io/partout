@@ -188,6 +188,9 @@ pub const Connection = struct {
         failure: Events.FailureDisposition,
     };
 
+    /// Requested daemon action after handling a network event.
+    pub const NetworkAction = enum { none, refresh_link };
+
     // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
     // FIXME: ###, Connections must not know about looper
 
@@ -271,9 +274,10 @@ pub const Connection = struct {
         }.call,
         stop: *const fn (*anyopaque, u32, Events) void,
 
-        /// Network reachability.
-        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
-        better_path: *const fn (*anyopaque, Events) void,
+        /// A refresh pauses link submissions and receives a replacement through
+        /// start_v2, retaining TUN without re-establishing the connection.
+        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) NetworkAction,
+        better_path: *const fn (*anyopaque, Events) NetworkAction,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
@@ -340,12 +344,12 @@ pub const Connection = struct {
         self: Connection,
         reachability: io.ReachabilityInfo,
         events: Events,
-    ) void {
-        self.vtable.network_change(self.ptr, reachability, events);
+    ) NetworkAction {
+        return self.vtable.network_change(self.ptr, reachability, events);
     }
 
-    pub fn betterPath(self: Connection, events: Events) void {
-        self.vtable.better_path(self.ptr, events);
+    pub fn betterPath(self: Connection, events: Events) NetworkAction {
+        return self.vtable.better_path(self.ptr, events);
     }
 
     pub fn destroy(self: Connection) void {

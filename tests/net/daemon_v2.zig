@@ -157,13 +157,14 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
             self.stop_count += 1;
             sink.stopped(sink.ctx);
         }
-        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
+        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) net.Connection.NetworkAction {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.looper.isOnQueue());
             self.reachability_count += 1;
             sink.data_count(sink.ctx, .{});
+            return .none;
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) net.Connection.NetworkAction {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.looper.isOnQueue());
             var servers = [_]api.Address{api.Address.parseRaw("1.1.1.1").?};
@@ -181,6 +182,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
             });
             // This storage expires before the actor can process established.
             servers[0] = api.Address.parseRaw("9.9.9.9").?;
+            return .none;
         }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -491,9 +493,13 @@ const FailingStartConnection = struct {
 
     fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
+        return .none;
+    }
 
     fn destroy(_: *anyopaque) void {}
 
@@ -535,7 +541,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             self.events = sb.events;
             return .{ .ptr = self, .vtable = &vtable };
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) net.Connection.NetworkAction {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.producer_thread = std.Thread.getCurrentId();
             var key = "OpenVPN.serverConfiguration".*;
@@ -545,6 +551,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             sink.set_env(sink.ctx, &key, &value);
             @memset(&key, 'x');
             @memset(&value, 'x');
+            return .none;
         }
         fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
             sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", null);
