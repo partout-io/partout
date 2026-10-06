@@ -61,10 +61,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 		},
 		func(packets [][]byte, destination netip.AddrPort) error {
 			address := endpointToC(destination)
-			var pins runtime.Pinner
-			pins.Pin(&address)
-			defer pins.Unpin()
-			_, err := host.write(packets, 0, func(batch *C.wg_packet, count C.uint32_t, request C.uintptr_t) C.int32_t {
+			_, err := host.write(packets, 0, &address, func(batch *C.wg_packet, count C.uint32_t, request C.uintptr_t) C.int32_t {
 				return C.wg_passive_link_write(linkIO.write, context, batch, count, &address, request)
 			})
 			return err
@@ -75,7 +72,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 			return host.read(tunIO.read, context, packets, sizes, nil, offset, done)
 		},
 		func(packets [][]byte, offset int) (int, error) {
-			return host.write(packets, offset, func(batch *C.wg_packet, count C.uint32_t, request C.uintptr_t) C.int32_t {
+			return host.write(packets, offset, nil, func(batch *C.wg_packet, count C.uint32_t, request C.uintptr_t) C.int32_t {
 				return C.wg_passive_tun_write(tunIO.write, context, batch, count, request)
 			})
 		})
@@ -242,8 +239,15 @@ type passiveResult struct {
 	status C.int32_t
 }
 
+// Pools contain only completed, unpinned requests. Clearing descriptors also
+// prevents the pools from retaining WireGuard message buffers across GC cycles.
+var passiveCompletions = sync.Pool{New: func() any { return make(chan passiveResult, 1) }}
+var passiveReads = sync.Pool{New: func() any { return new([passiveBatchSize]C.wg_read_packet) }}
+var passiveWrites = sync.Pool{New: func() any { return new([passiveBatchSize]C.wg_packet) }}
+
 func passiveRequest(submit func(C.uintptr_t) C.int32_t) passiveResult {
-	done := make(chan passiveResult, 1)
+	done := passiveCompletions.Get().(chan passiveResult)
+	defer passiveCompletions.Put(done)
 	handle := cgo.NewHandle(done)
 	defer handle.Delete()
 	if status := submit(C.uintptr_t(handle)); status != 0 {
@@ -274,7 +278,8 @@ func (h *passiveHost) read(read C.wg_read_fn, context unsafe.Pointer, packets []
 	if !h.waitReady(done) {
 		return 0, net.ErrClosed
 	}
-	var batch [passiveBatchSize]C.wg_read_packet
+	batch := passiveReads.Get().(*[passiveBatchSize]C.wg_read_packet)
+	defer func() { clear(batch[:]); passiveReads.Put(batch) }()
 	var pins runtime.Pinner
 	defer pins.Unpin()
 	for i, packet := range packets {
@@ -319,13 +324,17 @@ func (r passiveResult) err() error {
 	}
 }
 
-func (h *passiveHost) write(packets [][]byte, offset int,
+func (h *passiveHost) write(packets [][]byte, offset int, address *C.wg_endpoint,
 	submit func(*C.wg_packet, C.uint32_t, C.uintptr_t) C.int32_t) (int, error) {
 	// Up may synchronously send a keepalive handshake. The host must service
 	// writes while startup runs; waiting for ready here would deadlock Up.
-	var batch [passiveBatchSize]C.wg_packet
+	batch := passiveWrites.Get().(*[passiveBatchSize]C.wg_packet)
+	defer func() { clear(batch[:]); passiveWrites.Put(batch) }()
 	var pins runtime.Pinner
 	defer pins.Unpin()
+	if address != nil {
+		pins.Pin(address)
+	}
 	for i, packet := range packets {
 		data := unsafe.SliceData(packet[offset:])
 		if data != nil {
