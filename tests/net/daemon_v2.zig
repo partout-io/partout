@@ -748,4 +748,121 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
     }
 }
 
+test "v2 owned link is released on rejected dispatch and failed start" {
+    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const io = @import("source").net_io;
+    const Scenario = enum { initial_dispatch, refresh_dispatch, start_false, start_error };
+    const Probe = struct {
+        scenario: Scenario,
+        daemon: *Daemon = undefined,
+        terminated: bool = false,
+        socket_count: usize = 0,
+        start_count: usize = 0,
+        last_fd: io.FileDescriptor = undefined,
+        remote: ?net.RemoteDescriptor = null,
+        const endpoint_list = [_]api.ExtendedEndpoint{
+            api.ExtendedEndpoint.init("127.0.0.1", .init(.udp, 1194)).?,
+            api.ExtendedEndpoint.init("127.0.0.1", .init(.udp, 1195)).?,
+        };
+
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+            return &endpoint_list;
+        }
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            // Do not restart after the injected terminal looper failure.
+            if (self.terminated) return error.OutOfMemory;
+            return .{ .ptr = self, .vtable = &vtable, .owns_io = true };
+        }
+        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.start_count += 1;
+            self.remote = remote;
+            return switch (self.scenario) {
+                .start_false => false,
+                .start_error => error.UnableToStart,
+                else => true,
+            };
+        }
+        fn destroy(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (self.remote) |remote| remote.link.cleanup();
+            self.remote = null;
+        }
+        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+            destroy(raw);
+        }
+        fn looperTerminated(raw: *anyopaque, _: ?Looper.Failure) void {
+            destroy(raw);
+        }
+        fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
+            return .refresh_link;
+        }
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) net.SocketFactory.Error!Looper.LinkDescriptor {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
+            const descriptor = wrapper.linkDescriptor();
+            self.last_fd = descriptor.fd;
+            self.socket_count += 1;
+            const reject_at: usize = switch (self.scenario) {
+                .initial_dispatch => 1,
+                .refresh_dispatch => 2,
+                else => 0,
+            };
+            if (self.socket_count == reject_at) {
+                // Terminate after creating the socket, before dispatching startV2.
+                self.daemon.implementation.connection.looper.stop() catch unreachable;
+                self.terminated = true;
+            }
+            return descriptor;
+        }
+        const vtable = blk: {
+            var value = FailingStartConnection.vtable;
+            value.endpoints = endpoints;
+            value.start_v2 = start;
+            value.stop = stop;
+            value.destroy = destroy;
+            value.looper_terminated = looperTerminated;
+            value.better_path = betterPath;
+            break :blk value;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const allocator = std.testing.allocator;
+    for ([_]Scenario{ .initial_dispatch, .refresh_dispatch, .start_false, .start_error }) |scenario| {
+        var probe = Probe{ .scenario = scenario };
+        var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+        defer registry.deinit(allocator);
+        var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        var factory_table = mock_mod.noopSocketFactory().vtable.*;
+        factory_table.create = Probe.socket;
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+            .options = .{ .reconnection_delay_ms = 60_000 },
+        });
+        defer sut.destroy();
+        probe.daemon = sut;
+        try sut.start();
+        defer sut.stop();
+        // Drain the initial gate evaluation before requesting a link refresh.
+        try std.testing.expectError(error.AlreadyStarted, sut.start());
+        if (scenario == .refresh_dispatch) {
+            try std.testing.expectEqual(@as(usize, 1), probe.start_count);
+            try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
+            try sut.implementation.connection.actor.perform(void, .onBetterPath);
+        }
+        sut.stop();
+        try std.testing.expectEqual(@as(usize, if (scenario == .refresh_dispatch) 2 else 1), probe.socket_count);
+        try std.testing.expectEqual(@as(usize, if (scenario == .initial_dispatch) 0 else 1), probe.start_count);
+        try std.testing.expect(probe.remote == null);
+        try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
+    }
+}
+
 fn noopEstablish(_: *anyopaque, _: *net.TunWrapper) void {}
