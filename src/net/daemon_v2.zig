@@ -1204,6 +1204,7 @@ const ConnectionDaemon = struct {
     const CallOnLooper = struct {
         connection: Connection,
         events: Connection.Events,
+        start_entered: bool = false,
         operation: union(enum) {
             start: RemoteDescriptor,
             shutdown: Connection.ShutdownReason,
@@ -1213,9 +1214,12 @@ const ConnectionDaemon = struct {
         },
 
         fn run(ctx: ?*anyopaque) !bool {
-            const request: *const CallOnLooper = @ptrCast(@alignCast(ctx.?));
+            const request: *CallOnLooper = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
-                .start => |remote| return request.connection.startV2(remote),
+                .start => |remote| {
+                    request.start_entered = true;
+                    return request.connection.startV2(remote);
+                },
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
                 .reachability => |info| return request.connection.networkChange(info, request.events) == .refresh_link,
@@ -1235,6 +1239,9 @@ const ConnectionDaemon = struct {
             .events = self.events(),
             .operation = operation,
         };
+        // An owned link transfers only when startV2 is entered, even if it fails.
+        defer if (operation == .start and request.connection.owns_io and !request.start_entered)
+            operation.start.link.cleanup();
         return self.looper.perform(bool, &request, CallOnLooper.run);
     }
 

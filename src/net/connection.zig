@@ -248,6 +248,7 @@ pub const Connection = struct {
                 return null;
             }
         }.call,
+        /// When owns_io is true, takes link ownership on entry, including on failure.
         start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
                 return false;
