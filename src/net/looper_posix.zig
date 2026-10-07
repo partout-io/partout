@@ -12,7 +12,6 @@
 //! payloads until completion. No packet data is copied.
 
 const std = @import("std");
-const UDPBatch = @import("udp_batch.zig").UDPBatch;
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
@@ -1455,7 +1454,7 @@ pub const PosixLooper = struct {
         side: io.Side,
         fd: io.FileDescriptor,
         native_io: io_posix.POSIXInterface,
-        udp_batch: UDPBatch,
+        udp_batch: helpers.UDPBatch,
 
         // User callbacks.
         on_read: ?helpers.OnRead,
