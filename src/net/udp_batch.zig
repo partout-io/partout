@@ -1,14 +1,38 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
-//! UDP batching for looper v2. Borrows buffers directly and keeps the existing
-//! scalar path for small buffers, unsupported syscalls and packet errors.
+//! Optional UDP batching for looper v2. A null read/write result selects
+//! scalar I/O; platform support and socket eligibility stay inside this adapter.
 const std = @import("std");
 const linux = std.os.linux;
 const io = @import("io.zig");
 const helpers = @import("looper_helpers.zig");
 
 pub const UDPBatch = struct {
+    const supported = @import("builtin").os.tag == .linux;
+    backend: if (supported) ?LinuxUDPBatch else void = if (supported) null else {},
+
+    pub fn init(descriptor: io.LinkDescriptor) UDPBatch {
+        if (comptime !supported) return .{};
+        if (!descriptor.io.isUnconnected()) return .{};
+        const address = descriptor.localAddress() catch return .{};
+        return .{ .backend = LinuxUDPBatch.init(descriptor.fd, address.family) };
+    }
+
+    pub fn write(self: *UDPBatch, packets: helpers.Packets, destination: ?io.SocketAddress) ?usize {
+        if (comptime !supported) return null;
+        const backend = if (self.backend) |*value| value else return null;
+        return backend.write(packets, destination orelse return null);
+    }
+
+    pub fn read(self: *UDPBatch, buffers: []helpers.ReadBuffer, max_bytes: usize) ?usize {
+        if (comptime !supported) return null;
+        const backend = if (self.backend) |*value| value else return null;
+        return backend.read(buffers, max_bytes);
+    }
+};
+
+const LinuxUDPBatch = struct {
     fd: i32,
     dual_stack: bool,
     can_read: bool = true,
@@ -17,7 +41,7 @@ pub const UDPBatch = struct {
     const max_datagram = 65535;
     const mapped_prefix = [_]u8{0} ** 10 ++ .{ 0xff, 0xff };
 
-    pub fn init(fd: i32, family: u8) ?UDPBatch {
+    pub fn init(fd: i32, family: u8) ?LinuxUDPBatch {
         var v6_only: c_int = 1;
         if (family == 6) {
             var len: u32 = @sizeOf(c_int);
@@ -26,7 +50,7 @@ pub const UDPBatch = struct {
         return .{ .fd = fd, .dual_stack = family == 6 and v6_only == 0 };
     }
 
-    pub fn write(self: *UDPBatch, packets: helpers.Packets, destination: io.SocketAddress) ?usize {
+    pub fn write(self: *LinuxUDPBatch, packets: helpers.Packets, destination: io.SocketAddress) ?usize {
         if (!self.can_write or packets.len < 2) return null;
         var address: linux.sockaddr.in6 = undefined;
         const address_len = nativeAddress(&address, self.dual_stack, destination) orelse return null;
@@ -50,7 +74,7 @@ pub const UDPBatch = struct {
         }
     }
 
-    pub fn read(self: *UDPBatch, buffers: []helpers.ReadBuffer, max_bytes: usize) ?usize {
+    pub fn read(self: *LinuxUDPBatch, buffers: []helpers.ReadBuffer, max_bytes: usize) ?usize {
         if (!self.can_read or buffers.len < 2) return null;
         // Full UDP storage guarantees no truncation within a batch. Smaller
         // loans use the scalar path, which discards oversized packets in place.
