@@ -8,7 +8,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
-const helpers = @import("looper_helpers.zig");
 const api = core.api;
 const log = core.logging;
 const util = core.util;
@@ -152,13 +151,13 @@ pub const UDPBatch = struct {
         return .{ .backend = LinuxUDPBatch.init(descriptor.fd, address.family) };
     }
 
-    pub fn write(self: *UDPBatch, packets: helpers.Packets, destination: ?io.SocketAddress) ?usize {
+    pub fn write(self: *UDPBatch, packets: []const []const u8, destination: ?io.SocketAddress) ?usize {
         if (comptime !supported) return null;
         const backend = if (self.backend) |*value| value else return null;
         return backend.write(packets, destination orelse return null);
     }
 
-    pub fn read(self: *UDPBatch, buffers: []helpers.ReadBuffer, max_bytes: usize) ?usize {
+    pub fn read(self: *UDPBatch, buffers: []io.ReadBuffer, max_bytes: usize) ?usize {
         if (comptime !supported) return null;
         const backend = if (self.backend) |*value| value else return null;
         return backend.read(buffers, max_bytes);
@@ -185,7 +184,7 @@ const LinuxUDPBatch = struct {
         return .{ .fd = fd, .dual_stack = family == 6 and v6_only == 0 };
     }
 
-    pub fn write(self: *LinuxUDPBatch, packets: helpers.Packets, destination: io.SocketAddress) ?usize {
+    pub fn write(self: *LinuxUDPBatch, packets: []const []const u8, destination: io.SocketAddress) ?usize {
         if (!self.can_write or packets.len < 2) return null;
         var address: linux.sockaddr.in6 = undefined;
         const address_len = nativeAddress(&address, self.dual_stack, destination) orelse return null;
@@ -209,7 +208,7 @@ const LinuxUDPBatch = struct {
         }
     }
 
-    pub fn read(self: *LinuxUDPBatch, buffers: []helpers.ReadBuffer, max_bytes: usize) ?usize {
+    pub fn read(self: *LinuxUDPBatch, buffers: []io.ReadBuffer, max_bytes: usize) ?usize {
         if (!self.can_read or buffers.len < 2) return null;
         // Full UDP storage guarantees no truncation within a batch. Smaller
         // loans use the scalar path, which discards oversized packets in place.

@@ -22,6 +22,13 @@ pub const SocketAddress = io_c.pp_socket_address;
 pub const SocketAddressError = error{InvalidEndpoint};
 pub const SocketType = api.SocketType;
 
+/// Caller-owned storage. Only entries in the completed prefix have valid output.
+pub const ReadBuffer = struct {
+    data: []u8,
+    size: usize = 0,
+    source: ?SocketAddress = null,
+};
+
 /// Resolved peer address and transport, copied by value across queue boundaries.
 pub const SocketEndpoint = struct {
     address: SocketAddress,

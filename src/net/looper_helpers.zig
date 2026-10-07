@@ -368,11 +368,7 @@ pub const IOResult = struct {
 };
 
 /// Caller-owned storage. Only entries in the completed prefix have valid output.
-pub const ReadBuffer = struct {
-    data: []u8,
-    size: usize = 0,
-    source: ?io.SocketAddress = null,
-};
+pub const ReadBuffer = io.ReadBuffer;
 
 /// Called exactly once for an accepted write request, on the looper without its lock.
 /// Completion may run before submission returns. Rejected submissions never

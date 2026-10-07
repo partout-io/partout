@@ -15,6 +15,7 @@ pub const testing = common.testing;
 
 pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;
+pub const ReadBuffer = common.ReadBuffer;
 pub const Side = common.Side;
 pub const SocketOptions = common.SocketOptions;
 
