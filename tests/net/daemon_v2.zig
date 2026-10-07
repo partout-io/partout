@@ -85,10 +85,11 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         _ = connection_daemon.gate.updateStatus(previous_status);
         controller.reasserting = previous_status == .connecting;
 
-        _ = try controller.interface().setTunnelSettings(.{
+        const tun = try controller.interface().setTunnelSettings(.{
             .profile = profile,
             .original_module_id = @import("source").net_connection.activeConnectionModule(&profile).?.id(),
         });
+        tun.destroy();
         try std.testing.expect(controller.last_settings != null);
         const cleared_before = controller.clear_tunnel_settings_count;
         try connection_daemon.looper.stop();
@@ -288,7 +289,7 @@ test "v2 daemon preserves settings-only failure and hold behavior" {
             self.callbacks_on_caller = self.callbacks_on_caller and std.Thread.getCurrentId() == self.caller_thread;
             if (key == .last_error_code) self.last_error = null;
         }
-        fn failSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net.TunWrapper {
+        fn failSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*net.TunWrapper {
             return error.TunNotAvailable;
         }
     };

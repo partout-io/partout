@@ -89,7 +89,7 @@ const OpenVPNConnection = struct {
     events: ?net.Connection.Events,
     with_local_options: bool,
     current_session: ?*Session,
-    tunnel: ?net.TunWrapper,
+    tunnel: ?*net.TunWrapper,
 
     // MARK: - Public API
 
@@ -400,7 +400,7 @@ const OpenVPNConnection = struct {
             self.failTunnelSetup(session, error.TunNotAvailable);
             return;
         };
-        const active_tunnel = if (self.tunnel) |*value| value else {
+        const active_tunnel = if (self.tunnel) |value| value else {
             log.write(.fault, "Unable to get tun device");
             self.failTunnelSetup(session, error.TunNotAvailable);
             return;
@@ -414,6 +414,8 @@ const OpenVPNConnection = struct {
             .fd = fd,
             .io = active_tunnel.nativeIO(),
         };
+        // setTunnel consumes the descriptor, including on failure.
+        self.tunnel = null;
         session.setTunnel(descriptor) catch |err| {
             log.writef(.fault, "Unable to set tunnel: {s}", .{@errorName(err)});
             self.failTunnelSetup(session, error.TunnelFailure);
@@ -546,7 +548,7 @@ const OpenVPNConnection = struct {
     }
 
     fn clearLink(self: *OpenVPNConnection) void {
-        if (self.tunnel) |*tunnel| tunnel.deinit();
+        if (self.tunnel) |tunnel| tunnel.destroy();
         self.tunnel = null;
     }
 };

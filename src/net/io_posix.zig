@@ -45,8 +45,8 @@ pub const TunDescriptor = POSIXDescriptor;
 /// Native I/O for the closed set of POSIX wrappers. Each switch arm calls
 /// the concrete wrapper directly. Tests can supply a callback-backed mock;
 /// its payload is uninhabited outside test builds.
-/// Wrappers must remain at a stable address until cleanup. Socket wrappers
-/// are also destroyed and must be cleaned up exactly once.
+/// Wrappers must remain at a stable address until cleanup, which destroys them.
+/// Each wrapper must be cleaned up exactly once.
 pub const POSIXInterface = union(enum) {
     socket: *SocketWrapper,
     tun: *TunWrapper,
@@ -323,16 +323,20 @@ fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
 
 pub const TunWrapper = struct {
     tun: io_c.pp_tun,
+    allocator: std.mem.Allocator,
     is_closed: bool = false,
     test_descriptor: if (builtin.is_test) ?POSIXDescriptor else void = if (builtin.is_test) null else {},
 
-    pub fn init(tun: io_c.pp_tun) TunWrapper {
-        return .{ .tun = tun };
+    pub fn create(allocator: std.mem.Allocator, tun: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
+        const self = try allocator.create(TunWrapper);
+        self.* = .{ .tun = tun, .allocator = allocator };
+        return self;
     }
 
-    pub fn deinit(self: *TunWrapper) void {
-        log.write(.debug, "Deinit TunWrapper");
+    pub fn destroy(self: *TunWrapper) void {
+        log.write(.debug, "Destroy TunWrapper");
         self.free();
+        self.allocator.destroy(self);
     }
 
     fn open(
@@ -379,7 +383,7 @@ pub const TunWrapper = struct {
     }
 
     fn cleanup(self: *TunWrapper) void {
-        self.free();
+        self.destroy();
     }
 
     fn lastErrorCode(_: TunWrapper) c_int {

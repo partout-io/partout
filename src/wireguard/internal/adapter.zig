@@ -45,7 +45,7 @@ pub const WireGuardAdapter = struct {
     state: State = .stopped,
     /// Latest reachability event, used only to gate background restart retries.
     last_reachable: ?bool = null,
-    tunnel: ?net.TunWrapper = null,
+    tunnel: ?*net.TunWrapper = null,
 
     /// Concrete failures produced while activating the WireGuard tunnel.
     /// The connection preserves allocator failures and logs/erases the
@@ -179,8 +179,8 @@ pub const WireGuardAdapter = struct {
         };
 
         // The new settings should produce a new tun interface
-        if (self.tunnel) |*old_tunnel| {
-            old_tunnel.deinit();
+        if (self.tunnel) |old_tunnel| {
+            old_tunnel.destroy();
         }
         self.tunnel = new_tunnel;
         log.write(.info, "Tunnel interface is now UP");
@@ -383,8 +383,8 @@ pub const WireGuardAdapter = struct {
     }
 
     fn clearTunnel(self: *WireGuardAdapter) void {
-        if (self.tunnel) |*tun| {
-            tun.deinit();
+        if (self.tunnel) |tun| {
+            tun.destroy();
             self.tunnel = null;
         }
         self.controller.clearTunnelSettings(false);

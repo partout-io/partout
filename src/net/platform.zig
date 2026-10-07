@@ -310,7 +310,7 @@ const platform_tunnel_controller_vtable = TunnelController.VTable{
     .cancel_tunnel_connection = ctrlCancelTunnelConnection,
 };
 
-fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) TunnelController.Error!TunWrapper {
+fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) TunnelController.Error!*TunWrapper {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const allocator = std.heap.c_allocator;
 
@@ -327,7 +327,8 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     const tun = maybe_tun orelse {
         return error.TunNotAvailable;
     };
-    return TunWrapper.init(tun);
+    errdefer io.io_c.pp_tun_free(tun);
+    return TunWrapper.create(allocator, tun);
 }
 
 fn ctrlConfigureSockets(ptr: ?*anyopaque, descriptors: []const SocketDescriptor) TunnelController.Error!void {

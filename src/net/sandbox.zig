@@ -47,7 +47,7 @@ pub const TunnelController = struct {
     };
 
     pub const VTable = struct {
-        set_tunnel_settings: *const fn (?*anyopaque, api.TunnelRemoteInfoWrapper) Error!TunWrapper,
+        set_tunnel_settings: *const fn (?*anyopaque, api.TunnelRemoteInfoWrapper) Error!*TunWrapper,
         configure_sockets: *const fn (?*anyopaque, []const io.SocketDescriptor) Error!void,
         report_snapshot: *const fn (?*anyopaque, api.TunnelSnapshot) void,
         set_environment_value: *const fn (?*anyopaque, []const u8, ?[]const u8) void,
@@ -56,7 +56,7 @@ pub const TunnelController = struct {
         cancel_tunnel_connection: *const fn (?*anyopaque, ?api.PartoutErrorPair) void,
     };
 
-    pub fn setTunnelSettings(self: TunnelController, info: api.TunnelRemoteInfoWrapper) Error!TunWrapper {
+    pub fn setTunnelSettings(self: TunnelController, info: api.TunnelRemoteInfoWrapper) Error!*TunWrapper {
         return self.vtable.set_tunnel_settings(self.ptr, info);
     }
 

@@ -27,7 +27,7 @@ pub const TunDescriptor = struct {
     tun: *TunWrapper,
 
     pub fn cleanup(self: *TunDescriptor) void {
-        self.tun.deinit();
+        self.tun.destroy();
     }
 };
 
@@ -65,11 +65,17 @@ pub const SocketWrapper = struct {
 
 // FIXME: ###, Windows TunWrapper
 pub const TunWrapper = struct {
-    pub fn init(_: io_c.pp_tun) TunWrapper {
-        return .{};
+    allocator: std.mem.Allocator,
+
+    pub fn create(allocator: std.mem.Allocator, _: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
+        const self = try allocator.create(TunWrapper);
+        self.* = .{ .allocator = allocator };
+        return self;
     }
 
-    pub fn deinit(_: *TunWrapper) void {}
+    pub fn destroy(self: *TunWrapper) void {
+        self.allocator.destroy(self);
+    }
 
     pub fn tunDescriptor(_: *TunWrapper) !TunDescriptor {
         @panic("Windows TunWrapper.tunDescriptor is not implemented");

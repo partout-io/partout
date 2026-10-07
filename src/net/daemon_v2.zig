@@ -277,13 +277,13 @@ const SettingsDaemon = struct {
         };
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
-            var tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
+            const tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
                 log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(.{ .code = code }, false);
                 return;
             };
-            tun.deinit();
+            tun.destroy();
         }
     }
 
@@ -338,7 +338,7 @@ const ConnectionDaemon = struct {
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
-    tunnel: ?net.TunWrapper,
+    tunnel: ?*net.TunWrapper,
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
@@ -695,7 +695,7 @@ const ConnectionDaemon = struct {
     }
 
     fn destroyTunnel(self: *ConnectionDaemon) void {
-        if (self.tunnel) |*tunnel| tunnel.deinit();
+        if (self.tunnel) |tunnel| tunnel.destroy();
         self.tunnel = null;
     }
 
@@ -914,6 +914,8 @@ const ConnectionDaemon = struct {
             },
         }) catch return error.TunNotAvailable;
 
+        // Successful attachment transfers ownership to the looper.
+        self.tunnel = null;
         self.trackConnectionStatus(.connected);
     }
 

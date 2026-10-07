@@ -896,13 +896,13 @@ const fake_controller_vtable = sandbox.TunnelController.VTable{
     .cancel_tunnel_connection = fakeCancelTunnelConnection,
 };
 
-fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sandbox.TunnelController.Error!io.TunWrapper {
+fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sandbox.TunnelController.Error!*io.TunWrapper {
     const self: *FakeController = @ptrCast(@alignCast(ptr.?));
     self.set_tunnel_settings_count += 1;
     if (self.fail_set_tunnel_settings_number == self.set_tunnel_settings_count)
         return error.TunNotAvailable;
     if (info.original_module_id.len == 0) return error.InvalidProfile;
-    return io.TunWrapper.init(null);
+    return io.TunWrapper.create(std.testing.allocator, null);
 }
 
 fn fakeConfigureSockets(ptr: ?*anyopaque, descriptors: []const io.SocketDescriptor) sandbox.TunnelController.Error!void {
