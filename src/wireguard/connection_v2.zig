@@ -502,8 +502,8 @@ fn cloneSubnet(
 fn establish(_: *anyopaque, _: *net.TunWrapper) void {}
 
 const wireguard_connection_vtable = net.Connection.VTable{
-    .establish = establish,
     .start = start,
+    .establish = establish,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
