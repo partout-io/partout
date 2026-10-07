@@ -340,8 +340,7 @@ test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory"
     reservation.destroy();
 
     var factory = platform.socketFactoryV2();
-    factory.local_port = port;
-    var descriptor = try factory.create(allocator, null, reachable(true), 100);
+    var descriptor = try factory.create(allocator, null, port, reachable(true), 100);
     defer descriptor.cleanup();
     const local = try descriptor.localAddress();
     try std.testing.expectEqual(@as(u8, 4), local.family);
@@ -350,14 +349,14 @@ test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory"
 
     // Both failures propagate; fallback must still pass host configuration.
     policy.allow_ipv4 = false;
-    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, null, reachable(true), 100));
+    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, null, port, reachable(true), 100));
     try std.testing.expectEqual(@as(usize, 2), policy.ipv4_calls);
 
     // V1 gets no fallback, and a connected v2 socket is attempted only once.
     const before_legacy = policy.ipv4_calls;
-    try std.testing.expectError(error.LinkNotActive, platform.socketFactory().create(allocator, null, reachable(true), 100));
+    try std.testing.expectError(error.LinkNotActive, platform.socketFactory().create(allocator, null, 0, reachable(true), 100));
     try std.testing.expectEqual(before_legacy, policy.ipv4_calls);
     const before_connected = policy.calls;
-    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, 51820) }, reachable(true), 100));
+    try std.testing.expectError(error.LinkNotActive, factory.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, 51820) }, port, reachable(true), 100));
     try std.testing.expectEqual(before_connected + 1, policy.calls);
 }

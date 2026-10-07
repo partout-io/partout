@@ -688,7 +688,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
                 self.established_tun = null;
             }
         }
-        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) net.SocketFactory.Error!Looper.LinkDescriptor {
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.socket_connected = endpoint != null;
             // The factory probe records the requested mode; use a real local UDP
@@ -828,7 +828,7 @@ test "v2 owned link is released on rejected dispatch and failed start" {
         fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
             return .refresh_link;
         }
-        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) net.SocketFactory.Error!Looper.LinkDescriptor {
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
             const descriptor = wrapper.linkDescriptor();
