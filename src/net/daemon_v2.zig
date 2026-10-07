@@ -891,14 +891,14 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
+        // Retain ownership until descriptor preparation and handoff succeed.
+        errdefer tunnel.destroy();
+        const descriptor = try tunnel.tunDescriptor();
         if (connection.owns_io) {
-            connection.commit(tunnel);
+            connection.commit(descriptor);
             self.trackConnectionStatus(.connected);
             return;
         }
-        // Until attach succeeds, there is no looper owner to release TUN on failure.
-        errdefer tunnel.destroy();
-        const descriptor = try tunnel.tunDescriptor();
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{

@@ -679,4 +679,4 @@ pub fn connectionProfileJson() [:0]const u8 {
     ;
 }
 
-fn noopCommit(_: *anyopaque, _: *net.TunWrapper) void {}
+fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}

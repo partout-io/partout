@@ -586,7 +586,7 @@ fn legacyStart(
 
 // MARK: - Vtables
 
-fn commit(_: *anyopaque, _: *net.TunWrapper) void {}
+fn commit(_: *anyopaque, _: net.TunDescriptor) void {}
 
 const openvpn_connection_vtable = net.Connection.VTable{
     .endpoints = allEndpoints,

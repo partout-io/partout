@@ -254,6 +254,9 @@ pub const Connection = struct {
                 return false;
             }
         }.call,
+        /// Commits TUN after the established event, transferring ownership
+        /// to the connection when it performs packet I/O.
+        commit: *const fn (*anyopaque, io.TunDescriptor) void,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
@@ -269,9 +272,6 @@ pub const Connection = struct {
 
         /// Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool,
-        /// Commits TUN after the established event, transferring ownership
-        /// to the connection when it performs packet I/O.
-        commit: *const fn (*anyopaque, *io.TunWrapper) void,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization
@@ -309,7 +309,7 @@ pub const Connection = struct {
         return self.vtable.start(self.ptr, events);
     }
 
-    pub fn commit(self: Connection, tun: *io.TunWrapper) void {
+    pub fn commit(self: Connection, tun: io.TunDescriptor) void {
         self.vtable.commit(self.ptr, tun);
     }
 

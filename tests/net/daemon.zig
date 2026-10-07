@@ -1212,4 +1212,4 @@ test "snapshot publisher owns retained subcodes and formats only on delivery" {
     try std.testing.expect(publisher.environment.last_error_code == null);
 }
 
-fn noopCommit(_: *anyopaque, _: *net.TunWrapper) void {}
+fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}

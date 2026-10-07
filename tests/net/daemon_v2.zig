@@ -648,7 +648,8 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         owns_io: bool,
         events: net.Connection.Events = undefined,
         profile: *const api.Profile = undefined,
-        established_tun: ?*io.TunWrapper = null,
+        established_tun: ?io.TunDescriptor = null,
+        controller: mock_mod.MockTunnelController = .{},
         link_attached: bool = false,
         link_port: u16 = 0,
         socket_connected: ?bool = null,
@@ -674,7 +675,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             } });
             return self.owns_io;
         }
-        fn commit(raw: *anyopaque, tun: *io.TunWrapper) void {
+        fn commit(raw: *anyopaque, tun: io.TunDescriptor) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.established_tun = tun;
         }
@@ -683,7 +684,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             if (self.owns_io) {
                 if (self.remote) |remote| remote.link.cleanup();
                 self.remote = null;
-                if (self.established_tun) |tun| tun.destroy();
+                if (self.established_tun) |tun| tun.cleanup();
                 self.established_tun = null;
             }
         }
@@ -695,6 +696,34 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
             return wrapper.linkDescriptor();
         }
+        fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*io.TunWrapper {
+            const controller: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
+            const self: *@This() = @fieldParentPtr("controller", controller);
+            const tun = try controller.interface().setTunnelSettings(info);
+            // Borrow the link fd for descriptor preparation; the mock TUN owns no fd.
+            tun.test_descriptor = .{ .fd = self.remote.?.link.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            return tun;
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+            return error.WouldBlock;
+        }
+        fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            return data.len - offset;
+        }
+        fn cleanup(_: *anyopaque) void {}
+        fn lastError(_: *anyopaque) c_int {
+            return 0;
+        }
+        const tun_vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = lastError,
+        };
         const vtable = blk: {
             var table = FailingStartConnection.vtable;
             table.endpoints = endpoints;
@@ -717,12 +746,13 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             defer registry.deinit(allocator);
             var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
             defer profile.deinit(allocator);
-            var controller = mock_mod.MockTunnelController{};
+            var controller_table = probe.controller.interface().vtable.*;
+            controller_table.set_tunnel_settings = Probe.setTunnel;
             var monitor = mock_mod.MockNetworkMonitor{};
             var factory_table = mock_mod.noopSocketFactory().vtable.*;
             factory_table.create = Probe.socket;
             const sut = try Daemon.create(allocator, &profile, .{
-                .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
                 .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
             });
             defer sut.destroy();
@@ -865,4 +895,4 @@ test "v2 owned link is released on rejected dispatch and failed start" {
     }
 }
 
-fn noopCommit(_: *anyopaque, _: *net.TunWrapper) void {}
+fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}
