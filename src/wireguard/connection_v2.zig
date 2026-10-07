@@ -114,13 +114,13 @@ const WireGuardConnection = struct {
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        log.write(.notice, "Using WireGuardConnection");
+        log.write(.notice, "Using WireGuardConnection v2");
         return created.asConnection();
     }
 
     fn destroy(self: *WireGuardConnection) void {
         const allocator = self.allocator;
-        log.write(.debug, "Deinit WireGuardConnection");
+        log.write(.debug, "Deinit WireGuardConnection v2");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         self.data_count_timer.deinit();
@@ -156,8 +156,6 @@ const WireGuardConnection = struct {
         }
 
         log.write(.info, "Start tunnel");
-        events.status(events.ctx, .connecting);
-        errdefer events.status(events.ctx, .disconnected);
 
         self.adapter.start(self.allocator) catch |err| {
             switch (err) {
@@ -187,21 +185,13 @@ const WireGuardConnection = struct {
                     log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
                 },
             }
-            events.last_error(events.ctx, .{ .code = partoutCodeForError(err) });
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
                 error.DNSResolutionFailure => error.DNSResolutionFailure,
                 else => error.UnableToStart,
             };
         };
-        log.writef(.info, "Tunnel interface is {s}", .{
-            self.adapter.interfaceName() orelse "unknown",
-        });
-        events.status(events.ctx, .connected);
-        self.reportDataCount(events);
-        self.startDataCountTimer() catch |err| {
-            log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
-        };
+        errdefer self.adapter.stop(self.allocator);
         var info = TunnelRemoteInfoBuilder.init(
             self.allocator,
             self.adapter.profile,
@@ -212,6 +202,13 @@ const WireGuardConnection = struct {
             else => error.UnableToStart,
         };
         defer info.deinit(self.allocator);
+        log.writef(.info, "Tunnel interface is {s}", .{
+            self.adapter.interfaceName() orelse "unknown",
+        });
+        self.reportDataCount(events);
+        self.startDataCountTimer() catch |err| {
+            log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
+        };
         events.established(events.ctx, .{ .info = info });
         return true;
     }
@@ -230,18 +227,15 @@ const WireGuardConnection = struct {
         // Match Swift: wg-go shutdown is normally immediate, so the generic
         // connection timeout has nothing useful to interrupt here.
         _ = timeout_ms;
-        self.releaseIO();
-        if (self.adapter.isStopped()) {
-            log.write(.debug, "Stop ignored, adapter is stopped");
-            return;
-        }
-
-        log.write(.info, "Stop tunnel");
+        const had_state = self.link != null or self.tun != null or !self.adapter.isStopped();
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
-        events.status(events.ctx, .disconnecting);
         self.adapter.stop(self.allocator);
-        events.status(events.ctx, .disconnected);
+        self.releaseIO();
+        if (had_state) {
+            log.write(.info, "Stop tunnel");
+            events.stopped(events.ctx);
+        }
     }
 
     fn networkChange(
@@ -252,9 +246,8 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
-            // Swift reports `.connected` whenever applying the resumed tunnel
-            // settings succeeds, even if the external status was still up.
-            .resumed => events.status(events.ctx, .connected),
+            // Resuming the backend retains the established connection.
+            .resumed => {},
             .retry => |err| {
                 self.reportActivationFailure(events, err);
                 self.scheduleTemporaryShutdownRetry(events);
@@ -349,22 +342,17 @@ const WireGuardConnection = struct {
     }
 
     fn handleTemporaryShutdownRetrySchedulingFailure(
-        self: *WireGuardConnection,
+        _: *WireGuardConnection,
         events: net.Connection.Events,
         err: std.Thread.SpawnError,
     ) void {
         log.writef(.fault, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
 
-        // No later reachability event is guaranteed after an online signal.
-        // Finalize the suspended tunnel before reporting a terminal failure so
-        // callers never retain a connected status with no running backend.
-        self.stopDataCountTimer();
-        self.adapter.stop(self.allocator);
-        self.events = null;
-
-        const err_pair: api.PartoutErrorPair = .{ .code = partoutCodeForError(err) };
-        events.last_error(events.ctx, err_pair);
-        events.cancel(events.ctx, err_pair);
+        // The daemon owns shutdown and finalization after a terminal event.
+        events.failed(events.ctx, .{
+            .err_pair = .{ .code = partoutCodeForError(err) },
+            .disposition = .cancel,
+        });
     }
 
     fn reportActivationFailure(
@@ -372,10 +360,14 @@ const WireGuardConnection = struct {
         events: net.Connection.Events,
         err: ConnectionError,
     ) void {
-        const err_pair: api.PartoutErrorPair = .{ .code = partoutCodeForError(err) };
-        events.last_error(events.ctx, err_pair);
+        log.writef(.err, "Unable to resume WireGuard backend: {s}", .{@errorName(err)});
+        // Transient resume errors retain local retry work. A failure event
+        // would make the daemon stop the connection and cancel that retry.
         if (self.adapter.isStopped()) {
-            events.status(events.ctx, .disconnected);
+            events.failed(events.ctx, .{
+                .err_pair = .{ .code = partoutCodeForError(err) },
+                .disposition = .reconnect,
+            });
         }
     }
 
@@ -396,7 +388,7 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
-            .resumed => events.status(events.ctx, .connected),
+            .resumed => {},
             .retry => |err| {
                 self.reportActivationFailure(events, err);
                 self.scheduleTemporaryShutdownRetry(events);

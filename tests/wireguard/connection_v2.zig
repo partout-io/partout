@@ -206,11 +206,8 @@ test "WireGuard connection erases backend activation errors at the generic bound
 
     try std.testing.expectError(error.UnableToStart, startConnection(created, &environment.looper));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
@@ -244,11 +241,8 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     defer created.destroy();
 
     try std.testing.expectError(error.OutOfMemory, startConnection(created, &environment.looper));
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard v2 takes ownership of link and TUN descriptors" {
@@ -390,12 +384,9 @@ test "WireGuard connection starts and stops through backend and controller" {
     try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .disconnecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(u64, 10), recorder.data_count.received);
     try std.testing.expectEqual(@as(u64, 20), recorder.data_count.sent);
 }
@@ -712,18 +703,15 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
     try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     created.stop(1000, recorder.events());
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
 }
 
-test "WireGuard connection reports network settings failure while resuming" {
+test "WireGuard connection retries network settings failure without terminal events" {
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
@@ -766,22 +754,17 @@ test "WireGuard connection reports network settings failure while resuming" {
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
-    try std.testing.expectEqual(api.PartoutErrorCode.tunNotAvailable, recorder.last_error.?);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     connection.testing.waitForTemporaryShutdownRetry(created);
     environment.executor.drain();
 
     try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
@@ -825,12 +808,19 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         recorder.events(),
     );
 
+    try std.testing.expect(!connection.testing.adapter(created).isStopped());
+    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.cancel, recorder.failure.?.disposition);
+    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+
+    // Emulate the daemon finalizing the connection after receiving failure.
+    created.stop(0, recorder.events());
+    created.stop(0, recorder.events());
     try std.testing.expect(connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
-    try std.testing.expectEqual(@as(usize, 1), recorder.cancel_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.cancel_code.?);
+    try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
 }
 
 const FakeBackend = struct {
@@ -1032,18 +1022,18 @@ fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorPair) void {}
 
 const EventRecorder = struct {
     established_count: usize = 0,
-    statuses: [8]api.ConnectionStatus = undefined,
-    status_count: usize = 0,
+    stopped_count: usize = 0,
+    failure_count: usize = 0,
+    failure: ?conn.Connection.Events.Failure = null,
     has_data_count: AtomicBool = AtomicBool.init(false),
     data_count: api.DataCount = .{},
-    last_error: ?api.PartoutErrorCode = null,
-    cancel_count: usize = 0,
-    cancel_code: ?api.PartoutErrorCode = null,
 
     fn events(self: *EventRecorder) conn.Connection.Events {
         return .{
             .ctx = self,
             .established = recordEstablished,
+            .failed = recordFailed,
+            .stopped = recordStopped,
             .status = recordStatus,
             .last_error = recordLastError,
             .data_count = recordDataCount,
@@ -1052,15 +1042,23 @@ const EventRecorder = struct {
     }
 };
 
-fn recordStatus(ctx: *anyopaque, status_value: api.ConnectionStatus) void {
-    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.statuses[self.status_count] = status_value;
-    self.status_count += 1;
+fn recordStatus(_: *anyopaque, _: api.ConnectionStatus) void {
+    @panic("WireGuard v2 emitted legacy status");
 }
 
-fn recordLastError(ctx: *anyopaque, err_pair: api.PartoutErrorPair) void {
+fn recordLastError(_: *anyopaque, _: api.PartoutErrorPair) void {
+    @panic("WireGuard v2 emitted legacy last_error");
+}
+
+fn recordFailed(ctx: *anyopaque, failure: conn.Connection.Events.Failure) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.last_error = err_pair.code;
+    self.failure_count += 1;
+    self.failure = failure;
+}
+
+fn recordStopped(ctx: *anyopaque) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    self.stopped_count += 1;
 }
 
 fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
@@ -1069,10 +1067,8 @@ fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     self.has_data_count.store(true, .release);
 }
 
-fn recordCancel(ctx: *anyopaque, err_pair: ?api.PartoutErrorPair) void {
-    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.cancel_count += 1;
-    self.cancel_code = if (err_pair) |value| value.code else null;
+fn recordCancel(_: *anyopaque, _: ?api.PartoutErrorPair) void {
+    @panic("WireGuard v2 emitted legacy cancel");
 }
 
 fn recordEstablished(ctx: *anyopaque, success: conn.Connection.Events.Success) void {
