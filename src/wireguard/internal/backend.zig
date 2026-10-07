@@ -20,19 +20,18 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const StartTunnel = struct {
-    tun: ?*net.TunWrapper = null,
-    ifname: ?[]const u8 = null,
-    // FIXME: ###, Make this non-null and the only requirement after v2
-    passive: ?struct {
-        link: wireguard_c.wg_passive_link,
-        tun: wireguard_c.wg_passive_tun,
-        context: *anyopaque,
-    } = null,
+    tun: *net.TunWrapper,
+    ifname: []const u8,
 
     pub fn descriptor(self: StartTunnel) ?net.FileDescriptor {
-        const tun = self.tun orelse return null;
-        return tun.muxDescriptor();
+        return self.tun.muxDescriptor();
     }
+};
+
+pub const StartTunnelPassive = struct {
+    link: wireguard_c.wg_passive_link,
+    tun: wireguard_c.wg_passive_tun,
+    context: *anyopaque,
 };
 
 pub const Backend = struct {
@@ -40,7 +39,16 @@ pub const Backend = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        turn_on: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnel) Error!i32,
+        turn_on: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnel) Error!i32 = struct {
+            fn call(_: ?*anyopaque, _: std.mem.Allocator, _: [:0]const u8, _: StartTunnel) Error!i32 {
+                return error.TransportFailure;
+            }
+        }.call,
+        turn_on_passive: *const fn (?*anyopaque, std.mem.Allocator, [:0]const u8, StartTunnelPassive) Error!i32 = struct {
+            fn call(_: ?*anyopaque, _: std.mem.Allocator, _: [:0]const u8, _: StartTunnelPassive) Error!i32 {
+                return error.TransportFailure;
+            }
+        }.call,
         turn_off: *const fn (?*anyopaque, i32) void,
         get_config: *const fn (?*anyopaque, std.mem.Allocator, i32) Error!?[]u8,
         set_config: *const fn (?*anyopaque, std.mem.Allocator, i32, [:0]const u8) Error!i64,
@@ -57,6 +65,15 @@ pub const Backend = struct {
         tunnel: StartTunnel,
     ) Error!i32 {
         return self.vtable.turn_on(self.ptr, allocator, settings, tunnel);
+    }
+
+    pub fn turnOnPassive(
+        self: Backend,
+        allocator: std.mem.Allocator,
+        settings: [:0]const u8,
+        tunnel: StartTunnelPassive,
+    ) Error!i32 {
+        return self.vtable.turn_on_passive(self.ptr, allocator, settings, tunnel);
     }
 
     pub fn turnOff(self: Backend, handle: i32) void {
@@ -116,7 +133,7 @@ const go_backend_vtable = Backend.VTable{
 };
 
 const go_passive_backend_vtable = Backend.VTable{
-    .turn_on = cTurnOnPassive,
+    .turn_on_passive = cTurnOnPassive,
     .turn_off = cTurnOffPassive,
     .get_config = cGetConfigPassive,
     .set_config = cSetConfigPassive,
@@ -138,9 +155,8 @@ fn cTurnOn(
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
         // Unix-family builds consume the already-created native TUN fd.
-        const ifname = tunnel.ifname orelse return error.CannotLocateTunnelFileDescriptor;
         var c_ifname: util.TemporaryCString = .{};
-        try c_ifname.init(allocator, ifname);
+        try c_ifname.init(allocator, tunnel.ifname);
         defer c_ifname.deinit();
         return wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr());
     }
@@ -209,11 +225,10 @@ fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
     wireguard_c.pp_wg_tweak_mobile_roaming(handle);
 }
 
-fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: StartTunnel) Error!i32 {
-    const passive = tunnel.passive orelse return error.TransportFailure;
+fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: StartTunnelPassive) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
     wireguard_c.pp_wg_set_logger(cLog, null);
-    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &passive.link, &passive.tun, passive.context);
+    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &tunnel.link, &tunnel.tun, tunnel.context);
 }
 
 fn cTurnOffPassive(_: ?*anyopaque, handle: i32) void {

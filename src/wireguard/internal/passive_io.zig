@@ -33,12 +33,12 @@ pub const PassiveIO = struct {
         self.state = .link_paused;
     }
 
-    pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnel {
-        return .{ .passive = .{
+    pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnelPassive {
+        return .{
             .link = .{ .local_port = port, .read = readLink, .write = writeLink },
             .tun = .{ .mtu = mtu, .read = readTun, .write = writeTun },
             .context = self,
-        } };
+        };
     }
 
     /// Runs on the looper. Stop admission before the daemon detaches native I/O.

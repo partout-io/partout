@@ -1081,3 +1081,34 @@ fn startConnection(created: conn.Connection, looper: *@import("source").net.Loop
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
     return created.startV2(.{ .link = socket.linkDescriptor(), .looper = looper });
 }
+
+test "WireGuard backend dispatches the passive startup payload separately" {
+    const Probe = struct {
+        fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
+            const called: *bool = @ptrCast(@alignCast(raw.?));
+            if (tunnel.context != raw.? or tunnel.link.local_port != 51820 or tunnel.tun.mtu != 1420 or
+                !std.mem.eql(u8, settings, "passive")) return error.TransportFailure;
+            called.* = true;
+            return 7;
+        }
+    };
+    var called = false;
+    var vtable = fake_backend_vtable;
+    vtable.turn_on_passive = Probe.turnOn;
+    const backend = backend_mod.Backend{ .ptr = &called, .vtable = &vtable };
+    const tunnel = backend_mod.StartTunnelPassive{
+        .link = .{ .local_port = 51820, .read = null, .write = null },
+        .tun = .{ .mtu = 1420, .read = null, .write = null },
+        .context = &called,
+    };
+    try std.testing.expectEqual(@as(i32, 7), try backend.turnOnPassive(std.testing.allocator, "passive", tunnel));
+    try std.testing.expect(called);
+    try std.testing.expectError(error.TransportFailure, backend_mod.goBackend().turnOnPassive(std.testing.allocator, "passive", tunnel));
+
+    const tun = try io.TunWrapper.create(std.testing.allocator, null);
+    defer tun.destroy();
+    try std.testing.expectError(error.TransportFailure, backend_mod.goPassiveBackend().turnOn(std.testing.allocator, "legacy", .{
+        .tun = tun,
+        .ifname = "test",
+    }));
+}
