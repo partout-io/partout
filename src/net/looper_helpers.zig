@@ -128,6 +128,16 @@ pub const Timer = struct {
     id: ?u64 = null,
 };
 
+/// One-shot worker-to-looper notification. Arm/cancel on the looper queue,
+/// signal from any thread. Storage must survive until the producer has joined.
+/// All fields except the immutable task are protected by the looper mutex.
+pub const Notification = struct {
+    task: TimedTask,
+    armed: bool = false,
+    ready: bool = false,
+    next: ?*Notification = null,
+};
+
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,

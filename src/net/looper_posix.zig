@@ -70,7 +70,7 @@ pub const PosixLooper = struct {
     stop_completion: ?*helpers.Completion,
     waiter_count: usize,
 
-    notifications: ?*@import("looper_notification.zig").Notification = null,
+    notifications: ?*helpers.Notification = null,
 
     // Delayed command scheduler.
     scheduler: core.RunAfter,
@@ -477,7 +477,7 @@ pub const PosixLooper = struct {
         return self.perform(void, task.context, task.callback);
     }
 
-    const Notification = @import("looper_notification.zig").Notification;
+    const Notification = helpers.Notification;
 
     pub fn armNotification(self: *PosixLooper, notification: *Notification) error{LooperUnavailable}!void {
         std.debug.assert(self.isOnQueue());

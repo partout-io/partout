@@ -67,7 +67,7 @@ pub const WindowsLooper = struct {
         return self.perform(void, task.context, task.callback);
     }
 
-    const Notification = @import("looper_notification.zig").Notification;
+    const Notification = helpers.Notification;
 
     pub fn armNotification(_: *WindowsLooper, _: *Notification) error{LooperUnavailable}!void {
         @panic("WindowsLooper.armNotification is not implemented");
