@@ -249,6 +249,102 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
 }
 
+test "WireGuard v2 takes ownership of link and TUN descriptors" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    var context = ConnectionContext.init(fake_backend.backend());
+    var controller = FakeController{};
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    const created = try connection.createConnection(&context, allocator, module, .{
+        .profile = &tagged,
+        .controller = controller.controller(),
+        .resolver = mock.noopDNSResolver(),
+        .factory = mock.noopSocketFactory(),
+        .looper = &environment.looper,
+        .serialized_executor = environment.serializedExecutor(),
+        .options = .{ .min_data_count_interval = 2345 },
+    });
+    var destroyed = false;
+    defer if (!destroyed) created.destroy();
+    try std.testing.expect(created.owns_io);
+
+    var first_link = OwnedDescriptor{};
+    var first_tun = OwnedDescriptor{};
+    var second_link = OwnedDescriptor{};
+    var second_tun = OwnedDescriptor{};
+    try std.testing.expect(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
+    created.commit(first_tun.descriptor());
+    try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+
+    try std.testing.expect(try created.startV2(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    created.commit(second_tun.descriptor());
+    try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
+
+    created.stop(0, recorder.events());
+    created.stop(0, recorder.events());
+    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
+
+    var final_link = OwnedDescriptor{};
+    var final_tun = OwnedDescriptor{};
+    try std.testing.expect(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
+    created.commit(final_tun.descriptor());
+    created.destroy();
+    destroyed = true;
+    try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), final_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+}
+
+const OwnedDescriptor = struct {
+    cleanups: usize = 0,
+
+    fn descriptor(self: *@This()) io.LinkDescriptor {
+        return .{ .fd = -1, .io = .{ .mock = .{ .ptr = self, .vtable = &vtable } } };
+    }
+    fn cleanup(raw: *anyopaque) void {
+        const self: *@This() = @ptrCast(@alignCast(raw));
+        self.cleanups += 1;
+    }
+    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+    fn reset(_: *anyopaque) io.Error!void {}
+    fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+        return null;
+    }
+    fn write(_: *anyopaque, bytes: []const u8, offset: usize) io.Error!usize {
+        return bytes.len - offset;
+    }
+    fn lastError(_: *anyopaque) c_int {
+        return 0;
+    }
+    const vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+        .set_event_mask = mask,
+        .reset_events = reset,
+        .read = read,
+        .write = write,
+        .cleanup = cleanup,
+        .last_error_code = lastError,
+    };
+};
+
 test "WireGuard connection starts and stops through backend and controller" {
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;

@@ -44,6 +44,9 @@ pub const ConnectionContext = struct {
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
     adapter: WireGuardAdapter,
+    /// Descriptors transferred by the v2 daemon. Released on replacement or stop.
+    link: ?net.LinkDescriptor = null,
+    tun: ?net.TunDescriptor = null,
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
     /// Actor-owned event sink used only by serialized connection work.
@@ -120,6 +123,7 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         self.data_count_timer.deinit();
         self.temporary_shutdown_retry_timer.deinit();
+        self.releaseIO();
         self.adapter.deinit(allocator);
         self.configuration.deinit(allocator);
         allocator.destroy(self);
@@ -129,7 +133,26 @@ const WireGuardConnection = struct {
         return .{
             .ptr = self,
             .vtable = &wireguard_connection_vtable,
+            .owns_io = true,
         };
+    }
+
+    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        if (self.link) |*link| link.cleanup();
+        self.link = remote.link;
+        return true;
+    }
+
+    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
+        if (self.tun) |*tun| tun.cleanup();
+        self.tun = descriptor;
+    }
+
+    fn releaseIO(self: *WireGuardConnection) void {
+        if (self.link) |*link| link.cleanup();
+        self.link = null;
+        if (self.tun) |*tun| tun.cleanup();
+        self.tun = null;
     }
 
     fn start(
@@ -200,6 +223,7 @@ const WireGuardConnection = struct {
         // Match Swift: wg-go shutdown is normally immediate, so the generic
         // connection timeout has nothing useful to interrupt here.
         _ = timeout_ms;
+        self.releaseIO();
         if (self.adapter.isStopped()) {
             log.write(.debug, "Stop ignored, adapter is stopped");
             return;
@@ -499,11 +523,20 @@ fn cloneSubnet(
     };
 }
 
-fn commit(_: *anyopaque, _: net.TunDescriptor) void {}
+fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
+    return self.startV2(remote);
+}
+
+fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) void {
+    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
+    self.commit(descriptor);
+}
 
 const wireguard_connection_vtable = net.Connection.VTable{
-    .start = start,
+    .start_v2 = startV2,
     .commit = commit,
+    .start = start,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
