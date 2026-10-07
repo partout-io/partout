@@ -192,7 +192,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
         const vtable = net.Connection.VTable{
-            .establish = noopEstablish,
+            .commit = noopCommit,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -506,7 +506,7 @@ const FailingStartConnection = struct {
     fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
-        .establish = noopEstablish,
+        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -674,7 +674,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             } });
             return self.owns_io;
         }
-        fn establish(raw: *anyopaque, tun: *io.TunWrapper) void {
+        fn commit(raw: *anyopaque, tun: *io.TunWrapper) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.established_tun = tun;
         }
@@ -699,7 +699,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             var table = FailingStartConnection.vtable;
             table.endpoints = endpoints;
             table.start_v2 = start;
-            table.establish = establish;
+            table.commit = commit;
             table.stop = stop;
             break :blk table;
         };
@@ -865,4 +865,4 @@ test "v2 owned link is released on rejected dispatch and failed start" {
     }
 }
 
-fn noopEstablish(_: *anyopaque, _: *net.TunWrapper) void {}
+fn noopCommit(_: *anyopaque, _: *net.TunWrapper) void {}

@@ -959,7 +959,7 @@ const DelayedConnection = struct {
     }
 
     const vtable = net.Connection.VTable{
-        .establish = noopEstablish,
+        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -1021,7 +1021,7 @@ const FailingStartConnection = struct {
     fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
-        .establish = noopEstablish,
+        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -1146,7 +1146,7 @@ const SandboxCapture = struct {
     }
 
     const vtable = net.Connection.VTable{
-        .establish = noopEstablish,
+        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -1212,4 +1212,4 @@ test "snapshot publisher owns retained subcodes and formats only on delivery" {
     try std.testing.expect(publisher.environment.last_error_code == null);
 }
 
-fn noopEstablish(_: *anyopaque, _: *net.TunWrapper) void {}
+fn noopCommit(_: *anyopaque, _: *net.TunWrapper) void {}

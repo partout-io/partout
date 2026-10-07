@@ -499,11 +499,11 @@ fn cloneSubnet(
     };
 }
 
-fn establish(_: *anyopaque, _: *net.TunWrapper) void {}
+fn commit(_: *anyopaque, _: *net.TunWrapper) void {}
 
 const wireguard_connection_vtable = net.Connection.VTable{
     .start = start,
-    .establish = establish,
+    .commit = commit,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,

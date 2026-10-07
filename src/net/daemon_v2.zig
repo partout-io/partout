@@ -892,7 +892,7 @@ const ConnectionDaemon = struct {
             return error.TunNotAvailable;
         };
         if (connection.owns_io) {
-            connection.establish(tunnel);
+            connection.commit(tunnel);
             self.trackConnectionStatus(.connected);
             return;
         }

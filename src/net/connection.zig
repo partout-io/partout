@@ -269,8 +269,9 @@ pub const Connection = struct {
 
         /// Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool,
-        /// Transfers TUN ownership to the connection when it performs packet I/O.
-        establish: *const fn (*anyopaque, *io.TunWrapper) void,
+        /// Commits TUN after the established event, transferring ownership
+        /// to the connection when it performs packet I/O.
+        commit: *const fn (*anyopaque, *io.TunWrapper) void,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization
@@ -308,8 +309,8 @@ pub const Connection = struct {
         return self.vtable.start(self.ptr, events);
     }
 
-    pub fn establish(self: Connection, tun: *io.TunWrapper) void {
-        self.vtable.establish(self.ptr, tun);
+    pub fn commit(self: Connection, tun: *io.TunWrapper) void {
+        self.vtable.commit(self.ptr, tun);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
