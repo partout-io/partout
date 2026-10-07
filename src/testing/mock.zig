@@ -485,6 +485,7 @@ const DaemonMockConnection = struct {
 };
 
 const daemon_mock_connection_vtable = net_conn.Connection.VTable{
+    .establish = noopEstablish,
     .start = daemonMockStart,
     .stop = daemonMockStop,
     .network_change = daemonMockNetworkChange,
@@ -574,6 +575,7 @@ pub const BlockingStopConnection = struct {
 };
 
 const blocking_connection_vtable = net_conn.Connection.VTable{
+    .establish = noopEstablish,
     .start = blockingStart,
     .stop = blockingStop,
     .network_change = blockingNetworkChange,
@@ -676,3 +678,5 @@ pub fn connectionProfileJson() [:0]const u8 {
     \\}
     ;
 }
+
+fn noopEstablish(_: *anyopaque, _: *net.TunWrapper) void {}

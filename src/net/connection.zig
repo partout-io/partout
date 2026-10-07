@@ -169,6 +169,8 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 }
 
 pub const RemoteDescriptor = struct {
+    /// Owned by the connection when owns_io is true; otherwise borrowed from the looper.
+    link: io.LinkDescriptor,
     endpoint: ?io.SocketEndpoint = null,
     local_port: u16 = 0,
     looper: *Looper,
@@ -180,6 +182,7 @@ pub const RemoteDescriptor = struct {
 pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
+    owns_io: bool = false,
     /// Requested bind port for an unconnected link; zero selects an ephemeral port.
     local_port: u16 = 0,
 
@@ -265,6 +268,8 @@ pub const Connection = struct {
 
         /// Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool,
+        /// Transfers TUN ownership to the connection when it performs packet I/O.
+        establish: *const fn (*anyopaque, *io.TunWrapper) void,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization
@@ -300,6 +305,10 @@ pub const Connection = struct {
 
     pub fn start(self: Connection, events: Events) StartError!bool {
         return self.vtable.start(self.ptr, events);
+    }
+
+    pub fn establish(self: Connection, tun: *io.TunWrapper) void {
+        self.vtable.establish(self.ptr, tun);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {

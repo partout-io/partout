@@ -767,7 +767,10 @@ fn destroy(ptr: *anyopaque) void {
 
 // MARK: - Vtables
 
+fn establish(_: *anyopaque, _: *net.TunWrapper) void {}
+
 const openvpn_connection_vtable = net.Connection.VTable{
+    .establish = establish,
     .start = start,
     .stop = stop,
     .network_change = networkChange,

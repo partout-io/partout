@@ -192,6 +192,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
         const vtable = net.Connection.VTable{
+            .establish = noopEstablish,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -505,6 +506,7 @@ const FailingStartConnection = struct {
     fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
+        .establish = noopEstablish,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -643,19 +645,47 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
     const io = @import("source").net_io;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
+        owns_io: bool,
+        events: net.Connection.Events = undefined,
+        profile: *const api.Profile = undefined,
+        established_tun: ?*io.TunWrapper = null,
+        link_attached: bool = false,
+        link_port: u16 = 0,
         socket_connected: ?bool = null,
         remote: ?net.RemoteDescriptor = null,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
             return @as([*]const api.ExtendedEndpoint, @ptrCast(&self.endpoint))[0..1];
         }
-        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
-            return .{ .ptr = raw.?, .vtable = &vtable };
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events.?;
+            self.profile = sb.profile;
+            return .{ .ptr = self, .vtable = &vtable, .owns_io = self.owns_io };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.remote = remote;
-            return false;
+            self.link_attached = remote.looper.isLinkAttached();
+            self.link_port = (remote.link.localAddress() catch return error.UnableToStart).port;
+            if (self.owns_io) self.events.established(self.events.ctx, .{ .info = .{
+                .profile = self.profile.*,
+                .original_module_id = @import("source").net_connection.activeConnectionModule(self.profile).?.id(),
+            } });
+            return self.owns_io;
+        }
+        fn establish(raw: *anyopaque, tun: *io.TunWrapper) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.established_tun = tun;
+        }
+        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (self.owns_io) {
+                if (self.remote) |remote| remote.link.cleanup();
+                self.remote = null;
+                if (self.established_tun) |tun| tun.destroy();
+                self.established_tun = null;
+            }
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, _: ?io.ReachabilityInfo, _: c_int, port: u16) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -669,6 +699,8 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             var table = FailingStartConnection.vtable;
             table.endpoints = endpoints;
             table.start_v2 = start;
+            table.establish = establish;
+            table.stop = stop;
             break :blk table;
         };
         const implementation = net.ConnectionImplementation.VTable{
@@ -679,7 +711,8 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
     const allocator = std.testing.allocator;
     for ([_]api.IPSocketType{ .udp, .udp4, .udp6, .tcp, .tcp4, .tcp6 }) |proto| {
         for ([_]bool{ true, false }) |connect_udp| {
-            var probe = Probe{ .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+            const owns_io = !connect_udp;
+            var probe = Probe{ .owns_io = owns_io, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
             var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
             defer registry.deinit(allocator);
             var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
@@ -695,11 +728,24 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             defer sut.destroy();
             try sut.start();
             defer sut.stop();
+            try std.testing.expectError(error.AlreadyStarted, sut.start());
+            try std.testing.expectEqual(!owns_io, probe.link_attached);
+            try std.testing.expect(probe.link_port != 0);
+            if (owns_io) {
+                const owner = sut.implementation.connection;
+                try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                try std.testing.expect(probe.established_tun != null);
+                try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
+            }
             const peer = probe.remote.?.endpoint.?;
             try std.testing.expectEqual(proto, peer.type);
             try std.testing.expectEqual(@as(u16, 1194), peer.address.port);
             try std.testing.expectEqual(connect_udp or peer.plainSocketType() == .tcp, probe.socket_connected.?);
             if (!probe.socket_connected.?) try std.testing.expect(probe.remote.?.local_port != 0);
+            sut.stop();
+            try std.testing.expect(probe.established_tun == null);
         }
     }
 }
+
+fn noopEstablish(_: *anyopaque, _: *net.TunWrapper) void {}

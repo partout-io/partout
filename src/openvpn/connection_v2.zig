@@ -586,7 +586,10 @@ fn legacyStart(
 
 // MARK: - Vtables
 
+fn establish(_: *anyopaque, _: *net.TunWrapper) void {}
+
 const openvpn_connection_vtable = net.Connection.VTable{
+    .establish = establish,
     .endpoints = allEndpoints,
     .start_v2 = startV2,
     .shutdown = shutdown,
