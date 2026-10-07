@@ -118,6 +118,72 @@ fn waitRefresh(sut: *source.net_daemon_v2.Daemon, fake: *FakeBackend, count: usi
     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
 }
 
+test "WireGuard v2 mobile offline stops Go until reachability returns" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    const mock = source.mock;
+    const reservation = (try io.SocketWrapper.create(allocator, null, .{})).?;
+    const requested_port = (try reservation.localAddress()).port;
+    reservation.destroy();
+    var fds: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+    defer {
+        _ = libc.close(fds[0]);
+        _ = libc.close(fds[1]);
+    }
+    var probe = Probe{ .fd = fds[0], .requested_port = requested_port };
+    Probe.current = &probe;
+    var fake = FakeBackend{};
+    var dns = RefreshDNS{};
+    var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
+    ctx.stop_when_offline = true;
+    var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
+    defer registry.deinit(allocator);
+    var controller = mock.MockTunnelController{};
+    var controller_table = controller.interface().vtable.*;
+    controller_table.set_tunnel_settings = Probe.setTunnel;
+    var monitor = mock.MockNetworkMonitor{};
+    var factory = mock.noopSocketFactory();
+    var factory_table = factory.vtable.*;
+    factory_table.create = Probe.createSocket;
+    factory.vtable = &factory_table;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"mtu":1400},"peers":[{"publicKey":"CQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=","endpoint":"vpn.example:51820","allowedIPs":[]}]}}},
+        \\{"type":"IP","value":{"id":"44444444-4444-4444-8444-444444444444","mtu":1380}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333","44444444-4444-4444-8444-444444444444"]}
+    );
+    defer profile.deinit(allocator);
+    const module = @constCast(api.findActiveConnectionModule(&profile).?);
+    module.WireGuard.configuration.?.interface.listen_port = requested_port;
+    const sut = try source.net_daemon_v2.Daemon.create(allocator, &profile, .{
+        .objects = .{ .registry = &registry, .controller = .{ .ptr = &controller, .vtable = &controller_table }, .resolver = dns.interface(), .factory = factory, .monitor = monitor.interface() },
+        .options = .{ .connection_options = .{ .min_data_count_interval = 10 }, .reconnection_delay_ms = 60_000 },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try waitStatus(sut, .connected);
+    const sockets = probe.sockets.load(.acquire);
+    monitor.setReachable(false);
+    try waitStatus(sut, .disconnected);
+    try std.testing.expectEqual(@as(usize, 1), fake.turn_off_count);
+    try std.testing.expect(!owner.looper.isTunAttached() and !owner.looper.isLinkAttached());
+    const counts = fake.counts.load(.acquire);
+    // Even explicitly reopening the retry gate must not start while offline.
+    try owner.actor.perform(void, .resumeGate);
+    monitor.setReachable(false);
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+    try std.testing.expectEqual(@as(usize, 1), fake.turn_on_count);
+    try std.testing.expectEqual(sockets, probe.sockets.load(.acquire));
+    try std.testing.expectEqual(counts, fake.counts.load(.acquire));
+    monitor.setReachable(true);
+    try waitStatus(sut, .connected);
+    try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 2), dns.queries.load(.acquire));
+}
+
 test "WireGuard v2 daemon owns link and TUN across retry, path changes and termination" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
@@ -136,6 +202,7 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
     var dns = RefreshDNS{};
     var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
+    ctx.stop_when_offline = false;
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
