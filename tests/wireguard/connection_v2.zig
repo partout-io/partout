@@ -118,7 +118,7 @@ fn waitRefresh(sut: *source.net_daemon_v2.Daemon, fake: *FakeBackend, count: usi
     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
 }
 
-test "WireGuard v2 mobile offline stops Go until reachability returns" {
+test "WireGuard v2 offline stops Go until reachability returns" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const mock = source.mock;
@@ -136,7 +136,6 @@ test "WireGuard v2 mobile offline stops Go until reachability returns" {
     var fake = FakeBackend{};
     var dns = RefreshDNS{};
     var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
-    ctx.stop_when_offline = true;
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
@@ -202,7 +201,6 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
     var fake = FakeBackend{ .fail_turn_on_number = 1 };
     var dns = RefreshDNS{};
     var ctx = source.wireguard_connection_v2.ConnectionContext.init(.{ .ptr = &fake, .vtable = &fake_backend_vtable });
-    ctx.stop_when_offline = false;
     var registry = try source.net_connection.ConnectionRegistry.init(allocator, &.{.{ .ptr = &ctx, .vtable = &source.wireguard_exports.connection_v2_vtable }});
     defer registry.deinit(allocator);
     var controller = mock.MockTunnelController{};
@@ -273,12 +271,6 @@ test "WireGuard v2 daemon owns link and TUN across retry, path changes and termi
         try std.testing.expectEqual(@as(usize, 0), probe.cleaned);
     }
     dns.unavailable.store(false, .release);
-    monitor.setReachable(false);
-    try waitRefresh(sut, &fake, 5);
-    monitor.setReachable(true);
-    try waitRefresh(sut, &fake, 6);
-    try std.testing.expectEqual(@as(usize, 2), fake.turn_on_count);
-    try std.testing.expectEqual(@as(usize, 0), fake.turn_off_count);
     // A newer path during a blocked endpoint update must refresh LINK and
     // replay the latest endpoints once Go finishes, without replacing TUN.
     const refreshes = fake.refreshes.load(.acquire);

@@ -16,7 +16,6 @@ const uapi = @import("internal/uapi.zig");
 
 pub const ConnectionContext = struct {
     backend: impl.Backend,
-    stop_when_offline: bool = @import("builtin").os.tag != .macos,
     pub fn init(backend: impl.Backend) ConnectionContext {
         return .{ .backend = backend };
     }
@@ -46,7 +45,6 @@ pub fn createConnection(raw: ?*anyopaque, allocator: std.mem.Allocator, module: 
         .info = info,
         .events = events,
         .backend = context.backend,
-        .stop_when_offline = context.stop_when_offline,
         .bridge = .{ .allocator = allocator, .complete = complete },
         .resolver = PeerEndpointResolver.init(owned.peers, sandbox.resolver, sandbox.factory, sandbox.options.dns_timeout),
         .interval_ms = sandbox.options.min_data_count_interval,
@@ -64,7 +62,6 @@ const WireGuardConnection = struct {
     events: net.Connection.Events,
     resolver: PeerEndpointResolver,
     backend: impl.Backend,
-    stop_when_offline: bool,
     bridge: PassiveIO,
     looper: ?*net.Looper = null,
     timer: net.Looper.Timer = .{},
@@ -335,17 +332,17 @@ fn looperFailed(ptr: *anyopaque, side: net.Side, failure: net.Looper.Failure) vo
 fn networkChange(ptr: *anyopaque, info: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
     const self = cast(ptr);
     log.writef(.debug, "WireGuard v2 network changed, reachable: {}, state: {s}", .{ info.reachable, @tagName(self.state) });
-    // Match v1's mobile policy: an unreachable network must not leave Go's
+    // An unreachable network must not leave Go's
     // protocol timers and TUN processing running. The daemon drains borrowed
     // I/O before closing Go, then gates the next start on reachability.
-    if (!info.reachable and self.stop_when_offline) {
+    if (!info.reachable) {
         self.fail(.networkChanged);
         return .none;
     }
     switch (self.state) {
         .active => self.requestRefresh(),
         // A reachable notification may have just started this activation.
-        .activating => if (self.handle >= 0) self.requestRefresh() else if (!info.reachable) self.fail(.networkChanged),
+        .activating => if (self.handle >= 0) self.requestRefresh(),
         else => {},
     }
     return if (self.state == .refresh_requested) .refresh_link else .none;
