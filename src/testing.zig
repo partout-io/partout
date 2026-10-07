@@ -65,6 +65,7 @@ pub const wireguard_parser = if (wireguard_enabled) @import("wireguard/parser.zi
 pub const wireguard_serializer = if (wireguard_enabled) @import("wireguard/serializer.zig") else struct {};
 pub const wireguard_internal = if (wireguard_enabled) struct {
     pub const adapter = @import("wireguard/internal/adapter.zig");
+    pub const passive_io = @import("wireguard/internal/passive_io.zig");
     pub const adapter_v2 = @import("wireguard/internal/adapter_v2.zig");
     pub const backend = @import("wireguard/internal/backend.zig");
     pub const resolver = @import("wireguard/internal/resolver.zig");

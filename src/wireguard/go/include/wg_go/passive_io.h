@@ -20,7 +20,8 @@ enum {
     WG_IO_MAX_BATCH = 256,
     WG_IO_OK = 0,
     WG_IO_INVALID = -1,
-    WG_IO_CLOSED = -2
+    WG_IO_CLOSED = -2,
+    WG_IO_AGAIN = -3
 };
 
 /* Descriptors and payloads are borrowed until completion. */
@@ -33,7 +34,9 @@ typedef struct wg_packet {
  * wgCompleteIO(request, completed_count, status), possibly before return.
  * Nonzero rejects it and MUST NOT complete it. The host must release all
  * descriptors/payloads before completion. Cancellation completes with CLOSED.
- * Callbacks only submit work; they never wait for the looper. Before turn-off,
+ * Callbacks execute on Go workers and may complete inline. AGAIN completes a
+ * processed prefix (zero for reads with no data); Go retries the remaining
+ * packets after a cancellable wait. Before turn-off,
  * reject new requests and complete/cancel every accepted request.
  * Go pins all borrowed storage until completion and waits before reusing it. */
 typedef struct wg_read_packet {

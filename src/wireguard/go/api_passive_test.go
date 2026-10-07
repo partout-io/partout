@@ -165,3 +165,70 @@ func TestPassiveEndpointRefreshPreservesPeer(t *testing.T) {
 		}
 	}
 }
+
+func TestPassiveRetryWritesOnlyUnsentSuffix(t *testing.T) {
+	var offsets []int
+	result := retryPassiveIO(3, false, nil, nil, func(offset int) passiveResult {
+		offsets = append(offsets, offset)
+		switch len(offsets) {
+		case 1:
+			return passiveResult{1, -3} // Backpressure after one packet.
+		case 2:
+			return passiveResult{0, -3} // Still blocked.
+		default:
+			return passiveResult{2, 0}
+		}
+	})
+	if result.count != 3 || result.err() != nil || fmt.Sprint(offsets) != "[0 1 1]" {
+		t.Fatalf("result=%+v offsets=%v", result, offsets)
+	}
+}
+
+func TestPassiveRetryReadWaitsForPackets(t *testing.T) {
+	calls := 0
+	result := retryPassiveIO(16, true, nil, nil, func(offset int) passiveResult {
+		if offset != 0 {
+			t.Fatal("read reused a write offset")
+		}
+		calls++
+		if calls == 1 {
+			return passiveResult{0, -3}
+		}
+		return passiveResult{2, 0}
+	})
+	if result.count != 2 || result.err() != nil || calls != 2 {
+		t.Fatalf("result=%+v calls=%d", result, calls)
+	}
+}
+
+func TestPassiveRetryCancellation(t *testing.T) {
+	for _, abort := range []bool{false, true} {
+		t.Run(fmt.Sprint("abort=", abort), func(t *testing.T) {
+			canceled := make(chan struct{})
+			var done, aborted <-chan struct{}
+			if abort {
+				aborted = canceled
+			} else {
+				done = canceled
+			}
+			calls := 0
+			result := retryPassiveIO(3, false, done, aborted, func(offset int) passiveResult {
+				calls++
+				close(canceled)
+				return passiveResult{1, -3}
+			})
+			if result.count != 1 || !errors.Is(result.err(), net.ErrClosed) || calls != 1 {
+				t.Fatalf("result=%+v calls=%d", result, calls)
+			}
+		})
+	}
+}
+
+func TestPassiveRetryRejectsInvalidCompletion(t *testing.T) {
+	result := retryPassiveIO(2, false, nil, nil, func(int) passiveResult {
+		return passiveResult{3, -3}
+	})
+	if result.err() == nil {
+		t.Fatal("accepted out-of-bounds completion")
+	}
+}

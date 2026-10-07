@@ -48,11 +48,8 @@ pub const ConnectionContext = struct {
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
     adapter: WireGuardAdapter,
-    // Packet I/O remains closed until the connection wires its owned descriptors.
+    // Owns descriptors; native calls execute directly on Go workers.
     io: PassiveIO,
-    /// Descriptors transferred by the v2 daemon. Released on replacement or stop.
-    link: ?net.LinkDescriptor = null,
-    tun: ?net.TunDescriptor = null,
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
     /// Actor-owned event sink used only by serialized connection work.
@@ -100,7 +97,7 @@ const WireGuardConnection = struct {
         created.* = .{
             .allocator = allocator,
             .adapter = undefined,
-            .io = .{ .allocator = allocator, .complete = complete },
+            .io = .{ .complete = complete },
             .configuration = configuration,
             .events = sandbox.events,
             .serialized_executor = sandbox.serialized_executor,
@@ -137,10 +134,7 @@ const WireGuardConnection = struct {
     }
 
     fn releaseIO(self: *WireGuardConnection) void {
-        if (self.link) |*link| link.cleanup();
-        self.link = null;
-        if (self.tun) |*tun| tun.cleanup();
-        self.tun = null;
+        self.io.release();
     }
 
     fn asConnection(self: *WireGuardConnection) net.Connection {
@@ -153,8 +147,8 @@ const WireGuardConnection = struct {
     }
 
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
-        if (self.link) |*link| link.cleanup();
-        self.link = remote.link;
+        self.io.replaceLink(remote.link);
+        errdefer self.releaseIO();
         const events = self.events orelse return error.UnableToStart;
         if (!self.adapter.isStopped()) {
             log.write(.debug, "Start ignored, adapter is already active");
@@ -214,8 +208,7 @@ const WireGuardConnection = struct {
 
     fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
         log.write(.info, "Commit WireGuard TUN");
-        if (self.tun) |*tun| tun.cleanup();
-        self.tun = descriptor;
+        self.io.replaceTun(descriptor);
     }
 
     fn stop(
@@ -226,9 +219,10 @@ const WireGuardConnection = struct {
         // Match Swift: wg-go shutdown is normally immediate, so the generic
         // connection timeout has nothing useful to interrupt here.
         _ = timeout_ms;
-        const had_state = self.link != null or self.tun != null or !self.adapter.isStopped();
+        const had_state = self.io.hasIO() or !self.adapter.isStopped();
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
+        self.io.quiesce();
         self.adapter.stop(self.allocator);
         self.releaseIO();
         if (had_state) {

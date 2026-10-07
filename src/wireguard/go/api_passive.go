@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unsafe"
 
 	"golang.zx2c4.com/wireguard/conn"
@@ -84,7 +85,7 @@ func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) in
 	dev := device.NewDevice(tun, bind, logger)
 	closeDevice := func() {
 		if bind.host != nil {
-			close(bind.host.aborted)
+			bind.host.abort()
 		}
 		dev.Close()
 	}
@@ -126,6 +127,9 @@ func wgTurnOffWithPassiveIO(handle int32) {
 	delete(passiveBackends.byHandle, handle)
 	passiveBackends.Unlock()
 	if ok {
+		if tunnel.bind.host != nil {
+			tunnel.bind.host.abort()
+		}
 		tunnel.Close()
 	}
 }
@@ -152,7 +156,7 @@ func wgSetEndpointsWithPassiveIO(handle int32, settings *C.char) int64 {
 }
 
 // Endpoint-only updates cannot reopen Bind or replace peers and their sessions.
-// The caller runs this off its I/O queue: IpcSet can flush staged packets.
+// IpcSet can flush staged packets through callbacks on the calling Go worker.
 func setPassiveEndpoints(handle int32, settings string) int64 {
 	tunnel, ok := lookupPassiveBackend(handle)
 	if !ok {
@@ -263,7 +267,10 @@ func wgCompleteIO(request C.uintptr_t, count C.uint32_t, status C.int32_t) {
 
 type passiveHost struct {
 	ready, aborted chan struct{}
+	abortOnce      sync.Once
 }
+
+func (h *passiveHost) abort() { h.abortOnce.Do(func() { close(h.aborted) }) }
 
 func (h *passiveHost) waitReady(done <-chan struct{}) bool {
 	select {
@@ -293,8 +300,10 @@ func (h *passiveHost) read(read C.wg_read_fn, context unsafe.Pointer, packets []
 		batch[i] = C.wg_read_packet{data: (*C.uint8_t)(unsafe.Pointer(data)), capacity: C.uint32_t(len(packet) - offset)}
 	}
 	pins.Pin(&batch[0])
-	result := passiveRequest(func(request C.uintptr_t) C.int32_t {
-		return C.wg_passive_read(read, context, &batch[0], C.uint32_t(len(packets)), request)
+	result := retryPassiveIO(len(packets), true, done, h.aborted, func(_ int) passiveResult {
+		return passiveRequest(func(request C.uintptr_t) C.int32_t {
+			return C.wg_passive_read(read, context, &batch[0], C.uint32_t(len(packets)), request)
+		})
 	})
 	if result.count < 0 || result.count > len(packets) {
 		return 0, errPassivePacket
@@ -345,8 +354,10 @@ func (h *passiveHost) write(packets [][]byte, offset int, address *C.wg_endpoint
 		batch[i] = C.wg_packet{data: (*C.uint8_t)(unsafe.Pointer(data)), size: C.uint32_t(len(packet) - offset)}
 	}
 	pins.Pin(&batch[0])
-	result := passiveRequest(func(request C.uintptr_t) C.int32_t {
-		return submit(&batch[0], C.uint32_t(len(packets)), request)
+	result := retryPassiveIO(len(packets), false, nil, h.aborted, func(offset int) passiveResult {
+		return passiveRequest(func(request C.uintptr_t) C.int32_t {
+			return submit(&batch[offset], C.uint32_t(len(packets)-offset), request)
+		})
 	})
 	if result.count < 0 || result.count > len(packets) {
 		return 0, errPassivePacket
@@ -355,4 +366,41 @@ func (h *passiveHost) write(packets [][]byte, offset int, address *C.wg_endpoint
 		return result.count, errPassivePacket
 	}
 	return result.count, result.err()
+}
+
+// Native descriptors are nonblocking. Keep retry scheduling and cancellation
+// on Go workers, with no native queue or retained request between attempts.
+func retryPassiveIO(count int, reading bool, done, aborted <-chan struct{}, submit func(int) passiveResult) passiveResult {
+	completed := 0
+	for {
+		select {
+		case <-done:
+			return passiveResult{completed, C.WG_IO_CLOSED}
+		case <-aborted:
+			return passiveResult{completed, C.WG_IO_CLOSED}
+		default:
+		}
+		result := submit(completed)
+		if result.count < 0 || result.count > count-completed {
+			return passiveResult{completed, C.WG_IO_INVALID}
+		}
+		completed += result.count
+		if result.status != C.WG_IO_AGAIN {
+			return passiveResult{completed, result.status}
+		}
+		// Reads return any available batch; writes must finish the suffix.
+		if reading && completed != 0 || completed == count {
+			return passiveResult{completed, C.WG_IO_OK}
+		}
+		timer := time.NewTimer(time.Millisecond)
+		select {
+		case <-done:
+			timer.Stop()
+			return passiveResult{completed, C.WG_IO_CLOSED}
+		case <-aborted:
+			timer.Stop()
+			return passiveResult{completed, C.WG_IO_CLOSED}
+		case <-timer.C:
+		}
+	}
 }
