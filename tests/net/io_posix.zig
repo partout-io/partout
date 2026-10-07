@@ -34,7 +34,7 @@ test "socket wrapper rejects an invalid remote address" {
     })) == null);
 }
 
-test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
+test "POSIX interface dispatches to owned sockets and tunnels" {
     if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
     std.testing.refAllDecls(io_posix.POSIXInterface);
     const allocator = std.testing.allocator;
@@ -45,13 +45,13 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
         .remote_endpoint = try io.SocketEndpoint.init(.{ .address = "127.0.0.1", .proto = .init(.udp, 1194) }),
         .closes_on_empty_read = false,
     };
-    var tun = io_posix.TunWrapper.init(null);
+    const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
     const native_socket = socket.linkDescriptor().io;
     defer native_socket.cleanup();
     try std.testing.expectError(error.LibcFailure, tun.tunDescriptor());
     const native_tun = tun.nativeIO();
-    defer tun.deinit();
-    try std.testing.expect(native_tun.tun == &tun);
+    defer tun.destroy();
+    try std.testing.expect(native_tun.tun == tun);
     try std.testing.expect(native_socket.socket == socket);
     try std.testing.expect(native_socket == .socket);
     try std.testing.expect(native_tun == .tun);
@@ -61,9 +61,6 @@ test "POSIX interface dispatches to owned sockets and borrowed tunnels" {
     for ([_]io_posix.POSIXInterface{ native_socket, native_tun }) |native| {
         try std.testing.expectError(error.InvalidOffset, native.write("", 1));
     }
-    native_tun.cleanup();
-    native_tun.cleanup();
-    try std.testing.expect(tun.is_closed);
 }
 
 test "TUN looper descriptor is made nonblocking by the wrapper" {
@@ -77,12 +74,14 @@ test "TUN looper descriptor is made nonblocking by the wrapper" {
     defer _ = libc.close(fds[1]);
     const before: std.c.O = @bitCast(@as(u32, @intCast(std.c.fcntl(fds[0], std.c.F.GETFL))));
     try std.testing.expect(!before.NONBLOCK);
-    var tun = io_posix.TunWrapper.init(null);
+    const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
+    defer tun.destroy();
     // Borrow the pipe solely to exercise descriptor preparation, without a native TUN.
     tun.test_descriptor = .{ .fd = fds[0], .io = tun.nativeIO() };
     const descriptor = try tun.tunDescriptor();
+    tun.test_descriptor = null;
     try std.testing.expectEqual(fds[0], descriptor.fd);
-    try std.testing.expect(descriptor.io.tun == &tun);
+    try std.testing.expect(descriptor.io.tun == tun);
     const after: std.c.O = @bitCast(@as(u32, @intCast(std.c.fcntl(fds[0], std.c.F.GETFL))));
     try std.testing.expect(after.NONBLOCK);
 }
@@ -116,4 +115,59 @@ test "socket argument errors are rejected before native I/O" {
     // Valid arguments reach the invalid native handle and retain its native error.
     try std.testing.expectError(error.LibcFailure, socket.sendTo("payload", endpoint.address));
     try std.testing.expectEqual(@as(c_int, @intFromEnum(std.c.E.BADF)), native.lastErrorCode());
+}
+
+test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const Probe = struct {
+        closed: usize = 0,
+        fn finish(_: ?*anyopaque, _: ?@import("source").net.Looper.Failure) void {}
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+            return error.WouldBlock;
+        }
+        fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            return data.len - offset;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.closed += 1;
+        }
+        fn lastError(_: *anyopaque) c_int {
+            return 0;
+        }
+        const vtable = io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = lastError,
+        };
+    };
+    const libc = struct {
+        extern "c" fn close(c_int) c_int;
+    };
+    var fds: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&fds) != 0) return error.PipeFailed;
+    defer _ = libc.close(fds[0]);
+    defer _ = libc.close(fds[1]);
+    var probe = Probe{};
+    var loop = try @import("source").net.Looper.initExperimental(std.testing.allocator, .{ .on_finish = .{ .callback = Probe.finish } });
+    defer loop.deinit();
+    {
+        const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
+        tun.test_descriptor = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &probe, .vtable = &Probe.vtable } } };
+        const descriptor = try tun.tunDescriptor();
+        try std.testing.expectError(error.LooperUnavailable, loop.attach(.{ .pair = .{ .tun = descriptor } }));
+        try std.testing.expect(!tun.is_closed);
+        try loop.start();
+        try loop.attach(.{ .pair = .{ .tun = descriptor } });
+        try std.testing.expectEqual(@as(usize, 0), probe.closed);
+    }
+    try loop.detach(.tun);
+    try std.testing.expectEqual(@as(usize, 1), probe.closed);
+    try loop.stop();
+    try std.testing.expectEqual(@as(usize, 1), probe.closed);
 }

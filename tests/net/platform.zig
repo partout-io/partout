@@ -222,11 +222,11 @@ test "settings-only daemons release owned TUN descriptors" {
         native: *NativeTun,
         handed_out: bool = false,
 
-        fn setTunnel(raw: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) source.net.TunnelController.Error!io.TunWrapper {
+        fn setTunnel(raw: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) source.net.TunnelController.Error!*io.TunWrapper {
             const base: *mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
             const self: *@This() = @fieldParentPtr("mock", base);
             self.handed_out = true;
-            return io.TunWrapper.init(@ptrCast(self.native));
+            return io.TunWrapper.create(std.testing.allocator, @ptrCast(self.native));
         }
     };
     const allocator = std.testing.allocator;

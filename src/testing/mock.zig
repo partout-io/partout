@@ -184,7 +184,7 @@ const noop_controller_vtable = net.TunnelController.VTable{
     .cancel_tunnel_connection = noopCancelTunnelConnection,
 };
 
-fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net_io.TunWrapper {
+fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*net_io.TunWrapper {
     return error.TunNotAvailable;
 }
 
@@ -348,13 +348,13 @@ const mock_controller_vtable = net.TunnelController.VTable{
     .cancel_tunnel_connection = mockCancelTunnelConnection,
 };
 
-fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!net_io.TunWrapper {
+fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*net_io.TunWrapper {
     const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
     self.set_tunnel_settings_count += 1;
     self.last_settings_info = info;
     self.last_settings = snapshotTunnelSettings(info);
     if (self.set_tunnel_settings_error) |err| return err;
-    return net_io.TunWrapper.init(null);
+    return net_io.TunWrapper.create(std.testing.allocator, null);
 }
 
 fn mockConfigureSockets(ptr: ?*anyopaque, descriptors: []const net_io.SocketDescriptor) net.TunnelController.Error!void {
@@ -485,6 +485,7 @@ const DaemonMockConnection = struct {
 };
 
 const daemon_mock_connection_vtable = net_conn.Connection.VTable{
+    .commit = noopCommit,
     .start = daemonMockStart,
     .stop = daemonMockStop,
     .network_change = daemonMockNetworkChange,
@@ -574,6 +575,7 @@ pub const BlockingStopConnection = struct {
 };
 
 const blocking_connection_vtable = net_conn.Connection.VTable{
+    .commit = noopCommit,
     .start = blockingStart,
     .stop = blockingStop,
     .network_change = blockingNetworkChange,
@@ -676,3 +678,5 @@ pub fn connectionProfileJson() [:0]const u8 {
     \\}
     ;
 }
+
+fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}

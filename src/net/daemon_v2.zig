@@ -277,13 +277,13 @@ const SettingsDaemon = struct {
         };
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
-            var tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
+            const tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
                 log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(.{ .code = code }, false);
                 return;
             };
-            tun.deinit();
+            tun.destroy();
         }
     }
 
@@ -338,7 +338,6 @@ const ConnectionDaemon = struct {
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
-    tunnel: ?net.TunWrapper,
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
@@ -368,7 +367,6 @@ const ConnectionDaemon = struct {
             .connection = null,
             .endpoint_resolver = null,
             .looper = undefined,
-            .tunnel = null,
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
             .is_evaluating_connection = false,
@@ -669,7 +667,6 @@ const ConnectionDaemon = struct {
             log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)});
         };
         connection.destroy();
-        self.destroyTunnel();
         self.looper.deinit();
         self.daemon.allocator.destroy(self.looper);
         if (self.endpoint_resolver) |*resolver| resolver.deinit();
@@ -692,11 +689,6 @@ const ConnectionDaemon = struct {
     fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
         if (self.looper.isTunAttached()) try self.looper.detach(.tun);
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
-    }
-
-    fn destroyTunnel(self: *ConnectionDaemon) void {
-        if (self.tunnel) |*tunnel| tunnel.deinit();
-        self.tunnel = null;
     }
 
     fn startConnection(self: *ConnectionDaemon) void {
@@ -767,7 +759,7 @@ const ConnectionDaemon = struct {
         log.write(.notice, "Create new link");
         const connection = self.connection orelse @panic("setupLink but no connection");
         const conn_options = self.daemon.options.connection_options;
-        var remote = RemoteDescriptor{ .looper = self.looper };
+        var remote = RemoteDescriptor{ .link = undefined, .looper = self.looper };
         const reachability = self.factory.currentReachability();
         var endpoint: ?api.ExtendedEndpoint = null;
         if (self.endpoint_resolver) |*resolver| {
@@ -793,7 +785,7 @@ const ConnectionDaemon = struct {
             reachability,
             conn_options.link_activity_timeout,
         );
-        // Both link kinds transfer ownership only after a successful attach.
+        // Ownership transfers to the looper on attach, or to the connection on start.
         errdefer descriptor.cleanup();
         if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
         // Passive protocols retain their bind across host socket replacement.
@@ -802,13 +794,16 @@ const ConnectionDaemon = struct {
         log.writef(.info, "Link type is {s}", .{
             if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
         });
-        log.write(.info, "Attach LINK");
-        try self.looper.attach(.{
-            .pair = .{ .link = descriptor },
-            .read_buffers = connection.readBuffers(.link),
-            .on_read = .{ .context = self, .callback = onLinkRead },
-            .on_failure = .{ .context = self, .callback = onLinkFailure },
-        });
+        if (!connection.owns_io) {
+            log.write(.info, "Attach LINK");
+            try self.looper.attach(.{
+                .pair = .{ .link = descriptor },
+                .read_buffers = connection.readBuffers(.link),
+                .on_read = .{ .context = self, .callback = onLinkRead },
+                .on_failure = .{ .context = self, .callback = onLinkFailure },
+            });
+        }
+        remote.link = descriptor;
         return remote;
     }
 
@@ -892,11 +887,18 @@ const ConnectionDaemon = struct {
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
         const connection = self.connection orelse return;
 
-        self.tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
+        const tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        const descriptor = try self.tunnel.?.tunDescriptor();
+        // Retain ownership until descriptor preparation and handoff succeed.
+        errdefer tunnel.destroy();
+        const descriptor = try tunnel.tunDescriptor();
+        if (connection.owns_io) {
+            connection.commit(descriptor);
+            self.trackConnectionStatus(.connected);
+            return;
+        }
 
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
@@ -1057,7 +1059,6 @@ const ConnectionDaemon = struct {
     fn clearConnectionTunnel(self: *ConnectionDaemon) void {
         if (self.connection != null) {
             self.detachLooperSides() catch {};
-            self.destroyTunnel();
         }
         self.daemon.controller.clearTunnelSettings(false);
     }
@@ -1203,6 +1204,7 @@ const ConnectionDaemon = struct {
     const CallOnLooper = struct {
         connection: Connection,
         events: Connection.Events,
+        start_entered: bool = false,
         operation: union(enum) {
             start: RemoteDescriptor,
             shutdown: Connection.ShutdownReason,
@@ -1212,9 +1214,12 @@ const ConnectionDaemon = struct {
         },
 
         fn run(ctx: ?*anyopaque) !bool {
-            const request: *const CallOnLooper = @ptrCast(@alignCast(ctx.?));
+            const request: *CallOnLooper = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
-                .start => |remote| return request.connection.startV2(remote),
+                .start => |remote| {
+                    request.start_entered = true;
+                    return request.connection.startV2(remote);
+                },
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
                 .reachability => |info| return request.connection.networkChange(info, request.events) == .refresh_link,
@@ -1234,6 +1239,9 @@ const ConnectionDaemon = struct {
             .events = self.events(),
             .operation = operation,
         };
+        // An owned link transfers only when startV2 is entered, even if it fails.
+        defer if (operation == .start and request.connection.owns_io and !request.start_entered)
+            operation.start.link.cleanup();
         return self.looper.perform(bool, &request, CallOnLooper.run);
     }
 

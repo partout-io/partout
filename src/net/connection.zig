@@ -169,6 +169,8 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 }
 
 pub const RemoteDescriptor = struct {
+    /// Owned by the connection when owns_io is true; otherwise borrowed from the looper.
+    link: io.LinkDescriptor,
     endpoint: ?io.SocketEndpoint = null,
     local_port: u16 = 0,
     looper: *Looper,
@@ -180,6 +182,7 @@ pub const RemoteDescriptor = struct {
 pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
+    owns_io: bool = false,
     /// Requested bind port for an unconnected link; zero selects an ephemeral port.
     local_port: u16 = 0,
 
@@ -245,11 +248,15 @@ pub const Connection = struct {
                 return null;
             }
         }.call,
+        /// When owns_io is true, takes link ownership on entry, including on failure.
         start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
                 return false;
             }
         }.call,
+        /// Commits TUN after the established event, transferring ownership
+        /// to the connection when it performs packet I/O.
+        commit: *const fn (*anyopaque, io.TunDescriptor) void,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
@@ -300,6 +307,10 @@ pub const Connection = struct {
 
     pub fn start(self: Connection, events: Events) StartError!bool {
         return self.vtable.start(self.ptr, events);
+    }
+
+    pub fn commit(self: Connection, tun: io.TunDescriptor) void {
+        self.vtable.commit(self.ptr, tun);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {

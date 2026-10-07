@@ -446,13 +446,13 @@ pub const Daemon = struct {
             };
             if (maybe_info) |*info| {
                 defer info.deinit(self.allocator);
-                var tun = self.controller.setTunnelSettings(info.*) catch |err| {
+                const tun = self.controller.setTunnelSettings(info.*) catch |err| {
                     log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                     const code = self.handleStartError(err);
                     self.requestCancellation(.{ .code = code }, false);
                     return;
                 };
-                tun.deinit();
+                tun.destroy();
             }
             log.write(.notice, "Daemon started successfully");
             return;

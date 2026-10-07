@@ -41,6 +41,7 @@ pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
 pub const EndpointResolver = resolver.EndpointResolver;
 pub const FileDescriptor = io.FileDescriptor;
+pub const LinkDescriptor = io.LinkDescriptor;
 pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Platform = platform.Platform;
@@ -55,6 +56,7 @@ pub const SocketFactory = sandbox.SocketFactory;
 pub const SocketType = io.SocketType;
 pub const SocketWrapper = io.SocketWrapper;
 pub const TunnelController = sandbox.TunnelController;
+pub const TunDescriptor = io.TunDescriptor;
 pub const TunWrapper = io.TunWrapper;
 
 pub const canChangeStatus = conn.canChangeStatus;
