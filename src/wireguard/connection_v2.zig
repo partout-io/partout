@@ -11,8 +11,10 @@ const log = core.logging;
 
 const adapter_mod = @import("internal/adapter.zig");
 const impl = @import("internal/backend.zig");
+const tunnel_info = @import("internal/tunnel_info.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
+const TunnelRemoteInfoBuilder = tunnel_info.TunnelRemoteInfoBuilder;
 const ConnectionError = WireGuardAdapter.ActivationError || std.Thread.SpawnError;
 
 pub fn createConnection(
@@ -94,7 +96,7 @@ const WireGuardConnection = struct {
             .allocator = allocator,
             .adapter = undefined,
             .configuration = configuration,
-            .events = null,
+            .events = sandbox.events,
             .serialized_executor = sandbox.serialized_executor,
             .data_count_timer = .{},
             .data_count_timer_active = false,
@@ -129,6 +131,13 @@ const WireGuardConnection = struct {
         allocator.destroy(self);
     }
 
+    fn releaseIO(self: *WireGuardConnection) void {
+        if (self.link) |*link| link.cleanup();
+        self.link = null;
+        if (self.tun) |*tun| tun.cleanup();
+        self.tun = null;
+    }
+
     fn asConnection(self: *WireGuardConnection) net.Connection {
         return .{
             .ptr = self,
@@ -140,32 +149,13 @@ const WireGuardConnection = struct {
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         if (self.link) |*link| link.cleanup();
         self.link = remote.link;
-        return true;
-    }
-
-    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
-        if (self.tun) |*tun| tun.cleanup();
-        self.tun = descriptor;
-    }
-
-    fn releaseIO(self: *WireGuardConnection) void {
-        if (self.link) |*link| link.cleanup();
-        self.link = null;
-        if (self.tun) |*tun| tun.cleanup();
-        self.tun = null;
-    }
-
-    fn start(
-        self: *WireGuardConnection,
-        events: net.Connection.Events,
-    ) net.ConnectionStartError!bool {
+        const events = self.events orelse return error.UnableToStart;
         if (!self.adapter.isStopped()) {
             log.write(.debug, "Start ignored, adapter is already active");
             return false;
         }
 
         log.write(.info, "Start tunnel");
-        self.events = events;
         events.status(events.ctx, .connecting);
         errdefer events.status(events.ctx, .disconnected);
 
@@ -212,7 +202,24 @@ const WireGuardConnection = struct {
         self.startDataCountTimer() catch |err| {
             log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
         };
+        var info = TunnelRemoteInfoBuilder.init(
+            self.allocator,
+            self.adapter.profile,
+            self.adapter.module_id,
+            &self.configuration,
+        ).build() catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            else => error.UnableToStart,
+        };
+        defer info.deinit(self.allocator);
+        events.established(events.ctx, .{ .info = info });
         return true;
+    }
+
+    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
+        log.write(.info, "Commit WireGuard TUN");
+        if (self.tun) |*tun| tun.cleanup();
+        self.tun = descriptor;
     }
 
     fn stop(
@@ -536,17 +543,11 @@ fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) void {
 const wireguard_connection_vtable = net.Connection.VTable{
     .start_v2 = startV2,
     .commit = commit,
-    .start = start,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
     .destroy = destroy,
 };
-
-fn start(ptr: *anyopaque, events: net.Connection.Events) net.ConnectionStartError!bool {
-    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.start(events);
-}
 
 fn stop(
     ptr: *anyopaque,
