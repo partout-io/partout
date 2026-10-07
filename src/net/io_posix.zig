@@ -139,11 +139,11 @@ pub const POSIXInterface = union(enum) {
 };
 
 pub const SocketWrapper = struct {
+    allocator: std.mem.Allocator,
     socket: io_c.pp_socket,
     remote_endpoint: ?io.SocketEndpoint = null,
     closes_on_empty_read: bool = false,
     is_closed: bool = false,
-    allocator: std.mem.Allocator,
 
     /// Creates a connected socket (resolving hostnames in C), or one unconnected UDP socket for the requested families.
     /// A null endpoint selects unconnected UDP.
@@ -322,8 +322,8 @@ fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
 }
 
 pub const TunWrapper = struct {
-    tun: io_c.pp_tun,
     allocator: std.mem.Allocator,
+    tun: io_c.pp_tun,
     is_closed: bool = false,
     test_descriptor: if (builtin.is_test) ?POSIXDescriptor else void = if (builtin.is_test) null else {},
 
