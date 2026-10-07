@@ -1454,7 +1454,7 @@ pub const PosixLooper = struct {
         side: io.Side,
         fd: io.FileDescriptor,
         native_io: io_posix.POSIXInterface,
-        udp_batch: helpers.UDPBatch,
+        udp_batch: io_posix.UDPBatch,
 
         // User callbacks.
         on_read: ?helpers.OnRead,
