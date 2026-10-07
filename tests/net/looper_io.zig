@@ -787,53 +787,76 @@ test "v2 UDP packet errors complete the request without detaching other peers" {
     try loop.stop();
 }
 
-test "v2 notifications deliver once and cancel before producer completion" {
+test "v2 notifications use FIFO order and cancel queued or late completions" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         loop: *Looper,
+        cancel_index: usize,
         calls: Atomic = .init(0),
-        notification: Looper.Notification = .{ .task = .{ .callback = completed } },
+        order: [5]usize = undefined,
+        items: [7]Item = undefined,
 
-        fn completed(raw: ?*anyopaque) void {
+        const Item = struct {
+            owner: *ThisProbe,
+            index: usize,
+            notification: Looper.Notification,
+
+            fn completed(raw: ?*anyopaque) void {
+                const item: *Item = @ptrCast(@alignCast(raw.?));
+                const self = item.owner;
+                std.debug.assert(self.loop.isOnQueue());
+                if (self.cancel_index == 4 and item.index == 0) {
+                    // A callback can remove a later entry while the FIFO drains.
+                    self.loop.cancelNotification(&self.items[2].notification);
+                }
+                self.order[self.calls.load(.acquire)] = item.index;
+                _ = self.calls.fetchAdd(1, .release);
+            }
+        };
+        const ThisProbe = @This();
+
+        fn submit(raw: ?*anyopaque) anyerror!void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            std.debug.assert(self.loop.isOnQueue());
-            _ = self.calls.fetchAdd(1, .release);
+            for (self.items[0..4]) |*item| {
+                self.loop.signalNotification(&item.notification);
+                self.loop.signalNotification(&item.notification);
+            }
+            if (self.cancel_index < 4) self.loop.cancelNotification(&self.items[self.cancel_index].notification);
+            // Appending after removing the tail must preserve FIFO linkage.
+            self.loop.signalNotification(&self.items[4].notification);
+            self.loop.cancelNotification(&self.items[5].notification);
         }
-        fn arm(raw: ?*anyopaque) anyerror!void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.notification.task.context = self;
-            try self.loop.armNotification(&self.notification);
-        }
-        fn cancelReady(raw: ?*anyopaque) anyerror!void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            try arm(raw);
-            self.loop.signalNotification(&self.notification);
-            self.loop.cancelNotification(&self.notification);
-        }
-        fn signal(self: *@This()) void {
-            self.loop.signalNotification(&self.notification);
-            self.loop.signalNotification(&self.notification);
+        fn lateProducer(self: *@This()) void {
+            self.loop.signalNotification(&self.items[5].notification);
         }
     };
-    var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
-    defer loop.deinit();
-    var probe = Probe{ .loop = &loop };
-    try loop.start();
-    try loop.perform(void, &probe, Probe.arm);
-    const worker = try std.Thread.spawn(.{}, Probe.signal, .{&probe});
-    worker.join();
-    for (0..5000) |_| {
-        if (probe.calls.load(.acquire) != 0) break;
-        _ = libc.usleep(1000);
+    for (0..5) |cancel_index| {
+        var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
+        defer loop.deinit();
+        var probe = Probe{ .loop = &loop, .cancel_index = cancel_index };
+        for (&probe.items, 0..) |*item, i| item.* = .{
+            .owner = &probe,
+            .index = i,
+            .notification = .{ .task = .{ .context = item, .callback = Probe.Item.completed } },
+        };
+        try loop.start();
+        try loop.perform(void, &probe, Probe.submit);
+        const worker = try std.Thread.spawn(.{}, Probe.lateProducer, .{&probe});
+        worker.join();
+        for (0..5000) |_| {
+            if (probe.calls.load(.acquire) == 4) break;
+            _ = libc.usleep(1000);
+        }
+        try std.testing.expectEqual(@as(usize, 4), probe.calls.load(.acquire));
+        var next: usize = 0;
+        for (0..5) |i| {
+            if (i == (if (cancel_index == 4) @as(usize, 2) else cancel_index)) continue;
+            try std.testing.expectEqual(i, probe.order[next]);
+            next += 1;
+        }
+        try loop.stop();
+        loop.signalNotification(&probe.items[6].notification);
+        try std.testing.expectEqual(.finished, probe.items[6].notification.state);
+        try std.testing.expectEqual(@as(usize, 4), probe.calls.load(.acquire));
     }
-    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
-    try loop.perform(void, &probe, Probe.cancelReady);
-    probe.signal(); // A late producer cannot resurrect a cancelled callback.
-    try loop.performTask(.{ .callback = barrier });
-    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
-    try loop.perform(void, &probe, Probe.arm);
-    try loop.stop();
-    probe.signal();
-    try std.testing.expect(!probe.notification.armed);
-    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
 }

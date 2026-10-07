@@ -128,13 +128,12 @@ pub const Timer = struct {
     id: ?u64 = null,
 };
 
-/// One-shot worker-to-looper notification. Arm/cancel on the looper queue,
-/// signal from any thread. Storage must survive until the producer has joined.
-/// All fields except the immutable task are protected by the looper mutex.
+/// One-shot worker-to-looper notification. Signal from any thread, cancel on
+/// the looper queue. Keep storage alive until delivery/cancellation and producer
+/// exit. State and FIFO linkage are protected by the looper mutex.
 pub const Notification = struct {
     task: TimedTask,
-    armed: bool = false,
-    ready: bool = false,
+    state: enum { pending, queued, finished } = .pending,
     next: ?*Notification = null,
 };
 

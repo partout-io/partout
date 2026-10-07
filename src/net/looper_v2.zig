@@ -133,10 +133,6 @@ pub const Looper = struct {
         return self.impl.performTask(task);
     }
 
-    pub fn armNotification(self: *Looper, notification: *Notification) error{LooperUnavailable}!void {
-        return self.impl.armNotification(notification);
-    }
-
     pub fn cancelNotification(self: *Looper, notification: *Notification) void {
         return self.impl.cancelNotification(notification);
     }

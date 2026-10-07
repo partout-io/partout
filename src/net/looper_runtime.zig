@@ -158,14 +158,6 @@ pub const Looper = struct {
         };
     }
 
-    pub fn armNotification(self: *Looper, notification: *Notification) error{LooperUnavailable}!void {
-        if (comptime runtime_policy.v2_only) return self.implementation.experimental.armNotification(notification);
-        return switch (self.implementation) {
-            .experimental => |*impl| impl.armNotification(notification),
-            .legacy => @panic("Notifications require looper v2"),
-        };
-    }
-
     pub fn cancelNotification(self: *Looper, notification: *Notification) void {
         if (comptime runtime_policy.v2_only) return self.implementation.experimental.cancelNotification(notification);
         return switch (self.implementation) {

@@ -29,6 +29,22 @@ pub fn Fifo(comptime Node: type) type {
             return node;
         }
 
+        /// Removes a queued node without disturbing the order of the others.
+        pub fn remove(self: *Self, node: *Node) bool {
+            var previous: ?*Node = null;
+            var current = self.head;
+            while (current) |candidate| : (current = candidate.next) {
+                if (candidate == node) {
+                    if (previous) |before| before.next = candidate.next else self.head = candidate.next;
+                    if (self.tail == candidate) self.tail = previous;
+                    candidate.next = null;
+                    return true;
+                }
+                previous = candidate;
+            }
+            return false;
+        }
+
         /// Detaches the entire chain, preserving its links for traversal.
         pub fn takeAll(self: *Self) ?*Node {
             const head = self.head;

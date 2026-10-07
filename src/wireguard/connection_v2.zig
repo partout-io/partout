@@ -123,8 +123,6 @@ const WireGuardConnection = struct {
             .port = remote.local_port,
             .notification = .{ .task = .{ .context = self, .callback = onActivation } },
         };
-        try self.looper.?.armNotification(&pending.notification);
-        errdefer self.looper.?.cancelNotification(&pending.notification);
         self.bridge.activate(remote.looper);
         pending.thread = try std.Thread.spawn(.{}, Activation.run, .{pending});
         self.activation = pending;
