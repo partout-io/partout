@@ -12,6 +12,8 @@
 //! payloads until completion. No packet data is copied.
 
 const std = @import("std");
+const is_linux = @import("builtin").os.tag == .linux;
+const UDPBatch = if (is_linux) @import("udp_batch_linux.zig").UDPBatch else void;
 
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
@@ -922,6 +924,23 @@ pub const PosixLooper = struct {
     ) ProcessOutcome {
         var watch_writes = false;
         while (self.pendingWriteRequest(side_io)) |pending_req| {
+            if (comptime is_linux) {
+                if (side_io.udp_batch) |*batch| {
+                    if (batch.write(pending_req.packets[pending_req.count..], pending_req.destination.?)) |count| {
+                        std.debug.assert(count > 0);
+                        self.lock.lock();
+                        pending_req.count += count;
+                        const complete = pending_req.count == pending_req.packets.len;
+                        if (complete) {
+                            const removed = side_io.write_queue.take();
+                            std.debug.assert(removed == pending_req);
+                        }
+                        self.lock.unlock();
+                        if (complete) pending_req.complete(self.allocator, null);
+                        continue;
+                    }
+                }
+            }
             const pending_write = pending_req.pendingWrite();
             const written = side_io.native_io.writePacket(
                 pending_write.data,
@@ -1441,6 +1460,7 @@ pub const PosixLooper = struct {
         side: io.Side,
         fd: io.FileDescriptor,
         native_io: io_posix.POSIXInterface,
+        udp_batch: ?UDPBatch = null,
 
         // User callbacks.
         on_read: ?helpers.OnRead,
@@ -1493,6 +1513,13 @@ pub const PosixLooper = struct {
                 .is_writing = false,
                 .did_cleanup = false,
             };
+            if (comptime is_linux) {
+                if (descriptor.io.isUnconnected()) {
+                    if (descriptor.localAddress()) |address| {
+                        self.udp_batch = UDPBatch.init(descriptor.fd, address.family);
+                    } else |_| {} // Scalar I/O remains available.
+                }
+            }
             return self;
         }
 
@@ -1529,6 +1556,17 @@ pub const PosixLooper = struct {
             var result = helpers.IOResult{};
             var size: usize = 0;
             const limit = @min(buffers.len, self.read_packets.len);
+            if (comptime is_linux) {
+                if (self.udp_batch) |*batch| {
+                    if (batch.read(buffers[0..limit], max_size)) |count| {
+                        for (buffers[0..count], 0..) |buffer, i| {
+                            self.read_packets[i] = buffer.data[0..buffer.size];
+                            self.read_addresses.?[i] = buffer.source.?;
+                        }
+                        return .{ .count = count };
+                    }
+                }
+            }
             // Count discarded packets against the attempt budget too, so an
             // oversized-packet flood cannot monopolize the looper.
             for (0..limit) |_| {

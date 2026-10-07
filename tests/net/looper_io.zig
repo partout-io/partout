@@ -550,8 +550,8 @@ test "v2 borrowed UDP batches retain sources and empty datagrams" {
     defer v6.destroy();
     _ = try v4.sendTo("one", try destination(socket, 4));
     _ = try v6.sendTo("", try destination(socket, 6));
-    var first: [16]u8 = undefined;
-    var second: [16]u8 = undefined;
+    var first: [65535]u8 = undefined;
+    var second: [65535]u8 = undefined;
     var buffers = [_]Looper.ReadBuffer{ .{ .data = &first }, .{ .data = &second } };
     var read = ReadProbe{ .loop = &loop, .buffers = &buffers, .pause = true };
     loop.attach(read.attach(.{ .link = socket.linkDescriptor() })) catch |err| {
@@ -770,10 +770,10 @@ test "v2 UDP packet errors complete the request without detaching other peers" {
     var rejected = CompletionProbe{ .looper = &loop };
     var accepted = CompletionProbe{ .looper = &loop };
     const oversized = [_]u8{0} ** 65535;
-    const invalid = [_][]const u8{&oversized};
+    const invalid = [_][]const u8{ "prefix", &oversized, "not sent" };
     try loop.writeQueued(&invalid, .link, remote, rejected.callback());
     try rejected.wait();
-    try std.testing.expectEqual(@as(usize, 0), rejected.result.count);
+    try std.testing.expectEqual(@as(usize, 1), rejected.result.count);
     try std.testing.expect(rejected.result.failure.? == error.DatagramDropped);
     try std.testing.expect(loop.isLinkAttached());
     try loop.writeQueued(&.{"valid"}, .link, remote, accepted.callback());
@@ -782,7 +782,36 @@ test "v2 UDP packet errors complete the request without detaching other peers" {
     try std.testing.expect(accepted.result.failure == null);
     var bytes: [64]u8 = undefined;
     var sender: io.SocketAddress = undefined;
+    const prefix_size = try peer.receiveFrom(&bytes, &sender);
+    try std.testing.expectEqualStrings("prefix", bytes[0..prefix_size]);
     const size = try peer.receiveFrom(&bytes, &sender);
     try std.testing.expectEqualStrings("valid", bytes[0..size]);
     try loop.stop();
+}
+
+test "v2 UDP writes span syscall batches without copying or merging datagrams" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    for ([_]io.SocketOptions{ .{ .ipv6 = false }, .{ .ipv4 = false }, .{} }) |options| {
+        const socket = (try io.SocketWrapper.create(allocator, null, options)).?;
+        const peer = (try io.SocketWrapper.create(allocator, null, options)).?;
+        defer peer.destroy();
+        var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
+        defer loop.deinit();
+        try loop.start();
+        var read = ReadProbe{ .loop = &loop, .buffers = &.{} };
+        try loop.attach(read.attach(.{ .link = socket.linkDescriptor() }));
+        var completion = CompletionProbe{ .looper = &loop };
+        const packets = [_][]const u8{ "one", "", "three" } ** 7;
+        const remote = try destination(peer, if (options.ipv4) 4 else 6);
+        try loop.writeQueued(&packets, .link, remote, completion.callback());
+        try completion.wait();
+        try std.testing.expect(completion.result.failure == null);
+        try std.testing.expectEqual(packets.len, completion.result.count);
+        var bytes: [16]u8 = undefined;
+        for (packets) |packet| {
+            const len = try receive(peer, &bytes);
+            try std.testing.expectEqualSlices(u8, packet, bytes[0..len]);
+        }
+        try loop.stop();
+    }
 }
