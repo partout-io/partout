@@ -9,12 +9,14 @@ const net = @import("../net/exports.zig");
 const api = core.api;
 const log = core.logging;
 
-const adapter_mod = @import("internal/adapter.zig");
+const adapter_mod = @import("internal/adapter_v2.zig");
 const impl = @import("internal/backend.zig");
 const tunnel_info = @import("internal/tunnel_info.zig");
+const passive_io = @import("internal/passive_io.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
 const TunnelRemoteInfoBuilder = tunnel_info.TunnelRemoteInfoBuilder;
+const PassiveIO = passive_io.PassiveIO;
 const ConnectionError = WireGuardAdapter.ActivationError || std.Thread.SpawnError;
 
 pub fn createConnection(
@@ -46,6 +48,8 @@ pub const ConnectionContext = struct {
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
     adapter: WireGuardAdapter,
+    // Packet I/O remains closed until the connection wires its owned descriptors.
+    io: PassiveIO,
     /// Descriptors transferred by the v2 daemon. Released on replacement or stop.
     link: ?net.LinkDescriptor = null,
     tun: ?net.TunDescriptor = null,
@@ -81,6 +85,7 @@ const WireGuardConnection = struct {
             else => return error.MissingConnectionImplementation,
         };
 
+        const complete = backend.vtable.complete_io orelse return error.MissingConnectionImplementation;
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);
 
@@ -95,6 +100,7 @@ const WireGuardConnection = struct {
         created.* = .{
             .allocator = allocator,
             .adapter = undefined,
+            .io = .{ .allocator = allocator, .complete = complete },
             .configuration = configuration,
             .events = sandbox.events,
             .serialized_executor = sandbox.serialized_executor,
@@ -107,7 +113,6 @@ const WireGuardConnection = struct {
         created.adapter = WireGuardAdapter.init(
             module_id,
             backend,
-            sandbox.controller,
             sandbox.resolver,
             sandbox.factory,
             sandbox.profile,
@@ -143,6 +148,7 @@ const WireGuardConnection = struct {
             .ptr = self,
             .vtable = &wireguard_connection_vtable,
             .owns_io = true,
+            .local_port = @intCast(self.configuration.interface.listen_port orelse 0),
         };
     }
 
@@ -157,7 +163,17 @@ const WireGuardConnection = struct {
 
         log.write(.info, "Start tunnel");
 
-        self.adapter.start(self.allocator) catch |err| {
+        var info = TunnelRemoteInfoBuilder.init(
+            self.allocator,
+            self.adapter.profile,
+            self.adapter.module_id,
+            &self.configuration,
+        ).build() catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            else => error.UnableToStart,
+        };
+        defer info.deinit(self.allocator);
+        self.adapter.start(self.allocator, self.io.transport(remote.local_port, passiveMTU(info))) catch |err| {
             switch (err) {
                 error.CannotLocateTunnelFileDescriptor => {
                     log.write(
@@ -167,13 +183,6 @@ const WireGuardConnection = struct {
                 },
                 error.DNSResolutionFailure, error.InvalidEndpoint => {
                     log.write(.fault, "DNS resolution failed");
-                },
-                error.TunNotAvailable => {
-                    log.writef(
-                        .fault,
-                        "Starting tunnel failed with setTunnelNetworkSettings returning {s}",
-                        .{@errorName(err)},
-                    );
                 },
                 error.CouldNotStartBackend => {
                     log.write(.fault, "Starting tunnel backend failed");
@@ -192,16 +201,6 @@ const WireGuardConnection = struct {
             };
         };
         errdefer self.adapter.stop(self.allocator);
-        var info = TunnelRemoteInfoBuilder.init(
-            self.allocator,
-            self.adapter.profile,
-            self.adapter.module_id,
-            &self.configuration,
-        ).build() catch |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            else => error.UnableToStart,
-        };
-        defer info.deinit(self.allocator);
         log.writef(.info, "Tunnel interface is {s}", .{
             self.adapter.interfaceName() orelse "unknown",
         });
@@ -622,12 +621,8 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         => .linkNotActive,
         error.DNSResolutionFailure,
         => .dnsFailure,
-        error.SocketConfiguration,
-        => .socketConfiguration,
         error.CannotLocateTunnelFileDescriptor,
         => .fdUnavailable,
-        error.TunNotAvailable,
-        => .tunNotAvailable,
         // error.CouldNotStartBackend,
         else => .unhandled,
     };
