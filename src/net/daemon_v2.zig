@@ -780,14 +780,15 @@ const ConnectionDaemon = struct {
         var descriptor = try self.factory.create(
             self.daemon.allocator,
             if (unconnected) null else endpoint,
-            // Requested bind port for an unconnected link; zero selects an ephemeral port.
-            0,
+            connection.local_port,
             reachability,
             conn_options.link_activity_timeout,
         );
         // Ownership transfers to the looper on attach, or to the connection on start.
         errdefer descriptor.cleanup();
         if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
+        // Passive protocols retain their bind across host socket replacement.
+        if (self.endpoint_resolver == null) self.connection.?.local_port = remote.local_port;
         log.write(.notice, "Link is active");
         log.writef(.info, "Link type is {s}", .{
             if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),

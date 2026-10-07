@@ -184,6 +184,8 @@ pub const Connection = struct {
     vtable: *const VTable,
     /// Manages daemon link/tun I/O internally.
     owns_io: bool = false,
+    /// Requested bind port for an unconnected link; zero selects an ephemeral port.
+    local_port: u16 = 0,
 
     pub const ShutdownReason = union(enum) {
         explicit_stop,
