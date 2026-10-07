@@ -786,3 +786,54 @@ test "v2 UDP packet errors complete the request without detaching other peers" {
     try std.testing.expectEqualStrings("valid", bytes[0..size]);
     try loop.stop();
 }
+
+test "v2 notifications deliver once and cancel before producer completion" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Probe = struct {
+        loop: *Looper,
+        calls: Atomic = .init(0),
+        notification: Looper.Notification = .{ .task = .{ .callback = completed } },
+
+        fn completed(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            std.debug.assert(self.loop.isOnQueue());
+            _ = self.calls.fetchAdd(1, .release);
+        }
+        fn arm(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.notification.task.context = self;
+            try self.loop.armNotification(&self.notification);
+        }
+        fn cancelReady(raw: ?*anyopaque) anyerror!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            try arm(raw);
+            self.loop.signalNotification(&self.notification);
+            self.loop.cancelNotification(&self.notification);
+        }
+        fn signal(self: *@This()) void {
+            self.loop.signalNotification(&self.notification);
+            self.loop.signalNotification(&self.notification);
+        }
+    };
+    var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
+    defer loop.deinit();
+    var probe = Probe{ .loop = &loop };
+    try loop.start();
+    try loop.perform(void, &probe, Probe.arm);
+    const worker = try std.Thread.spawn(.{}, Probe.signal, .{&probe});
+    worker.join();
+    for (0..5000) |_| {
+        if (probe.calls.load(.acquire) != 0) break;
+        _ = libc.usleep(1000);
+    }
+    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
+    try loop.perform(void, &probe, Probe.cancelReady);
+    probe.signal(); // A late producer cannot resurrect a cancelled callback.
+    try loop.performTask(.{ .callback = barrier });
+    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
+    try loop.perform(void, &probe, Probe.arm);
+    try loop.stop();
+    probe.signal();
+    try std.testing.expect(!probe.notification.armed);
+    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
+}

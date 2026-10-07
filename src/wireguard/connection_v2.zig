@@ -90,9 +90,11 @@ const WireGuardConnection = struct {
             // The daemon has already replaced LINK. Resume I/O immediately,
             // then update endpoints again after the current Go call finishes.
             self.pending_refresh = remote;
-            try self.scheduleActivation();
             self.bridge.activate(remote.looper);
             self.state = .activating;
+            // Completion may have arrived between the refresh request and
+            // attachment, while onActivation could not yet resume the session.
+            if (self.activation.?.done.load(.acquire)) onActivation(self);
             return;
         }
         try self.activate(remote, .refresh);
@@ -117,10 +119,15 @@ const WireGuardConnection = struct {
         errdefer self.allocator.free(settings);
         const pending = try self.allocator.create(Activation);
         errdefer self.allocator.destroy(pending);
-        pending.* = .{ .owner = self, .operation = operation, .settings = settings, .port = remote.local_port };
-        // Schedule before transferring ownership to the worker. On error no
-        // worker can still reference the allocations released by errdefer.
-        try self.scheduleActivation();
+        pending.* = .{
+            .owner = self,
+            .operation = operation,
+            .settings = settings,
+            .port = remote.local_port,
+            .notification = .{ .task = .{ .context = self, .callback = onActivation } },
+        };
+        try self.looper.?.armNotification(&pending.notification);
+        errdefer self.looper.?.cancelNotification(&pending.notification);
         self.bridge.activate(remote.looper);
         pending.thread = try std.Thread.spawn(.{}, Activation.run, .{pending});
         self.activation = pending;
@@ -132,12 +139,14 @@ const WireGuardConnection = struct {
         settings: [:0]const u8,
         port: u16,
         thread: std.Thread = undefined,
+        notification: net.Looper.Notification,
         done: std.atomic.Value(bool) = .init(false),
         result: impl.Error!i32 = undefined,
 
         fn run(self: *Activation) void {
             self.result = self.callBackend();
             self.done.store(true, .release);
+            self.owner.looper.?.signalNotification(&self.notification);
         }
         fn callBackend(self: *Activation) impl.Error!i32 {
             const owner = self.owner;
@@ -158,6 +167,7 @@ const WireGuardConnection = struct {
     fn joinActivation(self: *WireGuardConnection) !void {
         const pending = self.activation orelse return;
         pending.thread.join();
+        self.looper.?.cancelNotification(&pending.notification);
         defer {
             self.allocator.free(pending.settings);
             self.allocator.destroy(pending);
@@ -173,18 +183,11 @@ const WireGuardConnection = struct {
         log.writef(.debug, "Passive wg-go backend {s} completed, handle: {d}", .{ @tagName(pending.operation), handle });
     }
 
-    fn scheduleActivation(self: *WireGuardConnection) !void {
-        errdefer |err| log.writef(.err, "Unable to schedule WireGuard v2 activation timer: {s}", .{@errorName(err)});
-        try self.looper.?.scheduleReplacing(&self.timer, 1, .{ .context = self, .callback = onActivation });
-    }
     fn onActivation(raw: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw.?));
         if (self.state != .activating) return;
         const activation = self.activation orelse @panic("onActivation with null self.activation");
-        if (!activation.done.load(.acquire)) {
-            self.scheduleActivation() catch self.fail(.unhandled);
-            return;
-        }
+        std.debug.assert(activation.done.load(.acquire));
         const operation = activation.operation;
         self.joinActivation() catch {
             self.fail(.unhandled);
@@ -244,7 +247,10 @@ const WireGuardConnection = struct {
     /// the daemon cancels writes on detach before stop joins Go.
     fn prepareStop(self: *WireGuardConnection) void {
         self.pending_refresh = null;
-        if (self.looper) |looper| looper.cancelTimer(&self.timer);
+        if (self.looper) |looper| {
+            looper.cancelTimer(&self.timer);
+            if (self.activation) |activation| looper.cancelNotification(&activation.notification);
+        }
         if (self.state != .stopping and self.state != .stopped) log.write(.debug, "Close WireGuard v2 I/O admission");
         self.bridge.quiesce();
         self.state = .stopping;

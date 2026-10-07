@@ -40,6 +40,7 @@ pub const Looper = struct {
     pub const Task = helpers.Task;
     pub const TimedTask = helpers.TimedTask;
     pub const Timer = helpers.Timer;
+    pub const Notification = @import("looper_notification.zig").Notification;
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
@@ -130,6 +131,18 @@ pub const Looper = struct {
     // FIXME: ###, anyerror
     pub fn performTask(self: *Looper, task: helpers.Task) anyerror!void {
         return self.impl.performTask(task);
+    }
+
+    pub fn armNotification(self: *Looper, notification: *Notification) error{LooperUnavailable}!void {
+        return self.impl.armNotification(notification);
+    }
+
+    pub fn cancelNotification(self: *Looper, notification: *Notification) void {
+        return self.impl.cancelNotification(notification);
+    }
+
+    pub fn signalNotification(self: *Looper, notification: *Notification) void {
+        return self.impl.signalNotification(notification);
     }
 
     /// Replaces one delayed task and executes its callback on the looper.

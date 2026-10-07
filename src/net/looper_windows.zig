@@ -67,6 +67,20 @@ pub const WindowsLooper = struct {
         return self.perform(void, task.context, task.callback);
     }
 
+    const Notification = @import("looper_notification.zig").Notification;
+
+    pub fn armNotification(_: *WindowsLooper, _: *Notification) error{LooperUnavailable}!void {
+        @panic("WindowsLooper.armNotification is not implemented");
+    }
+
+    pub fn cancelNotification(_: *WindowsLooper, _: *Notification) void {
+        @panic("WindowsLooper.cancelNotification is not implemented");
+    }
+
+    pub fn signalNotification(_: *WindowsLooper, _: *Notification) void {
+        @panic("WindowsLooper.signalNotification is not implemented");
+    }
+
     pub fn scheduleReplacing(
         _: *WindowsLooper,
         _: *helpers.Timer,

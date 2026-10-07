@@ -29,6 +29,7 @@ pub const Looper = struct {
     pub const Task = helpers.Task;
     pub const TimedTask = helpers.TimedTask;
     pub const Timer = helpers.Timer;
+    pub const Notification = @import("looper_notification.zig").Notification;
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
@@ -154,6 +155,30 @@ pub const Looper = struct {
     pub fn performTask(self: *Looper, task: Task) anyerror!void {
         return switch (self.implementation) {
             inline else => |*impl| impl.performTask(task),
+        };
+    }
+
+    pub fn armNotification(self: *Looper, notification: *Notification) error{LooperUnavailable}!void {
+        if (comptime runtime_policy.v2_only) return self.implementation.experimental.armNotification(notification);
+        return switch (self.implementation) {
+            .experimental => |*impl| impl.armNotification(notification),
+            .legacy => @panic("Notifications require looper v2"),
+        };
+    }
+
+    pub fn cancelNotification(self: *Looper, notification: *Notification) void {
+        if (comptime runtime_policy.v2_only) return self.implementation.experimental.cancelNotification(notification);
+        return switch (self.implementation) {
+            .experimental => |*impl| impl.cancelNotification(notification),
+            .legacy => @panic("Notifications require looper v2"),
+        };
+    }
+
+    pub fn signalNotification(self: *Looper, notification: *Notification) void {
+        if (comptime runtime_policy.v2_only) return self.implementation.experimental.signalNotification(notification);
+        return switch (self.implementation) {
+            .experimental => |*impl| impl.signalNotification(notification),
+            .legacy => @panic("Notifications require looper v2"),
         };
     }
 

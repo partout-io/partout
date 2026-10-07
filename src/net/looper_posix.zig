@@ -70,6 +70,8 @@ pub const PosixLooper = struct {
     stop_completion: ?*helpers.Completion,
     waiter_count: usize,
 
+    notifications: ?*@import("looper_notification.zig").Notification = null,
+
     // Delayed command scheduler.
     scheduler: core.RunAfter,
     timers_head: ?*helpers.CommandNode,
@@ -299,6 +301,7 @@ pub const PosixLooper = struct {
             return false;
         }
 
+        self.handleNotifications();
         const process_outcome = self.process(fd_set);
         self.lock.lock();
         const deinitializing_after_process = self.state == .deinitializing;
@@ -472,6 +475,65 @@ pub const PosixLooper = struct {
     // FIXME: ###, anyerror
     pub fn performTask(self: *PosixLooper, task: helpers.Task) anyerror!void {
         return self.perform(void, task.context, task.callback);
+    }
+
+    const Notification = @import("looper_notification.zig").Notification;
+
+    pub fn armNotification(self: *PosixLooper, notification: *Notification) error{LooperUnavailable}!void {
+        std.debug.assert(self.isOnQueue());
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (self.state != .started) return error.LooperUnavailable;
+        std.debug.assert(!notification.armed);
+        notification.armed = true;
+        notification.ready = false;
+        notification.next = self.notifications;
+        self.notifications = notification;
+    }
+
+    pub fn cancelNotification(self: *PosixLooper, notification: *Notification) void {
+        std.debug.assert(self.isOnQueue());
+        self.lock.lock();
+        defer self.lock.unlock();
+        var entry = &self.notifications;
+        while (entry.*) |candidate| {
+            if (candidate == notification) {
+                entry.* = candidate.next;
+                notification.armed = false;
+                notification.next = null;
+                return;
+            }
+            entry = &candidate.next;
+        }
+    }
+
+    pub fn signalNotification(self: *PosixLooper, notification: *Notification) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (!notification.armed or notification.ready or self.state != .started) return;
+        notification.ready = true;
+        self.wakeLocked();
+    }
+
+    fn handleNotifications(self: *PosixLooper) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        while (self.state == .started) {
+            var entry = &self.notifications;
+            while (entry.*) |notification| {
+                if (notification.ready) {
+                    entry.* = notification.next;
+                    notification.armed = false;
+                    notification.next = null;
+                    const task = notification.task;
+                    self.lock.unlock();
+                    task.call(); // May free the notification or cancel another.
+                    self.lock.lock();
+                    break;
+                }
+                entry = &notification.next;
+            } else return;
+        }
     }
 
     /// Replaces one delayed task and executes its callback on the helpers.
@@ -1236,6 +1298,11 @@ pub const PosixLooper = struct {
     /// Destroys every mux-owned resource. Caller must hold `lock` and the loop
     /// must either be the caller or have been joined.
     fn cleanupResourcesLocked(self: *PosixLooper) void {
+        while (self.notifications) |notification| {
+            self.notifications = notification.next;
+            notification.armed = false;
+            notification.next = null;
+        }
         self.cleanupSidesLocked();
         if (self.fd_set) |*fd_set| {
             fd_set.deinit();
