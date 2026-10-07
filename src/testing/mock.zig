@@ -167,9 +167,9 @@ fn noopSocketFactoryCreate(
     _: ?*anyopaque,
     _: std.mem.Allocator,
     _: ?api.ExtendedEndpoint,
+    _: u16,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-    _: u16,
 ) net.SocketFactory.Error!Looper.LinkDescriptor {
     return error.LinkNotActive;
 }

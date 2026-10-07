@@ -426,9 +426,9 @@ fn socketFactoryCreate(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
     endpoint: ?api.ExtendedEndpoint,
+    local_port: u16,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-    local_port: u16,
 ) SocketFactory.Error!Looper.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
@@ -451,11 +451,11 @@ fn socketFactoryCreateV2(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
     endpoint: ?api.ExtendedEndpoint,
+    local_port: u16,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-    local_port: u16,
 ) SocketFactory.Error!Looper.LinkDescriptor {
-    return socketFactoryCreate(ptr, allocator, endpoint, reachability, timeout, local_port) catch |err| {
+    return socketFactoryCreate(ptr, allocator, endpoint, local_port, reachability, timeout) catch |err| {
         if (err != error.LinkNotActive or endpoint != null) return err;
         // The portable API reports native open failures as null. Retry the
         // unconnected link with IPv4, preserving port and host configuration.

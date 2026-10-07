@@ -182,6 +182,7 @@ pub const RemoteDescriptor = struct {
 pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
+    /// Manages daemon link/tun I/O internally.
     owns_io: bool = false,
     /// Requested bind port for an unconnected link; zero selects an ephemeral port.
     local_port: u16 = 0,

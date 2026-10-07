@@ -181,18 +181,15 @@ pub const SocketFactory = struct {
     ptr: ?*anyopaque = null,
     vtable: *const VTable,
 
-    /// Requested bind port when creating an unconnected UDP socket.
-    local_port: u16 = 0,
-
     pub const VTable = struct {
         current_reachability: *const fn (?*anyopaque) ?io.ReachabilityInfo,
         create: *const fn (
             ptr: ?*anyopaque,
             allocator: std.mem.Allocator,
             endpoint: ?api.ExtendedEndpoint,
+            local_port: u16,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-            local_port: u16,
         ) Error!Looper.LinkDescriptor,
     };
 
@@ -204,6 +201,7 @@ pub const SocketFactory = struct {
         self: SocketFactory,
         allocator: std.mem.Allocator,
         endpoint: ?api.ExtendedEndpoint,
+        local_port: u16,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
     ) Error!Looper.LinkDescriptor {
@@ -215,9 +213,9 @@ pub const SocketFactory = struct {
             self.ptr,
             allocator,
             endpoint,
+            local_port,
             reachability,
             native_timeout,
-            self.local_port,
         );
     }
 };

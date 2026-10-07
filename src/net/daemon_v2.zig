@@ -777,11 +777,10 @@ const ConnectionDaemon = struct {
             resolved.plainSocketType() == .udp and !conn_options.connect_udp
         else
             true;
-        var factory = self.factory;
-        factory.local_port = connection.local_port;
-        var descriptor = try factory.create(
+        var descriptor = try self.factory.create(
             self.daemon.allocator,
             if (unconnected) null else endpoint,
+            connection.local_port,
             reachability,
             conn_options.link_activity_timeout,
         );

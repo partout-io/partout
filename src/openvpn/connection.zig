@@ -339,6 +339,7 @@ const OpenVPNConnection = struct {
         const descriptor = try self.factory.create(
             self.allocator,
             endpoint,
+            0,
             reachability,
             self.connection_options.link_activity_timeout,
         );
