@@ -490,6 +490,31 @@ const ConnectionDaemon = struct {
         };
     }
 
+    // Provides a way for the connection to run code on the daemon actor
+    fn serializedExecutor(self: *ConnectionDaemon) sandbox.SerializedExecutor {
+        return .{
+            .ptr = self,
+            .run_block = onConnectionBlock,
+        };
+    }
+
+    fn onConnectionBlock(
+        ctx: *anyopaque,
+        ptr: *anyopaque,
+        block: sandbox.SerializedExecutor.Block,
+        discard: ?sandbox.SerializedExecutor.Block,
+    ) sandbox.SerializedExecutor.RunError!void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
+        // RunAfter callbacks must return without waiting for the actor. This
+        // lets cancellation drain a callback even when stop currently owns the
+        // actor, and preserves FIFO ordering with a later restart.
+        try self.actor.schedule(.{ .onConnectionBlock = .{
+            .ptr = ptr,
+            .block = block,
+            .discard = discard,
+        } });
+    }
+
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
         self.actor.schedule(.{ .onConnectionDataCount = data_count }) catch |err| {
@@ -622,6 +647,22 @@ const ConnectionDaemon = struct {
         self.daemon.finishStop();
     }
 
+    fn handleConnectionBlock(
+        self: *const ConnectionDaemon,
+        ptr: *anyopaque,
+        block: sandbox.SerializedExecutor.Block,
+        discard: ?sandbox.SerializedExecutor.Block,
+    ) void {
+        // A timer may have elapsed just before stop cancelled it. Dropping the
+        // queued task here prevents stale work from touching a stopped
+        // connection while still allowing the timer thread to drain normally.
+        if (self.daemon.state != .started) {
+            if (discard) |callback| callback(ptr);
+            return;
+        }
+        block(ptr);
+    }
+
     // Called on the actor, before accepting connection work. Publish the
     // complete state before starting callbacks on the looper.
     fn createConnection(self: *ConnectionDaemon) Error!void {
@@ -636,7 +677,7 @@ const ConnectionDaemon = struct {
             .resolver = self.resolver,
             .factory = self.factory,
             .looper = undefined,
-            .serialized_executor = undefined,
+            .serialized_executor = self.serializedExecutor(),
         });
         errdefer connection.destroy();
         const looper = try self.daemon.allocator.create(Looper);
@@ -1138,6 +1179,11 @@ const ConnectionDaemon = struct {
             value: ?[]const u8,
         },
         onConnectionDataCount: api.DataCount,
+        onConnectionBlock: struct {
+            ptr: *anyopaque,
+            block: sandbox.SerializedExecutor.Block,
+            discard: ?sandbox.SerializedExecutor.Block,
+        },
         onLooperTerminated: ?Looper.Failure,
         recoverConnection,
     };
@@ -1174,6 +1220,11 @@ const ConnectionDaemon = struct {
                 }
             },
             .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
+            .onConnectionBlock => |payload| self.handleConnectionBlock(
+                payload.ptr,
+                payload.block,
+                payload.discard,
+            ),
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnection(),
         }
