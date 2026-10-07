@@ -67,6 +67,7 @@ pub const PassiveIO = struct {
         request: usize = 0,
         packets: [*c]c.wg_read_packet = null,
         count: usize = 0,
+        needs_resume: bool = true,
         buffers: [c.WG_IO_MAX_BATCH]net.Looper.ReadBuffer = undefined,
 
         // Caller holds the bridge lock and completes the returned request
@@ -83,6 +84,9 @@ pub const PassiveIO = struct {
             const slot: *ReadSlot = @ptrCast(@alignCast(raw.?));
             slot.owner.lock.lock();
             defer slot.owner.lock.unlock();
+            // An empty acquisition makes the looper pause. Publishing buffers
+            // only needs a wake in that case, not after every completed read.
+            if (slot.count == 0) slot.needs_resume = true;
             return slot.buffers[0..slot.count];
         }
         fn release(raw: ?*anyopaque, _: []net.Looper.ReadBuffer, result: net.Looper.IOResult) void {
@@ -129,10 +133,13 @@ pub const PassiveIO = struct {
         slot.count = count;
         const looper = self.looper.?;
         const attached = if (side == .link) looper.isLinkAttached() else looper.isTunAttached();
-        if (attached and (self.state == .active or side == .tun)) looper.resumeReading(side) catch {
-            _ = slot.takeRequest();
-            return c.WG_IO_CLOSED;
-        };
+        if (slot.needs_resume and attached and (self.state == .active or side == .tun)) {
+            looper.resumeReading(side) catch {
+                _ = slot.takeRequest();
+                return c.WG_IO_CLOSED;
+            };
+            slot.needs_resume = false;
+        }
         return c.WG_IO_OK;
     }
 

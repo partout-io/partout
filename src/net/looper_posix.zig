@@ -65,6 +65,7 @@ pub const PosixLooper = struct {
 
     // Command submission and synchronous completion.
     commands: helpers.CommandQueue,
+    wake_pending: bool = false,
     completions: helpers.CompletionQueue,
     stop_completion: ?*helpers.Completion,
     waiter_count: usize,
@@ -719,6 +720,9 @@ pub const PosixLooper = struct {
 
     fn handleCommands(self: *PosixLooper, fd_set: *DescriptorSet) CommandOutcome {
         self.lock.lock();
+        // The mux has drained the wake pipe. Producers joining this batch did
+        // not need another write; later producers must wake the next wait.
+        self.wake_pending = false;
         var pending = self.commands.takeReady();
 
         var outcome = CommandOutcome{};
@@ -1185,8 +1189,9 @@ pub const PosixLooper = struct {
         self.lock.unlock();
     }
 
-    fn wakeLocked(self: *const PosixLooper) void {
-        _ = io_c.pp_mux_wake(self.mux);
+    fn wakeLocked(self: *PosixLooper) void {
+        if (self.wake_pending) return;
+        self.wake_pending = io_c.pp_mux_wake(self.mux);
     }
 
     fn isReentrantLifecycleCall(self: *PosixLooper) bool {
