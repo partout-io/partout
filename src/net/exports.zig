@@ -41,6 +41,7 @@ pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
 pub const EndpointResolver = resolver.EndpointResolver;
 pub const FileDescriptor = io.FileDescriptor;
+pub const LinkDescriptor = io.LinkDescriptor;
 pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Platform = platform.Platform;
