@@ -285,3 +285,38 @@ test "WireGuard passive terminal I/O failures report once and cancellation stays
         try std.testing.expectEqual(@as(usize, if (scenario == .cancel) 0 else 1), failure.calls);
     }
 }
+
+test "WireGuard passive destination errors retain the shared UDP transport" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
+    const socket = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
+    var address = try socket.localAddress();
+    address.address[0..4].* = .{ 127, 0, 0, 1 };
+    passive.replaceLink(socket.linkDescriptor());
+    var failure = FailureRecorder{};
+    passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
+    const transport = passive.transport(address.port, 1400);
+    var completion = Completion{};
+    const destination = c.wg_endpoint{ .family = 4, .address = address.address, .port = address.port };
+    const oversized = try allocator.alloc(u8, 65535);
+    defer allocator.free(oversized);
+    @memset(oversized, 0);
+    const packets = [_]c.wg_packet{.{ .data = oversized.ptr, .size = @intCast(oversized.len) }};
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &packets, 1, &destination, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
+    try std.testing.expectEqual(@as(usize, 0), failure.calls);
+    const valid = [_]c.wg_packet{.{ .data = "test", .size = 4 }};
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &valid, 1, &destination, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_OK, completion.status);
+    var buffer: [32]u8 = undefined;
+    var reads = [_]c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
+    for (0..3) |_| {
+        try std.testing.expectEqual(c.WG_IO_OK, transport.link.read.?(transport.context, &reads, 1, completion.token()));
+        if (completion.status != c.WG_IO_AGAIN) break;
+    }
+    try std.testing.expectEqual(c.WG_IO_OK, completion.status);
+    try std.testing.expectEqual(@as(u32, 4), reads[0].size);
+    try std.testing.expectEqual(@as(usize, 0), failure.calls);
+}

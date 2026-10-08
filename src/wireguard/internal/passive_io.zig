@@ -171,11 +171,13 @@ pub const PassiveIO = struct {
         var completed: u32 = 0;
         var status: i32 = c.WG_IO_AGAIN;
         var would_block = false;
+        var dropped = false;
         if (descriptor) |value| {
             for (packets[0..count]) |packet| {
                 const data: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
                 const size = value.io.writePacket(data, 0, destination) catch |err| {
                     would_block = err == error.WouldBlock;
+                    dropped = side == .link and err == error.DatagramDropped;
                     if (err != error.WouldBlock and err != error.Backpressure) status = c.WG_IO_INVALID;
                     break;
                 };
@@ -188,7 +190,7 @@ pub const PassiveIO = struct {
         }
         if (completed == count) status = c.WG_IO_OK;
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, true, would_block);
-        const failure = if (status == c.WG_IO_INVALID) self.closeOnFailure() else null;
+        const failure = if (status == c.WG_IO_INVALID and !dropped) self.closeOnFailure() else null;
         self.lock.unlock();
         if (failure) |reporter| reporter.report(reporter.ctx);
         self.complete(request, completed, status);
