@@ -421,6 +421,7 @@ const ConnectionDaemon = struct {
         return .{
             .ctx = self,
             .established = onConnectionEstablished,
+            .needs_rebind = onConnectionNeedsRebind,
             .failed = onConnectionFailed,
             .stopped = onConnectionStopped,
             .set_env = onConnectionSetEnvironmentValue,
@@ -449,6 +450,13 @@ const ConnectionDaemon = struct {
         } }) catch |err| {
             info.deinit(self.daemon.allocator);
             log.writef(.fault, "Unable to enqueue established connection: {s}", .{@errorName(err)});
+        };
+    }
+
+    fn onConnectionNeedsRebind(ctx: *anyopaque) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
+        self.actor.schedule(.onConnectionNeedsRebind) catch |err| {
+            log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
         };
     }
 
@@ -864,18 +872,14 @@ const ConnectionDaemon = struct {
     fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        if (self.callOnLooper(.{ .reachability = reachability }) catch return) {
-            self.refreshLink() catch |err| self.linkRefreshFailed(err);
-        }
+        _ = self.callOnLooper(.{ .reachability = reachability }) catch return;
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        if (self.callOnLooper(.better_path) catch return) {
-            self.refreshLink() catch |err| self.linkRefreshFailed(err);
-        }
+        _ = self.callOnLooper(.better_path) catch return;
     }
 
     fn handleConnectionEstablished(
@@ -938,7 +942,7 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn refreshLink(self: *ConnectionDaemon) !void {
+    fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
         if (self.daemon.state != .started or self.connection == null) return;
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.
@@ -949,7 +953,7 @@ const ConnectionDaemon = struct {
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();
-        if (!try self.callOnLooper(.{ .start = remote })) return error.UnableToStart;
+        if (!try self.callOnLooper(.{ .rebind = remote })) return error.UnableToStart;
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1131,6 +1135,7 @@ const ConnectionDaemon = struct {
         onReachability: io.ReachabilityInfo,
         onBetterPath,
         onConnectionEstablished: net.Connection.Events.Success,
+        onConnectionNeedsRebind,
         onConnectionFailed: net.Connection.Events.Failure,
         onConnectionStopped,
         onConnectionSetEnvironmentValue: struct {
@@ -1162,6 +1167,7 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
+            .onConnectionNeedsRebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
             .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
             .onConnectionStopped => self.handleConnectionStopped(),
             .onConnectionSetEnvironmentValue => |update| {
@@ -1203,9 +1209,10 @@ const ConnectionDaemon = struct {
     const CallOnLooper = struct {
         connection: Connection,
         events: Connection.Events,
-        start_entered: bool = false,
+        link_handoff_entered: bool = false,
         operation: union(enum) {
             start: RemoteDescriptor,
+            rebind: RemoteDescriptor,
             shutdown: Connection.ShutdownReason,
             stop: u32,
             reachability: io.ReachabilityInfo,
@@ -1216,13 +1223,17 @@ const ConnectionDaemon = struct {
             const request: *CallOnLooper = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
                 .start => |remote| {
-                    request.start_entered = true;
+                    request.link_handoff_entered = true;
                     return request.connection.startV2(remote);
+                },
+                .rebind => |remote| {
+                    request.link_handoff_entered = true;
+                    return request.connection.rebind(remote);
                 },
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
-                .reachability => |info| return request.connection.networkChange(info, request.events) == .refresh_link,
-                .better_path => return request.connection.betterPath(request.events) == .refresh_link,
+                .reachability => |info| request.connection.networkChange(info, request.events),
+                .better_path => request.connection.betterPath(request.events),
             }
             return true;
         }
@@ -1238,9 +1249,13 @@ const ConnectionDaemon = struct {
             .events = self.events(),
             .operation = operation,
         };
-        // An owned link transfers only when startV2 is entered, even if it fails.
-        defer if (operation == .start and request.connection.owns_io and !request.start_entered)
-            operation.start.link.cleanup();
+        // An owned link transfers only when startV2 or rebind is entered, even if it fails.
+        defer if (request.connection.owns_io and !request.link_handoff_entered) {
+            switch (operation) {
+                .start, .rebind => |remote| remote.link.cleanup(),
+                else => {},
+            }
+        };
         return self.looper.perform(bool, &request, CallOnLooper.run);
     }
 

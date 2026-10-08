@@ -528,16 +528,14 @@ fn networkChange(
     ptr: *anyopaque,
     reachability: net.ReachabilityInfo,
     events: net.Connection.Events,
-) net.Connection.NetworkAction {
+) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     self.networkChange(reachability, events);
-    return .none;
 }
 
-fn betterPath(ptr: *anyopaque, events: net.Connection.Events) net.Connection.NetworkAction {
+fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     self.betterPath(events);
-    return .none;
 }
 
 fn destroy(ptr: *anyopaque) void {
