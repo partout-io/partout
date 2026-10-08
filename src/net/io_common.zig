@@ -7,6 +7,7 @@
 //! selected by `io.zig`. This module does not import either backend.
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const io_mod = @This();
 const core = @import("../core/exports.zig");
@@ -21,6 +22,11 @@ pub const ReachabilityInfo = io_c.pp_reachability;
 pub const SocketAddress = io_c.pp_socket_address;
 pub const SocketAddressError = error{InvalidEndpoint};
 pub const SocketType = api.SocketType;
+
+pub const Side = enum {
+    link,
+    tun,
+};
 
 /// Resolved peer address and transport, copied by value across queue boundaries.
 pub const SocketEndpoint = struct {
@@ -72,9 +78,53 @@ pub const SocketEndpoint = struct {
     }
 };
 
-pub const Side = enum {
-    link,
-    tun,
+/// Shared readiness wake. Callers serialize access with their I/O lock;
+/// wait() releases that lock while blocking and reacquires it before returning.
+pub const Waiter = struct {
+    pub const Error = error{WaitFailed};
+
+    mux: io_c.pp_mux,
+    pending: usize = 0,
+    released: bool = false,
+    test_wait_once: if (builtin.is_test) ?*const fn (io_c.pp_fd, bool, io_c.pp_fd) callconv(.c) c_int else void = if (builtin.is_test) null else {},
+
+    pub fn init() ?Waiter {
+        return .{ .mux = io_c.pp_mux_create(1) orelse return null };
+    }
+
+    pub fn wake(self: *Waiter) void {
+        if (self.pending != 0) _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    pub fn deinit(self: *Waiter) void {
+        self.wake();
+        self.released = true;
+        self.freeIfReleased();
+    }
+
+    fn freeIfReleased(self: *Waiter) void {
+        if (self.released and self.pending == 0) {
+            io_c.pp_mux_free(self.mux);
+            self.* = .{ .mux = null };
+        }
+    }
+
+    /// A null descriptor waits only for wake. Returns true for I/O readiness.
+    pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: ?*core.Mutex) Waiter.Error!bool {
+        self.pending += 1;
+        defer {
+            self.pending -= 1;
+            // Every concurrent waiter must observe wake before it is reset.
+            if (self.pending == 0) _ = io_c.pp_mux_reset_wake(self.mux);
+            self.freeIfReleased();
+        }
+        if (lock) |mutex| mutex.unlock();
+        defer if (lock) |mutex| mutex.lock();
+        const wait_once = if (builtin.is_test) self.test_wait_once orelse io_c.pp_mux_wait_once else io_c.pp_mux_wait_once;
+        const result = wait_once(fd orelse io_c.pp_fd_invalid(), writing, io_c.pp_mux_wake_descriptor(self.mux));
+        if (result < 0) return error.WaitFailed;
+        return result > 0;
+    }
 };
 
 pub const Error = std.mem.Allocator.Error || error{
