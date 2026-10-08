@@ -229,7 +229,7 @@ const WireGuardConnection = struct {
         defer self.lock.unlock();
         self.io.replaceLink(remote.link);
         self.adapter.sendKeepalives();
-        return self.adapter.isStarted();
+        return !self.adapter.isStopped();
     }
 
     fn stop(

@@ -747,7 +747,14 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
     );
+    var retained_tun = OwnedDescriptor{};
+    created.commit(retained_tun.descriptor());
+    created.betterPath(recorder.events());
     created.networkChange(.{ .reachable = false }, recorder.events());
+    // The queued rebind must succeed even if an offline event overtakes it.
+    var replacement_link = OwnedDescriptor{};
+    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
     created.networkChange(.{ .reachable = true }, recorder.events());
     connection.testing.waitForTemporaryShutdownRetry(created);
 
@@ -758,11 +765,13 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
+    try std.testing.expectEqual(@as(usize, 2), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
+    try std.testing.expectEqual(@as(usize, 0), retained_tun.cleanups);
 
     created.stop(1000, recorder.events());
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 1), retained_tun.cleanups);
 }
 
 test "WireGuard connection retries passive backend failure without terminal events" {
