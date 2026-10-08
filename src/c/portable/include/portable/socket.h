@@ -29,6 +29,7 @@ void pp_socket_free(pp_socket sock);
 
 /* Create a nonblocking connected socket, or bind unconnected UDP to a numeric local endpoint
  * Unconnected IPv6 is IPv6-only unless dual_stack is enabled; configuration runs before bind.
+ * Dual-stack wildcard binds fall back to IPv4 when IPv6 is unsupported.
  * timeout_ms applies only to connected sockets. */
 typedef bool (*pp_socket_configure)(void *_Nullable ctx,
                                     pp_socket_fd fd,

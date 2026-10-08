@@ -234,6 +234,13 @@ pp_socket pp_socket_open(const char *hostname,
         goto failure;
     }
     new_fd = socket(numeric_addr.ss_family, socktype, ipproto);
+    if (local_is_invalid_fd(new_fd) && options->dual_stack &&
+        pp_socket_last_error() == LOCAL_SOCKET_ERROR(EAFNOSUPPORT) &&
+        IN6_IS_ADDR_UNSPECIFIED(&((const struct sockaddr_in6 *)&numeric_addr)->sin6_addr)) {
+        /* Keep IPv4 usable when the platform cannot create an IPv6 socket. */
+        if (!local_parse_numeric_addr("0.0.0.0", port, &numeric_addr, &numeric_addrlen)) goto failure;
+        new_fd = socket(AF_INET, socktype, ipproto);
+    }
     if (local_is_invalid_fd(new_fd)) {
         local_print_error("socket()");
         goto failure;
@@ -286,7 +293,7 @@ pp_socket pp_socket_open(const char *hostname,
     pp_socket sock = pp_socket_create(new_fd);
     if (!sock) goto failure;
     sock->unconnected = options->unconnected;
-    sock->dual_stack = options->dual_stack;
+    sock->dual_stack = options->dual_stack && numeric_addr.ss_family == AF_INET6;
     local_log_opened_socket(sock, socktype);
     return sock;
 
