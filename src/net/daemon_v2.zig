@@ -421,7 +421,7 @@ const ConnectionDaemon = struct {
         return .{
             .ctx = self,
             .established = onConnectionEstablished,
-            .refreshed = onConnectionRefreshed,
+            .needs_rebind = onConnectionNeedsRebind,
             .failed = onConnectionFailed,
             .stopped = onConnectionStopped,
             .set_env = onConnectionSetEnvironmentValue,
@@ -453,9 +453,9 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn onConnectionRefreshed(ctx: *anyopaque) void {
+    fn onConnectionNeedsRebind(ctx: *anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.onConnectionRefreshed) catch |err| {
+        self.actor.schedule(.onConnectionNeedsRebind) catch |err| {
             log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
         };
     }
@@ -942,7 +942,7 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn handleConnectionRefreshed(self: *ConnectionDaemon) !void {
+    fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
         if (self.daemon.state != .started or self.connection == null) return;
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.
@@ -1135,7 +1135,7 @@ const ConnectionDaemon = struct {
         onReachability: io.ReachabilityInfo,
         onBetterPath,
         onConnectionEstablished: net.Connection.Events.Success,
-        onConnectionRefreshed,
+        onConnectionNeedsRebind,
         onConnectionFailed: net.Connection.Events.Failure,
         onConnectionStopped,
         onConnectionSetEnvironmentValue: struct {
@@ -1167,7 +1167,7 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
-            .onConnectionRefreshed => self.handleConnectionRefreshed() catch |err| self.linkRefreshFailed(err),
+            .onConnectionNeedsRebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
             .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
             .onConnectionStopped => self.handleConnectionStopped(),
             .onConnectionSetEnvironmentValue => |update| {

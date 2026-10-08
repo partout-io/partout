@@ -217,7 +217,7 @@ pub const Connection = struct {
         established: *const fn (*anyopaque, Success) void = struct {
             fn call(_: *anyopaque, _: Success) void {}
         }.call,
-        refreshed: *const fn (*anyopaque) void = struct {
+        needs_rebind: *const fn (*anyopaque) void = struct {
             fn call(_: *anyopaque) void {}
         }.call,
         failed: *const fn (*anyopaque, Failure) void = struct {
@@ -258,7 +258,7 @@ pub const Connection = struct {
         /// Commits TUN after the established event, transferring ownership
         /// to the connection when it performs packet I/O.
         commit: *const fn (*anyopaque, io.TunDescriptor) void,
-        /// Replaces the link after a refreshed event, retaining TUN and session state.
+        /// Replaces the link after a needs_rebind event, retaining TUN and session state.
         /// When owns_io is true, takes link ownership on entry, including on failure.
         rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {

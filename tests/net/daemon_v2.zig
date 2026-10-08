@@ -689,10 +689,10 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             return true;
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.refreshed(events.ctx);
+            events.needs_rebind(events.ctx);
         }
         fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
-            events.refreshed(events.ctx);
+            events.needs_rebind(events.ctx);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -794,7 +794,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
                 const owner = sut.implementation.connection;
                 const tun = probe.established_tun.?;
                 try owner.actor.perform(void, .onBetterPath);
-                // The network handler enqueues refreshed; drain its actor hop.
+                // The network handler enqueues needs_rebind; drain its actor hop.
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
                 try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
                 try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
@@ -872,7 +872,7 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.refreshed(events.ctx);
+            events.needs_rebind(events.ctx);
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
