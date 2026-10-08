@@ -41,6 +41,7 @@ comptime {
     _ = @import("net/looper_io.zig");
     _ = @import("net/looper_helpers.zig");
     _ = @import("net/mux.zig");
+    _ = @import("net/waiter.zig");
     _ = @import("net/platform.zig");
     _ = @import("net/resolver.zig");
     if (source.openvpn_enabled) {
