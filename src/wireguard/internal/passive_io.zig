@@ -46,6 +46,15 @@ pub const PassiveIO = struct {
         self.closed = false;
     }
 
+    /// Pause link workers and release the bind before the host creates its replacement.
+    pub fn releaseLink(self: *PassiveIO) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.wake();
+        if (self.link) |*link| link.cleanup();
+        self.link = null;
+    }
+
     pub fn replaceTun(self: *PassiveIO, descriptor: net.TunDescriptor) void {
         self.lock.lock();
         defer self.lock.unlock();

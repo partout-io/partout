@@ -256,14 +256,20 @@ const WireGuardConnection = struct {
                 self.scheduleTemporaryShutdownRetry(events);
             },
         }
-        return if (self.adapter.isStarted()) .refresh_link else .none;
+        return self.prepareLinkRefresh();
     }
 
     fn betterPath(
         self: *WireGuardConnection,
         _: net.Connection.Events,
     ) net.Connection.NetworkAction {
-        return if (self.adapter.isStarted()) .refresh_link else .none;
+        return self.prepareLinkRefresh();
+    }
+
+    fn prepareLinkRefresh(self: *WireGuardConnection) net.Connection.NetworkAction {
+        if (!self.adapter.isStarted()) return .none;
+        self.io.releaseLink();
+        return .refresh_link;
     }
 
     fn reportDataCount(
