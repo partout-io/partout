@@ -61,6 +61,27 @@ pub const TunnelRemoteInfoBuilder = struct {
         };
     }
 
+    pub fn effectiveMTU(info: api.TunnelRemoteInfoWrapper) u32 {
+        // Match host settings: active profile modules in order, with generated
+        // modules inserted immediately after the originating WireGuard module.
+        var mtu: u32 = 1420;
+        for (info.profile.modules) |module| {
+            const id = api.moduleId(&module);
+            if (!api.isActiveProfileModule(&info.profile, id)) continue;
+            mtu = moduleMTU(module) orelse mtu;
+            if (std.mem.eql(u8, &id, &info.original_module_id)) {
+                for (info.modules orelse &.{}) |remote| mtu = moduleMTU(remote) orelse mtu;
+            }
+        }
+        return mtu;
+    }
+
+    fn moduleMTU(module: api.TaggedModule) ?u32 {
+        if (module != .IP) return null;
+        const mtu = module.IP.mtu orelse return null;
+        return if (mtu > 0) @intCast(mtu) else null;
+    }
+
     fn buildDNSModule(self: Self, source: *const api.DNSModule) Error!api.DNSModule {
         // Unlike the synthesized IP module below, this DNS module already
         // belongs to the WireGuard configuration. Preserve its identity just

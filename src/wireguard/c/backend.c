@@ -90,6 +90,10 @@ int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
     return wgSetEndpointsWithPassiveIO(handle, settings);
 }
 
+void pp_wg_send_keepalives_passive(int32_t handle) {
+    wgSendKeepalivesWithPassiveIO(handle);
+}
+
 void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {
     wgDisableRoamingWithPassiveIO(handle);
 }
@@ -180,6 +184,10 @@ char *pp_wg_get_config_passive(int32_t handle) {
 int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
     (void)handle; (void)settings;
     return -1;
+}
+
+void pp_wg_send_keepalives_passive(int32_t handle) {
+    (void)handle;
 }
 
 void pp_wg_tweak_mobile_roaming_passive(int32_t handle) {

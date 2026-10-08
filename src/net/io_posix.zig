@@ -95,6 +95,16 @@ pub const POSIXInterface = union(enum) {
         };
     }
 
+    /// Resolve the wrapper's fd before releasing the caller's optional I/O lock.
+    /// The lock is reacquired before returning; no wrapper access occurs while waiting.
+    pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: ?*core.Mutex) Error!bool {
+        const fd = switch (self) {
+            .mock => -1,
+            inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
+        };
+        return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
+    }
+
     pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
         return switch (self) {
             .mock => |mock| if (builtin.is_test) mock.vtable.set_event_mask(mock.ptr, readable, writable) else unreachable,
@@ -307,6 +317,11 @@ pub const SocketWrapper = struct {
     pub fn remoteAddress(self: *const SocketWrapper) ?io.SocketAddress {
         const endpoint = self.remote_endpoint orelse return null;
         return endpoint.address;
+    }
+
+    pub fn muxDescriptor(self: SocketWrapper) ?io_c.pp_fd {
+        const fd = io_c.pp_socket_get_watch_fd(self.socket);
+        return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
 
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {

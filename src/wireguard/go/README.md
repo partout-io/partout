@@ -53,36 +53,32 @@ Partout v2 uses the borrowed-buffer callbacks required `read` and `write` in bot
 `wg_passive_link` and `wg_passive_tun`. A read callback supplies writable
 `wg_read_packet` descriptors pointing directly into WireGuard's Go buffers.
 A write callback supplies `wg_packet` descriptors pointing into its output
-buffers. The host retains these descriptors and payloads until completion;
-Go pins their storage and waits before returning from Bind/TUN Read/Write.
+buffers. Go pins their storage and waits before returning from Bind/TUN Read/Write.
 There are no intermediate payload copies or receive queues on this path.
-The bridge still allocates request metadata and synchronizes worker handoffs.
 
-Submission callbacks return promptly and never wait for the looper. Returning
-`WG_IO_OK` accepts the request and obliges the host to call
-`wgCompleteIO(request, count, status)` exactly once, including on cancellation.
-Completion may run before submission returns. A rejected submission must never
-complete. `count` is the completed prefix; only those read descriptors have
-valid `size` and, for UDP, `source` fields. All pointers become invalid at
-completion. An empty readiness read retains the request for the next attempt.
+Returning `WG_IO_OK` accepts the request and requires exactly one
+`wgCompleteIO(request, count, status)`. Completion may run inline before the
+callback returns. A rejected submission must never complete. `count` is the
+completed prefix; only those read descriptors have valid `size` and, for UDP,
+`source` fields. All borrowed pointers become invalid at completion.
 
-`connection_v2.zig` owns the Go handle, activation worker, and lifecycle state
-on the daemon's looper. `internal/passive_io.zig` only manages borrowed requests;
-its mutex serializes Go submission callbacks with looper admission changes.
-The daemon owns all native transport.
+Partout's `internal/passive_io.zig` calls the owned descriptor interfaces directly
+on Go workers and completes each attempt inline. Its mutex serializes native
+calls with descriptor replacement and cleanup. Nonblocking reads with no data,
+TUN calls before `commit()`, and write backpressure complete with `WG_IO_AGAIN`.
+On POSIX, `POSIXInterface.waitForReadiness()` uses `net.Waiter` and the shared
+mux poll helper on `WouldBlock`, releasing the bridge mutex while waiting. Link/TUN
+workers share a mux wake and wait without a poll timeout. Commit, descriptor
+replacement and adapter shutdown wake pending waits; before TUN commit, only wake
+is watched. Backpressure keeps its bounded retry delay. Go uses no retry timer. Read retries cancel on Bind/TUN close; backend shutdown cancels write retries. Writes retry only the uncompleted suffix. The callback ABI
+also continues to support asynchronous hosts that retain requests until completion.
 
-Startup and endpoint refresh run on a worker while the looper services borrowed
-writes: persistent keepalive and UAPI updates can send synchronously. An
-activation timer waits for that worker before publishing connection success;
-the statistics timer runs only while active. On shutdown:
-
-1. Reject new requests and complete outstanding reads with `WG_IO_CLOSED`.
-2. Detach native I/O, completing/cancelling all accepted writes.
-3. Join any activation worker, then call `wgTurnOffWithPassiveIO` to join Go workers, then release the context.
-
-Do not join Go on the looper while its workers are waiting for looper I/O.
-Configuration and bind failures publish no borrowed requests. A failure after startup uses
-the same quiesce/detach/join sequence. Handles are never reused, so stale lifecycle calls cannot affect a replacement
+Startup writes can run synchronously while `wgTurnOnWithPassiveIO` executes;
+readers wait for successful startup before entering the callbacks. Shutdown
+rejects new native requests, calls `wgTurnOffWithPassiveIO` to cancel retries and
+join Go workers, then releases the descriptors and bridge context. Each native
+call is nonblocking, and no packet request depends on a looper or native worker.
+Handles are never reused, so stale lifecycle calls cannot affect a replacement
 device.
 
 The passive API has a separate handle registry from the native v1 API. Use
@@ -94,17 +90,11 @@ only logging and the underlying WireGuard dependency are shared.
 
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain
-native Go I/O. V2 connections never own transport: the connection requests an
-unconnected UDP link, and the daemon creates/configures the socket, applies
-reported tunnel settings, and attaches both descriptors to its looper. It also
-owns detachment and native resource cleanup.
-
-The daemon attaches the bridge's read-buffer providers. Go workers publish
-buffer batches; looper reads fill them and release callbacks complete the Go
-requests. With no available Go buffers, reads pause until the next batch is
-published. Outgoing batches use the runtime's completion-based `writeBorrowed`
-API. Shutdown quiesces submissions, detaches I/O, then joins Go. Windows selects the same v2
-implementation; unfinished native I/O panics when invoked. The runtime log identifies this
+native Go I/O. V2 connections own transport (`owns_io = true`). The daemon
+creates/configures the UDP socket and transfers it through `startV2()`. After
+`.established`, it applies tunnel settings and transfers the TUN through
+`commit()`. The bridge owns replacement and native resource cleanup. Windows
+native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
 Validation:
@@ -125,17 +115,3 @@ cc -Isrc/wireguard/go/include src/wireguard/go/tests/passive_abi.c \
   -framework CoreFoundation -framework Security -o /tmp/passive-abi
 /tmp/passive-abi
 ```
-
-The connection transitions from stopped to activating to active. A network
-path change requests replacement of only the daemon-owned UDP link. TUN,
-tunnel settings and the connected status remain in place, so a path notification
-caused by applying settings cannot trigger a settings/reconnect loop. Link reads
-remain parked across detachment; link writes are rejected until reattachment,
-while TUN I/O remains active. The replacement socket keeps the selected local
-port. Only peer endpoints are updated (including fresh DNS64 resolution), on
-the activation worker because UAPI can flush staged sends. Peer sessions and
-counters survive; refresh transitions through activating to active without
-publishing another established event. Activation, link replacement or I/O
-failure, explicit stop, and terminal looper failure transition through stopping
-to stopped, cancelling requests and closing Go. A failed refresh uses the normal
-daemon reconnect path, so the next attempt starts a fresh device.

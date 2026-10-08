@@ -8,7 +8,7 @@
 //!
 //! SettingsDaemon is synchronous; callers serialize its controls. ConnectionDaemon
 //! owns an actor that serializes connection work and updates to shared state.
-//! Connection and I/O callbacks run on the looper and enqueue actor messages.
+//! Connection callbacks enqueue actor messages from runtime and worker threads.
 //! Ordinary reconnects retain Connection; terminal looper recovery replaces it.
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
 
@@ -335,6 +335,7 @@ const ConnectionDaemon = struct {
     // Internal state
     actor: *Actor,
     connection: ?Connection,
+    rebind_pending: std.atomic.Value(bool),
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
@@ -365,6 +366,7 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
+            .rebind_pending = .init(false),
             .endpoint_resolver = null,
             .looper = undefined,
             .gate = ConnectionGate.init(null),
@@ -413,7 +415,7 @@ const ConnectionDaemon = struct {
     //#region Any thread - asynchronous events
 
     // Network and protocol producers may hold locks needed by actor work. These
-    // callbacks enqueue messages without waiting or changing daemon state; borrowed
+    // callbacks enqueue messages without waiting or changing lifecycle state; borrowed
     // establishment data is cloned. V2 protocol events normally arrive on the looper.
 
     // This is where connection events are rerouted through the actor
@@ -455,7 +457,9 @@ const ConnectionDaemon = struct {
 
     fn onConnectionNeedsRebind(ctx: *anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
+        if (self.rebind_pending.swap(true, .acq_rel)) return;
         self.actor.schedule(.onConnectionNeedsRebind) catch |err| {
+            self.rebind_pending.store(false, .release);
             log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
         };
     }
@@ -644,7 +648,6 @@ const ConnectionDaemon = struct {
             .resolver = self.resolver,
             .factory = self.factory,
             .looper = undefined,
-            .serialized_executor = undefined,
         });
         errdefer connection.destroy();
         const looper = try self.daemon.allocator.create(Looper);
@@ -943,6 +946,7 @@ const ConnectionDaemon = struct {
     }
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
+        defer self.rebind_pending.store(false, .release);
         if (self.daemon.state != .started or self.connection == null) return;
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.

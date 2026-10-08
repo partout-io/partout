@@ -215,7 +215,7 @@ pub const WireGuardAdapter = struct {
     ) StartBackendError!i32 {
         log.write(.debug, "Start wg-go backend");
         const handle = self.backend.turnOn(allocator, wg_config, .{
-            .tun = self.tunnel,
+            .tun = self.tunnel orelse return error.CannotLocateTunnelFileDescriptor,
             .ifname = self.module_id[0..],
         }) catch |err| {
             log.writef(.err, "Starting tunnel failed: {s}", .{@errorName(err)});

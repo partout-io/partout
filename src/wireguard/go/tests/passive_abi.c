@@ -178,7 +178,89 @@ static void test_keepalive_startup(int cancel) {
     pthread_mutex_destroy(&p.io.mutex);
 }
 
+/* Direct nonblocking callbacks run on Go workers, complete inline, and never
+ * retain borrowed storage. AGAIN is retried by Go, including before TUN commit. */
+typedef struct direct_probe {
+    pthread_mutex_t mutex;
+    unsigned link_reads, tun_reads, writes, packets;
+    int committed;
+} direct_probe;
+static int32_t direct_link_read(void *raw, wg_read_packet *packets, uint32_t count, uintptr_t request) {
+    direct_probe *p = raw;
+    assert(packets && count && request);
+    pthread_mutex_lock(&p->mutex);
+    ++p->link_reads;
+    pthread_mutex_unlock(&p->mutex);
+    usleep(100000); /* Emulate the native host readiness wait. */
+    wgCompleteIO(request, 0, WG_IO_AGAIN);
+    return WG_IO_OK;
+}
+static int32_t direct_tun_read(void *raw, wg_read_packet *packets, uint32_t count, uintptr_t request) {
+    direct_probe *p = raw;
+    assert(packets && count && request);
+    pthread_mutex_lock(&p->mutex);
+    ++p->tun_reads;
+    int available = p->committed && !p->packets;
+    if (available) {
+        assert(packets[0].capacity >= 20);
+        memset(packets[0].data, 0, 20);
+        packets[0].data[0] = 0x45; packets[0].data[3] = 20;
+        packets[0].data[12] = packets[0].data[16] = 10;
+        packets[0].data[15] = 1; packets[0].data[19] = 2;
+        packets[0].size = 20;
+        ++p->packets;
+    }
+    pthread_mutex_unlock(&p->mutex);
+    if (!available) usleep(100000);
+    wgCompleteIO(request, available ? 1 : 0, available ? WG_IO_OK : WG_IO_AGAIN);
+    return WG_IO_OK;
+}
+static int32_t direct_link_write(void *raw, const wg_packet *packets, uint32_t count,
+    const wg_endpoint *destination, uintptr_t request) {
+    direct_probe *p = raw;
+    assert(packets && count && request && destination && destination->family == 4);
+    pthread_mutex_lock(&p->mutex);
+    int blocked = ++p->writes == 1;
+    pthread_mutex_unlock(&p->mutex);
+    wgCompleteIO(request, blocked ? 0 : count, blocked ? WG_IO_AGAIN : WG_IO_OK);
+    return WG_IO_OK;
+}
+static void test_direct_io(void) {
+    direct_probe p = {.mutex = PTHREAD_MUTEX_INITIALIZER};
+    wg_passive_link link = {.local_port = 51820, .read = direct_link_read, .write = direct_link_write};
+    wg_passive_tun tun = {.mtu = 1400, .read = direct_tun_read, .write = borrow_write_tun};
+    int32_t handle = wgTurnOnWithPassiveIO(
+        "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
+        "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
+        "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.0/24\npersistent_keepalive_interval=25\n",
+        &link, &tun, &p);
+    assert(handle >= 0);
+    int ready = 0;
+    for (int i = 0; i < 3000 && !ready; ++i) {
+        pthread_mutex_lock(&p.mutex);
+        ready = p.link_reads >= 2 && p.tun_reads >= 2 && p.writes >= 2;
+        pthread_mutex_unlock(&p.mutex);
+        if (!ready) usleep(1000);
+    }
+    assert(ready);
+    pthread_mutex_lock(&p.mutex);
+    p.committed = 1;
+    pthread_mutex_unlock(&p.mutex);
+    int received = 0;
+    for (int i = 0; i < 3000 && !received; ++i) {
+        pthread_mutex_lock(&p.mutex);
+        received = p.packets == 1;
+        pthread_mutex_unlock(&p.mutex);
+        if (!received) usleep(1000);
+    }
+    assert(received);
+    /* No native admission queue to drain: shutdown cancels retries after the native wait. */
+    wgTurnOffWithPassiveIO(handle);
+    pthread_mutex_destroy(&p.mutex);
+}
+
 int main(void) {
+    test_direct_io();
     test_borrowed_io();
     test_keepalive_startup(0);
     test_keepalive_startup(1);

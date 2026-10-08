@@ -337,6 +337,7 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 				addresses = [2]netip.AddrPort{netip.MustParseAddrPort("[2001:db8::1]:10001"), netip.MustParseAddrPort("[2001:db8::2]:10002")}
 			}
 			inputs := [2]testInput{make(testInput, 256), make(testInput, 256)}
+			keepalives := [2]chan struct{}{make(chan struct{}, 16), make(chan struct{}, 16)}
 			var binds [2]*passiveBind
 			for i := range binds {
 				i := i
@@ -345,6 +346,9 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 						return fmt.Errorf("wrong destination: %v", dst)
 					}
 					for _, packet := range packets {
+						if len(packet) == device.MessageTransportSize {
+							keepalives[i] <- struct{}{}
+						}
 						inputs[1-i] <- testPacket{append([]byte(nil), packet...), addresses[i]}
 					}
 					return nil
@@ -368,16 +372,16 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 				})
 			}
 			var devices [2]*device.Device
+			var handles [2]int32
 			for i := range devices {
-				devices[i] = device.NewDevice(tuns[i], binds[i], device.NewLogger(device.LogLevelSilent, ""))
-				defer devices[i].Close()
 				config := fmt.Sprintf("private_key=%x\npublic_key=%x\nendpoint=%s\nallowed_ip=10.0.0.%d/32\n", keys[i], public[1-i], addresses[1-i], 2-i)
-				if err := devices[i].IpcSet(config); err != nil {
-					t.Fatal(err)
+				handles[i] = turnOnPassiveDevice(config, binds[i], tuns[i])
+				if handles[i] < 0 {
+					t.Fatal("passive startup failed")
 				}
-				if err := devices[i].Up(); err != nil {
-					t.Fatal(err)
-				}
+				defer wgTurnOffWithPassiveIO(handles[i])
+				backend, _ := lookupPassiveBackend(handles[i])
+				devices[i] = backend.Device
 			}
 			for i := range devices {
 				packet := tuntest.Ping(netip.MustParseAddr(fmt.Sprintf("10.0.0.%d", 2-i)), netip.MustParseAddr(fmt.Sprintf("10.0.0.%d", i+1)))
@@ -389,6 +393,22 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 					}
 				case <-time.After(5 * time.Second):
 					t.Fatal("handshake/data timeout")
+				}
+			}
+			for i := range devices {
+				// Both peers now have a current keypair. Discard handshake keepalives.
+				for len(keepalives[i]) > 0 {
+					<-keepalives[i]
+				}
+				session := binds[i].session
+				wgSendKeepalivesWithPassiveIO(handles[i])
+				select {
+				case <-keepalives[i]:
+				case <-time.After(5 * time.Second):
+					t.Fatal("post-rebind keepalive timeout")
+				}
+				if binds[i].session != session {
+					t.Fatal("keepalive reopened Bind")
 				}
 			}
 		})

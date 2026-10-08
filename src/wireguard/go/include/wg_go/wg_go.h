@@ -48,6 +48,8 @@ extern void wgTurnOffWithPassiveIO(int32_t handle);
 extern char *wgGetConfigWithPassiveIO(int32_t handle);
 /* Endpoint-only UAPI update. Run off the I/O queue; retains peers and sessions. */
 extern int64_t wgSetEndpointsWithPassiveIO(int32_t handle, const char *settings);
+/* Send keepalives through the replacement host link; retains Bind and sessions. */
+extern void wgSendKeepalivesWithPassiveIO(int32_t handle);
 extern void wgDisableRoamingWithPassiveIO(int32_t handle);
 
 /* Completes one accepted borrowed I/O request; not a device handle. */

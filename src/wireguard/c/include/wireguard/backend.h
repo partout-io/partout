@@ -35,6 +35,7 @@ int32_t pp_wg_turn_on_passive(const char *, const wg_passive_link *, const wg_pa
 void pp_wg_turn_off_passive(int32_t);
 char *pp_wg_get_config_passive(int32_t);
 int64_t pp_wg_set_endpoints_passive(int32_t, const char *);
+void pp_wg_send_keepalives_passive(int32_t);
 void pp_wg_tweak_mobile_roaming_passive(int32_t);
 
 void pp_wg_complete_io(uintptr_t, uint32_t, int32_t);

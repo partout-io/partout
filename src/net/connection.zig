@@ -279,7 +279,11 @@ pub const Connection = struct {
         }.call,
 
         /// Deprecated.
-        start: *const fn (*anyopaque, Events) StartError!bool,
+        start: *const fn (*anyopaque, Events) StartError!bool = struct {
+            fn call(_: *anyopaque, _: Events) StartError!bool {
+                return error.UnableToStart;
+            }
+        }.call,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization

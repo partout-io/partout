@@ -79,6 +79,10 @@ test "TUN looper descriptor is made nonblocking by the wrapper" {
     // Borrow the pipe solely to exercise descriptor preparation, without a native TUN.
     tun.test_descriptor = .{ .fd = fds[0], .io = tun.nativeIO() };
     const descriptor = try tun.tunDescriptor();
+    var waiter = @import("source").net.Waiter.init() orelse return error.TestUnexpectedResult;
+    defer waiter.deinit();
+    try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "!", 1));
+    try std.testing.expect(try descriptor.io.waitForReadiness(false, &waiter, null));
     tun.test_descriptor = null;
     try std.testing.expectEqual(fds[0], descriptor.fd);
     try std.testing.expect(descriptor.io.tun == tun);
@@ -170,4 +174,37 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     try std.testing.expectEqual(@as(usize, 1), probe.closed);
     try loop.stop();
     try std.testing.expectEqual(@as(usize, 1), probe.closed);
+}
+
+test "POSIX readiness wait releases the ownership lock while waiting for UDP" {
+    if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
+    const core = @import("source").core;
+    const local = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
+    defer local.destroy();
+    const peer = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
+    defer peer.destroy();
+    var destination = try local.localAddress();
+    destination.address[0..4].* = .{ 127, 0, 0, 1 };
+    const native = local.linkDescriptor().io;
+    var waiter = @import("source").net.Waiter.init() orelse return error.TestUnexpectedResult;
+    defer waiter.deinit();
+    try std.testing.expect(try native.waitForReadiness(true, &waiter, null));
+    var mutex: core.Mutex = .{};
+    const Sender = struct {
+        fn send(lock: *core.Mutex, socket: *io.SocketWrapper, address: io.SocketAddress) void {
+            lock.lock();
+            defer lock.unlock();
+            _ = socket.sendTo("udp", address) catch unreachable;
+        }
+    };
+    mutex.lock();
+    const thread = try std.Thread.spawn(.{}, Sender.send, .{ &mutex, peer, destination });
+    const ready = native.waitForReadiness(false, &waiter, &mutex);
+    mutex.unlock();
+    thread.join();
+    try std.testing.expect(try ready);
+    var packet: [16]u8 = undefined;
+    var address: io.SocketAddress = undefined;
+    try std.testing.expectEqual(@as(usize, 3), try native.readPacket(&packet, &address));
+    try std.testing.expectEqualStrings("udp", packet[0..3]);
 }

@@ -6,7 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const wireguard_internal = @import("source").wireguard_internal;
-const adapter = wireguard_internal.adapter;
+const adapter = wireguard_internal.adapter_v2;
 const backend_mod = wireguard_internal.backend;
 const connection = @import("source").wireguard_connection_v2;
 const conn = @import("source").net_connection;
@@ -92,6 +92,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
     // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     try std.testing.expectEqual(configuration.?.interface.dns.?.id, dns.id);
     try std.testing.expectEqual(@as(?i32, 1420), ip.mtu);
+    try std.testing.expectEqual(@as(u32, 1420), tunnel_info.TunnelRemoteInfoBuilder.effectiveMTU(info));
     try std.testing.expectEqualStrings("1.1.1.1", dns.servers[0].raw);
 
     const ipv4 = ip.ipv4 orelse return error.TestUnexpectedResult;
@@ -195,21 +196,18 @@ test "WireGuard connection erases backend activation errors at the generic bound
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.UnableToStart, created.start(recorder.events()));
+    try std.testing.expectError(error.UnableToStart, startConnection(created, &environment.looper));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
@@ -233,23 +231,21 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.OutOfMemory, created.start(recorder.events()));
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
+    try std.testing.expectError(error.OutOfMemory, startConnection(created, &environment.looper));
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
-test "WireGuard connection starts and stops through backend and controller" {
+test "WireGuard v2 takes ownership of link and TUN descriptors" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
@@ -270,31 +266,163 @@ test "WireGuard connection starts and stops through backend and controller" {
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .min_data_count_interval = 2345 },
+    });
+    var destroyed = false;
+    defer if (!destroyed) created.destroy();
+    try std.testing.expect(created.owns_io);
+
+    var first_link = OwnedDescriptor{};
+    var first_tun = OwnedDescriptor{};
+    var second_link = OwnedDescriptor{};
+    var second_tun = OwnedDescriptor{};
+    try std.testing.expect(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    created.commit(first_tun.descriptor());
+    try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
+
+    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    created.commit(second_tun.descriptor());
+    try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
+
+    // Unexpected EOF from an owned descriptor reaches daemon recovery once.
+    const transport = fake_backend.transport.?;
+    const wg_c = wireguard_internal.passive_io.testing.abi;
+    var buffer: [32]u8 = undefined;
+    var packets = [_]wg_c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
+    const worker = try std.Thread.spawn(.{}, struct {
+        fn run(tunnel: backend_mod.StartTunnelPassive, batch: [*c]wg_c.wg_read_packet) void {
+            std.testing.expectEqual(wg_c.WG_IO_OK, tunnel.tun.read.?(tunnel.context, batch, 1, 1)) catch unreachable;
+        }
+    }.run, .{ transport, &packets });
+    worker.join();
+    try std.testing.expectEqual(wg_c.WG_IO_CLOSED, transport.tun.read.?(transport.context, &packets, 1, 1));
+    // Worker delivery is immediate; the daemon sink is responsible for queuing recovery.
+    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
+    try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);
+
+    created.stop(0, recorder.events());
+    created.stop(0, recorder.events());
+    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
+
+    var final_link = OwnedDescriptor{};
+    var final_tun = OwnedDescriptor{};
+    try std.testing.expect(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
+    created.commit(final_tun.descriptor());
+    created.destroy();
+    destroyed = true;
+    try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), final_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+}
+
+const OwnedDescriptor = struct {
+    cleanups: usize = 0,
+
+    fn descriptor(self: *@This()) io.LinkDescriptor {
+        return .{ .fd = -1, .io = .{ .mock = .{ .ptr = self, .vtable = &vtable } } };
+    }
+    fn cleanup(raw: *anyopaque) void {
+        const self: *@This() = @ptrCast(@alignCast(raw));
+        self.cleanups += 1;
+    }
+    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+    fn reset(_: *anyopaque) io.Error!void {}
+    fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+        return null;
+    }
+    fn write(_: *anyopaque, bytes: []const u8, offset: usize) io.Error!usize {
+        return bytes.len - offset;
+    }
+    fn lastError(_: *anyopaque) c_int {
+        return 0;
+    }
+    const vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+        .set_event_mask = mask,
+        .reset_events = reset,
+        .read = read,
+        .write = write,
+        .cleanup = cleanup,
+        .last_error_code = lastError,
+    };
+};
+
+test "WireGuard connection drains its running data timer before stopping" {
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    var context = ConnectionContext.init(fake_backend.backend());
+    var controller = FakeController{};
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: mock.MockConnectionEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    const created = try connection.createConnection(&context, allocator, module, .{
+        .profile = &tagged,
+        .events = recorder.events(),
+        .controller = controller.controller(),
+        .resolver = mock.noopDNSResolver(),
+        .factory = mock.noopSocketFactory(),
+        .looper = &environment.looper,
+        .options = .{ .min_data_count_interval = 1 },
     });
     defer created.destroy();
 
-    try std.testing.expectEqual(@as(u32, 2345), connection.testing.dataCountIntervalMs(created));
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expectEqual(@as(u32, 1), connection.testing.dataCountIntervalMs(created));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     waitUntil(&recorder.has_data_count);
-    created.stop(1000, recorder.events());
+    fake_backend.block_get_config.store(true, .release);
+    defer fake_backend.release_get_config.store(true, .release);
+    waitUntil(&fake_backend.get_config_entered);
+    const Stop = struct {
+        fn run(value: conn.Connection, events: conn.Connection.Events, entered: *AtomicBool, finished: *AtomicBool) void {
+            entered.store(true, .release);
+            value.stop(1000, events);
+            finished.store(true, .release);
+        }
+    };
+    var stop_entered = AtomicBool.init(false);
+    var stop_finished = AtomicBool.init(false);
+    const worker = try std.Thread.spawn(.{}, Stop.run, .{ created, recorder.events(), &stop_entered, &stop_finished });
+    defer worker.join();
+    waitUntil(&stop_entered);
+    const stopped_while_reading = stop_finished.load(.acquire);
+    fake_backend.release_get_config.store(true, .release);
+    waitUntil(&stop_finished);
+    try std.testing.expect(!stopped_while_reading);
 
-    try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
-    try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .disconnecting,
-        .disconnected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(u64, 10), recorder.data_count.received);
     try std.testing.expectEqual(@as(u64, 20), recorder.data_count.sent);
 }
@@ -326,16 +454,16 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .dns_timeout = 1234 },
     });
     defer created.destroy();
 
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -505,28 +633,36 @@ test "WireGuard connection handles network monitor events" {
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     created.betterPath(recorder.events());
+    try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.set_config_count);
+    const roaming_workarounds_before = fake_backend.disable_roaming_count;
 
     created.networkChange(.{ .reachable = true }, recorder.events());
 
+    try std.testing.expectEqual(@as(usize, 2), recorder.rebind_count);
+    try std.testing.expectEqual(@as(usize, if (builtin.os.tag == .macos) 0 else 1), fake_backend.set_config_count);
     if (builtin.os.tag == .macos) {
-        try std.testing.expectEqual(@as(usize, 1), fake_backend.bump_sockets_count);
-        try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
+        try std.testing.expect(fake_backend.last_set_config == null);
     } else {
-        try std.testing.expectEqual(@as(usize, 1), fake_backend.set_config_count);
         try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_set_config.?, "endpoint=127.0.0.1:51820\n") != null);
     }
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+    try std.testing.expectEqual(
+        roaming_workarounds_before + @as(usize, if (builtin.os.tag == .macos) 0 else 1),
+        fake_backend.disable_roaming_count,
+    );
 
     created.networkChange(.{ .reachable = false }, recorder.events());
     created.betterPath(recorder.events());
@@ -535,13 +671,22 @@ test "WireGuard connection handles network monitor events" {
         // Swift deliberately leaves wg-go alive on macOS regardless of the
         // reachability boolean and treats each event as a socket/path refresh.
         try std.testing.expectEqual(@as(usize, 0), fake_backend.turn_off_count);
-        try std.testing.expectEqual(@as(usize, 2), fake_backend.bump_sockets_count);
+        try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
 
         created.networkChange(.{ .reachable = true }, recorder.events());
-        try std.testing.expectEqual(@as(usize, 3), fake_backend.bump_sockets_count);
+        try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-        try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
+        try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+
+        try std.testing.expectEqual(@as(usize, 5), recorder.rebind_count);
+        try std.testing.expectEqual(@as(usize, 0), fake_backend.set_config_count);
+        try std.testing.expectEqual(@as(usize, 0), fake_backend.disable_roaming_count);
+        // The alternate policy still reapplies the workaround after live updates.
+        adapter.testing.setNetworkChangeBehavior(connection.testing.adapter(created), .suspend_backend_when_offline);
+        created.networkChange(.{ .reachable = true }, recorder.events());
+        try std.testing.expectEqual(@as(usize, 1), fake_backend.set_config_count);
+        try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 
         created.stop(1000, recorder.events());
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
@@ -551,11 +696,15 @@ test "WireGuard connection handles network monitor events" {
 
         created.networkChange(.{ .reachable = true }, recorder.events());
         try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-        try std.testing.expectEqual(@as(usize, 2), controller.set_tunnel_settings_count);
+        try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
 
         created.stop(1000, recorder.events());
         try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
     }
+    const rebinds_before = recorder.rebind_count;
+    created.networkChange(.{ .reachable = true }, recorder.events());
+    created.betterPath(recorder.events());
+    try std.testing.expectEqual(rebinds_before, recorder.rebind_count);
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
@@ -582,51 +731,57 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     // Exercise suspend/resume semantics independently of the host running the
     // test; platform selection itself is just the production default policy.
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
     );
+    var retained_tun = OwnedDescriptor{};
+    created.commit(retained_tun.descriptor());
+    created.betterPath(recorder.events());
     created.networkChange(.{ .reachable = false }, recorder.events());
+    // The queued rebind must succeed even if an offline event overtakes it.
+    var replacement_link = OwnedDescriptor{};
+    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
     created.networkChange(.{ .reachable = true }, recorder.events());
     connection.testing.waitForTemporaryShutdownRetry(created);
-    environment.executor.drain();
 
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
-    try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 2), recorder.rebind_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
+    try std.testing.expectEqual(@as(usize, 0), retained_tun.cleanups);
 
     created.stop(1000, recorder.events());
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 1), retained_tun.cleanups);
 }
 
-test "WireGuard connection reports network settings failure while resuming" {
+test "WireGuard connection retries passive backend failure without terminal events" {
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
-    var fake_backend = FakeBackend{};
+    var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
     defer fake_backend.deinit(allocator);
     var context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{ .fail_set_tunnel_settings_number = 2 };
+    var controller = FakeController{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -640,16 +795,16 @@ test "WireGuard connection reports network settings failure while resuming" {
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -657,26 +812,19 @@ test "WireGuard connection reports network settings failure while resuming" {
     created.networkChange(.{ .reachable = false }, recorder.events());
     created.networkChange(.{ .reachable = true }, recorder.events());
 
-    // The backend is paused, but the adapter remains active and retryable.
+    // A transient backend failure must not emit terminal events.
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-    try std.testing.expect(!connection.testing.adapter(created).isStopped());
-    try std.testing.expectEqual(api.PartoutErrorCode.tunNotAvailable, recorder.last_error.?);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     connection.testing.waitForTemporaryShutdownRetry(created);
-    environment.executor.drain();
 
-    try std.testing.expectEqual(@as(usize, 3), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .connecting,
-        .connected,
-        .connected,
-    }, recorder.statuses[0..recorder.status_count]);
+    try std.testing.expect(!connection.testing.adapter(created).isStopped());
+    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
@@ -700,15 +848,15 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     defer environment.deinit();
     const created = try connection.createConnection(&context, allocator, module, .{
         .profile = &tagged,
+        .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
-    try std.testing.expect(try created.start(recorder.events()));
+    try std.testing.expect(try startConnection(created, &environment.looper));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -719,22 +867,34 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         recorder.events(),
     );
 
+    try std.testing.expect(!connection.testing.adapter(created).isStopped());
+    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
+    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.cancel, recorder.failure.?.disposition);
+    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+
+    // Emulate the daemon finalizing the connection after receiving failure.
+    created.stop(0, recorder.events());
+    created.stop(0, recorder.events());
     try std.testing.expect(connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 1), controller.clear_tunnel_settings_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.last_error.?);
-    try std.testing.expectEqual(@as(usize, 1), recorder.cancel_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.cancel_code.?);
+    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
 }
 
 const FakeBackend = struct {
+    block_get_config: AtomicBool = AtomicBool.init(false),
+    get_config_entered: AtomicBool = AtomicBool.init(false),
+    release_get_config: AtomicBool = AtomicBool.init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
     set_config_count: usize = 0,
     bump_sockets_count: usize = 0,
+    send_keepalives_count: usize = 0,
     disable_roaming_count: usize = 0,
     fail_turn_on_number: ?usize = null,
     out_of_memory_turn_on_number: ?usize = null,
+    transport: ?backend_mod.StartTunnelPassive = null,
     last_settings: ?[]u8 = null,
     last_set_config: ?[]u8 = null,
 
@@ -752,12 +912,14 @@ const FakeBackend = struct {
 };
 
 const fake_backend_vtable = backend_mod.Backend.VTable{
-    .turn_on = fakeTurnOn,
+    .turn_on_passive = fakeTurnOn,
+    .complete_io = fakeCompleteIO,
     .turn_off = fakeTurnOff,
     .get_config = fakeGetConfig,
     .set_config = fakeSetConfig,
     .socket_descriptors = fakeSocketDescriptors,
     .bump_sockets = fakeBumpSockets,
+    .send_keepalives = fakeSendKeepalives,
     .disable_roaming = fakeDisableRoaming,
 };
 
@@ -765,9 +927,11 @@ fn fakeTurnOn(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
     settings: [:0]const u8,
-    _: backend_mod.StartTunnel,
+    tunnel: backend_mod.StartTunnelPassive,
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    std.testing.expect(tunnel.link.read != null and tunnel.link.write != null and tunnel.tun.read != null and tunnel.tun.write != null) catch unreachable;
+    self.transport = tunnel;
     self.turn_on_count += 1;
     if (self.out_of_memory_turn_on_number == self.turn_on_count)
         return error.OutOfMemory;
@@ -783,7 +947,12 @@ fn fakeTurnOff(ptr: ?*anyopaque, handle: i32) void {
     std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
 }
 
-fn fakeGetConfig(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
+fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
+    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    if (self.block_get_config.load(.acquire)) {
+        self.get_config_entered.store(true, .release);
+        waitUntil(&self.release_get_config);
+    }
     return try allocator.dupe(u8,
         \\rx_bytes=10
         \\tx_bytes=20
@@ -805,6 +974,12 @@ fn fakeSocketDescriptors(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) b
 fn fakeBumpSockets(ptr: ?*anyopaque, _: i32, _: bool) void {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.bump_sockets_count += 1;
+}
+
+fn fakeSendKeepalives(ptr: ?*anyopaque, handle: i32) void {
+    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
+    self.send_keepalives_count += 1;
 }
 
 fn fakeDisableRoaming(ptr: ?*anyopaque, _: i32) void {
@@ -925,17 +1100,21 @@ fn fakeSetReasserting(_: ?*anyopaque, _: bool) void {}
 fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorPair) void {}
 
 const EventRecorder = struct {
-    statuses: [8]api.ConnectionStatus = undefined,
-    status_count: usize = 0,
+    established_count: usize = 0,
+    rebind_count: usize = 0,
+    stopped_count: usize = 0,
+    failure_count: usize = 0,
+    failure: ?conn.Connection.Events.Failure = null,
     has_data_count: AtomicBool = AtomicBool.init(false),
     data_count: api.DataCount = .{},
-    last_error: ?api.PartoutErrorCode = null,
-    cancel_count: usize = 0,
-    cancel_code: ?api.PartoutErrorCode = null,
 
     fn events(self: *EventRecorder) conn.Connection.Events {
         return .{
             .ctx = self,
+            .established = recordEstablished,
+            .needs_rebind = recordNeedsRebind,
+            .failed = recordFailed,
+            .stopped = recordStopped,
             .status = recordStatus,
             .last_error = recordLastError,
             .data_count = recordDataCount,
@@ -944,15 +1123,23 @@ const EventRecorder = struct {
     }
 };
 
-fn recordStatus(ctx: *anyopaque, status_value: api.ConnectionStatus) void {
-    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.statuses[self.status_count] = status_value;
-    self.status_count += 1;
+fn recordStatus(_: *anyopaque, _: api.ConnectionStatus) void {
+    @panic("WireGuard v2 emitted legacy status");
 }
 
-fn recordLastError(ctx: *anyopaque, err_pair: api.PartoutErrorPair) void {
+fn recordLastError(_: *anyopaque, _: api.PartoutErrorPair) void {
+    @panic("WireGuard v2 emitted legacy last_error");
+}
+
+fn recordFailed(ctx: *anyopaque, failure: conn.Connection.Events.Failure) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.last_error = err_pair.code;
+    self.failure_count += 1;
+    self.failure = failure;
+}
+
+fn recordStopped(ctx: *anyopaque) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    self.stopped_count += 1;
 }
 
 fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
@@ -961,8 +1148,60 @@ fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     self.has_data_count.store(true, .release);
 }
 
-fn recordCancel(ctx: *anyopaque, err_pair: ?api.PartoutErrorPair) void {
-    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
-    self.cancel_count += 1;
-    self.cancel_code = if (err_pair) |value| value.code else null;
+fn recordCancel(_: *anyopaque, _: ?api.PartoutErrorPair) void {
+    @panic("WireGuard v2 emitted legacy cancel");
 }
+
+fn recordEstablished(ctx: *anyopaque, success: conn.Connection.Events.Success) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    std.testing.expectEqualStrings("WireGuard", success.info.profile.name) catch unreachable;
+    self.established_count += 1;
+}
+
+fn recordNeedsRebind(ctx: *anyopaque) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    self.rebind_count += 1;
+}
+
+fn startConnection(created: conn.Connection, looper: *@import("source").net.Looper) !bool {
+    const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+    const link = socket.linkDescriptor();
+    return created.startV2(.{
+        .link = link,
+        .local_port = if (builtin.os.tag == .windows) 51820 else (try link.localAddress()).port,
+        .looper = looper,
+    });
+}
+
+test "WireGuard backend dispatches the passive startup payload separately" {
+    const Probe = struct {
+        fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
+            const called: *bool = @ptrCast(@alignCast(raw.?));
+            if (tunnel.context != raw.? or tunnel.link.local_port != 51820 or tunnel.tun.mtu != 1420 or
+                !std.mem.eql(u8, settings, "passive")) return error.TransportFailure;
+            called.* = true;
+            return 7;
+        }
+    };
+    var called = false;
+    var vtable = fake_backend_vtable;
+    vtable.turn_on_passive = Probe.turnOn;
+    const backend = backend_mod.Backend{ .ptr = &called, .vtable = &vtable };
+    const tunnel = backend_mod.StartTunnelPassive{
+        .link = .{ .local_port = 51820, .read = null, .write = null },
+        .tun = .{ .mtu = 1420, .read = null, .write = null },
+        .context = &called,
+    };
+    try std.testing.expectEqual(@as(i32, 7), try backend.turnOnPassive(std.testing.allocator, "passive", tunnel));
+    try std.testing.expect(called);
+    try std.testing.expectError(error.TransportFailure, backend_mod.goBackend().turnOnPassive(std.testing.allocator, "passive", tunnel));
+
+    const tun = try io.TunWrapper.create(std.testing.allocator, null);
+    defer tun.destroy();
+    try std.testing.expectError(error.TransportFailure, backend_mod.goPassiveBackend().turnOn(std.testing.allocator, "legacy", .{
+        .tun = tun,
+        .ifname = "test",
+    }));
+}
+
+fn fakeCompleteIO(_: usize, _: u32, _: i32) callconv(.c) void {}
