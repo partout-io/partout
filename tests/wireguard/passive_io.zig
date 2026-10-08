@@ -308,6 +308,15 @@ test "WireGuard passive destination errors retain the shared UDP transport" {
     try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
     try std.testing.expectEqual(@as(usize, 0), failure.calls);
     const valid = [_]c.wg_packet{.{ .data = "test", .size = 4 }};
+    // An IPv6 peer must not take working IPv4 peers down after IPv4 fallback.
+    var ipv6_destination = std.mem.zeroes(c.wg_endpoint);
+    ipv6_destination.family = 6;
+    ipv6_destination.address[15] = 1;
+    ipv6_destination.port = address.port;
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &valid, 1, &ipv6_destination, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
+    try std.testing.expectEqual(@as(usize, 0), failure.calls);
+    try std.testing.expect(!passive.closed);
     try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &valid, 1, &destination, completion.token()));
     try std.testing.expectEqual(c.WG_IO_OK, completion.status);
     var buffer: [32]u8 = undefined;
