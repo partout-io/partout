@@ -220,6 +220,8 @@ pub const Connection = struct {
         established: *const fn (*anyopaque, Success) void = struct {
             fn call(_: *anyopaque, _: Success) void {}
         }.call,
+        /// May be called from I/O workers. The sink must be thread-safe and
+        /// enqueue recovery without synchronously stopping or destroying the producer.
         failed: *const fn (*anyopaque, Failure) void = struct {
             fn call(_: *anyopaque, _: Failure) void {}
         }.call,

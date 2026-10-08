@@ -92,6 +92,7 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
     // FIXME: #525, Make Configuration non-optional in OpenAPI and remove .IncompleteModule
     try std.testing.expectEqual(configuration.?.interface.dns.?.id, dns.id);
     try std.testing.expectEqual(@as(?i32, 1420), ip.mtu);
+    try std.testing.expectEqual(@as(u32, 1420), tunnel_info.TunnelRemoteInfoBuilder.effectiveMTU(info));
     try std.testing.expectEqualStrings("1.1.1.1", dns.servers[0].raw);
 
     const ipv4 = ip.ipv4 orelse return error.TestUnexpectedResult;
@@ -302,9 +303,14 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     const wg_c = wireguard_internal.passive_io.testing.abi;
     var buffer: [32]u8 = undefined;
     var packets = [_]wg_c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
-    try std.testing.expectEqual(wg_c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, 1, 1));
+    const worker = try std.Thread.spawn(.{}, struct {
+        fn run(tunnel: backend_mod.StartTunnelPassive, batch: [*c]wg_c.wg_read_packet) void {
+            std.testing.expectEqual(wg_c.WG_IO_OK, tunnel.tun.read.?(tunnel.context, batch, 1, 1)) catch unreachable;
+        }
+    }.run, .{ transport, &packets });
+    worker.join();
     try std.testing.expectEqual(wg_c.WG_IO_CLOSED, transport.tun.read.?(transport.context, &packets, 1, 1));
-    environment.executor.drain();
+    // Worker delivery is immediate; the daemon sink is responsible for queuing recovery.
     try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
     try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
     try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);

@@ -45,7 +45,7 @@ pub const WireGuardAdapter = struct {
     /// Latest reachability event, used only to gate background restart retries.
     last_reachable: ?bool = null,
     transport: impl.StartTunnelPassive = undefined,
-    io: ?*PassiveIO = null,
+    io: *PassiveIO,
 
     /// Concrete failures produced while activating the WireGuard tunnel.
     /// The connection preserves allocator failures and logs/erases the
@@ -81,6 +81,7 @@ pub const WireGuardAdapter = struct {
     pub fn init(
         module_id: api.UUID,
         backend: impl.Backend,
+        io: *PassiveIO,
         dns_resolver: net.DNSResolver,
         factory: net.SocketFactory,
         profile: *const api.Profile,
@@ -90,6 +91,7 @@ pub const WireGuardAdapter = struct {
         return .{
             .module_id = module_id,
             .backend = backend,
+            .io = io,
             .profile = profile,
             .configuration = configuration,
             .endpoint_resolver = PeerEndpointResolver.init(
@@ -160,17 +162,12 @@ pub const WireGuardAdapter = struct {
         self.state = .{ .started = handle };
     }
 
-    pub fn interfaceName(_: *const WireGuardAdapter) ?[]const u8 {
-        // The passive backend owns no native interface.
-        return null;
-    }
-
     fn startBackend(
         self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
         wg_config: [:0]const u8,
     ) StartBackendError!i32 {
-        if (self.io) |io| io.activate();
+        self.io.activate();
         log.write(.debug, "Start passive wg-go backend");
         const handle = self.backend.turnOnPassive(allocator, wg_config, self.transport) catch |err| {
             log.writef(.err, "Starting tunnel failed: {s}", .{@errorName(err)});
@@ -206,7 +203,7 @@ pub const WireGuardAdapter = struct {
                     .suspend_backend_when_offline => if (!is_reachable) {
                         log.write(.debug, "Connectivity offline, pausing backend.");
                         self.state = .temporary_shutdown;
-                        if (self.io) |io| io.quiesce();
+                        self.io.quiesce();
                         self.backend.turnOff(handle);
                     } else {
                         self.updatePeerEndpoints(allocator, handle);
@@ -297,7 +294,7 @@ pub const WireGuardAdapter = struct {
     fn shutdown(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
         switch (self.state) {
             .started => |handle| {
-                if (self.io) |io| io.quiesce();
+                self.io.quiesce();
                 self.backend.turnOff(handle);
             },
             .stopped, .temporary_shutdown => {},

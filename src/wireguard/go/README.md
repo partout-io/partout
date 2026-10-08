@@ -66,8 +66,8 @@ Partout's `internal/passive_io.zig` calls the owned descriptor interfaces direct
 on Go workers and completes each attempt inline. Its mutex serializes native
 calls with descriptor replacement and cleanup. Nonblocking reads with no data,
 TUN calls before `commit()`, and write backpressure complete with `WG_IO_AGAIN`.
-On POSIX, `POSIXInterface.waitForReadiness()` calls the shared `socket.c` poll
-helper on `WouldBlock`, releasing the bridge mutex while waiting. Link/TUN
+On POSIX, `POSIXInterface.waitForReadiness()` uses `net.Waiter` and the shared
+mux poll helper on `WouldBlock`, releasing the bridge mutex while waiting. Link/TUN
 workers share a mux wake and wait without a poll timeout. Commit, descriptor
 replacement and adapter shutdown wake pending waits; before TUN commit, only wake
 is watched. Backpressure keeps its bounded retry delay. Go uses no retry timer. Read retries cancel on Bind/TUN close; backend shutdown cancels write retries. Writes retry only the uncompleted suffix. The callback ABI

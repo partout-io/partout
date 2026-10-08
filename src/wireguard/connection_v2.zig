@@ -52,7 +52,7 @@ const WireGuardConnection = struct {
     io: PassiveIO,
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
-    /// Actor-owned event sink used only by serialized connection work.
+    /// Captured event sink; Go workers also report I/O failures through it.
     events: ?net.Connection.Events,
     /// Daemon-owned sandbox capability captured once at creation. Timer threads
     /// use it to enqueue work without retaining or inspecting the unrelated
@@ -110,13 +110,13 @@ const WireGuardConnection = struct {
         created.adapter = WireGuardAdapter.init(
             module_id,
             backend,
+            &created.io,
             sandbox.resolver,
             sandbox.factory,
             sandbox.profile,
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        created.adapter.io = &created.io;
         created.io.failure = .{ .ctx = created, .report = onIOFailure };
         log.write(.notice, "Using WireGuardConnection v2");
         return created.asConnection();
@@ -136,38 +136,14 @@ const WireGuardConnection = struct {
         allocator.destroy(self);
     }
 
-    const IOFailureTask = struct {
-        allocator: std.mem.Allocator,
-        events: net.Connection.Events,
-
-        fn run(raw: *anyopaque) void {
-            const task: *IOFailureTask = @ptrCast(@alignCast(raw));
-            defer discard(raw);
-            log.write(.err, "WireGuard native I/O failed");
-            task.events.failed(task.events.ctx, .{
-                .err_pair = .{ .code = .ioFailure },
-                .disposition = .reconnect,
-            });
-        }
-
-        fn discard(raw: *anyopaque) void {
-            const task: *IOFailureTask = @ptrCast(@alignCast(raw));
-            task.allocator.destroy(task);
-        }
-    };
-
     fn onIOFailure(raw: *anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
         const events = self.events orelse return;
-        const task = self.allocator.create(IOFailureTask) catch {
-            log.write(.err, "Unable to allocate WireGuard I/O failure task");
-            return;
-        };
-        task.* = .{ .allocator = self.allocator, .events = events };
-        self.serialized_executor.tryRunOwned(task, IOFailureTask.run, IOFailureTask.discard) catch {
-            IOFailureTask.discard(task);
-            log.write(.err, "Unable to enqueue WireGuard I/O failure");
-        };
+        log.write(.err, "WireGuard native I/O failed");
+        events.failed(events.ctx, .{
+            .err_pair = .{ .code = .ioFailure },
+            .disposition = .reconnect,
+        });
     }
 
     fn releaseIO(self: *WireGuardConnection) void {
@@ -204,7 +180,7 @@ const WireGuardConnection = struct {
             else => error.UnableToStart,
         };
         defer info.deinit(self.allocator);
-        self.adapter.start(self.allocator, self.io.transport(remote.local_port, passiveMTU(info))) catch |err| {
+        self.adapter.start(self.allocator, self.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info))) catch |err| {
             switch (err) {
                 error.CannotLocateTunnelFileDescriptor => {
                     log.write(
@@ -232,9 +208,6 @@ const WireGuardConnection = struct {
             };
         };
         errdefer self.adapter.stop(self.allocator);
-        log.writef(.info, "Tunnel interface is {s}", .{
-            self.adapter.interfaceName() orelse "unknown",
-        });
         self.reportDataCount(events);
         self.startDataCountTimer() catch |err| {
             log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
@@ -640,7 +613,7 @@ pub const testing = struct {
         );
     }
 
-    pub const effectiveMTU = passiveMTU;
+    pub const effectiveMTU = TunnelRemoteInfoBuilder.effectiveMTU;
 };
 
 // MARK: - Error mapping
@@ -656,25 +629,4 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
         // error.CouldNotStartBackend,
         else => .unhandled,
     };
-}
-
-fn passiveMTU(info: api.TunnelRemoteInfoWrapper) u32 {
-    // Match host settings: active profile modules in order, with generated
-    // modules inserted immediately after the originating WireGuard module.
-    var mtu: u32 = 1420;
-    for (info.profile.modules) |module| {
-        const id = api.moduleId(&module);
-        if (!api.isActiveProfileModule(&info.profile, id)) continue;
-        mtu = moduleMTU(module) orelse mtu;
-        if (std.mem.eql(u8, &id, &info.original_module_id)) {
-            for (info.modules orelse &.{}) |remote| mtu = moduleMTU(remote) orelse mtu;
-        }
-    }
-    return mtu;
-}
-
-fn moduleMTU(module: api.TaggedModule) ?u32 {
-    if (module != .IP) return null;
-    const mtu = module.IP.mtu orelse return null;
-    return if (mtu > 0) @intCast(mtu) else null;
 }

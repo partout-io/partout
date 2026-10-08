@@ -19,7 +19,9 @@ pub const PassiveIO = struct {
     link: ?net.LinkDescriptor = null,
     tun: ?net.TunDescriptor = null,
     closed: bool = true,
-    failure: ?struct { ctx: *anyopaque, report: core.SerializedExecutor.Block } = null,
+    failure: ?FailureReporter = null,
+
+    const FailureReporter = struct { ctx: *anyopaque, report: *const fn (*anyopaque) void };
 
     pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {
         return .{
@@ -137,8 +139,9 @@ pub const PassiveIO = struct {
         const terminal = status == c.WG_IO_INVALID or status == c.WG_IO_CLOSED;
         if (completed != 0) status = c.WG_IO_OK;
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, false, would_block);
-        if (terminal or status == c.WG_IO_INVALID) self.reportFailure();
+        const failure = if (terminal or status == c.WG_IO_INVALID) self.closeOnFailure() else null;
         self.lock.unlock();
+        if (failure) |reporter| reporter.report(reporter.ctx);
         // Inline completion: all descriptor/payload access ends before this.
         self.complete(request, completed, status);
         return c.WG_IO_OK;
@@ -185,8 +188,9 @@ pub const PassiveIO = struct {
         }
         if (completed == count) status = c.WG_IO_OK;
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, true, would_block);
-        if (status == c.WG_IO_INVALID) self.reportFailure();
+        const failure = if (status == c.WG_IO_INVALID) self.closeOnFailure() else null;
         self.lock.unlock();
+        if (failure) |reporter| reporter.report(reporter.ctx);
         self.complete(request, completed, status);
         return c.WG_IO_OK;
     }
@@ -197,12 +201,12 @@ pub const PassiveIO = struct {
         self.closed = false;
     }
 
-    // Called under the I/O lock; the reporter only queues serialized work.
-    fn reportFailure(self: *PassiveIO) void {
-        if (self.closed) return;
+    // Close under the I/O lock, then report from the worker after unlocking.
+    fn closeOnFailure(self: *PassiveIO) ?FailureReporter {
+        if (self.closed) return null;
         self.closed = true;
         self.wake();
-        if (self.failure) |failure| failure.report(failure.ctx);
+        return self.failure;
     }
 
     fn wake(self: *PassiveIO) void {
