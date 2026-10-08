@@ -104,7 +104,7 @@ pub const POSIXInterface = union(enum) {
         };
         if (io_lock) |mutex| mutex.unlock();
         defer if (io_lock) |mutex| mutex.lock();
-        const result = io_c.pp_socket_poll(fd, writing, io_c.pp_mux_wake_descriptor(mux));
+        const result = io_c.pp_mux_wait_once(fd, writing, io_c.pp_mux_wake_descriptor(mux));
         if (result < 0) return error.LibcFailure;
         return result > 0;
     }

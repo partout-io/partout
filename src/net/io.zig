@@ -17,6 +17,7 @@ pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;
 pub const Side = common.Side;
 pub const SocketOptions = common.SocketOptions;
+pub const Waiter = common.Waiter;
 
 pub const FileDescriptor = backend.FileDescriptor;
 pub const LinkDescriptor = backend.LinkDescriptor;

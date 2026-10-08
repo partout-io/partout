@@ -221,7 +221,7 @@ pub const PassiveIO = struct {
         } else {
             // Before TUN commit, wait for descriptor replacement or cancellation.
             self.lock.unlock();
-            const result = io_c.pp_socket_poll(-1, writing, io_c.pp_mux_wake_descriptor(self.mux));
+            const result = io_c.pp_mux_wait_once(-1, writing, io_c.pp_mux_wake_descriptor(self.mux));
             self.lock.lock();
             if (result < 0) return c.WG_IO_INVALID;
         }

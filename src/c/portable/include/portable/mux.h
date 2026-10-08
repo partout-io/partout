@@ -27,7 +27,14 @@ void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
 void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx);
 int pp_mux_wait(pp_mux mux, int *_Nullable error_code);
 
+/* Wait indefinitely on an I/O watch fd and a shared wake descriptor.
+ * POSIX uses poll(); Windows waits on configured socket/TUN events.
+ * Returns 1 for I/O readiness, 0 for wake, -1 on error. Wake is not reset here.
+ * An invalid I/O fd waits only for wake. */
+int pp_mux_wait_once(pp_fd fd, bool writing, pp_fd wake_fd);
+
 bool pp_mux_wake(pp_mux mux);
+/* Shared readiness waits leave wake signalled until their last waiter returns. */
 pp_fd pp_mux_wake_descriptor(pp_mux mux);
 bool pp_mux_reset_wake(pp_mux mux);
 

@@ -103,29 +103,6 @@ static int local_getaddrinfo(const char *hostname,
 #endif
 }
 
-int pp_socket_poll(pp_fd fd, bool writing, pp_fd wake_fd) {
-#if PARTOUT_WINDOWS
-    (void)writing; /* Read/write events are configured on the watch handle. */
-    HANDLE handles[2] = {wake_fd, fd};
-    const DWORD count = fd && fd != INVALID_HANDLE_VALUE ? 2 : 1;
-    const DWORD result = WaitForMultipleObjects(count, handles, FALSE, INFINITE);
-    if (result == WAIT_OBJECT_0) return 0;
-    return result == WAIT_OBJECT_0 + 1 ? 1 : -1;
-#else
-    struct pollfd descriptors[2] = {
-        {.fd = wake_fd, .events = POLLIN},
-        {.fd = fd, .events = writing ? POLLOUT : POLLIN},
-    };
-    int result;
-    do {
-        result = poll(descriptors, 2, -1);
-    } while (result < 0 && errno == EINTR);
-    if (result < 0) return -1;
-    if (descriptors[0].revents) return 0;
-    return 1;
-#endif
-}
-
 int pp_socket_last_error_binding(void) {
     return pp_socket_last_error();
 }

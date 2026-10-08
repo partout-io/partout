@@ -187,6 +187,15 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
     return 1;
 }
 
+int pp_mux_wait_once(pp_fd fd, bool writing, pp_fd wake_fd) {
+    (void)writing; /* Read/write events are configured on the watch handle. */
+    HANDLE handles[2] = {wake_fd, fd};
+    const DWORD count = fd && fd != INVALID_HANDLE_VALUE ? 2 : 1;
+    const DWORD result = WaitForMultipleObjects(count, handles, FALSE, INFINITE);
+    if (result == WAIT_OBJECT_0) return 0;
+    return result == WAIT_OBJECT_0 + 1 ? 1 : -1;
+}
+
 bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
     return SetEvent(mux->wake_event);
