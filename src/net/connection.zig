@@ -192,9 +192,6 @@ pub const Connection = struct {
         failure: Events.FailureDisposition,
     };
 
-    /// Requested daemon action after handling a network event.
-    pub const NetworkAction = enum { none, refresh_link };
-
     // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
     // FIXME: ###, Connections must not know about looper
 
@@ -220,8 +217,9 @@ pub const Connection = struct {
         established: *const fn (*anyopaque, Success) void = struct {
             fn call(_: *anyopaque, _: Success) void {}
         }.call,
-        /// May be called from I/O workers. The sink must be thread-safe and
-        /// enqueue recovery without synchronously stopping or destroying the producer.
+        needs_rebind: *const fn (*anyopaque) void = struct {
+            fn call(_: *anyopaque) void {}
+        }.call,
         failed: *const fn (*anyopaque, Failure) void = struct {
             fn call(_: *anyopaque, _: Failure) void {}
         }.call,
@@ -260,6 +258,13 @@ pub const Connection = struct {
         /// Commits TUN after the established event, transferring ownership
         /// to the connection when it performs packet I/O.
         commit: *const fn (*anyopaque, io.TunDescriptor) void,
+        /// Replaces the link after a needs_rebind event, retaining TUN and session state.
+        /// When owns_io is true, takes link ownership on entry, including on failure.
+        rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
+            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
+                return false;
+            }
+        }.call,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
@@ -289,9 +294,9 @@ pub const Connection = struct {
         stop: *const fn (*anyopaque, u32, Events) void,
 
         /// A refresh pauses link submissions and receives a replacement through
-        /// start_v2, retaining TUN without re-establishing the connection.
-        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) NetworkAction,
-        better_path: *const fn (*anyopaque, Events) NetworkAction,
+        /// rebind, retaining TUN without re-establishing the connection.
+        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
+        better_path: *const fn (*anyopaque, Events) void,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
@@ -318,6 +323,10 @@ pub const Connection = struct {
 
     pub fn commit(self: Connection, tun: io.TunDescriptor) void {
         self.vtable.commit(self.ptr, tun);
+    }
+
+    pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
+        return self.vtable.rebind(self.ptr, remote);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
@@ -362,12 +371,12 @@ pub const Connection = struct {
         self: Connection,
         reachability: io.ReachabilityInfo,
         events: Events,
-    ) NetworkAction {
-        return self.vtable.network_change(self.ptr, reachability, events);
+    ) void {
+        self.vtable.network_change(self.ptr, reachability, events);
     }
 
-    pub fn betterPath(self: Connection, events: Events) NetworkAction {
-        return self.vtable.better_path(self.ptr, events);
+    pub fn betterPath(self: Connection, events: Events) void {
+        self.vtable.better_path(self.ptr, events);
     }
 
     pub fn destroy(self: Connection) void {

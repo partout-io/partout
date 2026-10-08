@@ -224,6 +224,13 @@ const WireGuardConnection = struct {
         self.io.replaceTun(descriptor);
     }
 
+    fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.io.replaceLink(remote.link);
+        return self.adapter.isStarted();
+    }
+
     fn stop(
         self: *WireGuardConnection,
         timeout_ms: u32,
@@ -250,7 +257,7 @@ const WireGuardConnection = struct {
         self: *WireGuardConnection,
         reachability: net.ReachabilityInfo,
         events: net.Connection.Events,
-    ) net.Connection.NetworkAction {
+    ) void {
         self.cancelTemporaryShutdownRetry();
         self.lock.lock();
         defer self.lock.unlock();
@@ -263,22 +270,22 @@ const WireGuardConnection = struct {
                 self.scheduleTemporaryShutdownRetry(events);
             },
         }
-        return self.prepareLinkRefresh();
+        self.prepareLinkRefresh(events);
     }
 
     fn betterPath(
         self: *WireGuardConnection,
-        _: net.Connection.Events,
-    ) net.Connection.NetworkAction {
+        events: net.Connection.Events,
+    ) void {
         self.lock.lock();
         defer self.lock.unlock();
-        return self.prepareLinkRefresh();
+        self.prepareLinkRefresh(events);
     }
 
-    fn prepareLinkRefresh(self: *WireGuardConnection) net.Connection.NetworkAction {
-        if (!self.adapter.isStarted()) return .none;
+    fn prepareLinkRefresh(self: *WireGuardConnection, events: net.Connection.Events) void {
+        if (!self.adapter.isStarted()) return;
         self.io.releaseLink();
-        return .refresh_link;
+        events.needs_rebind(events.ctx);
     }
 
     fn reportDataCount(
@@ -549,9 +556,15 @@ fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) void {
     self.commit(descriptor);
 }
 
+fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
+    return self.rebind(remote);
+}
+
 const wireguard_connection_vtable = net.Connection.VTable{
     .start_v2 = startV2,
     .commit = commit,
+    .rebind = rebind,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
@@ -571,14 +584,14 @@ fn networkChange(
     ptr: *anyopaque,
     reachability: net.ReachabilityInfo,
     events: net.Connection.Events,
-) net.Connection.NetworkAction {
+) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.networkChange(reachability, events);
+    self.networkChange(reachability, events);
 }
 
-fn betterPath(ptr: *anyopaque, events: net.Connection.Events) net.Connection.NetworkAction {
+fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.betterPath(events);
+    self.betterPath(events);
 }
 
 fn destroy(ptr: *anyopaque) void {
