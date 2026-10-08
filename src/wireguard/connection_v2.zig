@@ -97,7 +97,7 @@ const WireGuardConnection = struct {
         created.* = .{
             .allocator = allocator,
             .adapter = undefined,
-            .io = .{ .complete = complete },
+            .io = try PassiveIO.init(complete),
             .configuration = configuration,
             .events = sandbox.events,
             .serialized_executor = sandbox.serialized_executor,
@@ -130,6 +130,7 @@ const WireGuardConnection = struct {
         self.temporary_shutdown_retry_timer.deinit();
         self.releaseIO();
         self.adapter.deinit(allocator);
+        self.io.deinit();
         self.configuration.deinit(allocator);
         allocator.destroy(self);
     }

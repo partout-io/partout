@@ -5,7 +5,6 @@ const std = @import("std");
 const net = @import("../../net/exports.zig");
 const core = @import("../../core/exports.zig");
 const c = @import("wireguard_c");
-const io_c = @import("../../net/io.zig").io_c;
 const backend = @import("backend.zig");
 const Endpoint = c.wg_endpoint;
 
@@ -15,12 +14,25 @@ const Endpoint = c.wg_endpoint;
 /// Shared readiness waits leave wake signalled until their last waiter returns.
 pub const PassiveIO = struct {
     lock: core.Mutex = .{},
+    waiter: net.Waiter,
     complete: *const fn (usize, u32, i32) callconv(.c) void,
     link: ?net.LinkDescriptor = null,
     tun: ?net.TunDescriptor = null,
     closed: bool = true,
-    mux: io_c.pp_mux = null,
-    waiters: usize = 0,
+
+    pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {
+        return .{
+            .waiter = net.Waiter.init() orelse return error.OutOfMemory,
+            .complete = complete,
+        };
+    }
+
+    pub fn deinit(self: *PassiveIO) void {
+        self.release();
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.waiter.deinit();
+    }
 
     pub fn replaceLink(self: *PassiveIO, descriptor: net.LinkDescriptor) void {
         self.lock.lock();
@@ -67,7 +79,6 @@ pub const PassiveIO = struct {
         self.link = null;
         if (self.tun) |*tun| tun.cleanup();
         self.tun = null;
-        self.freeMuxIfReleased();
     }
 
     pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnelPassive {
@@ -187,14 +198,7 @@ pub const PassiveIO = struct {
     }
 
     fn wake(self: *PassiveIO) void {
-        if (self.waiters != 0) _ = io_c.pp_mux_wake(self.mux);
-    }
-
-    fn freeMuxIfReleased(self: *PassiveIO) void {
-        if (self.closed and self.link == null and self.tun == null and self.waiters == 0) {
-            io_c.pp_mux_free(self.mux);
-            self.mux = null;
-        }
+        self.waiter.wake();
     }
 
     fn waitForReadiness(self: *PassiveIO, side: net.Side, writing: bool, would_block: bool) i32 {
@@ -208,22 +212,12 @@ pub const PassiveIO = struct {
             }
             return if (self.closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
         }
-        if (self.mux == null) self.mux = io_c.pp_mux_create(1) orelse return c.WG_IO_INVALID;
-        self.waiters += 1;
-        defer {
-            self.waiters -= 1;
-            // Keep wake latched until every concurrent waiter has returned.
-            if (self.waiters == 0) _ = io_c.pp_mux_reset_wake(self.mux);
-            self.freeMuxIfReleased();
-        }
+        const waiter = &self.waiter;
         if (descriptor) |value| {
-            _ = value.io.waitForReadiness(writing, self.mux, &self.lock) catch return c.WG_IO_INVALID;
+            _ = value.io.waitForReadiness(writing, waiter, &self.lock) catch return c.WG_IO_INVALID;
         } else {
             // Before TUN commit, wait for descriptor replacement or cancellation.
-            self.lock.unlock();
-            const result = io_c.pp_mux_wait_once(-1, writing, io_c.pp_mux_wake_descriptor(self.mux));
-            self.lock.lock();
-            if (result < 0) return c.WG_IO_INVALID;
+            _ = waiter.wait(null, writing, &self.lock) catch return c.WG_IO_INVALID;
         }
         return if (self.closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
     }

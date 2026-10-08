@@ -70,8 +70,8 @@ const PacketIO = struct {
 
 test "WireGuard passive callbacks directly use Go buffers and wait for commit" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    var passive: bridge.PassiveIO = .{ .complete = Completion.finish };
-    defer passive.release();
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
     var link: PacketIO = .{};
     var tun: PacketIO = .{};
     passive.replaceLink(link.descriptor());
@@ -109,8 +109,8 @@ test "WireGuard passive callbacks directly use Go buffers and wait for commit" {
 
 test "WireGuard passive writes report the completed prefix under backpressure" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    var passive: bridge.PassiveIO = .{ .complete = Completion.finish };
-    defer passive.release();
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
     var link: PacketIO = .{};
     var tun: PacketIO = .{ .block_write_after = 1 };
     passive.replaceLink(link.descriptor());
@@ -137,8 +137,8 @@ test "WireGuard passive UDP preserves source and destination addresses" {
     const local = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
     defer peer.destroy();
-    var passive: bridge.PassiveIO = .{ .complete = Completion.finish };
-    defer passive.release();
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
     const port = (try local.localAddress()).port;
     passive.replaceLink(local.linkDescriptor());
     var destination = try peer.localAddress();
@@ -191,7 +191,7 @@ const ReadRequest = struct {
 fn waitForWaiters(passive: *bridge.PassiveIO, count: usize) !void {
     for (0..3000) |_| {
         passive.lock.lock();
-        const ready = passive.waiters == count;
+        const ready = passive.waiter.pending == count;
         passive.lock.unlock();
         if (ready) return;
         _ = usleep(1000);
@@ -202,8 +202,8 @@ fn waitForWaiters(passive: *bridge.PassiveIO, count: usize) !void {
 
 test "WireGuard passive shared wake cancels link and precommit TUN waits" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    var passive: bridge.PassiveIO = .{ .complete = Completion.finish };
-    defer passive.release();
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
     const link = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
     passive.replaceLink(link.linkDescriptor());
     var buffers: [2][32]u8 = undefined;
