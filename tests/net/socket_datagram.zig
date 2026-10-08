@@ -369,6 +369,6 @@ test "unconnected socket family restrictions remain explicit" {
     defer v6.destroy();
     try std.testing.expectEqual(@as(u8, 4), (try v4.localAddress()).family);
     try std.testing.expectEqual(@as(u8, 6), (try v6.localAddress()).family);
-    try std.testing.expectError(error.LibcFailure, v4.sendTo("wrong family", try destination(v6, 6)));
-    try std.testing.expectError(error.LibcFailure, v6.sendTo("wrong family", try destination(v4, 4)));
+    try std.testing.expectError(error.DatagramDropped, v4.sendTo("wrong family", try destination(v6, 6)));
+    try std.testing.expectError(error.DatagramDropped, v6.sendTo("wrong family", try destination(v4, 4)));
 }

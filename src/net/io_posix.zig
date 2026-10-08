@@ -270,7 +270,7 @@ pub const SocketWrapper = struct {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
         if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
-        if (count < 0) return datagramError();
+        if (count < 0) return datagramError(false);
         return @intCast(count);
     }
 
@@ -278,11 +278,11 @@ pub const SocketWrapper = struct {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         if (address.family != 4 and address.family != 6) return error.InvalidAddressFamily;
         return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false) catch |err| {
-            return if (err == error.LibcFailure) datagramError() else err;
+            return if (err == error.LibcFailure) datagramError(true) else err;
         };
     }
 
-    fn datagramError() Error {
+    fn datagramError(writing: bool) Error {
         // Truncation and per-destination errors (including asynchronous ICMP)
         // do not invalidate a shared UDP socket or its other peers.
         return switch (io_c.pp_socket_last_error_binding()) {
@@ -290,7 +290,10 @@ pub const SocketWrapper = struct {
             @intFromEnum(std.c.E.NETUNREACH),
             @intFromEnum(std.c.E.HOSTUNREACH),
             @intFromEnum(std.c.E.CONNREFUSED),
+            @intFromEnum(std.c.E.AFNOSUPPORT),
             => error.DatagramDropped,
+            // macOS reports a destination/socket family mismatch as EINVAL.
+            @intFromEnum(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
             else => error.LibcFailure,
         };
     }
