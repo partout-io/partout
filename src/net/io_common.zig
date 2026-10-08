@@ -142,7 +142,7 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const SocketOptions = struct {
-    /// Used only for unconnected UDP. Enabling both selects one dual-stack socket.
+    /// Used only for unconnected UDP. Enabling both prefers dual-stack, with IPv4 fallback when IPv6 is unsupported.
     ipv4: bool = true,
     ipv6: bool = true,
     port: u16 = 0,
