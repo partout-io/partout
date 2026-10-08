@@ -56,7 +56,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 	}
 	linkIO, tunIO := *link, *tun
 	host := &passiveHost{ready: make(chan struct{}), aborted: make(chan struct{})}
-	bind := newPassiveBind(uint16(linkIO.local_port),
+	passive_bind := newPassiveBind(uint16(linkIO.local_port),
 		func(packets [][]byte, sizes []int, endpoints []conn.Endpoint, done <-chan struct{}) (int, error) {
 			return host.read(linkIO.read, context, packets, sizes, endpoints, 0, done)
 		},
@@ -67,8 +67,8 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 			})
 			return err
 		})
-	bind.host = host
-	passive := newPassiveTun(int(tunIO.mtu),
+	passive_bind.host = host
+	passive_tun := newPassiveTun(int(tunIO.mtu),
 		func(packets [][]byte, sizes []int, offset int, done <-chan struct{}) (int, error) {
 			return host.read(tunIO.read, context, packets, sizes, nil, offset, done)
 		},
@@ -77,7 +77,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 				return C.wg_passive_tun_write(tunIO.write, context, batch, count, request)
 			})
 		})
-	return turnOnPassiveDevice(C.GoString(settings), bind, passive)
+	return turnOnPassiveDevice(C.GoString(settings), passive_bind, passive_tun)
 }
 
 func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {
