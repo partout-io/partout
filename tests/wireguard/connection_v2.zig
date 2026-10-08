@@ -738,6 +738,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     created.stop(1000, recorder.events());

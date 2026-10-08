@@ -412,7 +412,7 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
-            .resumed => {},
+            .resumed => self.prepareLinkRefresh(events),
             .retry => |err| {
                 self.reportActivationFailure(events, err);
                 self.scheduleTemporaryShutdownRetry(events);
