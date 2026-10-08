@@ -686,9 +686,12 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             self.remote.?.link.cleanup();
             self.remote = remote;
             self.rebind_count += 1;
+            // Requests arriving during the handoff must also be coalesced.
+            self.events.needs_rebind(self.events.ctx);
             return true;
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+            events.needs_rebind(events.ctx);
             events.needs_rebind(events.ctx);
         }
         fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
@@ -794,7 +797,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
                 const owner = sut.implementation.connection;
                 const tun = probe.established_tun.?;
                 try owner.actor.perform(void, .onBetterPath);
-                // The network handler enqueues needs_rebind; drain its actor hop.
+                // Duplicate queued requests and requests during handoff share one rebind.
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
                 try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
                 try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
