@@ -35,7 +35,6 @@ static bool local_is_valid_socket(pp_socket sock);
 #endif
 
 #if !PARTOUT_WINDOWS
-#include <poll.h>
 #include <sys/uio.h>
 #endif
 static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *, bool);
