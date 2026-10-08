@@ -82,7 +82,7 @@ const WireGuardConnection = struct {
             else => return error.MissingConnectionImplementation,
         };
 
-        const complete = backend.vtable.complete_io orelse return error.MissingConnectionImplementation;
+        const complete = backend.vtable.complete_io orelse @panic("complete_io undefined in backend");
         const created = try allocator.create(WireGuardConnection);
         errdefer allocator.destroy(created);
 
