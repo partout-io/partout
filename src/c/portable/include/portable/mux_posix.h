@@ -229,6 +229,20 @@ int pp_mux_wait(pp_mux mux, int *error_code) {
     return num;
 }
 
+int pp_mux_wait_once(pp_fd fd, bool writing, pp_fd wake_fd) {
+    struct pollfd descriptors[2] = {
+        {.fd = wake_fd, .events = POLLIN},
+        {.fd = fd, .events = writing ? POLLOUT : POLLIN},
+    };
+    int result;
+    do {
+        result = poll(descriptors, 2, -1);
+    } while (result < 0 && errno == EINTR);
+    if (result < 0) return -1;
+    if (descriptors[0].revents) return 0;
+    return 1;
+}
+
 bool pp_mux_wake(pp_mux mux) {
     if (!mux) return false;
     const uint8_t byte = 1;
@@ -236,4 +250,12 @@ bool pp_mux_wake(pp_mux mux) {
     PP_IO_RETRY(ret, write(mux->wake_pipe[1], &byte, sizeof(byte)));
     if (ret == (ssize_t)sizeof(byte)) return true;
     return pp_io_wouldblock();
+}
+
+pp_fd pp_mux_wake_descriptor(pp_mux mux) {
+    return mux->wake_pipe[0];
+}
+
+bool pp_mux_reset_wake(pp_mux mux) {
+    return pp_mux_drain_wake(mux) == 0;
 }
