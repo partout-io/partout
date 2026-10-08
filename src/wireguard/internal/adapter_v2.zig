@@ -249,7 +249,9 @@ pub const WireGuardAdapter = struct {
         // Swift reapplies this wg-go workaround after every live endpoint
         // update under the suspend-while-offline policy. `setConfig` can
         // otherwise restore roaming behavior that is unreliable there.
-        self.backend.disableRoaming(handle);
+        if (self.network_change_behavior == .suspend_backend_when_offline) {
+            self.backend.disableRoaming(handle);
+        }
     }
 
     fn resumeTemporaryShutdown(

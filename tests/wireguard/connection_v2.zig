@@ -646,6 +646,7 @@ test "WireGuard connection handles network monitor events" {
     try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.set_config_count);
+    const roaming_workarounds_before = fake_backend.disable_roaming_count;
 
     created.networkChange(.{ .reachable = true }, recorder.events());
 
@@ -654,6 +655,10 @@ test "WireGuard connection handles network monitor events" {
     try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_set_config.?, "endpoint=127.0.0.1:51820\n") != null);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+    try std.testing.expectEqual(
+        roaming_workarounds_before + @as(usize, if (builtin.os.tag == .macos) 0 else 1),
+        fake_backend.disable_roaming_count,
+    );
 
     created.networkChange(.{ .reachable = false }, recorder.events());
     created.betterPath(recorder.events());
@@ -669,6 +674,12 @@ test "WireGuard connection handles network monitor events" {
         try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
         try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+
+        try std.testing.expectEqual(@as(usize, 0), fake_backend.disable_roaming_count);
+        // The alternate policy still reapplies the workaround after live updates.
+        adapter.testing.setNetworkChangeBehavior(connection.testing.adapter(created), .suspend_backend_when_offline);
+        created.networkChange(.{ .reachable = true }, recorder.events());
+        try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 
         created.stop(1000, recorder.events());
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
