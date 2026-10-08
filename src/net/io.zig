@@ -14,10 +14,10 @@ pub const io_c = common.io_c;
 pub const testing = common.testing;
 
 pub const Error = common.Error;
-pub const Waiter = common.Waiter;
 pub const ReachabilityInfo = common.ReachabilityInfo;
 pub const Side = common.Side;
 pub const SocketOptions = common.SocketOptions;
+pub const Waiter = common.Waiter;
 
 pub const FileDescriptor = backend.FileDescriptor;
 pub const LinkDescriptor = backend.LinkDescriptor;
