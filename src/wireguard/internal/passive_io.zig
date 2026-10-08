@@ -97,11 +97,6 @@ pub const PassiveIO = struct {
             self.lock.unlock();
             return c.WG_IO_CLOSED;
         }
-        // Windows native descriptor I/O is not implemented yet.
-        if (@import("builtin").os.tag == .windows) {
-            self.lock.unlock();
-            return c.WG_IO_INVALID;
-        }
         const descriptor = if (side == .link) self.link else self.tun;
         var completed: u32 = 0;
         var status: i32 = c.WG_IO_AGAIN;
@@ -158,10 +153,6 @@ pub const PassiveIO = struct {
         if (self.closed) {
             self.lock.unlock();
             return c.WG_IO_CLOSED;
-        }
-        if (@import("builtin").os.tag == .windows) {
-            self.lock.unlock();
-            return c.WG_IO_INVALID;
         }
         const descriptor = if (side == .link) self.link else self.tun;
         var completed: u32 = 0;
