@@ -137,6 +137,10 @@ pub const WireGuardAdapter = struct {
         };
     }
 
+    pub fn isStarted(self: *const WireGuardAdapter) bool {
+        return self.state == .started;
+    }
+
     fn activate(
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,

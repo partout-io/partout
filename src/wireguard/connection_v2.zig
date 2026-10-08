@@ -153,8 +153,8 @@ const WireGuardConnection = struct {
         errdefer self.releaseIO();
         const events = self.events orelse return error.UnableToStart;
         if (!self.adapter.isStopped()) {
-            log.write(.debug, "Start ignored, adapter is already active");
-            return false;
+            log.write(.debug, "Replaced link, adapter is already active");
+            return true;
         }
 
         log.write(.info, "Start tunnel");
@@ -237,7 +237,7 @@ const WireGuardConnection = struct {
         self: *WireGuardConnection,
         reachability: net.ReachabilityInfo,
         events: net.Connection.Events,
-    ) void {
+    ) net.Connection.NetworkAction {
         self.cancelTemporaryShutdownRetry();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
@@ -248,13 +248,14 @@ const WireGuardConnection = struct {
                 self.scheduleTemporaryShutdownRetry(events);
             },
         }
+        return if (self.adapter.isStarted()) .refresh_link else .none;
     }
 
     fn betterPath(
-        _: *WireGuardConnection,
+        self: *WireGuardConnection,
         _: net.Connection.Events,
-    ) void {
-        log.write(.debug, "Better path notification ignored");
+    ) net.Connection.NetworkAction {
+        return if (self.adapter.isStarted()) .refresh_link else .none;
     }
 
     fn reportDataCount(
@@ -551,14 +552,12 @@ fn networkChange(
     events: net.Connection.Events,
 ) net.Connection.NetworkAction {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.networkChange(reachability, events);
-    return .none;
+    return self.networkChange(reachability, events);
 }
 
 fn betterPath(ptr: *anyopaque, events: net.Connection.Events) net.Connection.NetworkAction {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.betterPath(events);
-    return .none;
+    return self.betterPath(events);
 }
 
 fn destroy(ptr: *anyopaque) void {
