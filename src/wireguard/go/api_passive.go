@@ -18,7 +18,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"time"
 	"unsafe"
 
 	"golang.zx2c4.com/wireguard/conn"
@@ -368,8 +367,8 @@ func (h *passiveHost) write(packets [][]byte, offset int, address *C.wg_endpoint
 	return result.count, result.err()
 }
 
-// Native descriptors are nonblocking. Keep retry scheduling and cancellation
-// on Go workers, with no native queue or retained request between attempts.
+// Hosts wait for readiness before returning AGAIN. Go checks cancellation and
+// retries only the uncompleted suffix, without a timer or native request queue.
 func retryPassiveIO(count int, reading bool, done, aborted <-chan struct{}, submit func(int) passiveResult) passiveResult {
 	completed := 0
 	for {
@@ -392,15 +391,6 @@ func retryPassiveIO(count int, reading bool, done, aborted <-chan struct{}, subm
 		if reading && completed != 0 || completed == count {
 			return passiveResult{completed, C.WG_IO_OK}
 		}
-		timer := time.NewTimer(time.Millisecond)
-		select {
-		case <-done:
-			timer.Stop()
-			return passiveResult{completed, C.WG_IO_CLOSED}
-		case <-aborted:
-			timer.Stop()
-			return passiveResult{completed, C.WG_IO_CLOSED}
-		case <-timer.C:
-		}
+
 	}
 }

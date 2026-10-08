@@ -35,8 +35,9 @@ typedef struct wg_packet {
  * Nonzero rejects it and MUST NOT complete it. The host must release all
  * descriptors/payloads before completion. Cancellation completes with CLOSED.
  * Callbacks execute on Go workers and may complete inline. AGAIN completes a
- * processed prefix (zero for reads with no data); Go retries the remaining
- * packets after a cancellable wait. Before turn-off,
+ * processed prefix (zero for reads with no data); the host waits for readiness
+ * before completing AGAIN. Go checks cancellation before retrying the remaining
+ * packets. Bound host waits so turn-off can finish. Before turn-off,
  * reject new requests and complete/cancel every accepted request.
  * Go pins all borrowed storage until completion and waits before reusing it. */
 typedef struct wg_read_packet {

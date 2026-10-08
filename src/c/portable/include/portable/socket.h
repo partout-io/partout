@@ -79,6 +79,12 @@ pp_socket_fd pp_socket_get_fd(pp_socket sock);
 /* Return the file descriptor to watch. Check result with pp_fd_is_valid(). */
 pp_fd pp_socket_get_watch_fd(pp_socket sock);
 
+/* Wait indefinitely on an I/O watch fd and a shared wake descriptor.
+ * POSIX uses poll(); Windows waits on configured socket/TUN events.
+ * Returns 1 for I/O readiness, 0 for wake, -1 on error. Wake is not reset here.
+ * An invalid I/O fd waits only for wake. */
+int pp_socket_poll(pp_fd fd, bool writing, pp_fd wake_fd);
+
 /* Configure nonblocking I/O for the native socket. */
 int pp_socket_set_nonblocking(pp_socket_fd fd);
 

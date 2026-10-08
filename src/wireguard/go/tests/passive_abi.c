@@ -191,6 +191,7 @@ static int32_t direct_link_read(void *raw, wg_read_packet *packets, uint32_t cou
     pthread_mutex_lock(&p->mutex);
     ++p->link_reads;
     pthread_mutex_unlock(&p->mutex);
+    usleep(100000); /* Emulate the native host readiness wait. */
     wgCompleteIO(request, 0, WG_IO_AGAIN);
     return WG_IO_OK;
 }
@@ -210,6 +211,7 @@ static int32_t direct_tun_read(void *raw, wg_read_packet *packets, uint32_t coun
         ++p->packets;
     }
     pthread_mutex_unlock(&p->mutex);
+    if (!available) usleep(100000);
     wgCompleteIO(request, available ? 1 : 0, available ? WG_IO_OK : WG_IO_AGAIN);
     return WG_IO_OK;
 }
@@ -252,7 +254,7 @@ static void test_direct_io(void) {
         if (!received) usleep(1000);
     }
     assert(received);
-    /* No native admission queue to drain: shutdown cancels the Go retry waits. */
+    /* No native admission queue to drain: shutdown cancels retries after the native wait. */
     wgTurnOffWithPassiveIO(handle);
     pthread_mutex_destroy(&p.mutex);
 }

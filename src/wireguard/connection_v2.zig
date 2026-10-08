@@ -116,6 +116,7 @@ const WireGuardConnection = struct {
             &created.configuration,
             sandbox.options.dns_timeout,
         );
+        created.adapter.io = &created.io;
         log.write(.notice, "Using WireGuardConnection v2");
         return created.asConnection();
     }

@@ -3,23 +3,28 @@
 
 const std = @import("std");
 const net = @import("../../net/exports.zig");
+const core = @import("../../core/exports.zig");
 const c = @import("wireguard_c");
+const io_c = @import("../../net/io.zig").io_c;
 const backend = @import("backend.zig");
 const Endpoint = c.wg_endpoint;
 
-/// Nonblocking native I/O called directly by Go workers. The bridge owns
+/// Native I/O called directly by Go workers. The bridge owns
 /// descriptors and serializes each native call with replacement and cleanup.
-/// Go handles retry waits; no native worker or looper retains borrowed buffers.
+/// Readiness waits release the mutex; no native worker or looper retains buffers.
 pub const PassiveIO = struct {
-    lock: @import("../../core/exports.zig").Mutex = .{},
+    lock: core.Mutex = .{},
     complete: *const fn (usize, u32, i32) callconv(.c) void,
     link: ?net.LinkDescriptor = null,
     tun: ?net.TunDescriptor = null,
     closed: bool = true,
+    mux: io_c.pp_mux = null,
+    waiters: usize = 0,
 
     pub fn replaceLink(self: *PassiveIO, descriptor: net.LinkDescriptor) void {
         self.lock.lock();
         defer self.lock.unlock();
+        self.wake();
         if (self.link) |*link| link.cleanup();
         self.link = descriptor;
         self.closed = false;
@@ -33,6 +38,7 @@ pub const PassiveIO = struct {
             rejected.cleanup();
             return;
         }
+        self.wake();
         if (self.tun) |*tun| tun.cleanup();
         self.tun = descriptor;
     }
@@ -48,16 +54,19 @@ pub const PassiveIO = struct {
         self.lock.lock();
         defer self.lock.unlock();
         self.closed = true;
+        self.wake();
     }
 
     pub fn release(self: *PassiveIO) void {
         self.lock.lock();
         defer self.lock.unlock();
         self.closed = true;
+        self.wake();
         if (self.link) |*link| link.cleanup();
         self.link = null;
         if (self.tun) |*tun| tun.cleanup();
         self.tun = null;
+        self.freeMuxIfReleased();
     }
 
     pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnelPassive {
@@ -95,13 +104,18 @@ pub const PassiveIO = struct {
         const descriptor = if (side == .link) self.link else self.tun;
         var completed: u32 = 0;
         var status: i32 = c.WG_IO_AGAIN;
+        var would_block = false;
         if (descriptor) |value| {
             for (packets[0..count]) |*packet| {
                 var address = std.mem.zeroes(net.SocketAddress);
                 const size = value.io.readPacket(packet.data[0..packet.capacity], &address) catch |err| {
+                    would_block = err == error.WouldBlock;
                     if (err != error.WouldBlock and err != error.DatagramDropped) status = c.WG_IO_INVALID;
                     break;
-                } orelse break;
+                } orelse {
+                    status = c.WG_IO_CLOSED;
+                    break;
+                };
                 packet.size = @intCast(size);
                 if (side == .link) {
                     if (value.io == .socket and !value.io.isUnconnected()) {
@@ -113,6 +127,11 @@ pub const PassiveIO = struct {
             }
         }
         if (completed != 0) status = c.WG_IO_OK;
+        if (status == c.WG_IO_INVALID or status == c.WG_IO_CLOSED) {
+            self.closed = true;
+            self.wake();
+        }
+        if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, false, would_block);
         self.lock.unlock();
         // Inline completion: all descriptor/payload access ends before this.
         self.complete(request, completed, status);
@@ -146,10 +165,12 @@ pub const PassiveIO = struct {
         const descriptor = if (side == .link) self.link else self.tun;
         var completed: u32 = 0;
         var status: i32 = c.WG_IO_AGAIN;
+        var would_block = false;
         if (descriptor) |value| {
             for (packets[0..count]) |packet| {
                 const data: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
                 const size = value.io.writePacket(data, 0, destination) catch |err| {
+                    would_block = err == error.WouldBlock;
                     if (err != error.WouldBlock and err != error.Backpressure) status = c.WG_IO_INVALID;
                     break;
                 };
@@ -161,9 +182,58 @@ pub const PassiveIO = struct {
             }
         }
         if (completed == count) status = c.WG_IO_OK;
+        if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, true, would_block);
         self.lock.unlock();
         self.complete(request, completed, status);
         return c.WG_IO_OK;
+    }
+
+    pub fn activate(self: *PassiveIO) void {
+        self.lock.lock();
+        defer self.lock.unlock();
+        self.closed = false;
+    }
+
+    fn wake(self: *PassiveIO) void {
+        if (self.waiters != 0) _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    fn freeMuxIfReleased(self: *PassiveIO) void {
+        if (self.closed and self.link == null and self.tun == null and self.waiters == 0) {
+            io_c.pp_mux_free(self.mux);
+            self.mux = null;
+        }
+    }
+
+    fn waitForReadiness(self: *PassiveIO, side: net.Side, writing: bool, would_block: bool) i32 {
+        const descriptor = if (side == .link) self.link else self.tun;
+        if (!would_block and descriptor != null) {
+            // Preserve the existing backpressure retry interval; idle reads use wake.
+            if (writing) {
+                self.lock.unlock();
+                core.sleepMs(100);
+                self.lock.lock();
+            }
+            return if (self.closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
+        }
+        if (self.mux == null) self.mux = io_c.pp_mux_create(1) orelse return c.WG_IO_INVALID;
+        self.waiters += 1;
+        defer {
+            self.waiters -= 1;
+            // Keep wake latched until every concurrent waiter has returned.
+            if (self.waiters == 0) _ = io_c.pp_mux_reset_wake(self.mux);
+            self.freeMuxIfReleased();
+        }
+        if (descriptor) |value| {
+            _ = value.io.waitForReadiness(writing, self.mux, &self.lock) catch return c.WG_IO_INVALID;
+        } else {
+            // Before TUN commit, wait for descriptor replacement or cancellation.
+            self.lock.unlock();
+            const result = io_c.pp_socket_poll(-1, writing, io_c.pp_mux_wake_descriptor(self.mux));
+            self.lock.lock();
+            if (result < 0) return c.WG_IO_INVALID;
+        }
+        return if (self.closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
     }
 };
 

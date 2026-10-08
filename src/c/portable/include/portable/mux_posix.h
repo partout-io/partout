@@ -237,3 +237,11 @@ bool pp_mux_wake(pp_mux mux) {
     if (ret == (ssize_t)sizeof(byte)) return true;
     return pp_io_wouldblock();
 }
+
+pp_fd pp_mux_wake_descriptor(pp_mux mux) {
+    return mux->wake_pipe[0];
+}
+
+bool pp_mux_reset_wake(pp_mux mux) {
+    return pp_mux_drain_wake(mux) == 0;
+}

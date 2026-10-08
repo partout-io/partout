@@ -11,6 +11,7 @@ const api = core.api;
 const log = core.logging;
 
 const impl = @import("backend.zig");
+const PassiveIO = @import("passive_io.zig").PassiveIO;
 const resolver = @import("resolver.zig");
 const uapi = @import("uapi.zig");
 
@@ -43,6 +44,7 @@ pub const WireGuardAdapter = struct {
     /// Latest reachability event, used only to gate background restart retries.
     last_reachable: ?bool = null,
     transport: impl.StartTunnelPassive = undefined,
+    io: ?*PassiveIO = null,
 
     /// Concrete failures produced while activating the WireGuard tunnel.
     /// The connection preserves allocator failures and logs/erases the
@@ -163,6 +165,7 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
         wg_config: [:0]const u8,
     ) StartBackendError!i32 {
+        if (self.io) |io| io.activate();
         log.write(.debug, "Start passive wg-go backend");
         const handle = self.backend.turnOnPassive(allocator, wg_config, self.transport) catch |err| {
             log.writef(.err, "Starting tunnel failed: {s}", .{@errorName(err)});
@@ -198,6 +201,7 @@ pub const WireGuardAdapter = struct {
                     .suspend_backend_when_offline => if (!is_reachable) {
                         log.write(.debug, "Connectivity offline, pausing backend.");
                         self.state = .temporary_shutdown;
+                        if (self.io) |io| io.quiesce();
                         self.backend.turnOff(handle);
                     } else {
                         self.updatePeerEndpoints(allocator, handle);
@@ -287,7 +291,10 @@ pub const WireGuardAdapter = struct {
 
     fn shutdown(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
         switch (self.state) {
-            .started => |handle| self.backend.turnOff(handle),
+            .started => |handle| {
+                if (self.io) |io| io.quiesce();
+                self.backend.turnOff(handle);
+            },
             .stopped, .temporary_shutdown => {},
         }
         self.state = .stopped;

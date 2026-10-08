@@ -79,10 +79,14 @@ test "WireGuard passive callbacks directly use Go buffers and wait for commit" {
     var result: Completion = .{};
     var buffer: [32]u8 = undefined;
     var packets = [_]c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
-    try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, 1, result.token()));
+    var before_commit = ReadRequest{ .passive = &passive, .side = .tun, .packets = &packets, .result = &result };
+    const pending = try std.Thread.spawn(.{}, ReadRequest.run, .{&before_commit});
+    try waitForWaiters(&passive, 1);
+    passive.replaceTun(tun.descriptor());
+    pending.join();
+    try std.testing.expectEqual(c.WG_IO_OK, before_commit.status);
     try std.testing.expectEqual(c.WG_IO_AGAIN, result.status);
     try std.testing.expectEqual(@as(u32, 0), result.count);
-    passive.replaceTun(tun.descriptor());
     try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, 1, result.token()));
     try std.testing.expectEqual(c.WG_IO_OK, result.status);
     try std.testing.expectEqual(@as(u32, 1), result.count);
@@ -169,4 +173,60 @@ test "WireGuard passive UDP preserves source and destination addresses" {
     try std.testing.expectEqual(destination.port, input[0].source.port);
     try std.testing.expectEqual(@as(u8, 4), input[0].source.family);
     try std.testing.expectEqualStrings("ip!", received[0..3]);
+}
+
+const ReadRequest = struct {
+    passive: *bridge.PassiveIO,
+    side: source.net.Side,
+    packets: [*c]c.wg_read_packet,
+    result: *Completion,
+    status: i32 = 99,
+    fn run(self: *ReadRequest) void {
+        const transport = self.passive.transport(51820, 1400);
+        const read = if (self.side == .link) transport.link.read else transport.tun.read;
+        self.status = read.?(transport.context, self.packets, 1, self.result.token());
+    }
+};
+
+fn waitForWaiters(passive: *bridge.PassiveIO, count: usize) !void {
+    for (0..3000) |_| {
+        passive.lock.lock();
+        const ready = passive.waiters == count;
+        passive.lock.unlock();
+        if (ready) return;
+        _ = usleep(1000);
+    }
+    passive.quiesce();
+    return error.TestUnexpectedResult;
+}
+
+test "WireGuard passive shared wake cancels link and precommit TUN waits" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var passive: bridge.PassiveIO = .{ .complete = Completion.finish };
+    defer passive.release();
+    const link = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
+    passive.replaceLink(link.linkDescriptor());
+    var buffers: [2][32]u8 = undefined;
+    var packets: [2]c.wg_read_packet = undefined;
+    var results: [2]Completion = .{ .{}, .{} };
+    var requests: [2]ReadRequest = undefined;
+    var threads: [2]std.Thread = undefined;
+    for (0..2) |i| {
+        packets[i] = .{ .data = &buffers[i], .capacity = 32 };
+        requests[i] = .{ .passive = &passive, .side = if (i == 0) .link else .tun, .packets = &packets[i], .result = &results[i] };
+        threads[i] = try std.Thread.spawn(.{}, ReadRequest.run, .{&requests[i]});
+    }
+    var joined = false;
+    errdefer if (!joined) {
+        passive.quiesce();
+        for (threads) |thread| thread.join();
+    };
+    try waitForWaiters(&passive, 2);
+    passive.quiesce();
+    for (threads) |thread| thread.join();
+    joined = true;
+    for (results) |result| {
+        try std.testing.expectEqual(@as(usize, 1), result.calls);
+        try std.testing.expectEqual(c.WG_IO_CLOSED, result.status);
+    }
 }

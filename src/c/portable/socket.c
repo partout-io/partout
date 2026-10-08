@@ -35,6 +35,7 @@ static bool local_is_valid_socket(pp_socket sock);
 #endif
 
 #if !PARTOUT_WINDOWS
+#include <poll.h>
 #include <sys/uio.h>
 #endif
 static bool address_pp_to_native(struct sockaddr_storage *, os_socklen_t *, const pp_socket_address *, bool);
@@ -99,6 +100,29 @@ static int local_getaddrinfo(const char *hostname,
 #else
     (void)reachability;
     return getaddrinfo(hostname, service, hints, result);
+#endif
+}
+
+int pp_socket_poll(pp_fd fd, bool writing, pp_fd wake_fd) {
+#if PARTOUT_WINDOWS
+    (void)writing; /* Read/write events are configured on the watch handle. */
+    HANDLE handles[2] = {wake_fd, fd};
+    const DWORD count = fd && fd != INVALID_HANDLE_VALUE ? 2 : 1;
+    const DWORD result = WaitForMultipleObjects(count, handles, FALSE, INFINITE);
+    if (result == WAIT_OBJECT_0) return 0;
+    return result == WAIT_OBJECT_0 + 1 ? 1 : -1;
+#else
+    struct pollfd descriptors[2] = {
+        {.fd = wake_fd, .events = POLLIN},
+        {.fd = fd, .events = writing ? POLLOUT : POLLIN},
+    };
+    int result;
+    do {
+        result = poll(descriptors, 2, -1);
+    } while (result < 0 && errno == EINTR);
+    if (result < 0) return -1;
+    if (descriptors[0].revents) return 0;
+    return 1;
 #endif
 }
 
