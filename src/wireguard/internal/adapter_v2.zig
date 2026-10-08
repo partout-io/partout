@@ -203,10 +203,9 @@ pub const WireGuardAdapter = struct {
         switch (self.state) {
             .started => |handle| {
                 switch (self.network_change_behavior) {
-                    .refresh_sockets => {
-                        // The host owns socket replacement; Go only updates peers.
-                        self.updatePeerEndpoints(allocator, handle);
-                    },
+                    // Match v1 on macOS: retain learned peer endpoints while
+                    // the connection requests host socket replacement.
+                    .refresh_sockets => {},
                     .suspend_backend_when_offline => if (!is_reachable) {
                         log.write(.debug, "Connectivity offline, pausing backend.");
                         self.state = .temporary_shutdown;
@@ -249,9 +248,7 @@ pub const WireGuardAdapter = struct {
         // Swift reapplies this wg-go workaround after every live endpoint
         // update under the suspend-while-offline policy. `setConfig` can
         // otherwise restore roaming behavior that is unreliable there.
-        if (self.network_change_behavior == .suspend_backend_when_offline) {
-            self.backend.disableRoaming(handle);
-        }
+        self.backend.disableRoaming(handle);
     }
 
     fn resumeTemporaryShutdown(
