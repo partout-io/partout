@@ -19,6 +19,7 @@ pub const PassiveIO = struct {
     link: ?net.LinkDescriptor = null,
     tun: ?net.TunDescriptor = null,
     closed: bool = true,
+    failure: ?struct { ctx: *anyopaque, report: core.SerializedExecutor.Block } = null,
 
     pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {
         return .{
@@ -133,12 +134,10 @@ pub const PassiveIO = struct {
                 completed += 1;
             }
         }
+        const terminal = status == c.WG_IO_INVALID or status == c.WG_IO_CLOSED;
         if (completed != 0) status = c.WG_IO_OK;
-        if (status == c.WG_IO_INVALID or status == c.WG_IO_CLOSED) {
-            self.closed = true;
-            self.wake();
-        }
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, false, would_block);
+        if (terminal or status == c.WG_IO_INVALID) self.reportFailure();
         self.lock.unlock();
         // Inline completion: all descriptor/payload access ends before this.
         self.complete(request, completed, status);
@@ -186,6 +185,7 @@ pub const PassiveIO = struct {
         }
         if (completed == count) status = c.WG_IO_OK;
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, true, would_block);
+        if (status == c.WG_IO_INVALID) self.reportFailure();
         self.lock.unlock();
         self.complete(request, completed, status);
         return c.WG_IO_OK;
@@ -195,6 +195,14 @@ pub const PassiveIO = struct {
         self.lock.lock();
         defer self.lock.unlock();
         self.closed = false;
+    }
+
+    // Called under the I/O lock; the reporter only queues serialized work.
+    fn reportFailure(self: *PassiveIO) void {
+        if (self.closed) return;
+        self.closed = true;
+        self.wake();
+        if (self.failure) |failure| failure.report(failure.ctx);
     }
 
     fn wake(self: *PassiveIO) void {

@@ -31,9 +31,13 @@ const PacketIO = struct {
     data_pointer: ?[*]const u8 = null,
     blocked: bool = false,
     block_write_after: ?usize = null,
+    read_error: bool = false,
+    write_error_after: ?usize = null,
+    short_write: bool = false,
 
     fn read(raw: *anyopaque, buffer: []u8) io.Error!?usize {
         const self: *PacketIO = @ptrCast(@alignCast(raw));
+        if (self.read_error) return error.LibcFailure;
         if (self.blocked or self.reads != 0) return error.WouldBlock;
         self.reads += 1;
         self.data_pointer = buffer.ptr;
@@ -42,6 +46,8 @@ const PacketIO = struct {
     }
     fn write(raw: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
         const self: *PacketIO = @ptrCast(@alignCast(raw));
+        if (self.writes == self.write_error_after) return error.LibcFailure;
+        if (self.short_write) return 0;
         if (self.blocked or self.writes == self.block_write_after) return error.Backpressure;
         self.writes += 1;
         self.data_pointer = data.ptr;
@@ -228,5 +234,54 @@ test "WireGuard passive shared wake cancels link and precommit TUN waits" {
     for (results) |result| {
         try std.testing.expectEqual(@as(usize, 1), result.calls);
         try std.testing.expectEqual(c.WG_IO_CLOSED, result.status);
+    }
+}
+
+const FailureRecorder = struct {
+    calls: usize = 0,
+    fn report(raw: *anyopaque) void {
+        const self: *FailureRecorder = @ptrCast(@alignCast(raw));
+        self.calls += 1;
+    }
+};
+
+fn failedWait(_: c_int, _: bool, _: c_int) callconv(.c) c_int {
+    return -1;
+}
+
+test "WireGuard passive terminal I/O failures report once and cancellation stays silent" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Scenario = enum { read_error, write_error, short_write, wait_error, cancel };
+    for (std.enums.values(Scenario)) |scenario| {
+        var passive = try bridge.PassiveIO.init(Completion.finish);
+        defer passive.deinit();
+        var failure = FailureRecorder{};
+        passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
+        var descriptor = PacketIO{
+            .read_error = scenario == .read_error,
+            .write_error_after = if (scenario == .write_error) 1 else null,
+            .short_write = scenario == .short_write,
+            .blocked = scenario == .wait_error,
+        };
+        passive.replaceLink(descriptor.descriptor());
+        passive.replaceTun(descriptor.descriptor());
+        const transport = passive.transport(51820, 1400);
+        var completion = Completion{};
+        var buffer: [32]u8 = undefined;
+        var reads = [_]c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
+        const writes = [_]c.wg_packet{ .{ .data = &buffer, .size = 4 }, .{ .data = &buffer, .size = 4 } };
+        if (scenario == .cancel) {
+            passive.quiesce();
+        } else if (scenario == .write_error or scenario == .short_write) {
+            try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, &writes, 2, completion.token()));
+            try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
+            try std.testing.expectEqual(@as(u32, if (scenario == .write_error) 1 else 0), completion.count);
+        } else {
+            if (scenario == .wait_error) passive.waiter.test_wait_once = failedWait;
+            try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &reads, 1, completion.token()));
+            try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
+        }
+        try std.testing.expectEqual(c.WG_IO_CLOSED, transport.tun.read.?(transport.context, &reads, 1, completion.token()));
+        try std.testing.expectEqual(@as(usize, if (scenario == .cancel) 0 else 1), failure.calls);
     }
 }

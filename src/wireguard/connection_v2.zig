@@ -117,6 +117,7 @@ const WireGuardConnection = struct {
             sandbox.options.dns_timeout,
         );
         created.adapter.io = &created.io;
+        created.io.failure = .{ .ctx = created, .report = onIOFailure };
         log.write(.notice, "Using WireGuardConnection v2");
         return created.asConnection();
     }
@@ -133,6 +134,40 @@ const WireGuardConnection = struct {
         self.io.deinit();
         self.configuration.deinit(allocator);
         allocator.destroy(self);
+    }
+
+    const IOFailureTask = struct {
+        allocator: std.mem.Allocator,
+        events: net.Connection.Events,
+
+        fn run(raw: *anyopaque) void {
+            const task: *IOFailureTask = @ptrCast(@alignCast(raw));
+            defer discard(raw);
+            log.write(.err, "WireGuard native I/O failed");
+            task.events.failed(task.events.ctx, .{
+                .err_pair = .{ .code = .ioFailure },
+                .disposition = .reconnect,
+            });
+        }
+
+        fn discard(raw: *anyopaque) void {
+            const task: *IOFailureTask = @ptrCast(@alignCast(raw));
+            task.allocator.destroy(task);
+        }
+    };
+
+    fn onIOFailure(raw: *anyopaque) void {
+        const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
+        const events = self.events orelse return;
+        const task = self.allocator.create(IOFailureTask) catch {
+            log.write(.err, "Unable to allocate WireGuard I/O failure task");
+            return;
+        };
+        task.* = .{ .allocator = self.allocator, .events = events };
+        self.serialized_executor.tryRunOwned(task, IOFailureTask.run, IOFailureTask.discard) catch {
+            IOFailureTask.discard(task);
+            log.write(.err, "Unable to enqueue WireGuard I/O failure");
+        };
     }
 
     fn releaseIO(self: *WireGuardConnection) void {

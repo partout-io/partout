@@ -297,6 +297,18 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     created.commit(second_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
 
+    // Unexpected EOF from an owned descriptor reaches daemon recovery once.
+    const transport = fake_backend.transport.?;
+    const wg_c = wireguard_internal.passive_io.testing.abi;
+    var buffer: [32]u8 = undefined;
+    var packets = [_]wg_c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
+    try std.testing.expectEqual(wg_c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, 1, 1));
+    try std.testing.expectEqual(wg_c.WG_IO_CLOSED, transport.tun.read.?(transport.context, &packets, 1, 1));
+    environment.executor.drain();
+    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
+    try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);
+
     created.stop(0, recorder.events());
     created.stop(0, recorder.events());
     try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
@@ -833,6 +845,7 @@ const FakeBackend = struct {
     disable_roaming_count: usize = 0,
     fail_turn_on_number: ?usize = null,
     out_of_memory_turn_on_number: ?usize = null,
+    transport: ?backend_mod.StartTunnelPassive = null,
     last_settings: ?[]u8 = null,
     last_set_config: ?[]u8 = null,
 
@@ -868,6 +881,7 @@ fn fakeTurnOn(
 ) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     std.testing.expect(tunnel.link.read != null and tunnel.link.write != null and tunnel.tun.read != null and tunnel.tun.write != null) catch unreachable;
+    self.transport = tunnel;
     self.turn_on_count += 1;
     if (self.out_of_memory_turn_on_number == self.turn_on_count)
         return error.OutOfMemory;
