@@ -201,7 +201,6 @@ test "WireGuard connection erases backend activation errors at the generic bound
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
@@ -237,7 +236,6 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
@@ -273,7 +271,6 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .min_data_count_interval = 2345 },
     });
     var destroyed = false;
@@ -363,7 +360,7 @@ const OwnedDescriptor = struct {
     };
 };
 
-test "WireGuard connection starts and stops through backend and controller" {
+test "WireGuard connection drains its running data timer before stopping" {
     const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
@@ -389,15 +386,32 @@ test "WireGuard connection starts and stops through backend and controller" {
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
-        .options = .{ .min_data_count_interval = 2345 },
+        .options = .{ .min_data_count_interval = 1 },
     });
     defer created.destroy();
 
-    try std.testing.expectEqual(@as(u32, 2345), connection.testing.dataCountIntervalMs(created));
+    try std.testing.expectEqual(@as(u32, 1), connection.testing.dataCountIntervalMs(created));
     try std.testing.expect(try startConnection(created, &environment.looper));
     waitUntil(&recorder.has_data_count);
-    created.stop(1000, recorder.events());
+    fake_backend.block_get_config.store(true, .release);
+    defer fake_backend.release_get_config.store(true, .release);
+    waitUntil(&fake_backend.get_config_entered);
+    const Stop = struct {
+        fn run(value: conn.Connection, events: conn.Connection.Events, entered: *AtomicBool, finished: *AtomicBool) void {
+            entered.store(true, .release);
+            value.stop(1000, events);
+            finished.store(true, .release);
+        }
+    };
+    var stop_entered = AtomicBool.init(false);
+    var stop_finished = AtomicBool.init(false);
+    const worker = try std.Thread.spawn(.{}, Stop.run, .{ created, recorder.events(), &stop_entered, &stop_finished });
+    defer worker.join();
+    waitUntil(&stop_entered);
+    const stopped_while_reading = stop_finished.load(.acquire);
+    fake_backend.release_get_config.store(true, .release);
+    waitUntil(&stop_finished);
+    try std.testing.expect(!stopped_while_reading);
 
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
@@ -443,7 +457,6 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
         .options = .{ .dns_timeout = 1234 },
     });
     defer created.destroy();
@@ -623,7 +636,6 @@ test "WireGuard connection handles network monitor events" {
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
@@ -701,7 +713,6 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
@@ -716,7 +727,6 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     _ = created.networkChange(.{ .reachable = false }, recorder.events());
     _ = created.networkChange(.{ .reachable = true }, recorder.events());
     connection.testing.waitForTemporaryShutdownRetry(created);
-    environment.executor.drain();
 
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
@@ -757,7 +767,6 @@ test "WireGuard connection retries passive backend failure without terminal even
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
@@ -770,17 +779,15 @@ test "WireGuard connection retries passive backend failure without terminal even
     _ = created.networkChange(.{ .reachable = false }, recorder.events());
     _ = created.networkChange(.{ .reachable = true }, recorder.events());
 
-    // The backend is paused, but the adapter remains active and retryable.
+    // A transient backend failure must not emit terminal events.
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-    try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     connection.testing.waitForTemporaryShutdownRetry(created);
-    environment.executor.drain();
 
+    try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
@@ -813,7 +820,6 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
         .looper = &environment.looper,
-        .serialized_executor = environment.serializedExecutor(),
     });
     defer created.destroy();
 
@@ -844,6 +850,9 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
 }
 
 const FakeBackend = struct {
+    block_get_config: AtomicBool = AtomicBool.init(false),
+    get_config_entered: AtomicBool = AtomicBool.init(false),
+    release_get_config: AtomicBool = AtomicBool.init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
     set_config_count: usize = 0,
@@ -903,7 +912,12 @@ fn fakeTurnOff(ptr: ?*anyopaque, handle: i32) void {
     std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
 }
 
-fn fakeGetConfig(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
+fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
+    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    if (self.block_get_config.load(.acquire)) {
+        self.get_config_entered.store(true, .release);
+        waitUntil(&self.release_get_config);
+    }
     return try allocator.dupe(u8,
         \\rx_bytes=10
         \\tx_bytes=20

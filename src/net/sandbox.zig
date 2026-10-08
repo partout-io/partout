@@ -32,7 +32,8 @@ pub const Sandbox = struct {
     resolver: DNSResolver,
     factory: SocketFactory,
     looper: *Looper,
-    serialized_executor: SerializedExecutor,
+    /// Legacy v1 capability; v2 connections do not use it.
+    serialized_executor: SerializedExecutor = undefined,
 };
 
 /// Interacts with the platform API to establish the physical

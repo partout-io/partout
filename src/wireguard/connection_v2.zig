@@ -47,6 +47,8 @@ pub const ConnectionContext = struct {
 
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
+    /// Serializes control calls with the connection's timer workers.
+    lock: core.Mutex,
     adapter: WireGuardAdapter,
     // Owns descriptors; native calls execute directly on Go workers.
     io: PassiveIO,
@@ -54,14 +56,11 @@ const WireGuardConnection = struct {
     configuration: api.WireGuardConfiguration,
     /// Captured event sink; Go workers also report I/O failures through it.
     events: ?net.Connection.Events,
-    /// Daemon-owned sandbox capability captured once at creation. Timer threads
-    /// use it to enqueue work without retaining or inspecting the unrelated
-    /// connection event callbacks.
-    serialized_executor: core.SerializedExecutor,
     data_count_timer: core.RunAfter,
     data_count_timer_active: bool,
     data_count_interval_ms: u32,
     temporary_shutdown_retry_timer: core.RunAfter,
+    temporary_shutdown_retry_timer_active: bool,
     temporary_shutdown_retry_delay_ms: u32,
 
     fn create(
@@ -96,15 +95,16 @@ const WireGuardConnection = struct {
 
         created.* = .{
             .allocator = allocator,
+            .lock = .{},
             .adapter = undefined,
             .io = try PassiveIO.init(complete),
             .configuration = configuration,
             .events = sandbox.events,
-            .serialized_executor = sandbox.serialized_executor,
             .data_count_timer = .{},
             .data_count_timer_active = false,
             .data_count_interval_ms = sandbox.options.min_data_count_interval,
             .temporary_shutdown_retry_timer = .{},
+            .temporary_shutdown_retry_timer_active = false,
             .temporary_shutdown_retry_delay_ms = 2000,
         };
         created.adapter = WireGuardAdapter.init(
@@ -133,6 +133,7 @@ const WireGuardConnection = struct {
         self.adapter.deinit(allocator);
         self.io.deinit();
         self.configuration.deinit(allocator);
+        self.lock.deinit();
         allocator.destroy(self);
     }
 
@@ -160,6 +161,8 @@ const WireGuardConnection = struct {
     }
 
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        self.lock.lock();
+        defer self.lock.unlock();
         self.io.replaceLink(remote.link);
         errdefer self.releaseIO();
         const events = self.events orelse return error.UnableToStart;
@@ -229,9 +232,11 @@ const WireGuardConnection = struct {
         // Match Swift: wg-go shutdown is normally immediate, so the generic
         // connection timeout has nothing useful to interrupt here.
         _ = timeout_ms;
-        const had_state = self.io.hasIO() or !self.adapter.isStopped();
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
+        self.lock.lock();
+        defer self.lock.unlock();
+        const had_state = self.io.hasIO() or !self.adapter.isStopped();
         self.io.quiesce();
         self.adapter.stop(self.allocator);
         self.releaseIO();
@@ -247,6 +252,8 @@ const WireGuardConnection = struct {
         events: net.Connection.Events,
     ) net.Connection.NetworkAction {
         self.cancelTemporaryShutdownRetry();
+        self.lock.lock();
+        defer self.lock.unlock();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => {},
             // Resuming the backend retains the established connection.
@@ -263,6 +270,8 @@ const WireGuardConnection = struct {
         self: *WireGuardConnection,
         _: net.Connection.Events,
     ) net.Connection.NetworkAction {
+        self.lock.lock();
+        defer self.lock.unlock();
         return self.prepareLinkRefresh();
     }
 
@@ -299,12 +308,12 @@ const WireGuardConnection = struct {
     }
 
     fn stopDataCountTimer(self: *WireGuardConnection) void {
+        self.lock.lock();
         const was_active = self.data_count_timer_active;
         self.data_count_timer_active = false;
         self.data_count_timer.cancel();
-        // The raw callback only posts asynchronously, so waiting cannot
-        // deadlock with the daemon actor. Once drained, a later start cannot
-        // inherit a callback from the previous timer generation.
+        self.lock.unlock();
+        // A running callback may be waiting for the connection lock.
         self.data_count_timer.wait();
         if (was_active) {
             log.write(.debug, "Cancelled WireGuardConnection.dataCountTimer");
@@ -313,16 +322,12 @@ const WireGuardConnection = struct {
 
     fn onDataCountTimer(ctx: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
-        self.serialized_executor.run(self, onDataCountTask);
-    }
-
-    fn onDataCountTask(ctx: *anyopaque) void {
-        const self: *WireGuardConnection = @ptrCast(@alignCast(ctx));
+        self.lock.lock();
+        defer self.lock.unlock();
         if (!self.data_count_timer_active) return;
         const events = self.events orelse return;
 
         self.reportDataCount(events);
-        if (!self.data_count_timer_active) return;
         self.data_count_timer.scheduleReplacing(
             self.data_count_interval_ms,
             onDataCountTimer,
@@ -342,11 +347,13 @@ const WireGuardConnection = struct {
         log.writef(.debug, "Retry backend restart in {} milliseconds", .{
             self.temporary_shutdown_retry_delay_ms,
         });
+        self.temporary_shutdown_retry_timer_active = true;
         self.temporary_shutdown_retry_timer.scheduleReplacing(
             self.temporary_shutdown_retry_delay_ms,
             onTemporaryShutdownRetry,
             self,
         ) catch |err| {
+            self.temporary_shutdown_retry_timer_active = false;
             self.handleTemporaryShutdownRetrySchedulingFailure(events, err);
         };
     }
@@ -382,19 +389,19 @@ const WireGuardConnection = struct {
     }
 
     fn cancelTemporaryShutdownRetry(self: *WireGuardConnection) void {
+        self.lock.lock();
+        self.temporary_shutdown_retry_timer_active = false;
         self.temporary_shutdown_retry_timer.cancel();
-        // See stopDataCountTimer(): draining closes the cancellation/startup
-        // race without adding synchronization to actor-owned adapter state.
+        self.lock.unlock();
         self.temporary_shutdown_retry_timer.wait();
     }
 
     fn onTemporaryShutdownRetry(ctx: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
-        self.serialized_executor.run(self, onTemporaryShutdownRetryTask);
-    }
-
-    fn onTemporaryShutdownRetryTask(ctx: *anyopaque) void {
-        const self: *WireGuardConnection = @ptrCast(@alignCast(ctx));
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (!self.temporary_shutdown_retry_timer_active) return;
+        self.temporary_shutdown_retry_timer_active = false;
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
