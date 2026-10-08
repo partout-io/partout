@@ -158,14 +158,13 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
             self.stop_count += 1;
             sink.stopped(sink.ctx);
         }
-        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) net.Connection.NetworkAction {
+        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.looper.isOnQueue());
             self.reachability_count += 1;
             sink.data_count(sink.ctx, .{});
-            return .none;
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) net.Connection.NetworkAction {
+        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.looper.isOnQueue());
             var servers = [_]api.Address{api.Address.parseRaw("1.1.1.1").?};
@@ -183,7 +182,6 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
             });
             // This storage expires before the actor can process established.
             servers[0] = api.Address.parseRaw("9.9.9.9").?;
-            return .none;
         }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -495,13 +493,9 @@ const FailingStartConnection = struct {
 
     fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) net.Connection.NetworkAction {
-        return .none;
-    }
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
-        return .none;
-    }
+    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
 
     fn destroy(_: *anyopaque) void {}
 
@@ -544,7 +538,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             self.events = sb.events;
             return .{ .ptr = self, .vtable = &vtable };
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) net.Connection.NetworkAction {
+        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.producer_thread = std.Thread.getCurrentId();
             var key = "OpenVPN.serverConfiguration".*;
@@ -554,7 +548,6 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             sink.set_env(sink.ctx, &key, &value);
             @memset(&key, 'x');
             @memset(&value, 'x');
-            return .none;
         }
         fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
             sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", null);
@@ -645,6 +638,7 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
     const io = @import("source").net_io;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
+        endpoint_list: [3]api.ExtendedEndpoint = undefined,
         owns_io: bool,
         events: net.Connection.Events = undefined,
         profile: *const api.Profile = undefined,
@@ -654,18 +648,23 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         link_port: u16 = 0,
         socket_connected: ?bool = null,
         remote: ?net.RemoteDescriptor = null,
+        start_count: usize = 0,
+        commit_count: usize = 0,
+        rebind_count: usize = 0,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            return @as([*]const api.ExtendedEndpoint, @ptrCast(&self.endpoint))[0..1];
+            return &self.endpoint_list;
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint };
             self.events = sb.events.?;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .owns_io = self.owns_io };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            self.start_count += 1;
             self.remote = remote;
             self.link_attached = remote.looper.isLinkAttached();
             self.link_port = (remote.link.localAddress() catch return error.UnableToStart).port;
@@ -677,7 +676,23 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         }
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            self.commit_count += 1;
             self.established_tun = tun;
+        }
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(remote.looper.isOnQueue());
+            std.debug.assert(self.established_tun != null);
+            self.remote.?.link.cleanup();
+            self.remote = remote;
+            self.rebind_count += 1;
+            return true;
+        }
+        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+            events.refreshed(events.ctx);
+        }
+        fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
+            events.refreshed(events.ctx);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -729,6 +744,9 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             table.endpoints = endpoints;
             table.start_v2 = start;
             table.commit = commit;
+            table.rebind = rebind;
+            table.better_path = betterPath;
+            table.network_change = networkChange;
             table.stop = stop;
             break :blk table;
         };
@@ -772,22 +790,38 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             try std.testing.expectEqual(@as(u16, 1194), peer.address.port);
             try std.testing.expectEqual(connect_udp or peer.plainSocketType() == .tcp, probe.socket_connected.?);
             if (!probe.socket_connected.?) try std.testing.expect(probe.remote.?.local_port != 0);
+            if (owns_io) {
+                const owner = sut.implementation.connection;
+                const tun = probe.established_tun.?;
+                try owner.actor.perform(void, .onBetterPath);
+                // The network handler enqueues refreshed; drain its actor hop.
+                try std.testing.expectError(error.AlreadyStarted, sut.start());
+                try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
+                try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
+                try std.testing.expectError(error.AlreadyStarted, sut.start());
+                try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
+                try std.testing.expectEqual(@as(usize, 1), probe.start_count);
+                try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
+                try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+            }
             sut.stop();
             try std.testing.expect(probe.established_tun == null);
         }
     }
 }
 
-test "v2 owned link is released on rejected dispatch and failed start" {
+test "v2 owned link is released on rejected dispatch and failed start or rebind" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const io = @import("source").net_io;
-    const Scenario = enum { initial_dispatch, refresh_dispatch, start_false, start_error };
+    const Scenario = enum { initial_dispatch, refresh_dispatch, start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
         scenario: Scenario,
         daemon: *Daemon = undefined,
         terminated: bool = false,
         socket_count: usize = 0,
         start_count: usize = 0,
+        rebind_count: usize = 0,
         last_fd: io.FileDescriptor = undefined,
         remote: ?net.RemoteDescriptor = null,
         const endpoint_list = [_]api.ExtendedEndpoint{
@@ -814,6 +848,18 @@ test "v2 owned link is released on rejected dispatch and failed start" {
                 else => true,
             };
         }
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(remote.looper.isOnQueue());
+            self.remote.?.link.cleanup();
+            self.remote = remote;
+            self.rebind_count += 1;
+            return switch (self.scenario) {
+                .rebind_false => false,
+                .rebind_error => error.UnableToStart,
+                else => true,
+            };
+        }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             if (self.remote) |remote| remote.link.cleanup();
@@ -825,8 +871,8 @@ test "v2 owned link is released on rejected dispatch and failed start" {
         fn looperTerminated(raw: *anyopaque, _: ?Looper.Failure) void {
             destroy(raw);
         }
-        fn betterPath(_: *anyopaque, _: net.Connection.Events) net.Connection.NetworkAction {
-            return .refresh_link;
+        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+            events.refreshed(events.ctx);
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -850,6 +896,7 @@ test "v2 owned link is released on rejected dispatch and failed start" {
             var value = FailingStartConnection.vtable;
             value.endpoints = endpoints;
             value.start_v2 = start;
+            value.rebind = rebind;
             value.stop = stop;
             value.destroy = destroy;
             value.looper_terminated = looperTerminated;
@@ -862,7 +909,7 @@ test "v2 owned link is released on rejected dispatch and failed start" {
         };
     };
     const allocator = std.testing.allocator;
-    for ([_]Scenario{ .initial_dispatch, .refresh_dispatch, .start_false, .start_error }) |scenario| {
+    for ([_]Scenario{ .initial_dispatch, .refresh_dispatch, .start_false, .start_error, .rebind_false, .rebind_error }) |scenario| {
         var probe = Probe{ .scenario = scenario };
         var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
         defer registry.deinit(allocator);
@@ -882,14 +929,17 @@ test "v2 owned link is released on rejected dispatch and failed start" {
         defer sut.stop();
         // Drain the initial gate evaluation before requesting a link refresh.
         try std.testing.expectError(error.AlreadyStarted, sut.start());
-        if (scenario == .refresh_dispatch) {
+        const refresh = scenario == .refresh_dispatch or scenario == .rebind_false or scenario == .rebind_error;
+        if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
             try sut.implementation.connection.actor.perform(void, .onBetterPath);
+            try std.testing.expectError(error.AlreadyStarted, sut.start());
         }
         sut.stop();
-        try std.testing.expectEqual(@as(usize, if (scenario == .refresh_dispatch) 2 else 1), probe.socket_count);
+        try std.testing.expectEqual(@as(usize, if (refresh) 2 else 1), probe.socket_count);
         try std.testing.expectEqual(@as(usize, if (scenario == .initial_dispatch) 0 else 1), probe.start_count);
+        try std.testing.expectEqual(@as(usize, if (scenario == .rebind_false or scenario == .rebind_error) 1 else 0), probe.rebind_count);
         try std.testing.expect(probe.remote == null);
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
     }
