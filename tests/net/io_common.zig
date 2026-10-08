@@ -3,8 +3,9 @@
 
 const std = @import("std");
 const source = @import("source");
-const c = source.ffi.io;
-const Waiter = source.net_waiter.Waiter;
+const io = source.net_io_common;
+const c = io.io_c;
+const Waiter = io.Waiter;
 
 fn failWait(_: c.pp_fd, _: bool, _: c.pp_fd) callconv(.c) c_int {
     return -1;

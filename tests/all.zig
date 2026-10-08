@@ -30,6 +30,7 @@ comptime {
     _ = @import("net/daemon.zig");
     _ = @import("net/daemon_v2.zig");
     _ = @import("net/io.zig");
+    _ = @import("net/io_common.zig");
     if (@import("builtin").os.tag != .windows) {
         _ = @import("net/io_posix.zig");
         _ = @import("net/socket_datagram.zig");
@@ -41,7 +42,6 @@ comptime {
     _ = @import("net/looper_io.zig");
     _ = @import("net/looper_helpers.zig");
     _ = @import("net/mux.zig");
-    _ = @import("net/waiter.zig");
     _ = @import("net/platform.zig");
     _ = @import("net/resolver.zig");
     if (source.openvpn_enabled) {

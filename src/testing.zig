@@ -20,7 +20,7 @@ pub const net_connection = @import("net/connection.zig");
 pub const net_daemon = @import("net/daemon.zig");
 pub const net_daemon_v2 = @import("net/daemon_v2.zig");
 pub const net_daemon_helpers = @import("net/daemon_helpers.zig");
-pub const net_waiter = @import("net/waiter.zig");
+pub const net_io_common = @import("net/io_common.zig");
 pub const net_io = @import("net/io.zig");
 pub const net_io_posix = if (@import("builtin").os.tag == .windows) struct {} else @import("net/io_posix.zig");
 pub const net_looper = @import("net/looper_runtime.zig");
