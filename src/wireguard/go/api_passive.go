@@ -178,6 +178,13 @@ func setPassiveEndpoints(handle int32, settings string) int64 {
 	return 0
 }
 
+//export wgSendKeepalivesWithPassiveIO
+func wgSendKeepalivesWithPassiveIO(handle int32) {
+	if tunnel, ok := lookupPassiveBackend(handle); ok {
+		tunnel.SendKeepalivesToPeersWithCurrentKeypair()
+	}
+}
+
 //export wgDisableRoamingWithPassiveIO
 func wgDisableRoamingWithPassiveIO(handle int32) {
 	if tunnel, ok := lookupPassiveBackend(handle); ok {

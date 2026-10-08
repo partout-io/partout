@@ -54,6 +54,11 @@ pub const Backend = struct {
         set_config: *const fn (?*anyopaque, std.mem.Allocator, i32, [:0]const u8) Error!i64,
         socket_descriptors: *const fn (?*anyopaque, std.mem.Allocator, i32) Error![]net.SocketDescriptor,
         bump_sockets: *const fn (?*anyopaque, i32, bool) void,
+        send_keepalives: *const fn (?*anyopaque, i32) void = struct {
+            fn call(_: ?*anyopaque, _: i32) void {
+                unreachable;
+            }
+        }.call,
         disable_roaming: *const fn (?*anyopaque, i32) void,
         complete_io: ?*const fn (usize, u32, i32) callconv(.c) void = null,
     };
@@ -109,6 +114,10 @@ pub const Backend = struct {
         self.vtable.bump_sockets(self.ptr, handle, sync);
     }
 
+    pub fn sendKeepalives(self: Backend, handle: i32) void {
+        self.vtable.send_keepalives(self.ptr, handle);
+    }
+
     pub fn disableRoaming(self: Backend, handle: i32) void {
         self.vtable.disable_roaming(self.ptr, handle);
     }
@@ -139,6 +148,7 @@ const go_passive_backend_vtable = Backend.VTable{
     .set_config = cSetConfigPassive,
     .socket_descriptors = cSocketDescriptorsPassive,
     .bump_sockets = cBumpSocketsPassive,
+    .send_keepalives = cSendKeepalivesPassive,
     .disable_roaming = cDisableRoamingPassive,
     .complete_io = wireguard_c.pp_wg_complete_io,
 };
@@ -254,6 +264,10 @@ fn cSocketDescriptorsPassive(_: ?*anyopaque, _: std.mem.Allocator, _: i32) Error
 // FIXME: ###
 fn cBumpSocketsPassive(_: ?*anyopaque, _: i32, _: bool) void {
     unreachable;
+}
+
+fn cSendKeepalivesPassive(_: ?*anyopaque, handle: i32) void {
+    wireguard_c.pp_wg_send_keepalives_passive(handle);
 }
 
 fn cDisableRoamingPassive(_: ?*anyopaque, handle: i32) void {

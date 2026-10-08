@@ -144,6 +144,13 @@ pub const WireGuardAdapter = struct {
         return self.state == .started;
     }
 
+    pub fn sendKeepalives(self: *const WireGuardAdapter) void {
+        switch (self.state) {
+            .started => |handle| self.backend.sendKeepalives(handle),
+            .stopped, .temporary_shutdown => {},
+        }
+    }
+
     fn activate(
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,

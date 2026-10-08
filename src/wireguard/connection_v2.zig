@@ -228,6 +228,7 @@ const WireGuardConnection = struct {
         self.lock.lock();
         defer self.lock.unlock();
         self.io.replaceLink(remote.link);
+        self.adapter.sendKeepalives();
         return self.adapter.isStarted();
     }
 

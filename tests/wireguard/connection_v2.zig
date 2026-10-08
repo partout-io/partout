@@ -286,8 +286,10 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     created.commit(first_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
 
     try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
@@ -861,6 +863,7 @@ const FakeBackend = struct {
     turn_off_count: usize = 0,
     set_config_count: usize = 0,
     bump_sockets_count: usize = 0,
+    send_keepalives_count: usize = 0,
     disable_roaming_count: usize = 0,
     fail_turn_on_number: ?usize = null,
     out_of_memory_turn_on_number: ?usize = null,
@@ -889,6 +892,7 @@ const fake_backend_vtable = backend_mod.Backend.VTable{
     .set_config = fakeSetConfig,
     .socket_descriptors = fakeSocketDescriptors,
     .bump_sockets = fakeBumpSockets,
+    .send_keepalives = fakeSendKeepalives,
     .disable_roaming = fakeDisableRoaming,
 };
 
@@ -943,6 +947,12 @@ fn fakeSocketDescriptors(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) b
 fn fakeBumpSockets(ptr: ?*anyopaque, _: i32, _: bool) void {
     const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
     self.bump_sockets_count += 1;
+}
+
+fn fakeSendKeepalives(ptr: ?*anyopaque, handle: i32) void {
+    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
+    std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
+    self.send_keepalives_count += 1;
 }
 
 fn fakeDisableRoaming(ptr: ?*anyopaque, _: i32) void {
