@@ -196,6 +196,10 @@ pub const PassiveIO = struct {
                 }
                 completed += 1;
             }
+        } else if (side == .link) {
+            // Synchronous Go sends must not wait for the daemon to finish rebinding.
+            dropped = true;
+            status = c.WG_IO_INVALID;
         }
         if (completed == count) status = c.WG_IO_OK;
         if (status == c.WG_IO_AGAIN) status = self.waitForReadiness(side, true, would_block);

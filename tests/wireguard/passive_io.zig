@@ -286,7 +286,7 @@ test "WireGuard passive terminal I/O failures report once and cancellation stays
     }
 }
 
-test "WireGuard passive destination errors retain the shared UDP transport" {
+test "WireGuard passive destination errors and rebind gaps stay nonterminal" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var passive = try bridge.PassiveIO.init(Completion.finish);
@@ -327,5 +327,21 @@ test "WireGuard passive destination errors retain the shared UDP transport" {
     }
     try std.testing.expectEqual(c.WG_IO_OK, completion.status);
     try std.testing.expectEqual(@as(u32, 4), reads[0].size);
+    try std.testing.expectEqual(@as(usize, 0), failure.calls);
+
+    passive.releaseLink();
+    // Make an unexpected wait fail immediately instead of hanging the test.
+    passive.waiter.test_wait_once = failedWait;
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &valid, 1, &destination, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_INVALID, completion.status);
+    try std.testing.expectEqual(@as(u32, 0), completion.count);
+    try std.testing.expectEqual(@as(usize, 0), failure.calls);
+    try std.testing.expect(!passive.closed);
+
+    const replacement = (try io.SocketWrapper.create(allocator, null, .{ .port = address.port, .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
+    passive.replaceLink(replacement.linkDescriptor());
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &valid, 1, &destination, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_OK, completion.status);
+    try std.testing.expectEqual(@as(u32, 1), completion.count);
     try std.testing.expectEqual(@as(usize, 0), failure.calls);
 }
