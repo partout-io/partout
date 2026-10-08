@@ -26,8 +26,8 @@ bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable);
 void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx);
 void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx);
 int pp_mux_wait(pp_mux mux, int *_Nullable error_code);
+
 bool pp_mux_wake(pp_mux mux);
-/* Shared readiness waits leave wake signalled until their last waiter returns. */
 pp_fd pp_mux_wake_descriptor(pp_mux mux);
 bool pp_mux_reset_wake(pp_mux mux);
 
