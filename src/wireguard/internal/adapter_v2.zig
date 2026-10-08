@@ -11,10 +11,11 @@ const api = core.api;
 const log = core.logging;
 
 const impl = @import("backend.zig");
-const PassiveIO = @import("passive_io.zig").PassiveIO;
+const passive_io = @import("passive_io.zig");
 const resolver = @import("resolver.zig");
 const uapi = @import("uapi.zig");
 
+const PassiveIO = passive_io.PassiveIO;
 const PeerEndpointResolver = resolver.PeerEndpointResolver;
 
 /// Selects network-change semantics independently of the platform name.
