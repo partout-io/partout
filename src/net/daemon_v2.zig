@@ -416,7 +416,7 @@ const ConnectionDaemon = struct {
 
     // Network and protocol producers may hold locks needed by actor work. These
     // callbacks enqueue messages without waiting or changing lifecycle state; borrowed
-    // establishment data is cloned. V2 protocol events normally arrive on the looper.
+    // establishment data is cloned. Protocol events may arrive on actor or I/O workers.
 
     // This is where connection events are rerouted through the actor
     fn events(self: *ConnectionDaemon) Connection.Events {
@@ -561,8 +561,8 @@ const ConnectionDaemon = struct {
     //#region Actor thread - connection lifecycle and state
 
     // The actor serializes these methods and their updates to the shared Daemon.
-    // Gate callbacks also run inline here. Protocol operations cross to the looper
-    // through callOnLooper; only the actor waits for that work to finish.
+    // Gate callbacks also run inline here. In looper mode, protocol operations
+    // cross to the looper through callConnection; only the actor waits.
 
     fn doStart(self: *ConnectionDaemon) Error!void {
         if (self.daemon.state != .initial) return error.AlreadyStarted;
@@ -635,7 +635,7 @@ const ConnectionDaemon = struct {
     }
 
     // Called on the actor, before accepting connection work. Publish the
-    // complete state before starting callbacks on the looper.
+    // complete state before starting any looper callbacks.
     fn createConnection(self: *ConnectionDaemon) Error!void {
         std.debug.assert(self.connection == null);
         const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
@@ -664,7 +664,7 @@ const ConnectionDaemon = struct {
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
         errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
-        looper.start() catch |err| return switch (err) {
+        if (connection.daemon_io == .looper) looper.start() catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             else => error.LooperFailure,
         };
@@ -692,9 +692,9 @@ const ConnectionDaemon = struct {
         timeout_ms: u32,
         reason: Connection.ShutdownReason,
     ) !void {
-        _ = try self.callOnLooper(.{ .shutdown = reason });
+        _ = try self.callConnection(.{ .shutdown = reason });
         try self.detachLooperSides();
-        _ = try self.callOnLooper(.{ .stop = timeout_ms });
+        _ = try self.callConnection(.{ .stop = timeout_ms });
     }
 
     fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
@@ -740,10 +740,10 @@ const ConnectionDaemon = struct {
             self.scheduleResumeGate();
             return;
         };
-        // Performs connection.start() on the looper thread. Remember to
-        // detach the link on failure.
+        // Start on the actor or looper according to daemon_io.
+        // Detach any looper-owned link on failure.
         self.trackConnectionStatus(.connecting);
-        const did_start = self.callOnLooper(.{ .start = remote }) catch |err| {
+        const did_start = self.callConnection(.{ .start = remote }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -763,14 +763,15 @@ const ConnectionDaemon = struct {
             self.scheduleResumeGate();
             return;
         }
-        // Connection attempted on the looper in background.
+        // Connection establishment continues through queued events.
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
-        log.write(.notice, "Create new link");
         const connection = self.connection orelse @panic("setupLink but no connection");
         const conn_options = self.daemon.options.connection_options;
-        var remote = RemoteDescriptor{ .link = undefined, .looper = self.looper };
+        var remote = RemoteDescriptor{ .looper = self.looper };
+        if (connection.daemon_io == .none) return remote;
+        log.write(.notice, "Create new link");
         const reachability = self.factory.currentReachability();
         var endpoint: ?api.ExtendedEndpoint = null;
         if (self.endpoint_resolver) |*resolver| {
@@ -804,7 +805,7 @@ const ConnectionDaemon = struct {
         log.writef(.info, "Link type is {s}", .{
             if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
         });
-        if (!connection.owns_io) {
+        if (connection.daemon_io == .looper) {
             log.write(.info, "Attach LINK");
             try self.looper.attach(.{
                 .pair = .{ .link = descriptor },
@@ -875,20 +876,20 @@ const ConnectionDaemon = struct {
     fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        _ = self.callOnLooper(.{ .reachability = reachability }) catch return;
+        _ = self.callConnection(.{ .reachability = reachability }) catch return;
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
-        _ = self.callOnLooper(.better_path) catch return;
+        _ = self.callConnection(.better_path) catch return;
     }
 
     fn handleConnectionEstablished(
         self: *ConnectionDaemon,
         success: net.Connection.Events.Success,
-    ) !void {
+    ) StartError!void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
         const connection = self.connection orelse return;
@@ -899,9 +900,9 @@ const ConnectionDaemon = struct {
         };
         // Retain ownership until descriptor preparation and handoff succeed.
         errdefer tunnel.destroy();
-        const descriptor = try tunnel.tunDescriptor();
-        if (connection.owns_io) {
-            connection.commit(descriptor);
+        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
+        if (connection.daemon_io != .looper) {
+            try connection.commit(descriptor);
             self.trackConnectionStatus(.connected);
             return;
         }
@@ -932,7 +933,7 @@ const ConnectionDaemon = struct {
         if (self.daemon.state != .started) return;
         if (self.connection == null) return;
         // Failure callbacks leave the session owned by Connection. Finalize
-        // it on the looper before the gate can start another attempt.
+        // it before the gate can start another attempt.
         self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
             log.writef(.err, "Unable to stop failed connection: {s}", .{@errorName(err)});
             return;
@@ -957,7 +958,7 @@ const ConnectionDaemon = struct {
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();
-        if (!try self.callOnLooper(.{ .rebind = remote })) return error.UnableToStart;
+        if (!try self.callConnection(.{ .rebind = remote })) return error.UnableToStart;
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1166,7 +1167,7 @@ const ConnectionDaemon = struct {
                 self.handleConnectionEstablished(success) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
-                        .err_pair = .{ .code = .tunNotAvailable },
+                        .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
                     });
                 };
@@ -1204,13 +1205,13 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Looper interface
+    //#region Connection dispatch
 
-    // The actor submits a stack-backed request through callOnLooper and waits for
-    // completion. CallOnLooper.run executes on the looper; connection callbacks
-    // only enqueue actor messages, allowing the actor to wait without a cycle.
+    // The actor executes connection control directly unless the looper owns I/O.
+    // Looper mode dispatches a stack-backed request and waits for completion;
+    // connection callbacks enqueue actor messages without waiting for the actor.
 
-    const CallOnLooper = struct {
+    const ConnectionCall = struct {
         connection: Connection,
         events: Connection.Events,
         link_handoff_entered: bool = false,
@@ -1224,7 +1225,7 @@ const ConnectionDaemon = struct {
         },
 
         fn run(ctx: ?*anyopaque) !bool {
-            const request: *CallOnLooper = @ptrCast(@alignCast(ctx.?));
+            const request: *ConnectionCall = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
                 .start => |remote| {
                     request.link_handoff_entered = true;
@@ -1244,23 +1245,24 @@ const ConnectionDaemon = struct {
     };
 
     // Only the actor waits. Connection callbacks enqueue actor messages.
-    fn callOnLooper(
+    fn callConnection(
         self: *ConnectionDaemon,
-        operation: @FieldType(CallOnLooper, "operation"),
+        operation: @FieldType(ConnectionCall, "operation"),
     ) !bool {
-        var request = CallOnLooper{
+        var request = ConnectionCall{
             .connection = self.connection.?,
             .events = self.events(),
             .operation = operation,
         };
-        // An owned link transfers only when startV2 or rebind is entered, even if it fails.
-        defer if (request.connection.owns_io and !request.link_handoff_entered) {
+        // A daemon-created link transfers only when startV2 or rebind is entered, even if it fails.
+        defer if (request.connection.daemon_io == .link and !request.link_handoff_entered) {
             switch (operation) {
-                .start, .rebind => |remote| remote.link.cleanup(),
+                .start, .rebind => |remote| if (remote.link) |link| link.cleanup(),
                 else => {},
             }
         };
-        return self.looper.perform(bool, &request, CallOnLooper.run);
+        if (request.connection.daemon_io != .looper) return ConnectionCall.run(&request);
+        return self.looper.perform(bool, &request, ConnectionCall.run);
     }
 
     //#endregion

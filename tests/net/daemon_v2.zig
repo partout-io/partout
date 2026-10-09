@@ -190,7 +190,6 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
         const vtable = net.Connection.VTable{
-            .commit = noopCommit,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -500,7 +499,6 @@ const FailingStartConnection = struct {
     fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
-        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -633,23 +631,26 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     try std.testing.expect(controller.valid_payload);
 }
 
-test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadata" {
+test "v2 I/O modes control socket creation, attachment, and descriptor handoff" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const io = @import("source").net_io;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
         endpoint_list: [3]api.ExtendedEndpoint = undefined,
-        owns_io: bool,
+        daemon_io: net.Connection.DaemonIO,
         events: net.Connection.Events = undefined,
         profile: *const api.Profile = undefined,
         established_tun: ?io.TunDescriptor = null,
         controller: mock_mod.MockTunnelController = .{},
         link_attached: bool = false,
         link_port: u16 = 0,
+        tun_fd: io.FileDescriptor = undefined,
         socket_connected: ?bool = null,
         remote: ?net.RemoteDescriptor = null,
         start_count: usize = 0,
         commit_count: usize = 0,
+        commit_error: ?net.ConnectionStartError = null,
+        tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -660,30 +661,36 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint };
             self.events = sb.events.?;
             self.profile = sb.profile;
-            return .{ .ptr = self, .vtable = &vtable, .owns_io = self.owns_io };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(remote.looper.isOnQueue() == (self.daemon_io == .looper));
+            if (self.daemon_io != .looper) {
+                std.testing.expectError(error.LooperUnavailable, remote.looper.perform(void, null, idleCheck)) catch unreachable;
+            }
             self.start_count += 1;
             self.remote = remote;
             self.link_attached = remote.looper.isLinkAttached();
-            self.link_port = (remote.link.localAddress() catch return error.UnableToStart).port;
-            if (self.owns_io) self.events.established(self.events.ctx, .{ .info = .{
+            self.link_port = if (remote.link) |link| (link.localAddress() catch return error.UnableToStart).port else 0;
+            if (self.daemon_io != .looper) self.events.established(self.events.ctx, .{ .info = .{
                 .profile = self.profile.*,
                 .original_module_id = @import("source").net_connection.activeConnectionModule(self.profile).?.id(),
             } });
-            return self.owns_io;
+            return self.daemon_io != .looper;
         }
-        fn commit(raw: *anyopaque, tun: io.TunDescriptor) void {
+        fn idleCheck(_: ?*anyopaque) anyerror!void {}
+        fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
+            if (self.commit_error) |err| return err;
             self.established_tun = tun;
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(remote.looper.isOnQueue());
+            std.debug.assert(!remote.looper.isOnQueue());
             std.debug.assert(self.established_tun != null);
-            self.remote.?.link.cleanup();
+            if (self.remote.?.link) |link| link.cleanup();
             self.remote = remote;
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
@@ -699,8 +706,8 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            if (self.owns_io) {
-                if (self.remote) |remote| remote.link.cleanup();
+            if (self.daemon_io != .looper) {
+                if (self.remote) |remote| if (remote.link) |link| link.cleanup();
                 self.remote = null;
                 if (self.established_tun) |tun| tun.cleanup();
                 self.established_tun = null;
@@ -718,8 +725,8 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
             const controller: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
             const self: *@This() = @fieldParentPtr("controller", controller);
             const tun = try controller.interface().setTunnelSettings(info);
-            // Borrow the link fd for descriptor preparation; the mock TUN owns no fd.
-            tun.test_descriptor = .{ .fd = self.remote.?.link.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            // Borrow the link fd when present; a handed-off mock TUN needs no native fd.
+            tun.test_descriptor = .{ .fd = if (self.remote.?.link) |link| link.fd else self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -730,7 +737,10 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
             return data.len - offset;
         }
-        fn cleanup(_: *anyopaque) void {}
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.tun_cleanup_count += 1;
+        }
         fn lastError(_: *anyopaque) c_int {
             return 0;
         }
@@ -759,69 +769,109 @@ test "v2 connect_udp selects UDP socket mode and preserves resolved peer metadat
         };
     };
     const allocator = std.testing.allocator;
+    const scenarios = [_]struct { mode: net.Connection.DaemonIO, err: ?net.ConnectionStartError = null }{
+        .{ .mode = .none },
+        .{ .mode = .link },
+        .{ .mode = .looper },
+        .{ .mode = .none, .err = error.UnableToStart },
+        .{ .mode = .link, .err = error.UnableToStart },
+        .{ .mode = .none, .err = error.OutOfMemory },
+        .{ .mode = .link, .err = error.OutOfMemory },
+    };
     for ([_]api.IPSocketType{ .udp, .udp4, .udp6, .tcp, .tcp4, .tcp6 }) |proto| {
-        for ([_]bool{ true, false }) |connect_udp| {
-            const owns_io = !connect_udp;
-            var probe = Probe{ .owns_io = owns_io, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
-            var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
-            defer registry.deinit(allocator);
-            var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
-            defer profile.deinit(allocator);
-            var controller_table = probe.controller.interface().vtable.*;
-            controller_table.set_tunnel_settings = Probe.setTunnel;
-            var monitor = mock_mod.MockNetworkMonitor{};
-            var factory_table = mock_mod.noopSocketFactory().vtable.*;
-            factory_table.create = Probe.socket;
-            const sut = try Daemon.create(allocator, &profile, .{
-                .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
-                .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
-            });
-            defer sut.destroy();
-            try sut.start();
-            defer sut.stop();
-            try std.testing.expectError(error.AlreadyStarted, sut.start());
-            try std.testing.expectEqual(!owns_io, probe.link_attached);
-            try std.testing.expect(probe.link_port != 0);
-            if (owns_io) {
-                const owner = sut.implementation.connection;
-                try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-                try std.testing.expect(probe.established_tun != null);
-                try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
-            }
-            const peer = probe.remote.?.endpoint.?;
-            try std.testing.expectEqual(proto, peer.type);
-            try std.testing.expectEqual(@as(u16, 1194), peer.address.port);
-            try std.testing.expectEqual(connect_udp or peer.plainSocketType() == .tcp, probe.socket_connected.?);
-            if (!probe.socket_connected.?) try std.testing.expect(probe.remote.?.local_port != 0);
-            if (owns_io) {
-                const owner = sut.implementation.connection;
-                const tun = probe.established_tun.?;
-                try owner.actor.perform(void, .onBetterPath);
-                // Duplicate queued requests and requests during handoff share one rebind.
+        for (scenarios) |scenario| {
+            const daemon_io = scenario.mode;
+            const commit_error = scenario.err;
+            for ([_]bool{ true, false }) |connect_udp| {
+                var probe = Probe{ .daemon_io = daemon_io, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+                var tun_pipe: [2]std.c.fd_t = undefined;
+                if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
+                defer _ = std.c.close(tun_pipe[0]);
+                defer _ = std.c.close(tun_pipe[1]);
+                probe.tun_fd = tun_pipe[0];
+                var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+                defer registry.deinit(allocator);
+                var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+                defer profile.deinit(allocator);
+                var controller_table = probe.controller.interface().vtable.*;
+                controller_table.set_tunnel_settings = Probe.setTunnel;
+                var monitor = mock_mod.MockNetworkMonitor{};
+                var factory_table = mock_mod.noopSocketFactory().vtable.*;
+                factory_table.create = Probe.socket;
+                const sut = try Daemon.create(allocator, &profile, .{
+                    .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                    .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
+                });
+                defer sut.destroy();
+                try sut.start();
+                defer sut.stop();
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
-                try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
-                try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
-                try std.testing.expectError(error.AlreadyStarted, sut.start());
-                try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
-                try std.testing.expectEqual(@as(usize, 1), probe.start_count);
-                try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
-                try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
-                try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                if (commit_error) |err| {
+                    try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
+                    try std.testing.expect(probe.established_tun == null);
+                    try std.testing.expect(probe.remote == null);
+                    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                    try std.testing.expectEqual(daemon.testing.codeForDaemonStartError(err), sut.snapshot_publisher.last_error.?.code);
+                    for (sut.test_status_history[0..sut.test_status_count]) |status| {
+                        try std.testing.expect(status != .connected);
+                    }
+                    continue;
+                }
+                try std.testing.expectEqual(daemon_io == .looper, probe.link_attached);
+                if (daemon_io == .none) {
+                    try std.testing.expect(probe.remote.?.link == null);
+                    try std.testing.expect(probe.remote.?.endpoint == null);
+                    try std.testing.expectEqual(@as(u16, 0), probe.link_port);
+                    try std.testing.expect(probe.socket_connected == null);
+                } else {
+                    try std.testing.expect(probe.link_port != 0);
+                }
+                if (daemon_io != .looper) {
+                    const owner = sut.implementation.connection;
+                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    try std.testing.expect(probe.established_tun != null);
+                    try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
+                }
+                if (daemon_io != .none) {
+                    const peer = probe.remote.?.endpoint.?;
+                    try std.testing.expectEqual(proto, peer.type);
+                    try std.testing.expectEqual(@as(u16, 1194), peer.address.port);
+                    try std.testing.expectEqual(connect_udp or peer.plainSocketType() == .tcp, probe.socket_connected.?);
+                    if (!probe.socket_connected.?) try std.testing.expect(probe.remote.?.local_port != 0);
+                }
+                if (daemon_io != .looper) {
+                    const owner = sut.implementation.connection;
+                    const tun = probe.established_tun.?;
+                    try owner.actor.perform(void, .onBetterPath);
+                    // Duplicate queued requests and requests during handoff share one rebind.
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
+                    try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
+                    if (daemon_io == .none) {
+                        try std.testing.expect(probe.remote.?.link == null);
+                        try std.testing.expect(probe.socket_connected == null);
+                    }
+                    try std.testing.expectEqual(@as(usize, 1), probe.start_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                    try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
+                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                }
+                sut.stop();
+                try std.testing.expect(probe.established_tun == null);
             }
-            sut.stop();
-            try std.testing.expect(probe.established_tun == null);
         }
     }
 }
 
-test "v2 owned link is released on rejected dispatch and failed start or rebind" {
+test "v2 daemon-created link is released on failed start or rebind" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const io = @import("source").net_io;
-    const Scenario = enum { initial_dispatch, refresh_dispatch, start_false, start_error, rebind_false, rebind_error };
+    const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
         scenario: Scenario,
-        daemon: *Daemon = undefined,
-        terminated: bool = false,
         socket_count: usize = 0,
         start_count: usize = 0,
         rebind_count: usize = 0,
@@ -837,9 +887,7 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            // Do not restart after the injected terminal looper failure.
-            if (self.terminated) return error.OutOfMemory;
-            return .{ .ptr = self, .vtable = &vtable, .owns_io = true };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -853,8 +901,8 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(remote.looper.isOnQueue());
-            self.remote.?.link.cleanup();
+            std.debug.assert(!remote.looper.isOnQueue());
+            self.remote.?.link.?.cleanup();
             self.remote = remote;
             self.rebind_count += 1;
             return switch (self.scenario) {
@@ -865,13 +913,10 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
         }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            if (self.remote) |remote| remote.link.cleanup();
+            if (self.remote) |remote| remote.link.?.cleanup();
             self.remote = null;
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
-            destroy(raw);
-        }
-        fn looperTerminated(raw: *anyopaque, _: ?Looper.Failure) void {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
@@ -883,16 +928,6 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
             const descriptor = wrapper.linkDescriptor();
             self.last_fd = descriptor.fd;
             self.socket_count += 1;
-            const reject_at: usize = switch (self.scenario) {
-                .initial_dispatch => 1,
-                .refresh_dispatch => 2,
-                else => 0,
-            };
-            if (self.socket_count == reject_at) {
-                // Terminate after creating the socket, before dispatching startV2.
-                self.daemon.implementation.connection.looper.stop() catch unreachable;
-                self.terminated = true;
-            }
             return descriptor;
         }
         const vtable = blk: {
@@ -902,7 +937,6 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
             value.rebind = rebind;
             value.stop = stop;
             value.destroy = destroy;
-            value.looper_terminated = looperTerminated;
             value.better_path = betterPath;
             break :blk value;
         };
@@ -912,7 +946,7 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
         };
     };
     const allocator = std.testing.allocator;
-    for ([_]Scenario{ .initial_dispatch, .refresh_dispatch, .start_false, .start_error, .rebind_false, .rebind_error }) |scenario| {
+    for ([_]Scenario{ .start_false, .start_error, .rebind_false, .rebind_error }) |scenario| {
         var probe = Probe{ .scenario = scenario };
         var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
         defer registry.deinit(allocator);
@@ -927,12 +961,11 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
             .options = .{ .reconnection_delay_ms = 60_000 },
         });
         defer sut.destroy();
-        probe.daemon = sut;
         try sut.start();
         defer sut.stop();
         // Drain the initial gate evaluation before requesting a link refresh.
         try std.testing.expectError(error.AlreadyStarted, sut.start());
-        const refresh = scenario == .refresh_dispatch or scenario == .rebind_false or scenario == .rebind_error;
+        const refresh = scenario == .rebind_false or scenario == .rebind_error;
         if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
@@ -941,11 +974,9 @@ test "v2 owned link is released on rejected dispatch and failed start or rebind"
         }
         sut.stop();
         try std.testing.expectEqual(@as(usize, if (refresh) 2 else 1), probe.socket_count);
-        try std.testing.expectEqual(@as(usize, if (scenario == .initial_dispatch) 0 else 1), probe.start_count);
+        try std.testing.expectEqual(@as(usize, 1), probe.start_count);
         try std.testing.expectEqual(@as(usize, if (scenario == .rebind_false or scenario == .rebind_error) 1 else 0), probe.rebind_count);
         try std.testing.expect(probe.remote == null);
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
     }
 }
-
-fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}

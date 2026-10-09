@@ -169,8 +169,8 @@ pub fn activeConnectionModule(profile: *const api.Profile) ?ConnectionModule {
 }
 
 pub const RemoteDescriptor = struct {
-    /// Owned by the connection when owns_io is true; otherwise borrowed from the looper.
-    link: io.LinkDescriptor,
+    /// Absent in none mode, transferred in link mode, borrowed in looper mode.
+    link: ?io.LinkDescriptor = null,
     endpoint: ?io.SocketEndpoint = null,
     local_port: u16 = 0,
     looper: *Looper,
@@ -182,10 +182,21 @@ pub const RemoteDescriptor = struct {
 pub const Connection = struct {
     ptr: *anyopaque,
     vtable: *const VTable,
-    /// Manages daemon link/tun I/O internally.
-    owns_io: bool = false,
+    /// Selects the daemon's responsibility for socket creation and packet I/O.
+    daemon_io: DaemonIO = .looper,
+
     /// Requested bind port for an unconnected link; zero selects an ephemeral port.
     local_port: u16 = 0,
+
+    pub const DaemonIO = enum {
+        /// The connection/backend creates sockets and performs all packet I/O.
+        /// The daemon creates TUN and transfers it through commit().
+        none,
+        /// The daemon creates sockets and TUN, then transfers them to the connection.
+        link,
+        /// The daemon creates sockets and TUN; the looper owns their lifetime and I/O.
+        looper,
+    };
 
     pub const ShutdownReason = union(enum) {
         explicit_stop,
@@ -249,17 +260,19 @@ pub const Connection = struct {
                 return null;
             }
         }.call,
-        /// When owns_io is true, takes link ownership on entry, including on failure.
+        /// In link mode, takes link ownership on entry, including on failure.
         start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
                 return false;
             }
         }.call,
-        /// Commits TUN after the established event, transferring ownership
-        /// to the connection when it performs packet I/O.
-        commit: *const fn (*anyopaque, io.TunDescriptor) void,
+        /// Commits TUN after the established event. On success, transfers ownership
+        /// to the connection when it performs packet I/O; on failure, the caller retains it.
+        commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
+            fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
+        }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
-        /// When owns_io is true, takes link ownership on entry, including on failure.
+        /// In link mode, takes link ownership on entry, including on failure.
         rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
                 return false;
@@ -321,8 +334,8 @@ pub const Connection = struct {
         return self.vtable.start(self.ptr, events);
     }
 
-    pub fn commit(self: Connection, tun: io.TunDescriptor) void {
-        self.vtable.commit(self.ptr, tun);
+    pub fn commit(self: Connection, tun: io.TunDescriptor) StartError!void {
+        return self.vtable.commit(self.ptr, tun);
     }
 
     pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {

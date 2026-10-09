@@ -155,7 +155,7 @@ const WireGuardConnection = struct {
         return .{
             .ptr = self,
             .vtable = &wireguard_connection_vtable,
-            .owns_io = true,
+            .daemon_io = .link,
             .local_port = @intCast(self.configuration.interface.listen_port orelse 0),
         };
     }
@@ -163,9 +163,9 @@ const WireGuardConnection = struct {
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link);
+        self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 start() requires a link descriptor"));
         errdefer self.releaseIO();
-        const events = self.events orelse return error.UnableToStart;
+        const events = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
         if (!self.adapter.isStopped()) {
             log.write(.debug, "Replaced link, adapter is already active");
             return true;
@@ -219,7 +219,7 @@ const WireGuardConnection = struct {
         return true;
     }
 
-    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
+    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
         log.write(.info, "Commit WireGuard TUN");
         self.io.replaceTun(descriptor);
     }
@@ -227,7 +227,7 @@ const WireGuardConnection = struct {
     fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link);
+        self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 rebind() requires a link descriptor"));
         self.adapter.sendKeepalives();
         return !self.adapter.isStopped();
     }
@@ -552,9 +552,9 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     return self.startV2(remote);
 }
 
-fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) void {
+fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.commit(descriptor);
+    return self.commit(descriptor);
 }
 
 fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {

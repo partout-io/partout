@@ -275,7 +275,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     });
     var destroyed = false;
     defer if (!destroyed) created.destroy();
-    try std.testing.expect(created.owns_io);
+    try std.testing.expectEqual(.link, created.daemon_io);
 
     var first_link = OwnedDescriptor{};
     var first_tun = OwnedDescriptor{};
@@ -283,7 +283,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     var second_tun = OwnedDescriptor{};
     try std.testing.expect(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
     try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
-    created.commit(first_tun.descriptor());
+    try created.commit(first_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
@@ -294,7 +294,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
-    created.commit(second_tun.descriptor());
+    try created.commit(second_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
 
     // Unexpected EOF from an owned descriptor reaches daemon recovery once.
@@ -322,7 +322,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     var final_link = OwnedDescriptor{};
     var final_tun = OwnedDescriptor{};
     try std.testing.expect(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
-    created.commit(final_tun.descriptor());
+    try created.commit(final_tun.descriptor());
     created.destroy();
     destroyed = true;
     try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
@@ -748,7 +748,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         .suspend_backend_when_offline,
     );
     var retained_tun = OwnedDescriptor{};
-    created.commit(retained_tun.descriptor());
+    try created.commit(retained_tun.descriptor());
     created.betterPath(recorder.events());
     created.networkChange(.{ .reachable = false }, recorder.events());
     // The queued rebind must succeed even if an offline event overtakes it.
