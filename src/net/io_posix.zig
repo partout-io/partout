@@ -95,9 +95,9 @@ pub const POSIXInterface = union(enum) {
         };
     }
 
-    /// Resolve the wrapper's fd before releasing the caller's optional I/O lock.
+    /// Resolve the wrapper's fd before releasing the caller's held I/O lock.
     /// The lock is reacquired before returning; no wrapper access occurs while waiting.
-    pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: ?*core.Mutex) Error!bool {
+    pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: *core.Mutex) Error!bool {
         const fd = switch (self) {
             .mock => -1,
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,

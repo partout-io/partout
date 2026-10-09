@@ -116,20 +116,19 @@ pub const Waiter = struct {
     }
 
     /// A null descriptor waits only for wake. Returns true for I/O readiness.
-    /// Concurrent callers must supply the same protecting lock. A caller joining
+    /// Callers must hold the same protecting lock. A caller joining
     /// an outstanding wake waits for its original pollers to drain, then returns
     /// false so the owner can recheck descriptors replaced during that wake.
-    pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: ?*core.Mutex) Waiter.Error!bool {
+    pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: *core.Mutex) Waiter.Error!bool {
         self.pending += 1;
         defer {
             self.pending -= 1;
             self.freeIfReleased();
         }
         if (self.waking) {
-            const mutex = lock orelse @panic("Concurrent readiness waits require a lock");
             // A fresh, unsignalled poller may enter before this caller resumes.
             // Only wait for the wake to drain, not for all later I/O to finish.
-            while (self.waking) self.pollers.drained.wait(mutex);
+            while (self.waking) self.pollers.drained.wait(lock);
             return false;
         }
         self.pollers.enter();
@@ -141,8 +140,8 @@ pub const Waiter = struct {
                 self.waking = false;
             }
         }
-        if (lock) |mutex| mutex.unlock();
-        defer if (lock) |mutex| mutex.lock();
+        lock.unlock();
+        defer lock.lock();
         const wait_once = if (builtin.is_test) self.test_wait_once orelse io_c.pp_mux_wait_once else io_c.pp_mux_wait_once;
         const result = wait_once(fd orelse io_c.pp_fd_invalid(), writing, io_c.pp_mux_wake_descriptor(self.mux));
         if (result < 0) return error.WaitFailed;

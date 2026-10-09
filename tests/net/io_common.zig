@@ -27,10 +27,14 @@ test "waiter returns a named failure and completes cleanup" {
 test "waiter initializes its mux before waiting" {
     var waiter = Waiter.init() orelse return error.MuxCreationFailed;
     defer waiter.deinit();
+    var lock: source.core.Mutex = .{};
+    defer lock.deinit();
+    lock.lock();
+    defer lock.unlock();
 
     try std.testing.expect(waiter.mux != null);
     try std.testing.expect(c.pp_mux_wake(waiter.mux));
-    try std.testing.expect(!try waiter.wait(null, false, null));
+    try std.testing.expect(!try waiter.wait(null, false, &lock));
     try std.testing.expectEqual(@as(usize, 0), waiter.pending);
 }
 

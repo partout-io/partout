@@ -81,8 +81,12 @@ test "TUN looper descriptor is made nonblocking by the wrapper" {
     const descriptor = try tun.tunDescriptor();
     var waiter = @import("source").net.Waiter.init() orelse return error.TestUnexpectedResult;
     defer waiter.deinit();
+    var mutex: @import("source").core.Mutex = .{};
+    defer mutex.deinit();
+    mutex.lock();
+    defer mutex.unlock();
     try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "!", 1));
-    try std.testing.expect(try descriptor.io.waitForReadiness(false, &waiter, null));
+    try std.testing.expect(try descriptor.io.waitForReadiness(false, &waiter, &mutex));
     tun.test_descriptor = null;
     try std.testing.expectEqual(fds[0], descriptor.fd);
     try std.testing.expect(descriptor.io.tun == tun);
@@ -188,8 +192,13 @@ test "POSIX readiness wait releases the ownership lock while waiting for UDP" {
     const native = local.linkDescriptor().io;
     var waiter = @import("source").net.Waiter.init() orelse return error.TestUnexpectedResult;
     defer waiter.deinit();
-    try std.testing.expect(try native.waitForReadiness(true, &waiter, null));
     var mutex: core.Mutex = .{};
+    defer mutex.deinit();
+    {
+        mutex.lock();
+        defer mutex.unlock();
+        try std.testing.expect(try native.waitForReadiness(true, &waiter, &mutex));
+    }
     const Sender = struct {
         fn send(lock: *core.Mutex, socket: *io.SocketWrapper, address: io.SocketAddress) void {
             lock.lock();
