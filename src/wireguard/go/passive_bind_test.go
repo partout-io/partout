@@ -379,7 +379,7 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 				if handles[i] < 0 {
 					t.Fatal("passive startup failed")
 				}
-				defer wgTurnOffWithPassiveIO(handles[i])
+				defer wgTurnOff(handles[i])
 				backend, _ := lookupPassiveBackend(handles[i])
 				devices[i] = backend.Device
 			}
@@ -401,7 +401,7 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 					<-keepalives[i]
 				}
 				session := binds[i].session
-				wgSendKeepalivesWithPassiveIO(handles[i])
+				wgSendKeepalives(handles[i])
 				select {
 				case <-keepalives[i]:
 				case <-time.After(5 * time.Second):

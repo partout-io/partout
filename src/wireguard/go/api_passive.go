@@ -10,7 +10,6 @@ import "C"
 
 import (
 	"fmt"
-	"math"
 	"net"
 	"net/netip"
 	"runtime"
@@ -30,19 +29,12 @@ type passiveBackend struct {
 	tun  *passiveTun
 }
 
-// Passive handles belong to a separate registry and must only be passed to
-// passive ABI functions. Never reuse IDs: stale lifecycle calls must not reach a new device.
-var passiveBackends = struct {
-	sync.RWMutex
-	next     int64
-	byHandle map[int32]passiveBackend
-}{byHandle: make(map[int32]passiveBackend)}
-
 func lookupPassiveBackend(handle int32) (passiveBackend, bool) {
-	passiveBackends.RLock()
-	defer passiveBackends.RUnlock()
-	tunnel, ok := passiveBackends.byHandle[handle]
-	return tunnel, ok
+	tunnel, ok := lookupTunnelHandle(handle)
+	if !ok || tunnel.passive == nil {
+		return passiveBackend{}, false
+	}
+	return *tunnel.passive, true
 }
 
 //export wgTurnOnWithPassiveIO
@@ -95,55 +87,22 @@ func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) in
 	}
 	// Reserve a handle before Up can publish writes: no fallible registration
 	// work may remain after the host has accepted borrowed requests.
-	passiveBackends.Lock()
-	if passiveBackends.next > math.MaxInt32 {
-		passiveBackends.Unlock()
+	handle := reserveTunnelHandle()
+	if handle < 0 {
 		closeDevice()
 		return -1
 	}
-	handle := int32(passiveBackends.next)
-	passiveBackends.next++
-	passiveBackends.Unlock()
 	if err := dev.Up(); err != nil {
 		logger.Errorf("Unable to start device: %v", err)
 		closeDevice()
 		return -1
 	}
 	logger.Verbosef("Device started")
-	passiveBackends.Lock()
-	defer passiveBackends.Unlock()
-	passiveBackends.byHandle[handle] = passiveBackend{dev, bind, tun}
+	registerTunnelHandle(handle, tunnelHandle{Device: dev, Logger: logger, passive: &passiveBackend{dev, bind, tun}})
 	if bind.host != nil {
 		close(bind.host.ready)
 	}
 	return handle
-}
-
-//export wgTurnOffWithPassiveIO
-func wgTurnOffWithPassiveIO(handle int32) {
-	passiveBackends.Lock()
-	tunnel, ok := passiveBackends.byHandle[handle]
-	delete(passiveBackends.byHandle, handle)
-	passiveBackends.Unlock()
-	if ok {
-		if tunnel.bind.host != nil {
-			tunnel.bind.host.abort()
-		}
-		tunnel.Close()
-	}
-}
-
-//export wgGetConfigWithPassiveIO
-func wgGetConfigWithPassiveIO(handle int32) *C.char {
-	tunnel, ok := lookupPassiveBackend(handle)
-	if !ok {
-		return nil
-	}
-	settings, err := tunnel.IpcGet()
-	if err != nil {
-		return nil
-	}
-	return C.CString(settings)
 }
 
 //export wgSetEndpointsWithPassiveIO
@@ -176,20 +135,6 @@ func setPassiveEndpoints(handle int32, settings string) int64 {
 		return -1
 	}
 	return 0
-}
-
-//export wgSendKeepalivesWithPassiveIO
-func wgSendKeepalivesWithPassiveIO(handle int32) {
-	if tunnel, ok := lookupPassiveBackend(handle); ok {
-		tunnel.SendKeepalivesToPeersWithCurrentKeypair()
-	}
-}
-
-//export wgDisableRoamingWithPassiveIO
-func wgDisableRoamingWithPassiveIO(handle int32) {
-	if tunnel, ok := lookupPassiveBackend(handle); ok {
-		tunnel.DisableSomeRoamingForBrokenMobileSemantics()
-	}
 }
 
 func endpointFromC(endpoint *C.wg_endpoint) (netip.AddrPort, error) {

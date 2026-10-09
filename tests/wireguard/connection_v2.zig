@@ -1194,11 +1194,11 @@ test "WireGuard backend dispatches the passive startup payload separately" {
     };
     try std.testing.expectEqual(@as(i32, 7), try backend.turnOnPassive(std.testing.allocator, "passive", tunnel));
     try std.testing.expect(called);
-    try std.testing.expectError(error.TransportFailure, backend_mod.goBackend().turnOnPassive(std.testing.allocator, "passive", tunnel));
+    try std.testing.expect(backend_mod.goBackend().vtable.complete_io != null);
 
     const tun = try io.TunWrapper.create(std.testing.allocator, null);
     defer tun.destroy();
-    try std.testing.expectError(error.TransportFailure, backend_mod.goPassiveBackend().turnOn(std.testing.allocator, "legacy", .{
+    try std.testing.expectError(error.TransportFailure, backend.turnOn(std.testing.allocator, "legacy", .{
         .tun = tun,
         .ifname = "test",
     }));

@@ -75,26 +75,29 @@ also continues to support asynchronous hosts that retain requests until completi
 
 Startup writes can run synchronously while `wgTurnOnWithPassiveIO` executes;
 readers wait for successful startup before entering the callbacks. Shutdown
-rejects new native requests, calls `wgTurnOffWithPassiveIO` to cancel retries and
+rejects new native requests, calls `wgTurnOff` to cancel retries and
 join Go workers, then releases the descriptors and bridge context. Each native
 call is nonblocking, and no packet request depends on a looper or native worker.
 Handles are never reused, so stale lifecycle calls cannot affect a replacement
 device.
 
-The passive API has a separate handle registry from the native v1 API. Use
-`wgGetConfigWithPassiveIO` for statistics/configuration reads and
-`wgDisableRoamingWithPassiveIO` for the mobile roaming policy. Never pass passive
-handles to native lifecycle/configuration functions (or vice versa): their
-numeric values can overlap. The legacy Go implementation remains unchanged;
-only logging and the underlying WireGuard dependency are shared.
+Both startup modes share one non-reused handle registry and the same `wgTurnOff`,
+`wgGetConfig`, `wgDisableSomeRoamingForBrokenMobileSemantics`, and
+`wgSendKeepalives` entry points. Passive shutdown also aborts host requests before
+joining Go workers. `wgSetEndpointsWithPassiveIO` accepts endpoint-only updates;
+`wgSetConfig` applies the same restriction to passive handles. Full configuration,
+MTU, or listen-port changes require restarting a passive device. Socket bump
+functions leave passive host-owned transport unchanged.
 
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain
-native Go I/O. V2 connections own transport (`daemon_io = .link`). The daemon
-creates/configures the UDP socket and transfers it through `startV2()`. After
-`.established`, it applies tunnel settings and transfers the TUN through
-`commit()`. The bridge owns replacement and native resource cleanup. Windows
-native descriptor I/O remains unimplemented. The runtime log identifies this
+native Go I/O. V2 uses native Go I/O on non-Windows platforms
+(`daemon_io = .none`) and passive transport on Windows (`daemon_io = .link`).
+In link mode, the daemon creates/configures UDP and transfers it through `startV2()`.
+After `.established`, the daemon applies tunnel settings and transfers the TUN
+through `commit()` in both modes. The active backend starts on commit. The
+connection owns handed-off resources and cleans them up after backend shutdown.
+Windows native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
 Validation:

@@ -12,9 +12,6 @@ wgBumpSocketsAndWait
 wgDisableSomeRoamingForBrokenMobileSemantics
 wgVersion
 wgTurnOnWithPassiveIO
-wgTurnOffWithPassiveIO
-wgGetConfigWithPassiveIO
 wgSetEndpointsWithPassiveIO
-wgSendKeepalivesWithPassiveIO
-wgDisableRoamingWithPassiveIO
 wgCompleteIO
+wgSendKeepalives

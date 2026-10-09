@@ -127,29 +127,16 @@ pub fn goBackend() Backend {
     return .{ .vtable = &go_backend_vtable };
 }
 
-pub fn goPassiveBackend() Backend {
-    return .{ .vtable = &go_passive_backend_vtable };
-}
-
 const go_backend_vtable = Backend.VTable{
     .turn_on = cTurnOn,
+    .turn_on_passive = cTurnOnPassive,
     .turn_off = cTurnOff,
     .get_config = cGetConfig,
     .set_config = cSetConfig,
     .socket_descriptors = cSocketDescriptors,
     .bump_sockets = cBumpSockets,
+    .send_keepalives = cSendKeepalives,
     .disable_roaming = cDisableRoaming,
-};
-
-const go_passive_backend_vtable = Backend.VTable{
-    .turn_on_passive = cTurnOnPassive,
-    .turn_off = cTurnOffPassive,
-    .get_config = cGetConfigPassive,
-    .set_config = cSetConfigPassive,
-    .socket_descriptors = cSocketDescriptorsPassive,
-    .bump_sockets = cBumpSocketsPassive,
-    .send_keepalives = cSendKeepalivesPassive,
-    .disable_roaming = cDisableRoamingPassive,
     .complete_io = wireguard_c.pp_wg_complete_io,
 };
 
@@ -241,35 +228,6 @@ fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, 
     return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context);
 }
 
-fn cTurnOffPassive(_: ?*anyopaque, handle: i32) void {
-    wireguard_c.pp_wg_turn_off_passive(handle);
-}
-
-fn cGetConfigPassive(_: ?*anyopaque, allocator: std.mem.Allocator, handle: i32) Error!?[]u8 {
-    const config = wireguard_c.pp_wg_get_config_passive(handle) orelse return null;
-    defer portable_c.pp_free(config);
-    return try allocator.dupe(u8, std.mem.span(config));
-}
-
-// Passive updates are restricted to peer endpoints; the host owns transport.
-fn cSetConfigPassive(_: ?*anyopaque, _: std.mem.Allocator, handle: i32, settings: [:0]const u8) Error!i64 {
-    return wireguard_c.pp_wg_set_endpoints_passive(handle, settings.ptr);
-}
-
-// FIXME: ###
-fn cSocketDescriptorsPassive(_: ?*anyopaque, _: std.mem.Allocator, _: i32) Error![]net.SocketDescriptor {
-    return error.TransportFailure;
-}
-
-// FIXME: ###
-fn cBumpSocketsPassive(_: ?*anyopaque, _: i32, _: bool) void {
-    unreachable;
-}
-
-fn cSendKeepalivesPassive(_: ?*anyopaque, handle: i32) void {
-    wireguard_c.pp_wg_send_keepalives_passive(handle);
-}
-
-fn cDisableRoamingPassive(_: ?*anyopaque, handle: i32) void {
-    wireguard_c.pp_wg_tweak_mobile_roaming_passive(handle);
+fn cSendKeepalives(_: ?*anyopaque, handle: i32) void {
+    wireguard_c.pp_wg_send_keepalives(handle);
 }

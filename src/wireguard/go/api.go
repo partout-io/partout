@@ -18,6 +18,7 @@ import (
 	"math"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -31,9 +32,39 @@ var loggerCtx unsafe.Pointer
 type tunnelHandle struct {
 	*device.Device
 	*device.Logger
+	passive *passiveBackend
 }
 
-var tunnelHandles = make(map[int32]tunnelHandle)
+// Both modes share non-reused handles so stale calls cannot reach a replacement.
+var tunnelHandles = struct {
+	sync.RWMutex
+	next     int64
+	byHandle map[int32]tunnelHandle
+}{byHandle: make(map[int32]tunnelHandle)}
+
+func reserveTunnelHandle() int32 {
+	tunnelHandles.Lock()
+	defer tunnelHandles.Unlock()
+	if tunnelHandles.next > math.MaxInt32 {
+		return -1
+	}
+	handle := int32(tunnelHandles.next)
+	tunnelHandles.next++
+	return handle
+}
+
+func registerTunnelHandle(handle int32, tunnel tunnelHandle) {
+	tunnelHandles.Lock()
+	defer tunnelHandles.Unlock()
+	tunnelHandles.byHandle[handle] = tunnel
+}
+
+func lookupTunnelHandle(handle int32) (tunnelHandle, bool) {
+	tunnelHandles.RLock()
+	defer tunnelHandles.RUnlock()
+	tunnel, ok := tunnelHandles.byHandle[handle]
+	return tunnel, ok
+}
 
 //export wgSetLogger
 func wgSetLogger(context, loggerFn uintptr) {
@@ -48,25 +79,19 @@ func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger)
 		return -1
 	}
 
-	dev.Up()
-	logger.Verbosef("Device started")
-
-	var i int32
-	for i = 0; i < math.MaxInt32; i++ {
-		if _, exists := tunnelHandles[i]; !exists {
-			break
-		}
-	}
-	if i == math.MaxInt32 {
+	handle := reserveTunnelHandle()
+	if handle < 0 {
 		return -1
 	}
-	tunnelHandles[i] = tunnelHandle{dev, logger}
-	return i
+	dev.Up()
+	logger.Verbosef("Device started")
+	registerTunnelHandle(handle, tunnelHandle{Device: dev, Logger: logger})
+	return handle
 }
 
 //export wgGetSocketV4
 func wgGetSocketV4(tunnelHandle int32) int32 {
-	dev, ok := tunnelHandles[tunnelHandle]
+	dev, ok := lookupTunnelHandle(tunnelHandle)
 	if !ok {
 		return -1
 	}
@@ -83,7 +108,7 @@ func wgGetSocketV4(tunnelHandle int32) int32 {
 
 //export wgGetSocketV6
 func wgGetSocketV6(tunnelHandle int32) int32 {
-	dev, ok := tunnelHandles[tunnelHandle]
+	dev, ok := lookupTunnelHandle(tunnelHandle)
 	if !ok {
 		return -1
 	}
@@ -100,19 +125,30 @@ func wgGetSocketV6(tunnelHandle int32) int32 {
 
 //export wgTurnOff
 func wgTurnOff(tunnelHandle int32) {
-	dev, ok := tunnelHandles[tunnelHandle]
+	tunnelHandles.Lock()
+	dev, ok := tunnelHandles.byHandle[tunnelHandle]
+	delete(tunnelHandles.byHandle, tunnelHandle)
+	tunnelHandles.Unlock()
 	if !ok {
 		return
 	}
-	delete(tunnelHandles, tunnelHandle)
+	if dev.passive != nil && dev.passive.bind.host != nil {
+		dev.passive.bind.host.abort()
+	}
 	dev.Close()
 }
 
 //export wgSetConfig
 func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
-	dev, ok := tunnelHandles[tunnelHandle]
+	dev, ok := lookupTunnelHandle(tunnelHandle)
 	if !ok {
 		return 0
+	}
+	if settings == nil {
+		return -1
+	}
+	if dev.passive != nil {
+		return setPassiveEndpoints(tunnelHandle, C.GoString(settings))
 	}
 	err := dev.IpcSet(C.GoString(settings))
 	if err != nil {
@@ -127,7 +163,7 @@ func wgSetConfig(tunnelHandle int32, settings *C.char) int64 {
 
 //export wgGetConfig
 func wgGetConfig(tunnelHandle int32) *C.char {
-	device, ok := tunnelHandles[tunnelHandle]
+	device, ok := lookupTunnelHandle(tunnelHandle)
 	if !ok {
 		return nil
 	}
@@ -140,8 +176,8 @@ func wgGetConfig(tunnelHandle int32) *C.char {
 
 //export wgBumpSockets
 func wgBumpSockets(tunnelHandle int32) {
-	dev, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	dev, ok := lookupTunnelHandle(tunnelHandle)
+	if !ok || dev.passive != nil {
 		return
 	}
 	go func() {
@@ -160,8 +196,8 @@ func wgBumpSockets(tunnelHandle int32) {
 
 //export wgBumpSocketsAndWait
 func wgBumpSocketsAndWait(tunnelHandle int32) {
-	dev, ok := tunnelHandles[tunnelHandle]
-	if !ok {
+	dev, ok := lookupTunnelHandle(tunnelHandle)
+	if !ok || dev.passive != nil {
 		return
 	}
 	for i := 0; i < 10; i++ {
@@ -178,11 +214,18 @@ func wgBumpSocketsAndWait(tunnelHandle int32) {
 
 //export wgDisableSomeRoamingForBrokenMobileSemantics
 func wgDisableSomeRoamingForBrokenMobileSemantics(tunnelHandle int32) {
-	dev, ok := tunnelHandles[tunnelHandle]
+	dev, ok := lookupTunnelHandle(tunnelHandle)
 	if !ok {
 		return
 	}
 	dev.DisableSomeRoamingForBrokenMobileSemantics()
+}
+
+//export wgSendKeepalives
+func wgSendKeepalives(handle int32) {
+	if dev, ok := lookupTunnelHandle(handle); ok {
+		dev.SendKeepalivesToPeersWithCurrentKeypair()
+	}
 }
 
 //export wgVersion
