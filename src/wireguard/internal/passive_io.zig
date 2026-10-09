@@ -11,7 +11,7 @@ const Endpoint = c.wg_endpoint;
 /// Native I/O called directly by Go workers. The bridge owns
 /// descriptors and serializes each native call with replacement and cleanup.
 /// Readiness waits release the mutex; no native worker or looper retains buffers.
-/// Shared readiness waits leave wake signalled until their last waiter returns.
+/// Shared readiness wakes drain their original waiters before admitting retries.
 pub const PassiveIO = struct {
     lock: core.Mutex = .{},
     waiter: net.Waiter,

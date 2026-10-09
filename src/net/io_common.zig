@@ -85,6 +85,9 @@ pub const Waiter = struct {
 
     mux: io_c.pp_mux,
     pending: usize = 0,
+    polling: usize = 0,
+    waking: bool = false,
+    wake_drained: core.Condition = .{},
     released: bool = false,
     test_wait_once: if (builtin.is_test) ?*const fn (io_c.pp_fd, bool, io_c.pp_fd) callconv(.c) c_int else void = if (builtin.is_test) null else {},
 
@@ -93,7 +96,10 @@ pub const Waiter = struct {
     }
 
     pub fn wake(self: *Waiter) void {
-        if (self.pending != 0) _ = io_c.pp_mux_wake(self.mux);
+        if (self.polling != 0 and !self.waking) {
+            self.waking = true;
+            _ = io_c.pp_mux_wake(self.mux);
+        }
     }
 
     pub fn deinit(self: *Waiter) void {
@@ -105,18 +111,37 @@ pub const Waiter = struct {
     fn freeIfReleased(self: *Waiter) void {
         if (self.released and self.pending == 0) {
             io_c.pp_mux_free(self.mux);
+            self.wake_drained.deinit();
             self.* = .{ .mux = null };
         }
     }
 
     /// A null descriptor waits only for wake. Returns true for I/O readiness.
+    /// Concurrent callers must supply the same protecting lock. A caller joining
+    /// an outstanding wake waits for its original pollers to drain, then returns
+    /// false so the owner can recheck descriptors replaced during that wake.
     pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: ?*core.Mutex) Waiter.Error!bool {
         self.pending += 1;
         defer {
             self.pending -= 1;
-            // Every concurrent waiter must observe wake before it is reset.
-            if (self.pending == 0) _ = io_c.pp_mux_reset_wake(self.mux);
             self.freeIfReleased();
+        }
+        if (self.waking) {
+            const mutex = lock orelse @panic("Concurrent readiness waits require a lock");
+            while (self.waking) self.wake_drained.wait(mutex);
+            return false;
+        }
+        self.polling += 1;
+        defer {
+            self.polling -= 1;
+            // Retries cannot join this cohort and keep its wake signalled.
+            if (self.polling == 0) {
+                _ = io_c.pp_mux_reset_wake(self.mux);
+                if (self.waking) {
+                    self.waking = false;
+                    self.wake_drained.broadcast();
+                }
+            }
         }
         if (lock) |mutex| mutex.unlock();
         defer if (lock) |mutex| mutex.lock();
