@@ -155,7 +155,7 @@ const WireGuardConnection = struct {
         return .{
             .ptr = self,
             .vtable = &wireguard_connection_vtable,
-            .owns_io = true,
+            .daemon_io = .link,
             .local_port = @intCast(self.configuration.interface.listen_port orelse 0),
         };
     }
@@ -163,7 +163,7 @@ const WireGuardConnection = struct {
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link);
+        self.io.replaceLink(remote.link orelse return error.UnableToStart);
         errdefer self.releaseIO();
         const events = self.events orelse return error.UnableToStart;
         if (!self.adapter.isStopped()) {
@@ -227,7 +227,7 @@ const WireGuardConnection = struct {
     fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link);
+        self.io.replaceLink(remote.link orelse return error.UnableToStart);
         self.adapter.sendKeepalives();
         return !self.adapter.isStopped();
     }

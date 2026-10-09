@@ -275,7 +275,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     });
     var destroyed = false;
     defer if (!destroyed) created.destroy();
-    try std.testing.expect(created.owns_io);
+    try std.testing.expectEqual(.link, created.daemon_io);
 
     var first_link = OwnedDescriptor{};
     var first_tun = OwnedDescriptor{};

@@ -767,10 +767,11 @@ const ConnectionDaemon = struct {
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
-        log.write(.notice, "Create new link");
         const connection = self.connection orelse @panic("setupLink but no connection");
         const conn_options = self.daemon.options.connection_options;
-        var remote = RemoteDescriptor{ .link = undefined, .looper = self.looper };
+        var remote = RemoteDescriptor{ .looper = self.looper };
+        if (connection.daemon_io == .none) return remote;
+        log.write(.notice, "Create new link");
         const reachability = self.factory.currentReachability();
         var endpoint: ?api.ExtendedEndpoint = null;
         if (self.endpoint_resolver) |*resolver| {
@@ -804,7 +805,7 @@ const ConnectionDaemon = struct {
         log.writef(.info, "Link type is {s}", .{
             if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
         });
-        if (!connection.owns_io) {
+        if (connection.daemon_io == .looper) {
             log.write(.info, "Attach LINK");
             try self.looper.attach(.{
                 .pair = .{ .link = descriptor },
@@ -900,7 +901,7 @@ const ConnectionDaemon = struct {
         // Retain ownership until descriptor preparation and handoff succeed.
         errdefer tunnel.destroy();
         const descriptor = try tunnel.tunDescriptor();
-        if (connection.owns_io) {
+        if (connection.daemon_io != .looper) {
             connection.commit(descriptor);
             self.trackConnectionStatus(.connected);
             return;
@@ -1253,10 +1254,10 @@ const ConnectionDaemon = struct {
             .events = self.events(),
             .operation = operation,
         };
-        // An owned link transfers only when startV2 or rebind is entered, even if it fails.
-        defer if (request.connection.owns_io and !request.link_handoff_entered) {
+        // A daemon-created link transfers only when startV2 or rebind is entered, even if it fails.
+        defer if (request.connection.daemon_io == .link and !request.link_handoff_entered) {
             switch (operation) {
-                .start, .rebind => |remote| remote.link.cleanup(),
+                .start, .rebind => |remote| if (remote.link) |link| link.cleanup(),
                 else => {},
             }
         };
