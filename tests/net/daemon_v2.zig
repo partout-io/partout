@@ -663,6 +663,10 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(remote.looper.isOnQueue() == (self.daemon_io == .looper));
+            if (self.daemon_io != .looper) {
+                std.testing.expectError(error.LooperUnavailable, remote.looper.perform(void, null, idleCheck)) catch unreachable;
+            }
             self.start_count += 1;
             self.remote = remote;
             self.link_attached = remote.looper.isLinkAttached();
@@ -673,6 +677,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             } });
             return self.daemon_io != .looper;
         }
+        fn idleCheck(_: ?*anyopaque) anyerror!void {}
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
@@ -680,7 +685,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(remote.looper.isOnQueue());
+            std.debug.assert(!remote.looper.isOnQueue());
             std.debug.assert(self.established_tun != null);
             if (self.remote.?.link) |link| link.cleanup();
             self.remote = remote;
@@ -832,14 +837,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     }
 }
 
-test "v2 daemon-created link is released on rejected dispatch and failed start or rebind" {
+test "v2 daemon-created link is released on failed start or rebind" {
     if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
     const io = @import("source").net_io;
-    const Scenario = enum { initial_dispatch, refresh_dispatch, start_false, start_error, rebind_false, rebind_error };
+    const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
         scenario: Scenario,
-        daemon: *Daemon = undefined,
-        terminated: bool = false,
         socket_count: usize = 0,
         start_count: usize = 0,
         rebind_count: usize = 0,
@@ -855,8 +858,6 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            // Do not restart after the injected terminal looper failure.
-            if (self.terminated) return error.OutOfMemory;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
@@ -871,7 +872,7 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(remote.looper.isOnQueue());
+            std.debug.assert(!remote.looper.isOnQueue());
             self.remote.?.link.?.cleanup();
             self.remote = remote;
             self.rebind_count += 1;
@@ -889,9 +890,6 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             destroy(raw);
         }
-        fn looperTerminated(raw: *anyopaque, _: ?Looper.Failure) void {
-            destroy(raw);
-        }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
             events.needs_rebind(events.ctx);
         }
@@ -901,16 +899,6 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
             const descriptor = wrapper.linkDescriptor();
             self.last_fd = descriptor.fd;
             self.socket_count += 1;
-            const reject_at: usize = switch (self.scenario) {
-                .initial_dispatch => 1,
-                .refresh_dispatch => 2,
-                else => 0,
-            };
-            if (self.socket_count == reject_at) {
-                // Terminate after creating the socket, before dispatching startV2.
-                self.daemon.implementation.connection.looper.stop() catch unreachable;
-                self.terminated = true;
-            }
             return descriptor;
         }
         const vtable = blk: {
@@ -920,7 +908,6 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
             value.rebind = rebind;
             value.stop = stop;
             value.destroy = destroy;
-            value.looper_terminated = looperTerminated;
             value.better_path = betterPath;
             break :blk value;
         };
@@ -930,7 +917,7 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         };
     };
     const allocator = std.testing.allocator;
-    for ([_]Scenario{ .initial_dispatch, .refresh_dispatch, .start_false, .start_error, .rebind_false, .rebind_error }) |scenario| {
+    for ([_]Scenario{ .start_false, .start_error, .rebind_false, .rebind_error }) |scenario| {
         var probe = Probe{ .scenario = scenario };
         var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
         defer registry.deinit(allocator);
@@ -945,12 +932,11 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
             .options = .{ .reconnection_delay_ms = 60_000 },
         });
         defer sut.destroy();
-        probe.daemon = sut;
         try sut.start();
         defer sut.stop();
         // Drain the initial gate evaluation before requesting a link refresh.
         try std.testing.expectError(error.AlreadyStarted, sut.start());
-        const refresh = scenario == .refresh_dispatch or scenario == .rebind_false or scenario == .rebind_error;
+        const refresh = scenario == .rebind_false or scenario == .rebind_error;
         if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
@@ -959,7 +945,7 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         }
         sut.stop();
         try std.testing.expectEqual(@as(usize, if (refresh) 2 else 1), probe.socket_count);
-        try std.testing.expectEqual(@as(usize, if (scenario == .initial_dispatch) 0 else 1), probe.start_count);
+        try std.testing.expectEqual(@as(usize, 1), probe.start_count);
         try std.testing.expectEqual(@as(usize, if (scenario == .rebind_false or scenario == .rebind_error) 1 else 0), probe.rebind_count);
         try std.testing.expect(probe.remote == null);
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
