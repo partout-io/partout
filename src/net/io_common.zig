@@ -85,6 +85,8 @@ pub const Waiter = struct {
 
     mux: io_c.pp_mux,
     pending: usize = 0,
+    pollers: core.Drainer = .{},
+    waking: bool = false,
     released: bool = false,
     test_wait_once: if (builtin.is_test) ?*const fn (io_c.pp_fd, bool, io_c.pp_fd) callconv(.c) c_int else void = if (builtin.is_test) null else {},
 
@@ -93,7 +95,10 @@ pub const Waiter = struct {
     }
 
     pub fn wake(self: *Waiter) void {
-        if (self.pending != 0) _ = io_c.pp_mux_wake(self.mux);
+        if (self.pollers.in_flight != 0 and !self.waking) {
+            self.waking = true;
+            _ = io_c.pp_mux_wake(self.mux);
+        }
     }
 
     pub fn deinit(self: *Waiter) void {
@@ -105,21 +110,38 @@ pub const Waiter = struct {
     fn freeIfReleased(self: *Waiter) void {
         if (self.released and self.pending == 0) {
             io_c.pp_mux_free(self.mux);
+            self.pollers.deinit();
             self.* = .{ .mux = null };
         }
     }
 
     /// A null descriptor waits only for wake. Returns true for I/O readiness.
-    pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: ?*core.Mutex) Waiter.Error!bool {
+    /// Callers must hold the same protecting lock. A caller joining
+    /// an outstanding wake waits for its original pollers to drain, then returns
+    /// false so the owner can recheck descriptors replaced during that wake.
+    pub fn wait(self: *Waiter, fd: ?io_c.pp_fd, writing: bool, lock: *core.Mutex) Waiter.Error!bool {
         self.pending += 1;
         defer {
             self.pending -= 1;
-            // Every concurrent waiter must observe wake before it is reset.
-            if (self.pending == 0) _ = io_c.pp_mux_reset_wake(self.mux);
             self.freeIfReleased();
         }
-        if (lock) |mutex| mutex.unlock();
-        defer if (lock) |mutex| mutex.lock();
+        if (self.waking) {
+            // A fresh, unsignalled poller may enter before this caller resumes.
+            // Only wait for the wake to drain, not for all later I/O to finish.
+            while (self.waking) self.pollers.drained.wait(lock);
+            return false;
+        }
+        self.pollers.enter();
+        defer {
+            self.pollers.leaveLocked();
+            // Retries cannot join this cohort and keep its wake signalled.
+            if (self.pollers.in_flight == 0) {
+                _ = io_c.pp_mux_reset_wake(self.mux);
+                self.waking = false;
+            }
+        }
+        lock.unlock();
+        defer lock.lock();
         const wait_once = if (builtin.is_test) self.test_wait_once orelse io_c.pp_mux_wait_once else io_c.pp_mux_wait_once;
         const result = wait_once(fd orelse io_c.pp_fd_invalid(), writing, io_c.pp_mux_wake_descriptor(self.mux));
         if (result < 0) return error.WaitFailed;
