@@ -74,7 +74,7 @@ const WakeRegression = struct {
     fn awaitPending(waiter: *Waiter, lock: *source.core.Mutex, pending: usize, polling: usize) !void {
         for (0..3000) |_| {
             lock.lock();
-            const ready = waiter.pending == pending and waiter.polling == polling;
+            const ready = waiter.pending == pending and waiter.pollers.in_flight == polling;
             lock.unlock();
             if (ready) return;
             source.core.sleepMs(1);

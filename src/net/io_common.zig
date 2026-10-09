@@ -85,9 +85,8 @@ pub const Waiter = struct {
 
     mux: io_c.pp_mux,
     pending: usize = 0,
-    polling: usize = 0,
+    pollers: core.Drainer = .{},
     waking: bool = false,
-    wake_drained: core.Condition = .{},
     released: bool = false,
     test_wait_once: if (builtin.is_test) ?*const fn (io_c.pp_fd, bool, io_c.pp_fd) callconv(.c) c_int else void = if (builtin.is_test) null else {},
 
@@ -96,7 +95,7 @@ pub const Waiter = struct {
     }
 
     pub fn wake(self: *Waiter) void {
-        if (self.polling != 0 and !self.waking) {
+        if (self.pollers.in_flight != 0 and !self.waking) {
             self.waking = true;
             _ = io_c.pp_mux_wake(self.mux);
         }
@@ -111,7 +110,7 @@ pub const Waiter = struct {
     fn freeIfReleased(self: *Waiter) void {
         if (self.released and self.pending == 0) {
             io_c.pp_mux_free(self.mux);
-            self.wake_drained.deinit();
+            self.pollers.deinit();
             self.* = .{ .mux = null };
         }
     }
@@ -128,19 +127,18 @@ pub const Waiter = struct {
         }
         if (self.waking) {
             const mutex = lock orelse @panic("Concurrent readiness waits require a lock");
-            while (self.waking) self.wake_drained.wait(mutex);
+            // A fresh, unsignalled poller may enter before this caller resumes.
+            // Only wait for the wake to drain, not for all later I/O to finish.
+            while (self.waking) self.pollers.drained.wait(mutex);
             return false;
         }
-        self.polling += 1;
+        self.pollers.enter();
         defer {
-            self.polling -= 1;
+            self.pollers.leaveLocked();
             // Retries cannot join this cohort and keep its wake signalled.
-            if (self.polling == 0) {
+            if (self.pollers.in_flight == 0) {
                 _ = io_c.pp_mux_reset_wake(self.mux);
-                if (self.waking) {
-                    self.waking = false;
-                    self.wake_drained.broadcast();
-                }
+                self.waking = false;
             }
         }
         if (lock) |mutex| mutex.unlock();
