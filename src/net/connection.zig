@@ -266,10 +266,10 @@ pub const Connection = struct {
                 return false;
             }
         }.call,
-        /// Commits TUN after the established event, transferring ownership
-        /// to the connection when it performs packet I/O.
-        commit: *const fn (*anyopaque, io.TunDescriptor) void = struct {
-            fn call(_: *anyopaque, _: io.TunDescriptor) void {}
+        /// Commits TUN after the established event. On success, transfers ownership
+        /// to the connection when it performs packet I/O; on failure, the caller retains it.
+        commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
+            fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
         }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
         /// In link mode, takes link ownership on entry, including on failure.
@@ -334,8 +334,8 @@ pub const Connection = struct {
         return self.vtable.start(self.ptr, events);
     }
 
-    pub fn commit(self: Connection, tun: io.TunDescriptor) void {
-        self.vtable.commit(self.ptr, tun);
+    pub fn commit(self: Connection, tun: io.TunDescriptor) StartError!void {
+        return self.vtable.commit(self.ptr, tun);
     }
 
     pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {

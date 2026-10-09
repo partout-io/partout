@@ -649,6 +649,8 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         remote: ?net.RemoteDescriptor = null,
         start_count: usize = 0,
         commit_count: usize = 0,
+        commit_error: ?net.ConnectionStartError = null,
+        tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -678,9 +680,10 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             return self.daemon_io != .looper;
         }
         fn idleCheck(_: ?*anyopaque) anyerror!void {}
-        fn commit(raw: *anyopaque, tun: io.TunDescriptor) void {
+        fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
+            if (self.commit_error) |err| return err;
             self.established_tun = tun;
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
@@ -734,7 +737,10 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
             return data.len - offset;
         }
-        fn cleanup(_: *anyopaque) void {}
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.tun_cleanup_count += 1;
+        }
         fn lastError(_: *anyopaque) c_int {
             return 0;
         }
@@ -763,10 +769,21 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         };
     };
     const allocator = std.testing.allocator;
+    const scenarios = [_]struct { mode: net.Connection.DaemonIO, err: ?net.ConnectionStartError = null }{
+        .{ .mode = .none },
+        .{ .mode = .link },
+        .{ .mode = .looper },
+        .{ .mode = .none, .err = error.UnableToStart },
+        .{ .mode = .link, .err = error.UnableToStart },
+        .{ .mode = .none, .err = error.OutOfMemory },
+        .{ .mode = .link, .err = error.OutOfMemory },
+    };
     for ([_]api.IPSocketType{ .udp, .udp4, .udp6, .tcp, .tcp4, .tcp6 }) |proto| {
-        for ([_]net.Connection.DaemonIO{ .none, .link, .looper }) |daemon_io| {
+        for (scenarios) |scenario| {
+            const daemon_io = scenario.mode;
+            const commit_error = scenario.err;
             for ([_]bool{ true, false }) |connect_udp| {
-                var probe = Probe{ .daemon_io = daemon_io, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+                var probe = Probe{ .daemon_io = daemon_io, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
                 var tun_pipe: [2]std.c.fd_t = undefined;
                 if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
                 defer _ = std.c.close(tun_pipe[0]);
@@ -789,6 +806,18 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 try sut.start();
                 defer sut.stop();
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
+                if (commit_error) |err| {
+                    try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
+                    try std.testing.expect(probe.established_tun == null);
+                    try std.testing.expect(probe.remote == null);
+                    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                    try std.testing.expectEqual(daemon.testing.codeForDaemonStartError(err), sut.snapshot_publisher.last_error.?.code);
+                    for (sut.test_status_history[0..sut.test_status_count]) |status| {
+                        try std.testing.expect(status != .connected);
+                    }
+                    continue;
+                }
                 try std.testing.expectEqual(daemon_io == .looper, probe.link_attached);
                 if (daemon_io == .none) {
                     try std.testing.expect(probe.remote.?.link == null);

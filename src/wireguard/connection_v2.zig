@@ -219,7 +219,7 @@ const WireGuardConnection = struct {
         return true;
     }
 
-    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) void {
+    fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
         log.write(.info, "Commit WireGuard TUN");
         self.io.replaceTun(descriptor);
     }
@@ -552,9 +552,9 @@ fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErr
     return self.startV2(remote);
 }
 
-fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) void {
+fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.commit(descriptor);
+    return self.commit(descriptor);
 }
 
 fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {

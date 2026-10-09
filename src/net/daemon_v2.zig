@@ -889,7 +889,7 @@ const ConnectionDaemon = struct {
     fn handleConnectionEstablished(
         self: *ConnectionDaemon,
         success: net.Connection.Events.Success,
-    ) !void {
+    ) StartError!void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
         const connection = self.connection orelse return;
@@ -900,9 +900,9 @@ const ConnectionDaemon = struct {
         };
         // Retain ownership until descriptor preparation and handoff succeed.
         errdefer tunnel.destroy();
-        const descriptor = try tunnel.tunDescriptor();
+        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
         if (connection.daemon_io != .looper) {
-            connection.commit(descriptor);
+            try connection.commit(descriptor);
             self.trackConnectionStatus(.connected);
             return;
         }
@@ -1167,7 +1167,7 @@ const ConnectionDaemon = struct {
                 self.handleConnectionEstablished(success) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
-                        .err_pair = .{ .code = .tunNotAvailable },
+                        .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
                     });
                 };
