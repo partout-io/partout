@@ -1204,4 +1204,63 @@ test "WireGuard backend dispatches the passive startup payload separately" {
     }));
 }
 
+test "WireGuard v2 adapter supports active startup and both reachability policies" {
+    const mock = @import("source").mock;
+    const allocator = std.testing.allocator;
+    const Probe = struct {
+        fn turnOn(raw: ?*anyopaque, alloc: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnel) backend_mod.Error!i32 {
+            const self: *FakeBackend = @ptrCast(@alignCast(raw.?));
+            std.testing.expectEqualStrings("test", tunnel.ifname) catch unreachable;
+            self.turn_on_count += 1;
+            if (self.last_settings) |value| alloc.free(value);
+            self.last_settings = try alloc.dupe(u8, settings);
+            return 7;
+        }
+    };
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    var vtable = fake_backend_vtable;
+    vtable.turn_on = Probe.turnOn;
+    var controller = FakeController{};
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[],"activeModulesIds":[]}
+    );
+    defer profile.deinit(allocator);
+    var configuration = try api.WireGuardConfiguration.parse(allocator,
+        \\{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[]}
+    );
+    defer configuration.deinit(allocator);
+    const tun = try io.TunWrapper.create(allocator, null);
+    defer tun.destroy();
+    var sut = adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, mock.noopDNSResolver(), mock.noopSocketFactory(), &profile, &configuration, 1000);
+    defer sut.deinit(allocator);
+
+    sut.sendKeepalives(); // Safe before a transport has been selected.
+    try sut.start(allocator, .{ .active = .{ .start = .{ .tun = tun, .ifname = "test" }, .controller = controller.controller() } });
+    try std.testing.expect(sut.isStarted());
+    try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
+    sut.sendKeepalives();
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
+
+    adapter.testing.setNetworkChangeBehavior(&sut, .refresh_sockets);
+    _ = sut.didUpdateReachable(allocator, false);
+    try std.testing.expect(sut.isStarted());
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.bump_sockets_count);
+    try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
+
+    adapter.testing.setNetworkChangeBehavior(&sut, .suspend_backend_when_offline);
+    _ = sut.didUpdateReachable(allocator, false);
+    try std.testing.expect(!sut.isStarted());
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
+    try std.testing.expect(sut.didUpdateReachable(allocator, true) == .resumed);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
+    _ = sut.didUpdateReachable(allocator, true);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.bump_sockets_count);
+    try std.testing.expectEqual(@as(usize, 4), controller.configure_sockets_count);
+
+    sut.stop(allocator);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+}
+
 fn fakeCompleteIO(_: usize, _: u32, _: i32) callconv(.c) void {}

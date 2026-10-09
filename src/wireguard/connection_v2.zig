@@ -110,7 +110,6 @@ const WireGuardConnection = struct {
         created.adapter = WireGuardAdapter.init(
             module_id,
             backend,
-            &created.io,
             sandbox.resolver,
             sandbox.factory,
             sandbox.profile,
@@ -183,7 +182,10 @@ const WireGuardConnection = struct {
             else => error.UnableToStart,
         };
         defer info.deinit(self.allocator);
-        self.adapter.start(self.allocator, self.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info))) catch |err| {
+        self.adapter.start(self.allocator, .{ .passive = .{
+            .start = self.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info)),
+            .io = &self.io,
+        } }) catch |err| {
             switch (err) {
                 error.CannotLocateTunnelFileDescriptor => {
                     log.write(
