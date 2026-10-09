@@ -163,9 +163,9 @@ const WireGuardConnection = struct {
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link orelse return error.UnableToStart);
+        self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 start() requires a link descriptor"));
         errdefer self.releaseIO();
-        const events = self.events orelse return error.UnableToStart;
+        const events = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
         if (!self.adapter.isStopped()) {
             log.write(.debug, "Replaced link, adapter is already active");
             return true;
@@ -227,7 +227,7 @@ const WireGuardConnection = struct {
     fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.io.replaceLink(remote.link orelse return error.UnableToStart);
+        self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 rebind() requires a link descriptor"));
         self.adapter.sendKeepalives();
         return !self.adapter.isStopped();
     }
