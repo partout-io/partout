@@ -136,9 +136,16 @@ pub const WireGuardAdapter = struct {
         };
     }
 
+    /// Resolve hostnames before the caller applies tunnel settings. Numeric
+    /// address/DNS64 mapping still runs when building UAPI, matching v1.
+    pub fn prepare(self: *WireGuardAdapter, allocator: std.mem.Allocator) resolver.ResolutionError!void {
+        errdefer self.endpoint_resolver.reset(allocator);
+        try self.endpoint_resolver.cacheAll(allocator);
+    }
+
     pub fn stop(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
-        if (self.isStopped()) return;
-        log.write(.info, "Stop adapter");
+        if (!self.isStopped()) log.write(.info, "Stop adapter");
+        // A prepared active connection can be stopped before commit starts Go.
         self.shutdown(allocator);
     }
 
@@ -164,7 +171,7 @@ pub const WireGuardAdapter = struct {
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
     ) ActivationError!void {
-        try self.endpoint_resolver.cacheAll(allocator);
+        try self.prepare(allocator);
 
         const wg_config = try buildConfiguration(
             allocator,

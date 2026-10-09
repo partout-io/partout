@@ -104,8 +104,13 @@ native Go I/O. V2 uses native Go I/O on non-Windows platforms
 (`daemon_io = .none`) and passive transport on Windows (`daemon_io = .link`).
 In link mode, the daemon creates/configures UDP and transfers it through `startV2()`.
 After `.established`, the daemon applies tunnel settings and transfers the TUN
-through `commit()` in both modes. The active backend starts on commit. The
-connection owns handed-off resources and cleans them up after backend shutdown.
+through `commit()` in both modes. Active mode caches peer hostname answers in
+`startV2()`, before reporting establishment and before the daemon applies tunnel
+settings. Commit maps the cached numeric addresses for the current network and
+starts Go, preserving v1's DNS/DNS64 ordering. Stopping before commit discards the
+cached answers. Offline resume currently retains the committed TUN and restarts
+Go; reapplying settings and replacing the TUN remains deferred.
+The connection owns handed-off resources and cleans them up after backend shutdown.
 Windows native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
