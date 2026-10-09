@@ -190,7 +190,6 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
         const vtable = net.Connection.VTable{
-            .commit = noopCommit,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -500,7 +499,6 @@ const FailingStartConnection = struct {
     fn destroy(_: *anyopaque) void {}
 
     const vtable = net.Connection.VTable{
-        .commit = noopCommit,
         .start = start,
         .stop = stop,
         .network_change = networkChange,
@@ -967,5 +965,3 @@ test "v2 daemon-created link is released on rejected dispatch and failed start o
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
     }
 }
-
-fn noopCommit(_: *anyopaque, _: net.TunDescriptor) void {}

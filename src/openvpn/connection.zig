@@ -766,11 +766,8 @@ fn destroy(ptr: *anyopaque) void {
 
 // MARK: - Vtables
 
-fn commit(_: *anyopaque, _: net.TunDescriptor) void {}
-
 const openvpn_connection_vtable = net.Connection.VTable{
     .start = start,
-    .commit = commit,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,

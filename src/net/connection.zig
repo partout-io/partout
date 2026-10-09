@@ -268,7 +268,9 @@ pub const Connection = struct {
         }.call,
         /// Commits TUN after the established event, transferring ownership
         /// to the connection when it performs packet I/O.
-        commit: *const fn (*anyopaque, io.TunDescriptor) void,
+        commit: *const fn (*anyopaque, io.TunDescriptor) void = struct {
+            fn call(_: *anyopaque, _: io.TunDescriptor) void {}
+        }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
         /// In link mode, takes link ownership on entry, including on failure.
         rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
