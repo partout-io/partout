@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 const runtime_policy = @import("../runtime_policy.zig");
 const build_options = @import("build_options");
 
