@@ -160,7 +160,7 @@ const WireGuardConnection = struct {
         };
     }
 
-    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
         self.lock.lock();
         defer self.lock.unlock();
         self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 start() requires a link descriptor"));
@@ -168,7 +168,7 @@ const WireGuardConnection = struct {
         const events = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
         if (!self.adapter.isStopped()) {
             log.write(.debug, "Replaced link, adapter is already active");
-            return true;
+            return .started;
         }
 
         log.write(.info, "Start tunnel");
@@ -182,7 +182,7 @@ const WireGuardConnection = struct {
             error.OutOfMemory => error.OutOfMemory,
             else => error.UnableToStart,
         };
-        defer info.deinit(self.allocator);
+        errdefer info.deinit(self.allocator);
         self.adapter.start(self.allocator, self.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info))) catch |err| {
             switch (err) {
                 error.CannotLocateTunnelFileDescriptor => {
@@ -215,8 +215,7 @@ const WireGuardConnection = struct {
         self.startDataCountTimer() catch |err| {
             log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
         };
-        events.established(events.ctx, .{ .info = info });
-        return true;
+        return .{ .established = .{ .info = info } };
     }
 
     fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
@@ -547,7 +546,7 @@ fn cloneSubnet(
     };
 }
 
-fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     return self.startV2(remote);
 }

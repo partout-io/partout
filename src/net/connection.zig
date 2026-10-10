@@ -198,6 +198,15 @@ pub const Connection = struct {
         looper,
     };
 
+    pub const StartResult = union(enum) {
+        /// Startup is pending; establishment will arrive through Events.
+        started,
+        /// Synchronous establishment. The caller owns info and must deinit it
+        /// with the connection's allocator after applying settings and commit.
+        established: Events.Success,
+        failed,
+    };
+
     pub const ShutdownReason = union(enum) {
         explicit_stop,
         failure: Events.FailureDisposition,
@@ -261,13 +270,16 @@ pub const Connection = struct {
             }
         }.call,
         /// In link mode, takes link ownership on entry, including on failure.
-        start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
-            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
-                return false;
+        /// Return established instead of emitting Events.established when startup
+        /// completes synchronously; its info ownership transfers to the caller.
+        start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!StartResult = struct {
+            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!StartResult {
+                return .failed;
             }
         }.call,
-        /// Commits TUN after the established event. On success, transfers ownership
-        /// to the connection when it performs packet I/O; on failure, the caller retains it.
+        /// Commits TUN after synchronous establishment or the established event.
+        /// On success, transfers ownership to the connection when it performs
+        /// packet I/O; on failure, the caller retains it.
         commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
             fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
         }.call,
@@ -326,7 +338,7 @@ pub const Connection = struct {
     pub fn startV2(
         self: Connection,
         remote: RemoteDescriptor,
-    ) StartError!bool {
+    ) StartError!StartResult {
         return self.vtable.start_v2(self.ptr, remote);
     }
 

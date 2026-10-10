@@ -91,10 +91,11 @@ only logging and the underlying WireGuard dependency are shared.
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain
 native Go I/O. V2 connections own transport (`daemon_io = .link`). The daemon
-creates/configures the UDP socket and transfers it through `startV2()`. After
-`.established`, it applies tunnel settings and transfers the TUN through
-`commit()`. The bridge owns replacement and native resource cleanup. Windows
-native descriptor I/O remains unimplemented. The runtime log identifies this
+creates/configures the UDP socket and transfers it through `startV2()`. WireGuard
+returns `.established` with owned tunnel info. The daemon applies tunnel settings
+and transfers the TUN through `commit()` immediately in the same actor turn.
+The bridge owns replacement and native resource cleanup. Windows native
+descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
 Validation:

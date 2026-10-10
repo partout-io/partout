@@ -281,8 +281,8 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     var first_tun = OwnedDescriptor{};
     var second_link = OwnedDescriptor{};
     var second_tun = OwnedDescriptor{};
-    try std.testing.expect(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try expectEstablished(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try created.commit(first_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
@@ -290,7 +290,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
 
     try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
@@ -321,7 +321,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
 
     var final_link = OwnedDescriptor{};
     var final_tun = OwnedDescriptor{};
-    try std.testing.expect(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
+    try expectEstablished(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
     try created.commit(final_tun.descriptor());
     created.destroy();
     destroyed = true;
@@ -420,7 +420,7 @@ test "WireGuard connection drains its running data timer before stopping" {
     try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(u64, 10), recorder.data_count.received);
@@ -764,7 +764,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 2), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
     try std.testing.expectEqual(@as(usize, 0), retained_tun.cleanups);
@@ -815,7 +815,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     // A transient backend failure must not emit terminal events.
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
     connection.testing.waitForTemporaryShutdownRetry(created);
@@ -823,7 +823,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
-    try std.testing.expectEqual(@as(usize, 1), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 }
 
@@ -1166,11 +1166,27 @@ fn recordNeedsRebind(ctx: *anyopaque) void {
 fn startConnection(created: conn.Connection, looper: *@import("source").net.Looper) !bool {
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
     const link = socket.linkDescriptor();
-    return created.startV2(.{
+    return (try consumeStartResult(try created.startV2(.{
         .link = link,
         .local_port = if (builtin.os.tag == .windows) 51820 else (try link.localAddress()).port,
         .looper = looper,
-    });
+    }))) == .established;
+}
+
+fn consumeStartResult(result: conn.Connection.StartResult) !std.meta.Tag(conn.Connection.StartResult) {
+    switch (result) {
+        .established => |success| {
+            var owned = success;
+            defer owned.info.deinit(std.testing.allocator);
+            try std.testing.expectEqualStrings("33333333-3333-4333-8333-333333333333", &owned.info.original_module_id);
+        },
+        .started, .failed => {},
+    }
+    return std.meta.activeTag(result);
+}
+
+fn expectEstablished(result: conn.Connection.StartResult) !void {
+    try std.testing.expectEqual(.established, try consumeStartResult(result));
 }
 
 test "WireGuard backend dispatches the passive startup payload separately" {
