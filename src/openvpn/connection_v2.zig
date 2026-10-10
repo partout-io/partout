@@ -213,10 +213,10 @@ const OpenVPNConnection = struct {
     fn startV2(
         self: *OpenVPNConnection,
         remote: net.RemoteDescriptor,
-    ) net.ConnectionStartError!bool {
+    ) net.ConnectionStartError!net.Connection.StartResult {
         if (self.current_session != null) {
             log.write(.err, "Ignore start, connection attempt pending");
-            return false;
+            return .failed;
         }
 
         const session = Session.create(self.allocator, .{
@@ -248,7 +248,7 @@ const OpenVPNConnection = struct {
                 else => error.UnableToStart,
             };
         };
-        return true;
+        return .started;
     }
 
     fn shutdown(self: *OpenVPNConnection, reason: net.Connection.ShutdownReason) void {
@@ -500,7 +500,7 @@ fn allEndpoints(ptr: *anyopaque) ?[]const api.ExtendedEndpoint {
 fn startV2(
     ptr: *anyopaque,
     remote: net.RemoteDescriptor,
-) net.ConnectionStartError!bool {
+) net.ConnectionStartError!net.Connection.StartResult {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.startV2(remote);
 }

@@ -743,7 +743,7 @@ const ConnectionDaemon = struct {
         // Start on the actor or looper according to daemon_io.
         // Detach any looper-owned link on failure.
         self.trackConnectionStatus(.connecting);
-        const did_start = self.callConnection(.{ .start = remote }) catch |err| {
+        const result = self.callConnection(.{ .start = remote }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -756,14 +756,27 @@ const ConnectionDaemon = struct {
             self.scheduleResumeGate();
             return;
         };
-        if (!did_start) {
-            log.write(.err, "Connection could not start");
-            self.trackConnectionStatus(.disconnected);
-            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
-            self.scheduleResumeGate();
-            return;
+        switch (result) {
+            .started => {}, // Asynchronous establishment continues through events.
+            .established => |success| {
+                var owned = success;
+                defer owned.info.deinit(self.daemon.allocator);
+                // Complete startup before yielding to queued reachability events.
+                self.handleConnectionEstablished(success) catch |err| {
+                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
+                    self.handleConnectionFailed(.{
+                        .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
+                        .disposition = .reconnect,
+                    });
+                };
+            },
+            .failed => {
+                log.write(.err, "Connection could not start");
+                self.trackConnectionStatus(.disconnected);
+                self.stopConnection(0, .{ .failure = .reconnect }) catch {};
+                self.scheduleResumeGate();
+            },
         }
-        // Connection establishment continues through queued events.
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
@@ -958,7 +971,7 @@ const ConnectionDaemon = struct {
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();
-        if (!try self.callConnection(.{ .rebind = remote })) return error.UnableToStart;
+        if (try self.callConnection(.{ .rebind = remote }) == .failed) return error.UnableToStart;
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1224,7 +1237,7 @@ const ConnectionDaemon = struct {
             better_path,
         },
 
-        fn run(ctx: ?*anyopaque) !bool {
+        fn run(ctx: ?*anyopaque) !Connection.StartResult {
             const request: *ConnectionCall = @ptrCast(@alignCast(ctx.?));
             switch (request.operation) {
                 .start => |remote| {
@@ -1233,14 +1246,14 @@ const ConnectionDaemon = struct {
                 },
                 .rebind => |remote| {
                     request.link_handoff_entered = true;
-                    return request.connection.rebind(remote);
+                    return if (try request.connection.rebind(remote)) .started else .failed;
                 },
                 .shutdown => |reason| request.connection.shutdown(reason),
                 .stop => |timeout| request.connection.stop(timeout, request.events),
                 .reachability => |info| request.connection.networkChange(info, request.events),
                 .better_path => request.connection.betterPath(request.events),
             }
-            return true;
+            return .started;
         }
     };
 
@@ -1248,7 +1261,7 @@ const ConnectionDaemon = struct {
     fn callConnection(
         self: *ConnectionDaemon,
         operation: @FieldType(ConnectionCall, "operation"),
-    ) !bool {
+    ) !Connection.StartResult {
         var request = ConnectionCall{
             .connection = self.connection.?,
             .events = self.events(),
@@ -1262,7 +1275,7 @@ const ConnectionDaemon = struct {
             }
         };
         if (request.connection.daemon_io != .looper) return ConnectionCall.run(&request);
-        return self.looper.perform(bool, &request, ConnectionCall.run);
+        return self.looper.perform(Connection.StartResult, &request, ConnectionCall.run);
     }
 
     //#endregion

@@ -638,6 +638,10 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         endpoint: api.ExtendedEndpoint,
         endpoint_list: [3]api.ExtendedEndpoint = undefined,
         daemon_io: net.Connection.DaemonIO,
+        sync_establish: bool,
+        daemon: *Daemon = undefined,
+        startup_reachability_pending: bool = false,
+        startup_reachability_saw_commit: bool = false,
         events: net.Connection.Events = undefined,
         profile: *const api.Profile = undefined,
         established_tun: ?io.TunDescriptor = null,
@@ -663,7 +667,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
         }
-        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(remote.looper.isOnQueue() == (self.daemon_io == .looper));
             if (self.daemon_io != .looper) {
@@ -673,11 +677,20 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.remote = remote;
             self.link_attached = remote.looper.isLinkAttached();
             self.link_port = if (remote.link) |link| (link.localAddress() catch return error.UnableToStart).port else 0;
-            if (self.daemon_io != .looper) self.events.established(self.events.ctx, .{ .info = .{
+            if (self.daemon_io == .looper) return .failed;
+            const info = api.TunnelRemoteInfoWrapper{
                 .profile = self.profile.*,
                 .original_module_id = @import("source").net_connection.activeConnectionModule(self.profile).?.id(),
-            } });
-            return self.daemon_io != .looper;
+            };
+            if (self.sync_establish) {
+                // Queue an event ahead of where an asynchronous established event
+                // would land. It must see commit completed when the actor resumes.
+                self.startup_reachability_pending = true;
+                self.daemon.implementation.connection.actor.schedule(.{ .onReachability = .{ .reachable = true } }) catch return error.UnableToStart;
+                return .{ .established = .{ .info = info.clone(std.testing.allocator) catch return error.OutOfMemory } };
+            }
+            self.events.established(self.events.ctx, .{ .info = info });
+            return .started;
         }
         fn idleCheck(_: ?*anyopaque) anyerror!void {}
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
@@ -701,7 +714,13 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             events.needs_rebind(events.ctx);
             events.needs_rebind(events.ctx);
         }
-        fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
+        fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (self.startup_reachability_pending) {
+                self.startup_reachability_pending = false;
+                self.startup_reachability_saw_commit = self.commit_count == 1;
+                return;
+            }
             events.needs_rebind(events.ctx);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
@@ -769,10 +788,14 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         };
     };
     const allocator = std.testing.allocator;
-    const scenarios = [_]struct { mode: net.Connection.DaemonIO, err: ?net.ConnectionStartError = null }{
+    const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, err: ?net.ConnectionStartError = null }{
         .{ .mode = .none },
         .{ .mode = .link },
         .{ .mode = .looper },
+        .{ .mode = .none, .sync_establish = false },
+        .{ .mode = .link, .sync_establish = false },
+        .{ .mode = .none, .sync_establish = false, .err = error.UnableToStart },
+        .{ .mode = .link, .sync_establish = false, .err = error.OutOfMemory },
         .{ .mode = .none, .err = error.UnableToStart },
         .{ .mode = .link, .err = error.UnableToStart },
         .{ .mode = .none, .err = error.OutOfMemory },
@@ -783,7 +806,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const daemon_io = scenario.mode;
             const commit_error = scenario.err;
             for ([_]bool{ true, false }) |connect_udp| {
-                var probe = Probe{ .daemon_io = daemon_io, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+                var probe = Probe{ .daemon_io = daemon_io, .sync_establish = scenario.sync_establish, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
                 var tun_pipe: [2]std.c.fd_t = undefined;
                 if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
                 defer _ = std.c.close(tun_pipe[0]);
@@ -803,9 +826,14 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
                 });
                 defer sut.destroy();
+                probe.daemon = sut;
                 try sut.start();
                 defer sut.stop();
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
+                try std.testing.expectError(error.AlreadyStarted, sut.start());
+                if (scenario.sync_establish and daemon_io != .looper) {
+                    try std.testing.expect(probe.startup_reachability_saw_commit);
+                }
                 if (commit_error) |err| {
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
                     try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
@@ -889,14 +917,14 @@ test "v2 daemon-created link is released on failed start or rebind" {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
         }
-        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.start_count += 1;
             self.remote = remote;
             return switch (self.scenario) {
-                .start_false => false,
+                .start_false => .failed,
                 .start_error => error.UnableToStart,
-                else => true,
+                else => .started,
             };
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
