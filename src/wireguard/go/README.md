@@ -81,17 +81,22 @@ call is nonblocking, and no packet request depends on a looper or native worker.
 Handles are never reused, so stale lifecycle calls cannot affect a replacement
 device.
 
-The native Go API is unchanged. Passive devices use an independent registry and
-`wgTurnOffWithPassiveIO`, `wgGetConfigWithPassiveIO`,
-`wgDisableRoamingWithPassiveIO`, and `wgSendKeepalivesWithPassiveIO` entry points.
-Passive handles are never reused. `wgSetEndpointsWithPassiveIO` accepts only
-endpoint updates; full configuration, MTU, or listen-port changes require restart.
+The existing native Go functions are unchanged. Passive devices register in the
+original handle map as well as a separate registry retaining their I/O state.
+They use the original config getter and roaming functions, plus the common
+`wgSendKeepalives` entry point. `wgTurnOffWithPassiveIO` removes both entries and
+closes passive I/O. Passive handles are never reused. `wgSetEndpointsWithPassiveIO`
+accepts only endpoint updates; full configuration, MTU, or listen-port changes
+require restart.
 
 Partout's C wrappers expose common operations to the single Zig backend vtable.
-They remember the mode selected by successful startup and dispatch to the matching
-Go API. Active and passive backends must never run concurrently, and all calls
-from the previous mode must finish before switching modes: registry IDs can
-overlap. Passive socket refresh is a no-op because the host owns transport.
+They serialize device calls to protect the original Go handle map, and remember
+the mode selected by successful startup for shutdown and configuration updates.
+I/O completion remains unlocked so callbacks can finish during device calls.
+Direct Go ABI callers must serialize device calls themselves. Active and passive
+backends must never run concurrently, and all calls from the previous mode must
+finish before switching modes. Passive socket refresh is a no-op because the host
+owns transport.
 
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain

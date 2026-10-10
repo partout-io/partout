@@ -7,7 +7,7 @@
 #include "wg_go/wg_go.h"
 
 static unsigned native_off, passive_off, native_config, passive_config;
-static unsigned native_bump, native_roaming, passive_roaming, passive_keepalives;
+static unsigned native_bump, roaming, keepalives;
 
 void pp_clog_v(pp_log_level level, const char *fmt, ...) { (void)level; (void)fmt; }
 const char *wgVersion(void) { return "test"; }
@@ -32,13 +32,12 @@ int64_t wgSetConfig(int handle, const char *settings) {
 int64_t wgSetEndpointsWithPassiveIO(int32_t handle, const char *settings) {
     assert(handle == 7); (void)settings; ++passive_config; return 0;
 }
-char *wgGetConfig(int handle) { assert(handle == 7); return "native"; }
-char *wgGetConfigWithPassiveIO(int32_t handle) { assert(handle == 7); return "passive"; }
+static const char *current_mode;
+char *wgGetConfig(int handle) { assert(handle == 7); return (char *)current_mode; }
 void wgBumpSockets(int handle) { assert(handle == 7); ++native_bump; }
 void wgBumpSocketsAndWait(int handle) { wgBumpSockets(handle); }
-void wgDisableSomeRoamingForBrokenMobileSemantics(int handle) { assert(handle == 7); ++native_roaming; }
-void wgDisableRoamingWithPassiveIO(int32_t handle) { assert(handle == 7); ++passive_roaming; }
-void wgSendKeepalivesWithPassiveIO(int32_t handle) { assert(handle == 7); ++passive_keepalives; }
+void wgDisableSomeRoamingForBrokenMobileSemantics(int handle) { assert(handle == 7); ++roaming; }
+void wgSendKeepalives(int handle) { assert(handle == 7); ++keepalives; }
 void wgCompleteIO(uintptr_t request, uint32_t count, int32_t status) { (void)request; (void)count; (void)status; }
 #ifdef __ANDROID__
 int wgGetSocketV4(int handle) { assert(handle == 7); return 3; }
@@ -64,24 +63,28 @@ static void exercise(const char *mode) {
 
 int main(void) {
     assert(start_native("") == 7);
+    current_mode = "native";
     assert(pp_wg_turn_on_passive("fail", NULL, NULL, NULL) == -1);
     exercise("native"); // Failed opposite-mode startup must not change dispatch.
     pp_wg_turn_off(7);
     assert(native_off == 1 && passive_off == 0);
     assert(native_config == 1 && passive_config == 0 && native_bump == 2);
-    assert(native_roaming == 1 && passive_roaming == 0 && passive_keepalives == 0);
+    assert(roaming == 1 && keepalives == 1);
 
     assert(pp_wg_turn_on_passive("", NULL, NULL, NULL) == 7);
+    current_mode = "passive";
     assert(start_native("fail") == -1);
-    exercise("passive"); // Identical handles belong to independent registries.
+    exercise("passive"); // Common operations use the original ABI in both modes.
     pp_wg_turn_off(7);
     assert(native_off == 1 && passive_off == 1);
     assert(native_config == 1 && passive_config == 1 && native_bump == 2);
-    assert(native_roaming == 1 && passive_roaming == 1 && passive_keepalives == 1);
+    assert(roaming == 2 && keepalives == 2);
 
     assert(start_native("") == 7);
+    current_mode = "native";
     exercise("native");
     pp_wg_turn_off(7);
     assert(native_off == 2 && passive_off == 1 && native_bump == 4);
+    assert(roaming == 3 && keepalives == 3);
     return 0;
 }
