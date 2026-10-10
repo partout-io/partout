@@ -155,15 +155,15 @@ const WireGuardConnection = struct {
         };
     }
 
-    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
         self.lock.lock();
         defer self.lock.unlock();
-        const events = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
+        _ = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
         self.shim.replaceLink(remote);
         errdefer self.shim.release();
         if (!self.adapter.isStopped() or self.shim.isAwaitingCommit()) {
             log.write(.debug, "Replaced link, adapter is already active");
-            return true;
+            return .started;
         }
 
         log.write(.info, "Start tunnel");
@@ -177,10 +177,9 @@ const WireGuardConnection = struct {
             error.OutOfMemory => error.OutOfMemory,
             else => error.UnableToStart,
         };
-        defer info.deinit(self.allocator);
+        errdefer info.deinit(self.allocator);
         try self.shim.start(self, remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
-        events.established(events.ctx, .{ .info = info });
-        return true;
+        return .{ .established = .{ .info = info } };
     }
 
     fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
@@ -520,7 +519,7 @@ fn cloneSubnet(
     };
 }
 
-fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+fn startV2(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     return self.startV2(remote);
 }
