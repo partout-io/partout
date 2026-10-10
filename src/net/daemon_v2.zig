@@ -334,6 +334,8 @@ const ConnectionDaemon = struct {
 
     // Internal state
     actor: *Actor,
+    // Owns the wake source borrowed by the connection looper.
+    mux: io.io_c.pp_mux,
     connection: ?Connection,
     rebind_pending: std.atomic.Value(bool),
     // Valid while connection is non-null; only this class accesses them.
@@ -357,10 +359,13 @@ const ConnectionDaemon = struct {
         const allocator = daemon.allocator;
         const self = try allocator.create(ConnectionDaemon);
         errdefer allocator.destroy(self);
+        const mux = io.io_c.pp_mux_create(1) orelse return error.LooperFailure;
+        errdefer io.io_c.pp_mux_free(mux);
         const actor = Actor.create(allocator, self) catch return error.OutOfMemory;
         self.* = .{
             .daemon = daemon,
             .actor = actor,
+            .mux = mux,
             .module = module,
             .registry = objects.registry,
             .resolver = objects.resolver,
@@ -394,6 +399,7 @@ const ConnectionDaemon = struct {
         self.gate.deinit();
         if (self.connection != null)
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
+        io.io_c.pp_mux_free(self.mux);
         self.daemon.allocator.destroy(self);
 
         log.write(.debug, "Deinit daemon");
@@ -675,9 +681,9 @@ const ConnectionDaemon = struct {
         errdefer tun_storage.destroy();
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
-        looper.* = Looper.init(self.daemon.allocator, options) catch |err| return switch (err) {
+        looper.* = Looper.init(self.daemon.allocator, io.io_c.pp_mux_wake_descriptor(self.mux), options) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
-            error.MuxFailure => error.LooperFailure,
+            error.MuxFailure, error.InvalidWakeDescriptor => error.LooperFailure,
         };
         errdefer looper.deinit();
         const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{

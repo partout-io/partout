@@ -89,8 +89,8 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const SubmissionError = io.SubmissionError;
-pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
+pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+pub const InitError = std.mem.Allocator.Error || error{ MuxFailure, InvalidWakeDescriptor };
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
     AlreadyStarted,
 };

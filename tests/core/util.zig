@@ -377,3 +377,23 @@ const RawValue = enum {
         };
     }
 };
+
+test "FIFO removal preserves order and updates head and tail" {
+    const Node = struct { next: ?*@This() = null };
+    var queue = util.Fifo(Node){};
+    var nodes: [4]Node = @splat(.{});
+    for (nodes[0..3]) |*node| queue.append(node);
+    try std.testing.expect(!queue.remove(&nodes[3]));
+    try std.testing.expect(queue.remove(&nodes[1]));
+    try std.testing.expect(nodes[1].next == null);
+    try std.testing.expect(nodes[0].next == &nodes[2]);
+    try std.testing.expect(queue.remove(&nodes[2]));
+    try std.testing.expect(queue.tail == &nodes[0]);
+    queue.append(&nodes[3]);
+    try std.testing.expect(queue.remove(&nodes[0]));
+    try std.testing.expect(queue.head == &nodes[3]);
+    try std.testing.expect(queue.remove(&nodes[3]));
+    try std.testing.expect(queue.head == null and queue.tail == null);
+    queue.append(&nodes[1]);
+    try std.testing.expect(queue.take() == &nodes[1]);
+}

@@ -840,7 +840,9 @@ pub const Daemon = struct {
             },
         }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.MuxFailure => return error.LooperFailure,
+            error.InvalidWakeDescriptor,
+            error.MuxFailure,
+            => return error.LooperFailure,
         };
         errdefer looper.deinit();
 

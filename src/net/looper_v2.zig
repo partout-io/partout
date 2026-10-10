@@ -2,14 +2,9 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Serial, mux-backed I/O loop for a link descriptor and a tunnel descriptor.
-//!
-//! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
-//! at a stable address from `start()` until `stop()`/`deinit()` has completed.
-//! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). Reads acquire caller-owned buffers on readiness
-//! and release them after on_read returns. Queued writes borrow descriptors and
-//! payloads until completion. No packet data is copied.
+//! Caller-driven platform I/O. The caller serializes access and owns the wake
+//! descriptor. loopOnce() runs callbacks inline; writes borrow until completion.
+//! Legacy worker APIs remain as explicit panics during the daemon migration.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -62,11 +57,12 @@ pub const Looper = struct {
     /// Allocates a looper whose storage is released by `destroy()`.
     pub fn create(
         allocator: std.mem.Allocator,
+        wake_fd: io.FileDescriptor,
         options: Options,
     ) helpers.InitError!*Looper {
         const self = try allocator.create(Looper);
         errdefer allocator.destroy(self);
-        self.* = try init(allocator, options);
+        self.* = try init(allocator, wake_fd, options);
         return self;
     }
 
@@ -77,10 +73,10 @@ pub const Looper = struct {
         allocator.destroy(self);
     }
 
-    pub fn init(allocator: std.mem.Allocator, options: Options) helpers.InitError!Looper {
+    pub fn init(allocator: std.mem.Allocator, wake_fd: io.FileDescriptor, options: Options) helpers.InitError!Looper {
         return .{
             .allocator = allocator,
-            .impl = try Impl.create(allocator, options),
+            .impl = try Impl.create(allocator, wake_fd, options),
         };
     }
 
@@ -88,50 +84,13 @@ pub const Looper = struct {
         self.impl.destroy();
     }
 
-    pub fn start(self: *Looper) helpers.StartError!void {
-        return self.impl.start();
+    pub fn loopOnce(self: *Looper, max_wait_ms: ?u32) bool {
+        return self.impl.loopOnce(max_wait_ms);
     }
 
-    /// Requests an orderly stop and waits for the worker thread to terminate.
-    ///
-    /// The stop command runs after work that the looper has already accepted.
-    /// Entering `.stopping` rejects new work, and delayed commands that have not
-    /// become ready complete with `error.LooperUnavailable` when the worker
-    /// finishes. Calling `stop` before `start`, or after the worker has already
-    /// stopped, is a no-op.
-    ///
-    /// This function must run outside the looper thread and outside callbacks
-    /// that borrow looper-owned state. It waits for an in-progress `start` or
-    /// `stop` transition, but returns `error.LooperUnavailable` if `deinit` takes
-    /// ownership of shutdown. The synchronous stop command is caller-owned and
-    /// does not allocate.
-    ///
-    /// A failure that independently terminates the worker is logged by
-    /// `finish` and delivered to `on_finish`; it is not returned by `stop`.
-    /// `deinit` is still required to release the looper's resources.
+    /// Synchronously cancels pending work. Must run outside callbacks.
     pub fn stop(self: *Looper) helpers.StopError!void {
         return self.impl.stop();
-    }
-
-    pub fn isOnQueue(self: *Looper) bool {
-        return self.impl.isOnQueue();
-    }
-
-    /// Performs a task synchronously with the worker. Runs inline
-    /// if on the same queue to prevent deadlock. Submission does not allocate.
-    // FIXME: ###, anyerror
-    pub fn perform(
-        self: *Looper,
-        comptime Result: type,
-        context: ?*anyopaque,
-        callback: *const fn (?*anyopaque) anyerror!Result,
-    ) anyerror!Result {
-        return self.impl.perform(Result, context, callback);
-    }
-
-    // FIXME: ###, anyerror
-    pub fn performTask(self: *Looper, task: helpers.Task) anyerror!void {
-        return self.impl.performTask(task);
     }
 
     /// Replaces one delayed task and executes its callback on the looper.
@@ -165,11 +124,11 @@ pub const Looper = struct {
     }
 
     pub fn isLinkAttached(self: *Looper) bool {
-        return self.impl.isLinkAttached();
+        return self.impl.isAttached(.link);
     }
 
     pub fn isTunAttached(self: *Looper) bool {
-        return self.impl.isTunAttached();
+        return self.impl.isAttached(.tun);
     }
 
     pub fn resumeReading(self: *Looper, side: io.Side) helpers.ResumeReadingError!void {
@@ -188,15 +147,49 @@ pub const Looper = struct {
         destination: ?io.SocketAddress,
         completion: OnWriteComplete,
     ) WriteError!void {
-        return self.impl.writeQueued(packets, side, destination, completion);
+        return self.impl.write(packets, side, destination, completion);
+    }
+
+    /// Copies packets before returning; loopOnce() performs the actual I/O.
+    pub fn write(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) (SubmissionError || error{MissingDestination})!void {
+        if (packets.len == 0) return;
+        const copy = try io.WriteCopy.create(self.allocator, packets);
+        errdefer copy.destroy();
+        self.writeQueued(copy.packets, side, destination, .{ .context = copy, .callback = io.WriteCopy.complete }) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
+            else => |failure| return failure,
+        };
+    }
+
+    // Unsupported legacy worker APIs.
+
+    pub fn start(_: *Looper) helpers.StartError!void {
+        @panic("Looper v2 is caller-driven; use loopOnce");
+    }
+
+    pub fn isOnQueue(_: *Looper) bool {
+        @panic("Looper v2 has no worker queue; execution belongs to the daemon");
+    }
+
+    pub fn perform(
+        _: *Looper,
+        comptime Result: type,
+        _: ?*anyopaque,
+        _: *const fn (?*anyopaque) anyerror!Result,
+    ) anyerror!Result {
+        @panic("Looper v2 cannot dispatch work; execution belongs to the daemon");
+    }
+
+    pub fn performTask(_: *Looper, _: helpers.Task) anyerror!void {
+        @panic("Looper v2 cannot dispatch work; execution belongs to the daemon");
     }
 
     pub fn writeOutOfBand(
-        self: *Looper,
-        packets: helpers.Packets,
-        side: io.Side,
-        destination: ?io.SocketAddress,
+        _: *Looper,
+        _: helpers.Packets,
+        _: io.Side,
+        _: ?io.SocketAddress,
     ) helpers.WriteOOBError!void {
-        return self.impl.writeOutOfBand(packets, side, destination);
+        @panic("Looper v2 writes must be queued");
     }
 };
