@@ -1240,7 +1240,7 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
     try std.testing.expect(sut.isStarted());
     try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
     sut.sendKeepalives();
-    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
 
     adapter.testing.setNetworkChangeBehavior(&sut, .refresh_sockets);
     _ = sut.didUpdateReachable(allocator, false);

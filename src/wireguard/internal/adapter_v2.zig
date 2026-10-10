@@ -155,7 +155,7 @@ pub const WireGuardAdapter = struct {
 
     pub fn sendKeepalives(self: *const WireGuardAdapter) void {
         switch (self.state) {
-            .started => |handle| if (self.transport == .passive) self.backend.sendKeepalives(handle),
+            .started => |handle| self.backend.sendKeepalives(handle),
             .stopped, .temporary_shutdown => {},
         }
     }
