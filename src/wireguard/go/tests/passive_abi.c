@@ -87,13 +87,11 @@ static void test_borrowed_io(void) {
         "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
         "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.2/32\n", &link, &tun, &p);
     assert(handle >= 0);
-    char *config = wgGetConfig(handle);
+    char *config = wgGetConfigWithPassiveIO(handle);
     assert(config != NULL && strstr(config, "listen_port=51820") != NULL);
     free(config);
-    wgDisableSomeRoamingForBrokenMobileSemantics(handle);
-    assert(wgSetConfig(handle, "listen_port=1234\n") != 0);
-    wgBumpSockets(handle); // Host-owned transport must not be reopened.
-    wgBumpSocketsAndWait(handle);
+    wgDisableRoamingWithPassiveIO(handle);
+    assert(wgSetEndpointsWithPassiveIO(handle, "listen_port=1234\n") != 0);
     uintptr_t input = 0;
     for (int i = 0; i < 3000 && !input; ++i) {
         pthread_mutex_lock(&p.mutex);
@@ -129,7 +127,7 @@ static void test_borrowed_io(void) {
     // Quiesce reads, cancel writes, then join Go. Never return storage earlier.
     for (unsigned i = 0; i < 2; ++i) if (reads[i]) wgCompleteIO(reads[i], 0, WG_IO_CLOSED);
     wgCompleteIO(output, 0, WG_IO_CLOSED);
-    wgTurnOff(handle);
+    wgTurnOffWithPassiveIO(handle);
     pthread_mutex_destroy(&p.mutex);
 }
 
@@ -167,7 +165,7 @@ static void test_keepalive_startup(int cancel) {
     wgCompleteIO(request, cancel ? 0 : 1, cancel ? WG_IO_CLOSED : WG_IO_OK);
     assert(pthread_join(worker, NULL) == 0);
     assert(p.handle >= 0);
-    char *config = wgGetConfig(p.handle);
+    char *config = wgGetConfigWithPassiveIO(p.handle);
     assert(config && strstr(config, "persistent_keepalive_interval=25"));
     free(config);
     pthread_mutex_lock(&p.io.mutex);
@@ -175,7 +173,7 @@ static void test_keepalive_startup(int cancel) {
     uintptr_t reads[2] = {p.io.read_requests[0], p.io.read_requests[1]};
     pthread_mutex_unlock(&p.io.mutex);
     for (unsigned i = 0; i < 2; ++i) if (reads[i]) wgCompleteIO(reads[i], 0, WG_IO_CLOSED);
-    wgTurnOff(p.handle);
+    wgTurnOffWithPassiveIO(p.handle);
     pthread_mutex_destroy(&p.io.mutex);
 }
 
@@ -256,7 +254,7 @@ static void test_direct_io(void) {
     }
     assert(received);
     /* No native admission queue to drain: shutdown cancels retries after the native wait. */
-    wgTurnOff(handle);
+    wgTurnOffWithPassiveIO(handle);
     pthread_mutex_destroy(&p.mutex);
 }
 

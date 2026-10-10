@@ -16,6 +16,11 @@
  * else.
  */
 #include <wg_go/wg_go.h>
+#include <stdatomic.h>
+
+/* One backend mode is active at a time. Drain previous-mode calls before
+ * switching: the independent Go registries can return overlapping handles. */
+static atomic_bool passive_mode = false;
 
 int pp_wg_init(void) {
     pp_clog_v(PPLogLevelInfo, "wg-go version: %s", pp_wg_version());
@@ -32,27 +37,40 @@ void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context) {
 
 #if PARTOUT_WINDOWS
 int pp_wg_turn_on(const char *settings, const char *ifname) {
-    return wgTurnOn(settings, ifname);
+    int handle = wgTurnOn(settings, ifname);
+    if (handle >= 0) atomic_store(&passive_mode, false);
+    return handle;
 }
 #else
 int pp_wg_turn_on(const char *settings, int32_t tun_fd) {
-    return wgTurnOn(settings, tun_fd);
+    int handle = wgTurnOn(settings, tun_fd);
+    if (handle >= 0) atomic_store(&passive_mode, false);
+    return handle;
 }
 #endif
 
 void pp_wg_turn_off(int handle) {
-    wgTurnOff(handle);
+    if (atomic_load(&passive_mode)) {
+        wgTurnOffWithPassiveIO(handle);
+    } else {
+        wgTurnOff(handle);
+    }
 }
 
 int64_t pp_wg_set_config(int handle, const char *settings) {
-    return wgSetConfig(handle, settings);
+    return atomic_load(&passive_mode)
+        ? wgSetEndpointsWithPassiveIO(handle, settings)
+        : wgSetConfig(handle, settings);
 }
 
 char *pp_wg_get_config(int handle) {
-    return wgGetConfig(handle);
+    return atomic_load(&passive_mode)
+        ? wgGetConfigWithPassiveIO(handle)
+        : wgGetConfig(handle);
 }
 
 void pp_wg_bump_sockets(int handle, bool sync) {
+    if (atomic_load(&passive_mode)) return;
     if (sync) {
         wgBumpSocketsAndWait(handle);
     } else {
@@ -61,21 +79,27 @@ void pp_wg_bump_sockets(int handle, bool sync) {
 }
 
 void pp_wg_tweak_mobile_roaming(int handle) {
-    wgDisableSomeRoamingForBrokenMobileSemantics(handle);
+    if (atomic_load(&passive_mode)) {
+        wgDisableRoamingWithPassiveIO(handle);
+    } else {
+        wgDisableSomeRoamingForBrokenMobileSemantics(handle);
+    }
 }
 
 #if PARTOUT_ANDROID
 int pp_wg_get_socket_v4(int handle) {
-    return wgGetSocketV4(handle);
+    return atomic_load(&passive_mode) ? -1 : wgGetSocketV4(handle);
 }
 
 int pp_wg_get_socket_v6(int handle) {
-    return wgGetSocketV6(handle);
+    return atomic_load(&passive_mode) ? -1 : wgGetSocketV6(handle);
 }
 #endif
 
 int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
-    return wgTurnOnWithPassiveIO(settings, link, tun, context);
+    int32_t handle = wgTurnOnWithPassiveIO(settings, link, tun, context);
+    if (handle >= 0) atomic_store(&passive_mode, true);
+    return handle;
 }
 
 int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
@@ -83,7 +107,7 @@ int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
 }
 
 void pp_wg_send_keepalives(int handle) {
-    wgSendKeepalives(handle);
+    if (atomic_load(&passive_mode)) wgSendKeepalivesWithPassiveIO(handle);
 }
 
 void pp_wg_complete_io(uintptr_t request, uint32_t count, int32_t status) {

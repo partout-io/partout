@@ -23,46 +23,45 @@ func startPassiveTestDevice(t *testing.T) int32 {
 	if handle < 0 {
 		t.Fatal("passive startup failed")
 	}
-	t.Cleanup(func() { wgTurnOff(handle) })
+	t.Cleanup(func() { wgTurnOffWithPassiveIO(handle) })
 	return handle
 }
 
-func TestSharedLifecycleAndStaleHandles(t *testing.T) {
+func TestPassiveLifecycleIsolatedFromLegacy(t *testing.T) {
 	handle := startPassiveTestDevice(t)
 	passive, _ := lookupPassiveBackend(handle)
 	logger := device.NewLogger(device.LogLevelSilent, "")
-	native := device.NewDevice(testTun(), testBind(), logger)
-	nativeHandle := wgTurnOnDevice(nil, native, logger)
-	if nativeHandle < 0 {
-		native.Close()
-		t.Fatal("native startup failed")
+	legacy := device.NewDevice(testTun(), testBind(), logger)
+	// Deliberately overlap IDs to verify that each ABI uses its own registry.
+	tunnelHandles[handle] = tunnelHandle{legacy, logger}
+	t.Cleanup(func() { wgTurnOff(handle) })
+	wgTurnOffWithPassiveIO(handle)
+	if tunnelHandles[handle].Device != legacy {
+		t.Fatal("passive shutdown changed the legacy registry")
 	}
-	t.Cleanup(func() { wgTurnOff(nativeHandle) })
-	if nativeHandle == handle {
-		t.Fatal("native and passive handles overlap")
+	if err := legacy.Up(); err != nil {
+		t.Fatalf("passive shutdown closed the legacy device: %v", err)
 	}
-	if _, ok := lookupPassiveBackend(nativeHandle); ok {
-		t.Fatal("native handle accepted as passive")
-	}
-	wgTurnOff(handle)
 	if _, err := passive.tun.Write([][]byte{{1}}, 0); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("passive TUN remains open: %v", err)
 	}
-	if current, ok := lookupTunnelHandle(nativeHandle); !ok || current.Device != native {
-		t.Fatal("passive shutdown changed the native device")
-	}
+
 	replacement := startPassiveTestDevice(t)
-	if replacement == handle || replacement == nativeHandle {
-		t.Fatal("handle was reused")
+	if replacement == handle {
+		t.Fatal("passive handle was reused")
 	}
-	wgTurnOff(nativeHandle)
-	wgTurnOff(handle) // A late shutdown cannot close the replacement.
+	// Move the legacy entry to overlap the replacement, then stop only v1.
+	delete(tunnelHandles, handle)
+	tunnelHandles[replacement] = tunnelHandle{legacy, logger}
+	t.Cleanup(func() { wgTurnOff(replacement) })
+	wgTurnOff(replacement)
+	wgTurnOffWithPassiveIO(handle) // A late shutdown cannot close the replacement.
 	current, ok := lookupPassiveBackend(replacement)
 	if !ok {
 		t.Fatal("replacement missing")
 	}
 	if _, err := current.tun.Write([][]byte{{1}}, 0); err != nil {
-		t.Fatal("native or stale shutdown closed the passive replacement")
+		t.Fatal("legacy or stale shutdown closed the passive replacement")
 	}
 }
 
@@ -80,7 +79,7 @@ func TestPassiveRegistryConcurrentShutdown(t *testing.T) {
 			}
 		}()
 	}
-	wgTurnOff(handle)
+	wgTurnOffWithPassiveIO(handle)
 	workers.Wait()
 	if _, ok := lookupPassiveBackend(handle); ok {
 		t.Fatal("closed passive device is still registered")
@@ -92,7 +91,7 @@ func TestPassiveStartupFailureClosesIO(t *testing.T) {
 	tun := testTun()
 	// The host bound 51820; a conflicting requested port must fail at Up.
 	if handle := turnOnPassiveDevice("listen_port=1234\n", bind, tun); handle != -1 {
-		wgTurnOff(handle)
+		wgTurnOffWithPassiveIO(handle)
 		t.Fatal("startup accepted a conflicting listen port")
 	}
 	if _, err := tun.Write([][]byte{{1}}, 0); !errors.Is(err, os.ErrClosed) {
@@ -125,7 +124,7 @@ func TestPassiveIdlePayloadBudget(t *testing.T) {
 	if handle < 0 {
 		t.Fatal("startup failed")
 	}
-	defer wgTurnOff(handle)
+	defer wgTurnOffWithPassiveIO(handle)
 	budget := 2 << 20
 	if total := <-capacity + <-capacity; total > budget {
 		t.Fatalf("idle payload storage = %d bytes, budget = %d", total, budget)
