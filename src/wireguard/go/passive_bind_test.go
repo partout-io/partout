@@ -401,7 +401,7 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 					<-keepalives[i]
 				}
 				session := binds[i].session
-				wgSendKeepalivesWithPassiveIO(handles[i])
+				wgSendKeepalives(handles[i])
 				select {
 				case <-keepalives[i]:
 				case <-time.After(5 * time.Second):

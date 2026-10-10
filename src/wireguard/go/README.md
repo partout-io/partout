@@ -81,21 +81,39 @@ call is nonblocking, and no packet request depends on a looper or native worker.
 Handles are never reused, so stale lifecycle calls cannot affect a replacement
 device.
 
-The passive API has a separate handle registry from the native v1 API. Use
-`wgGetConfigWithPassiveIO` for statistics/configuration reads and
-`wgDisableRoamingWithPassiveIO` for the mobile roaming policy. Never pass passive
-handles to native lifecycle/configuration functions (or vice versa): their
-numeric values can overlap. The legacy Go implementation remains unchanged;
-only logging and the underlying WireGuard dependency are shared.
+The existing native Go functions are unchanged. Passive devices register in the
+original handle map as well as a separate registry retaining their I/O state.
+They use the original config getter and roaming functions, plus the common
+`wgSendKeepalives` entry point. `wgTurnOffWithPassiveIO` removes both entries and
+closes passive I/O. Passive handles are never reused. `wgSetEndpointsWithPassiveIO`
+accepts only endpoint updates; full configuration, MTU, or listen-port changes
+require restart.
+
+Partout's C wrappers expose common operations to the single Zig backend vtable.
+They serialize device calls to protect the original Go handle map, and remember
+the mode selected by successful startup for shutdown and configuration updates.
+I/O completion remains unlocked so callbacks can finish during device calls.
+Direct Go ABI callers must serialize device calls themselves. Active and passive
+backends must never run concurrently, and all calls from the previous mode must
+finish before switching modes. Passive socket refresh is a no-op because the host
+owns transport.
 
 Partout selects `connection_v2.zig` when daemon v2 is enabled, using the same
 runtime selection as OpenVPN. The legacy `connection.zig` and adapter retain
-native Go I/O. V2 connections own transport (`daemon_io = .link`). The daemon
-creates/configures the UDP socket and transfers it through `startV2()`. WireGuard
-returns `.established` with owned tunnel info. The daemon applies tunnel settings
-and transfers the TUN through `commit()` immediately in the same actor turn.
-The bridge owns replacement and native resource cleanup. Windows native
-descriptor I/O remains unimplemented. The runtime log identifies this
+native Go I/O. V2 uses native Go I/O on non-Windows platforms
+(`daemon_io = .none`) and passive transport on Windows (`daemon_io = .link`).
+In link mode, the daemon creates/configures UDP and transfers it through `startV2()`.
+WireGuard returns `.established` with owned tunnel info. The daemon applies tunnel
+settings and transfers the TUN through `commit()` immediately in the same actor
+turn, before processing queued reachability events.
+Active mode caches peer hostname answers in `startV2()`, before returning
+establishment and before the daemon applies tunnel settings. Commit maps the
+cached numeric addresses for the current network and starts Go, preserving v1's
+DNS/DNS64 ordering. Stopping before commit discards the cached answers.
+Offline resume currently retains the committed TUN and restarts Go; reapplying
+settings and replacing the TUN remains deferred.
+The connection owns handed-off resources and cleans them up after backend shutdown.
+Windows native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
 
 Validation:
