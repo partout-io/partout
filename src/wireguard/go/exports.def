@@ -10,8 +10,8 @@ wgGetConfig
 wgBumpSockets
 wgBumpSocketsAndWait
 wgDisableSomeRoamingForBrokenMobileSemantics
+wgSendKeepalives
 wgVersion
 wgTurnOnWithPassiveIO
 wgSetEndpointsWithPassiveIO
 wgCompleteIO
-wgSendKeepalives
