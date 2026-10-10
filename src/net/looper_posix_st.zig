@@ -43,7 +43,7 @@ pub const PosixLooper = struct {
     options: helpers.Options,
     state: State = .idle,
     callback_depth: usize = 0,
-    timers_head: ?*Scheduled = null,
+    timers: core.Fifo(Scheduled) = .{},
     next_timer_id: u64 = 1,
     mux: io_c.pp_mux,
     fd_set: ?DescriptorSet = null,
@@ -129,21 +129,19 @@ pub const PosixLooper = struct {
         if (self.next_timer_id == 0) self.next_timer_id = 1;
         node.* = .{ .id = id, .deadline_ns = deadlineAfter(delay_ms), .task = task };
         self.cancelTimer(timer);
-        node.next = self.timers_head;
-        self.timers_head = node;
+        self.timers.append(node);
         timer.id = id;
     }
 
     pub fn cancelTimer(self: *PosixLooper, timer: *helpers.Timer) void {
         const id = timer.id orelse return;
-        var cursor = &self.timers_head;
-        while (cursor.*) |node| {
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next) {
             if (node.id == id) {
-                cursor.* = node.next;
+                std.debug.assert(self.timers.remove(node));
                 self.allocator.destroy(node);
                 break;
             }
-            cursor = &node.next;
         }
         timer.id = null;
     }
@@ -425,7 +423,7 @@ pub const PosixLooper = struct {
     fn waitReady(self: *PosixLooper, max_wait_ms: ?u32, fd_set: *DescriptorSet) ?c_int {
         var timeout_ns: ?u64 = if (max_wait_ms) |ms| @as(u64, ms) * std.time.ns_per_ms else null;
         const now = monotonicNs();
-        var timer = self.timers_head;
+        var timer = self.timers.head;
         while (timer) |node| : (timer = node.next) boundTimeout(&timeout_ns, node.deadline_ns -| now);
         for (self.read_retries ++ self.write_retries) |deadline| {
             if (deadline) |ns| boundTimeout(&timeout_ns, ns -| now);
@@ -464,19 +462,20 @@ pub const PosixLooper = struct {
 
     fn runTimers(self: *PosixLooper) void {
         const now = monotonicNs();
-        // Snapshot identities so callbacks may replace/cancel timers safely, and
+        // Mark ready tasks so callbacks may replace/cancel timers safely, and
         // newly scheduled zero-delay tasks cannot monopolize this iteration.
-        var pending = self.timers_head;
+        var pending = self.timers.head;
         while (pending) |node| : (pending = node.next) node.ready = node.deadline_ns <= now;
-        var cursor = &self.timers_head;
-        while (cursor.*) |node| {
+        pending = self.timers.head;
+        while (pending) |node| {
             if (node.ready) {
-                cursor.* = node.next;
+                std.debug.assert(self.timers.remove(node));
                 const task = node.task;
                 self.allocator.destroy(node);
                 task.call();
-                cursor = &self.timers_head;
-            } else cursor = &node.next;
+                // The callback may have removed or replaced any pending node.
+                pending = self.timers.head;
+            } else pending = node.next;
         }
     }
 
@@ -554,10 +553,7 @@ pub const PosixLooper = struct {
     }
 
     fn cancelAllTimers(self: *PosixLooper) void {
-        while (self.timers_head) |node| {
-            self.timers_head = node.next;
-            self.allocator.destroy(node);
-        }
+        while (self.timers.take()) |node| self.allocator.destroy(node);
     }
 
     fn sideIO(self: *const PosixLooper, side: io.Side) ?*SideIO {
