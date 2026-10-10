@@ -38,3 +38,4 @@ pub const SerializedExecutor = concurrency.SerializedExecutor;
 pub const isGeneratedId = uuid.isV4;
 pub const newId = uuid.newId;
 pub const sleepMs = concurrency.sleepMs;
+pub const monotonicNs = concurrency.monotonicNs;

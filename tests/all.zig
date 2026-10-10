@@ -33,6 +33,7 @@ comptime {
     _ = @import("net/io_common.zig");
     if (@import("builtin").os.tag != .windows) {
         _ = @import("net/io_posix.zig");
+        _ = @import("net/looper_posix_st.zig");
         _ = @import("net/socket_datagram.zig");
     }
     if (!source.runtime_policy.v2_only) {

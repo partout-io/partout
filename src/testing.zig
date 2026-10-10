@@ -24,6 +24,7 @@ pub const net_io_common = @import("net/io_common.zig");
 pub const net_io = @import("net/io.zig");
 pub const net_io_posix = if (@import("builtin").os.tag == .windows) struct {} else @import("net/io_posix.zig");
 pub const net_looper = @import("net/looper_runtime.zig");
+pub const net_looper_posix_st = if (@import("builtin").os.tag == .windows) struct {} else @import("net/looper_posix_st.zig");
 pub const net_looper_v2 = @import("net/looper_v2.zig");
 pub const net_looper_helpers = @import("net/looper_helpers.zig");
 pub const net_sandbox = @import("net/sandbox.zig");
