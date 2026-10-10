@@ -135,13 +135,6 @@ int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link,
     return handle;
 }
 
-int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
-    lock_devices();
-    int64_t result = wgSetEndpointsWithPassiveIO(handle, settings);
-    unlock_devices();
-    return result;
-}
-
 void pp_wg_send_keepalives(int handle) {
     lock_devices();
     wgSendKeepalives(handle);
@@ -219,11 +212,6 @@ int pp_wg_get_socket_v6(int handle) {
 
 int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
     (void)settings; (void)link; (void)tun; (void)context;
-    return -1;
-}
-
-int64_t pp_wg_set_endpoints_passive(int32_t handle, const char *settings) {
-    (void)handle; (void)settings;
     return -1;
 }
 
