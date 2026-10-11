@@ -192,15 +192,10 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        // Keep each active protocol on a matching daemon/connection stack.
-        const experimental_daemon = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
-        const experimental_openvpn = runtime_policy.v2_only or (experimental_daemon and options.feature_flags.contains(.experimentalOpenVPN));
-        const experimental_wireguard = runtime_policy.v2_only or (experimental_daemon and options.feature_flags.contains(.experimentalWireGuard));
-        const experimental = if (api.findActiveConnectionModule(&options.profile)) |module| switch (api.moduleType(module)) {
-            .OpenVPN => experimental_openvpn,
-            .WireGuard => experimental_wireguard,
-            else => experimental_daemon,
-        } else experimental_daemon;
+        // The shared policy excludes legacy implementations at compile time.
+        const experimental = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
+        const experimental_openvpn = runtime_policy.v2_only or (experimental and options.feature_flags.contains(.experimentalOpenVPN));
+        const experimental_wireguard = runtime_policy.v2_only or (experimental and options.feature_flags.contains(.experimentalWireGuard));
         log.write(.notice, if (experimental) "Using daemon v2 (experimental)" else "Using daemon v1 (legacy)");
 
         // Register the known connection implementations
