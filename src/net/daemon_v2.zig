@@ -339,7 +339,7 @@ const ConnectionDaemon = struct {
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
-    read_storage: [2]?*helpers.ReadStorage = .{ null, null },
+    read_storage: [2]*helpers.ReadStorage = undefined,
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
@@ -666,11 +666,16 @@ const ConnectionDaemon = struct {
     // complete state before starting any looper callbacks.
     fn createConnection(self: *ConnectionDaemon) Error!void {
         std.debug.assert(self.connection == null);
+        const options: Looper.Options = .{
+            .on_finish = .{ .context = self, .callback = onLooperTerminate },
+        };
+        const link_storage = try helpers.ReadStorage.create(self.daemon.allocator, options.max_read_count, options.link_buf_size);
+        errdefer link_storage.destroy();
+        const tun_storage = try helpers.ReadStorage.create(self.daemon.allocator, options.max_read_count, options.tun_buf_size);
+        errdefer tun_storage.destroy();
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
-        looper.* = Looper.init(self.daemon.allocator, .{
-            .on_finish = .{ .context = self, .callback = onLooperTerminate },
-        }) catch |err| return switch (err) {
+        looper.* = Looper.init(self.daemon.allocator, options) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.MuxFailure => error.LooperFailure,
         };
@@ -693,6 +698,7 @@ const ConnectionDaemon = struct {
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
         errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
+        self.read_storage = .{ link_storage, tun_storage };
         if (connection.daemon_io == .looper) looper.start() catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             else => error.LooperFailure,
@@ -709,10 +715,7 @@ const ConnectionDaemon = struct {
         connection.destroy();
         self.looper.deinit();
         self.daemon.allocator.destroy(self.looper);
-        for (&self.read_storage) |*storage| {
-            if (storage.*) |value| value.destroy();
-            storage.* = null;
-        }
+        for (self.read_storage) |storage| storage.destroy();
         if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.endpoint_resolver = null;
         self.connection = null;
@@ -812,15 +815,9 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn readBuffers(self: *ConnectionDaemon, side: io.Side) error{OutOfMemory}!Looper.ReadBuffers {
+    fn readBuffers(self: *ConnectionDaemon, side: io.Side) Looper.ReadBuffers {
         if (self.connection.?.readBuffers(side)) |buffers| return buffers;
-        const storage = &self.read_storage[@intFromEnum(side)];
-        if (storage.* == null) {
-            const options = self.looper.impl.options;
-            const size = if (side == .link) options.link_buf_size else options.tun_buf_size;
-            storage.* = try helpers.ReadStorage.create(self.daemon.allocator, options.max_read_count, size);
-        }
-        return storage.*.?.provider();
+        return self.read_storage[@intFromEnum(side)].provider();
     }
 
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
@@ -866,7 +863,7 @@ const ConnectionDaemon = struct {
             log.write(.info, "Attach LINK");
             try self.looper.attach(.{
                 .pair = .{ .link = descriptor },
-                .read_buffers = try self.readBuffers(.link),
+                .read_buffers = self.readBuffers(.link),
                 .on_read = .{ .context = self, .callback = onLinkRead },
                 .on_failure = .{ .context = self, .callback = onLinkFailure },
             });
@@ -969,7 +966,7 @@ const ConnectionDaemon = struct {
             .pair = .{
                 .tun = descriptor,
             },
-            .read_buffers = try self.readBuffers(.tun),
+            .read_buffers = self.readBuffers(.tun),
             .on_read = .{
                 .context = self,
                 .callback = onTunnelRead,
