@@ -12,14 +12,12 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const conn = @import("connection.zig");
 const io = @import("io.zig");
-const looper_v2 = @import("looper_v2.zig");
 const runtime_policy = @import("../runtime_policy.zig");
-const looper = runtime_policy.legacy_looper;
+const looper = @import("looper.zig");
 const api = core.api;
 
 const Looper = if (runtime_policy.v2_only) void else looper.Looper;
 const TunWrapper = io.TunWrapper;
-pub const ConnectionWriter = conn.ConnectionWriter(looper_v2.Looper);
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
 /// to make a connection within it.
@@ -35,8 +33,8 @@ pub const Sandbox = struct {
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
+    /// Legacy v1 capabilities; v2 connections do not use these.
     looper: *Looper,
-    /// Legacy v1 capability; v2 connections do not use it.
     serialized_executor: SerializedExecutor = undefined,
 };
 
@@ -296,4 +294,43 @@ pub const ConnectionOptions = struct {
 
     /// Generic user data represented as JSON.
     user_info: ?api.JSONValue = null,
+};
+
+/// Packet writes and timers supplied by the connection owner.
+/// The borrowed context must outlive the connection and its sessions.
+pub const ConnectionWriter = struct {
+    ptr: *anyopaque,
+    vtable: *const VTable,
+
+    pub const VTable = struct {
+        write_packets: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void,
+        write_out_of_band: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) io.WriteOOBError!void,
+        schedule_timer: *const fn (*anyopaque, *io.Timer, u64, io.TimedTask) io.SubmissionError!void,
+        cancel_timer: *const fn (*anyopaque, *io.Timer) void,
+    };
+
+    pub fn init(ptr: *anyopaque, vtable: *const VTable) ConnectionWriter {
+        return .{ .ptr = ptr, .vtable = vtable };
+    }
+
+    pub fn deinit(self: *ConnectionWriter) void {
+        self.* = undefined;
+    }
+
+    /// The implementation consumes or copies packets before returning.
+    pub fn writePackets(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+        return self.vtable.write_packets(self.ptr, packets, side, destination);
+    }
+
+    pub fn writeOutOfBand(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
+        return self.vtable.write_out_of_band(self.ptr, packets, side, destination);
+    }
+
+    pub fn scheduleTimer(self: ConnectionWriter, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+        return self.vtable.schedule_timer(self.ptr, timer, delay_ms, task);
+    }
+
+    pub fn cancelTimer(self: ConnectionWriter, timer: *io.Timer) void {
+        self.vtable.cancel_timer(self.ptr, timer);
+    }
 };

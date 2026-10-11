@@ -403,38 +403,3 @@ pub const Connection = struct {
         self.vtable.destroy(self.ptr);
     }
 };
-
-/// Packet writes and timers for a connection. Borrows the daemon-owned looper,
-/// which must outlive the connection and its sessions.
-pub fn ConnectionWriter(comptime Looper: type) type {
-    return struct {
-        const Self = @This();
-        looper: *Looper,
-
-        pub fn init(looper: *Looper) Self {
-            return .{ .looper = looper };
-        }
-
-        /// Releases the wrapper; the daemon retains ownership of the looper.
-        pub fn deinit(self: *Self) void {
-            self.* = undefined;
-        }
-
-        /// Copies packet data before submitting it to the looper.
-        pub fn writePackets(self: Self, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
-            return io.WriteCopy.submit(self.looper.allocator, self.looper, packets, side, destination);
-        }
-
-        pub fn writeOutOfBand(self: Self, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
-            return self.looper.writeOutOfBand(packets, side, destination);
-        }
-
-        pub fn scheduleTimer(self: Self, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
-            return self.looper.scheduleReplacing(timer, delay_ms, task);
-        }
-
-        pub fn cancelTimer(self: Self, timer: *io.Timer) void {
-            self.looper.cancelTimer(timer);
-        }
-    };
-}

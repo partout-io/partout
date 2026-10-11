@@ -8,6 +8,7 @@ const builtin = @import("builtin");
 const source = @import("source");
 
 const net = source.net;
+const io = source.net_io;
 
 const AuthToken = source.openvpn_internal.auth.AuthToken;
 const Looper = source.net_looper_v2.Looper;
@@ -58,7 +59,7 @@ test "Session uses externally supplied I/O callbacks" {
     var auth_token = AuthToken{};
     defer auth_token.deinit();
     const session = try Session.create(allocator, .{
-        .writer = net.ConnectionWriter.init(&looper),
+        .writer = net.ConnectionWriter.init(&looper, &writer_vtable),
         .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .events = .{
             .established = Callbacks.established,
@@ -75,7 +76,7 @@ test "Session uses externally supplied I/O callbacks" {
     });
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
-    try std.testing.expect(session.writer.looper == &looper);
+    try std.testing.expect(session.writer.ptr == @as(*anyopaque, &looper));
 
     session.destroy();
     session_destroyed = true;
@@ -127,7 +128,7 @@ test "Session reports protocol failures without owning shutdown policy" {
             .failed = RecordingEvents.failed,
             .data_count = RecordingEvents.dataCount,
         },
-        .writer = net.ConnectionWriter.init(&looper),
+        .writer = net.ConnectionWriter.init(&looper, &writer_vtable),
         .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .configuration = .{},
         .credentials = null,
@@ -179,4 +180,31 @@ test "Session preserves callback failures and classifies native side failures" {
             .code = 5,
         } }, error.LinkFailure),
     );
+}
+
+const writer_vtable: net.ConnectionWriter.VTable = .{
+    .write_packets = writePackets,
+    .write_out_of_band = writeOutOfBand,
+    .schedule_timer = scheduleTimer,
+    .cancel_timer = cancelTimer,
+};
+
+fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return io.WriteCopy.submit(looper.allocator, looper, packets, side, destination);
+}
+
+fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return looper.writeOutOfBand(packets, side, destination);
+}
+
+fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return looper.scheduleReplacing(timer, delay_ms, task);
+}
+
+fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    looper.cancelTimer(timer);
 }

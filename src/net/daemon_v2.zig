@@ -436,6 +436,33 @@ const ConnectionDaemon = struct {
         };
     }
 
+    const writer_vtable: net.ConnectionWriter.VTable = .{
+        .write_packets = writePackets,
+        .write_out_of_band = writeOutOfBand,
+        .schedule_timer = scheduleTimer,
+        .cancel_timer = cancelTimer,
+    };
+
+    fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        return io.WriteCopy.submit(looper.allocator, looper, packets, side, destination);
+    }
+
+    fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        return looper.writeOutOfBand(packets, side, destination);
+    }
+
+    fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        return looper.scheduleReplacing(timer, delay_ms, task);
+    }
+
+    fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        looper.cancelTimer(timer);
+    }
+
     fn onConnectionEstablished(
         ctx: *anyopaque,
         success: net.Connection.Events.Success,
@@ -653,7 +680,7 @@ const ConnectionDaemon = struct {
             .options = self.daemon.options.connection_options,
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
-            .writer = net.ConnectionWriter.init(looper),
+            .writer = net.ConnectionWriter.init(looper, &writer_vtable),
             // FIXME: ###, Delete all these from Sandbox
             .controller = self.daemon.controller,
             .resolver = self.resolver,
