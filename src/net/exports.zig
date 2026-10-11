@@ -25,6 +25,7 @@ const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 pub const Connection = conn.Connection;
+pub const ConnectionWriter = sandbox.ConnectionWriter;
 pub const ConnectionCreateError = conn.CreateError;
 pub const ConnectionImplementation = conn.ConnectionImplementation;
 pub const ConnectionModule = conn.ConnectionModule;

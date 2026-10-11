@@ -20,6 +20,7 @@ pub const ReadBuffer = common.ReadBuffer;
 pub const ReadBuffers = common.ReadBuffers;
 pub const IOError = common.IOError;
 pub const IOResult = common.IOResult;
+pub const WriteCopy = common.WriteCopy;
 
 pub const Failure = common.Failure;
 pub const TimedTask = common.TimedTask;
@@ -40,13 +41,12 @@ pub const SocketWrapper = backend.SocketWrapper;
 pub const TunDescriptor = backend.TunDescriptor;
 pub const TunWrapper = backend.TunWrapper;
 
-/// The looper manages exactly one link and one tun (at most).
-pub const DescriptorPair = union(Side) {
-    link: LinkDescriptor,
-    tun: TunDescriptor,
-};
-
 pub const SocketAddress = common.SocketAddress;
 pub const SocketEndpoint = common.SocketEndpoint;
 pub const SocketType = common.SocketType;
 pub const Datagram = common.Datagram;
+
+pub const DescriptorPair = union(Side) {
+    link: LinkDescriptor,
+    tun: TunDescriptor,
+};

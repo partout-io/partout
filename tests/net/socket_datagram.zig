@@ -71,7 +71,7 @@ const Echo = struct {
                 else => return error.UnexpectedFamily,
             }
         }
-        for (packets, addresses) |packet, address| try daemon_helpers.WriteCopy.submit(self.looper.allocator, self.looper, &.{packet}, .link, address);
+        for (packets, addresses) |packet, address| try io.WriteCopy.submit(self.looper.allocator, self.looper, &.{packet}, .link, address);
         _ = self.count.fetchAdd(packets.len, .release);
         if (self.pause_once) {
             self.pause_once = false;
@@ -147,7 +147,7 @@ test "v2 one UDP link echoes several peers across both address families" {
         server.destroy();
         return err;
     };
-    try std.testing.expectError(error.MissingDestination, daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"address required"}, .link, null));
+    try std.testing.expectError(error.MissingDestination, io.WriteCopy.submit(loop.allocator, &loop, &.{"address required"}, .link, null));
     try loop.performTask(.{ .context = &loop, .callback = struct {
         fn check(raw: ?*anyopaque) anyerror!void {
             const looper: *Looper = @ptrCast(@alignCast(raw.?));
@@ -173,7 +173,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     try std.testing.expectEqual(@as(usize, 0), try receive(third, &buf, &address));
     try std.testing.expectEqual(@as(u8, 6), address.family);
     try std.testing.expectEqual(v6.port, address.port);
-    try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{ "batch one", "batch two" }, .link, try destination(first, 4));
+    try io.WriteCopy.submit(loop.allocator, &loop, &.{ "batch one", "batch two" }, .link, try destination(first, 4));
     n = try receive(first, &buf, &address);
     try std.testing.expectEqualStrings("batch one", buf[0..n]);
     n = try receive(first, &buf, &address);
@@ -181,7 +181,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     try loop.detach(.link);
     try std.testing.expect(!loop.isLinkAttached());
     try std.testing.expect(loop.isTunAttached());
-    try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"tun still usable"}, .tun, null);
+    try io.WriteCopy.submit(loop.allocator, &loop, &.{"tun still usable"}, .tun, null);
     try loop.stop();
     try std.testing.expectEqual(@as(usize, 1), tun.cleaned.load(.acquire));
     try std.testing.expectEqual(@as(usize, 3), echo.count.load(.acquire));
@@ -314,7 +314,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
             return err;
         };
         if (Implementation == Looper) {
-            try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"request"}, .link, peer);
+            try io.WriteCopy.submit(loop.allocator, &loop, &.{"request"}, .link, peer);
         } else {
             try loop.writeQueued(&.{"request"}, .link, peer);
         }

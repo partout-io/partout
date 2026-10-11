@@ -8,7 +8,7 @@ const source = @import("source");
 const daemon_helpers = source.net_daemon_helpers;
 const io = source.net_io;
 const Looper = source.net_looper_v2.Looper;
-const queues = source.net_looper_helpers;
+const queues = source.net_looper_v2.testing_helpers;
 const allocator = std.testing.allocator;
 const Atomic = std.atomic.Value(usize);
 const libc = struct {
@@ -310,7 +310,7 @@ test "v2 compatibility writes clean up copies when allocation fails" {
         failing.fail_index = failing.alloc_index + successful_allocations;
         try std.testing.expectError(
             error.OutOfMemory,
-            daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{ "one", "two" }, .tun, null),
+            io.WriteCopy.submit(loop.allocator, &loop, &.{ "one", "two" }, .tun, null),
         );
         failing.fail_index = std.math.maxInt(usize);
         try loop.stop();

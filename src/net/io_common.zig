@@ -98,6 +98,57 @@ pub const WriteOOBError = SubmissionError || Error || error{
     WriteIncomplete,
 };
 
+pub const WriteCopy = struct {
+    allocator: std.mem.Allocator,
+    packets: []Packet,
+
+    /// Copies before submitting; the completion releases accepted packets.
+    pub fn submit(allocator: std.mem.Allocator, looper: anytype, packets: Packets, side: Side, destination: ?SocketAddress) (SubmissionError || error{MissingDestination})!void {
+        if (packets.len == 0) return;
+        const copy = try create(allocator, packets);
+        errdefer copy.destroy();
+        looper.writeQueued(copy.packets, side, destination, .{ .context = copy, .callback = complete }) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
+            else => |failure| return failure,
+        };
+    }
+
+    fn create(
+        allocator: std.mem.Allocator,
+        packets: Packets,
+    ) std.mem.Allocator.Error!*WriteCopy {
+        const copies = try allocator.alloc(Packet, packets.len);
+        errdefer allocator.free(copies);
+        var copied: usize = 0;
+        errdefer {
+            for (copies[0..copied]) |packet| {
+                allocator.free(packet);
+            }
+        }
+        for (packets, copies) |packet, *copy| {
+            copy.* = try allocator.dupe(u8, packet);
+            copied += 1;
+        }
+        const self = try allocator.create(WriteCopy);
+        self.* = .{ .allocator = allocator, .packets = copies };
+        return self;
+    }
+
+    fn destroy(self: *WriteCopy) void {
+        const allocator = self.allocator;
+        for (self.packets) |packet| {
+            allocator.free(packet);
+        }
+        allocator.free(self.packets);
+        allocator.destroy(self);
+    }
+
+    fn complete(raw: ?*anyopaque, _: IOResult) void {
+        const self: *WriteCopy = @ptrCast(@alignCast(raw.?));
+        self.destroy();
+    }
+};
+
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };
 pub const ReachabilityInfo = io_c.pp_reachability;

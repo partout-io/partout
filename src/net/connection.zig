@@ -228,13 +228,6 @@ pub const Connection = struct {
 
         ctx: *anyopaque,
 
-        /// V2 requests, invoked on the connection execution context.
-        /// Writers consume or copy packets before returning.
-        write_packets: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void = null,
-        write_out_of_band: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) io.WriteOOBError!void = null,
-        schedule_timer: ?*const fn (*anyopaque, *io.Timer, u64, io.TimedTask) io.SubmissionError!void = null,
-        cancel_timer: ?*const fn (*anyopaque, *io.Timer) void = null,
-
         // FIXME: ###, New v2 callbacks, temporary noops
         established: *const fn (*anyopaque, Success) void = struct {
             fn call(_: *anyopaque, _: Success) void {}
@@ -410,3 +403,38 @@ pub const Connection = struct {
         self.vtable.destroy(self.ptr);
     }
 };
+
+/// Packet writes and timers for a connection. Borrows the daemon-owned looper,
+/// which must outlive the connection and its sessions.
+pub fn ConnectionWriter(comptime Looper: type) type {
+    return struct {
+        const Self = @This();
+        looper: *Looper,
+
+        pub fn init(looper: *Looper) Self {
+            return .{ .looper = looper };
+        }
+
+        /// Releases the wrapper; the daemon retains ownership of the looper.
+        pub fn deinit(self: *Self) void {
+            self.* = undefined;
+        }
+
+        /// Copies packet data before submitting it to the looper.
+        pub fn writePackets(self: Self, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+            return io.WriteCopy.submit(self.looper.allocator, self.looper, packets, side, destination);
+        }
+
+        pub fn writeOutOfBand(self: Self, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
+            return self.looper.writeOutOfBand(packets, side, destination);
+        }
+
+        pub fn scheduleTimer(self: Self, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+            return self.looper.scheduleReplacing(timer, delay_ms, task);
+        }
+
+        pub fn cancelTimer(self: Self, timer: *io.Timer) void {
+            self.looper.cancelTimer(timer);
+        }
+    };
+}

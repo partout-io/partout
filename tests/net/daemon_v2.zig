@@ -377,7 +377,9 @@ test "v2 settings daemon creation rolls back allocation failures" {
 
 test "v2 daemon owns the profile and rolls back connection startup allocations" {
     const Factory = struct {
+        create_count: usize = 0,
         destroy_count: usize = 0,
+        writer: ?net.ConnectionWriter = null,
         profile: ?*const api.Profile = null,
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
         fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -385,6 +387,8 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         }
         fn create(ptr: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(ptr.?));
+            self.create_count += 1;
+            self.writer = sb.writer;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable };
         }
@@ -434,14 +438,15 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         sut.start() catch |err| {
             failing.fail_index = std.math.maxInt(usize);
             try std.testing.expectEqual(error.OutOfMemory, err);
-            try std.testing.expectEqual(@as(usize, 1), factory.destroy_count);
+            try std.testing.expectEqual(factory.create_count, factory.destroy_count);
             try std.testing.expectEqual(@as(usize, 0), monitor.start_count);
             // Failed startup remains retryable and retains profile ownership.
             try sut.start();
             defer sut.stop();
             try std.testing.expectEqual(&sut.profile, factory.profile.?);
+            try std.testing.expect(factory.writer != null);
             sut.stop();
-            try std.testing.expectEqual(@as(usize, 2), factory.destroy_count);
+            try std.testing.expectEqual(factory.create_count, factory.destroy_count);
             continue;
         };
         failing.fail_index = std.math.maxInt(usize);

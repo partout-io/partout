@@ -12,12 +12,14 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const conn = @import("connection.zig");
 const io = @import("io.zig");
+const looper_v2 = @import("looper_v2.zig");
 const runtime_policy = @import("../runtime_policy.zig");
 const looper = runtime_policy.legacy_looper;
 const api = core.api;
 
 const Looper = if (runtime_policy.v2_only) void else looper.Looper;
 const TunWrapper = io.TunWrapper;
+pub const ConnectionWriter = conn.ConnectionWriter(looper_v2.Looper);
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
 /// to make a connection within it.
@@ -28,6 +30,7 @@ pub const Sandbox = struct {
     /// it during creation.
     cache_dir: []const u8 = "",
     events: ?conn.Connection.Events = null,
+    writer: ?ConnectionWriter = null,
     // FIXME: ###, Delete all these from Sandbox
     controller: TunnelController,
     resolver: DNSResolver,

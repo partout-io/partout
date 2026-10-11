@@ -78,6 +78,7 @@ const OpenVPNConnection = struct {
 
     /// Stable callback sink supplied at creation.
     events: ?net.Connection.Events,
+    writer: ?net.ConnectionWriter,
     with_local_options: bool,
     /// Ownership marks an attempt awaiting finalization, even if stopped.
     current_session: ?*Session,
@@ -173,6 +174,7 @@ const OpenVPNConnection = struct {
             .cache_dir = cache_dir,
             .ca_filename = ca_filename,
             .events = sandbox.events,
+            .writer = sandbox.writer,
             .with_local_options = true,
             .current_session = null,
             .pending_failure = null,
@@ -189,6 +191,7 @@ const OpenVPNConnection = struct {
     fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit OpenVPNConnection v2");
         self.releaseSession();
+        if (self.writer) |*writer| writer.deinit();
         self.auth_token.deinit();
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
@@ -220,7 +223,7 @@ const OpenVPNConnection = struct {
         }
 
         const session = Session.create(self.allocator, .{
-            .connection_events = self.events orelse return error.UnableToStart,
+            .writer = self.writer orelse return error.UnableToStart,
             .remote_endpoint = remote.endpoint orelse return error.UnableToStart,
             .events = self.session_events,
             .configuration = self.configuration,

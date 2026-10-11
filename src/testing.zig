@@ -63,7 +63,6 @@ pub const net_io = @import("net/io.zig");
 pub const net_io_posix = if (builtin.os.tag == .windows) struct {} else io_posix_module;
 pub const net_looper = runtime_policy.legacy_looper;
 pub const net_looper_v2 = @import("net/looper_v2.zig");
-pub const net_looper_helpers = net_looper_v2.testing_helpers;
 pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const net_resolver = @import("net/resolver.zig");

@@ -133,7 +133,7 @@ pub const Session = struct {
     options: SessionOptions,
 
     // Link interface.
-    connection_events: net.Connection.Events,
+    writer: net.ConnectionWriter,
     remote_endpoint: net.SocketEndpoint,
     events: SessionEvents,
 
@@ -146,7 +146,7 @@ pub const Session = struct {
 
     pub const Init = struct {
         /// I/O strategy.
-        connection_events: net.Connection.Events,
+        writer: net.ConnectionWriter,
         remote_endpoint: net.SocketEndpoint,
         events: SessionEvents,
         /// OpenVPN configuration.
@@ -220,7 +220,7 @@ pub const Session = struct {
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
             .options = init.options,
-            .connection_events = init.connection_events,
+            .writer = init.writer,
             .remote_endpoint = init.remote_endpoint,
             .events = init.events,
             .state = .{
@@ -242,6 +242,7 @@ pub const Session = struct {
             .stopped => {},
             .active => |active| active.context.destroy(),
         }
+        self.writer.deinit();
         self.control_channel.destroy();
         self.link_processor.destroy();
 
@@ -453,8 +454,8 @@ pub const Session = struct {
     }
 
     fn cancelTimers(self: *Session) void {
-        self.connection_events.cancel_timer.?(self.connection_events.ctx, &self.negotiation_timer);
-        self.connection_events.cancel_timer.?(self.connection_events.ctx, &self.ping_timer);
+        self.writer.cancelTimer(&self.negotiation_timer);
+        self.writer.cancelTimer(&self.ping_timer);
     }
 
     // MARK: Packet I/O
@@ -668,23 +669,22 @@ pub const Session = struct {
 
     fn writeDataPackets(raw: ?*anyopaque, packets: io.Packets, side: net.Side, destination: ?net.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        return self.connection_events.write_packets.?(self.connection_events.ctx, packets, side, destination);
+        return self.writer.writePackets(packets, side, destination);
     }
 
     fn writeOutOfBand(raw: ?*anyopaque, packets: io.Packets, side: net.Side, destination: ?net.SocketAddress) io.WriteOOBError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        return self.connection_events.write_out_of_band.?(self.connection_events.ctx, packets, side, destination);
+        return self.writer.writeOutOfBand(packets, side, destination);
     }
 
     fn writeLinkPackets(raw: ?*anyopaque, packets: io.Packets, destination: net.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        return self.connection_events.write_packets.?(self.connection_events.ctx, packets, .link, destination);
+        return self.writer.writePackets(packets, .link, destination);
     }
 
     fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) io.SubmissionError!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.connection_events.schedule_timer.?(
-            self.connection_events.ctx,
+        try self.writer.scheduleTimer(
             &self.negotiation_timer,
             delay_ms,
             .{ .context = self, .callback = onNegotiationTimer },
@@ -695,8 +695,7 @@ pub const Session = struct {
         const delay_ms = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay_ms);
-        try self.connection_events.schedule_timer.?(
-            self.connection_events.ctx,
+        try self.writer.scheduleTimer(
             &self.ping_timer,
             delay_ms,
             .{ .context = self, .callback = onPingTimer },

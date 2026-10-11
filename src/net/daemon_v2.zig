@@ -423,10 +423,6 @@ const ConnectionDaemon = struct {
     fn events(self: *ConnectionDaemon) Connection.Events {
         return .{
             .ctx = self,
-            .write_packets = writePackets,
-            .write_out_of_band = writeOutOfBand,
-            .schedule_timer = scheduleTimer,
-            .cancel_timer = cancelTimer,
             .established = onConnectionEstablished,
             .needs_rebind = onConnectionNeedsRebind,
             .failed = onConnectionFailed,
@@ -438,26 +434,6 @@ const ConnectionDaemon = struct {
             .last_error = legacyLastError,
             .cancel = legacyCancel,
         };
-    }
-
-    fn writePackets(raw: *anyopaque, packets: Looper.Packets, side: io.Side, destination: ?io.SocketAddress) (Looper.SubmissionError || error{MissingDestination})!void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        return helpers.WriteCopy.submit(self.daemon.allocator, self.looper, packets, side, destination);
-    }
-
-    fn writeOutOfBand(raw: *anyopaque, packets: Looper.Packets, side: io.Side, destination: ?io.SocketAddress) Looper.WriteOOBError!void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        return self.looper.writeOutOfBand(packets, side, destination);
-    }
-
-    fn scheduleTimer(raw: *anyopaque, timer: *Looper.Timer, delay_ms: u64, task: Looper.TimedTask) Looper.SubmissionError!void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        return self.looper.scheduleReplacing(timer, delay_ms, task);
-    }
-
-    fn cancelTimer(raw: *anyopaque, timer: *Looper.Timer) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        self.looper.cancelTimer(timer);
     }
 
     fn onConnectionEstablished(
@@ -663,18 +639,6 @@ const ConnectionDaemon = struct {
     // complete state before starting any looper callbacks.
     fn createConnection(self: *ConnectionDaemon) Error!void {
         std.debug.assert(self.connection == null);
-        const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
-            .profile = &self.daemon.profile,
-            .options = self.daemon.options.connection_options,
-            .cache_dir = self.daemon.options.cache_dir,
-            .events = self.events(),
-            // FIXME: ###, Delete all these from Sandbox
-            .controller = self.daemon.controller,
-            .resolver = self.resolver,
-            .factory = self.factory,
-            .looper = undefined,
-        });
-        errdefer connection.destroy();
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
         looper.* = Looper.init(self.daemon.allocator, .{
@@ -684,6 +648,19 @@ const ConnectionDaemon = struct {
             error.MuxFailure => error.LooperFailure,
         };
         errdefer looper.deinit();
+        const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
+            .profile = &self.daemon.profile,
+            .options = self.daemon.options.connection_options,
+            .cache_dir = self.daemon.options.cache_dir,
+            .events = self.events(),
+            .writer = net.ConnectionWriter.init(looper),
+            // FIXME: ###, Delete all these from Sandbox
+            .controller = self.daemon.controller,
+            .resolver = self.resolver,
+            .factory = self.factory,
+            .looper = undefined,
+        });
+        errdefer connection.destroy();
         self.connection = connection;
         errdefer self.connection = null;
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
