@@ -23,7 +23,6 @@ const api = core_mod.api;
 const log = core_mod.logging;
 
 const Authenticator = auth_mod.Authenticator;
-const io = @import("../../net/io.zig");
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
@@ -70,13 +69,13 @@ pub const NegotiatorOptions = struct {
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
-    write_packets: *const fn (?*anyopaque, io.Packets, net_mod.SocketAddress) (io.SubmissionError || error{MissingDestination})!void,
+    write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
     // The Session owns the looper timer token; this callback lets the
     // Negotiator own when its next check is armed.
     schedule_negotiation_check: *const fn (
         ?*anyopaque,
         u64,
-    ) io.SubmissionError!void,
+    ) net_mod.SubmissionError!void,
 
     pub fn newAuthenticator(
         self: NegotiatorOptions,

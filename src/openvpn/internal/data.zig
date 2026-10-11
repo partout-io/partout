@@ -6,7 +6,6 @@ const std = @import("std");
 const ffi = @import("../../c/exports.zig");
 const core_mod = @import("../../core/exports.zig");
 const net_mod = @import("../../net/exports.zig");
-const io = @import("../../net/io.zig");
 const auth_mod = @import("auth.zig");
 const configuration_mod = @import("configuration.zig");
 const constants_mod = @import("constants.zig");
@@ -368,7 +367,7 @@ pub const DataChannel = struct {
 /// The owning session serializes calls and supplies the packet write callbacks.
 pub const DataLink = struct {
     pub const SendError = DataPath.ProcessingError || processing_mod.PacketError ||
-        (io.SubmissionError || error{MissingDestination}) ||
+        (net_mod.SubmissionError || error{MissingDestination}) ||
         error{
             EndOfStream,
             InvalidAddressFamily,
@@ -379,7 +378,7 @@ pub const DataLink = struct {
             Timeout,
             WriteIncomplete,
         };
-    pub const ReceiveError = DataPath.ProcessingError || (io.SubmissionError || error{MissingDestination});
+    pub const ReceiveError = DataPath.ProcessingError || (net_mod.SubmissionError || error{MissingDestination});
 
     allocator: std.mem.Allocator,
     remote_endpoint: SocketEndpoint,
@@ -388,8 +387,8 @@ pub const DataLink = struct {
     callbacks: Callbacks,
 
     pub const Callbacks = struct {
-        write_packets: *const fn (?*anyopaque, io.Packets, net_mod.Side, ?net_mod.SocketAddress) (io.SubmissionError || error{MissingDestination})!void,
-        write_out_of_band: *const fn (?*anyopaque, io.Packets, net_mod.Side, ?net_mod.SocketAddress) io.WriteOOBError!void,
+        write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
+        write_out_of_band: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) net_mod.WriteOOBError!void,
         data_channel: *const fn (?*anyopaque, u8) ?*DataChannel,
         report_inbound_data_count: *const fn (?*anyopaque, usize) void,
         report_outbound_data_count: *const fn (?*anyopaque, usize) void,
