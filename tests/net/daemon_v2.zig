@@ -226,18 +226,28 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    const looper = try allocator.create(Looper);
-    looper.* = try Looper.init(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
-    var probe = Probe{ .looper = looper, .profile = &sut.profile };
+    var probe = Probe{ .looper = undefined, .profile = &sut.profile };
     const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
     // Publish a runtime before any actor/looper work, without opening sockets.
-    connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
-    connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
-    connection_daemon.looper = looper;
-    sut.state = .started;
-    sut.snapshot_publisher.setConnectionStatus(.connecting);
-    try looper.start();
+    {
+        const options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
+        const looper = try allocator.create(Looper);
+        errdefer allocator.destroy(looper);
+        looper.* = try Looper.init(allocator, options);
+        errdefer looper.deinit();
+        const link_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.link_buf_size);
+        errdefer link_storage.destroy();
+        const tun_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.tun_buf_size);
+        probe.looper = looper;
+        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
+        connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
+        connection_daemon.looper = looper;
+        connection_daemon.read_storage = .{ link_storage, tun_storage };
+        sut.state = .started;
+    }
     defer sut.stop();
+    sut.snapshot_publisher.setConnectionStatus(.connecting);
+    try connection_daemon.looper.start();
 
     // The factory rejects the link. The delayed callback must reenable the
     // gate even though no connection session ever started or emitted events.
