@@ -138,7 +138,7 @@ test "daemon runtime owns options during lifecycle" {
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            const expected_openvpn = expected_experimental;
+            const expected_openvpn = source.runtime_policy.v2_only;
             try std.testing.expectEqual(expected_openvpn, ctx.OpenVPN == .experimental);
             const expected_vtable = if (expected_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
             try std.testing.expect(impl.vtable == expected_vtable);
@@ -345,14 +345,14 @@ test "daemon options reject unknown feature bits" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
 
-test "daemon runtime selects matching connection implementations regardless of protocol flags" {
-    const Case = struct { json: [:0]const u8, enabled: bool };
+test "daemon runtime selectively enables matching v2 stacks by protocol" {
+    const Case = struct { json: [:0]const u8, enabled: bool, connection_type: ?api.ModuleType = null };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
-        .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled },
+        .{ .json = mock.connectionProfileJson(), .enabled = source.openvpn_enabled, .connection_type = .OpenVPN },
         .{ .json =
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333"}}],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
-        , .enabled = source.wireguard_enabled },
+        , .enabled = source.wireguard_enabled, .connection_type = .WireGuard },
         .{ .json =
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"Inactive OpenVPN","modules":[{"type":"OpenVPN","value":{"id":"44444444-4444-4444-8444-444444444444","configuration":{}}}],"activeModulesIds":[]}
         , .enabled = source.openvpn_enabled },
@@ -374,9 +374,14 @@ test "daemon runtime selects matching connection implementations regardless of p
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = source.runtime_policy.v2_only or (flags & partout_c.PartoutDaemonFlagExperimentalDaemon != 0);
-            const experimental_openvpn = experimental;
-            const experimental_wireguard = experimental;
+            const experimental_daemon = source.runtime_policy.v2_only or (flags & partout_c.PartoutDaemonFlagExperimentalDaemon != 0);
+            const experimental_openvpn = source.runtime_policy.v2_only or (experimental_daemon and flags & partout_c.PartoutDaemonFlagExperimentalOpenVPN != 0);
+            const experimental_wireguard = source.runtime_policy.v2_only or (experimental_daemon and flags & partout_c.PartoutDaemonFlagExperimentalWireGuard != 0);
+            const experimental = if (case.connection_type) |module_type| switch (module_type) {
+                .OpenVPN => experimental_openvpn,
+                .WireGuard => experimental_wireguard,
+                else => unreachable,
+            } else experimental_daemon;
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
             if (source.wireguard_enabled) {
                 const impl = runtime.registry.implementation(.WireGuard).?;

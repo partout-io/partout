@@ -192,8 +192,15 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        // The shared policy excludes legacy implementations at compile time.
-        const experimental = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
+        // Keep each active protocol on a matching daemon/connection stack.
+        const experimental_daemon = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
+        const experimental_openvpn = runtime_policy.v2_only or (experimental_daemon and options.feature_flags.contains(.experimentalOpenVPN));
+        const experimental_wireguard = runtime_policy.v2_only or (experimental_daemon and options.feature_flags.contains(.experimentalWireGuard));
+        const experimental = if (api.findActiveConnectionModule(&options.profile)) |module| switch (api.moduleType(module)) {
+            .OpenVPN => experimental_openvpn,
+            .WireGuard => experimental_wireguard,
+            else => experimental_daemon,
+        } else experimental_daemon;
         log.write(.notice, if (experimental) "Using daemon v2 (experimental)" else "Using daemon v1 (legacy)");
 
         // Register the known connection implementations
@@ -203,7 +210,7 @@ pub const DaemonRuntime = struct {
         if (build_options.openvpn and ffi.has_default_crypto_backend) {
             const ctx = self.contexts.putUninitialized(.OpenVPN);
             const backend = options.crypto_backend orelse api.defaultCryptoBackend();
-            const impl: net.ConnectionImplementation = if (experimental) blk: {
+            const impl: net.ConnectionImplementation = if (experimental_openvpn) blk: {
                 ctx.* = .{ .OpenVPN = .{ .experimental = .{ .session_options = .{ .backend = backend } } } };
                 break :blk .{ .ptr = &ctx.OpenVPN.experimental, .vtable = &openvpn.connection_v2_vtable };
             } else blk: {
@@ -214,7 +221,7 @@ pub const DaemonRuntime = struct {
         }
         if (build_options.wireguard) {
             const ctx = self.contexts.putUninitialized(.WireGuard);
-            const impl: net.ConnectionImplementation = if (experimental) blk: {
+            const impl: net.ConnectionImplementation = if (experimental_wireguard) blk: {
                 ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_passive_backend } } };
                 break :blk .{ .ptr = &ctx.WireGuard.experimental, .vtable = &wireguard.connection_v2_vtable };
             } else blk: {
