@@ -38,7 +38,6 @@ pub const PosixLooper = struct {
 
     allocator: std.mem.Allocator,
     options: helpers.Options,
-    wake_fd: io.FileDescriptor,
     mux: io_c.pp_mux,
     stopped: bool = false,
     // Protects active stack frames from callback-driven destruction, not threads.
@@ -51,9 +50,9 @@ pub const PosixLooper = struct {
     /// through destroy(); the looper never reads, resets, writes, or closes it.
     pub fn create(
         allocator: std.mem.Allocator,
-        wake_fd: io.FileDescriptor,
         options: helpers.Options,
     ) (helpers.InitError || error{InvalidWakeDescriptor})!*PosixLooper {
+        const wake_fd = options.wake_fd orelse return error.InvalidWakeDescriptor;
         if (wake_fd < 0) return error.InvalidWakeDescriptor;
         // The external wake is a normal readable mux entry: pp_mux_wait leaves
         // it signalled for its owner, unlike the mux's own internal wake pipe.
@@ -61,7 +60,7 @@ pub const PosixLooper = struct {
         errdefer io_c.pp_mux_free(mux);
         if (!io_c.pp_mux_add(mux, wake_fd)) return error.MuxFailure;
         const self = try allocator.create(PosixLooper);
-        self.* = .{ .allocator = allocator, .options = options, .wake_fd = wake_fd, .mux = mux };
+        self.* = .{ .allocator = allocator, .options = options, .mux = mux };
         io_c.pp_mux_set_on_readable(mux, onReadable, self);
         io_c.pp_mux_set_on_writable(mux, onWritable, self);
         return self;
@@ -173,7 +172,7 @@ pub const PosixLooper = struct {
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
-        if (descriptor.fd < 0 or descriptor.fd == self.wake_fd or
+        if (descriptor.fd < 0 or descriptor.fd == self.options.wake_fd.? or
             (descriptor.io.isUnconnected() and tag != .link)) return error.MuxFailure;
         for (self.sides) |other| {
             if (other) |side| if (side.fd == descriptor.fd) return error.MuxFailure;

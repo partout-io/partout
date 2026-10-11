@@ -4,7 +4,7 @@
 const std = @import("std");
 const source = @import("source");
 const Looper = source.net_looper_posix.PosixLooper;
-const helpers = source.net_looper_helpers;
+const helpers = source.net_looper_v2.testing_helpers;
 const io = source.net_io;
 const allocator = std.testing.allocator;
 
@@ -56,7 +56,7 @@ test "ST looper lifecycle and timers are caller driven" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, wake.fds[0], .{ .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     defer loop.destroy();
     probe.looper = loop;
     try std.testing.expect(loop.loopOnce(0));
@@ -159,7 +159,7 @@ test "ST looper inline reads writes retries and synchronous detach" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, wake.fds[0], .{ .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     defer loop.destroy();
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
@@ -233,7 +233,7 @@ test "ST timer callbacks can cancel and replace other ready tasks" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, wake.fds[0], .{ .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     defer loop.destroy();
     var tasks = Tasks{ .loop = loop };
     var first = helpers.Timer{};
@@ -253,7 +253,7 @@ test "ST write backpressure preserves an explicitly paused opposite side" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, wake.fds[0], .{ .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
     defer _ = std.c.close(fds[0]);
@@ -303,7 +303,7 @@ test "ST external wake interrupts an idle loop and remains caller owned" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, wake.fds[0], .{ .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     var destroyed = false;
     defer if (!destroyed) loop.destroy();
     probe.looper = loop;
@@ -332,5 +332,6 @@ test "ST external wake interrupts an idle loop and remains caller owned" {
 
 test "ST rejects invalid wake descriptors" {
     const options = helpers.Options{ .on_finish = .{ .callback = Probe.finish } };
-    try std.testing.expectError(error.InvalidWakeDescriptor, Looper.create(allocator, -1, options));
+    try std.testing.expectError(error.InvalidWakeDescriptor, Looper.create(allocator, options));
+    try std.testing.expectError(error.InvalidWakeDescriptor, Looper.create(allocator, .{ .wake_fd = -1, .on_finish = options.on_finish }));
 }

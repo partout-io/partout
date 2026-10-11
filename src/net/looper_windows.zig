@@ -14,18 +14,15 @@ pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     options: helpers.Options,
 
-    wake_fd: io.FileDescriptor,
     stopped: bool = false,
 
     pub fn create(
         allocator: std.mem.Allocator,
-        wake_fd: io.FileDescriptor,
         options: helpers.Options,
     ) helpers.InitError!*WindowsLooper {
         const self = try allocator.create(WindowsLooper);
         self.* = .{
             .allocator = allocator,
-            .wake_fd = wake_fd,
             .options = options,
         };
         return self;

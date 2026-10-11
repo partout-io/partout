@@ -10,14 +10,15 @@ const log = core.logging;
 
 // FIXME: ###, anyerror
 
-/// Fine-tuning.
 pub const Options = struct {
-    // FIXME: ###, *_buf_size unused by v2
+    /// Borrowed caller-owned wake descriptor; required by v2, ignored by v1.
+    /// Keep it open through looper destruction.
+    wake_fd: ?io.FileDescriptor = null,
+    on_finish: OnFinish,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,
     max_read_size: usize = 256 * 1024,
     max_read_count: usize = 128,
-    on_finish: OnFinish,
 };
 
 pub const Packet = io.Packet;

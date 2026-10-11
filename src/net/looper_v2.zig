@@ -12,15 +12,17 @@ const builtin = @import("builtin");
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
+const looper_posix = @import("looper_posix.zig");
+const looper_windows = @import("looper_windows.zig");
 const log = core.logging;
 
 pub const testing_helpers = if (builtin.is_test) helpers else void;
 
 pub const Looper = struct {
     pub const Impl = if (builtin.os.tag == .windows)
-        @import("looper_windows.zig").WindowsLooper
+        looper_windows.WindowsLooper
     else
-        @import("looper_posix.zig").PosixLooper;
+        looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
     pub const ReadBuffer = helpers.ReadBuffer;
@@ -57,12 +59,11 @@ pub const Looper = struct {
     /// Allocates a looper whose storage is released by `destroy()`.
     pub fn create(
         allocator: std.mem.Allocator,
-        wake_fd: io.FileDescriptor,
         options: Options,
     ) helpers.InitError!*Looper {
         const self = try allocator.create(Looper);
         errdefer allocator.destroy(self);
-        self.* = try init(allocator, wake_fd, options);
+        self.* = try init(allocator, options);
         return self;
     }
 
@@ -73,10 +74,10 @@ pub const Looper = struct {
         allocator.destroy(self);
     }
 
-    pub fn init(allocator: std.mem.Allocator, wake_fd: io.FileDescriptor, options: Options) helpers.InitError!Looper {
+    pub fn init(allocator: std.mem.Allocator, options: Options) helpers.InitError!Looper {
         return .{
             .allocator = allocator,
-            .impl = try Impl.create(allocator, wake_fd, options),
+            .impl = try Impl.create(allocator, options),
         };
     }
 
