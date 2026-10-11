@@ -152,7 +152,6 @@ test "daemon runtime owns options during lifecycle" {
 }
 
 test "starts DNS-only profile through tunnel controller" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -181,7 +180,6 @@ test "starts DNS-only profile through tunnel controller" {
 }
 
 test "starts profile without active modules without tunnel settings" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -205,7 +203,6 @@ test "starts profile without active modules without tunnel settings" {
 }
 
 test "requires a connection implementation for active connection profiles" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -224,7 +221,6 @@ test "requires a connection implementation for active connection profiles" {
 }
 
 test "starts and stops connection profile through injected dependencies" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try mockConnectionRegistry(allocator);
@@ -264,7 +260,6 @@ test "starts and stops connection profile through injected dependencies" {
 }
 
 test "stop blocks until connection teardown finishes" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var blocking_connection = mock.BlockingStopConnection{};
@@ -287,7 +282,6 @@ test "stop blocks until connection teardown finishes" {
 }
 
 test "network monitor gates immediate connection evaluation" {
-    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{ .monitor = .{ .reachable = false } };
     var registry = try mockConnectionRegistry(allocator);
