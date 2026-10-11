@@ -6,7 +6,6 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const packet_io = @import("looper_helpers.zig");
 
 const api = core.api;
 const log = core.logging;
@@ -352,17 +351,17 @@ pub const ReadStorage = struct {
 
     allocator: std.mem.Allocator,
     bytes: []u8,
-    buffers: []packet_io.ReadBuffer,
+    buffers: []io.ReadBuffer,
 
     pub fn create(
         allocator: std.mem.Allocator,
-        options: packet_io.Options,
+        max_read_count: usize,
         buffer_size: usize,
     ) std.mem.Allocator.Error!*ReadStorage {
         const size = @max(1, buffer_size);
         // Limit each side's pool, while retaining at least one full-size buffer.
         // max_read_size separately limits actual payload read in each batch.
-        const count = @min(options.max_read_count, @max(1, byte_budget / size));
+        const count = @min(max_read_count, @max(1, byte_budget / size));
         const total_size = std.math.mul(
             usize,
             count,
@@ -370,7 +369,7 @@ pub const ReadStorage = struct {
         ) catch return error.OutOfMemory;
         const bytes = try allocator.alloc(u8, total_size);
         errdefer allocator.free(bytes);
-        const buffers = try allocator.alloc(packet_io.ReadBuffer, count);
+        const buffers = try allocator.alloc(io.ReadBuffer, count);
         errdefer allocator.free(buffers);
         for (buffers, 0..) |*buffer, index| {
             buffer.* = .{ .data = bytes[index * size ..][0..size] };
@@ -391,24 +390,24 @@ pub const ReadStorage = struct {
         allocator.destroy(self);
     }
 
-    pub fn provider(self: *ReadStorage) packet_io.ReadBuffers {
+    pub fn provider(self: *ReadStorage) io.ReadBuffers {
         return .{ .context = self, .acquire = acquire, .release = release };
     }
 
-    fn acquire(raw: ?*anyopaque) []packet_io.ReadBuffer {
+    fn acquire(raw: ?*anyopaque) []io.ReadBuffer {
         const self: *ReadStorage = @ptrCast(@alignCast(raw.?));
         return self.buffers;
     }
 
-    fn release(_: ?*anyopaque, _: []packet_io.ReadBuffer, _: packet_io.IOResult) void {}
+    fn release(_: ?*anyopaque, _: []io.ReadBuffer, _: io.IOResult) void {}
 };
 
 pub const WriteCopy = struct {
     allocator: std.mem.Allocator,
-    packets: []packet_io.Packet,
+    packets: []io.Packet,
 
     /// Copies before submitting; the completion releases accepted packets.
-    pub fn submit(allocator: std.mem.Allocator, looper: anytype, packets: packet_io.Packets, side: io.Side, destination: ?io.SocketAddress) (packet_io.SubmissionError || error{MissingDestination})!void {
+    pub fn submit(allocator: std.mem.Allocator, looper: anytype, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
         if (packets.len == 0) return;
         const copy = try create(allocator, packets);
         errdefer copy.destroy();
@@ -420,9 +419,9 @@ pub const WriteCopy = struct {
 
     fn create(
         allocator: std.mem.Allocator,
-        packets: packet_io.Packets,
+        packets: io.Packets,
     ) std.mem.Allocator.Error!*WriteCopy {
-        const copies = try allocator.alloc(packet_io.Packet, packets.len);
+        const copies = try allocator.alloc(io.Packet, packets.len);
         errdefer allocator.free(copies);
         var copied: usize = 0;
         errdefer {
@@ -448,7 +447,7 @@ pub const WriteCopy = struct {
         allocator.destroy(self);
     }
 
-    fn complete(raw: ?*anyopaque, _: packet_io.IOResult) void {
+    fn complete(raw: ?*anyopaque, _: io.IOResult) void {
         const self: *WriteCopy = @ptrCast(@alignCast(raw.?));
         self.destroy();
     }

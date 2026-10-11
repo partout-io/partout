@@ -814,7 +814,7 @@ const ConnectionDaemon = struct {
         if (storage.* == null) {
             const options = self.looper.impl.options;
             const size = if (side == .link) options.link_buf_size else options.tun_buf_size;
-            storage.* = try helpers.ReadStorage.create(self.daemon.allocator, options, size);
+            storage.* = try helpers.ReadStorage.create(self.daemon.allocator, options.max_read_count, size);
         }
         return storage.*.?.provider();
     }

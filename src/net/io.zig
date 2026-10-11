@@ -21,6 +21,12 @@ pub const ReadBuffers = common.ReadBuffers;
 pub const IOError = common.IOError;
 pub const IOResult = common.IOResult;
 
+pub const Failure = common.Failure;
+pub const TimedTask = common.TimedTask;
+pub const Timer = common.Timer;
+pub const SubmissionError = common.SubmissionError;
+pub const WriteOOBError = common.WriteOOBError;
+
 pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;
 pub const Side = common.Side;

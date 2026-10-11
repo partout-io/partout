@@ -4,7 +4,8 @@
 
 const std = @import("std");
 
-const queue_mod = @import("source").net_looper_helpers;
+const source = @import("source");
+const queue_mod = source.net_looper_helpers;
 const Completion = queue_mod.Completion;
 const CompletionQueue = queue_mod.CompletionQueue;
 const CommandNode = queue_mod.CommandNode;

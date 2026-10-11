@@ -44,31 +44,7 @@ pub const OnRead = struct {
     }
 };
 
-/// Returns details about the underlying reason of a deferred
-/// failure. It represents the former Swift errors:
-///
-/// - SideError(Side, Error?) -> .user
-/// - WaitError(errno) -> .wait
-/// - NativeIOError -> .io
-///
-/// Precisely:
-///
-/// - .wait and .system are fatal syscall failures
-/// - .io causes a side to be detached, but lets the loop continue
-/// - .user comes from `OnRead` callback invocations
-///
-/// Swift MuxError is resolved to error.MuxFailure and is not
-/// mapped here because it's always returned synchronously.
-pub const Failure = union(enum) {
-    wait: c_int,
-    system: io.Error,
-    io: struct {
-        side: io.Side,
-        cause: io.Error,
-        code: ?c_int,
-    },
-    user: anyerror,
-};
+pub const Failure = io.Failure;
 
 /// Invoked on any failure event.
 pub const OnFailure = struct {
@@ -100,23 +76,8 @@ pub const Task = struct {
     }
 };
 
-/// Infallible task submitted for delayed execution on the looper worker.
-/// Error handling belongs to the owner because a task failure must not stop a
-/// daemon-scoped looper shared by otherwise independent consumers.
-pub const TimedTask = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque) void,
-
-    pub fn call(self: TimedTask) void {
-        self.callback(self.context);
-    }
-};
-
-/// Identity of one replaceable delayed task. The looper never retains this
-/// value's address; callers may store it inline with their queue-owned state.
-pub const Timer = struct {
-    id: ?u64 = null,
-};
+pub const TimedTask = io.TimedTask;
+pub const Timer = io.Timer;
 
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
@@ -128,7 +89,7 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+pub const SubmissionError = io.SubmissionError;
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
     AlreadyStarted,
@@ -147,11 +108,7 @@ pub const WriteError = SubmissionError || error{
     InvalidBuffers,
     MissingDestination,
 };
-pub const WriteOOBError = SubmissionError || io.Error || error{
-    MissingDestination,
-    OOBOutsideQueue,
-    WriteIncomplete,
-};
+pub const WriteOOBError = io.WriteOOBError;
 
 pub const CompletionError = std.mem.Allocator.Error || error{
     LooperUnavailable,

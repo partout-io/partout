@@ -6,7 +6,7 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
-const packet_io = @import("../net/looper_helpers.zig");
+const io = @import("../net/io.zig");
 const auth_mod = @import("internal/auth.zig");
 const configuration_mod = @import("internal/configuration.zig");
 const constants_mod = @import("internal/constants.zig");
@@ -274,9 +274,9 @@ const OpenVPNConnection = struct {
     fn submitPackets(
         self: *OpenVPNConnection,
         side: net.Side,
-        packets: packet_io.Packets,
+        packets: io.Packets,
         sources: ?[]const net.SocketAddress,
-    ) packet_io.ReadAction {
+    ) io.ReadAction {
         const session = self.current_session orelse return .pause;
         if (self.pending_failure != null) return .pause;
         if (side == .link) if (sources) |addresses| {
@@ -296,13 +296,13 @@ const OpenVPNConnection = struct {
     fn looperFailed(
         self: *OpenVPNConnection,
         side: net.Side,
-        failure: packet_io.Failure,
+        failure: io.Failure,
     ) void {
         const session = self.current_session orelse return;
         session.looperFailed(side, failure);
     }
 
-    fn looperTerminated(self: *OpenVPNConnection, failure: ?packet_io.Failure) void {
+    fn looperTerminated(self: *OpenVPNConnection, failure: ?io.Failure) void {
         const session = self.current_session orelse return;
         self.handleSessionFailed(error.LooperTerminated);
         session.looperTerminated(failure);
@@ -522,9 +522,9 @@ fn stop(
 fn submitPackets(
     ptr: *anyopaque,
     side: net.Side,
-    packets: packet_io.Packets,
+    packets: io.Packets,
     sources: ?[]const net.SocketAddress,
-) packet_io.ReadAction {
+) io.ReadAction {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.submitPackets(side, packets, sources);
 }
@@ -542,7 +542,7 @@ fn isPeerSource(source: net.SocketAddress, peer: net.SocketAddress) bool {
 fn looperFailed(
     ptr: *anyopaque,
     side: net.Side,
-    failure: packet_io.Failure,
+    failure: io.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperFailed(side, failure);
@@ -550,7 +550,7 @@ fn looperFailed(
 
 fn looperTerminated(
     ptr: *anyopaque,
-    failure: ?packet_io.Failure,
+    failure: ?io.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperTerminated(failure);

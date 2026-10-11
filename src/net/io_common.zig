@@ -62,6 +62,42 @@ pub const ReadBuffers = struct {
     release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
 };
 
+/// Deferred readiness, system, side I/O, or consumer callback failure.
+pub const Failure = union(enum) {
+    wait: c_int,
+    system: Error,
+    io: struct {
+        side: Side,
+        cause: Error,
+        code: ?c_int,
+    },
+    user: anyerror,
+};
+
+/// Infallible callback for delayed execution. The owner handles failures.
+pub const TimedTask = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque) void,
+
+    pub fn call(self: TimedTask) void {
+        self.callback(self.context);
+    }
+};
+
+/// Identity of one replaceable delayed task. The scheduler does not retain
+/// this value's address; callers may store it inline with their state.
+pub const Timer = struct {
+    id: ?u64 = null,
+};
+
+pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+
+pub const WriteOOBError = SubmissionError || Error || error{
+    MissingDestination,
+    OOBOutsideQueue,
+    WriteIncomplete,
+};
+
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };
 pub const ReachabilityInfo = io_c.pp_reachability;

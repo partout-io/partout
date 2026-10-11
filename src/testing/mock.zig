@@ -10,7 +10,7 @@ const net_conn = @import("../net/connection.zig");
 const net_daemon = @import("../net/daemon.zig");
 const net_io = @import("../net/io.zig");
 const net_sandbox = @import("../net/sandbox.zig");
-const packet_io = @import("../net/looper_helpers.zig");
+const io = @import("../net/io.zig");
 const runtime_policy = @import("../runtime_policy.zig");
 
 const api = core.api;
@@ -109,7 +109,7 @@ pub const MockConnectionEnvironment = struct {
         return self.executor.interface();
     }
 
-    fn onLooperFinish(_: ?*anyopaque, _: ?packet_io.Failure) void {}
+    fn onLooperFinish(_: ?*anyopaque, _: ?io.Failure) void {}
 };
 
 pub const MockDaemonRuntime = struct {

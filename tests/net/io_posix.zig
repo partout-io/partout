@@ -170,7 +170,7 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     defer _ = libc.close(fds[1]);
     var probe = Probe{};
     const read_options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
-    const read_storage = try daemon_helpers.ReadStorage.create(std.testing.allocator, read_options, read_options.link_buf_size);
+    const read_storage = try daemon_helpers.ReadStorage.create(std.testing.allocator, read_options.max_read_count, read_options.link_buf_size);
     defer read_storage.destroy();
     var loop = try Looper.init(std.testing.allocator, .{ .on_finish = .{ .callback = Probe.finish } });
     defer loop.deinit();

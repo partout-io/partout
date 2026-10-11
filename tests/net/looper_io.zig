@@ -228,7 +228,7 @@ test "v2 compatibility reads bound batches and drain remaining packets" {
                     .max_read_size = max_read_size,
                     .max_read_count = max_read_count,
                 };
-                const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+                const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
                 defer read_storage.destroy();
                 var loop = try Looper.init(allocator, .{
                     .on_finish = .{ .callback = finish },
@@ -277,7 +277,7 @@ test "v2 compatibility initialization cleans up allocation failures" {
             const read_options: Looper.Options = .{
                 .on_finish = .{ .callback = finish },
             };
-            const read_storage = try daemon_helpers.ReadStorage.create(test_allocator, read_options, read_options.link_buf_size);
+            const read_storage = try daemon_helpers.ReadStorage.create(test_allocator, read_options.max_read_count, read_options.link_buf_size);
             defer read_storage.destroy();
             var loop = try source.net_looper_v2.Looper.init(test_allocator, .{
                 .on_finish = .{ .callback = finish },
@@ -299,7 +299,7 @@ test "v2 compatibility writes clean up copies when allocation fails" {
         const read_options: Looper.Options = .{
             .on_finish = .{ .callback = finish },
         };
-        const read_storage = try daemon_helpers.ReadStorage.create(failing.allocator(), read_options, read_options.link_buf_size);
+        const read_storage = try daemon_helpers.ReadStorage.create(failing.allocator(), read_options.max_read_count, read_options.link_buf_size);
         defer read_storage.destroy();
         var loop = try source.net_looper_v2.Looper.init(failing.allocator(), .{
             .on_finish = .{ .callback = finish },

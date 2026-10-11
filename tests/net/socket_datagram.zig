@@ -126,7 +126,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     }
     var tun = TunProbe{};
     const read_options: Looper.Options = .{ .on_finish = .{ .callback = finish } };
-    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
     defer read_storage.destroy();
     var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
     defer loop.deinit();
@@ -191,7 +191,7 @@ test "v2 one UDP link echoes several peers across both address families" {
 
 test "v2 UDP pause, resume and replacement apply to the logical link" {
     const read_options: Looper.Options = .{ .max_read_count = 1, .on_finish = .{ .callback = finish } };
-    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
     defer read_storage.destroy();
     var loop = try Looper.init(allocator, .{ .max_read_count = 1, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
@@ -230,7 +230,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
 
 test "v2 UDP truncation drops the packet and retains the link" {
     const read_options: Looper.Options = .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } };
-    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
     defer read_storage.destroy();
     var loop = try Looper.init(allocator, .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
@@ -285,7 +285,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         var tun = TunProbe{ .payload = "plain" };
         var probe = Probe{};
         const read_options: Looper.Options = .{ .on_finish = .{ .callback = finish } };
-        const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+        const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
         defer read_storage.destroy();
         var loop = try Implementation.init(allocator, .{ .on_finish = .{ .callback = finish } });
         defer loop.deinit();

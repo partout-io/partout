@@ -9,7 +9,6 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const packet_io = @import("looper_helpers.zig");
 const platform = @import("sandbox.zig");
 const api = core.api;
 
@@ -231,10 +230,10 @@ pub const Connection = struct {
 
         /// V2 requests, invoked on the connection execution context.
         /// Writers consume or copy packets before returning.
-        write_packets: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (packet_io.SubmissionError || error{MissingDestination})!void = null,
-        write_out_of_band: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) packet_io.WriteOOBError!void = null,
-        schedule_timer: ?*const fn (*anyopaque, *packet_io.Timer, u64, packet_io.TimedTask) packet_io.SubmissionError!void = null,
-        cancel_timer: ?*const fn (*anyopaque, *packet_io.Timer) void = null,
+        write_packets: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void = null,
+        write_out_of_band: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) io.WriteOOBError!void = null,
+        schedule_timer: ?*const fn (*anyopaque, *io.Timer, u64, io.TimedTask) io.SubmissionError!void = null,
+        cancel_timer: ?*const fn (*anyopaque, *io.Timer) void = null,
 
         // FIXME: ###, New v2 callbacks, temporary noops
         established: *const fn (*anyopaque, Success) void = struct {
@@ -299,11 +298,11 @@ pub const Connection = struct {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, packet_io.Failure) void = struct {
-            fn call(_: *anyopaque, _: io.Side, _: packet_io.Failure) void {}
+        looper_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Failure) void {}
         }.call,
-        looper_terminated: *const fn (*anyopaque, ?packet_io.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?packet_io.Failure) void {}
+        looper_terminated: *const fn (*anyopaque, ?io.Failure) void = struct {
+            fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
         /// Deprecated.
@@ -383,14 +382,14 @@ pub const Connection = struct {
     pub fn looperFailed(
         self: Connection,
         side: io.Side,
-        failure: packet_io.Failure,
+        failure: io.Failure,
     ) void {
         self.vtable.looper_failed(self.ptr, side, failure);
     }
 
     pub fn looperTerminated(
         self: Connection,
-        failure: ?packet_io.Failure,
+        failure: ?io.Failure,
     ) void {
         self.vtable.looper_terminated(self.ptr, failure);
     }
