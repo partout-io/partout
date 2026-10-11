@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Shared reachability, sides, and errors for socket and TUN I/O.
+//! Shared packets, buffers, reachability, sides, and errors for socket and TUN I/O.
 //! Platform-specific descriptors, options, and wrappers belong to the backends
 //! selected by `io.zig`. This module does not import either backend.
 
@@ -15,6 +15,52 @@ const ffi = @import("../c/exports.zig");
 
 const api = core.api;
 pub const io_c = ffi.io;
+
+/// Single binary data packet.
+pub const Packet = []const u8;
+/// Slice of packets.
+pub const Packets = []const Packet;
+
+/// Whether to continue reading or pause until the consumer resumes reads.
+pub const ReadAction = enum {
+    keep,
+    pause,
+};
+
+pub const IOError = Error || error{
+    Cancelled,
+    InvalidBuffers,
+};
+
+/// Number of whole packets processed, plus an optional failure. A partial
+/// stream write is not counted; cancellation does not undo bytes already sent.
+pub const IOResult = struct {
+    count: usize = 0,
+    failure: ?IOError = null,
+};
+
+/// Caller-owned storage. Only entries in the completed prefix have valid output.
+pub const ReadBuffer = struct {
+    data: []u8,
+    size: usize = 0,
+    source: ?SocketAddress = null,
+};
+
+/// Lends payload storage for a read attempt. The provider retains ownership
+/// of descriptors and payloads, and its context must outlive their use.
+pub const ReadBuffers = struct {
+    context: ?*anyopaque = null,
+
+    /// Lend writable buffers for one read attempt. Each buffer must have nonzero
+    /// capacity. An empty slice requests that reading pause.
+    acquire: *const fn (?*anyopaque) []ReadBuffer,
+
+    /// Return the entire loan after the read attempt and any on_read callback.
+    /// Called once per acquisition, even when nothing was read or a read failed.
+    /// Only result.count entries have valid size/source fields; the rest are unused.
+    /// The owner may now reuse or recycle the storage. Release does not imply free.
+    release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
+};
 
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };

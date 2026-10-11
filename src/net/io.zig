@@ -5,13 +5,21 @@
 //! Platform-selected socket and TUN I/O with shared descriptors and options.
 
 const common = @import("io_common.zig");
-const backend = if (@import("builtin").os.tag == .windows)
-    @import("io_windows.zig")
-else
-    @import("io_posix.zig");
+const builtin = @import("builtin");
+const windows = @import("io_windows.zig");
+const posix = @import("io_posix.zig");
+const backend = if (builtin.os.tag == .windows) windows else posix;
 
 pub const io_c = common.io_c;
 pub const testing = common.testing;
+
+pub const Packet = common.Packet;
+pub const Packets = common.Packets;
+pub const ReadAction = common.ReadAction;
+pub const ReadBuffer = common.ReadBuffer;
+pub const ReadBuffers = common.ReadBuffers;
+pub const IOError = common.IOError;
+pub const IOResult = common.IOResult;
 
 pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;

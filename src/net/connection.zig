@@ -231,8 +231,8 @@ pub const Connection = struct {
 
         /// V2 requests, invoked on the connection execution context.
         /// Writers consume or copy packets before returning.
-        write_packets: ?*const fn (*anyopaque, packet_io.Packets, io.Side, ?io.SocketAddress) (packet_io.SubmissionError || error{MissingDestination})!void = null,
-        write_out_of_band: ?*const fn (*anyopaque, packet_io.Packets, io.Side, ?io.SocketAddress) packet_io.WriteOOBError!void = null,
+        write_packets: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (packet_io.SubmissionError || error{MissingDestination})!void = null,
+        write_out_of_band: ?*const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) packet_io.WriteOOBError!void = null,
         schedule_timer: ?*const fn (*anyopaque, *packet_io.Timer, u64, packet_io.TimedTask) packet_io.SubmissionError!void = null,
         cancel_timer: ?*const fn (*anyopaque, *packet_io.Timer) void = null,
 
@@ -265,7 +265,7 @@ pub const Connection = struct {
 
     pub const VTable = struct {
         /// Optional caller-owned buffers for v2 reads; released after on_read.
-        read_buffers: ?*const fn (*anyopaque, io.Side) ?packet_io.ReadBuffers = null,
+        read_buffers: ?*const fn (*anyopaque, io.Side) ?io.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
         endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -294,8 +294,8 @@ pub const Connection = struct {
             }
         }.call,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
-        submit_packets: *const fn (*anyopaque, io.Side, packet_io.Packets, ?[]const io.SocketAddress) packet_io.ReadAction = struct {
-            fn call(_: *anyopaque, _: io.Side, _: packet_io.Packets, _: ?[]const io.SocketAddress) packet_io.ReadAction {
+        submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
                 return .pause;
             }
         }.call,
@@ -329,7 +329,7 @@ pub const Connection = struct {
         destroy: *const fn (*anyopaque) void,
     };
 
-    pub fn readBuffers(self: Connection, side: io.Side) ?packet_io.ReadBuffers {
+    pub fn readBuffers(self: Connection, side: io.Side) ?io.ReadBuffers {
         const callback = self.vtable.read_buffers orelse return null;
         return callback(self.ptr, side);
     }
@@ -374,9 +374,9 @@ pub const Connection = struct {
     pub fn submitPackets(
         self: Connection,
         side: io.Side,
-        packets: packet_io.Packets,
+        packets: io.Packets,
         sources: ?[]const io.SocketAddress,
-    ) packet_io.ReadAction {
+    ) io.ReadAction {
         return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
