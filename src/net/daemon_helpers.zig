@@ -4,15 +4,12 @@
 
 const std = @import("std");
 
-const conn_mod = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const packet_io = @import("looper_helpers.zig");
 
 const api = core.api;
 const log = core.logging;
-const Connection = conn_mod.Connection;
-const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const activeConnectionModule = conn_mod.activeConnectionModule;
 
 pub const ConnectionGate = struct {
     pub const ReachabilityBlock = struct {
@@ -345,5 +342,114 @@ pub const SnapshotPublisher = struct {
 
     fn uintDelta(lhs: u64, rhs: u64) u64 {
         return if (lhs >= rhs) lhs - rhs else rhs - lhs;
+    }
+};
+
+// Buffer ownership retained from the removed runtime facade. The daemon supplies
+// these adapters to the unchanged borrowing looper API.
+pub const ReadStorage = struct {
+    const byte_budget = 1024 * 1024;
+
+    allocator: std.mem.Allocator,
+    bytes: []u8,
+    buffers: []packet_io.ReadBuffer,
+
+    pub fn create(
+        allocator: std.mem.Allocator,
+        options: packet_io.Options,
+        buffer_size: usize,
+    ) std.mem.Allocator.Error!*ReadStorage {
+        const size = @max(1, buffer_size);
+        // Limit each side's pool, while retaining at least one full-size buffer.
+        // max_read_size separately limits actual payload read in each batch.
+        const count = @min(options.max_read_count, @max(1, byte_budget / size));
+        const total_size = std.math.mul(
+            usize,
+            count,
+            size,
+        ) catch return error.OutOfMemory;
+        const bytes = try allocator.alloc(u8, total_size);
+        errdefer allocator.free(bytes);
+        const buffers = try allocator.alloc(packet_io.ReadBuffer, count);
+        errdefer allocator.free(buffers);
+        for (buffers, 0..) |*buffer, index| {
+            buffer.* = .{ .data = bytes[index * size ..][0..size] };
+        }
+        const self = try allocator.create(ReadStorage);
+        self.* = .{
+            .allocator = allocator,
+            .bytes = bytes,
+            .buffers = buffers,
+        };
+        return self;
+    }
+
+    pub fn destroy(self: *ReadStorage) void {
+        const allocator = self.allocator;
+        allocator.free(self.buffers);
+        allocator.free(self.bytes);
+        allocator.destroy(self);
+    }
+
+    pub fn provider(self: *ReadStorage) packet_io.ReadBuffers {
+        return .{ .context = self, .acquire = acquire, .release = release };
+    }
+
+    fn acquire(raw: ?*anyopaque) []packet_io.ReadBuffer {
+        const self: *ReadStorage = @ptrCast(@alignCast(raw.?));
+        return self.buffers;
+    }
+
+    fn release(_: ?*anyopaque, _: []packet_io.ReadBuffer, _: packet_io.IOResult) void {}
+};
+
+pub const WriteCopy = struct {
+    allocator: std.mem.Allocator,
+    packets: []packet_io.Packet,
+
+    /// Copies before submitting; the completion releases accepted packets.
+    pub fn submit(allocator: std.mem.Allocator, looper: anytype, packets: packet_io.Packets, side: io.Side, destination: ?io.SocketAddress) (packet_io.SubmissionError || error{MissingDestination})!void {
+        if (packets.len == 0) return;
+        const copy = try create(allocator, packets);
+        errdefer copy.destroy();
+        looper.writeQueued(copy.packets, side, destination, .{ .context = copy, .callback = complete }) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
+            else => |failure| return failure,
+        };
+    }
+
+    fn create(
+        allocator: std.mem.Allocator,
+        packets: packet_io.Packets,
+    ) std.mem.Allocator.Error!*WriteCopy {
+        const copies = try allocator.alloc(packet_io.Packet, packets.len);
+        errdefer allocator.free(copies);
+        var copied: usize = 0;
+        errdefer {
+            for (copies[0..copied]) |packet| {
+                allocator.free(packet);
+            }
+        }
+        for (packets, copies) |packet, *copy| {
+            copy.* = try allocator.dupe(u8, packet);
+            copied += 1;
+        }
+        const self = try allocator.create(WriteCopy);
+        self.* = .{ .allocator = allocator, .packets = copies };
+        return self;
+    }
+
+    fn destroy(self: *WriteCopy) void {
+        const allocator = self.allocator;
+        for (self.packets) |packet| {
+            allocator.free(packet);
+        }
+        allocator.free(self.packets);
+        allocator.destroy(self);
+    }
+
+    fn complete(raw: ?*anyopaque, _: packet_io.IOResult) void {
+        const self: *WriteCopy = @ptrCast(@alignCast(raw.?));
+        self.destroy();
     }
 };

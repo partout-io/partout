@@ -443,6 +443,23 @@ pub const Session = struct {
         self.reportFailure(error.TLSFailure);
     }
 
+    fn writeDataPackets(raw: ?*anyopaque, packets: Looper.Packets, side: net.Side, destination: ?net.SocketAddress) (Looper.SubmissionError || error{MissingDestination})!void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        self.looper.writeQueued(packets, side, destination) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => {},
+            else => |failure| return failure,
+        };
+    }
+
+    fn writeOutOfBand(raw: ?*anyopaque, packets: Looper.Packets, side: net.Side, destination: ?net.SocketAddress) Looper.WriteOOBError!void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        return self.looper.writeOutOfBand(packets, side, destination);
+    }
+
+    fn writeLinkPackets(raw: ?*anyopaque, packets: Looper.Packets, destination: net.SocketAddress) (Looper.SubmissionError || error{MissingDestination})!void {
+        return writeDataPackets(raw, packets, .link, destination);
+    }
+
     fn scheduleNegotiationCheck(
         raw: ?*anyopaque,
         delay_ms: u64,
@@ -587,12 +604,13 @@ const SessionOnQueue = struct {
             @panic("Session cannot start before its link processor is configured");
         const data_link = DataLink.init(
             self.session.allocator,
-            self.session.looper,
             remote_endpoint,
             processor,
             self.session,
             .{
                 .data_channel = Session.dataChannelForKey,
+                .write_packets = Session.writeDataPackets,
+                .write_out_of_band = Session.writeOutOfBand,
                 .report_inbound_data_count = Session.reportInboundDataCount,
                 .report_outbound_data_count = Session.reportOutboundDataCount,
             },
@@ -803,7 +821,6 @@ const SessionOnQueue = struct {
         var tls_transferred = false;
         errdefer if (!tls_transferred) tls.destroy();
         const negotiator = try Negotiator.create(self.session.allocator, .{
-            .looper = self.session.looper,
             .link_processor = self.link_processor orelse
                 @panic("Cannot start negotiation before the link processor is configured"),
             .remote_endpoint = &context.remote_endpoint,
@@ -818,6 +835,7 @@ const SessionOnQueue = struct {
                 .session_options = self.session.options,
                 .callback_context = self.session,
                 .schedule_negotiation_check = Session.scheduleNegotiationCheck,
+                .write_packets = Session.writeLinkPackets,
             },
         });
         tls_transferred = true;

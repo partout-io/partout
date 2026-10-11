@@ -3,8 +3,9 @@
 
 const std = @import("std");
 const source = @import("source");
+const daemon_helpers = source.net_daemon_helpers;
 const io = source.net_io;
-const Looper = source.net_looper.Looper;
+const Looper = source.net_looper_v2.Looper;
 const allocator = std.testing.allocator;
 const Atomic = std.atomic.Value(usize);
 const libc = struct {
@@ -70,7 +71,7 @@ const Echo = struct {
                 else => return error.UnexpectedFamily,
             }
         }
-        for (packets, addresses) |packet, address| try self.looper.writeQueued(&.{packet}, .link, address);
+        for (packets, addresses) |packet, address| try daemon_helpers.WriteCopy.submit(self.looper.allocator, self.looper, &.{packet}, .link, address);
         _ = self.count.fetchAdd(packets.len, .release);
         if (self.pause_once) {
             self.pause_once = false;
@@ -124,10 +125,13 @@ test "v2 one UDP link echoes several peers across both address families" {
         _ = libc.close(fds[1]);
     }
     var tun = TunProbe{};
-    var loop = try Looper.initExperimental(allocator, .{ .on_finish = .{ .callback = finish } });
+    const read_options: Looper.Options = .{ .on_finish = .{ .callback = finish } };
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    defer read_storage.destroy();
+    var loop = try Looper.init(allocator, .{ .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
-    try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
+    try loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
     var configure_count: usize = 0;
     const server = (try io.SocketWrapper.create(allocator, null, .{ .configure = configured, .configure_ctx = &configure_count })) orelse return error.SocketFailed;
     try std.testing.expectEqual(@as(usize, 1), configure_count);
@@ -139,11 +143,11 @@ test "v2 one UDP link echoes several peers across both address families" {
     const v6 = try destination(server, 6);
     try std.testing.expectEqual(v4.port, v6.port);
     var echo = Echo{ .looper = &loop };
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
-    try std.testing.expectError(error.MissingDestination, loop.writeQueued(&.{"address required"}, .link, null));
+    try std.testing.expectError(error.MissingDestination, daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"address required"}, .link, null));
     try loop.performTask(.{ .context = &loop, .callback = struct {
         fn check(raw: ?*anyopaque) anyerror!void {
             const looper: *Looper = @ptrCast(@alignCast(raw.?));
@@ -169,7 +173,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     try std.testing.expectEqual(@as(usize, 0), try receive(third, &buf, &address));
     try std.testing.expectEqual(@as(u8, 6), address.family);
     try std.testing.expectEqual(v6.port, address.port);
-    try loop.writeQueued(&.{ "batch one", "batch two" }, .link, try destination(first, 4));
+    try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{ "batch one", "batch two" }, .link, try destination(first, 4));
     n = try receive(first, &buf, &address);
     try std.testing.expectEqualStrings("batch one", buf[0..n]);
     n = try receive(first, &buf, &address);
@@ -177,7 +181,7 @@ test "v2 one UDP link echoes several peers across both address families" {
     try loop.detach(.link);
     try std.testing.expect(!loop.isLinkAttached());
     try std.testing.expect(loop.isTunAttached());
-    try loop.writeQueued(&.{"tun still usable"}, .tun, null);
+    try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"tun still usable"}, .tun, null);
     try loop.stop();
     try std.testing.expectEqual(@as(usize, 1), tun.cleaned.load(.acquire));
     try std.testing.expectEqual(@as(usize, 3), echo.count.load(.acquire));
@@ -186,16 +190,19 @@ test "v2 one UDP link echoes several peers across both address families" {
 }
 
 test "v2 UDP pause, resume and replacement apply to the logical link" {
-    var loop = try Looper.initExperimental(allocator, .{ .max_read_count = 1, .on_finish = .{ .callback = finish } });
+    const read_options: Looper.Options = .{ .max_read_count = 1, .on_finish = .{ .callback = finish } };
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    defer read_storage.destroy();
+    var loop = try Looper.init(allocator, .{ .max_read_count = 1, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
     const server = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     const v4 = try destination(server, 4);
     const v6 = try destination(server, 6);
     var echo = Echo{ .looper = &loop, .pause_once = true };
-    try std.testing.expectError(error.MuxFailure, loop.attach(.{ .pair = .{ .tun = server.linkDescriptor() } }));
+    try std.testing.expectError(error.MuxFailure, loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .tun = server.linkDescriptor() } }));
     // Failed attach retains ownership, so the same object can be attached correctly.
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .link = server.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
@@ -212,7 +219,7 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     try loop.detach(.link);
     const replacement = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
     const new_address = try destination(replacement, 6);
-    loop.attach(.{ .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .link = replacement.linkDescriptor() }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         replacement.destroy();
         return err;
     };
@@ -222,13 +229,16 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
 }
 
 test "v2 UDP truncation drops the packet and retains the link" {
-    var loop = try Looper.initExperimental(allocator, .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } });
+    const read_options: Looper.Options = .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } };
+    const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+    defer read_storage.destroy();
+    var loop = try Looper.init(allocator, .{ .link_buf_size = 4, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     try loop.start();
     var echo = Echo{ .looper = &loop };
     const server = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     const address = try destination(server, 4);
-    loop.attach(.{ .pair = .{ .link = server.linkDescriptor() }, .on_failure = .{ .context = &echo, .callback = Echo.failed }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
+    loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .link = server.linkDescriptor() }, .on_failure = .{ .context = &echo, .callback = Echo.failed }, .on_read = .{ .context = &echo, .callback = Echo.read } }) catch |err| {
         server.destroy();
         return err;
     };
@@ -265,7 +275,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
             return .pause;
         }
     };
-    inline for (.{ Looper.init, Looper.initExperimental }) |init| {
+    inline for (.{ source.net_looper.Looper, Looper }) |Implementation| {
         var fds: [2]std.c.fd_t = undefined;
         if (std.c.pipe(&fds) != 0) return error.PipeFailed;
         defer {
@@ -274,10 +284,14 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         }
         var tun = TunProbe{ .payload = "plain" };
         var probe = Probe{};
-        var loop = try init(allocator, .{ .on_finish = .{ .callback = finish } });
+        const read_options: Looper.Options = .{ .on_finish = .{ .callback = finish } };
+        const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options, read_options.link_buf_size);
+        defer read_storage.destroy();
+        var loop = try Implementation.init(allocator, .{ .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         try loop.start();
         try loop.attach(.{
+            .read_buffers = read_storage.provider(),
             .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } },
             .on_read = .{ .context = &probe, .callback = Probe.read },
         });
@@ -292,13 +306,18 @@ test "unified read callback has no addresses for connected UDP and TUN" {
             .buf_size = 4096,
         })) orelse return error.SocketFailed;
         loop.attach(.{
+            .read_buffers = read_storage.provider(),
             .pair = .{ .link = client.linkDescriptor() },
             .on_read = .{ .context = &probe, .callback = Probe.read },
         }) catch |err| {
             client.destroy();
             return err;
         };
-        try loop.writeQueued(&.{"request"}, .link, peer);
+        if (Implementation == Looper) {
+            try daemon_helpers.WriteCopy.submit(loop.allocator, &loop, &.{"request"}, .link, peer);
+        } else {
+            try loop.writeQueued(&.{"request"}, .link, peer);
+        }
         var buf: [32]u8 = undefined;
         var sender: io.SocketAddress = undefined;
         _ = try receive(server, &buf, &sender);

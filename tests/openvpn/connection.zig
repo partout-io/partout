@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+
+const builtin = @import("builtin");
 const source = @import("source");
 
 const core = source.core;
@@ -13,17 +15,17 @@ const net = source.net;
 const api = core.api;
 const Looper = net.Looper;
 
-test "v2-only policy selects OpenVPN connection v2" {
+test "v2-only builds expose the explicit OpenVPN v2 implementation" {
     if (!source.runtime_policy.v2_only) return error.SkipZigTest;
     const v2 = source.openvpn_connection_v2;
     try std.testing.expect(connection == v2);
-    try std.testing.expect(source.openvpn_exports.ConnectionContext == v2.ConnectionContext);
-    try std.testing.expect(source.openvpn_exports.connection_vtable.create_connection == v2.createConnection);
+    try std.testing.expect(source.openvpn_exports.ConnectionContextV2 == v2.ConnectionContext);
+    try std.testing.expect(source.openvpn_exports.connection_v2_vtable.create_connection == v2.createConnection);
 }
 
 test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
     // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const v2 = source.openvpn_connection_v2;
     const Request = struct {
         created: net.Connection,
@@ -114,7 +116,7 @@ test "OpenVPN connection declarations are semantically analyzed" {
 
 test "OpenVPN connection borrows the daemon looper" {
     // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 

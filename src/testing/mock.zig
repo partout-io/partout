@@ -10,6 +10,8 @@ const net_conn = @import("../net/connection.zig");
 const net_daemon = @import("../net/daemon.zig");
 const net_io = @import("../net/io.zig");
 const net_sandbox = @import("../net/sandbox.zig");
+const packet_io = @import("../net/looper_helpers.zig");
+const runtime_policy = @import("../runtime_policy.zig");
 
 const api = core.api;
 
@@ -89,7 +91,7 @@ pub const MockConnectionEnvironment = struct {
         const executor = try MockSerializedExecutor.create(allocator);
         errdefer executor.destroy();
         self.* = .{
-            .looper = try Looper.init(allocator, .{
+            .looper = if (runtime_policy.v2_only) {} else try Looper.init(allocator, .{
                 .on_finish = .{ .callback = onLooperFinish },
             }),
             .executor = executor,
@@ -97,7 +99,7 @@ pub const MockConnectionEnvironment = struct {
     }
 
     pub fn deinit(self: *MockConnectionEnvironment) void {
-        self.looper.deinit();
+        if (!runtime_policy.v2_only) self.looper.deinit();
         self.executor.destroy();
     }
 
@@ -107,7 +109,7 @@ pub const MockConnectionEnvironment = struct {
         return self.executor.interface();
     }
 
-    fn onLooperFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
+    fn onLooperFinish(_: ?*anyopaque, _: ?packet_io.Failure) void {}
 };
 
 pub const MockDaemonRuntime = struct {
@@ -170,7 +172,7 @@ fn noopSocketFactoryCreate(
     _: u16,
     _: ?net_io.ReachabilityInfo,
     _: c_int,
-) net.SocketFactory.Error!Looper.LinkDescriptor {
+) net.SocketFactory.Error!net_io.LinkDescriptor {
     return error.LinkNotActive;
 }
 

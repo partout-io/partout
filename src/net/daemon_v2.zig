@@ -20,7 +20,7 @@ const conn_mod = @import("connection.zig");
 const daemon_mod = @import("daemon.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
-const looper_mod = @import("looper_runtime.zig");
+const looper_mod = @import("looper_v2.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -339,6 +339,7 @@ const ConnectionDaemon = struct {
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     looper: *Looper,
+    read_storage: [2]?*helpers.ReadStorage = .{ null, null },
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
@@ -422,6 +423,10 @@ const ConnectionDaemon = struct {
     fn events(self: *ConnectionDaemon) Connection.Events {
         return .{
             .ctx = self,
+            .write_packets = writePackets,
+            .write_out_of_band = writeOutOfBand,
+            .schedule_timer = scheduleTimer,
+            .cancel_timer = cancelTimer,
             .established = onConnectionEstablished,
             .needs_rebind = onConnectionNeedsRebind,
             .failed = onConnectionFailed,
@@ -433,6 +438,26 @@ const ConnectionDaemon = struct {
             .last_error = legacyLastError,
             .cancel = legacyCancel,
         };
+    }
+
+    fn writePackets(raw: *anyopaque, packets: Looper.Packets, side: io.Side, destination: ?io.SocketAddress) (Looper.SubmissionError || error{MissingDestination})!void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        return helpers.WriteCopy.submit(self.daemon.allocator, self.looper, packets, side, destination);
+    }
+
+    fn writeOutOfBand(raw: *anyopaque, packets: Looper.Packets, side: io.Side, destination: ?io.SocketAddress) Looper.WriteOOBError!void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        return self.looper.writeOutOfBand(packets, side, destination);
+    }
+
+    fn scheduleTimer(raw: *anyopaque, timer: *Looper.Timer, delay_ms: u64, task: Looper.TimedTask) Looper.SubmissionError!void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        return self.looper.scheduleReplacing(timer, delay_ms, task);
+    }
+
+    fn cancelTimer(raw: *anyopaque, timer: *Looper.Timer) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        self.looper.cancelTimer(timer);
     }
 
     fn onConnectionEstablished(
@@ -652,7 +677,7 @@ const ConnectionDaemon = struct {
         errdefer connection.destroy();
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
-        looper.* = Looper.initExperimental(self.daemon.allocator, .{
+        looper.* = Looper.init(self.daemon.allocator, .{
             .on_finish = .{ .context = self, .callback = onLooperTerminate },
         }) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
@@ -680,6 +705,10 @@ const ConnectionDaemon = struct {
         connection.destroy();
         self.looper.deinit();
         self.daemon.allocator.destroy(self.looper);
+        for (&self.read_storage) |*storage| {
+            if (storage.*) |value| value.destroy();
+            storage.* = null;
+        }
         if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.endpoint_resolver = null;
         self.connection = null;
@@ -779,10 +808,21 @@ const ConnectionDaemon = struct {
         }
     }
 
+    fn readBuffers(self: *ConnectionDaemon, side: io.Side) error{OutOfMemory}!Looper.ReadBuffers {
+        if (self.connection.?.readBuffers(side)) |buffers| return buffers;
+        const storage = &self.read_storage[@intFromEnum(side)];
+        if (storage.* == null) {
+            const options = self.looper.impl.options;
+            const size = if (side == .link) options.link_buf_size else options.tun_buf_size;
+            storage.* = try helpers.ReadStorage.create(self.daemon.allocator, options, size);
+        }
+        return storage.*.?.provider();
+    }
+
     fn setupLink(self: *ConnectionDaemon) !RemoteDescriptor {
         const connection = self.connection orelse @panic("setupLink but no connection");
         const conn_options = self.daemon.options.connection_options;
-        var remote = RemoteDescriptor{ .looper = self.looper };
+        var remote = RemoteDescriptor{};
         if (connection.daemon_io == .none) return remote;
         log.write(.notice, "Create new link");
         const reachability = self.factory.currentReachability();
@@ -822,7 +862,7 @@ const ConnectionDaemon = struct {
             log.write(.info, "Attach LINK");
             try self.looper.attach(.{
                 .pair = .{ .link = descriptor },
-                .read_buffers = connection.readBuffers(.link),
+                .read_buffers = try self.readBuffers(.link),
                 .on_read = .{ .context = self, .callback = onLinkRead },
                 .on_failure = .{ .context = self, .callback = onLinkFailure },
             });
@@ -925,7 +965,7 @@ const ConnectionDaemon = struct {
             .pair = .{
                 .tun = descriptor,
             },
-            .read_buffers = connection.readBuffers(.tun),
+            .read_buffers = try self.readBuffers(.tun),
             .on_read = .{
                 .context = self,
                 .callback = onTunnelRead,

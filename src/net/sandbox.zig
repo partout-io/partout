@@ -12,10 +12,11 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const conn = @import("connection.zig");
 const io = @import("io.zig");
-const looper = @import("looper_runtime.zig");
+const runtime_policy = @import("../runtime_policy.zig");
+const looper = runtime_policy.legacy_looper;
 const api = core.api;
 
-const Looper = looper.Looper;
+const Looper = if (runtime_policy.v2_only) void else looper.Looper;
 const TunWrapper = io.TunWrapper;
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
@@ -191,7 +192,7 @@ pub const SocketFactory = struct {
             local_port: u16,
             reachability: ?io.ReachabilityInfo,
             timeout: c_int,
-        ) Error!Looper.LinkDescriptor,
+        ) Error!io.LinkDescriptor,
     };
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
@@ -205,7 +206,7 @@ pub const SocketFactory = struct {
         local_port: u16,
         reachability: ?io.ReachabilityInfo,
         timeout: u32,
-    ) Error!Looper.LinkDescriptor {
+    ) Error!io.LinkDescriptor {
         const native_timeout: c_int = @intCast(@min(
             timeout,
             @as(u32, @intCast(std.math.maxInt(c_int))),

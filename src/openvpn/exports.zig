@@ -55,10 +55,9 @@
 //! [dep-tunnelblick-xor]: https://tunnelblick.net/cOpenvpn_xorpatch.html
 
 const std = @import("std");
-const runtime_policy = @import("../runtime_policy.zig");
 const build_options = @import("build_options");
 
-const connection = runtime_policy.openvpn_connection;
+const connection = @import("connection.zig");
 const connection_v2 = @import("connection_v2.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");

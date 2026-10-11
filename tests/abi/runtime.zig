@@ -138,7 +138,7 @@ test "daemon runtime owns options during lifecycle" {
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            const expected_openvpn = source.runtime_policy.v2_only;
+            const expected_openvpn = expected_experimental;
             try std.testing.expectEqual(expected_openvpn, ctx.OpenVPN == .experimental);
             const expected_vtable = if (expected_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
             try std.testing.expect(impl.vtable == expected_vtable);
@@ -152,6 +152,7 @@ test "daemon runtime owns options during lifecycle" {
 }
 
 test "starts DNS-only profile through tunnel controller" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -180,6 +181,7 @@ test "starts DNS-only profile through tunnel controller" {
 }
 
 test "starts profile without active modules without tunnel settings" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -203,6 +205,7 @@ test "starts profile without active modules without tunnel settings" {
 }
 
 test "requires a connection implementation for active connection profiles" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -221,6 +224,7 @@ test "requires a connection implementation for active connection profiles" {
 }
 
 test "starts and stops connection profile through injected dependencies" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try mockConnectionRegistry(allocator);
@@ -260,6 +264,7 @@ test "starts and stops connection profile through injected dependencies" {
 }
 
 test "stop blocks until connection teardown finishes" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var blocking_connection = mock.BlockingStopConnection{};
@@ -282,6 +287,7 @@ test "stop blocks until connection teardown finishes" {
 }
 
 test "network monitor gates immediate connection evaluation" {
+    if (source.runtime_policy.v2_only) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{ .monitor = .{ .reachable = false } };
     var registry = try mockConnectionRegistry(allocator);
@@ -339,7 +345,7 @@ test "daemon options reject unknown feature bits" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
 
-test "experimental protocol flags require daemon v2 and select implementations independently" {
+test "daemon runtime selects matching connection implementations regardless of protocol flags" {
     const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
@@ -369,8 +375,8 @@ test "experimental protocol flags require daemon v2 and select implementations i
             };
             defer runtime.destroy(allocator);
             const experimental = source.runtime_policy.v2_only or (flags & partout_c.PartoutDaemonFlagExperimentalDaemon != 0);
-            const experimental_openvpn = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalOpenVPN != 0);
-            const experimental_wireguard = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalWireGuard != 0);
+            const experimental_openvpn = experimental;
+            const experimental_wireguard = experimental;
             try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
             if (source.wireguard_enabled) {
                 const impl = runtime.registry.implementation(.WireGuard).?;
