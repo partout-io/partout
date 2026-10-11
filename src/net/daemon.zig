@@ -51,7 +51,8 @@ const conn_mod = @import("connection.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
-const looper_mod = @import("looper_runtime.zig");
+const runtime_policy = @import("../runtime_policy.zig");
+const looper_mod = runtime_policy.legacy_looper;
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -59,7 +60,7 @@ const log = core.logging;
 const Connection = conn_mod.Connection;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const Looper = looper_mod.Looper;
+const Looper = if (runtime_policy.v2_only) void else looper_mod.Looper;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 

@@ -19,6 +19,8 @@ const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
+pub const testing_helpers = if (builtin.is_test) helpers else void;
+
 pub const Looper = struct {
     pub const Impl = if (builtin.os.tag == .windows)
         @import("looper_windows.zig").WindowsLooper

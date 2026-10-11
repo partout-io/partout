@@ -3,12 +3,15 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+
+const builtin = @import("builtin");
 const source = @import("source");
 
 const net = source.net;
+const io = source.net_io;
 
 const AuthToken = source.openvpn_internal.auth.AuthToken;
-const Looper = net.Looper;
+const Looper = source.net_looper_v2.Looper;
 const PRNG = source.openvpn_internal.crypto.PRNG;
 const Session = source.openvpn_internal.session_v2.Session;
 const SessionError = source.openvpn_internal.session_v2.SessionError;
@@ -25,9 +28,9 @@ test "v2-only policy selects OpenVPN session v2" {
     try std.testing.expect(@hasDecl(Session, "submitPackets"));
 }
 
-test "Session borrows an externally managed Looper" {
+test "Session uses externally supplied I/O callbacks" {
     // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
@@ -45,7 +48,7 @@ test "Session borrows an externally managed Looper" {
     };
 
     const allocator = std.testing.allocator;
-    var looper = try Looper.initExperimental(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();
@@ -56,7 +59,7 @@ test "Session borrows an externally managed Looper" {
     var auth_token = AuthToken{};
     defer auth_token.deinit();
     const session = try Session.create(allocator, .{
-        .looper = &looper,
+        .writer = net.ConnectionWriter.init(&looper, &writer_vtable),
         .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .events = .{
             .established = Callbacks.established,
@@ -73,7 +76,7 @@ test "Session borrows an externally managed Looper" {
     });
     var session_destroyed = false;
     defer if (!session_destroyed) session.destroy();
-    try std.testing.expect(session.looper == &looper);
+    try std.testing.expect(session.writer.ptr == @as(*anyopaque, &looper));
 
     session.destroy();
     session_destroyed = true;
@@ -106,7 +109,7 @@ test "Session reports protocol failures without owning shutdown policy" {
 
     const allocator = std.testing.allocator;
     var event_state = RecordingEvents.State{};
-    var looper = try Looper.initExperimental(allocator, .{
+    var looper = try Looper.init(allocator, .{
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },
@@ -125,7 +128,7 @@ test "Session reports protocol failures without owning shutdown policy" {
             .failed = RecordingEvents.failed,
             .data_count = RecordingEvents.dataCount,
         },
-        .looper = &looper,
+        .writer = net.ConnectionWriter.init(&looper, &writer_vtable),
         .remote_endpoint = try source.net.SocketEndpoint.init(source.core.api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?),
         .configuration = .{},
         .credentials = null,
@@ -177,4 +180,31 @@ test "Session preserves callback failures and classifies native side failures" {
             .code = 5,
         } }, error.LinkFailure),
     );
+}
+
+const writer_vtable: net.ConnectionWriter.VTable = .{
+    .write_packets = writePackets,
+    .write_out_of_band = writeOutOfBand,
+    .schedule_timer = scheduleTimer,
+    .cancel_timer = cancelTimer,
+};
+
+fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return io.WriteCopy.submit(looper.allocator, looper, packets, side, destination);
+}
+
+fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return looper.writeOutOfBand(packets, side, destination);
+}
+
+fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    return looper.scheduleReplacing(timer, delay_ms, task);
+}
+
+fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {
+    const looper: *Looper = @ptrCast(@alignCast(raw));
+    looper.cancelTimer(timer);
 }

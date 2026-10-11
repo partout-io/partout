@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const looper = @import("looper_runtime.zig");
 const builtin = @import("builtin");
 
 const platform_mod = @This();
@@ -19,7 +18,6 @@ const log = core.logging;
 const util = core.util;
 
 const DNSResolver = sandbox.DNSResolver;
-const Looper = looper.Looper;
 const PlatformDNS = resolver.PlatformDNS;
 const ReachabilityInfo = io.ReachabilityInfo;
 const NetworkMonitor = sandbox.NetworkMonitor;
@@ -429,7 +427,7 @@ fn socketFactoryCreate(
     local_port: u16,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-) SocketFactory.Error!Looper.LinkDescriptor {
+) SocketFactory.Error!io.LinkDescriptor {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const effective_reachability = reachability orelse self.currentReachability();
     var options = self.socketOptions(effective_reachability, timeout);
@@ -454,7 +452,7 @@ fn socketFactoryCreateV2(
     local_port: u16,
     reachability: ?ReachabilityInfo,
     timeout: c_int,
-) SocketFactory.Error!Looper.LinkDescriptor {
+) SocketFactory.Error!io.LinkDescriptor {
     return socketFactoryCreate(ptr, allocator, endpoint, local_port, reachability, timeout) catch |err| {
         if (err != error.LinkNotActive or endpoint != null) return err;
         // The portable API reports native open failures as null. Retry the

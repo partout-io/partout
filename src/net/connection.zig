@@ -9,11 +9,8 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const looper = @import("looper_runtime.zig");
 const platform = @import("sandbox.zig");
 const api = core.api;
-
-const Looper = looper.Looper;
 
 pub const CreateError = std.mem.Allocator.Error || error{
     IdGeneration,
@@ -173,7 +170,6 @@ pub const RemoteDescriptor = struct {
     link: ?io.LinkDescriptor = null,
     endpoint: ?io.SocketEndpoint = null,
     local_port: u16 = 0,
-    looper: *Looper,
 };
 
 /// A physical connection to a network service. A connection
@@ -213,7 +209,6 @@ pub const Connection = struct {
     };
 
     // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
-    // FIXME: ###, Connections must not know about looper
 
     pub const Events = struct {
         pub const Success = struct {
@@ -262,7 +257,7 @@ pub const Connection = struct {
 
     pub const VTable = struct {
         /// Optional caller-owned buffers for v2 reads; released after on_read.
-        read_buffers: ?*const fn (*anyopaque, io.Side) ?Looper.ReadBuffers = null,
+        read_buffers: ?*const fn (*anyopaque, io.Side) ?io.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
         endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -291,16 +286,16 @@ pub const Connection = struct {
             }
         }.call,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
-        submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
-            fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
+        submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: io.Side, _: Looper.Failure) void {}
+        looper_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Failure) void {}
         }.call,
-        looper_terminated: *const fn (*anyopaque, ?Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?Looper.Failure) void {}
+        looper_terminated: *const fn (*anyopaque, ?io.Failure) void = struct {
+            fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
         /// Deprecated.
@@ -326,7 +321,7 @@ pub const Connection = struct {
         destroy: *const fn (*anyopaque) void,
     };
 
-    pub fn readBuffers(self: Connection, side: io.Side) ?Looper.ReadBuffers {
+    pub fn readBuffers(self: Connection, side: io.Side) ?io.ReadBuffers {
         const callback = self.vtable.read_buffers orelse return null;
         return callback(self.ptr, side);
     }
@@ -371,23 +366,23 @@ pub const Connection = struct {
     pub fn submitPackets(
         self: Connection,
         side: io.Side,
-        packets: Looper.Packets,
+        packets: io.Packets,
         sources: ?[]const io.SocketAddress,
-    ) Looper.ReadAction {
+    ) io.ReadAction {
         return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
     pub fn looperFailed(
         self: Connection,
         side: io.Side,
-        failure: Looper.Failure,
+        failure: io.Failure,
     ) void {
         self.vtable.looper_failed(self.ptr, side, failure);
     }
 
     pub fn looperTerminated(
         self: Connection,
-        failure: ?Looper.Failure,
+        failure: ?io.Failure,
     ) void {
         self.vtable.looper_terminated(self.ptr, failure);
     }

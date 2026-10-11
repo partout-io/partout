@@ -4,12 +4,16 @@
 
 const std = @import("std");
 
-const core = @import("source").core;
-const daemon = @import("source").net_daemon_v2;
-const daemon_helpers = @import("source").net_daemon_helpers;
-const net = @import("source").net;
-const Looper = net.Looper;
-const mock_mod = @import("source").mock;
+const source = @import("source");
+const builtin = @import("builtin");
+const io = source.net_io;
+
+const core = source.core;
+const daemon = source.net_daemon_v2;
+const daemon_helpers = source.net_daemon_helpers;
+const net = source.net;
+const Looper = source.net_looper_v2.Looper;
+const mock_mod = source.mock;
 
 const api = core.api;
 
@@ -18,7 +22,7 @@ const ConnectionGate = daemon_helpers.ConnectionGate;
 
 test "v2 daemon resets terminal status before retrying failed replacement link" {
     // FIXME: ###, Enable when WindowsLooper delivers termination callbacks.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         const endpoint_list = [_]api.ExtendedEndpoint{
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
@@ -75,7 +79,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         const connection_daemon = sut.implementation.connection;
         try sut.start();
         defer sut.stop();
-        try std.testing.expect(connection_daemon.looper.implementation == .experimental);
+        try std.testing.expect(@TypeOf(connection_daemon.looper.*) == Looper);
         connection_daemon.resume_gate_timer.cancel();
         connection_daemon.resume_gate_timer.wait();
         try std.testing.expectError(error.AlreadyStarted, sut.start());
@@ -87,7 +91,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
 
         const tun = try controller.interface().setTunnelSettings(.{
             .profile = profile,
-            .original_module_id = @import("source").net_connection.activeConnectionModule(&profile).?.id(),
+            .original_module_id = source.net_connection.activeConnectionModule(&profile).?.id(),
         });
         tun.destroy();
         try std.testing.expect(controller.last_settings != null);
@@ -129,7 +133,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
 }
 
 test "v2 daemon dispatches controls to looper and owns queued establishment metadata" {
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         looper: *Looper,
         profile: *const api.Profile,
@@ -222,18 +226,28 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    const looper = try allocator.create(Looper);
-    looper.* = try Looper.initExperimental(allocator, .{ .on_finish = .{ .callback = Probe.finish } });
-    var probe = Probe{ .looper = looper, .profile = &sut.profile };
+    var probe = Probe{ .looper = undefined, .profile = &sut.profile };
     const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
     // Publish a runtime before any actor/looper work, without opening sockets.
-    connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
-    connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
-    connection_daemon.looper = looper;
-    sut.state = .started;
-    sut.snapshot_publisher.setConnectionStatus(.connecting);
-    try looper.start();
+    {
+        const options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
+        const looper = try allocator.create(Looper);
+        errdefer allocator.destroy(looper);
+        looper.* = try Looper.init(allocator, options);
+        errdefer looper.deinit();
+        const link_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.link_buf_size);
+        errdefer link_storage.destroy();
+        const tun_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.tun_buf_size);
+        probe.looper = looper;
+        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
+        connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
+        connection_daemon.looper = looper;
+        connection_daemon.read_storage = .{ link_storage, tun_storage };
+        sut.state = .started;
+    }
     defer sut.stop();
+    sut.snapshot_publisher.setConnectionStatus(.connecting);
+    try connection_daemon.looper.start();
 
     // The factory rejects the link. The delayed callback must reenable the
     // gate even though no connection session ever started or emitted events.
@@ -373,7 +387,9 @@ test "v2 settings daemon creation rolls back allocation failures" {
 
 test "v2 daemon owns the profile and rolls back connection startup allocations" {
     const Factory = struct {
+        create_count: usize = 0,
         destroy_count: usize = 0,
+        writer: ?net.ConnectionWriter = null,
         profile: ?*const api.Profile = null,
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
         fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -381,6 +397,8 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         }
         fn create(ptr: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(ptr.?));
+            self.create_count += 1;
+            self.writer = sb.writer;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable };
         }
@@ -430,14 +448,15 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
         sut.start() catch |err| {
             failing.fail_index = std.math.maxInt(usize);
             try std.testing.expectEqual(error.OutOfMemory, err);
-            try std.testing.expectEqual(@as(usize, 1), factory.destroy_count);
+            try std.testing.expectEqual(factory.create_count, factory.destroy_count);
             try std.testing.expectEqual(@as(usize, 0), monitor.start_count);
             // Failed startup remains retryable and retains profile ownership.
             try sut.start();
             defer sut.stop();
             try std.testing.expectEqual(&sut.profile, factory.profile.?);
+            try std.testing.expect(factory.writer != null);
             sut.stop();
-            try std.testing.expectEqual(@as(usize, 2), factory.destroy_count);
+            try std.testing.expectEqual(factory.create_count, factory.destroy_count);
             continue;
         };
         failing.fail_index = std.math.maxInt(usize);
@@ -526,7 +545,7 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 
 test "v2 daemon owns environment updates and delivers finalization clears on actor" {
     // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
         producer_thread: ?std.Thread.Id = null,
@@ -632,8 +651,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
 }
 
 test "v2 I/O modes control socket creation, attachment, and descriptor handoff" {
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
-    const io = @import("source").net_io;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
         endpoint_list: [3]api.ExtendedEndpoint = undefined,
@@ -669,18 +687,18 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(remote.looper.isOnQueue() == (self.daemon_io == .looper));
+            std.debug.assert(self.daemon.implementation.connection.looper.isOnQueue() == (self.daemon_io == .looper));
             if (self.daemon_io != .looper) {
-                std.testing.expectError(error.LooperUnavailable, remote.looper.perform(void, null, idleCheck)) catch unreachable;
+                std.testing.expectError(error.LooperUnavailable, self.daemon.implementation.connection.looper.perform(void, null, idleCheck)) catch unreachable;
             }
             self.start_count += 1;
             self.remote = remote;
-            self.link_attached = remote.looper.isLinkAttached();
+            self.link_attached = self.daemon.implementation.connection.looper.isLinkAttached();
             self.link_port = if (remote.link) |link| (link.localAddress() catch return error.UnableToStart).port else 0;
             if (self.daemon_io == .looper) return .failed;
             const info = api.TunnelRemoteInfoWrapper{
                 .profile = self.profile.*,
-                .original_module_id = @import("source").net_connection.activeConnectionModule(self.profile).?.id(),
+                .original_module_id = source.net_connection.activeConnectionModule(self.profile).?.id(),
             };
             if (self.sync_establish) {
                 // Queue an event ahead of where an asynchronous established event
@@ -701,7 +719,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(!remote.looper.isOnQueue());
             std.debug.assert(self.established_tun != null);
             if (self.remote.?.link) |link| link.cleanup();
             self.remote = remote;
@@ -763,7 +780,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn lastError(_: *anyopaque) c_int {
             return 0;
         }
-        const tun_vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+        const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
             .set_event_mask = mask,
             .reset_events = reset,
             .read = read,
@@ -895,8 +912,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
 }
 
 test "v2 daemon-created link is released on failed start or rebind" {
-    if (@import("builtin").os.tag == .windows) return error.SkipZigTest;
-    const io = @import("source").net_io;
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
         scenario: Scenario,
@@ -929,7 +945,6 @@ test "v2 daemon-created link is released on failed start or rebind" {
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(!remote.looper.isOnQueue());
             self.remote.?.link.?.cleanup();
             self.remote = remote;
             self.rebind_count += 1;

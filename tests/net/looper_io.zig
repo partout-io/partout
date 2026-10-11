@@ -5,9 +5,10 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const daemon_helpers = source.net_daemon_helpers;
 const io = source.net_io;
 const Looper = source.net_looper_v2.Looper;
-const queues = source.net_looper_helpers;
+const queues = source.net_looper_v2.testing_helpers;
 const allocator = std.testing.allocator;
 const Atomic = std.atomic.Value(usize);
 const libc = struct {
@@ -197,16 +198,15 @@ fn closePipe(fds: [2]std.c.fd_t) void {
 
 test "v2 compatibility reads bound batches and drain remaining packets" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const RuntimeLooper = source.net_looper.Looper;
     const Probe = struct {
         total: Atomic = .init(0),
         first_count: usize = 0,
 
         fn read(
             raw: ?*anyopaque,
-            packets: RuntimeLooper.Packets,
+            packets: Looper.Packets,
             _: ?[]const io.SocketAddress,
-        ) anyerror!RuntimeLooper.ReadAction {
+        ) anyerror!Looper.ReadAction {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             for (packets) |packet| {
                 try std.testing.expectEqualStrings("x", packet);
@@ -223,7 +223,14 @@ test "v2 compatibility reads bound batches and drain remaining packets" {
                 defer closePipe(fds);
                 var mock = Mock{ .fd = fds[0] };
                 var probe = Probe{};
-                var loop = try RuntimeLooper.initExperimental(allocator, .{
+                const read_options: Looper.Options = .{
+                    .on_finish = .{ .callback = finish },
+                    .max_read_size = max_read_size,
+                    .max_read_count = max_read_count,
+                };
+                const read_storage = try daemon_helpers.ReadStorage.create(allocator, read_options.max_read_count, read_options.link_buf_size);
+                defer read_storage.destroy();
+                var loop = try Looper.init(allocator, .{
                     .on_finish = .{ .callback = finish },
                     .max_read_size = max_read_size,
                     .max_read_count = max_read_count,
@@ -237,6 +244,7 @@ test "v2 compatibility reads bound batches and drain remaining packets" {
                 );
                 const descriptor = mock.pair().tun;
                 try loop.attach(.{
+                    .read_buffers = read_storage.provider(),
                     .pair = switch (side) {
                         .link => .{ .link = descriptor },
                         .tun => .{ .tun = descriptor },
@@ -266,7 +274,12 @@ test "v2 compatibility reads bound batches and drain remaining packets" {
 test "v2 compatibility initialization cleans up allocation failures" {
     const Scenario = struct {
         fn run(test_allocator: std.mem.Allocator) !void {
-            var loop = try source.net_looper.Looper.initExperimental(test_allocator, .{
+            const read_options: Looper.Options = .{
+                .on_finish = .{ .callback = finish },
+            };
+            const read_storage = try daemon_helpers.ReadStorage.create(test_allocator, read_options.max_read_count, read_options.link_buf_size);
+            defer read_storage.destroy();
+            var loop = try source.net_looper_v2.Looper.init(test_allocator, .{
                 .on_finish = .{ .callback = finish },
             });
             defer loop.deinit();
@@ -283,16 +296,21 @@ test "v2 compatibility writes clean up copies when allocation fails" {
         defer closePipe(fds);
         var mock = Mock{ .fd = fds[0], .block_writes = true };
         var failing = std.testing.FailingAllocator.init(allocator, .{});
-        var loop = try source.net_looper.Looper.initExperimental(failing.allocator(), .{
+        const read_options: Looper.Options = .{
+            .on_finish = .{ .callback = finish },
+        };
+        const read_storage = try daemon_helpers.ReadStorage.create(failing.allocator(), read_options.max_read_count, read_options.link_buf_size);
+        defer read_storage.destroy();
+        var loop = try source.net_looper_v2.Looper.init(failing.allocator(), .{
             .on_finish = .{ .callback = finish },
         });
         defer loop.deinit();
         try loop.start();
-        try loop.attach(.{ .pair = mock.pair() });
+        try loop.attach(.{ .read_buffers = read_storage.provider(), .pair = mock.pair() });
         failing.fail_index = failing.alloc_index + successful_allocations;
         try std.testing.expectError(
             error.OutOfMemory,
-            loop.writeQueued(&.{ "one", "two" }, .tun, null),
+            io.WriteCopy.submit(loop.allocator, &loop, &.{ "one", "two" }, .tun, null),
         );
         failing.fail_index = std.math.maxInt(usize);
         try loop.stop();

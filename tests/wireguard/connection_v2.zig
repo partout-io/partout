@@ -3,16 +3,19 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+
+const source = @import("source");
+const mock = source.mock;
 const builtin = @import("builtin");
 
-const wireguard_internal = @import("source").wireguard_internal;
+const wireguard_internal = source.wireguard_internal;
 const adapter = wireguard_internal.adapter_v2;
 const backend_mod = wireguard_internal.backend;
-const connection = @import("source").wireguard_connection_v2;
-const conn = @import("source").net_connection;
-const core = @import("source").core;
-const io = @import("source").net_io;
-const sandbox = @import("source").net_sandbox;
+const connection = source.wireguard_connection_v2;
+const conn = source.net_connection;
+const core = source.core;
+const io = source.net_io;
+const sandbox = source.net_sandbox;
 const tunnel_info = wireguard_internal.tunnel_info;
 const uapi = wireguard_internal.uapi;
 
@@ -27,7 +30,6 @@ fn waitUntil(value: *const AtomicBool) void {
 
 const ConnectionContext = connection.ConnectionContext;
 test "WireGuard connection builds UAPI configuration" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
     var configuration = try api.WireGuardConfiguration.parse(allocator,
         \\{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"listenPort":51820},
@@ -176,7 +178,6 @@ test "WireGuard connection parses runtime data count" {
 }
 
 test "WireGuard connection erases backend activation errors at the generic boundary" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 1 };
@@ -204,14 +205,13 @@ test "WireGuard connection erases backend activation errors at the generic bound
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.UnableToStart, startConnection(created, &environment.looper));
+    try std.testing.expectError(error.UnableToStart, startConnection(created));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
@@ -239,14 +239,13 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.OutOfMemory, startConnection(created, &environment.looper));
+    try std.testing.expectError(error.OutOfMemory, startConnection(created));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard v2 takes ownership of link and TUN descriptors" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -281,14 +280,14 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     var first_tun = OwnedDescriptor{};
     var second_link = OwnedDescriptor{};
     var second_tun = OwnedDescriptor{};
-    try expectEstablished(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
+    try expectEstablished(try created.startV2(.{ .link = first_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try created.commit(first_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
 
-    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
@@ -321,7 +320,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
 
     var final_link = OwnedDescriptor{};
     var final_tun = OwnedDescriptor{};
-    try expectEstablished(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
+    try expectEstablished(try created.startV2(.{ .link = final_link.descriptor() }));
     try created.commit(final_tun.descriptor());
     created.destroy();
     destroyed = true;
@@ -352,7 +351,7 @@ const OwnedDescriptor = struct {
     fn lastError(_: *anyopaque) c_int {
         return 0;
     }
-    const vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+    const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = mask,
         .reset_events = reset,
         .read = read,
@@ -363,7 +362,6 @@ const OwnedDescriptor = struct {
 };
 
 test "WireGuard connection drains its running data timer before stopping" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -393,7 +391,7 @@ test "WireGuard connection drains its running data timer before stopping" {
     defer created.destroy();
 
     try std.testing.expectEqual(@as(u32, 1), connection.testing.dataCountIntervalMs(created));
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     waitUntil(&recorder.has_data_count);
     fake_backend.block_get_config.store(true, .release);
     defer fake_backend.release_get_config.store(true, .release);
@@ -428,7 +426,6 @@ test "WireGuard connection drains its running data timer before stopping" {
 }
 
 test "WireGuard connection resolves hostname endpoints through sandbox resolver" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -463,7 +460,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -613,7 +610,6 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 }
 
 test "WireGuard connection handles network monitor events" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -641,7 +637,7 @@ test "WireGuard connection handles network monitor events" {
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     created.betterPath(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
@@ -708,7 +704,6 @@ test "WireGuard connection handles network monitor events" {
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -740,7 +735,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     // Exercise suspend/resume semantics independently of the host running the
     // test; platform selection itself is just the production default policy.
     adapter.testing.setNetworkChangeBehavior(
@@ -753,7 +748,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     created.networkChange(.{ .reachable = false }, recorder.events());
     // The queued rebind must succeed even if an offline event overtakes it.
     var replacement_link = OwnedDescriptor{};
-    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
     created.networkChange(.{ .reachable = true }, recorder.events());
     connection.testing.waitForTemporaryShutdownRetry(created);
@@ -775,7 +770,6 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
 }
 
 test "WireGuard connection retries passive backend failure without terminal events" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -804,7 +798,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -828,7 +822,6 @@ test "WireGuard connection retries passive backend failure without terminal even
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -856,7 +849,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -1163,13 +1156,12 @@ fn recordNeedsRebind(ctx: *anyopaque) void {
     self.rebind_count += 1;
 }
 
-fn startConnection(created: conn.Connection, looper: *@import("source").net.Looper) !bool {
+fn startConnection(created: conn.Connection) !bool {
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
     const link = socket.linkDescriptor();
     return (try consumeStartResult(try created.startV2(.{
         .link = link,
         .local_port = if (builtin.os.tag == .windows) 51820 else (try link.localAddress()).port,
-        .looper = looper,
     }))) == .established;
 }
 

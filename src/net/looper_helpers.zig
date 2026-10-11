@@ -20,19 +20,9 @@ pub const Options = struct {
     on_finish: OnFinish,
 };
 
-/// Single binary data packet.
-pub const Packet = []const u8;
-/// Slice of packets.
-pub const Packets = []const Packet;
-
-/// The `OnRead` callback returns an action. Consumers will
-/// normally `.keep` reading (default behavior), but may also
-/// return `.pause` to temporarily suspend the observation
-/// of read events.
-pub const ReadAction = enum {
-    keep,
-    pause,
-};
+pub const Packet = io.Packet;
+pub const Packets = io.Packets;
+pub const ReadAction = io.ReadAction;
 
 /// Invoked on read events from either looper side. Payloads and addresses are
 /// borrowed until the callback returns. Unconnected UDP supplies one source
@@ -54,31 +44,7 @@ pub const OnRead = struct {
     }
 };
 
-/// Returns details about the underlying reason of a deferred
-/// failure. It represents the former Swift errors:
-///
-/// - SideError(Side, Error?) -> .user
-/// - WaitError(errno) -> .wait
-/// - NativeIOError -> .io
-///
-/// Precisely:
-///
-/// - .wait and .system are fatal syscall failures
-/// - .io causes a side to be detached, but lets the loop continue
-/// - .user comes from `OnRead` callback invocations
-///
-/// Swift MuxError is resolved to error.MuxFailure and is not
-/// mapped here because it's always returned synchronously.
-pub const Failure = union(enum) {
-    wait: c_int,
-    system: io.Error,
-    io: struct {
-        side: io.Side,
-        cause: io.Error,
-        code: ?c_int,
-    },
-    user: anyerror,
-};
+pub const Failure = io.Failure;
 
 /// Invoked on any failure event.
 pub const OnFailure = struct {
@@ -110,23 +76,8 @@ pub const Task = struct {
     }
 };
 
-/// Infallible task submitted for delayed execution on the looper worker.
-/// Error handling belongs to the owner because a task failure must not stop a
-/// daemon-scoped looper shared by otherwise independent consumers.
-pub const TimedTask = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque) void,
-
-    pub fn call(self: TimedTask) void {
-        self.callback(self.context);
-    }
-};
-
-/// Identity of one replaceable delayed task. The looper never retains this
-/// value's address; callers may store it inline with their queue-owned state.
-pub const Timer = struct {
-    id: ?u64 = null,
-};
+pub const TimedTask = io.TimedTask;
+pub const Timer = io.Timer;
 
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
@@ -138,7 +89,7 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+pub const SubmissionError = io.SubmissionError;
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
     AlreadyStarted,
@@ -157,11 +108,7 @@ pub const WriteError = SubmissionError || error{
     InvalidBuffers,
     MissingDestination,
 };
-pub const WriteOOBError = SubmissionError || io.Error || error{
-    MissingDestination,
-    OOBOutsideQueue,
-    WriteIncomplete,
-};
+pub const WriteOOBError = io.WriteOOBError;
 
 pub const CompletionError = std.mem.Allocator.Error || error{
     LooperUnavailable,
@@ -355,24 +302,9 @@ pub const WriteQueue = struct {
 
 // I/O requests used by looper v2.
 
-pub const IOError = io.Error || error{
-    Cancelled,
-    InvalidBuffers,
-};
-
-/// Number of whole packets processed, plus an optional failure. A partial
-/// stream write is not counted; cancellation does not undo bytes already sent.
-pub const IOResult = struct {
-    count: usize = 0,
-    failure: ?IOError = null,
-};
-
-/// Caller-owned storage. Only entries in the completed prefix have valid output.
-pub const ReadBuffer = struct {
-    data: []u8,
-    size: usize = 0,
-    source: ?io.SocketAddress = null,
-};
+pub const IOError = io.IOError;
+pub const IOResult = io.IOResult;
+pub const ReadBuffer = io.ReadBuffer;
 
 /// Called exactly once for an accepted write request, on the looper without its lock.
 /// Completion may run before submission returns. Rejected submissions never
@@ -395,19 +327,7 @@ pub const OnWriteComplete = struct {
 /// descriptors nor their payloads. Both callbacks run on the looper without its
 /// lock and must not call attach, detach, stop, or deinit. The provider context
 /// must outlive the attachment.
-pub const ReadBuffers = struct {
-    context: ?*anyopaque = null,
-
-    /// Lend writable buffers for one read attempt. Each buffer must have nonzero
-    /// capacity. An empty slice pauses reading until resumeReading() is called.
-    acquire: *const fn (?*anyopaque) []ReadBuffer,
-
-    /// Return the entire loan after the read attempt and any on_read callback.
-    /// Called once per acquisition, even when nothing was read or a read failed.
-    /// Only result.count entries have valid size/source fields; the rest are unused.
-    /// The owner may now reuse or recycle the storage. Release does not imply free.
-    release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
-};
+pub const ReadBuffers = io.ReadBuffers;
 
 pub const WriteRequest = struct {
     packets: Packets,

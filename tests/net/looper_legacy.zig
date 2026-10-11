@@ -104,7 +104,6 @@ fn returnFortyTwo(_: ?*anyopaque) anyerror!u8 {
 fn initLooper(on_finish: Looper.OnFinish) !Looper {
     var looper = try Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
     errdefer looper.deinit();
-    try std.testing.expect(looper.implementation == .legacy);
     return looper;
 }
 

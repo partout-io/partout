@@ -8,19 +8,11 @@ const builtin = @import("builtin");
 const source = @import("source");
 
 const AtomicBool = std.atomic.Value(bool);
-const Looper = source.net_looper.Looper;
+const Looper = source.net_looper_v2.Looper;
 
 test "v2-only policy excludes the legacy looper" {
     if (!source.runtime_policy.v2_only) return error.SkipZigTest;
-    const Callbacks = struct {
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
-    };
-    inline for (.{ Looper.init, Looper.initExperimental }) |init| {
-        var looper = try init(std.testing.allocator, .{ .on_finish = .{ .callback = Callbacks.finish } });
-        defer looper.deinit();
-        try std.testing.expect(!@hasField(@TypeOf(looper.implementation), "legacy"));
-        try std.testing.expect(looper.implementation == .experimental);
-    }
+    try std.testing.expect(!@hasDecl(source.runtime_policy.legacy_looper, "Looper"));
 }
 
 fn waitUntil(value: *const AtomicBool) void {
@@ -100,14 +92,13 @@ const FinishCallProbe = struct {
     }
 };
 
-test "experimental looper dispatches tasks and timers through the shared API" {
+test "v2 looper dispatches tasks and timers" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     var finish = FinishCallProbe{};
-    var looper = try Looper.initExperimental(std.testing.allocator, .{
+    var looper = try Looper.init(std.testing.allocator, .{
         .on_finish = .{ .context = &finish, .callback = FinishCallProbe.onFinish },
     });
     defer looper.deinit();
-    try std.testing.expect(looper.implementation == .experimental);
     try looper.start();
     var stopped = false;
     defer if (!stopped) looper.stop() catch {};

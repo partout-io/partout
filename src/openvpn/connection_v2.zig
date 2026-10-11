@@ -20,7 +20,6 @@ const log = core.logging;
 const openvpn_log = logging_mod;
 
 const AuthToken = auth_mod.AuthToken;
-const Looper = net.Looper;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
@@ -78,6 +77,7 @@ const OpenVPNConnection = struct {
 
     /// Stable callback sink supplied at creation.
     events: ?net.Connection.Events,
+    writer: ?net.ConnectionWriter,
     with_local_options: bool,
     /// Ownership marks an attempt awaiting finalization, even if stopped.
     current_session: ?*Session,
@@ -173,6 +173,7 @@ const OpenVPNConnection = struct {
             .cache_dir = cache_dir,
             .ca_filename = ca_filename,
             .events = sandbox.events,
+            .writer = sandbox.writer,
             .with_local_options = true,
             .current_session = null,
             .pending_failure = null,
@@ -189,6 +190,7 @@ const OpenVPNConnection = struct {
     fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit OpenVPNConnection v2");
         self.releaseSession();
+        if (self.writer) |*writer| writer.deinit();
         self.auth_token.deinit();
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
@@ -220,7 +222,7 @@ const OpenVPNConnection = struct {
         }
 
         const session = Session.create(self.allocator, .{
-            .looper = remote.looper,
+            .writer = self.writer orelse return error.UnableToStart,
             .remote_endpoint = remote.endpoint orelse return error.UnableToStart,
             .events = self.session_events,
             .configuration = self.configuration,
@@ -274,9 +276,9 @@ const OpenVPNConnection = struct {
     fn submitPackets(
         self: *OpenVPNConnection,
         side: net.Side,
-        packets: Looper.Packets,
+        packets: net.Packets,
         sources: ?[]const net.SocketAddress,
-    ) Looper.ReadAction {
+    ) net.ReadAction {
         const session = self.current_session orelse return .pause;
         if (self.pending_failure != null) return .pause;
         if (side == .link) if (sources) |addresses| {
@@ -296,13 +298,13 @@ const OpenVPNConnection = struct {
     fn looperFailed(
         self: *OpenVPNConnection,
         side: net.Side,
-        failure: Looper.Failure,
+        failure: net.Failure,
     ) void {
         const session = self.current_session orelse return;
         session.looperFailed(side, failure);
     }
 
-    fn looperTerminated(self: *OpenVPNConnection, failure: ?Looper.Failure) void {
+    fn looperTerminated(self: *OpenVPNConnection, failure: ?net.Failure) void {
         const session = self.current_session orelse return;
         self.handleSessionFailed(error.LooperTerminated);
         session.looperTerminated(failure);
@@ -522,9 +524,9 @@ fn stop(
 fn submitPackets(
     ptr: *anyopaque,
     side: net.Side,
-    packets: Looper.Packets,
+    packets: net.Packets,
     sources: ?[]const net.SocketAddress,
-) Looper.ReadAction {
+) net.ReadAction {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.submitPackets(side, packets, sources);
 }
@@ -542,7 +544,7 @@ fn isPeerSource(source: net.SocketAddress, peer: net.SocketAddress) bool {
 fn looperFailed(
     ptr: *anyopaque,
     side: net.Side,
-    failure: Looper.Failure,
+    failure: net.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperFailed(side, failure);
@@ -550,7 +552,7 @@ fn looperFailed(
 
 fn looperTerminated(
     ptr: *anyopaque,
-    failure: ?Looper.Failure,
+    failure: ?net.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperTerminated(failure);

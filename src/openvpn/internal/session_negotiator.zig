@@ -23,7 +23,6 @@ const api = core_mod.api;
 const log = core_mod.logging;
 
 const Authenticator = auth_mod.Authenticator;
-const Looper = net_mod.Looper;
 const ControlChannel = control_mod.ControlChannel(control_serializers_mod.Serializer);
 const ControlConstants = constants_mod.Control;
 const ControlPacket = packet_mod.ControlPacket;
@@ -70,12 +69,13 @@ pub const NegotiatorOptions = struct {
     with_local_options: bool,
     session_options: SessionOptions,
     callback_context: ?*anyopaque,
+    write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
     // The Session owns the looper timer token; this callback lets the
     // Negotiator own when its next check is armed.
     schedule_negotiation_check: *const fn (
         ?*anyopaque,
         u64,
-    ) Looper.SubmissionError!void,
+    ) net_mod.SubmissionError!void,
 
     pub fn newAuthenticator(
         self: NegotiatorOptions,
@@ -100,7 +100,6 @@ pub const Negotiator = struct {
     key: u8,
     history: ?PushReply,
     renegotiation: ?RenegotiationType,
-    looper: *Looper,
     link_processor: *LinkProcessor,
     remote_endpoint: *const SocketEndpoint,
     channel: *ControlChannel,
@@ -120,7 +119,6 @@ pub const Negotiator = struct {
         key: u8 = 0,
         history: ?PushReply = null,
         renegotiation: ?RenegotiationType = null,
-        looper: *Looper,
         link_processor: *LinkProcessor,
         remote_endpoint: *const SocketEndpoint,
         channel: *ControlChannel,
@@ -145,7 +143,6 @@ pub const Negotiator = struct {
             .key = init.key,
             .history = init.history,
             .renegotiation = init.renegotiation,
-            .looper = init.looper,
             .link_processor = init.link_processor,
             .remote_endpoint = init.remote_endpoint,
             .channel = init.channel,
@@ -199,7 +196,6 @@ pub const Negotiator = struct {
             .key = ControlConstants.nextKey(self.key),
             .history = history,
             .renegotiation = initiated_by,
-            .looper = self.looper,
             .link_processor = self.link_processor,
             .remote_endpoint = self.remote_endpoint,
             .channel = self.channel,
@@ -223,7 +219,6 @@ pub const Negotiator = struct {
     }
 
     pub fn start(self: *Negotiator) !void {
-        std.debug.assert(self.looper.isOnQueue());
         try self.channel.reset(self.renegotiation == null);
         try self.checkNegotiation();
 
@@ -261,7 +256,6 @@ pub const Negotiator = struct {
 
     /// Performs and rearms the former recursive `Task.sleep` check.
     pub fn checkNegotiation(self: *Negotiator) !void {
-        std.debug.assert(self.looper.isOnQueue());
         const elapsed = self.elapsedMs();
         if (self.state == .idle and elapsed > self.options.session_options.hard_reset_timeout_ms) {
             log.write(.notice, "OpenVPN hard reset timed out");
@@ -368,7 +362,7 @@ pub const Negotiator = struct {
     fn writeLink(self: *const Negotiator, packets: []const []const u8) !void {
         var processed = try self.link_processor.processOutbound(packets);
         defer processed.deinit();
-        try self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address);
+        try self.options.write_packets(self.options.callback_context, processed.packets(), self.remote_endpoint.address);
     }
 
     fn requestsWrappedKeyResend(payload: ?[]const u8) bool {
