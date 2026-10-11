@@ -13,6 +13,7 @@ const log = core.logging;
 pub const Options = struct {
     /// Borrowed caller-owned wake descriptor; required by v2, ignored by v1.
     /// Keep it open through looper destruction.
+    // FIXME: ###, Make non-optional after v2
     wake_fd: ?io.FileDescriptor = null,
     on_finish: OnFinish,
     link_buf_size: usize = 64 * 1024,

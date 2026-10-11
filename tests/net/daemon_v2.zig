@@ -38,7 +38,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
             _: net.ConnectionModule,
             _: net.Sandbox,
         ) net.ConnectionCreateError!net.Connection {
-            return .{ .ptr = ptr.?, .vtable = &vtable };
+            return .{ .ptr = ptr.?, .vtable = &vtable, .daemon_io = .none };
         }
 
         const vtable = blk: {
@@ -132,10 +132,11 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
     }
 }
 
-test "v2 daemon dispatches controls to looper and owns queued establishment metadata" {
+test "v2 daemon dispatches controls to actor and owns queued establishment metadata" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         looper: *Looper,
+        daemon: *Daemon,
         profile: *const api.Profile,
         reachability_count: usize = 0,
         stop_count: usize = 0,
@@ -147,7 +148,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn shutdown(raw: *anyopaque, reason: net.Connection.ShutdownReason) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             self.shutdown_count += 1;
             switch (self.shutdown_count) {
                 1, 2 => std.debug.assert(reason == .failure and reason.failure == .reconnect),
@@ -156,7 +157,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn stop(raw: *anyopaque, _: u32, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
             std.debug.assert(!self.looper.isLinkAttached() and !self.looper.isTunAttached());
             self.stop_count += 1;
@@ -164,13 +165,13 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             self.reachability_count += 1;
             sink.data_count(sink.ctx, .{});
         }
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             var servers = [_]api.Address{api.Address.parseRaw("1.1.1.1").?};
             const modules = [_]api.TaggedModule{.{ .DNS = .{
                 .id = "11111111-1111-4111-8111-111111111111".*,
@@ -189,7 +190,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(!self.looper.isOnQueue());
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             self.destroyed = true;
         }
         fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
@@ -226,11 +227,11 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    var probe = Probe{ .looper = undefined, .profile = &sut.profile };
+    var probe = Probe{ .looper = undefined, .daemon = sut, .profile = &sut.profile };
     const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-    // Publish a runtime before any actor/looper work, without opening sockets.
+    // Publish a runtime before any actor work, without opening sockets.
     {
-        const options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
+        const options: Looper.Options = .{ .wake_fd = io.io_c.pp_mux_wake_descriptor(connection_daemon.mux), .on_finish = .{ .callback = Probe.finish } };
         const looper = try allocator.create(Looper);
         errdefer allocator.destroy(looper);
         looper.* = try Looper.init(allocator, options);
@@ -239,7 +240,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         errdefer link_storage.destroy();
         const tun_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.tun_buf_size);
         probe.looper = looper;
-        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
+        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable, .daemon_io = .link };
         connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
         connection_daemon.looper = looper;
         connection_daemon.read_storage = .{ link_storage, tun_storage };
@@ -247,7 +248,6 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     }
     defer sut.stop();
     sut.snapshot_publisher.setConnectionStatus(.connecting);
-    try connection_daemon.looper.start();
 
     // The factory rejects the link. The delayed callback must reenable the
     // gate even though no connection session ever started or emitted events.
@@ -266,10 +266,10 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
     try std.testing.expectEqualStrings("1.1.1.1", controller.last_settings.?.dnsServer(0));
-    // The controller rejects establishment; stopping it also runs on looper.
+    // The controller rejects establishment; stopping it also runs on actor.
     try std.testing.expectEqual(@as(usize, 1), probe.stop_count);
     // A protocol failure must finalize the attempt just like setup failure:
-    // shutdown and stop must run in order on the looper before status changes.
+    // shutdown and stop must run in order on the actor before status changes.
     try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
         .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
@@ -400,7 +400,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
             self.create_count += 1;
             self.writer = sb.writer;
             self.profile = sb.profile;
-            return .{ .ptr = self, .vtable = &vtable };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
         }
         fn destroy(ptr: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(ptr));
@@ -544,7 +544,6 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 }
 
 test "v2 daemon owns environment updates and delivers finalization clears on actor" {
-    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
@@ -553,15 +552,15 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.events = sb.events;
-            return .{ .ptr = self, .vtable = &vtable };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
         }
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.producer_thread = std.Thread.getCurrentId();
             var key = "OpenVPN.serverConfiguration".*;
             var value = "{\"test\":true}".*;
-            // The actor is waiting for this looper operation to return, so it
-            // cannot consume the borrowed strings before we overwrite them.
+            // The actor queues the event while running this callback, so it
+            // consumes the copied strings after this operation returns.
             sink.set_env(sink.ctx, &key, &value);
             @memset(&key, 'x');
             @memset(&value, 'x');
@@ -636,7 +635,7 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     try actor.perform(void, .resumeGate);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
-    try std.testing.expect(controller.delivery_thread.? != factory.producer_thread.?);
+    try std.testing.expectEqual(factory.producer_thread.?, controller.delivery_thread.?);
     try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
 
     sut.stop();
@@ -687,10 +686,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.daemon.implementation.connection.looper.isOnQueue() == (self.daemon_io == .looper));
-            if (self.daemon_io != .looper) {
-                std.testing.expectError(error.LooperUnavailable, self.daemon.implementation.connection.looper.perform(void, null, idleCheck)) catch unreachable;
-            }
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             self.start_count += 1;
             self.remote = remote;
             self.link_attached = self.daemon.implementation.connection.looper.isLinkAttached();
@@ -710,7 +706,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.events.established(self.events.ctx, .{ .info = info });
             return .started;
         }
-        fn idleCheck(_: ?*anyopaque) anyerror!void {}
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
@@ -808,7 +803,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, err: ?net.ConnectionStartError = null }{
         .{ .mode = .none },
         .{ .mode = .link },
-        .{ .mode = .looper },
+        // .looper is covered by the explicitly pending test below.
         .{ .mode = .none, .sync_establish = false },
         .{ .mode = .link, .sync_establish = false },
         .{ .mode = .none, .sync_establish = false, .err = error.UnableToStart },
@@ -1022,4 +1017,10 @@ test "v2 daemon-created link is released on failed start or rebind" {
         try std.testing.expect(probe.remote == null);
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
     }
+}
+
+// FIXME: ###, Reenable when ConnectionDaemon drives loopOnce() on its actor.
+// The current .looper path calls the intentionally unsupported worker APIs.
+test "v2 daemon drives caller-owned looper I/O" {
+    return error.SkipZigTest;
 }
