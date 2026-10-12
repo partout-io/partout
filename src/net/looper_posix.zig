@@ -72,7 +72,7 @@ pub const PosixLooper = struct {
     /// Wake readiness returns control to the caller; pp_mux_wait consumes the
     /// mux wake signal. The caller must keep the borrowed mux valid.
     /// Tasks scheduled by callbacks become eligible on the next iteration.
-    pub fn loopOnce(self: *PosixLooper, max_wait_ms: ?u32) bool {
+    pub fn loopOnce(self: *PosixLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         if (self.busy) @panic("Looper.loopOnce() must not be reentrant");
         if (self.stopped) return false;
         self.busy = true;
@@ -80,7 +80,7 @@ pub const PosixLooper = struct {
 
         if (self.waitReady(max_wait_ms)) |code| {
             self.clear();
-            self.options.on_finish.call(.{ .wait = code });
+            failure.* = .{ .wait = code };
             return false;
         }
         const now = core.monotonicNs();
@@ -108,8 +108,9 @@ pub const PosixLooper = struct {
         for ([_]io.Side{ .link, .tun }) |tag| {
             const side = self.sides[@intFromEnum(tag)] orelse continue;
             if (side.write_ready and side.write_retry == null) {
-                if (self.processWrite(side)) |failure| {
-                    self.removeSide(tag, failure);
+                if (self.processWrite(side)) |internal_failure| {
+                    self.removeSide(tag, internal_failure);
+                    failure.* = internal_failure;
                     return true;
                 }
             }
@@ -117,8 +118,9 @@ pub const PosixLooper = struct {
         for ([_]io.Side{ .tun, .link }) |tag| {
             const side = self.sides[@intFromEnum(tag)] orelse continue;
             if (side.read_ready and side.reading and side.read_retry == null) {
-                if (self.processRead(side)) |failure| {
-                    self.removeSide(tag, failure);
+                if (self.processRead(side)) |internal_failure| {
+                    self.removeSide(tag, internal_failure);
+                    failure.* = internal_failure;
                     return true;
                 }
             }
@@ -126,14 +128,13 @@ pub const PosixLooper = struct {
         return true;
     }
 
-    /// Cancels pending work, cleans attached sides, and invokes on_finish once.
+    /// Cancels pending work, cleans attached sides.
     pub fn stop(self: *PosixLooper) error{ReentrantCall}!void {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return;
         self.busy = true;
         defer self.busy = false;
         self.clear();
-        self.options.on_finish.call(null);
     }
 
     /// Failed replacement preserves the old task. The token's address is not retained.

@@ -59,16 +59,6 @@ pub const OnFailure = struct {
     }
 };
 
-/// Invoked when the looper finishes, with the optional failure.
-pub const OnFinish = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, ?Failure) void,
-
-    pub fn call(self: OnFinish, failure: ?Failure) void {
-        self.callback(self.context, failure);
-    }
-};
-
 pub const TimedTask = io.TimedTask;
 
 pub const Timer = io.Timer;
@@ -318,5 +308,16 @@ pub const CommandQueue = struct {
 
     pub fn takeReady(self: *CommandQueue) ?*CommandNode {
         return self.pending.takeAll();
+    }
+};
+
+/// FIXME: ###, Deprecated: used only by the v1 looper.
+/// Invoked when the looper finishes, with the optional failure.
+pub const OnFinish = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque, ?Failure) void,
+
+    pub fn call(self: OnFinish, failure: ?Failure) void {
+        self.callback(self.context, failure);
     }
 };

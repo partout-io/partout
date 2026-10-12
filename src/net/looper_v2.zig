@@ -77,8 +77,8 @@ pub const Looper = struct {
         self.impl.destroy();
     }
 
-    pub fn loopOnce(self: *Looper, max_wait_ms: ?u32) bool {
-        return self.impl.loopOnce(max_wait_ms);
+    pub fn loopOnce(self: *Looper, failure: *?Failure) bool {
+        return self.impl.loopOnce(null, failure);
     }
 
     /// Synchronously cancels pending work. Must run outside callbacks.

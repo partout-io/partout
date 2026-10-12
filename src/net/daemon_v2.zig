@@ -24,6 +24,7 @@ const looper_mod = @import("looper_v2.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
+const io_c = io.io_c;
 const log = core.logging;
 const Connection = conn_mod.Connection;
 const ConnectionGate = helpers.ConnectionGate;
@@ -324,6 +325,11 @@ const SettingsDaemon = struct {
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
+    const Job = struct {
+        message: Message,
+        next: ?*Job = null,
+    };
+
     // Shared lifecycle and reporting, plus connection-specific dependencies.
     daemon: *Daemon,
     module: conn_mod.ConnectionModule,
@@ -332,15 +338,18 @@ const ConnectionDaemon = struct {
     factory: sandbox.SocketFactory,
     monitor: sandbox.NetworkMonitor,
 
+    // Event loop
+    mux: io_c.pp_mux,
+    actor: std.Thread,
+    looper: *Looper,
+    mutex: core.Mutex,
+    jobs: core.Fifo(Job),
+
     // Internal state
-    actor: *Actor,
-    // Owns the wake source borrowed by the connection looper.
-    mux: io.io_c.pp_mux,
     connection: ?Connection,
     rebind_pending: std.atomic.Value(bool),
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
-    looper: *Looper,
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
@@ -358,12 +367,23 @@ const ConnectionDaemon = struct {
         const allocator = daemon.allocator;
         const self = try allocator.create(ConnectionDaemon);
         errdefer allocator.destroy(self);
-        const mux = io.io_c.pp_mux_create(2) orelse return error.LooperFailure;
-        errdefer io.io_c.pp_mux_free(mux);
+        const mux = io_c.pp_mux_create(2) orelse return error.LooperFailure;
+        errdefer io_c.pp_mux_free(mux);
+        const actor = std.Thread.spawn(.{}, run, .{self}) catch return error.OutOfMemory;
+        const looper = Looper.create(allocator, .{
+            .mux = mux,
+            .on_finish = .{
+                .callback = unreachable,
+                .context = self,
+            },
+        });
         self.* = .{
             .daemon = daemon,
-            .actor = undefined,
             .mux = mux,
+            .actor = actor,
+            .looper = looper,
+            .mutex = .{},
+            .jobs = .{},
             .module = module,
             .registry = objects.registry,
             .resolver = objects.resolver,
@@ -372,16 +392,11 @@ const ConnectionDaemon = struct {
             .connection = null,
             .rebind_pending = .init(false),
             .endpoint_resolver = null,
-            .looper = undefined,
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
             .is_evaluating_connection = false,
             .is_deinitializing = false,
         };
-        errdefer self.gate.deinit();
-        errdefer self.resume_gate_timer.deinit();
-        // The driver can enter its idle wait immediately after thread creation.
-        self.actor = Actor.create(allocator, self) catch return error.OutOfMemory;
         return self;
     }
 
@@ -393,7 +408,6 @@ const ConnectionDaemon = struct {
         // Suppress the actor's unexpected-termination path: stop() already
         // released the connection resources.
         self.is_deinitializing = true;
-        self.actor.destroy();
 
         self.monitor.setEventHandler(null);
         self.monitor.stopObserving();
@@ -401,22 +415,101 @@ const ConnectionDaemon = struct {
         self.gate.deinit();
         if (self.connection != null)
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
-        io.io_c.pp_mux_free(self.mux);
+
+        // Stop the looper and wait for it to finish.
+        self.submit(.stop) catch {};
+        self.actor.join();
+
+        self.mutex.deinit();
+        io_c.pp_mux_free(self.mux);
         self.daemon.allocator.destroy(self);
 
         log.write(.debug, "Deinit daemon");
     }
 
-    fn start(self: *const ConnectionDaemon) Error!void {
-        return self.actor.perform(void, .start);
+    // FIXME: ###, perform
+    fn start(self: *ConnectionDaemon) Error!void {
+        // return self.perform(void, .start);
+        try self.submit(.start);
     }
 
-    fn hold(self: *const ConnectionDaemon) void {
-        self.actor.perform(void, .hold) catch return;
+    // FIXME: ###, perform
+    fn hold(self: *ConnectionDaemon) void {
+        // self.perform(void, .hold) catch return;
+        self.submit(.hold) catch return;
     }
 
-    fn stop(self: *const ConnectionDaemon) void {
-        self.actor.perform(void, .stop) catch return;
+    // FIXME: ###, perform
+    fn stop(self: *ConnectionDaemon) void {
+        // self.perform(void, .stop) catch return;
+        self.submit(.stop) catch return;
+    }
+
+    //#endregion
+
+    //#region Event loop
+
+    fn run(self: *ConnectionDaemon) void {
+        defer {
+            // Do not destroy the looper in self.destroy() twice.
+            self.looper.destroy();
+        }
+        while (true) {
+            // Fetch pending jobs if any.
+            self.mutex.lock();
+            _ = io_c.pp_mux_reset_wake(self.mux);
+            const maybe_jobs = self.jobs.takeAll();
+            self.mutex.unlock();
+
+            // Drain fetched jobs.
+            var pending = maybe_jobs;
+            var is_stopped = false;
+            while (pending) |job| {
+                pending = job.next;
+                log.writef(.debug, "Run job: {s}", .{@tagName(job.message)});
+                const keep_alive = self.dispatch(job.message) catch |err| blk: {
+                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
+                    break :blk true;
+                };
+                if (!keep_alive) is_stopped = true;
+                self.daemon.allocator.destroy(job);
+            }
+            if (is_stopped) return;
+
+            // Wait for new jobs or I/O.
+            var failure: ?io.Failure = null;
+            const is_alive = self.looper.loopOnce(&failure);
+            if (failure) |err| {
+                log.writef(.err, "Looper failed: .{}", err);
+            }
+            if (!is_alive) return;
+        }
+    }
+
+    fn submit(self: *ConnectionDaemon, message: Message) !void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        var job = try self.daemon.allocator.create(Job);
+        job.message = message;
+        self.jobs.append(job);
+        _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    fn dispatch(self: *ConnectionDaemon, message: Message) !bool {
+        switch (message) {
+            .start => try self.doStart(),
+            .hold => self.doStop(.preserve_environment),
+            .stop => {
+                self.doStop(.clear_environment);
+                return false;
+            },
+            .onReachability => |info| self.handleReachability(info),
+            .onBetterPath => self.handleBetterPath(),
+            else => {
+                // FIXME: ###, Delete other cases
+            },
+        }
+        return true;
     }
 
     //#endregion
@@ -1166,14 +1259,6 @@ const ConnectionDaemon = struct {
     // Mailbox messages enter through perform on the actor. actorDidFinish also
     // runs on that thread and completes serialized shutdown before it exits.
 
-    const Actor = core.actor.Actor(
-        ConnectionDaemon,
-        LooperDriver,
-        Message,
-        Error,
-        perform,
-    );
-
     const Message = union(enum) {
         start,
         hold,
@@ -1195,7 +1280,7 @@ const ConnectionDaemon = struct {
         recoverConnection,
     };
 
-    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+    fn perform2(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doHold(),
@@ -1309,7 +1394,7 @@ const ConnectionDaemon = struct {
 
     /// Combines actor completion waits with the caller-driven connection looper.
     const LooperDriver = struct {
-        mux: io.io_c.pp_mux,
+        mux: io_c.pp_mux,
         driver: core.actor.DefaultDriver(ConnectionDaemon, null),
 
         pub fn init(mutex: *core.Mutex, context: *ConnectionDaemon) LooperDriver {
@@ -1338,12 +1423,12 @@ const ConnectionDaemon = struct {
         pub fn wake(self: *LooperDriver) void {
             // The condition wake also allows shutdown if the mux wait fails.
             self.driver.wake();
-            if (!io.io_c.pp_mux_wake(self.mux)) log.write(.fault, "Unable to wake daemon actor");
+            if (!io_c.pp_mux_wake(self.mux)) log.write(.fault, "Unable to wake daemon actor");
         }
 
         pub fn resetWake(self: *LooperDriver) void {
             self.driver.resetWake();
-            if (!io.io_c.pp_mux_reset_wake(self.mux)) log.write(.fault, "Unable to reset daemon actor wake");
+            if (!io_c.pp_mux_reset_wake(self.mux)) log.write(.fault, "Unable to reset daemon actor wake");
         }
 
         pub fn loopOnce(self: *LooperDriver, context: *ConnectionDaemon, max_wait_ms: ?u32) void {
@@ -1355,7 +1440,7 @@ const ConnectionDaemon = struct {
             // mailbox work without spinning on a stopped looper.
             const timeout: c_int = if (max_wait_ms) |ms| @intCast(@min(ms, std.math.maxInt(c_int))) else -1;
             var code: c_int = 0;
-            if (io.io_c.pp_mux_wait(self.mux, timeout, &code) < 0) {
+            if (io_c.pp_mux_wait(self.mux, timeout, &code) < 0) {
                 log.writef(.fault, "Daemon actor mux wait failed: {}", .{code});
                 context.daemon.requestCancellation(.{ .code = .ioFailure }, true);
                 self.driver.loopOnce(context, max_wait_ms);
