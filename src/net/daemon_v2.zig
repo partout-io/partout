@@ -354,6 +354,7 @@ const ConnectionDaemon = struct {
     // Event loop
     mux: io_c.pp_mux,
     actor: std.Thread,
+    actor_id: ?std.Thread.Id,
     looper: *Looper,
     jobs: core.Fifo(Job),
     jobs_mutex: core.Mutex,
@@ -403,6 +404,7 @@ const ConnectionDaemon = struct {
             .daemon = daemon,
             .mux = mux,
             .actor = undefined,
+            .actor_id = null,
             .looper = looper,
             .jobs = .{},
             .jobs_mutex = .{},
@@ -1205,7 +1207,11 @@ const ConnectionDaemon = struct {
     };
 
     fn run(self: *ConnectionDaemon) void {
-        var running = true;
+        self.jobs_mutex.lock();
+        var running = self.is_running;
+        self.actor_id = std.Thread.getCurrentId();
+        self.jobs_mutex.unlock();
+
         while (running) {
             // Fetch pending jobs if any.
             self.jobs_mutex.lock();
@@ -1241,6 +1247,7 @@ const ConnectionDaemon = struct {
         // Signal finalization to close job submissions.
         self.jobs_mutex.lock();
         self.is_running = false;
+        self.actor_id = null;
         var pending = self.jobs.takeAll();
         self.jobs_mutex.unlock();
 
@@ -1294,14 +1301,27 @@ const ConnectionDaemon = struct {
         };
 
         self.jobs_mutex.lock();
-        defer self.jobs_mutex.unlock();
-        if (!self.is_running) return error.Closed;
+        if (!self.is_running) {
+            self.jobs_mutex.unlock();
+            return error.Closed;
+        }
 
         var request = Request{ .message = message };
         var job = Job{ .command = .{ .perform = .{
             .context = &request,
             .callback = Request.call,
         } } };
+
+        // Watch out for recursive locks. If we are invoking perform()
+        // on the actor thread, e.g., as the effect of a nested
+        // perform(), we must execute the job immediately. Waiting on
+        // the condition would lead to a deadlock.
+        if (self.isCurrentThread()) {
+            self.jobs_mutex.unlock();
+            return try self.dispatch(Result, message);
+        }
+        defer self.jobs_mutex.unlock();
+
         self.jobs.append(&job);
         _ = io_c.pp_mux_wake(self.mux);
         while (!job.done) {
@@ -1355,6 +1375,11 @@ const ConnectionDaemon = struct {
             .onLooperTerminated => |failure| self.handleLooperTermination(failure),
             .recoverConnection => self.recoverConnection(),
         }
+    }
+
+    fn isCurrentThread(self: *const ConnectionDaemon) bool {
+        const actor_id = self.actor_id orelse return false;
+        return actor_id == std.Thread.getCurrentId();
     }
 
     fn actorDidFinish(self: *ConnectionDaemon) void {
