@@ -367,7 +367,7 @@ const ConnectionDaemon = struct {
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     gate: ConnectionGate,
-    resume_gate_timer: core.RunAfter,
+    resume_gate_timer: Looper.Timer,
     is_evaluating_connection: bool,
 
     //#region Caller thread - daemon lifecycle
@@ -425,7 +425,6 @@ const ConnectionDaemon = struct {
         errdefer self.jobs_mutex.deinit();
         errdefer self.jobs_condition.deinit();
         errdefer self.gate.deinit();
-        errdefer self.resume_gate_timer.deinit();
         self.actor = std.Thread.spawn(.{}, run, .{self}) catch return error.OutOfMemory;
         return self;
     }
@@ -438,7 +437,6 @@ const ConnectionDaemon = struct {
 
         // Daemon checked the shared lifecycle precondition. Drain callbacks
         // before releasing this implementation and its borrowed Daemon.
-        self.resume_gate_timer.deinit();
 
         self.monitor.setEventHandler(null);
         self.monitor.stopObserving();
@@ -600,16 +598,17 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Timer thread - delayed gate resumption
+    //#region Actor thread - delayed gate resumption
 
-    // RunAfter invokes this callback on its worker. It synchronously enters the
-    // actor so gate changes remain serialized with connection work.
+    // Looper timers run inside loopOnce(). Defer gate changes until it returns,
+    // because a ready transition may start a connection and attach I/O.
 
     // This is scheduled with a delay
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.perform(void, .resumeGate) catch |err| {
+        self.schedule(.resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
+            self.daemon.requestCancellation(null, true);
         };
     }
 
@@ -664,7 +663,7 @@ const ConnectionDaemon = struct {
 
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
-        self.resume_gate_timer.cancel();
+        self.looper.cancelTimer(&self.resume_gate_timer);
 
         self.monitor.setEventHandler(null);
         self.monitor.stopObserving();
@@ -874,7 +873,10 @@ const ConnectionDaemon = struct {
         log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
 
         // Contextually cancels the previous attempt
-        self.resume_gate_timer.scheduleReplacing(delay_ms, onResumeGate, self) catch |err| {
+        self.looper.scheduleTimer(&self.resume_gate_timer, delay_ms, .{
+            .context = self,
+            .callback = onResumeGate,
+        }) catch |err| {
             log.writef(.err, "Unable to schedule resume connection gate, enqueue resume: {s}", .{@errorName(err)});
             // Finish the current evaluation and drain queued connection events
             // before the gate can start another attempt.
@@ -1077,7 +1079,7 @@ const ConnectionDaemon = struct {
 
         // onLooperTerminate() already finalized protocol state on the actor.
         // Recovery replaces the stopped looper before accepting new I/O.
-        self.resume_gate_timer.cancel();
+        self.looper.cancelTimer(&self.resume_gate_timer);
         self.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
             self.daemon.controller.setReasserting(false);
@@ -1096,7 +1098,7 @@ const ConnectionDaemon = struct {
         // the delayed retry normally scheduled by the disconnected status.
         self.daemon.controller.clearTunnelSettings(false);
         self.trackConnectionStatus(.disconnected);
-        self.resume_gate_timer.cancel();
+        self.looper.cancelTimer(&self.resume_gate_timer);
         if (self.daemon.state != .started) return;
         self.createConnection() catch |err| {
             log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
@@ -1118,7 +1120,7 @@ const ConnectionDaemon = struct {
     }
 
     fn pause(self: *ConnectionDaemon) void {
-        self.resume_gate_timer.cancel();
+        self.looper.cancelTimer(&self.resume_gate_timer);
         _ = self.gate.setEnabled(false);
     }
 
