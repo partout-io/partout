@@ -144,7 +144,7 @@ pub const PosixLooper = struct {
     }
 
     /// Failed replacement preserves the old task. The token's address is not retained.
-    pub fn scheduleReplacing(self: *PosixLooper, timer: *helpers.Timer, delay_ms: u64, task: helpers.TimedTask) helpers.SubmissionError!void {
+    pub fn scheduleTimer(self: *PosixLooper, timer: *helpers.Timer, delay_ms: u64, task: helpers.TimedTask) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         node.* = .{ .id = self.next_timer_id, .deadline_ns = deadlineAfter(delay_ms), .task = task };

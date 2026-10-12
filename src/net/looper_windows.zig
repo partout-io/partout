@@ -40,7 +40,7 @@ pub const WindowsLooper = struct {
         self.options.on_finish.call(null);
     }
 
-    pub fn scheduleReplacing(
+    pub fn scheduleTimer(
         _: *WindowsLooper,
         _: *helpers.Timer,
         _: u64,

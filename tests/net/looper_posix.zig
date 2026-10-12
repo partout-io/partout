@@ -48,7 +48,7 @@ const Probe = struct {
         const self: *Probe = @ptrCast(@alignCast(raw.?));
         self.tasks += 1;
         // A zero-delay replacement must wait for another caller-driven iteration.
-        self.looper.scheduleReplacing(&self.timer, 0, .{ .context = self, .callback = task }) catch unreachable;
+        self.looper.scheduleTimer(&self.timer, 0, .{ .context = self, .callback = task }) catch unreachable;
     }
 };
 
@@ -60,8 +60,8 @@ test "looper lifecycle and timers are caller driven" {
     defer loop.destroy();
     probe.looper = loop;
     try std.testing.expect(loop.loopOnce(0));
-    try loop.scheduleReplacing(&probe.timer, 1000, .{ .context = &probe, .callback = Probe.task });
-    try loop.scheduleReplacing(&probe.timer, 0, .{ .context = &probe, .callback = Probe.task });
+    try loop.scheduleTimer(&probe.timer, 1000, .{ .context = &probe, .callback = Probe.task });
+    try loop.scheduleTimer(&probe.timer, 0, .{ .context = &probe, .callback = Probe.task });
     try std.testing.expectEqual(0, probe.tasks);
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(1, probe.tasks);
@@ -70,14 +70,14 @@ test "looper lifecycle and timers are caller driven" {
     loop.cancelTimer(&probe.timer);
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(2, probe.tasks);
-    try loop.scheduleReplacing(&probe.timer, 2, .{ .context = &probe, .callback = Probe.task });
+    try loop.scheduleTimer(&probe.timer, 2, .{ .context = &probe, .callback = Probe.task });
     try std.testing.expect(loop.loopOnce(null));
     try std.testing.expectEqual(3, probe.tasks);
     try loop.stop();
     try loop.stop();
     try std.testing.expectEqual(1, probe.finishes);
     try std.testing.expect(!loop.loopOnce(0));
-    try std.testing.expectError(error.LooperUnavailable, loop.scheduleReplacing(&probe.timer, 0, .{ .callback = Probe.task }));
+    try std.testing.expectError(error.LooperUnavailable, loop.scheduleTimer(&probe.timer, 0, .{ .callback = Probe.task }));
 }
 
 const Mock = struct {
@@ -202,7 +202,7 @@ test "timer callbacks can cancel and replace other ready tasks" {
         fn edit(raw: ?*anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.loop.cancelTimer(&self.cancel);
-            self.loop.scheduleReplacing(&self.replace, 0, .{ .context = self, .callback = called }) catch unreachable;
+            self.loop.scheduleTimer(&self.replace, 0, .{ .context = self, .callback = called }) catch unreachable;
         }
         fn called(raw: ?*anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -216,9 +216,9 @@ test "timer callbacks can cancel and replace other ready tasks" {
     defer loop.destroy();
     var tasks = Tasks{ .loop = loop };
     var first = helpers.Timer{};
-    try loop.scheduleReplacing(&first, 0, .{ .context = &tasks, .callback = Tasks.edit });
-    try loop.scheduleReplacing(&tasks.cancel, 0, .{ .context = &tasks, .callback = Tasks.called });
-    try loop.scheduleReplacing(&tasks.replace, 0, .{ .context = &tasks, .callback = Tasks.called });
+    try loop.scheduleTimer(&first, 0, .{ .context = &tasks, .callback = Tasks.edit });
+    try loop.scheduleTimer(&tasks.cancel, 0, .{ .context = &tasks, .callback = Tasks.called });
+    try loop.scheduleTimer(&tasks.replace, 0, .{ .context = &tasks, .callback = Tasks.called });
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(0, tasks.calls);
     try std.testing.expect(loop.loopOnce(0));
@@ -284,7 +284,7 @@ test "external wake interrupts an idle loop and remains caller owned" {
     defer if (!destroyed) loop.destroy();
     probe.looper = loop;
     // A watchdog makes a missing wake fail without hanging the test suite.
-    try loop.scheduleReplacing(&probe.timer, 2000, .{ .context = &probe, .callback = Probe.task });
+    try loop.scheduleTimer(&probe.timer, 2000, .{ .context = &probe, .callback = Probe.task });
     const producer = try std.Thread.spawn(.{}, Producer.signal, .{wake});
     const continued = loop.loopOnce(null);
     producer.join();

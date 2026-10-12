@@ -207,7 +207,7 @@ fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destinati
 
 fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
-    return looper.scheduleReplacing(timer, delay_ms, task);
+    return looper.scheduleTimer(timer, delay_ms, task);
 }
 
 fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {

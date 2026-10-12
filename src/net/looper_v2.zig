@@ -93,13 +93,13 @@ pub const Looper = struct {
     ///
     /// This operation is queue-confined. The looper owns the internal command;
     /// `timer` is only an identity token and its address is never retained.
-    pub fn scheduleReplacing(
+    pub fn scheduleTimer(
         self: *Looper,
         timer: *helpers.Timer,
         delay_ms: u64,
         task: helpers.TimedTask,
     ) helpers.SubmissionError!void {
-        return self.impl.scheduleReplacing(timer, delay_ms, task);
+        return self.impl.scheduleTimer(timer, delay_ms, task);
     }
 
     /// Cancels one delayed task. After this returns, its borrowed callback
