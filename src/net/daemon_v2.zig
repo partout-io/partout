@@ -1177,8 +1177,9 @@ const ConnectionDaemon = struct {
     // Mailbox messages enter through perform on the actor. actorDidFinish also
     // runs on that thread and completes serialized shutdown before it exits.
 
-    const Actor = core.actor.ActorWithFinish(
+    const Actor = core.actor.Actor(
         ConnectionDaemon,
+        null,
         Message,
         Error,
         perform,

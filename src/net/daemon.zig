@@ -257,8 +257,9 @@ pub const Daemon = struct {
 
     // #region Actor interface
 
-    const Actor = core.actor.ActorWithFinish(
+    const Actor = core.actor.Actor(
         Daemon,
+        null,
         Message,
         Error,
         perform,

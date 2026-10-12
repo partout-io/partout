@@ -28,8 +28,9 @@ fn performCounter(state: *CounterState, comptime Result: type, message: CounterM
     }
 }
 
-const CounterActor = source.core.Actor(
+const CounterActor = source.core.ActorWithoutFinish(
     CounterState,
+    null,
     CounterMessage,
     CounterError,
     performCounter,
@@ -66,7 +67,7 @@ test "actor propagates errors and rejects messages after shutdown" {
 }
 
 const ResultState = struct {
-    const Actor = source.core.Actor(ResultState, Message, CounterError, handle);
+    const Actor = source.core.ActorWithoutFinish(ResultState, null, Message, CounterError, handle);
     const Message = union(enum) {
         add: usize,
         nested,
@@ -116,7 +117,7 @@ test "actor returns typed results for queued and nested messages" {
 }
 
 const PayloadState = struct {
-    const Actor = source.core.Actor(PayloadState, Message, CounterError, handle);
+    const Actor = source.core.ActorWithoutFinish(PayloadState, null, Message, CounterError, handle);
     const Payload = struct {
         words: [64]u64 align(64),
         owner: *const usize,
@@ -218,7 +219,7 @@ test "actor keeps concurrent callers results and errors isolated" {
 
 test "actor shutdown drains scheduled work and permits typed finish callbacks" {
     const State = struct {
-        const Actor = source.core.actor.ActorWithFinish(@This(), Message, CounterError, handle, finish);
+        const Actor = source.core.actor.Actor(@This(), null, Message, CounterError, handle, finish);
         const Message = union(enum) { add: usize, read, fail };
         actor: ?*Actor = null,
         value: usize = 0,
