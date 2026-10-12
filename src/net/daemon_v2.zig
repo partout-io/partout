@@ -708,7 +708,7 @@ const ConnectionDaemon = struct {
     }
 
     fn releaseConnection(self: *ConnectionDaemon) void {
-        const connection = self.connection orelse return;
+        const connection = self.connection orelse @panic("releaseConnection but no connection");
         connection.destroy();
         if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.endpoint_resolver = null;
@@ -722,9 +722,10 @@ const ConnectionDaemon = struct {
         timeout_ms: u32,
         reason: Connection.ShutdownReason,
     ) !void {
-        _ = try self.callConnection(.{ .shutdown = reason });
+        const connection = self.connection orelse @panic("stopConnection but no connection");
+        connection.shutdown(reason);
         try self.detachLooperSides();
-        _ = try self.callConnection(.{ .stop = timeout_ms });
+        connection.stop(timeout_ms, self.events());
     }
 
     fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
@@ -745,7 +746,7 @@ const ConnectionDaemon = struct {
             log.write(.info, "Ignore evaluation, daemon not started");
             return;
         }
-        if (self.connection == null) return;
+        const connection = self.connection orelse @panic("internalEvaluateConnection but no connection");
         if (self.is_evaluating_connection) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
@@ -772,7 +773,8 @@ const ConnectionDaemon = struct {
         };
         // Start on the actor, detaching any looper-owned link on failure.
         self.trackConnectionStatus(.connecting);
-        const result = self.callConnection(.{ .start = remote }) catch |err| {
+        // Entering startV2 transfers a connection-owned link, even on failure.
+        const result = connection.startV2(remote) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
             _ = self.daemon.handleStartError(switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -919,15 +921,15 @@ const ConnectionDaemon = struct {
     // Forwards the event to the underlying connection
     fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
-        if (self.connection == null) return;
-        _ = self.callConnection(.{ .reachability = reachability }) catch return;
+        const connection = self.connection orelse @panic("handleReachability but no connection");
+        connection.networkChange(reachability, self.events());
     }
 
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
-        if (self.connection == null) return;
-        _ = self.callConnection(.better_path) catch return;
+        const connection = self.connection orelse @panic("handleBetterPath but no connection");
+        connection.betterPath(self.events());
     }
 
     fn handleConnectionEstablished(
@@ -936,7 +938,7 @@ const ConnectionDaemon = struct {
     ) StartError!void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
-        const connection = self.connection orelse return;
+        const connection = self.connection orelse @panic("handleConnectionEstablished but no connection");
 
         const tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
@@ -974,7 +976,6 @@ const ConnectionDaemon = struct {
         failure: net.Connection.Events.Failure,
     ) void {
         if (self.daemon.state != .started) return;
-        if (self.connection == null) return;
         // Failure callbacks leave the session owned by Connection. Finalize
         // it before the gate can start another attempt.
         self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
@@ -991,7 +992,8 @@ const ConnectionDaemon = struct {
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
         defer self.rebind_pending.store(false, .release);
-        if (self.daemon.state != .started or self.connection == null) return;
+        if (self.daemon.state != .started) return;
+        const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.
         switch (self.daemon.snapshot_publisher.environment.connection_status) {
@@ -1001,7 +1003,8 @@ const ConnectionDaemon = struct {
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();
-        if (try self.callConnection(.{ .rebind = remote }) == .failed) return error.UnableToStart;
+        // Entering rebind transfers a connection-owned link, even on failure.
+        if (!try connection.rebind(remote)) return error.UnableToStart;
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1375,67 +1378,9 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Connection dispatch
-
-    // Controls and looper callbacks share the actor thread. Connection events
-    // enqueue messages so lifecycle changes run after any active I/O callback.
-
-    const ConnectionCall = struct {
-        connection: Connection,
-        events: Connection.Events,
-        link_handoff_entered: bool = false,
-        operation: union(enum) {
-            start: RemoteDescriptor,
-            rebind: RemoteDescriptor,
-            shutdown: Connection.ShutdownReason,
-            stop: u32,
-            reachability: io.ReachabilityInfo,
-            better_path,
-        },
-
-        fn run(ctx: ?*anyopaque) !Connection.StartResult {
-            const request: *ConnectionCall = @ptrCast(@alignCast(ctx.?));
-            switch (request.operation) {
-                .start => |remote| {
-                    request.link_handoff_entered = true;
-                    return request.connection.startV2(remote);
-                },
-                .rebind => |remote| {
-                    request.link_handoff_entered = true;
-                    return if (try request.connection.rebind(remote)) .started else .failed;
-                },
-                .shutdown => |reason| request.connection.shutdown(reason),
-                .stop => |timeout| request.connection.stop(timeout, request.events),
-                .reachability => |info| request.connection.networkChange(info, request.events),
-                .better_path => request.connection.betterPath(request.events),
-            }
-            return .started;
-        }
-    };
-
-    fn callConnection(
-        self: *ConnectionDaemon,
-        operation: @FieldType(ConnectionCall, "operation"),
-    ) !Connection.StartResult {
-        var request = ConnectionCall{
-            .connection = self.connection.?,
-            .events = self.events(),
-            .operation = operation,
-        };
-        // A daemon-created link transfers only when startV2 or rebind is entered, even if it fails.
-        defer if (request.connection.daemon_io == .link and !request.link_handoff_entered) {
-            switch (operation) {
-                .start, .rebind => |remote| if (remote.link) |link| link.cleanup(),
-                else => {},
-            }
-        };
-        return ConnectionCall.run(&request);
-    }
-
-    //#endregion
 };
 
-// MARK: - Error mapping
+//#region Error mapping
 
 fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
     return switch (err) {
@@ -1510,3 +1455,5 @@ pub const testing = struct {
         return job.result;
     }
 };
+
+//#endregion
