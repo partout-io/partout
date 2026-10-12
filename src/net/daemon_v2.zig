@@ -9,7 +9,7 @@
 //! SettingsDaemon is synchronous; callers serialize its controls. ConnectionDaemon
 //! owns an actor that serializes connection work and updates to shared state.
 //! Connection callbacks enqueue actor messages from runtime and worker threads.
-//! Ordinary reconnects retain Connection; terminal looper recovery replaces it.
+//! Ordinary reconnects retain Connection; terminal looper failure ends the event loop.
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
 
 const std = @import("std");
@@ -1065,53 +1065,6 @@ const ConnectionDaemon = struct {
         self.daemon.requestCancellation(err_pair, false);
     }
 
-    fn handleLooperTermination(
-        self: *ConnectionDaemon,
-        failure: ?Looper.Failure,
-    ) void {
-        if (self.daemon.state != .started) return;
-
-        log.write(.fault, "ConnectionDaemon-owned looper terminated");
-
-        if (partoutCodeForLooperFailure(failure)) |code| {
-            self.daemon.handleLastError(.{ .code = code });
-        }
-
-        // onLooperTerminate() already finalized protocol state on the actor.
-        // Recovery replaces the stopped looper before accepting new I/O.
-        self.looper.cancelTimer(&self.resume_gate_timer);
-        self.schedule(.recoverConnection) catch |err| {
-            log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
-            self.daemon.controller.setReasserting(false);
-            self.daemon.requestCancellation(if (partoutCodeForLooperFailure(failure)) |code| .{ .code = code } else null, true);
-        };
-    }
-
-    fn recoverConnection(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) return;
-
-        log.write(.notice, "Replace connection after terminal looper");
-        _ = self.gate.setEnabled(false);
-        self.releaseConnection();
-        // Reset both the published status and gate before replacing the
-        // connection. Recovery starts immediately; only a failed attempt needs
-        // the delayed retry normally scheduled by the disconnected status.
-        self.daemon.controller.clearTunnelSettings(false);
-        self.trackConnectionStatus(.disconnected);
-        self.looper.cancelTimer(&self.resume_gate_timer);
-        if (self.daemon.state != .started) return;
-        self.createConnection() catch |err| {
-            log.writef(.fault, "Unable to replace connection: {s}", .{@errorName(err)});
-            const code = self.daemon.handleStartError(err);
-            self.daemon.requestCancellation(.{ .code = code }, true);
-            return;
-        };
-
-        if (self.daemon.state == .started) {
-            self.startConnection();
-        }
-    }
-
     fn clearConnectionTunnel(self: *ConnectionDaemon) void {
         if (self.connection != null) {
             self.detachLooperSides() catch {};
@@ -1126,11 +1079,10 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Actor thread - I/O and termination callbacks
+    //#region Actor thread - I/O callbacks
 
-    // The driver invokes looper callbacks on the actor thread. They may run
+    // The event loop invokes looper callbacks on the actor thread. They may run
     // protocol work directly; lifecycle events are queued until loopOnce returns.
-    // Termination finalizes protocol state before enqueueing recovery.
 
     fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
@@ -1204,8 +1156,6 @@ const ConnectionDaemon = struct {
             value: ?[]const u8,
         },
         onConnectionDataCount: api.DataCount,
-        onLooperTerminated: ?Looper.Failure,
-        recoverConnection,
     };
 
     fn run(self: *ConnectionDaemon) void {
@@ -1400,8 +1350,6 @@ const ConnectionDaemon = struct {
                 }
             },
             .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
-            .onLooperTerminated => |failure| self.handleLooperTermination(failure),
-            .recoverConnection => self.recoverConnection(),
         }
     }
 
