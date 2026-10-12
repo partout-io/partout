@@ -246,7 +246,7 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     connection_daemon.gate.setReachabilityBlock(reachabilityBlock(&monitor));
     _ = connection_daemon.gate.setEnabled(true);
     sut.options.reconnection_delay_ms = 10;
-    try daemon.testing.perform(connection_daemon, void, .evaluateConnection);
+    try daemon.testing.evaluateConnection(connection_daemon);
     try waitForGate(connection_daemon);
     try std.testing.expect(connection_daemon.gate.isReady());
     try std.testing.expectEqual(@as(usize, 0), probe.stop_count);
@@ -254,7 +254,7 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
 
     try daemon.testing.perform(connection_daemon, void, .{ .onReachability = .{ .reachable = false } });
     try daemon.testing.perform(connection_daemon, void, .onBetterPath);
-    try daemon.testing.perform(connection_daemon, void, .resumeGate); // Drain establishment and setup failure.
+    try daemon.testing.resumeGate(connection_daemon); // Drain establishment and setup failure.
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
     try std.testing.expectEqualStrings("1.1.1.1", controller.last_settings.?.dnsServer(0));
@@ -266,7 +266,7 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
         .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
     } });
-    try daemon.testing.perform(connection_daemon, void, .resumeGate); // Drain the queued stopped event.
+    try daemon.testing.resumeGate(connection_daemon); // Drain the queued stopped event.
     try std.testing.expectEqual(@as(usize, 2), probe.shutdown_count);
     try std.testing.expectEqual(@as(usize, 2), probe.stop_count);
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
@@ -625,19 +625,19 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     defer sut.stop();
     const actor = sut.implementation.connection;
     try daemon.testing.perform(actor, void, .onBetterPath);
-    try daemon.testing.perform(actor, void, .resumeGate);
+    try daemon.testing.resumeGate(actor);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
     try std.testing.expectEqual(factory.producer_thread.?, controller.delivery_thread.?);
     try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
 
     sut.stop();
-    try daemon.testing.perform(actor, void, .resumeGate);
+    try daemon.testing.resumeGate(actor);
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
     const sink = factory.events.?;
     sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", "stale");
-    try daemon.testing.perform(actor, void, .resumeGate);
+    try daemon.testing.resumeGate(actor);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
 }
@@ -1027,6 +1027,7 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
         cleaned: usize = 0,
         destroyed: usize = 0,
         stopped: usize = 0,
+        starts: usize = 0,
         termination_count: usize = 0,
         output: [64]u8 = undefined,
         output_len: usize = 0,
@@ -1052,6 +1053,9 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             std.debug.assert(self.daemon.implementation.connection.looper.isLinkAttached());
+            self.starts += 1;
+            // The retry timer must reattach LINK outside the looper callback.
+            if (self.starts == 1) return .failed;
             self.writer.writePackets(&.{"start"}, .link, null) catch return error.UnableToStart;
             if (self.created.load(.acquire) == 1) {
                 self.writer.scheduleTimer(&self.timer, 20, .{ .context = self, .callback = tick }) catch return error.UnableToStart;
@@ -1191,7 +1195,7 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
             .factory = .{ .ptr = &probe, .vtable = &factory_table },
             .monitor = monitor.interface(),
         },
-        .options = .{ .starts_immediately = true, .connection_options = .{ .connect_udp = true } },
+        .options = .{ .starts_immediately = true, .reconnection_delay_ms = 1, .connection_options = .{ .connect_udp = true } },
     });
     defer sut.destroy();
     probe.daemon = sut;
@@ -1210,11 +1214,12 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
     try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
     try std.testing.expectEqualStrings("starttimerin", probe.output[0..probe.output_len]);
     try std.testing.expectEqual(@as(usize, 3), probe.writes.load(.acquire));
-    try std.testing.expectEqual(@as(usize, 1), probe.cleaned);
+    try std.testing.expectEqual(@as(usize, 2), probe.starts);
+    try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
     try std.testing.expectEqual(@as(usize, 1), probe.destroyed);
-    try std.testing.expectEqual(@as(usize, 1), probe.stopped);
+    try std.testing.expectEqual(@as(usize, 2), probe.stopped);
     try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
-    try std.testing.expectError(error.Closed, daemon.testing.perform(owner, void, .resumeGate));
+    try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
     try std.testing.expect(sut.state == .stopped);
 }
 
@@ -1355,8 +1360,8 @@ test "v2 event loop completes pending performs and releases discarded payloads o
     }
     try std.testing.expect(sut.state == .stopped);
     try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
-    try std.testing.expectError(error.Closed, daemon.testing.perform(owner, void, .resumeGate));
-    try std.testing.expectError(error.Closed, daemon.testing.schedule(owner, .resumeGate));
+    try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
+    try std.testing.expectError(error.Closed, daemon.testing.schedule(owner, .onBetterPath));
 }
 
 test "v2 terminal protocol failure pauses retries and honors cancellation policy" {
@@ -1395,7 +1400,7 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
         try std.testing.expectEqualStrings("openVPN.tlsFailure", recorder.last_error_raw[0..recorder.last_error_len]);
         if (cancels) try std.testing.expectEqualStrings("openVPN.tlsFailure", controller.last_cancel_raw[0..controller.last_cancel_len]);
         const snapshots = controller.report_snapshot_count;
-        try daemon.testing.perform(owner, void, .resumeGate);
+        try daemon.testing.resumeGate(owner);
         try std.testing.expectEqual(snapshots, controller.report_snapshot_count);
         sut.hold();
         try std.testing.expect(sut.state == .stopped);

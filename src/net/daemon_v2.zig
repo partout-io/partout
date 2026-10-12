@@ -860,9 +860,10 @@ const ConnectionDaemon = struct {
             .context = self,
             .callback = onResumeGate,
         }) catch |err| {
-            log.writef(.err, "Unable to schedule resume connection gate, enqueue resume: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to schedule resume connection gate, defer resume: {s}", .{@errorName(err)});
             // Finish the current evaluation and drain queued connection events
             // before the gate can start another attempt.
+            self.looper.cancelTimer(&self.resume_gate_timer);
             self.schedule(.resumeGate) catch |schedule_err| {
                 log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
                 self.daemon.requestCancellation(null, true);
@@ -886,9 +887,7 @@ const ConnectionDaemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.perform(void, .evaluateConnection) catch |err| {
-            log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
-        };
+        self.doEvaluateConnection();
     }
 
     fn isReachable(ctx: ?*const anyopaque) bool {
@@ -1142,7 +1141,6 @@ const ConnectionDaemon = struct {
         start,
         hold,
         stop,
-        evaluateConnection,
         resumeGate,
         onReachability: io.ReachabilityInfo,
         onBetterPath,
@@ -1334,7 +1332,6 @@ const ConnectionDaemon = struct {
             .start => try self.doStart(),
             .hold => self.doHold(),
             .stop => self.doStop(.clear_environment),
-            .evaluateConnection => self.doEvaluateConnection(),
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
@@ -1427,6 +1424,18 @@ pub const testing = struct {
 
     pub fn shutdown(owner: anytype) void {
         owner.shutdown();
+    }
+
+    pub fn evaluateConnection(owner: anytype) Error!void {
+        return onLoop(owner, {}, struct {
+            fn run(loop: *ConnectionDaemon, _: void) Error!void {
+                loop.doEvaluateConnection();
+            }
+        }.run);
+    }
+
+    pub fn resumeGate(owner: anytype) Error!void {
+        return owner.perform(void, .resumeGate);
     }
 
     /// Runs test setup and observations on the same thread as daemon state.
