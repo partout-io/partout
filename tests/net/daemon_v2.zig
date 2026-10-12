@@ -41,9 +41,17 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
             return .{ .ptr = ptr.?, .vtable = &vtable, .daemon_io = .none };
         }
 
+        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+            const connection: *FailingStartConnection = @ptrCast(@alignCast(raw));
+            const owner = connection.terminal_daemon.?.implementation.connection;
+            std.debug.assert(owner.actor.isOnQueue());
+            owner.looper.stop() catch unreachable;
+        }
+
         const vtable = blk: {
             var value = FailingStartConnection.vtable;
             value.endpoints = endpoints;
+            value.better_path = terminate;
             break :blk value;
         };
         const implementation_vtable = net.ConnectionImplementation.VTable{
@@ -77,6 +85,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         });
         defer sut.destroy();
         const connection_daemon = sut.implementation.connection;
+        connection.terminal_daemon = sut;
         try sut.start();
         defer sut.stop();
         try std.testing.expect(@TypeOf(connection_daemon.looper.*) == Looper);
@@ -96,7 +105,7 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         tun.destroy();
         try std.testing.expect(controller.last_settings != null);
         const cleared_before = controller.clear_tunnel_settings_count;
-        try connection_daemon.looper.stop();
+        try connection_daemon.actor.perform(void, .onBetterPath);
         // Drain the termination notification and its queued recovery barrier.
         try std.testing.expectError(error.AlreadyStarted, sut.start());
         try std.testing.expectError(error.AlreadyStarted, sut.start());
@@ -135,9 +144,9 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
 test "v2 daemon dispatches controls to actor and owns queued establishment metadata" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
-        looper: *Looper,
-        daemon: *Daemon,
-        profile: *const api.Profile,
+        looper: *Looper = undefined,
+        daemon: *Daemon = undefined,
+        profile: *const api.Profile = undefined,
         reachability_count: usize = 0,
         stop_count: usize = 0,
         shutdown_count: usize = 0,
@@ -193,8 +202,24 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
             std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
             self.destroyed = true;
         }
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.looper = @ptrCast(@alignCast(sb.writer.?.ptr));
+            self.profile = sb.profile;
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
+        }
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const list = struct {
+                const value = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
+            };
+            return &list.value;
+        }
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
         const vtable = net.Connection.VTable{
+            .endpoints = endpoints,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -206,7 +231,8 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
     defer profile.deinit(allocator);
-    var registry = try net.ConnectionRegistry.init(allocator, &.{});
+    var probe = Probe{};
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
     defer registry.deinit(allocator);
     var controller = mock_mod.MockTunnelController{ .set_tunnel_settings_error = error.TunNotAvailable };
     var controller_vtable = controller.interface().vtable.*;
@@ -214,7 +240,7 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     controller_vtable.clear_tunnel_settings = struct {
         fn call(_: ?*anyopaque, _: bool) void {}
     }.call;
-    var monitor = mock_mod.MockNetworkMonitor{};
+    var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
     const sut = try Daemon.create(allocator, &profile, .{
         .objects = .{
             .registry = &registry,
@@ -227,22 +253,13 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    var probe = Probe{ .looper = undefined, .daemon = sut, .profile = &sut.profile };
-    const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-    // Publish a runtime before any actor work, without opening sockets.
-    {
-        const options: Looper.Options = .{ .wake_fd = io.io_c.pp_mux_wake_descriptor(connection_daemon.mux), .on_finish = .{ .callback = Probe.finish } };
-        const looper = try allocator.create(Looper);
-        errdefer allocator.destroy(looper);
-        looper.* = try Looper.init(allocator, options);
-        errdefer looper.deinit();
-        probe.looper = looper;
-        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable, .daemon_io = .link };
-        connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
-        connection_daemon.looper = looper;
-        sut.state = .started;
-    }
+    probe.daemon = sut;
+    // Publish the runtime on its actor through the normal startup path.
+    try sut.start();
     defer sut.stop();
+    // Test delayed gate readiness independently of automatic connection starts.
+    connection_daemon.gate.setReadyHandler(null);
+    monitor.reachable = true;
     sut.snapshot_publisher.setConnectionStatus(.connecting);
 
     // The factory rejects the link. The delayed callback must reenable the
@@ -471,6 +488,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
 }
 
 const FailingStartConnection = struct {
+    terminal_daemon: ?*Daemon = null,
     start_count: usize = 0,
 
     fn implementation(self: *FailingStartConnection) net.ConnectionImplementation {
@@ -799,7 +817,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, err: ?net.ConnectionStartError = null }{
         .{ .mode = .none },
         .{ .mode = .link },
-        // .looper is covered by the explicitly pending test below.
+        .{ .mode = .looper },
         .{ .mode = .none, .sync_establish = false },
         .{ .mode = .link, .sync_establish = false },
         .{ .mode = .none, .sync_establish = false, .err = error.UnableToStart },
@@ -1015,8 +1033,205 @@ test "v2 daemon-created link is released on failed start or rebind" {
     }
 }
 
-// FIXME: ###, Reenable when ConnectionDaemon drives loopOnce() on its actor.
-// The current .looper path calls the intentionally unsupported worker APIs.
-test "v2 daemon drives caller-owned looper I/O" {
-    return error.SkipZigTest;
+test "v2 daemon driver runs I/O timers recovery and shutdown on its actor" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Atomic = std.atomic.Value(usize);
+    const Probe = struct {
+        daemon: *Daemon = undefined,
+        writer: net.ConnectionWriter = undefined,
+        fd: io.FileDescriptor,
+        timer: io.Timer = .{},
+        created: Atomic = .init(0),
+        ticks: Atomic = .init(0),
+        reads: Atomic = .init(0),
+        writes: Atomic = .init(0),
+        cleaned: usize = 0,
+        destroyed: usize = 0,
+        stopped: usize = 0,
+        termination_count: usize = 0,
+        output: [64]u8 = undefined,
+        output_len: usize = 0,
+
+        fn onActor(self: *@This()) void {
+            std.debug.assert(self.daemon.implementation.connection.actor.isOnQueue());
+        }
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            self.writer = sb.writer.?;
+            self.timer = .{};
+            _ = self.created.fetchAdd(1, .release);
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .looper };
+        }
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const list = struct {
+                const value = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
+            };
+            return &list.value;
+        }
+        fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(self.daemon.implementation.connection.looper.isLinkAttached());
+            self.writer.writePackets(&.{"start"}, .link, null) catch return error.UnableToStart;
+            if (self.created.load(.acquire) == 1) {
+                self.writer.scheduleTimer(&self.timer, 20, .{ .context = self, .callback = tick }) catch return error.UnableToStart;
+            }
+            return .started;
+        }
+        fn tick(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            self.writer.writePackets(&.{"timer"}, .link, null) catch unreachable;
+            _ = self.ticks.fetchAdd(1, .release);
+        }
+        fn submit(raw: *anyopaque, side: io.Side, packets: io.Packets, sources: ?[]const io.SocketAddress) io.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(side == .link and sources == null);
+            self.writer.writePackets(packets, .link, null) catch unreachable;
+            _ = self.reads.fetchAdd(packets.len, .release);
+            return .keep;
+        }
+        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.daemon.implementation.connection.looper.stop() catch unreachable;
+        }
+        fn terminated(raw: *anyopaque, failure: ?io.Failure) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(failure == null);
+            self.writer.cancelTimer(&self.timer);
+            self.termination_count += 1;
+        }
+        fn shutdown(raw: *anyopaque, _: net.Connection.ShutdownReason) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.writer.cancelTimer(&self.timer);
+            self.writer.writeOutOfBand(&.{"exit"}, .link, null) catch unreachable;
+        }
+        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(!self.daemon.implementation.connection.looper.isLinkAttached());
+            self.stopped += 1;
+        }
+        fn destroy(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.destroyed += 1;
+        }
+        fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            const count = std.c.read(self.fd, data.ptr, data.len);
+            if (count < 0) return error.WouldBlock;
+            return @intCast(count);
+        }
+        fn write(raw: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            const remaining = data[offset..];
+            @memcpy(self.output[self.output_len..][0..remaining.len], remaining);
+            self.output_len += remaining.len;
+            _ = self.writes.fetchAdd(1, .release);
+            return remaining.len;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.cleaned += 1;
+        }
+        fn code(_: *anyopaque) c_int {
+            return 0;
+        }
+        fn wait(value: *const Atomic, expected: usize) !void {
+            const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+            while (value.load(.acquire) < expected) {
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+        }
+        const io_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = code,
+        };
+        const vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.endpoints = endpoints;
+            table.start_v2 = start;
+            table.submit_packets = submit;
+            table.better_path = terminate;
+            table.looper_terminated = terminated;
+            table.shutdown = shutdown;
+            table.stop = stop;
+            table.destroy = destroy;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    var fds: [2]std.c.fd_t = undefined;
+    try std.testing.expectEqual(0, std.c.pipe(&fds));
+    defer _ = std.c.close(fds[0]);
+    defer _ = std.c.close(fds[1]);
+    const flags = std.c.fcntl(fds[0], std.c.F.GETFL, @as(c_int, 0));
+    try std.testing.expect(flags >= 0);
+    try std.testing.expect(std.c.fcntl(fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
+    const allocator = std.testing.allocator;
+    var probe = Probe{ .fd = fds[0] };
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller = mock_mod.MockTunnelController{};
+    var monitor = mock_mod.MockNetworkMonitor{};
+    var factory_table = mock_mod.noopSocketFactory().vtable.*;
+    factory_table.create = Probe.socket;
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = .{ .ptr = &probe, .vtable = &factory_table },
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .starts_immediately = true, .connection_options = .{ .connect_udp = true } },
+    });
+    defer sut.destroy();
+    probe.daemon = sut;
+    try sut.start();
+    defer sut.stop();
+    // The actor drives these writes and timer while its mailbox is idle.
+    try Probe.wait(&probe.writes, 2);
+    try std.testing.expectEqual(@as(usize, 1), probe.ticks.load(.acquire));
+    try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "in", 2));
+    try Probe.wait(&probe.writes, 3);
+    try std.testing.expectEqual(@as(usize, 1), probe.reads.load(.acquire));
+    // Terminal recovery must replace the looper and resume I/O on the same actor.
+    try sut.implementation.connection.actor.perform(void, .onBetterPath);
+    try Probe.wait(&probe.writes, 4);
+    try std.testing.expectEqual(@as(usize, 2), probe.created.load(.acquire));
+    sut.hold();
+    try std.testing.expectEqualStrings("starttimerinstartexit", probe.output[0..probe.output_len]);
+    try std.testing.expectEqual(@as(usize, 5), probe.writes.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
+    try std.testing.expectEqual(@as(usize, 2), probe.destroyed);
+    try std.testing.expectEqual(@as(usize, 1), probe.stopped);
+    // No connection remains: mailbox wakeups must still release the mux wait.
+    try sut.implementation.connection.actor.perform(void, .resumeGate);
 }

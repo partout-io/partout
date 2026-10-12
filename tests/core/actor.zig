@@ -282,7 +282,7 @@ fn waitForFlag(flag: *const AtomicBool) !void {
 // Watch an external wake descriptor, as the caller-driven looper does. Polling
 // this mux leaves the actor's wake latched until resetWake() clears it.
 const DrivenState = struct {
-    const Actor = source.core.actor.Actor(@This(), Driver, Message, CounterError, handle, finish);
+    const Actor = source.core.actor.Actor(@This(), Driver, Message, CounterError, handle);
     const Message = union(enum) { add: usize, echo: usize, read, nested, fail, block };
 
     wake_mux: mux_c.pp_mux,
@@ -328,11 +328,15 @@ const DrivenState = struct {
 
     const Driver = struct {
         state: *DrivenState,
-        completion: source.core.actor.DefaultDriver,
+        completion: source.core.actor.DefaultDriver(DrivenState, null),
 
         pub fn init(mutex: *source.core.Mutex, state: *DrivenState) Driver {
             mux_c.pp_mux_set_on_readable(state.poll_mux, onReadable, state);
             return .{ .state = state, .completion = .init(mutex, state) };
+        }
+
+        pub fn finish(_: *Driver, context: *DrivenState) void {
+            context.finish();
         }
 
         pub fn deinit(self: *Driver) void {

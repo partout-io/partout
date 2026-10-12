@@ -360,10 +360,9 @@ const ConnectionDaemon = struct {
         errdefer allocator.destroy(self);
         const mux = io.io_c.pp_mux_create(1) orelse return error.LooperFailure;
         errdefer io.io_c.pp_mux_free(mux);
-        const actor = Actor.create(allocator, self) catch return error.OutOfMemory;
         self.* = .{
             .daemon = daemon,
-            .actor = actor,
+            .actor = undefined,
             .mux = mux,
             .module = module,
             .registry = objects.registry,
@@ -379,6 +378,10 @@ const ConnectionDaemon = struct {
             .is_evaluating_connection = false,
             .is_deinitializing = false,
         };
+        errdefer self.gate.deinit();
+        errdefer self.resume_gate_timer.deinit();
+        // The driver can enter its idle wait immediately after thread creation.
+        self.actor = Actor.create(allocator, self) catch return error.OutOfMemory;
         return self;
     }
 
@@ -457,8 +460,7 @@ const ConnectionDaemon = struct {
     }
 
     fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
-        const looper: *Looper = @ptrCast(@alignCast(raw));
-        return looper.writeOutOfBand(packets, side, destination);
+        return writePackets(raw, packets, side, destination);
     }
 
     fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
@@ -597,8 +599,7 @@ const ConnectionDaemon = struct {
     //#region Actor thread - connection lifecycle and state
 
     // The actor serializes these methods and their updates to the shared Daemon.
-    // Gate callbacks also run inline here. In looper mode, protocol operations
-    // cross to the looper through callConnection; only the actor waits.
+    // Gate callbacks and protocol controls run inline on the same actor thread.
 
     fn doStart(self: *ConnectionDaemon) Error!void {
         if (self.daemon.state != .initial) return error.AlreadyStarted;
@@ -703,16 +704,12 @@ const ConnectionDaemon = struct {
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
         errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.looper = looper;
-        if (connection.daemon_io == .looper) looper.start() catch |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            else => error.LooperFailure,
-        };
     }
 
     fn releaseConnection(self: *ConnectionDaemon) void {
         const connection = self.connection orelse return;
-        // Join the looper before freeing Connection, and retain the looper
-        // object until Connection has released the sessions borrowing it.
+        // Stop I/O on the actor, retaining the looper until Connection has
+        // released the sessions that use its writer and timers.
         self.looper.stop() catch |err| {
             log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)});
         };
@@ -724,14 +721,16 @@ const ConnectionDaemon = struct {
         self.connection = null;
     }
 
-    // Runs as one actor operation; shutdown quiesces protocol activity
-    // while the looper remains free to process the detach commands.
+    // Runs as one actor operation; shutdown quiesces protocol activity before
+    // detaching I/O and releasing protocol state.
     fn stopConnection(
         self: *ConnectionDaemon,
         timeout_ms: u32,
         reason: Connection.ShutdownReason,
     ) !void {
         _ = try self.callConnection(.{ .shutdown = reason });
+        // Give queued shutdown notifications one nonblocking write attempt.
+        if (self.connection.?.daemon_io == .looper) _ = self.looper.loopOnce(0);
         try self.detachLooperSides();
         _ = try self.callConnection(.{ .stop = timeout_ms });
     }
@@ -779,8 +778,7 @@ const ConnectionDaemon = struct {
             self.scheduleResumeGate();
             return;
         };
-        // Start on the actor or looper according to daemon_io.
-        // Detach any looper-owned link on failure.
+        // Start on the actor, detaching any looper-owned link on failure.
         self.trackConnectionStatus(.connecting);
         const result = self.callConnection(.{ .start = remote }) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
@@ -1079,8 +1077,8 @@ const ConnectionDaemon = struct {
             self.daemon.handleLastError(.{ .code = code });
         }
 
-        // onLooperTerminate() already finalized Connection on its looper.
-        // No further Connection operations can be dispatched to that queue.
+        // onLooperTerminate() already finalized protocol state on the actor.
+        // Recovery replaces the stopped looper before accepting new I/O.
         self.resume_gate_timer.cancel();
         self.actor.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
@@ -1128,11 +1126,11 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Looper thread - I/O and termination callbacks
+    //#region Actor thread - I/O and termination callbacks
 
-    // The looper invokes these callbacks against the current Connection. They may
-    // run protocol work directly, but must never wait for the actor. Termination
-    // finalizes protocol state here, then enqueues actor-owned recovery.
+    // The driver invokes looper callbacks on the actor thread. They may run
+    // protocol work directly; lifecycle events are queued until loopOnce returns.
+    // Termination finalizes protocol state before enqueueing recovery.
 
     fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
@@ -1175,7 +1173,7 @@ const ConnectionDaemon = struct {
 
     const Actor = core.actor.Actor(
         ConnectionDaemon,
-        ActorDriver,
+        LooperDriver,
         Message,
         Error,
         perform,
@@ -1257,9 +1255,8 @@ const ConnectionDaemon = struct {
 
     //#region Connection dispatch
 
-    // The actor executes connection control directly unless the looper owns I/O.
-    // Looper mode dispatches a stack-backed request and waits for completion;
-    // connection callbacks enqueue actor messages without waiting for the actor.
+    // Controls and looper callbacks share the actor thread. Connection events
+    // enqueue messages so lifecycle changes run after any active I/O callback.
 
     const ConnectionCall = struct {
         connection: Connection,
@@ -1294,7 +1291,6 @@ const ConnectionDaemon = struct {
         }
     };
 
-    // Only the actor waits. Connection callbacks enqueue actor messages.
     fn callConnection(
         self: *ConnectionDaemon,
         operation: @FieldType(ConnectionCall, "operation"),
@@ -1311,12 +1307,66 @@ const ConnectionDaemon = struct {
                 else => {},
             }
         };
-        if (request.connection.daemon_io != .looper) return ConnectionCall.run(&request);
-        return self.looper.perform(Connection.StartResult, &request, ConnectionCall.run);
+        return ConnectionCall.run(&request);
     }
 
     //#endregion
-    const ActorDriver = core.actor.DefaultDriver(ConnectionDaemon, actorDidFinish);
+
+    /// Combines actor completion waits with the caller-driven connection looper.
+    const LooperDriver = struct {
+        mux: io.io_c.pp_mux,
+        driver: core.actor.DefaultDriver(ConnectionDaemon, null),
+
+        pub fn init(mutex: *core.Mutex, context: *ConnectionDaemon) LooperDriver {
+            return .{
+                .mux = context.mux,
+                .driver = .init(mutex, context),
+            };
+        }
+
+        pub fn finish(_: *LooperDriver, context: *ConnectionDaemon) void {
+            context.actorDidFinish();
+        }
+
+        pub fn deinit(self: *LooperDriver) void {
+            self.driver.deinit();
+        }
+
+        pub fn wait(self: *LooperDriver) void {
+            self.driver.wait();
+        }
+
+        pub fn notify(self: *LooperDriver) void {
+            self.driver.notify();
+        }
+
+        pub fn wake(self: *LooperDriver) void {
+            // The condition wake also allows shutdown if the mux wait fails.
+            self.driver.wake();
+            if (!io.io_c.pp_mux_wake(self.mux)) log.write(.fault, "Unable to wake daemon actor");
+        }
+
+        pub fn resetWake(self: *LooperDriver) void {
+            self.driver.resetWake();
+            if (!io.io_c.pp_mux_reset_wake(self.mux)) log.write(.fault, "Unable to reset daemon actor wake");
+        }
+
+        pub fn loopOnce(self: *LooperDriver, context: *ConnectionDaemon, max_wait_ms: ?u32) void {
+            // Run looper I/O only in .looper mode.
+            if (context.connection) |connection| {
+                if (connection.daemon_io == .looper and context.looper.loopOnce(max_wait_ms)) return;
+            }
+            // No active looper I/O, including after terminal failure: wait for
+            // mailbox work without spinning on a stopped looper.
+            const timeout: c_int = if (max_wait_ms) |ms| @intCast(@min(ms, std.math.maxInt(c_int))) else -1;
+            var code: c_int = 0;
+            if (io.io_c.pp_mux_wait(self.mux, timeout, &code) < 0) {
+                log.writef(.fault, "Daemon actor mux wait failed: {}", .{code});
+                context.daemon.requestCancellation(.{ .code = .ioFailure }, true);
+                self.driver.loopOnce(context, max_wait_ms);
+            }
+        }
+    };
 };
 
 // MARK: - Error mapping
