@@ -415,6 +415,7 @@ const ConnectionDaemon = struct {
         // Signal thread stop and wait for it to finish.
         self.shutdown();
         self.actor.join();
+        self.looper.destroy();
 
         // Daemon checked the shared lifecycle precondition. Drain callbacks
         // before releasing this implementation and its borrowed Daemon.
@@ -457,10 +458,6 @@ const ConnectionDaemon = struct {
     //#region Event loop
 
     fn run(self: *ConnectionDaemon) void {
-        defer {
-            // Do not destroy the looper in self.destroy() twice.
-            self.looper.destroy();
-        }
         var running = true;
         while (running) {
             // Fetch pending jobs if any.
