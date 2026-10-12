@@ -246,6 +246,41 @@ test "v2 copies write payloads and descriptors across partial writes and backpre
     try loop.stop();
 }
 
+test "v2 shutdown flush attempts writes without dispatching callbacks or waiting" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Mode = enum { writable, blocked, failed };
+    for ([_]Mode{ .writable, .blocked, .failed }) |mode| {
+        const fds = try pipe();
+        defer closePipe(fds);
+        const wake = try test_helpers.Mux.init();
+        defer wake.deinit();
+        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        defer loop.deinit();
+        var mock = Mock{ .fd = fds[0], .block_writes = mode == .blocked, .fail_after = if (mode == .failed) 0 else null };
+        var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
+        try loop.attach(probe.attach(mock.pair()));
+        try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "x", 1));
+        var timer: io.Timer = .{};
+        var fired = false;
+        try loop.scheduleTimer(&timer, 0, .{ .context = &fired, .callback = struct {
+            fn call(raw: ?*anyopaque) void {
+                const value: *bool = @ptrCast(@alignCast(raw.?));
+                value.* = true;
+            }
+        }.call });
+        try loop.write(&.{"exit"}, .tun, null);
+        const failure = try loop.flushWrites(.tun);
+        try std.testing.expectEqual(mode == .failed, failure != null);
+        try std.testing.expectEqual(@as(usize, if (mode == .writable) 1 else 0), mock.writes);
+        if (mode == .writable) try std.testing.expectEqualStrings("exit", mock.output[0..mock.output_len]);
+        try std.testing.expect(!fired);
+        try std.testing.expectEqual(@as(usize, 0), mock.reads);
+        try std.testing.expectEqual(@as(usize, 0), probe.failures);
+        try loop.detach(.tun);
+        try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
+    }
+}
+
 test "v2 detach stop and destroy free pending write copies" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Action = enum { detach, stop, deinit };

@@ -75,6 +75,11 @@ pub const Looper = struct {
         return self.impl.loopOnce(null, failure);
     }
 
+    /// Attempts queued writes once without running protocol callbacks or waiting.
+    pub fn flushWrites(self: *Looper, side: io.Side) DetachError!?Failure {
+        return self.impl.flushWrites(side);
+    }
+
     /// Synchronously cancels pending work. Must run outside callbacks.
     pub fn stop(self: *Looper) helpers.StopError!void {
         return self.impl.stop();

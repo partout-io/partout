@@ -77,6 +77,10 @@ pub const WindowsLooper = struct {
         @panic("WindowsLooper.write is not implemented");
     }
 
+    pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?helpers.Failure {
+        @panic("WindowsLooper.flushWrites is not implemented");
+    }
+
     pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
         _ = self;
         _ = side;

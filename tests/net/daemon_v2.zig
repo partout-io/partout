@@ -1043,7 +1043,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
     }
 }
 
-test "v2 event loop runs I/O timers and finalizes terminal failure on its thread" {
+test "v2 event loop flushes graceful shutdown and finalizes terminal failure on its thread" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Atomic = std.atomic.Value(usize);
     const Probe = struct {
@@ -1201,57 +1201,64 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
             .create_connection = create,
         };
     };
-    var fds: [2]std.c.fd_t = undefined;
-    try std.testing.expectEqual(0, std.c.pipe(&fds));
-    defer _ = std.c.close(fds[0]);
-    defer _ = std.c.close(fds[1]);
-    const flags = std.c.fcntl(fds[0], std.c.F.GETFL, @as(c_int, 0));
-    try std.testing.expect(flags >= 0);
-    try std.testing.expect(std.c.fcntl(fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
-    const allocator = std.testing.allocator;
-    var probe = Probe{ .fd = fds[0] };
-    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
-    defer registry.deinit(allocator);
-    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
-    defer profile.deinit(allocator);
-    var controller = mock_mod.MockTunnelController{};
-    var monitor = mock_mod.MockNetworkMonitor{};
-    var factory_table = mock_mod.noopSocketFactory().vtable.*;
-    factory_table.create = Probe.socket;
-    const sut = try Daemon.create(allocator, &profile, .{
-        .objects = .{
-            .registry = &registry,
-            .controller = controller.interface(),
-            .resolver = mock_mod.noopDNSResolver(),
-            .factory = .{ .ptr = &probe, .vtable = &factory_table },
-            .monitor = monitor.interface(),
-        },
-        .options = .{ .starts_immediately = true, .reconnection_delay_ms = 1, .connection_options = .{ .connect_udp = true } },
-    });
-    defer sut.destroy();
-    probe.daemon = sut;
-    try sut.start();
-    defer sut.stop();
-    // The actor drives these writes and timer while its mailbox is idle.
-    try Probe.wait(&probe.writes, 2);
-    try std.testing.expectEqual(@as(usize, 1), probe.ticks.load(.acquire));
-    try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "in", 2));
-    try Probe.wait(&probe.writes, 3);
-    try std.testing.expectEqual(@as(usize, 1), probe.reads.load(.acquire));
-    // Terminal failure ends the loop, finalizes the connection, and cancels the host.
-    const owner = sut.implementation.connection;
-    try daemon.testing.perform(owner, .onBetterPath);
-    try waitForExit(owner);
-    try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
-    try std.testing.expectEqualStrings("starttimerin", probe.output[0..probe.output_len]);
-    try std.testing.expectEqual(@as(usize, 3), probe.writes.load(.acquire));
-    try std.testing.expectEqual(@as(usize, 2), probe.starts);
-    try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
-    try std.testing.expectEqual(@as(usize, 1), probe.destroyed);
-    try std.testing.expectEqual(@as(usize, 2), probe.stopped);
-    try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
-    try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
-    try std.testing.expect(sut.state == .stopped);
+    for ([_]bool{ true, false }) |terminal| {
+        var fds: [2]std.c.fd_t = undefined;
+        try std.testing.expectEqual(0, std.c.pipe(&fds));
+        defer _ = std.c.close(fds[0]);
+        defer _ = std.c.close(fds[1]);
+        const flags = std.c.fcntl(fds[0], std.c.F.GETFL, @as(c_int, 0));
+        try std.testing.expect(flags >= 0);
+        try std.testing.expect(std.c.fcntl(fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
+        const allocator = std.testing.allocator;
+        var probe = Probe{ .fd = fds[0] };
+        var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+        defer registry.deinit(allocator);
+        var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        var factory_table = mock_mod.noopSocketFactory().vtable.*;
+        factory_table.create = Probe.socket;
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = .{ .ptr = &probe, .vtable = &factory_table },
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = true, .reconnection_delay_ms = 1, .connection_options = .{ .connect_udp = true } },
+        });
+        defer sut.destroy();
+        probe.daemon = sut;
+        try sut.start();
+        defer sut.stop();
+        // The actor drives these writes and timer while its mailbox is idle.
+        try Probe.wait(&probe.writes, 2);
+        try std.testing.expectEqual(@as(usize, 1), probe.ticks.load(.acquire));
+        try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "in", 2));
+        try Probe.wait(&probe.writes, 3);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads.load(.acquire));
+        const owner = sut.implementation.connection;
+        if (terminal) {
+            // Terminal failure finalizes without a usable link and cancels the host.
+            try daemon.testing.perform(owner, .onBetterPath);
+            try waitForExit(owner);
+        } else {
+            // Explicit stop must transmit shutdown writes before detaching LINK.
+            sut.stop();
+        }
+        try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
+        try std.testing.expectEqualStrings(if (terminal) "starttimerin" else "starttimerinexit", probe.output[0..probe.output_len]);
+        try std.testing.expectEqual(@as(usize, if (terminal) 3 else 4), probe.writes.load(.acquire));
+        try std.testing.expectEqual(@as(usize, 2), probe.starts);
+        try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
+        try std.testing.expectEqual(@as(usize, 1), probe.destroyed);
+        try std.testing.expectEqual(@as(usize, 2), probe.stopped);
+        try std.testing.expectEqual(@as(usize, if (terminal) 1 else 0), controller.cancel_count);
+        if (terminal) try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
+        try std.testing.expect(sut.state == .stopped);
+    }
 }
 
 fn cancelGateTimer(owner: anytype) !void {

@@ -679,6 +679,15 @@ const ConnectionDaemon = struct {
     ) !void {
         const connection = self.connection orelse @panic("stopConnection but no connection");
         connection.shutdown(reason);
+        if (reason == .explicit_stop and self.looper.isLinkAttached()) {
+            // Shutdown may queue an OpenVPN UDP exit notification. Attempt it
+            // before detaching, without restarting protocol callbacks or waiting.
+            const failure = self.looper.flushWrites(.link) catch |err| blk: {
+                log.writef(.err, "Unable to flush shutdown packets: {s}", .{@errorName(err)});
+                break :blk null;
+            };
+            if (failure) |value| log.writef(.err, "Shutdown write failed: .{}", .{value});
+        }
         try self.detachLooperSides();
         connection.stop(timeout_ms, self.events());
     }

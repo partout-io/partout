@@ -210,6 +210,17 @@ pub const PosixLooper = struct {
         if (side.write_retry == null) side.write_ready = true;
     }
 
+    /// Makes one nonblocking drain attempt without invoking read, timer or failure callbacks.
+    /// The caller may detach afterwards even if writes fail or remain blocked.
+    pub fn flushWrites(self: *PosixLooper, tag: io.Side) helpers.DetachError!?helpers.Failure {
+        if (self.busy) return error.ReentrantCall;
+        if (self.stopped) return error.LooperUnavailable;
+        self.busy = true;
+        defer self.busy = false;
+        const side = self.sides[@intFromEnum(tag)] orelse return null;
+        return self.processWrite(side);
+    }
+
     fn processWrite(self: *PosixLooper, side: *SideIO) ?helpers.Failure {
         defer side.write_ready = false;
         while (side.write_queue.pending()) |pending| {
