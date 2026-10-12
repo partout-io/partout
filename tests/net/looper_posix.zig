@@ -52,7 +52,7 @@ const Probe = struct {
     }
 };
 
-test "ST looper lifecycle and timers are caller driven" {
+test "looper lifecycle and timers are caller driven" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
@@ -139,7 +139,7 @@ const Mock = struct {
     }
 };
 
-test "ST looper inline reads writes retries and synchronous detach" {
+test "looper inline reads writes retries and synchronous detach" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
@@ -193,7 +193,7 @@ test "ST looper inline reads writes retries and synchronous detach" {
     try loop.stop();
 }
 
-test "ST timer callbacks can cancel and replace other ready tasks" {
+test "timer callbacks can cancel and replace other ready tasks" {
     const Tasks = struct {
         loop: *Looper,
         cancel: helpers.Timer = .{},
@@ -228,7 +228,7 @@ test "ST timer callbacks can cancel and replace other ready tasks" {
     loop.cancelTimer(&tasks.replace);
 }
 
-test "ST write backpressure preserves an explicitly paused opposite side" {
+test "write backpressure preserves an explicitly paused opposite side" {
     var probe = Probe{};
     const wake = try WakePipe.init();
     defer wake.deinit();
@@ -268,7 +268,7 @@ test "ST write backpressure preserves an explicitly paused opposite side" {
     try std.testing.expectEqual(1, tun.cleanups);
 }
 
-test "ST external wake interrupts an idle loop and remains caller owned" {
+test "external wake interrupts an idle loop and remains caller owned" {
     const Producer = struct {
         extern "c" fn usleep(c_uint) c_int;
         fn signal(wake: WakePipe) void {
@@ -306,7 +306,7 @@ test "ST external wake interrupts an idle loop and remains caller owned" {
     try wake.reset();
 }
 
-test "ST rejects invalid wake descriptors" {
+test "rejects invalid wake descriptors" {
     const options = helpers.Options{ .on_finish = .{ .callback = Probe.finish } };
     try std.testing.expectError(error.InvalidWakeDescriptor, Looper.create(allocator, options));
     try std.testing.expectError(error.InvalidWakeDescriptor, Looper.create(allocator, .{ .wake_fd = -1, .on_finish = options.on_finish }));
