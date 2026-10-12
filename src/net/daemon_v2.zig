@@ -1076,7 +1076,7 @@ const ConnectionDaemon = struct {
         // onLooperTerminate() already finalized protocol state on the actor.
         // Recovery replaces the stopped looper before accepting new I/O.
         self.resume_gate_timer.cancel();
-        self.actor.schedule(.recoverConnection) catch |err| {
+        self.schedule(.recoverConnection) catch |err| {
             log.writef(.fault, "Unable to schedule connection recovery: {s}", .{@errorName(err)});
             self.daemon.controller.setReasserting(false);
             self.daemon.requestCancellation(if (partoutCodeForLooperFailure(failure)) |code| .{ .code = code } else null, true);
