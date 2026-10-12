@@ -466,146 +466,6 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Event loop
-
-    fn run(self: *ConnectionDaemon) void {
-        var running = true;
-        while (running) {
-            // Fetch pending jobs if any.
-            self.jobs_mutex.lock();
-            running = self.is_running;
-            _ = io_c.pp_mux_reset_wake(self.mux);
-            const maybe_jobs = self.jobs.takeAll();
-            self.jobs_mutex.unlock();
-
-            // Drain fetched jobs.
-            var pending = maybe_jobs;
-            while (pending) |job| {
-                pending = job.next;
-
-                // Run jobs if thread is still running.
-                const is_owned = job.isOwned();
-                const result = if (running) self.executeJob(job.command) else error.Closed;
-                result catch |err| {
-                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
-                };
-
-                // Notify synchronous performs.
-                self.jobs_mutex.lock();
-                job.done = true;
-                job.result = result;
-                self.jobs_condition.broadcast();
-                running = self.is_running;
-                self.jobs_mutex.unlock();
-
-                if (is_owned) self.daemon.allocator.destroy(job);
-            }
-            if (!running) break;
-
-            // Wait for new jobs or I/O.
-            var maybe_failure: ?io.Failure = null;
-            const should_loop = self.looper.loopOnce(&maybe_failure);
-            if (maybe_failure) |failure| {
-                log.writef(.err, "Looper failed: .{}", .{failure});
-            }
-            // A hard looper failure may also stop the thread.
-            if (!should_loop) running = false;
-        }
-
-        // Signal finalization to close job submissions.
-        self.jobs_mutex.lock();
-        self.is_running = false;
-        var pending = self.jobs.takeAll();
-        self.jobs_mutex.unlock();
-
-        // Drain outstanding jobs.
-        while (pending) |job| {
-            pending = job.next;
-            self.jobs_mutex.lock();
-            const is_owned = job.isOwned();
-            job.result = error.Closed;
-            job.done = true;
-            self.jobs_condition.broadcast();
-            self.jobs_mutex.unlock();
-
-            if (is_owned) self.daemon.allocator.destroy(job);
-        }
-    }
-
-    fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
-        switch (command) {
-            .message => |message| return try self.dispatch(void, message),
-            .perform => |request| return request.callback(self, request.context),
-        }
-    }
-
-    fn schedule(self: *ConnectionDaemon, message: Message) !void {
-        self.jobs_mutex.lock();
-        defer self.jobs_mutex.unlock();
-        if (!self.is_running) return error.Closed;
-
-        var job = try self.daemon.allocator.create(Job);
-        job.command = .{ .message = message };
-        self.jobs.append(job);
-        _ = io_c.pp_mux_wake(self.mux);
-    }
-
-    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
-        const Request = struct {
-            message: Message,
-            result: Result = undefined,
-
-            fn call(context: *ConnectionDaemon, opaque_request: *anyopaque) Error!void {
-                const request: *@This() = @ptrCast(@alignCast(opaque_request));
-                request.result = try dispatch(context, Result, request.message);
-            }
-        };
-
-        self.jobs_mutex.lock();
-        defer self.jobs_mutex.unlock();
-        if (!self.is_running) return error.Closed;
-
-        var request = Request{ .message = message };
-        var job = Job{ .command = .{ .perform = .{
-            .context = &request,
-            .callback = Request.call,
-        } } };
-        self.jobs.append(&job);
-        _ = io_c.pp_mux_wake(self.mux);
-        while (!job.done) {
-            self.jobs_condition.wait(&self.jobs_mutex);
-        }
-        try job.result;
-        return request.result;
-    }
-
-    fn shutdown(self: *ConnectionDaemon) void {
-        self.jobs_mutex.lock();
-        defer self.jobs_mutex.unlock();
-        if (!self.is_running) return;
-        self.is_running = false;
-        _ = io_c.pp_mux_wake(self.mux);
-    }
-
-    fn dispatch(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
-        log.writef(.debug, "Dispatch message: {s}", .{@tagName(message)});
-        switch (message) {
-            .start => try self.doStart(),
-            .hold => self.doStop(.preserve_environment),
-            .stop => {
-                self.doStop(.clear_environment);
-                self.shutdown();
-            },
-            .onReachability => |info| self.handleReachability(info),
-            .onBetterPath => self.handleBetterPath(),
-            else => {
-                // FIXME: ###, Delete other cases
-            },
-        }
-    }
-
-    //#endregion
-
     //#region Any thread - asynchronous events
 
     // Network and protocol producers may hold locks needed by actor work. These
@@ -1343,7 +1203,126 @@ const ConnectionDaemon = struct {
         recoverConnection,
     };
 
-    fn perform2(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+    fn run(self: *ConnectionDaemon) void {
+        var running = true;
+        while (running) {
+            // Fetch pending jobs if any.
+            self.jobs_mutex.lock();
+            running = self.is_running;
+            _ = io_c.pp_mux_reset_wake(self.mux);
+            const maybe_jobs = self.jobs.takeAll();
+            self.jobs_mutex.unlock();
+
+            // Drain fetched jobs.
+            var pending = maybe_jobs;
+            while (pending) |job| {
+                pending = job.next;
+
+                // Run jobs if thread is still running.
+                const is_owned = job.isOwned();
+                const result = if (running) self.executeJob(job.command) else error.Closed;
+                result catch |err| {
+                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
+                };
+
+                // Notify synchronous performs.
+                self.jobs_mutex.lock();
+                job.done = true;
+                job.result = result;
+                self.jobs_condition.broadcast();
+                running = self.is_running;
+                self.jobs_mutex.unlock();
+
+                if (is_owned) self.daemon.allocator.destroy(job);
+            }
+            if (!running) break;
+
+            // Wait for new jobs or I/O.
+            var maybe_failure: ?io.Failure = null;
+            const should_loop = self.looper.loopOnce(&maybe_failure);
+            if (maybe_failure) |failure| {
+                log.writef(.err, "Looper failed: .{}", .{failure});
+            }
+            // A hard looper failure may also stop the thread.
+            if (!should_loop) running = false;
+        }
+
+        // Signal finalization to close job submissions.
+        self.jobs_mutex.lock();
+        self.is_running = false;
+        var pending = self.jobs.takeAll();
+        self.jobs_mutex.unlock();
+
+        // Drain outstanding jobs.
+        while (pending) |job| {
+            pending = job.next;
+            self.jobs_mutex.lock();
+            const is_owned = job.isOwned();
+            job.result = error.Closed;
+            job.done = true;
+            self.jobs_condition.broadcast();
+            self.jobs_mutex.unlock();
+
+            if (is_owned) self.daemon.allocator.destroy(job);
+        }
+    }
+
+    fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
+        switch (command) {
+            .message => |message| return try self.dispatch(void, message),
+            .perform => |request| return request.callback(self, request.context),
+        }
+    }
+
+    fn schedule(self: *ConnectionDaemon, message: Message) !void {
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return error.Closed;
+
+        var job = try self.daemon.allocator.create(Job);
+        job.command = .{ .message = message };
+        self.jobs.append(job);
+        _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+        const Request = struct {
+            message: Message,
+            result: Result = undefined,
+
+            fn call(context: *ConnectionDaemon, opaque_request: *anyopaque) Error!void {
+                const request: *@This() = @ptrCast(@alignCast(opaque_request));
+                request.result = try dispatch(context, Result, request.message);
+            }
+        };
+
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return error.Closed;
+
+        var request = Request{ .message = message };
+        var job = Job{ .command = .{ .perform = .{
+            .context = &request,
+            .callback = Request.call,
+        } } };
+        self.jobs.append(&job);
+        _ = io_c.pp_mux_wake(self.mux);
+        while (!job.done) {
+            self.jobs_condition.wait(&self.jobs_mutex);
+        }
+        try job.result;
+        return request.result;
+    }
+
+    fn shutdown(self: *ConnectionDaemon) void {
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return;
+        self.is_running = false;
+        _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    fn dispatch(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doHold(),
@@ -1452,62 +1431,6 @@ const ConnectionDaemon = struct {
     }
 
     //#endregion
-
-    /// Combines actor completion waits with the caller-driven connection looper.
-    const LooperDriver = struct {
-        mux: io_c.pp_mux,
-        driver: core.actor.DefaultDriver(ConnectionDaemon, null),
-
-        pub fn init(mutex: *core.Mutex, context: *ConnectionDaemon) LooperDriver {
-            return .{
-                .mux = context.mux,
-                .driver = .init(mutex, context),
-            };
-        }
-
-        pub fn finish(_: *LooperDriver, context: *ConnectionDaemon) void {
-            context.actorDidFinish();
-        }
-
-        pub fn deinit(self: *LooperDriver) void {
-            self.driver.deinit();
-        }
-
-        pub fn wait(self: *LooperDriver) void {
-            self.driver.wait();
-        }
-
-        pub fn notify(self: *LooperDriver) void {
-            self.driver.notify();
-        }
-
-        pub fn wake(self: *LooperDriver) void {
-            // The condition wake also allows shutdown if the mux wait fails.
-            self.driver.wake();
-            if (!io_c.pp_mux_wake(self.mux)) log.write(.fault, "Unable to wake daemon actor");
-        }
-
-        pub fn resetWake(self: *LooperDriver) void {
-            self.driver.resetWake();
-            if (!io_c.pp_mux_reset_wake(self.mux)) log.write(.fault, "Unable to reset daemon actor wake");
-        }
-
-        pub fn loopOnce(self: *LooperDriver, context: *ConnectionDaemon, max_wait_ms: ?u32) void {
-            // Run looper I/O only in .looper mode.
-            if (context.connection) |connection| {
-                if (connection.daemon_io == .looper and context.looper.loopOnce(max_wait_ms)) return;
-            }
-            // No active looper I/O, including after terminal failure: wait for
-            // mailbox work without spinning on a stopped looper.
-            const timeout: c_int = if (max_wait_ms) |ms| @intCast(@min(ms, std.math.maxInt(c_int))) else -1;
-            var code: c_int = 0;
-            if (io_c.pp_mux_wait(self.mux, timeout, &code) < 0) {
-                log.writef(.fault, "Daemon actor mux wait failed: {}", .{code});
-                context.daemon.requestCancellation(.{ .code = .ioFailure }, true);
-                self.driver.loopOnce(context, max_wait_ms);
-            }
-        }
-    };
 };
 
 // MARK: - Error mapping
