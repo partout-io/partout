@@ -325,20 +325,6 @@ const SettingsDaemon = struct {
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
-    const Job = struct {
-        command: Command,
-        done: bool = false,
-        result: Error!void = {},
-        next: ?*Job = null,
-    };
-    const Command = union(enum) {
-        message: Message,
-        perform: struct {
-            context: *anyopaque,
-            callback: *const fn (*ConnectionDaemon, *anyopaque) Error!void,
-        },
-    };
-
     // Shared lifecycle and reporting, plus connection-specific dependencies.
     daemon: *Daemon,
     module: conn_mod.ConnectionModule,
@@ -1136,6 +1122,21 @@ const ConnectionDaemon = struct {
 
     // Mailbox messages enter through perform on the event-loop thread.
     // Connection finalization also runs on that thread before it exits.
+
+    const Job = struct {
+        command: Command,
+        done: bool = false,
+        result: Error!void = {},
+        next: ?*Job = null,
+    };
+
+    const Command = union(enum) {
+        message: Message,
+        perform: struct {
+            context: *anyopaque,
+            callback: *const fn (*ConnectionDaemon, *anyopaque) Error!void,
+        },
+    };
 
     const Message = union(enum) {
         start,
