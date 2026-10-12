@@ -257,12 +257,12 @@ pub const Daemon = struct {
 
     // #region Actor interface
 
-    const Actor = core.actor.ActorWithFinish(
+    const Actor = core.actor.Actor(
         Daemon,
+        ActorDriver,
         Message,
         Error,
         perform,
-        actorDidFinish,
     );
 
     const Message = union(enum) {
@@ -939,6 +939,7 @@ pub const Daemon = struct {
     }
 
     // #endregion
+    const ActorDriver = core.actor.DefaultDriver(Daemon, actorDidFinish);
 };
 
 fn buildSettingsOnlyTunnelInfo(

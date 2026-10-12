@@ -7,6 +7,8 @@
 //! The actor owns a worker thread and a FIFO mailbox. `perform` enqueues
 //! stack-backed jobs and waits for completion; `schedule` enqueues heap-backed
 //! jobs and returns immediately.
+//! A custom driver can poll I/O between jobs and replace the worker's idle wait.
+//! Synchronous callers still use the condition variable for job completion.
 //!
 //! The handler has signature `fn (*Context, comptime Result: type, Message)
 //! Error!Result`. Each `perform` call chooses its result type; scheduled messages
@@ -19,21 +21,26 @@ const util = @import("util.zig");
 
 const Fifo = util.Fifo;
 
+/// Pass null for the driver type to use DefaultDriver. A custom driver is
+/// initialized with the shared mailbox mutex and Context pointer.
+/// It provides init(), deinit(), wait(), notify(), wake(), resetWake(),
+/// loopOnce(context, max_wait_ms), and finish(context). Custom-driver contexts and external resources
+/// must be ready before create() and remain valid through shutdown().
+///
+/// wait() releases/reacquires the shared mutex while waiting for completion;
+/// notify() wakes completion waiters. wake() and resetWake() run with that same
+/// mutex held, must not call actor APIs, and must preserve a wake until consumed
+/// or reset. loopOnce() runs on the worker outside the mutex: zero polls, null
+/// may block until I/O, a timer, or wake(). It may perform nested actor work and
+/// must handle its own I/O failures, returning on wake so shutdown can proceed.
+/// finish() runs on the worker outside the mutex before it exits, with nested
+/// actor work still available. deinit() releases driver resources after joining.
 pub fn Actor(
     comptime Context: type,
+    comptime OptionalDriver: ?type,
     comptime Message: type,
     comptime Error: type,
     comptime handler: anytype,
-) type {
-    return ActorWithFinish(Context, Message, Error, handler, null);
-}
-
-pub fn ActorWithFinish(
-    comptime Context: type,
-    comptime Message: type,
-    comptime Error: type,
-    comptime handler: anytype,
-    comptime on_finish: ?*const fn (*Context) void,
 ) type {
     return struct {
         const Self = @This();
@@ -63,10 +70,12 @@ pub fn ActorWithFinish(
         pub const ScheduleError = std.mem.Allocator.Error || error{Closed};
         pub const PerformError = Error || error{Closed};
 
+        pub const Driver = OptionalDriver orelse DefaultDriver(Context, null);
+
         allocator: std.mem.Allocator,
         context: *Context,
+        driver: Driver,
         mutex: concurrency.Mutex,
-        cond: concurrency.Condition,
         thread: ?std.Thread,
         thread_id: ?std.Thread.Id,
         accepting: bool,
@@ -77,15 +86,16 @@ pub fn ActorWithFinish(
             self.* = .{
                 .allocator = allocator,
                 .context = context,
+                .driver = undefined,
                 .mutex = .{},
-                .cond = .{},
                 .thread = null,
                 .thread_id = null,
                 .accepting = true,
                 .jobs = .{},
             };
+            self.driver = Driver.init(&self.mutex, context);
             errdefer {
-                self.cond.deinit();
+                self.driver.deinit();
                 self.mutex.deinit();
                 allocator.destroy(self);
             }
@@ -96,7 +106,7 @@ pub fn ActorWithFinish(
 
         pub fn destroy(self: *Self) void {
             self.shutdown();
-            self.cond.deinit();
+            self.driver.deinit();
             self.mutex.deinit();
             self.allocator.destroy(self);
         }
@@ -159,7 +169,7 @@ pub fn ActorWithFinish(
             if (!self.accepting) return error.Closed;
             self.pushLocked(&job);
             while (!job.done) {
-                self.cond.wait(&self.mutex);
+                self.driver.wait();
             }
             try job.result;
             return request.result;
@@ -178,7 +188,7 @@ pub fn ActorWithFinish(
             self.accepting = false;
             self.pushLocked(&job);
             while (!job.done) {
-                self.cond.wait(&self.mutex);
+                self.driver.wait();
             }
             // Stop exposing the join handle, but retain the worker identity
             // until its terminal callback has completed. This lets that
@@ -197,46 +207,53 @@ pub fn ActorWithFinish(
         /// Pushes to the queue while inside the mutex.
         fn pushLocked(self: *Self, job: *Job) void {
             self.jobs.append(job);
-            self.cond.broadcast();
+            self.driver.wake();
         }
 
-        fn popBlocking(self: *Self) *Job {
+        fn pop(self: *Self) ?*Job {
             self.mutex.lock();
             defer self.mutex.unlock();
 
-            while (self.jobs.head == null) {
-                self.cond.wait(&self.mutex);
-            }
-            return self.jobs.take().?;
+            return self.jobs.take();
+        }
+
+        fn drive(self: *Self) void {
+            self.mutex.lock();
+            self.driver.resetWake();
+            const has_jobs = self.jobs.head != null;
+            self.mutex.unlock();
+
+            // Enqueueing after the check leaves a wake pending. Never hold the
+            // mailbox mutex while polling, waiting, or invoking I/O callbacks.
+            self.driver.loopOnce(self.context, if (has_jobs) 0 else null);
         }
 
         fn run(self: *Self) void {
-            defer if (on_finish) |callback| callback(self.context);
+            defer self.driver.finish(self.context);
 
             self.mutex.lock();
             self.thread_id = std.Thread.getCurrentId();
-            self.cond.broadcast();
+            self.driver.notify();
             self.mutex.unlock();
 
             while (true) {
-                const job = self.popBlocking();
-                const outcome = self.performCommand(job.command);
-                // Snapshot ownership before publishing completion. A synchronous
-                // caller may return and invalidate its stack-backed job as soon
-                // as done is signalled.
-                const owned = job.owned;
+                if (self.pop()) |job| {
+                    const outcome = self.performCommand(job.command);
+                    // Snapshot ownership before publishing completion. A synchronous
+                    // caller may return and invalidate its stack-backed job as soon
+                    // as done is signalled.
+                    const owned = job.owned;
 
-                self.mutex.lock();
-                job.result = outcome.result;
-                job.done = true;
-                self.cond.broadcast();
-                self.mutex.unlock();
+                    self.mutex.lock();
+                    job.result = outcome.result;
+                    job.done = true;
+                    self.driver.notify();
+                    self.mutex.unlock();
 
-                const should_exit = outcome.exit;
-                if (owned) {
-                    self.allocator.destroy(job);
+                    if (owned) self.allocator.destroy(job);
+                    if (outcome.exit) return;
                 }
-                if (should_exit) return;
+                self.drive();
             }
         }
 
@@ -246,6 +263,61 @@ pub fn ActorWithFinish(
                 .perform => |request| return .{ .result = request.callback(self.context, request.context) },
                 .shutdown => return .{ .exit = true },
             }
+        }
+    };
+}
+
+/// Default worker wake and synchronous job-completion waits. The actor owns
+/// the shared mailbox mutex; this driver owns the condition variable.
+/// wait(), notify(), wake(), and resetWake() require the mutex to be held.
+/// Deinitialize only after the worker and completion waiters have finished.
+/// Pass null for on_finish to leave worker exit handling empty.
+pub fn DefaultDriver(
+    comptime Context: type,
+    comptime on_finish: ?*const fn (*Context) void,
+) type {
+    return struct {
+        const Self = @This();
+
+        mutex: *concurrency.Mutex,
+        condition: concurrency.Condition = .{},
+        signalled: bool = false,
+
+        pub fn init(mutex: *concurrency.Mutex, _: *Context) Self {
+            return .{ .mutex = mutex };
+        }
+
+        pub fn finish(_: *Self, context: *Context) void {
+            if (on_finish) |callback| callback(context);
+        }
+
+        pub fn deinit(self: *Self) void {
+            self.condition.deinit();
+        }
+
+        pub fn wait(self: *Self) void {
+            self.condition.wait(self.mutex);
+        }
+
+        pub fn notify(self: *Self) void {
+            self.condition.broadcast();
+        }
+
+        pub fn wake(self: *Self) void {
+            self.signalled = true;
+            self.notify();
+        }
+
+        pub fn resetWake(self: *Self) void {
+            self.signalled = false;
+        }
+
+        pub fn loopOnce(self: *Self, _: *Context, max_wait_ms: ?u32) void {
+            if (max_wait_ms != null) return;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            // Completion broadcasts do not mean that mailbox work is available.
+            while (!self.signalled) self.wait();
         }
     };
 }

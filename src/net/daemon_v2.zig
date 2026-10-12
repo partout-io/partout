@@ -1177,12 +1177,12 @@ const ConnectionDaemon = struct {
     // Mailbox messages enter through perform on the actor. actorDidFinish also
     // runs on that thread and completes serialized shutdown before it exits.
 
-    const Actor = core.actor.ActorWithFinish(
+    const Actor = core.actor.Actor(
         ConnectionDaemon,
+        ActorDriver,
         Message,
         Error,
         perform,
-        actorDidFinish,
     );
 
     const Message = union(enum) {
@@ -1320,6 +1320,7 @@ const ConnectionDaemon = struct {
     }
 
     //#endregion
+    const ActorDriver = core.actor.DefaultDriver(ConnectionDaemon, actorDidFinish);
 };
 
 // MARK: - Error mapping

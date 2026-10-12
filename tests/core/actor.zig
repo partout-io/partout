@@ -30,6 +30,7 @@ fn performCounter(state: *CounterState, comptime Result: type, message: CounterM
 
 const CounterActor = source.core.Actor(
     CounterState,
+    null,
     CounterMessage,
     CounterError,
     performCounter,
@@ -66,7 +67,7 @@ test "actor propagates errors and rejects messages after shutdown" {
 }
 
 const ResultState = struct {
-    const Actor = source.core.Actor(ResultState, Message, CounterError, handle);
+    const Actor = source.core.Actor(ResultState, null, Message, CounterError, handle);
     const Message = union(enum) {
         add: usize,
         nested,
@@ -116,7 +117,7 @@ test "actor returns typed results for queued and nested messages" {
 }
 
 const PayloadState = struct {
-    const Actor = source.core.Actor(PayloadState, Message, CounterError, handle);
+    const Actor = source.core.Actor(PayloadState, null, Message, CounterError, handle);
     const Payload = struct {
         words: [64]u64 align(64),
         owner: *const usize,
@@ -216,9 +217,10 @@ test "actor keeps concurrent callers results and errors isolated" {
     for (callers) |caller| if (caller.failure) |err| return err;
 }
 
-test "actor shutdown drains scheduled work and permits typed finish callbacks" {
+test "actor driver finishes on its worker after draining scheduled work" {
     const State = struct {
-        const Actor = source.core.actor.ActorWithFinish(@This(), Message, CounterError, handle, finish);
+        const Self = @This();
+        const Actor = source.core.actor.Actor(Self, Driver, Message, CounterError, handle);
         const Message = union(enum) { add: usize, read, fail };
         actor: ?*Actor = null,
         value: usize = 0,
@@ -226,6 +228,8 @@ test "actor shutdown drains scheduled work and permits typed finish callbacks" {
         final_value: ?usize = null,
         finish_on_queue: bool = false,
         finish_error: ?anyerror = null,
+
+        const Driver = source.core.actor.DefaultDriver(Self, finish);
 
         fn handle(self: *@This(), comptime Result: type, message: Message) CounterError!Result {
             switch (message) {
