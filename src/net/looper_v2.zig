@@ -142,27 +142,4 @@ pub const Looper = struct {
     ) WriteError!void {
         return self.impl.write(packets, side, destination);
     }
-
-    // Unsupported legacy worker APIs.
-
-    pub fn start(_: *Looper) helpers.StartError!void {
-        @panic("Looper v2 is caller-driven; use loopOnce");
-    }
-
-    pub fn isOnQueue(_: *Looper) bool {
-        @panic("Looper v2 has no worker queue; execution belongs to the daemon");
-    }
-
-    pub fn perform(
-        _: *Looper,
-        comptime Result: type,
-        _: ?*anyopaque,
-        _: *const fn (?*anyopaque) anyerror!Result,
-    ) anyerror!Result {
-        @panic("Looper v2 cannot dispatch work; execution belongs to the daemon");
-    }
-
-    pub fn performTask(_: *Looper, _: helpers.Task) anyerror!void {
-        @panic("Looper v2 cannot dispatch work; execution belongs to the daemon");
-    }
 };
