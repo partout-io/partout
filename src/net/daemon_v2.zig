@@ -1184,8 +1184,8 @@ const ConnectionDaemon = struct {
 
     //#region Event loop
 
-    // Mailbox messages enter through perform on the actor. actorDidFinish also
-    // runs on that thread and completes serialized shutdown before it exits.
+    // Mailbox messages enter through perform on the event-loop thread.
+    // Connection finalization also runs on that thread before it exits.
 
     const Message = union(enum) {
         start,
@@ -1213,6 +1213,8 @@ const ConnectionDaemon = struct {
         var running = self.is_running;
         self.actor_id = std.Thread.getCurrentId();
         self.jobs_mutex.unlock();
+        var loop_terminated = false;
+        var loop_failure: ?io.Failure = null;
 
         while (running) {
             // Fetch pending jobs if any.
@@ -1243,21 +1245,45 @@ const ConnectionDaemon = struct {
                 log.writef(.err, "Looper failed: .{}", .{failure});
             }
             // A hard looper failure may also stop the thread.
-            if (!should_loop) running = false;
+            if (!should_loop) {
+                loop_terminated = true;
+                loop_failure = maybe_failure;
+                running = false;
+            }
         }
 
         // Signal finalization to close job submissions.
         self.jobs_mutex.lock();
+        const unexpected_exit = loop_terminated and self.is_running;
         self.is_running = false;
-        self.actor_id = null;
         var pending = self.jobs.takeAll();
         self.jobs_mutex.unlock();
+
+        // Explicit shutdown must also finalize a connection if stop was not run.
+        self.doStop(if (unexpected_exit) .preserve_environment else .clear_environment);
 
         // Discard outstanding jobs.
         while (pending) |job| {
             pending = job.next;
             _ = self.completeJob(job, error.Closed);
         }
+
+        if (unexpected_exit) self.handleEventLoopFailure(loop_failure);
+
+        self.jobs_mutex.lock();
+        self.actor_id = null;
+        self.jobs_mutex.unlock();
+    }
+
+    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
+        log.write(.fault, "ConnectionDaemon event loop terminated unexpectedly");
+        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
+            .{ .code = code }
+        else
+            null;
+        if (err_pair) |err| self.daemon.handleLastError(err);
+        self.daemon.controller.setReasserting(false);
+        self.daemon.requestCancellation(err_pair, true);
     }
 
     fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
@@ -1382,17 +1408,6 @@ const ConnectionDaemon = struct {
     fn isCurrentThread(self: *const ConnectionDaemon) bool {
         const actor_id = self.actor_id orelse return false;
         return actor_id == std.Thread.getCurrentId();
-    }
-
-    fn actorDidFinish(self: *ConnectionDaemon) void {
-        log.write(.fault, "ConnectionDaemon actor terminated");
-
-        // The callback still runs on the actor thread, so it can complete the
-        // normal serialized stop before the worker exits. The host cancellation
-        // then owns final ConnectionDaemon/Looper deinitialization.
-        self.doStop(.preserve_environment);
-        self.daemon.controller.setReasserting(false);
-        self.daemon.requestCancellation(null, true);
     }
 
     //#endregion
