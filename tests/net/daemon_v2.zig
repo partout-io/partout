@@ -105,7 +105,7 @@ test "v2 daemon terminates and cancels after terminal looper failure" {
         tun.destroy();
         try std.testing.expect(controller.last_settings != null);
         const cleared_before = controller.clear_tunnel_settings_count;
-        try daemon.testing.perform(connection_daemon, void, .onBetterPath);
+        try daemon.testing.perform(connection_daemon, .onBetterPath);
         try waitForExit(connection_daemon);
         try std.testing.expectError(error.Closed, sut.start());
         try std.testing.expect(sut.state == .stopped);
@@ -255,8 +255,8 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     try std.testing.expectEqual(@as(usize, 0), probe.stop_count);
     sut.options.reconnection_delay_ms = 60_000;
 
-    try daemon.testing.perform(connection_daemon, void, .{ .onReachability = .{ .reachable = false } });
-    try daemon.testing.perform(connection_daemon, void, .onBetterPath);
+    try daemon.testing.perform(connection_daemon, .{ .onReachability = .{ .reachable = false } });
+    try daemon.testing.perform(connection_daemon, .onBetterPath);
     try daemon.testing.resumeGate(connection_daemon); // Drain establishment and setup failure.
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
@@ -265,7 +265,7 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     try std.testing.expectEqual(@as(usize, 1), probe.stop_count);
     // A protocol failure must finalize the attempt just like setup failure:
     // shutdown and stop must run in order on the actor before status changes.
-    try daemon.testing.perform(connection_daemon, void, .{ .onConnectionEvent = .{ .failed = .{
+    try daemon.testing.perform(connection_daemon, .{ .onConnectionEvent = .{ .failed = .{
         .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
     } } });
@@ -636,7 +636,7 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
     try sut.start();
     defer sut.stop();
     const actor = sut.implementation.connection;
-    try daemon.testing.perform(actor, void, .onBetterPath);
+    try daemon.testing.perform(actor, .onBetterPath);
     try std.testing.expect(factory.reporting_inline);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
@@ -895,11 +895,11 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (daemon_io != .looper) {
                     const owner = sut.implementation.connection;
                     const tun = probe.established_tun.?;
-                    try daemon.testing.perform(owner, void, .onBetterPath);
+                    try daemon.testing.perform(owner, .onBetterPath);
                     // Duplicate queued requests and requests during handoff share one rebind.
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
-                    try daemon.testing.perform(owner, void, .{ .onReachability = .{ .reachable = true } });
+                    try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } });
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
                     if (daemon_io == .none) {
@@ -1019,7 +1019,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
         if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
-            try daemon.testing.perform(sut.implementation.connection, void, .onBetterPath);
+            try daemon.testing.perform(sut.implementation.connection, .onBetterPath);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
         }
         sut.stop();
@@ -1228,7 +1228,7 @@ test "v2 event loop runs I/O timers and finalizes terminal failure on its thread
     try std.testing.expectEqual(@as(usize, 1), probe.reads.load(.acquire));
     // Terminal failure ends the loop, finalizes the connection, and cancels the host.
     const owner = sut.implementation.connection;
-    try daemon.testing.perform(owner, void, .onBetterPath);
+    try daemon.testing.perform(owner, .onBetterPath);
     try waitForExit(owner);
     try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
     try std.testing.expectEqualStrings("starttimerin", probe.output[0..probe.output_len]);
@@ -1306,7 +1306,7 @@ test "v2 event loop completes pending performs and releases discarded payloads o
     var nested_error = false;
     try daemon.testing.onLoop(owner, &nested_error, struct {
         fn run(loop: anytype, saw_error: *bool) daemon.Error!void {
-            daemon.testing.perform(loop, void, .start) catch |err| {
+            daemon.testing.perform(loop, .start) catch |err| {
                 saw_error.* = err == error.AlreadyStarted;
                 return;
             };
@@ -1332,7 +1332,7 @@ test "v2 event loop completes pending performs and releases discarded payloads o
             };
         }
         fn waiter(loop: anytype, self: *@This()) void {
-            daemon.testing.perform(loop, void, .start) catch |err| {
+            daemon.testing.perform(loop, .start) catch |err| {
                 self.waiter_closed.store(err == error.Closed, .release);
             };
         }
@@ -1359,7 +1359,7 @@ test "v2 event loop completes pending performs and releases discarded payloads o
     defer probe.released.store(true, .release);
     while (true) {
         owner.jobs_mutex.lock();
-        const queued = if (owner.jobs.tail) |tail| tail.command == .perform else false;
+        const queued = if (owner.jobs.tail) |tail| !tail.owned else false;
         owner.jobs_mutex.unlock();
         if (queued) break;
         if (core.monotonicNs() >= deadline) return error.Timeout;
@@ -1405,7 +1405,7 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
         try sut.start();
         defer sut.stop();
         const owner = sut.implementation.connection;
-        try daemon.testing.perform(owner, void, .{ .onConnectionEvent = .{ .failed = .{
+        try daemon.testing.perform(owner, .{ .onConnectionEvent = .{ .failed = .{
             .err_pair = api.openVPNErrorPair(.tlsFailure),
             .disposition = .cancel,
         } } });

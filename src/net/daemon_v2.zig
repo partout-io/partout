@@ -13,6 +13,7 @@
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
@@ -346,7 +347,7 @@ const ConnectionDaemon = struct {
 
     // Internal state
     connection: ?Connection,
-    rebind_pending: std.atomic.Value(bool),
+    rebind_pending: bool,
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     gate: ConnectionGate,
@@ -399,7 +400,7 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
-            .rebind_pending = .init(false),
+            .rebind_pending = false,
             .endpoint_resolver = null,
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
@@ -420,12 +421,7 @@ const ConnectionDaemon = struct {
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
         self.looper.destroy();
 
-        // Daemon checked the shared lifecycle precondition. Drain callbacks
-        // before releasing this implementation and its borrowed Daemon.
-
-        self.monitor.setEventHandler(null);
-        self.monitor.stopObserving();
-        self.gate.stopObserving();
+        // The worker finalized connection state and quiesced callbacks before exit.
         self.gate.deinit();
         self.jobs_mutex.deinit();
         self.jobs_condition.deinit();
@@ -436,15 +432,15 @@ const ConnectionDaemon = struct {
     }
 
     fn start(self: *ConnectionDaemon) Error!void {
-        return self.perform(void, .start);
+        return self.perform(.start);
     }
 
     fn hold(self: *ConnectionDaemon) void {
-        self.perform(void, .hold) catch return;
+        self.perform(.hold) catch return;
     }
 
     fn stop(self: *ConnectionDaemon) void {
-        self.perform(void, .stop) catch return;
+        self.perform(.stop) catch return;
     }
 
     //#endregion
@@ -488,9 +484,11 @@ const ConnectionDaemon = struct {
                 };
             },
             .needs_rebind => {
-                if (self.rebind_pending.swap(true, .acq_rel)) return;
+                std.debug.assert(self.isCurrentThread());
+                if (self.rebind_pending) return;
+                self.rebind_pending = true;
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    self.rebind_pending.store(false, .release);
+                    self.rebind_pending = false;
                     log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
                 };
             },
@@ -593,14 +591,10 @@ const ConnectionDaemon = struct {
 
         // Start a connection now, or defer the choice to the gate
         if (self.daemon.options.starts_immediately) {
-            self.startConnection();
+            self.evaluateConnection(true);
         } else {
             _ = self.gate.setEnabled(true);
         }
-    }
-
-    fn doHold(self: *ConnectionDaemon) void {
-        self.doStop(.preserve_environment);
     }
 
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
@@ -647,11 +641,8 @@ const ConnectionDaemon = struct {
             .factory = self.factory,
             .looper = undefined,
         });
-        errdefer connection.destroy();
         self.connection = connection;
-        errdefer self.connection = null;
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
-        errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
     }
 
     fn releaseConnection(self: *ConnectionDaemon) void {
@@ -680,20 +671,12 @@ const ConnectionDaemon = struct {
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
     }
 
-    fn startConnection(self: *ConnectionDaemon) void {
-        self.internalEvaluateConnection(true);
-    }
-
-    fn doEvaluateConnection(self: *ConnectionDaemon) void {
-        self.internalEvaluateConnection(false);
-    }
-
-    fn internalEvaluateConnection(self: *ConnectionDaemon, force: bool) void {
+    fn evaluateConnection(self: *ConnectionDaemon, force: bool) void {
         if (self.daemon.state != .started) {
             log.write(.info, "Ignore evaluation, daemon not started");
             return;
         }
-        const connection = self.connection orelse @panic("internalEvaluateConnection but no connection");
+        const connection = self.connection orelse @panic("evaluateConnection but no connection");
         if (self.is_evaluating_connection) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
@@ -848,7 +831,7 @@ const ConnectionDaemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.doEvaluateConnection();
+        self.evaluateConnection(false);
     }
 
     fn isReachable(ctx: ?*const anyopaque) bool {
@@ -937,7 +920,7 @@ const ConnectionDaemon = struct {
     }
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
-        defer self.rebind_pending.store(false, .release);
+        defer self.rebind_pending = false;
         if (self.daemon.state != .started) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
         // Go may have established while its success event is still queued on
@@ -1084,18 +1067,12 @@ const ConnectionDaemon = struct {
     // Connection finalization also runs on that thread before it exits.
 
     const Job = struct {
-        command: Command,
+        message: Message = undefined,
+        owned: bool = false,
         done: bool = false,
         result: Error!void = {},
         next: ?*Job = null,
-    };
-
-    const Command = union(enum) {
-        message: Message,
-        perform: struct {
-            context: *anyopaque,
-            callback: *const fn (*ConnectionDaemon, *anyopaque) Error!void,
-        },
+        test_task: if (builtin.is_test) ?testing.Task else void = if (builtin.is_test) null else {},
     };
 
     const Message = union(enum) {
@@ -1146,7 +1123,7 @@ const ConnectionDaemon = struct {
                 pending = job.next;
 
                 // Run jobs if thread is still running.
-                const result = if (running) self.executeJob(job.command) else error.Closed;
+                const result = if (running) self.executeJob(job) else error.Closed;
                 result catch |err| {
                     log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
                 };
@@ -1192,27 +1169,26 @@ const ConnectionDaemon = struct {
         self.jobs_mutex.unlock();
     }
 
-    fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
-        switch (command) {
-            .message => |message| return try self.dispatch(void, message),
-            .perform => |request| return request.callback(self, request.context),
+    fn executeJob(self: *ConnectionDaemon, job: *const Job) Error!void {
+        if (builtin.is_test) {
+            if (job.test_task) |task| return task.callback(self, task.context);
         }
+        return self.dispatch(job.message);
     }
 
     fn completeJob(self: *ConnectionDaemon, job: *Job, result: Error!void) bool {
+        const owned = job.owned;
         self.jobs_mutex.lock();
         const still_running = self.is_running;
-        const owned_message: ?Message = switch (job.command) {
-            .message => |message| message,
-            .perform => null,
-        };
-        job.result = result;
-        job.done = true;
-        self.jobs_condition.broadcast();
+        if (!owned) {
+            job.result = result;
+            job.done = true;
+            self.jobs_condition.broadcast();
+        }
         self.jobs_mutex.unlock();
 
-        if (owned_message) |message| {
-            message.deinit(self.daemon.allocator);
+        if (owned) {
+            job.message.deinit(self.daemon.allocator);
             self.daemon.allocator.destroy(job);
         }
         return still_running;
@@ -1223,52 +1199,30 @@ const ConnectionDaemon = struct {
         defer self.jobs_mutex.unlock();
         if (!self.is_running) return error.Closed;
 
-        var job = try self.daemon.allocator.create(Job);
-        job.command = .{ .message = message };
+        const job = try self.daemon.allocator.create(Job);
+        job.* = .{ .message = message, .owned = true };
         self.jobs.append(job);
         _ = io_c.pp_mux_wake(self.mux);
     }
 
-    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
-        const Request = struct {
-            message: Message,
-            result: Result = undefined,
-
-            fn call(context: *ConnectionDaemon, opaque_request: *anyopaque) Error!void {
-                const request: *@This() = @ptrCast(@alignCast(opaque_request));
-                request.result = try dispatch(context, Result, request.message);
-            }
-        };
-
+    fn perform(self: *ConnectionDaemon, message: Message) Error!void {
         self.jobs_mutex.lock();
         if (!self.is_running) {
             self.jobs_mutex.unlock();
             return error.Closed;
         }
-
-        var request = Request{ .message = message };
-        var job = Job{ .command = .{ .perform = .{
-            .context = &request,
-            .callback = Request.call,
-        } } };
-
-        // Watch out for recursive locks. If we are invoking perform()
-        // on the actor thread, e.g., as the effect of a nested
-        // perform(), we must execute the job immediately. Waiting on
-        // the condition would lead to a deadlock.
+        // Nested calls execute inline, outside the mailbox lock.
         if (self.isCurrentThread()) {
             self.jobs_mutex.unlock();
-            return try self.dispatch(Result, message);
+            return self.dispatch(message);
         }
         defer self.jobs_mutex.unlock();
 
+        var job = Job{ .message = message };
         self.jobs.append(&job);
         _ = io_c.pp_mux_wake(self.mux);
-        while (!job.done) {
-            self.jobs_condition.wait(&self.jobs_mutex);
-        }
-        try job.result;
-        return request.result;
+        while (!job.done) self.jobs_condition.wait(&self.jobs_mutex);
+        return job.result;
     }
 
     fn shutdown(self: *ConnectionDaemon) void {
@@ -1279,10 +1233,10 @@ const ConnectionDaemon = struct {
         _ = io_c.pp_mux_wake(self.mux);
     }
 
-    fn dispatch(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+    fn dispatch(self: *ConnectionDaemon, message: Message) Error!void {
         switch (message) {
             .start => try self.doStart(),
-            .hold => self.doHold(),
+            .hold => self.doStop(.preserve_environment),
             .stop => self.doStop(.clear_environment),
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
@@ -1373,6 +1327,10 @@ fn partoutCodeForLooperFailure(opt_failure: ?Looper.Failure) ?api.PartoutErrorCo
 }
 
 pub const testing = struct {
+    const Task = struct {
+        context: *anyopaque,
+        callback: *const fn (*ConnectionDaemon, *anyopaque) Error!void,
+    };
     pub const perform = ConnectionDaemon.perform;
     pub const schedule = ConnectionDaemon.schedule;
     pub const isCurrentThread = ConnectionDaemon.isCurrentThread;
@@ -1386,13 +1344,13 @@ pub const testing = struct {
     pub fn evaluateConnection(owner: anytype) Error!void {
         return onLoop(owner, {}, struct {
             fn run(loop: *ConnectionDaemon, _: void) Error!void {
-                loop.doEvaluateConnection();
+                loop.evaluateConnection(false);
             }
         }.run);
     }
 
     pub fn resumeGate(owner: anytype) Error!void {
-        return owner.perform(void, .resumeGate);
+        return owner.perform(.resumeGate);
     }
 
     /// Runs test setup and observations on the same thread as daemon state.
@@ -1412,10 +1370,10 @@ pub const testing = struct {
         defer self.jobs_mutex.unlock();
         if (!self.is_running) return error.Closed;
         var request = Request{ .context = context };
-        var job = ConnectionDaemon.Job{ .command = .{ .perform = .{
+        var job = ConnectionDaemon.Job{ .test_task = .{
             .context = &request,
             .callback = Request.call,
-        } } };
+        } };
         self.jobs.append(&job);
         _ = io_c.pp_mux_wake(self.mux);
         while (!job.done) self.jobs_condition.wait(&self.jobs_mutex);
