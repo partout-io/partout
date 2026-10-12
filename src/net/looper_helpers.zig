@@ -22,7 +22,9 @@ pub const Options = struct {
 };
 
 pub const Packet = io.Packet;
+
 pub const Packets = io.Packets;
+
 pub const ReadAction = io.ReadAction;
 
 /// Invoked on read events from either looper side. Payloads and addresses are
@@ -67,17 +69,8 @@ pub const OnFinish = struct {
     }
 };
 
-/// Runs a generic task in the worker thread.
-pub const Task = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque) anyerror!void,
-
-    pub fn call(self: Task) anyerror!void {
-        return self.callback(self.context);
-    }
-};
-
 pub const TimedTask = io.TimedTask;
+
 pub const Timer = io.Timer;
 
 /// The arguments to attach a side of the looper.
@@ -89,119 +82,26 @@ pub const AttachArguments = struct {
 };
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
-pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
-    AlreadyStarted,
-};
+
 pub const AttachError = SubmissionError || error{
     InvalidBuffers,
     MuxFailure,
     SideAlreadyAttached,
     ReentrantCall,
 };
+
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
+
 pub const ResumeReadingError = SubmissionError;
+
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
+
 pub const WriteError = SubmissionError || error{
     SideNotAttached,
     InvalidBuffers,
     MissingDestination,
-};
-pub const WriteOOBError = io.WriteOOBError;
-
-pub const CompletionError = std.mem.Allocator.Error || error{
-    LooperUnavailable,
-    MuxFailure,
-    SideAlreadyAttached,
-};
-
-pub const Completion = struct {
-    // Completion state.
-    done: bool = false,
-    // Completion failure or null on success.
-    failure: ?CompletionError = null,
-    // Intrusive completion queue linkage.
-    next: ?*Completion = null,
-};
-
-/// Intrusive FIFO of synchronous command completions.
-/// The queue is not thread-safe; callers must synchronize access.
-pub const CompletionQueue = struct {
-    pending: core.Fifo(Completion) = .{},
-
-    pub fn append(
-        self: *CompletionQueue,
-        completion: *Completion,
-        failure: ?CompletionError,
-    ) void {
-        completion.failure = failure;
-        self.pending.append(completion);
-    }
-
-    pub fn releaseAll(self: *CompletionQueue) void {
-        while (self.pending.take()) |completion| completion.done = true;
-    }
-};
-
-/// Uniquely identifies a side. Acts as a discriminator
-/// if a task is submitted to a side but the side is
-/// detached before the task is actually executed.
-pub const SideIdentity = struct {
-    side: io.Side,
-    id: ?u64,
-};
-
-/// These are the supported commands by the looper worker.
-pub const Command = union(enum) {
-    attach: struct {
-        arguments: AttachArguments,
-        completion: *Completion,
-    },
-    detach: struct {
-        side: io.Side,
-        completion: *Completion,
-    },
-    enable_read: SideIdentity,
-    enable_write: SideIdentity,
-    perform: struct {
-        task: Task,
-        completion: *Completion,
-    },
-    timed_task: struct {
-        id: u64,
-        task: ?TimedTask,
-    },
-    stop,
-};
-
-/// A node in `CommandQueue`, with the payload and
-/// an optional one-shot timer for deferred scheduling.
-pub const CommandNode = struct {
-    command: Command,
-    timer: core.RunAfter.Scheduled = .{},
-
-    // Synchronous callers keep their node on the stack until completion.
-    // Asynchronous commands set this when allocating a persistent node.
-    allocated: bool = false,
-
-    // Intrusive command queue linkage.
-    next: ?*CommandNode = null,
-
-    // Intrusive linkage while a timed task is pending or ready.
-    timer_next: ?*CommandNode = null,
-};
-
-/// A plain FIFO for the pending worker commands. Not thread-safe.
-pub const CommandQueue = struct {
-    pending: core.Fifo(CommandNode) = .{},
-
-    pub fn append(self: *CommandQueue, node: *CommandNode) void {
-        self.pending.append(node);
-    }
-
-    pub fn takeReady(self: *CommandQueue) ?*CommandNode {
-        return self.pending.takeAll();
-    }
 };
 
 /// Helps storing a pending write without copying the
@@ -295,5 +195,128 @@ pub const WriteQueue = struct {
             allocator.destroy(node);
             current = next;
         }
+    }
+};
+
+// Deprecated v1-only worker helpers. Retained until the v1 looper is removed.
+
+/// Deprecated: used only by the v1 looper.
+pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
+    AlreadyStarted,
+};
+
+/// Deprecated: used only by the v1 looper.
+pub const WriteOOBError = io.WriteOOBError;
+
+/// Deprecated: used only by the v1 looper.
+pub const CompletionError = std.mem.Allocator.Error || error{
+    LooperUnavailable,
+    MuxFailure,
+    SideAlreadyAttached,
+};
+
+/// Deprecated: used only by the v1 looper.
+/// Runs a generic task in the worker thread.
+pub const Task = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque) anyerror!void,
+
+    pub fn call(self: Task) anyerror!void {
+        return self.callback(self.context);
+    }
+};
+
+/// Deprecated: used only by the v1 looper.
+pub const Completion = struct {
+    // Completion state.
+    done: bool = false,
+    // Completion failure or null on success.
+    failure: ?CompletionError = null,
+    // Intrusive completion queue linkage.
+    next: ?*Completion = null,
+};
+
+/// Deprecated: used only by the v1 looper.
+/// Intrusive FIFO of synchronous command completions.
+/// The queue is not thread-safe; callers must synchronize access.
+pub const CompletionQueue = struct {
+    pending: core.Fifo(Completion) = .{},
+
+    pub fn append(
+        self: *CompletionQueue,
+        completion: *Completion,
+        failure: ?CompletionError,
+    ) void {
+        completion.failure = failure;
+        self.pending.append(completion);
+    }
+
+    pub fn releaseAll(self: *CompletionQueue) void {
+        while (self.pending.take()) |completion| completion.done = true;
+    }
+};
+
+/// Deprecated: used only by the v1 looper.
+/// Uniquely identifies a side. Acts as a discriminator
+/// if a task is submitted to a side but the side is
+/// detached before the task is actually executed.
+pub const SideIdentity = struct {
+    side: io.Side,
+    id: ?u64,
+};
+
+/// Deprecated: used only by the v1 looper.
+/// These are the supported commands by the looper worker.
+pub const Command = union(enum) {
+    attach: struct {
+        arguments: AttachArguments,
+        completion: *Completion,
+    },
+    detach: struct {
+        side: io.Side,
+        completion: *Completion,
+    },
+    enable_read: SideIdentity,
+    enable_write: SideIdentity,
+    perform: struct {
+        task: Task,
+        completion: *Completion,
+    },
+    timed_task: struct {
+        id: u64,
+        task: ?TimedTask,
+    },
+    stop,
+};
+
+/// Deprecated: used only by the v1 looper.
+/// A node in `CommandQueue`, with the payload and
+/// an optional one-shot timer for deferred scheduling.
+pub const CommandNode = struct {
+    command: Command,
+    timer: core.RunAfter.Scheduled = .{},
+
+    // Synchronous callers keep their node on the stack until completion.
+    // Asynchronous commands set this when allocating a persistent node.
+    allocated: bool = false,
+
+    // Intrusive command queue linkage.
+    next: ?*CommandNode = null,
+
+    // Intrusive linkage while a timed task is pending or ready.
+    timer_next: ?*CommandNode = null,
+};
+
+/// Deprecated: used only by the v1 looper.
+/// A plain FIFO for the pending worker commands. Not thread-safe.
+pub const CommandQueue = struct {
+    pending: core.Fifo(CommandNode) = .{},
+
+    pub fn append(self: *CommandQueue, node: *CommandNode) void {
+        self.pending.append(node);
+    }
+
+    pub fn takeReady(self: *CommandQueue) ?*CommandNode {
+        return self.pending.takeAll();
     }
 };
