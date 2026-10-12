@@ -27,6 +27,7 @@ const test_net_io_common = @import("net/io_common.zig");
 const test_net_io_posix = @import("net/io_posix.zig");
 const test_net_socket_datagram = @import("net/socket_datagram.zig");
 const test_net_looper_legacy = @import("net/looper_legacy.zig");
+const test_net_looper_posix = @import("net/looper_posix.zig");
 const test_net_looper_v2 = @import("net/looper_v2.zig");
 const test_net_looper_io = @import("net/looper_io.zig");
 const test_net_looper_helpers = @import("net/looper_helpers.zig");
@@ -96,6 +97,7 @@ comptime {
     _ = test_net_io_common;
     if (builtin.os.tag != .windows) {
         _ = test_net_io_posix;
+        _ = test_net_looper_posix;
         _ = test_net_socket_datagram;
     }
     if (!source.runtime_policy.v2_only) {

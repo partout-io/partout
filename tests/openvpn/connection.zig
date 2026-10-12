@@ -81,7 +81,7 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
     };
     var context = v2.ConnectionContext{ .session_options = .{ .backend = .mock } };
     var controller = mock.MockTunnelController{};
-    var looper = try Looper.init(allocator, .{ .on_finish = .{ .callback = Request.finish } });
+    var looper = try Looper.init(allocator, .{ .mux = null, .on_finish = .{ .callback = Request.finish } });
     defer looper.deinit();
     const created = try v2.createConnection(
         &context,
@@ -125,6 +125,7 @@ test "OpenVPN connection borrows the daemon looper" {
 
     const allocator = std.testing.allocator;
     var looper = try Looper.init(allocator, .{
+        .mux = null,
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();

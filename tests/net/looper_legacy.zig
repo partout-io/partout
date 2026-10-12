@@ -102,7 +102,7 @@ fn returnFortyTwo(_: ?*anyopaque) anyerror!u8 {
 }
 
 fn initLooper(on_finish: Looper.OnFinish) !Looper {
-    var looper = try Looper.init(std.testing.allocator, .{ .on_finish = on_finish });
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null, .on_finish = on_finish });
     errdefer looper.deinit();
     return looper;
 }
@@ -442,6 +442,7 @@ test "synchronous lifecycle commands do not allocate" {
     defer pipe.deinit();
     var mock = MockIO{};
     var looper = try Looper.init(failing.allocator(), .{
+        .mux = null,
         .on_finish = .{ .callback = noopFinish },
     });
     defer looper.deinit();

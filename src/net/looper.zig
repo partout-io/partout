@@ -292,7 +292,7 @@ pub const Looper = struct {
 
         fd_set.resetReadable();
         var code: c_int = 0;
-        if (io_c.pp_mux_wait(self.mux, &code) < 0) {
+        if (io_c.pp_mux_wait(self.mux, -1, &code) < 0) {
             log.writef(.err, "Looper: pp_mux_wait() failed (code={d})", .{code});
             self.finish(.{ .wait = code });
             return false;

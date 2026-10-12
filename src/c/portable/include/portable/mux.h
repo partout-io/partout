@@ -25,7 +25,10 @@ bool pp_mux_set_read(pp_mux mux, pp_fd fd, bool enable);
 bool pp_mux_set_write(pp_mux mux, pp_fd fd, bool enable);
 void pp_mux_set_on_readable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx);
 void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), void *ctx);
-int pp_mux_wait(pp_mux mux, int *_Nullable error_code);
+/* timeout_ms: negative waits indefinitely, zero polls, positive waits at most
+ * that many milliseconds. Returns 0 on timeout (or interrupted timed wait),
+ * a positive readiness count, or a negative error. */
+int pp_mux_wait(pp_mux mux, int timeout_ms, int *_Nullable error_code);
 
 /* Wait indefinitely on an I/O watch fd and a shared wake descriptor.
  * POSIX uses poll(); Windows waits on configured socket/TUN events.

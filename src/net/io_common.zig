@@ -27,41 +27,6 @@ pub const ReadAction = enum {
     pause,
 };
 
-pub const IOError = Error || error{
-    Cancelled,
-    InvalidBuffers,
-};
-
-/// Number of whole packets processed, plus an optional failure. A partial
-/// stream write is not counted; cancellation does not undo bytes already sent.
-pub const IOResult = struct {
-    count: usize = 0,
-    failure: ?IOError = null,
-};
-
-/// Caller-owned storage. Only entries in the completed prefix have valid output.
-pub const ReadBuffer = struct {
-    data: []u8,
-    size: usize = 0,
-    source: ?SocketAddress = null,
-};
-
-/// Lends payload storage for a read attempt. The provider retains ownership
-/// of descriptors and payloads, and its context must outlive their use.
-pub const ReadBuffers = struct {
-    context: ?*anyopaque = null,
-
-    /// Lend writable buffers for one read attempt. Each buffer must have nonzero
-    /// capacity. An empty slice requests that reading pause.
-    acquire: *const fn (?*anyopaque) []ReadBuffer,
-
-    /// Return the entire loan after the read attempt and any on_read callback.
-    /// Called once per acquisition, even when nothing was read or a read failed.
-    /// Only result.count entries have valid size/source fields; the rest are unused.
-    /// The owner may now reuse or recycle the storage. Release does not imply free.
-    release: *const fn (?*anyopaque, []ReadBuffer, IOResult) void,
-};
-
 /// Deferred readiness, system, side I/O, or consumer callback failure.
 pub const Failure = union(enum) {
     wait: c_int,
@@ -96,57 +61,6 @@ pub const WriteOOBError = SubmissionError || Error || error{
     MissingDestination,
     OOBOutsideQueue,
     WriteIncomplete,
-};
-
-pub const WriteCopy = struct {
-    allocator: std.mem.Allocator,
-    packets: []Packet,
-
-    /// Copies before submitting; the completion releases accepted packets.
-    pub fn submit(allocator: std.mem.Allocator, looper: anytype, packets: Packets, side: Side, destination: ?SocketAddress) (SubmissionError || error{MissingDestination})!void {
-        if (packets.len == 0) return;
-        const copy = try create(allocator, packets);
-        errdefer copy.destroy();
-        looper.writeQueued(copy.packets, side, destination, .{ .context = copy, .callback = complete }) catch |err| switch (err) {
-            error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
-            else => |failure| return failure,
-        };
-    }
-
-    fn create(
-        allocator: std.mem.Allocator,
-        packets: Packets,
-    ) std.mem.Allocator.Error!*WriteCopy {
-        const copies = try allocator.alloc(Packet, packets.len);
-        errdefer allocator.free(copies);
-        var copied: usize = 0;
-        errdefer {
-            for (copies[0..copied]) |packet| {
-                allocator.free(packet);
-            }
-        }
-        for (packets, copies) |packet, *copy| {
-            copy.* = try allocator.dupe(u8, packet);
-            copied += 1;
-        }
-        const self = try allocator.create(WriteCopy);
-        self.* = .{ .allocator = allocator, .packets = copies };
-        return self;
-    }
-
-    fn destroy(self: *WriteCopy) void {
-        const allocator = self.allocator;
-        for (self.packets) |packet| {
-            allocator.free(packet);
-        }
-        allocator.free(self.packets);
-        allocator.destroy(self);
-    }
-
-    fn complete(raw: ?*anyopaque, _: IOResult) void {
-        const self: *WriteCopy = @ptrCast(@alignCast(raw.?));
-        self.destroy();
-    }
 };
 
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };

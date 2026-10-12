@@ -149,11 +149,13 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait(pp_mux mux, int *error_code) {
+int pp_mux_wait(pp_mux mux, int timeout_ms, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     const int handles_count = pp_mux_build_handles(mux);
-    const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, INFINITE);
+    const DWORD timeout = timeout_ms < 0 ? INFINITE : (DWORD)timeout_ms;
+    const DWORD ret = WaitForMultipleObjects((DWORD)handles_count, mux->handles, FALSE, timeout);
+    if (ret == WAIT_TIMEOUT) return 0;
     if (ret == WAIT_FAILED) {
         const DWORD error = GetLastError();
         pp_clog_v(PPLogLevelFault, "pp_mux_wait WaitForMultipleObjects() failed: error=%lu", error);

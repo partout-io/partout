@@ -304,7 +304,6 @@ pub const ConnectionWriter = struct {
 
     pub const VTable = struct {
         write_packets: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void,
-        write_out_of_band: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) io.WriteOOBError!void,
         schedule_timer: *const fn (*anyopaque, *io.Timer, u64, io.TimedTask) io.SubmissionError!void,
         cancel_timer: *const fn (*anyopaque, *io.Timer) void,
     };
@@ -320,10 +319,6 @@ pub const ConnectionWriter = struct {
     /// The implementation consumes or copies packets before returning.
     pub fn writePackets(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
         return self.vtable.write_packets(self.ptr, packets, side, destination);
-    }
-
-    pub fn writeOutOfBand(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
-        return self.vtable.write_out_of_band(self.ptr, packets, side, destination);
     }
 
     pub fn scheduleTimer(self: ConnectionWriter, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {

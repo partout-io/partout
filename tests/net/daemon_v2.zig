@@ -20,8 +20,9 @@ const api = core.api;
 const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
-test "v2 daemon resets terminal status before retrying failed replacement link" {
+test "v2 daemon terminates and cancels after terminal looper failure" {
     // FIXME: ###, Enable when WindowsLooper delivers termination callbacks.
+    // Windows I/O polling is not implemented yet.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         const endpoint_list = [_]api.ExtendedEndpoint{
@@ -38,12 +39,20 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
             _: net.ConnectionModule,
             _: net.Sandbox,
         ) net.ConnectionCreateError!net.Connection {
-            return .{ .ptr = ptr.?, .vtable = &vtable };
+            return .{ .ptr = ptr.?, .vtable = &vtable, .daemon_io = .none };
+        }
+
+        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+            const connection: *FailingStartConnection = @ptrCast(@alignCast(raw));
+            const owner = connection.terminal_daemon.?.implementation.connection;
+            std.debug.assert(daemon.testing.isCurrentThread(owner));
+            owner.looper.stop() catch unreachable;
         }
 
         const vtable = blk: {
             var value = FailingStartConnection.vtable;
             value.endpoints = endpoints;
+            value.better_path = terminate;
             break :blk value;
         };
         const implementation_vtable = net.ConnectionImplementation.VTable{
@@ -77,11 +86,11 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         });
         defer sut.destroy();
         const connection_daemon = sut.implementation.connection;
+        connection.terminal_daemon = sut;
         try sut.start();
         defer sut.stop();
         try std.testing.expect(@TypeOf(connection_daemon.looper.*) == Looper);
-        connection_daemon.resume_gate_timer.cancel();
-        connection_daemon.resume_gate_timer.wait();
+        try cancelGateTimer(connection_daemon);
         try std.testing.expectError(error.AlreadyStarted, sut.start());
         // The mock has no event producers and the retry timer is drained.
         // Seed the pre-termination state without a legacy status callback.
@@ -96,47 +105,27 @@ test "v2 daemon resets terminal status before retrying failed replacement link" 
         tun.destroy();
         try std.testing.expect(controller.last_settings != null);
         const cleared_before = controller.clear_tunnel_settings_count;
-        try connection_daemon.looper.stop();
-        // Drain the termination notification and its queued recovery barrier.
-        try std.testing.expectError(error.AlreadyStarted, sut.start());
-        try std.testing.expectError(error.AlreadyStarted, sut.start());
+        try daemon.testing.perform(connection_daemon, .onBetterPath);
+        try waitForExit(connection_daemon);
+        try std.testing.expectError(error.Closed, sut.start());
+        try std.testing.expect(sut.state == .stopped);
         try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
         try std.testing.expect(!controller.reasserting);
         try std.testing.expectEqual(cleared_before + 1, controller.clear_tunnel_settings_count);
         try std.testing.expect(controller.last_settings == null);
-
-        // The replacement's factory rejected the link. Resuming the gate
-        // must attempt setup again and report another failure snapshot.
-        const snapshots = controller.report_snapshot_count;
-        try connection_daemon.actor.perform(void, .resumeGate);
-        try std.testing.expect(controller.report_snapshot_count > snapshots);
-        try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
-
-        // A terminal protocol failure uses the shared Daemon state to pause
-        // connection retries, even when host cancellation is disabled.
-        try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
-            .err_pair = api.openVPNErrorPair(.tlsFailure),
-            .disposition = .cancel,
-        } });
-        try std.testing.expect(sut.state == .failed);
+        // Looper failure is terminal even when protocol cancellation is disabled.
+        try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+        try std.testing.expect(connection_daemon.connection == null);
         try std.testing.expect(!connection_daemon.gate.isReady());
-        try std.testing.expectEqual(@as(usize, if (cancels) 1 else 0), controller.cancel_count);
-        try std.testing.expectEqualStrings("openVPN.tlsFailure", event_recorder.last_error_raw[0..event_recorder.last_error_len]);
-        if (cancels) try std.testing.expectEqualStrings("openVPN.tlsFailure", controller.last_cancel_raw[0..controller.last_cancel_len]);
-        const failed_snapshots = controller.report_snapshot_count;
-        try connection_daemon.actor.perform(void, .resumeGate);
-        try std.testing.expectEqual(failed_snapshots, controller.report_snapshot_count);
-        sut.hold();
-        try std.testing.expect(sut.state == .stopped);
-        try std.testing.expectEqualStrings("tlsFailure", sut.snapshot_publisher.last_error.?.sub_code.?);
     }
 }
 
-test "v2 daemon dispatches controls to looper and owns queued establishment metadata" {
+test "v2 daemon dispatches controls to actor and owns queued establishment metadata" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
-        looper: *Looper,
-        profile: *const api.Profile,
+        looper: *Looper = undefined,
+        daemon: *Daemon = undefined,
+        profile: *const api.Profile = undefined,
         reachability_count: usize = 0,
         stop_count: usize = 0,
         shutdown_count: usize = 0,
@@ -147,7 +136,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn shutdown(raw: *anyopaque, reason: net.Connection.ShutdownReason) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.shutdown_count += 1;
             switch (self.shutdown_count) {
                 1, 2 => std.debug.assert(reason == .failure and reason.failure == .reconnect),
@@ -156,44 +145,62 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
         }
         fn stop(raw: *anyopaque, _: u32, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
             std.debug.assert(!self.looper.isLinkAttached() and !self.looper.isTunAttached());
             self.stop_count += 1;
-            sink.stopped(sink.ctx);
+            const status = self.daemon.snapshot_publisher.environment.connection_status;
+            sink.emit(.stopped);
+            std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == status);
         }
         fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.reachability_count += 1;
-            sink.data_count(sink.ctx, .{});
+            sink.emit(.{ .data_count = .{} });
         }
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.looper.isOnQueue());
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             var servers = [_]api.Address{api.Address.parseRaw("1.1.1.1").?};
             const modules = [_]api.TaggedModule{.{ .DNS = .{
                 .id = "11111111-1111-4111-8111-111111111111".*,
                 .servers = &servers,
             } }};
-            sink.established(sink.ctx, .{
+            sink.emit(.{ .established = .{
                 .remote_endpoint = net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?) catch unreachable,
                 .info = .{
                     .profile = self.profile.*,
                     .original_module_id = "11111111-1111-4111-8111-111111111111".*,
                     .modules = &modules,
                 },
-            });
+            } });
             // This storage expires before the actor can process established.
             servers[0] = api.Address.parseRaw("9.9.9.9").?;
         }
         fn destroy(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(!self.looper.isOnQueue());
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.destroyed = true;
         }
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.looper = @ptrCast(@alignCast(sb.writer.?.ptr));
+            self.profile = sb.profile;
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
+        }
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const list = struct {
+                const value = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
+            };
+            return &list.value;
+        }
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
         const vtable = net.Connection.VTable{
+            .endpoints = endpoints,
             .start = start,
             .shutdown = shutdown,
             .stop = stop,
@@ -205,7 +212,8 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
     defer profile.deinit(allocator);
-    var registry = try net.ConnectionRegistry.init(allocator, &.{});
+    var probe = Probe{};
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
     defer registry.deinit(allocator);
     var controller = mock_mod.MockTunnelController{ .set_tunnel_settings_error = error.TunNotAvailable };
     var controller_vtable = controller.interface().vtable.*;
@@ -213,7 +221,7 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     controller_vtable.clear_tunnel_settings = struct {
         fn call(_: ?*anyopaque, _: bool) void {}
     }.call;
-    var monitor = mock_mod.MockNetworkMonitor{};
+    var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
     const sut = try Daemon.create(allocator, &profile, .{
         .objects = .{
             .registry = &registry,
@@ -226,55 +234,41 @@ test "v2 daemon dispatches controls to looper and owns queued establishment meta
     });
     defer sut.destroy();
     const connection_daemon = sut.implementation.connection;
-    var probe = Probe{ .looper = undefined, .profile = &sut.profile };
-    const endpoints = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
-    // Publish a runtime before any actor/looper work, without opening sockets.
-    {
-        const options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
-        const looper = try allocator.create(Looper);
-        errdefer allocator.destroy(looper);
-        looper.* = try Looper.init(allocator, options);
-        errdefer looper.deinit();
-        const link_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.link_buf_size);
-        errdefer link_storage.destroy();
-        const tun_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.tun_buf_size);
-        probe.looper = looper;
-        connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable };
-        connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
-        connection_daemon.looper = looper;
-        connection_daemon.read_storage = .{ link_storage, tun_storage };
-        sut.state = .started;
-    }
+    probe.daemon = sut;
+    // Publish the runtime on its actor through the normal startup path.
+    try sut.start();
     defer sut.stop();
+    // Test delayed gate readiness independently of automatic connection starts.
+    connection_daemon.gate.setReadyHandler(null);
+    monitor.reachable = true;
     sut.snapshot_publisher.setConnectionStatus(.connecting);
-    try connection_daemon.looper.start();
 
     // The factory rejects the link. The delayed callback must reenable the
     // gate even though no connection session ever started or emitted events.
     connection_daemon.gate.setReachabilityBlock(reachabilityBlock(&monitor));
     _ = connection_daemon.gate.setEnabled(true);
     sut.options.reconnection_delay_ms = 10;
-    try connection_daemon.actor.perform(void, .evaluateConnection);
-    connection_daemon.resume_gate_timer.wait();
+    try daemon.testing.evaluateConnection(connection_daemon);
+    try waitForGate(connection_daemon);
     try std.testing.expect(connection_daemon.gate.isReady());
     try std.testing.expectEqual(@as(usize, 0), probe.stop_count);
     sut.options.reconnection_delay_ms = 60_000;
 
-    try connection_daemon.actor.perform(void, .{ .onReachability = .{ .reachable = false } });
-    try connection_daemon.actor.perform(void, .onBetterPath);
-    try connection_daemon.actor.perform(void, .resumeGate); // Drain establishment and setup failure.
+    try daemon.testing.perform(connection_daemon, .{ .onReachability = .{ .reachable = false } });
+    try daemon.testing.perform(connection_daemon, .onBetterPath);
+    try daemon.testing.resumeGate(connection_daemon); // Drain establishment and setup failure.
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
     try std.testing.expectEqual(@as(usize, 1), controller.set_tunnel_settings_count);
     try std.testing.expectEqualStrings("1.1.1.1", controller.last_settings.?.dnsServer(0));
-    // The controller rejects establishment; stopping it also runs on looper.
+    // The controller rejects establishment; stopping it also runs on actor.
     try std.testing.expectEqual(@as(usize, 1), probe.stop_count);
     // A protocol failure must finalize the attempt just like setup failure:
-    // shutdown and stop must run in order on the looper before status changes.
-    try connection_daemon.actor.perform(void, .{ .onConnectionFailed = .{
+    // shutdown and stop must run in order on the actor before status changes.
+    try daemon.testing.perform(connection_daemon, .{ .onConnectionEvent = .{ .failed = .{
         .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
-    } });
-    try connection_daemon.actor.perform(void, .resumeGate); // Drain the queued stopped event.
+    } } });
+    try daemon.testing.resumeGate(connection_daemon); // Confirm stopped reporting completed.
     try std.testing.expectEqual(@as(usize, 2), probe.shutdown_count);
     try std.testing.expectEqual(@as(usize, 2), probe.stop_count);
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
@@ -400,7 +394,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
             self.create_count += 1;
             self.writer = sb.writer;
             self.profile = sb.profile;
-            return .{ .ptr = self, .vtable = &vtable };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
         }
         fn destroy(ptr: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(ptr));
@@ -475,6 +469,7 @@ test "v2 daemon owns the profile and rolls back connection startup allocations" 
 }
 
 const FailingStartConnection = struct {
+    terminal_daemon: ?*Daemon = null,
     start_count: usize = 0,
 
     fn implementation(self: *FailingStartConnection) net.ConnectionImplementation {
@@ -543,32 +538,41 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
     return monitor.reachable;
 }
 
-test "v2 daemon owns environment updates and delivers finalization clears on actor" {
-    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
+test "v2 daemon defers reporting with owned payloads and permits reentrant stop" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
         producer_thread: ?std.Thread.Id = null,
+        daemon: *Daemon = undefined,
+        delivered_updates: *const usize = undefined,
+        reporting_inline: bool = false,
+        producing: bool = false,
 
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.events = sb.events;
-            return .{ .ptr = self, .vtable = &vtable };
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
         }
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.producer_thread = std.Thread.getCurrentId();
+            self.producing = true;
+            defer self.producing = false;
             var key = "OpenVPN.serverConfiguration".*;
             var value = "{\"test\":true}".*;
-            // The actor is waiting for this looper operation to return, so it
-            // cannot consume the borrowed strings before we overwrite them.
-            sink.set_env(sink.ctx, &key, &value);
+            // Deferred reporting must copy strings before the producer changes them.
+            sink.emit(.{ .set_env = .{ .key = &key, .value = &value } });
+            self.daemon.snapshot_publisher.setConnectionStatus(.connected);
+            sink.emit(.{ .data_count = .{ .received = 10, .sent = 20 } });
+            self.reporting_inline = self.delivered_updates.* == 1 and
+                self.daemon.snapshot_publisher.environment.data_count.received == 10 and
+                self.daemon.snapshot_publisher.environment.data_count.sent == 20;
             @memset(&key, 'x');
             @memset(&value, 'x');
         }
         fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
-            sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", null);
-            sink.stopped(sink.ctx);
+            sink.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = null } });
+            sink.emit(.stopped);
         }
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
         fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -592,6 +596,9 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
         clears: usize = 0,
         delivery_thread: ?std.Thread.Id = null,
         valid_payload: bool = true,
+        factory: *Factory = undefined,
+        stop_on_update: bool = false,
+        delivered_outside_producer: bool = true,
 
         fn setEnvironment(raw: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
             const mock: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
@@ -602,6 +609,8 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             self.valid_payload = self.valid_payload and std.mem.eql(u8, key, "OpenVPN.serverConfiguration");
             if (value) |bytes| {
                 self.updates += 1;
+                self.delivered_outside_producer = self.delivered_outside_producer and !self.factory.producing;
+                if (self.stop_on_update) self.factory.daemon.stop();
                 self.valid_payload = self.valid_payload and std.mem.eql(u8, bytes, "{\"test\":true}");
             } else {
                 self.clears += 1;
@@ -629,24 +638,38 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
         .options = .{},
     });
     defer sut.destroy();
+    factory.daemon = sut;
+    factory.delivered_updates = &controller.updates;
+    controller.factory = &factory;
     try sut.start();
     defer sut.stop();
-    const actor = sut.implementation.connection.actor;
-    try actor.perform(void, .onBetterPath);
-    try actor.perform(void, .resumeGate);
+    const actor = sut.implementation.connection;
+    try daemon.testing.perform(actor, .onBetterPath);
+    try daemon.testing.resumeGate(actor);
+    try std.testing.expect(!factory.reporting_inline);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
-    try std.testing.expect(controller.delivery_thread.? != factory.producer_thread.?);
+    try std.testing.expectEqual(factory.producer_thread.?, controller.delivery_thread.?);
     try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
 
-    sut.stop();
-    try actor.perform(void, .resumeGate);
+    controller.stop_on_update = true;
+    try daemon.testing.perform(actor, .onBetterPath);
+    try daemon.testing.resumeGate(actor);
+    try daemon.testing.resumeGate(actor);
+    try std.testing.expect(controller.delivered_outside_producer);
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
     const sink = factory.events.?;
-    sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", "stale");
-    try actor.perform(void, .resumeGate);
-    try std.testing.expectEqual(@as(usize, 1), controller.updates);
+    try daemon.testing.onLoop(actor, sink, struct {
+        fn run(_: anytype, events: net.Connection.Events) daemon.Error!void {
+            events.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = "stale" } });
+            events.emit(.{ .data_count = .{ .received = 99, .sent = 99 } });
+            events.emit(.stopped);
+        }
+    }.run);
+    try daemon.testing.resumeGate(actor);
+    try std.testing.expectEqual(@as(usize, 2), controller.updates);
+    try std.testing.expectEqual(@as(u64, 0), sut.snapshot_publisher.environment.data_count.received);
     try std.testing.expect(controller.valid_payload);
 }
 
@@ -670,6 +693,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         socket_connected: ?bool = null,
         remote: ?net.RemoteDescriptor = null,
         start_count: usize = 0,
+        startup_count_reports: usize = 0,
         commit_count: usize = 0,
         commit_error: ?net.ConnectionStartError = null,
         tun_cleanup_count: usize = 0,
@@ -687,10 +711,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            std.debug.assert(self.daemon.implementation.connection.looper.isOnQueue() == (self.daemon_io == .looper));
-            if (self.daemon_io != .looper) {
-                std.testing.expectError(error.LooperUnavailable, self.daemon.implementation.connection.looper.perform(void, null, idleCheck)) catch unreachable;
-            }
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.start_count += 1;
             self.remote = remote;
             self.link_attached = self.daemon.implementation.connection.looper.isLinkAttached();
@@ -704,13 +725,26 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 // Queue an event ahead of where an asynchronous established event
                 // would land. It must see commit completed when the actor resumes.
                 self.startup_reachability_pending = true;
-                self.daemon.implementation.connection.actor.schedule(.{ .onReachability = .{ .reachable = true } }) catch return error.UnableToStart;
+                daemon.testing.schedule(self.daemon.implementation.connection, .{ .onReachability = .{ .reachable = true } }) catch return error.UnableToStart;
+                // WireGuard reports its initial counters before returning success.
+                self.events.emit(.{ .data_count = .{ .received = 123, .sent = 456 } });
                 return .{ .established = .{ .info = info.clone(std.testing.allocator) catch return error.OutOfMemory } };
             }
-            self.events.established(self.events.ctx, .{ .info = info });
+            self.events.emit(.{ .established = .{ .info = info } });
+            self.events.emit(.{ .data_count = .{ .received = 123, .sent = 456 } });
             return .started;
         }
-        fn idleCheck(_: ?*anyopaque) anyerror!void {}
+        fn reportDataCount(raw: *anyopaque, count: api.DataCount) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
+            std.debug.assert(self.commit_count == 1 and self.established_tun != null);
+            std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .connected);
+            std.debug.assert(count.received == 123 and count.sent == 456);
+            self.startup_count_reports += 1;
+        }
+        fn status(_: *anyopaque, _: api.ConnectionStatus) void {}
+        fn lastErrorEvent(_: *anyopaque, _: api.PartoutErrorPair) void {}
+        fn remove(_: *anyopaque, _: daemon.EventKey) void {}
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
@@ -724,12 +758,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.remote = remote;
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
-            self.events.needs_rebind(self.events.ctx);
+            self.events.emit(.needs_rebind);
             return true;
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.needs_rebind(events.ctx);
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
+            events.emit(.needs_rebind);
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -738,7 +772,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -840,7 +874,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 factory_table.create = Probe.socket;
                 const sut = try Daemon.create(allocator, &profile, .{
                     .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
-                    .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
+                    .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000, .events = .{ .ctx = &probe, .status = Probe.status, .last_error = Probe.lastErrorEvent, .data_count = Probe.reportDataCount, .remove_key = Probe.remove } },
                 });
                 defer sut.destroy();
                 probe.daemon = sut;
@@ -851,7 +885,9 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (scenario.sync_establish and daemon_io != .looper) {
                     try std.testing.expect(probe.startup_reachability_saw_commit);
                 }
+                try std.testing.expectEqual(@as(usize, if (daemon_io != .looper and commit_error == null) 1 else 0), probe.startup_count_reports);
                 if (commit_error) |err| {
+                    try std.testing.expectEqual(@as(u64, 0), sut.snapshot_publisher.environment.data_count.received);
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
                     try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
                     try std.testing.expect(probe.established_tun == null);
@@ -875,6 +911,8 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (daemon_io != .looper) {
                     const owner = sut.implementation.connection;
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    try std.testing.expectEqual(@as(u64, 123), sut.snapshot_publisher.environment.data_count.received);
+                    try std.testing.expectEqual(@as(u64, 456), sut.snapshot_publisher.environment.data_count.sent);
                     try std.testing.expect(probe.established_tun != null);
                     try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
                 }
@@ -888,11 +926,11 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (daemon_io != .looper) {
                     const owner = sut.implementation.connection;
                     const tun = probe.established_tun.?;
-                    try owner.actor.perform(void, .onBetterPath);
+                    try daemon.testing.perform(owner, .onBetterPath);
                     // Duplicate queued requests and requests during handoff share one rebind.
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
-                    try owner.actor.perform(void, .{ .onReachability = .{ .reachable = true } });
+                    try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } });
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
                     if (daemon_io == .none) {
@@ -963,7 +1001,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -1012,7 +1050,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
         if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
-            try sut.implementation.connection.actor.perform(void, .onBetterPath);
+            try daemon.testing.perform(sut.implementation.connection, .onBetterPath);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
         }
         sut.stop();
@@ -1021,5 +1059,423 @@ test "v2 daemon-created link is released on failed start or rebind" {
         try std.testing.expectEqual(@as(usize, if (scenario == .rebind_false or scenario == .rebind_error) 1 else 0), probe.rebind_count);
         try std.testing.expect(probe.remote == null);
         try std.testing.expectEqual(@as(c_int, -1), std.c.fcntl(probe.last_fd, std.c.F.GETFD));
+    }
+}
+
+test "v2 event loop flushes graceful shutdown and finalizes terminal failure on its thread" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Atomic = std.atomic.Value(usize);
+    const Probe = struct {
+        daemon: *Daemon = undefined,
+        writer: net.ConnectionWriter = undefined,
+        fd: io.FileDescriptor,
+        timer: io.Timer = .{},
+        created: Atomic = .init(0),
+        ticks: Atomic = .init(0),
+        reads: Atomic = .init(0),
+        writes: Atomic = .init(0),
+        cleaned: usize = 0,
+        destroyed: usize = 0,
+        stopped: usize = 0,
+        starts: usize = 0,
+        termination_count: usize = 0,
+        output: [64]u8 = undefined,
+        output_len: usize = 0,
+
+        fn onActor(self: *@This()) void {
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
+        }
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            self.writer = sb.writer.?;
+            self.timer = .{};
+            _ = self.created.fetchAdd(1, .release);
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .looper };
+        }
+        fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const list = struct {
+                const value = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
+            };
+            return &list.value;
+        }
+        fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(self.daemon.implementation.connection.looper.isLinkAttached());
+            self.starts += 1;
+            // The retry timer must reattach LINK outside the looper callback.
+            if (self.starts == 1) return .failed;
+            self.writer.writePackets(&.{"start"}, .link, null) catch return error.UnableToStart;
+            if (self.created.load(.acquire) == 1) {
+                self.writer.scheduleTimer(&self.timer, 20, .{ .context = self, .callback = tick }) catch return error.UnableToStart;
+            }
+            return .started;
+        }
+        fn tick(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            self.writer.writePackets(&.{"timer"}, .link, null) catch unreachable;
+            _ = self.ticks.fetchAdd(1, .release);
+        }
+        fn submit(raw: *anyopaque, side: io.Side, packets: io.Packets, sources: ?[]const io.SocketAddress) io.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(side == .link and sources == null);
+            self.writer.writePackets(packets, .link, null) catch unreachable;
+            _ = self.reads.fetchAdd(packets.len, .release);
+            return .keep;
+        }
+        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.daemon.implementation.connection.looper.stop() catch unreachable;
+        }
+        fn terminated(raw: *anyopaque, failure: ?io.Failure) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(failure == null);
+            self.writer.cancelTimer(&self.timer);
+            self.termination_count += 1;
+        }
+        fn shutdown(raw: *anyopaque, _: net.Connection.ShutdownReason) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.writer.cancelTimer(&self.timer);
+            // The rejected first start has no active protocol to shut down.
+            if (self.starts == 1) return;
+            self.writer.writePackets(&.{"exit"}, .link, null) catch |err| {
+                std.debug.assert(err == error.LooperUnavailable);
+            };
+        }
+        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            std.debug.assert(!self.daemon.implementation.connection.looper.isLinkAttached());
+            self.stopped += 1;
+        }
+        fn destroy(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.destroyed += 1;
+        }
+        fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.onActor();
+            return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            const count = std.c.read(self.fd, data.ptr, data.len);
+            if (count < 0) return error.WouldBlock;
+            return @intCast(count);
+        }
+        fn write(raw: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            const remaining = data[offset..];
+            @memcpy(self.output[self.output_len..][0..remaining.len], remaining);
+            self.output_len += remaining.len;
+            _ = self.writes.fetchAdd(1, .release);
+            return remaining.len;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.onActor();
+            self.cleaned += 1;
+        }
+        fn code(_: *anyopaque) c_int {
+            return 0;
+        }
+        fn wait(value: *const Atomic, expected: usize) !void {
+            const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+            while (value.load(.acquire) < expected) {
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+        }
+        const io_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = code,
+        };
+        const vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.endpoints = endpoints;
+            table.start_v2 = start;
+            table.submit_packets = submit;
+            table.better_path = terminate;
+            table.looper_terminated = terminated;
+            table.shutdown = shutdown;
+            table.stop = stop;
+            table.destroy = destroy;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const Shutdown = enum { terminal, stop, reconnect };
+    for ([_]Shutdown{ .terminal, .stop, .reconnect }) |shutdown| {
+        const terminal = shutdown == .terminal;
+        var fds: [2]std.c.fd_t = undefined;
+        try std.testing.expectEqual(0, std.c.pipe(&fds));
+        defer _ = std.c.close(fds[0]);
+        defer _ = std.c.close(fds[1]);
+        const flags = std.c.fcntl(fds[0], std.c.F.GETFL, @as(c_int, 0));
+        try std.testing.expect(flags >= 0);
+        try std.testing.expect(std.c.fcntl(fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
+        const allocator = std.testing.allocator;
+        var probe = Probe{ .fd = fds[0] };
+        var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+        defer registry.deinit(allocator);
+        var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        var factory_table = mock_mod.noopSocketFactory().vtable.*;
+        factory_table.create = Probe.socket;
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = .{ .ptr = &probe, .vtable = &factory_table },
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = true, .reconnection_delay_ms = 1, .connection_options = .{ .connect_udp = true } },
+        });
+        defer sut.destroy();
+        probe.daemon = sut;
+        try sut.start();
+        defer sut.stop();
+        // The actor drives these writes and timer while its mailbox is idle.
+        try Probe.wait(&probe.writes, 2);
+        try std.testing.expectEqual(@as(usize, 1), probe.ticks.load(.acquire));
+        try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "in", 2));
+        try Probe.wait(&probe.writes, 3);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads.load(.acquire));
+        const owner = sut.implementation.connection;
+        if (terminal) {
+            // Terminal failure finalizes without a usable link and cancels the host.
+            try daemon.testing.perform(owner, .onBetterPath);
+            try waitForExit(owner);
+        } else {
+            if (shutdown == .reconnect) {
+                // Keep the next attempt dormant while inspecting failure shutdown.
+                try daemon.testing.onLoop(owner, {}, struct {
+                    fn run(loop: anytype, _: void) daemon.Error!void {
+                        loop.daemon.options.reconnection_delay_ms = 60_000;
+                    }
+                }.run);
+                try daemon.testing.perform(owner, .{ .onConnectionEvent = .{ .failed = .{
+                    .err_pair = .{ .code = .networkChanged },
+                    .disposition = .reconnect,
+                } } });
+                try std.testing.expectEqualStrings("starttimerinexit", probe.output[0..probe.output_len]);
+                try std.testing.expectEqual(@as(usize, 2), probe.stopped);
+                try std.testing.expectEqual(@as(usize, 0), probe.destroyed);
+            }
+            // Both reconnect and explicit stop must flush before detaching LINK.
+            sut.stop();
+        }
+        try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
+        try std.testing.expectEqualStrings(if (terminal) "starttimerin" else "starttimerinexit", probe.output[0..probe.output_len]);
+        try std.testing.expectEqual(@as(usize, if (terminal) 3 else 4), probe.writes.load(.acquire));
+        try std.testing.expectEqual(@as(usize, 2), probe.starts);
+        try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
+        try std.testing.expectEqual(@as(usize, 1), probe.destroyed);
+        try std.testing.expectEqual(@as(usize, if (shutdown == .reconnect) 3 else 2), probe.stopped);
+        try std.testing.expectEqual(@as(usize, if (terminal) 1 else 0), controller.cancel_count);
+        if (terminal) try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
+        try std.testing.expect(sut.state == .stopped);
+    }
+}
+
+fn cancelGateTimer(owner: anytype) !void {
+    try daemon.testing.onLoop(owner, {}, struct {
+        fn run(loop: anytype, _: void) daemon.Error!void {
+            loop.looper.cancelTimer(&loop.resume_gate_timer);
+        }
+    }.run);
+}
+
+fn waitForGate(owner: anytype) !void {
+    const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+    while (core.monotonicNs() < deadline) {
+        var ready = false;
+        try daemon.testing.onLoop(owner, &ready, struct {
+            fn run(loop: anytype, out: *bool) daemon.Error!void {
+                out.* = loop.gate.isReady();
+            }
+        }.run);
+        if (ready) return;
+        core.sleepMs(1);
+    }
+    return error.Timeout;
+}
+
+fn waitForExit(owner: anytype) !void {
+    const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+    while (core.monotonicNs() < deadline) {
+        owner.jobs_mutex.lock();
+        const exited = owner.actor_id == null;
+        owner.jobs_mutex.unlock();
+        if (exited) return;
+        core.sleepMs(1);
+    }
+    return error.Timeout;
+}
+
+test "v2 event loop completes pending performs and releases discarded payloads on shutdown" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    var connection = FailingStartConnection{};
+    var registry = try net.ConnectionRegistry.init(allocator, &.{connection.implementation()});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller = mock_mod.MockTunnelController{};
+    var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{},
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+
+    // Nested perform executes inline and preserves its domain error.
+    var nested_error = false;
+    try daemon.testing.onLoop(owner, &nested_error, struct {
+        fn run(loop: anytype, saw_error: *bool) daemon.Error!void {
+            daemon.testing.perform(loop, .start) catch |err| {
+                saw_error.* = err == error.AlreadyStarted;
+                return;
+            };
+        }
+    }.run);
+    try std.testing.expect(nested_error);
+    try std.testing.expectError(error.AlreadyStarted, sut.start());
+
+    const Probe = struct {
+        entered: std.atomic.Value(bool) = .init(false),
+        released: std.atomic.Value(bool) = .init(false),
+        waiter_closed: std.atomic.Value(bool) = .init(false),
+        blocker_error: ?anyerror = null,
+        fn block(loop: anytype, self: *@This()) daemon.Error!void {
+            std.debug.assert(daemon.testing.isCurrentThread(loop));
+            self.entered.store(true, .release);
+            const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+            while (!self.released.load(.acquire) and core.monotonicNs() < deadline) core.sleepMs(1);
+        }
+        fn blocker(loop: anytype, self: *@This()) void {
+            daemon.testing.onLoop(loop, self, block) catch |err| {
+                self.blocker_error = err;
+            };
+        }
+        fn waiter(loop: anytype, self: *@This()) void {
+            daemon.testing.perform(loop, .start) catch |err| {
+                self.waiter_closed.store(err == error.Closed, .release);
+            };
+        }
+    };
+    var probe = Probe{};
+    const blocker = try std.Thread.spawn(.{}, Probe.blocker, .{ owner, &probe });
+    defer blocker.join();
+    defer probe.released.store(true, .release);
+    const deadline = core.monotonicNs() + std.time.ns_per_s;
+    while (!probe.entered.load(.acquire)) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+
+    // Successful enqueue transfers these allocations to the event loop.
+    const info = api.TunnelRemoteInfoWrapper{
+        .profile = profile,
+        .original_module_id = source.net_connection.activeConnectionModule(&profile).?.id(),
+    };
+    // The testing allocator detects leaks if discarded establishment metadata is retained.
+    try daemon.testing.schedule(owner, .{ .onConnectionEvent = .{ .established = .{ .info = try info.clone(allocator) } } });
+    const waiter = try std.Thread.spawn(.{}, Probe.waiter, .{ owner, &probe });
+    defer waiter.join();
+    defer probe.released.store(true, .release);
+    while (true) {
+        owner.jobs_mutex.lock();
+        const queued = if (owner.jobs.tail) |tail| !tail.owned else false;
+        owner.jobs_mutex.unlock();
+        if (queued) break;
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    daemon.testing.shutdown(owner);
+    probe.released.store(true, .release);
+    try waitForExit(owner);
+    const completion_deadline = core.monotonicNs() + std.time.ns_per_s;
+    while (!probe.waiter_closed.load(.acquire)) {
+        if (core.monotonicNs() >= completion_deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    try std.testing.expect(sut.state == .stopped);
+    try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
+    try std.testing.expectError(error.Closed, daemon.testing.schedule(owner, .onBetterPath));
+}
+
+test "v2 terminal protocol failure pauses retries and honors cancellation policy" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+    for ([_]bool{ false, true }) |cancels| {
+        var connection = FailingStartConnection{};
+        var registry = try net.ConnectionRegistry.init(allocator, &.{connection.implementation()});
+        defer registry.deinit(allocator);
+        var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var recorder = mock_mod.DaemonEventRecorder{};
+        var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .events = recorder.events(), .cancels_unrecoverable = cancels },
+        });
+        defer sut.destroy();
+        try sut.start();
+        defer sut.stop();
+        const owner = sut.implementation.connection;
+        try daemon.testing.perform(owner, .{ .onConnectionEvent = .{ .failed = .{
+            .err_pair = api.openVPNErrorPair(.tlsFailure),
+            .disposition = .cancel,
+        } } });
+        try std.testing.expect(sut.state == .failed);
+        try std.testing.expect(!owner.gate.isReady());
+        try std.testing.expectEqual(@as(usize, if (cancels) 1 else 0), controller.cancel_count);
+        try std.testing.expectEqualStrings("openVPN.tlsFailure", recorder.last_error_raw[0..recorder.last_error_len]);
+        if (cancels) try std.testing.expectEqualStrings("openVPN.tlsFailure", controller.last_cancel_raw[0..controller.last_cancel_len]);
+        const snapshots = controller.report_snapshot_count;
+        try daemon.testing.resumeGate(owner);
+        try std.testing.expectEqual(snapshots, controller.report_snapshot_count);
+        sut.hold();
+        try std.testing.expect(sut.state == .stopped);
+        try std.testing.expectEqualStrings("tlsFailure", sut.snapshot_publisher.last_error.?.sub_code.?);
     }
 }

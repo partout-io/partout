@@ -92,6 +92,7 @@ pub const MockConnectionEnvironment = struct {
         errdefer executor.destroy();
         self.* = .{
             .looper = if (runtime_policy.v2_only) {} else try Looper.init(allocator, .{
+                .mux = null,
                 .on_finish = .{ .callback = onLooperFinish },
             }),
             .executor = executor,

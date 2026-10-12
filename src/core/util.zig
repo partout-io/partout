@@ -29,6 +29,34 @@ pub fn Fifo(comptime Node: type) type {
             return node;
         }
 
+        /// Removes a specific node, preserving the order of the others.
+        /// Returns false if the node does not belong to this queue.
+        pub fn remove(self: *Self, node: *Node) bool {
+            const Match = struct {
+                fn pointer(candidate: *const Node, target: *Node) bool {
+                    return candidate == target;
+                }
+            };
+            return self.removeWhere(node, Match.pointer) != null;
+        }
+
+        /// Unlinks the first matching node in one traversal. The predicate must
+        /// not mutate the queue. Ownership of the returned node passes to caller.
+        pub fn removeWhere(self: *Self, context: anytype, comptime matches: fn (*const Node, @TypeOf(context)) bool) ?*Node {
+            var previous: ?*Node = null;
+            var current = self.head;
+            while (current) |candidate| : (current = candidate.next) {
+                if (matches(candidate, context)) {
+                    if (previous) |before| before.next = candidate.next else self.head = candidate.next;
+                    if (self.tail == candidate) self.tail = previous;
+                    candidate.next = null;
+                    return candidate;
+                }
+                previous = candidate;
+            }
+            return null;
+        }
+
         /// Detaches the entire chain, preserving its links for traversal.
         pub fn takeAll(self: *Self) ?*Node {
             const head = self.head;

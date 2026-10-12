@@ -36,5 +36,6 @@ pub const SerializeError = registry.SerializeError;
 pub const SerializedExecutor = concurrency.SerializedExecutor;
 
 pub const isGeneratedId = uuid.isV4;
+pub const monotonicNs = concurrency.monotonicNs;
 pub const newId = uuid.newId;
 pub const sleepMs = concurrency.sleepMs;
