@@ -385,6 +385,7 @@ const ConnectionDaemon = struct {
         errdefer io_c.pp_mux_free(mux);
         const looper = Looper.create(allocator, .{
             .mux = mux,
+            // FIXME: ###, Delete after v2
             .on_finish = .{
                 .callback = struct {
                     fn call(_: ?*anyopaque, _: ?Looper.Failure) void {
@@ -487,30 +488,6 @@ const ConnectionDaemon = struct {
             .last_error = legacyLastError,
             .cancel = legacyCancel,
         };
-    }
-
-    const writer_vtable: net.ConnectionWriter.VTable = .{
-        .write_packets = writePackets,
-        .schedule_timer = scheduleTimer,
-        .cancel_timer = cancelTimer,
-    };
-
-    fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
-        const looper: *Looper = @ptrCast(@alignCast(raw));
-        looper.write(packets, side, destination) catch |err| switch (err) {
-            error.SideNotAttached, error.InvalidBuffers => {},
-            else => |failure| return failure,
-        };
-    }
-
-    fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
-        const looper: *Looper = @ptrCast(@alignCast(raw));
-        return looper.scheduleTimer(timer, delay_ms, task);
-    }
-
-    fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {
-        const looper: *Looper = @ptrCast(@alignCast(raw));
-        looper.cancelTimer(timer);
     }
 
     fn onConnectionEstablished(
@@ -1175,9 +1152,33 @@ const ConnectionDaemon = struct {
         conn.looperFailed(.tun, failure);
     }
 
+    const writer_vtable: net.ConnectionWriter.VTable = .{
+        .write_packets = writePackets,
+        .schedule_timer = scheduleTimer,
+        .cancel_timer = cancelTimer,
+    };
+
+    fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        looper.write(packets, side, destination) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => {},
+            else => |failure| return failure,
+        };
+    }
+
+    fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        return looper.scheduleTimer(timer, delay_ms, task);
+    }
+
+    fn cancelTimer(raw: *anyopaque, timer: *io.Timer) void {
+        const looper: *Looper = @ptrCast(@alignCast(raw));
+        looper.cancelTimer(timer);
+    }
+
     //#endregion
 
-    //#region Actor interface
+    //#region Event loop
 
     // Mailbox messages enter through perform on the actor. actorDidFinish also
     // runs on that thread and completes serialized shutdown before it exits.
