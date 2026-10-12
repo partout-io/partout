@@ -326,8 +326,21 @@ const SettingsDaemon = struct {
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
     const Job = struct {
-        message: Message,
+        command: Command,
+        done: bool = false,
+        result: Error!void = {},
         next: ?*Job = null,
+
+        fn isOwned(self: *const Job) bool {
+            return self.command == .message;
+        }
+    };
+    const Command = union(enum) {
+        message: Message,
+        perform: struct {
+            context: *anyopaque,
+            callback: *const fn (*ConnectionDaemon, *anyopaque) Error!void,
+        },
     };
 
     // Shared lifecycle and reporting, plus connection-specific dependencies.
@@ -342,8 +355,9 @@ const ConnectionDaemon = struct {
     mux: io_c.pp_mux,
     actor: std.Thread,
     looper: *Looper,
-    mutex: core.Mutex,
     jobs: core.Fifo(Job),
+    jobs_mutex: core.Mutex,
+    jobs_condition: core.concurrency.Condition = .{},
     is_running: bool,
 
     // Internal state
@@ -389,8 +403,9 @@ const ConnectionDaemon = struct {
             .mux = mux,
             .actor = undefined,
             .looper = looper,
-            .mutex = .{},
             .jobs = .{},
+            .jobs_mutex = .{},
+            .jobs_condition = .{},
             .is_running = true,
             .module = module,
             .registry = objects.registry,
@@ -404,7 +419,8 @@ const ConnectionDaemon = struct {
             .resume_gate_timer = .{},
             .is_evaluating_connection = false,
         };
-        errdefer self.mutex.deinit();
+        errdefer self.jobs_mutex.deinit();
+        errdefer self.jobs_condition.deinit();
         errdefer self.gate.deinit();
         errdefer self.resume_gate_timer.deinit();
         self.actor = std.Thread.spawn(.{}, run, .{self}) catch return error.OutOfMemory;
@@ -428,7 +444,8 @@ const ConnectionDaemon = struct {
         if (self.connection != null)
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
 
-        self.mutex.deinit();
+        self.jobs_mutex.deinit();
+        self.jobs_condition.deinit();
         io_c.pp_mux_free(self.mux);
         self.daemon.allocator.destroy(self);
 
@@ -455,27 +472,33 @@ const ConnectionDaemon = struct {
         var running = true;
         while (running) {
             // Fetch pending jobs if any.
-            self.mutex.lock();
+            self.jobs_mutex.lock();
             running = self.is_running;
             _ = io_c.pp_mux_reset_wake(self.mux);
             const maybe_jobs = self.jobs.takeAll();
-            self.mutex.unlock();
+            self.jobs_mutex.unlock();
 
             // Drain fetched jobs.
             var pending = maybe_jobs;
             while (pending) |job| {
                 pending = job.next;
-                // Ignore but deallocate jobs if thread was stopped.
-                if (running) {
-                    log.writef(.debug, "Run job: {s}", .{@tagName(job.message)});
-                    const keep_alive = self.dispatch(job.message) catch |err| blk: {
-                        log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
-                        break :blk true;
-                    };
-                    // A dispatched message may also stop the thread.
-                    if (!keep_alive) running = false;
-                }
-                self.daemon.allocator.destroy(job);
+
+                // Run jobs if thread is still running.
+                const is_owned = job.isOwned();
+                const result = if (running) self.executeJob(job.command) else error.Closed;
+                result catch |err| {
+                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
+                };
+
+                // Notify synchronous performs.
+                self.jobs_mutex.lock();
+                job.done = true;
+                job.result = result;
+                self.jobs_condition.broadcast();
+                running = self.is_running;
+                self.jobs_mutex.unlock();
+
+                if (is_owned) self.daemon.allocator.destroy(job);
             }
             if (!running) break;
 
@@ -490,48 +513,88 @@ const ConnectionDaemon = struct {
         }
 
         // Signal finalization to close job submissions.
-        self.mutex.lock();
+        self.jobs_mutex.lock();
         self.is_running = false;
         var pending = self.jobs.takeAll();
-        self.mutex.unlock();
+        self.jobs_mutex.unlock();
 
         // Drain outstanding jobs.
         while (pending) |job| {
             pending = job.next;
-            self.daemon.allocator.destroy(job);
+            self.jobs_mutex.lock();
+            const is_owned = job.isOwned();
+            job.result = error.Closed;
+            job.done = true;
+            self.jobs_condition.broadcast();
+            self.jobs_mutex.unlock();
+
+            if (is_owned) self.daemon.allocator.destroy(job);
         }
     }
 
-    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
-        _ = self;
-        _ = message;
-        @panic("FIXME: ###");
+    fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
+        switch (command) {
+            .message => |message| return try self.dispatch(void, message),
+            .perform => |request| return request.callback(self, request.context),
+        }
     }
 
     fn schedule(self: *ConnectionDaemon, message: Message) !void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        if (!self.is_running) return;
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return error.Closed;
+
         var job = try self.daemon.allocator.create(Job);
-        job.message = message;
+        job.command = .{ .message = message };
         self.jobs.append(job);
         _ = io_c.pp_mux_wake(self.mux);
     }
 
+    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+        const Request = struct {
+            message: Message,
+            result: Result = undefined,
+
+            fn call(context: *ConnectionDaemon, opaque_request: *anyopaque) Error!void {
+                const request: *@This() = @ptrCast(@alignCast(opaque_request));
+                request.result = try dispatch(context, Result, request.message);
+            }
+        };
+
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return error.Closed;
+
+        var request = Request{ .message = message };
+        var job = Job{ .command = .{ .perform = .{
+            .context = &request,
+            .callback = Request.call,
+        } } };
+        self.jobs.append(&job);
+        _ = io_c.pp_mux_wake(self.mux);
+        while (!job.done) {
+            self.jobs_condition.wait(&self.jobs_mutex);
+        }
+        try job.result;
+        return request.result;
+    }
+
     fn shutdown(self: *ConnectionDaemon) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return;
         self.is_running = false;
         _ = io_c.pp_mux_wake(self.mux);
     }
 
-    fn dispatch(self: *ConnectionDaemon, message: Message) !bool {
+    fn dispatch(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+        log.writef(.debug, "Dispatch message: {s}", .{@tagName(message)});
         switch (message) {
             .start => try self.doStart(),
             .hold => self.doStop(.preserve_environment),
             .stop => {
                 self.doStop(.clear_environment);
-                return false;
+                self.shutdown();
             },
             .onReachability => |info| self.handleReachability(info),
             .onBetterPath => self.handleBetterPath(),
@@ -539,7 +602,6 @@ const ConnectionDaemon = struct {
                 // FIXME: ###, Delete other cases
             },
         }
-        return true;
     }
 
     //#endregion
