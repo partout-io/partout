@@ -793,23 +793,12 @@ const ConnectionDaemon = struct {
     // complete state before starting any looper callbacks.
     fn createConnection(self: *ConnectionDaemon) Error!void {
         std.debug.assert(self.connection == null);
-        const options: Looper.Options = .{
-            .mux = self.mux,
-            .on_finish = .{ .context = self, .callback = onLooperTerminate },
-        };
-        const looper = try self.daemon.allocator.create(Looper);
-        errdefer self.daemon.allocator.destroy(looper);
-        looper.* = Looper.init(self.daemon.allocator, options) catch |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.MuxFailure => error.LooperFailure,
-        };
-        errdefer looper.deinit();
         const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
             .profile = &self.daemon.profile,
             .options = self.daemon.options.connection_options,
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
-            .writer = net.ConnectionWriter.init(looper, &writer_vtable),
+            .writer = net.ConnectionWriter.init(self.looper, &writer_vtable),
             // FIXME: ###, Delete all these from Sandbox
             .controller = self.daemon.controller,
             .resolver = self.resolver,
@@ -821,19 +810,11 @@ const ConnectionDaemon = struct {
         errdefer self.connection = null;
         self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
         errdefer if (self.endpoint_resolver) |*resolver| resolver.deinit();
-        self.looper = looper;
     }
 
     fn releaseConnection(self: *ConnectionDaemon) void {
         const connection = self.connection orelse return;
-        // Stop I/O on the actor, retaining the looper until Connection has
-        // released the sessions that use its writer and timers.
-        self.looper.stop() catch |err| {
-            log.writef(.debug, "Unable to stop connection looper: {s}", .{@errorName(err)});
-        };
         connection.destroy();
-        self.looper.deinit();
-        self.daemon.allocator.destroy(self.looper);
         if (self.endpoint_resolver) |*resolver| resolver.deinit();
         self.endpoint_resolver = null;
         self.connection = null;
@@ -847,8 +828,6 @@ const ConnectionDaemon = struct {
         reason: Connection.ShutdownReason,
     ) !void {
         _ = try self.callConnection(.{ .shutdown = reason });
-        // Give queued shutdown notifications one nonblocking write attempt.
-        if (self.connection.?.daemon_io == .looper) _ = self.looper.loopOnce(0);
         try self.detachLooperSides();
         _ = try self.callConnection(.{ .stop = timeout_ms });
     }
@@ -1272,14 +1251,6 @@ const ConnectionDaemon = struct {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelFailure but no connection");
         conn.looperFailed(.tun, failure);
-    }
-
-    fn onLooperTerminate(ctx: ?*anyopaque, failure: ?Looper.Failure) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.connection.?.looperTerminated(failure);
-        self.actor.schedule(.{ .onLooperTerminated = failure }) catch |err| {
-            log.writef(.debug, "Ignore terminal looper after actor shutdown: {s}", .{@errorName(err)});
-        };
     }
 
     //#endregion
