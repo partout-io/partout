@@ -17,7 +17,7 @@ const passive_io = @import("internal/passive_io.zig");
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
 const TunnelRemoteInfoBuilder = tunnel_info.TunnelRemoteInfoBuilder;
 const PassiveIO = passive_io.PassiveIO;
-const ConnectionError = WireGuardAdapter.ActivationError || std.Thread.SpawnError;
+const ConnectionError = WireGuardAdapter.ActivationError || net.SubmissionError;
 
 pub fn createConnection(
     ptr: ?*anyopaque,
@@ -47,7 +47,7 @@ pub const ConnectionContext = struct {
 
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
-    /// Serializes control calls with the connection's timer workers.
+    /// Control calls and timers run on the owning event-loop thread.
     lock: core.Mutex,
     adapter: WireGuardAdapter,
     // Owns descriptors; native calls execute directly on Go workers.
@@ -56,10 +56,11 @@ const WireGuardConnection = struct {
     configuration: api.WireGuardConfiguration,
     /// Captured event sink; Go workers also report I/O failures through it.
     events: ?net.Connection.Events,
-    data_count_timer: core.RunAfter,
+    writer: net.ConnectionWriter,
+    data_count_timer: net.Timer,
     data_count_timer_active: bool,
     data_count_interval_ms: u32,
-    temporary_shutdown_retry_timer: core.RunAfter,
+    temporary_shutdown_retry_timer: net.Timer,
     temporary_shutdown_retry_timer_active: bool,
     temporary_shutdown_retry_delay_ms: u32,
 
@@ -100,6 +101,7 @@ const WireGuardConnection = struct {
             .io = try PassiveIO.init(complete),
             .configuration = configuration,
             .events = sandbox.events,
+            .writer = sandbox.writer orelse @panic("WireGuardConnection v2 requires a looper writer"),
             .data_count_timer = .{},
             .data_count_timer_active = false,
             .data_count_interval_ms = sandbox.options.min_data_count_interval,
@@ -127,8 +129,6 @@ const WireGuardConnection = struct {
         log.write(.debug, "Deinit WireGuardConnection v2");
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
-        self.data_count_timer.deinit();
-        self.temporary_shutdown_retry_timer.deinit();
         self.releaseIO();
         self.adapter.deinit(allocator);
         self.io.deinit();
@@ -302,13 +302,12 @@ const WireGuardConnection = struct {
         };
     }
 
-    fn startDataCountTimer(self: *WireGuardConnection) std.Thread.SpawnError!void {
+    fn startDataCountTimer(self: *WireGuardConnection) net.SubmissionError!void {
         self.data_count_timer_active = true;
-        self.data_count_timer.scheduleReplacing(
-            self.data_count_interval_ms,
-            onDataCountTimer,
-            self,
-        ) catch |err| {
+        self.writer.scheduleTimer(&self.data_count_timer, self.data_count_interval_ms, .{
+            .context = self,
+            .callback = onDataCountTimer,
+        }) catch |err| {
             self.data_count_timer_active = false;
             return err;
         };
@@ -318,10 +317,8 @@ const WireGuardConnection = struct {
         self.lock.lock();
         const was_active = self.data_count_timer_active;
         self.data_count_timer_active = false;
-        self.data_count_timer.cancel();
+        self.writer.cancelTimer(&self.data_count_timer);
         self.lock.unlock();
-        // A running callback may be waiting for the connection lock.
-        self.data_count_timer.wait();
         if (was_active) {
             log.write(.debug, "Cancelled WireGuardConnection.dataCountTimer");
         }
@@ -335,11 +332,10 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
 
         self.reportDataCount(events);
-        self.data_count_timer.scheduleReplacing(
-            self.data_count_interval_ms,
-            onDataCountTimer,
-            self,
-        ) catch |err| {
+        self.writer.scheduleTimer(&self.data_count_timer, self.data_count_interval_ms, .{
+            .context = self,
+            .callback = onDataCountTimer,
+        }) catch |err| {
             log.writef(.err, "Unable to reschedule data count timer: {s}", .{@errorName(err)});
             self.data_count_timer_active = false;
         };
@@ -355,11 +351,10 @@ const WireGuardConnection = struct {
             self.temporary_shutdown_retry_delay_ms,
         });
         self.temporary_shutdown_retry_timer_active = true;
-        self.temporary_shutdown_retry_timer.scheduleReplacing(
-            self.temporary_shutdown_retry_delay_ms,
-            onTemporaryShutdownRetry,
-            self,
-        ) catch |err| {
+        self.writer.scheduleTimer(&self.temporary_shutdown_retry_timer, self.temporary_shutdown_retry_delay_ms, .{
+            .context = self,
+            .callback = onTemporaryShutdownRetry,
+        }) catch |err| {
             self.temporary_shutdown_retry_timer_active = false;
             self.handleTemporaryShutdownRetrySchedulingFailure(events, err);
         };
@@ -368,7 +363,7 @@ const WireGuardConnection = struct {
     fn handleTemporaryShutdownRetrySchedulingFailure(
         _: *WireGuardConnection,
         events: net.Connection.Events,
-        err: std.Thread.SpawnError,
+        err: net.SubmissionError,
     ) void {
         log.writef(.fault, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
 
@@ -398,9 +393,8 @@ const WireGuardConnection = struct {
     fn cancelTemporaryShutdownRetry(self: *WireGuardConnection) void {
         self.lock.lock();
         self.temporary_shutdown_retry_timer_active = false;
-        self.temporary_shutdown_retry_timer.cancel();
+        self.writer.cancelTimer(&self.temporary_shutdown_retry_timer);
         self.lock.unlock();
-        self.temporary_shutdown_retry_timer.wait();
     }
 
     fn onTemporaryShutdownRetry(ctx: ?*anyopaque) void {
@@ -623,11 +617,6 @@ pub const testing = struct {
         return &self.adapter;
     }
 
-    pub fn waitForTemporaryShutdownRetry(connection: net.Connection) void {
-        const self: *WireGuardConnection = @ptrCast(@alignCast(connection.ptr));
-        self.temporary_shutdown_retry_timer.wait();
-    }
-
     pub fn simulateTemporaryShutdownRetrySchedulingFailure(
         connection: net.Connection,
         events: net.Connection.Events,
@@ -635,7 +624,7 @@ pub const testing = struct {
         const self: *WireGuardConnection = @ptrCast(@alignCast(connection.ptr));
         self.handleTemporaryShutdownRetrySchedulingFailure(
             events,
-            error.ThreadQuotaExceeded,
+            error.OutOfMemory,
         );
     }
 
@@ -646,6 +635,7 @@ pub const testing = struct {
 
 fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
     return switch (err) {
+        error.OutOfMemory => .outOfMemory,
         error.InvalidEndpoint,
         => .linkNotActive,
         error.DNSResolutionFailure,
