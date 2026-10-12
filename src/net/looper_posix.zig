@@ -158,12 +158,12 @@ pub const PosixLooper = struct {
     pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
-        const buffer_size = switch (std.meta.activeTag(arguments.pair)) {
+        const tag = std.meta.activeTag(arguments.pair);
+        const buffer_size = switch (tag) {
             .link => self.options.link_buf_size,
             .tun => self.options.tun_buf_size,
         };
         if (buffer_size == 0 or self.options.max_read_count == 0 or self.options.max_read_size == 0) return error.InvalidBuffers;
-        const tag = std.meta.activeTag(arguments.pair);
         const slot = &self.sides[@intFromEnum(tag)];
         if (slot.* != null) return error.SideAlreadyAttached;
         const descriptor = switch (arguments.pair) {
