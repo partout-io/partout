@@ -5,7 +5,6 @@
 //! Caller-driven platform I/O. The caller serializes access and owns the mux
 //! and its wake source. loopOnce() runs callbacks inline. Read storage and queued writes
 //! are owned by the looper; read packet views expire when the callback returns.
-//! Legacy worker APIs remain as explicit panics during the daemon migration.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -24,21 +23,16 @@ pub const Looper = struct {
         looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
-    pub const OnRead = helpers.OnRead;
     pub const ReadAction = helpers.ReadAction;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
     pub const Failure = helpers.Failure;
-    pub const OnFailure = helpers.OnFailure;
-    pub const OnFinish = helpers.OnFinish;
     pub const TimedTask = helpers.TimedTask;
     pub const Timer = helpers.Timer;
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
-    pub const InitError = helpers.InitError;
-    pub const StopError = helpers.StopError;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
