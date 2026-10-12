@@ -1219,21 +1219,11 @@ const ConnectionDaemon = struct {
                 pending = job.next;
 
                 // Run jobs if thread is still running.
-                const is_owned = job.isOwned();
                 const result = if (running) self.executeJob(job.command) else error.Closed;
                 result catch |err| {
                     log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
                 };
-
-                // Notify synchronous performs.
-                self.jobs_mutex.lock();
-                job.done = true;
-                job.result = result;
-                self.jobs_condition.broadcast();
-                running = self.is_running;
-                self.jobs_mutex.unlock();
-
-                if (is_owned) self.daemon.allocator.destroy(job);
+                running = self.completeJob(job, result);
             }
             if (!running) break;
 
@@ -1253,17 +1243,10 @@ const ConnectionDaemon = struct {
         var pending = self.jobs.takeAll();
         self.jobs_mutex.unlock();
 
-        // Drain outstanding jobs.
+        // Discard outstanding jobs.
         while (pending) |job| {
             pending = job.next;
-            self.jobs_mutex.lock();
-            const is_owned = job.isOwned();
-            job.result = error.Closed;
-            job.done = true;
-            self.jobs_condition.broadcast();
-            self.jobs_mutex.unlock();
-
-            if (is_owned) self.daemon.allocator.destroy(job);
+            _ = self.completeJob(job, error.Closed);
         }
     }
 
@@ -1272,6 +1255,19 @@ const ConnectionDaemon = struct {
             .message => |message| return try self.dispatch(void, message),
             .perform => |request| return request.callback(self, request.context),
         }
+    }
+
+    fn completeJob(self: *ConnectionDaemon, job: *Job, result: Error!void) bool {
+        self.jobs_mutex.lock();
+        const still_running = self.is_running;
+        const is_owned = job.isOwned();
+        job.result = result;
+        job.done = true;
+        self.jobs_condition.broadcast();
+        self.jobs_mutex.unlock();
+
+        if (is_owned) self.daemon.allocator.destroy(job);
+        return still_running;
     }
 
     fn schedule(self: *ConnectionDaemon, message: Message) !void {
