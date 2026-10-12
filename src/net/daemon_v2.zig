@@ -433,6 +433,8 @@ const ConnectionDaemon = struct {
         // Signal thread stop and wait for it to finish.
         self.shutdown();
         self.actor.join();
+        if (self.connection != null)
+            @panic("ConnectionDaemon.destroy() cannot release live connection resources");
         self.looper.destroy();
 
         // Daemon checked the shared lifecycle precondition. Drain callbacks
@@ -442,9 +444,6 @@ const ConnectionDaemon = struct {
         self.monitor.stopObserving();
         self.gate.stopObserving();
         self.gate.deinit();
-        if (self.connection != null)
-            @panic("ConnectionDaemon.destroy() cannot release live connection resources");
-
         self.jobs_mutex.deinit();
         self.jobs_condition.deinit();
         io_c.pp_mux_free(self.mux);
