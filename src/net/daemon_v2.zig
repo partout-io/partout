@@ -687,7 +687,7 @@ const ConnectionDaemon = struct {
     ) !void {
         const connection = self.connection orelse @panic("stopConnection but no connection");
         connection.shutdown(reason);
-        if (reason == .explicit_stop and self.looper.isLinkAttached()) {
+        if (self.looper.isLinkAttached()) {
             // Attempt shutdown writes before detaching, without running callbacks or waiting.
             const failure = self.looper.flushWrites(.link) catch |err| blk: {
                 log.writef(.err, "Unable to flush shutdown packets: {s}", .{@errorName(err)});

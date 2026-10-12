@@ -1142,6 +1142,8 @@ test "v2 event loop flushes graceful shutdown and finalizes terminal failure on 
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             self.writer.cancelTimer(&self.timer);
+            // The rejected first start has no active protocol to shut down.
+            if (self.starts == 1) return;
             self.writer.writePackets(&.{"exit"}, .link, null) catch |err| {
                 std.debug.assert(err == error.LooperUnavailable);
             };
@@ -1220,7 +1222,9 @@ test "v2 event loop flushes graceful shutdown and finalizes terminal failure on 
             .create_connection = create,
         };
     };
-    for ([_]bool{ true, false }) |terminal| {
+    const Shutdown = enum { terminal, stop, reconnect };
+    for ([_]Shutdown{ .terminal, .stop, .reconnect }) |shutdown| {
+        const terminal = shutdown == .terminal;
         var fds: [2]std.c.fd_t = undefined;
         try std.testing.expectEqual(0, std.c.pipe(&fds));
         defer _ = std.c.close(fds[0]);
@@ -1264,7 +1268,22 @@ test "v2 event loop flushes graceful shutdown and finalizes terminal failure on 
             try daemon.testing.perform(owner, .onBetterPath);
             try waitForExit(owner);
         } else {
-            // Explicit stop must transmit shutdown writes before detaching LINK.
+            if (shutdown == .reconnect) {
+                // Keep the next attempt dormant while inspecting failure shutdown.
+                try daemon.testing.onLoop(owner, {}, struct {
+                    fn run(loop: anytype, _: void) daemon.Error!void {
+                        loop.daemon.options.reconnection_delay_ms = 60_000;
+                    }
+                }.run);
+                try daemon.testing.perform(owner, .{ .onConnectionEvent = .{ .failed = .{
+                    .err_pair = .{ .code = .networkChanged },
+                    .disposition = .reconnect,
+                } } });
+                try std.testing.expectEqualStrings("starttimerinexit", probe.output[0..probe.output_len]);
+                try std.testing.expectEqual(@as(usize, 2), probe.stopped);
+                try std.testing.expectEqual(@as(usize, 0), probe.destroyed);
+            }
+            // Both reconnect and explicit stop must flush before detaching LINK.
             sut.stop();
         }
         try std.testing.expectEqual(@as(usize, 1), probe.created.load(.acquire));
@@ -1273,7 +1292,7 @@ test "v2 event loop flushes graceful shutdown and finalizes terminal failure on 
         try std.testing.expectEqual(@as(usize, 2), probe.starts);
         try std.testing.expectEqual(@as(usize, 2), probe.cleaned);
         try std.testing.expectEqual(@as(usize, 1), probe.destroyed);
-        try std.testing.expectEqual(@as(usize, 2), probe.stopped);
+        try std.testing.expectEqual(@as(usize, if (shutdown == .reconnect) 3 else 2), probe.stopped);
         try std.testing.expectEqual(@as(usize, if (terminal) 1 else 0), controller.cancel_count);
         if (terminal) try std.testing.expectError(error.Closed, daemon.testing.resumeGate(owner));
         try std.testing.expect(sut.state == .stopped);
