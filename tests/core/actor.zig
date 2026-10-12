@@ -229,41 +229,7 @@ test "actor driver finishes on its worker after draining scheduled work" {
         finish_on_queue: bool = false,
         finish_error: ?anyerror = null,
 
-        const Driver = struct {
-            driver: source.core.actor.DefaultDriver,
-
-            pub fn init(mutex: *source.core.Mutex, context: *Self) Driver {
-                return .{ .driver = .init(mutex, context) };
-            }
-
-            pub fn deinit(self: *Driver) void {
-                self.driver.deinit();
-            }
-
-            pub fn wait(self: *Driver) void {
-                self.driver.wait();
-            }
-
-            pub fn notify(self: *Driver) void {
-                self.driver.notify();
-            }
-
-            pub fn wake(self: *Driver) void {
-                self.driver.wake();
-            }
-
-            pub fn resetWake(self: *Driver) void {
-                self.driver.resetWake();
-            }
-
-            pub fn loopOnce(self: *Driver, context: *Self, max_wait_ms: ?u32) void {
-                self.driver.loopOnce(context, max_wait_ms);
-            }
-
-            pub fn finish(_: *Driver, context: *Self) void {
-                context.finish();
-            }
-        };
+        const Driver = source.core.actor.DefaultDriver(Self, finish);
 
         fn handle(self: *@This(), comptime Result: type, message: Message) CounterError!Result {
             switch (message) {

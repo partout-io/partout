@@ -70,7 +70,7 @@ pub fn Actor(
         pub const ScheduleError = std.mem.Allocator.Error || error{Closed};
         pub const PerformError = Error || error{Closed};
 
-        pub const Driver = OptionalDriver orelse DefaultDriver;
+        pub const Driver = OptionalDriver orelse DefaultDriver(Context, null);
 
         allocator: std.mem.Allocator,
         context: *Context,
@@ -271,43 +271,53 @@ pub fn Actor(
 /// the shared mailbox mutex; this driver owns the condition variable.
 /// wait(), notify(), wake(), and resetWake() require the mutex to be held.
 /// Deinitialize only after the worker and completion waiters have finished.
-pub const DefaultDriver = struct {
-    mutex: *concurrency.Mutex,
-    condition: concurrency.Condition = .{},
-    signalled: bool = false,
+/// Pass null for on_finish to leave worker exit handling empty.
+pub fn DefaultDriver(
+    comptime Context: type,
+    comptime on_finish: ?*const fn (*Context) void,
+) type {
+    return struct {
+        const Self = @This();
 
-    pub fn init(mutex: *concurrency.Mutex, _: anytype) DefaultDriver {
-        return .{ .mutex = mutex };
-    }
+        mutex: *concurrency.Mutex,
+        condition: concurrency.Condition = .{},
+        signalled: bool = false,
 
-    pub fn finish(_: *DefaultDriver, _: anytype) void {}
+        pub fn init(mutex: *concurrency.Mutex, _: *Context) Self {
+            return .{ .mutex = mutex };
+        }
 
-    pub fn deinit(self: *DefaultDriver) void {
-        self.condition.deinit();
-    }
+        pub fn finish(_: *Self, context: *Context) void {
+            if (on_finish) |callback| callback(context);
+        }
 
-    pub fn wait(self: *DefaultDriver) void {
-        self.condition.wait(self.mutex);
-    }
+        pub fn deinit(self: *Self) void {
+            self.condition.deinit();
+        }
 
-    pub fn notify(self: *DefaultDriver) void {
-        self.condition.broadcast();
-    }
+        pub fn wait(self: *Self) void {
+            self.condition.wait(self.mutex);
+        }
 
-    pub fn wake(self: *DefaultDriver) void {
-        self.signalled = true;
-        self.notify();
-    }
+        pub fn notify(self: *Self) void {
+            self.condition.broadcast();
+        }
 
-    pub fn resetWake(self: *DefaultDriver) void {
-        self.signalled = false;
-    }
+        pub fn wake(self: *Self) void {
+            self.signalled = true;
+            self.notify();
+        }
 
-    pub fn loopOnce(self: *DefaultDriver, _: anytype, max_wait_ms: ?u32) void {
-        if (max_wait_ms != null) return;
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        // Completion broadcasts do not mean that mailbox work is available.
-        while (!self.signalled) self.wait();
-    }
-};
+        pub fn resetWake(self: *Self) void {
+            self.signalled = false;
+        }
+
+        pub fn loopOnce(self: *Self, _: *Context, max_wait_ms: ?u32) void {
+            if (max_wait_ms != null) return;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            // Completion broadcasts do not mean that mailbox work is available.
+            while (!self.signalled) self.wait();
+        }
+    };
+}

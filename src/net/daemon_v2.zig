@@ -1320,41 +1320,7 @@ const ConnectionDaemon = struct {
     }
 
     //#endregion
-    const ActorDriver = struct {
-        driver: core.actor.DefaultDriver,
-
-        pub fn init(mutex: *core.Mutex, context: *ConnectionDaemon) ActorDriver {
-            return .{ .driver = .init(mutex, context) };
-        }
-
-        pub fn deinit(self: *ActorDriver) void {
-            self.driver.deinit();
-        }
-
-        pub fn wait(self: *ActorDriver) void {
-            self.driver.wait();
-        }
-
-        pub fn notify(self: *ActorDriver) void {
-            self.driver.notify();
-        }
-
-        pub fn wake(self: *ActorDriver) void {
-            self.driver.wake();
-        }
-
-        pub fn resetWake(self: *ActorDriver) void {
-            self.driver.resetWake();
-        }
-
-        pub fn loopOnce(self: *ActorDriver, context: *ConnectionDaemon, max_wait_ms: ?u32) void {
-            self.driver.loopOnce(context, max_wait_ms);
-        }
-
-        pub fn finish(_: *ActorDriver, context: *ConnectionDaemon) void {
-            context.actorDidFinish();
-        }
-    };
+    const ActorDriver = core.actor.DefaultDriver(ConnectionDaemon, actorDidFinish);
 };
 
 // MARK: - Error mapping
