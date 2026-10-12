@@ -8,7 +8,7 @@
 //!
 //! SettingsDaemon is synchronous; callers serialize its controls. ConnectionDaemon
 //! owns an actor that serializes connection work and updates to shared state.
-//! Connection callbacks enqueue actor messages from runtime and worker threads.
+//! Lifecycle callbacks defer actor work; reporting callbacks run on the event-loop thread.
 //! Ordinary reconnects retain Connection; terminal looper failure ends the event loop.
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
 
@@ -27,6 +27,7 @@ const api = core.api;
 const io_c = io.io_c;
 const log = core.logging;
 const Connection = conn_mod.Connection;
+const ConnectionEvent = Connection.Event;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
 const EndpointResolver = net.EndpointResolver;
@@ -450,20 +451,15 @@ const ConnectionDaemon = struct {
 
     //#region Any thread - asynchronous events
 
-    // Network and protocol producers may hold locks needed by actor work. These
-    // callbacks enqueue messages without waiting or changing lifecycle state; borrowed
-    // establishment data is cloned. Protocol events may arrive on actor or I/O workers.
+    // Lifecycle callbacks defer work that may reenter protocol state or change I/O.
+    // Failure notifications may also arrive on Go workers. Reporting and stopped
+    // callbacks run directly on the event-loop thread; borrowed data stays inline.
 
     // This is where connection events are rerouted through the actor
     fn events(self: *ConnectionDaemon) Connection.Events {
         return .{
             .ctx = self,
-            .established = onConnectionEstablished,
-            .needs_rebind = onConnectionNeedsRebind,
-            .failed = onConnectionFailed,
-            .stopped = onConnectionStopped,
-            .set_env = onConnectionSetEnvironmentValue,
-            .data_count = onConnectionDataCount,
+            .event = onConnectionEvent,
             // FIXME: ###, Deprecated callbacks must never be emitted by a v2 connection.
             .status = legacyStatus,
             .last_error = legacyLastError,
@@ -471,78 +467,43 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn onConnectionEstablished(
-        ctx: *anyopaque,
-        success: net.Connection.Events.Success,
-    ) void {
+    fn onConnectionEvent(ctx: *anyopaque, event: ConnectionEvent) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        // The payload is borrowed only for this callback. Own it across the
-        // asynchronous hop, including when stop overtakes its actor handler.
-        var info = success.info.clone(self.daemon.allocator) catch {
-            onConnectionFailed(ctx, .{ .err_pair = .{ .code = .outOfMemory }, .disposition = .reconnect });
-            return;
-        };
-        self.schedule(.{ .onConnectionEstablished = .{
-            .remote_endpoint = success.remote_endpoint,
-            .info = info,
-        } }) catch |err| {
-            info.deinit(self.daemon.allocator);
-            log.writef(.fault, "Unable to enqueue established connection: {s}", .{@errorName(err)});
-        };
-    }
-
-    fn onConnectionNeedsRebind(ctx: *anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        if (self.rebind_pending.swap(true, .acq_rel)) return;
-        self.schedule(.onConnectionNeedsRebind) catch |err| {
-            self.rebind_pending.store(false, .release);
-            log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
-        };
-    }
-
-    fn onConnectionFailed(ctx: *anyopaque, failure: Connection.Events.Failure) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.schedule(.{ .onConnectionFailed = failure }) catch |err| {
-            log.writef(.err, "Unable to enqueue connection failure: {s}", .{@errorName(err)});
-        };
-    }
-
-    fn onConnectionStopped(ctx: *anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.schedule(.onConnectionStopped) catch |err| {
-            log.writef(.err, "Unable to enqueue connection stop: {s}", .{@errorName(err)});
-        };
-    }
-
-    fn onConnectionSetEnvironmentValue(ctx: *anyopaque, key: []const u8, value: ?[]const u8) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        // The producer releases this storage when the callback returns. Own both
-        // strings until the actor delivers the update (or discards it after stop).
-        const allocator = self.daemon.allocator;
-        const owned_key = allocator.dupe(u8, key) catch {
-            log.write(.err, "Unable to copy connection environment key");
-            return;
-        };
-        const owned_value = if (value) |bytes| allocator.dupe(u8, bytes) catch {
-            allocator.free(owned_key);
-            log.write(.err, "Unable to copy connection environment value");
-            return;
-        } else null;
-        self.schedule(.{ .onConnectionSetEnvironmentValue = .{
-            .key = owned_key,
-            .value = owned_value,
-        } }) catch |err| {
-            allocator.free(owned_key);
-            if (owned_value) |bytes| allocator.free(bytes);
-            log.writef(.err, "Unable to enqueue connection environment update: {s}", .{@errorName(err)});
-        };
-    }
-
-    fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.schedule(.{ .onConnectionDataCount = data_count }) catch |err| {
-            log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
-        };
+        switch (event) {
+            .established => |success| {
+                // Own the borrowed metadata across the deferred hop.
+                var info = success.info.clone(self.daemon.allocator) catch {
+                    onConnectionEvent(ctx, .{ .failed = .{
+                        .err_pair = .{ .code = .outOfMemory },
+                        .disposition = .reconnect,
+                    } });
+                    return;
+                };
+                self.schedule(.{ .onConnectionEvent = .{ .established = .{
+                    .remote_endpoint = success.remote_endpoint,
+                    .info = info,
+                } } }) catch |err| {
+                    info.deinit(self.daemon.allocator);
+                    log.writef(.fault, "Unable to enqueue established connection: {s}", .{@errorName(err)});
+                };
+            },
+            .needs_rebind => {
+                if (self.rebind_pending.swap(true, .acq_rel)) return;
+                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
+                    self.rebind_pending.store(false, .release);
+                    log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
+                };
+            },
+            .failed => {
+                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
+                    log.writef(.err, "Unable to enqueue connection failure: {s}", .{@errorName(err)});
+                };
+            },
+            .stopped, .set_env, .data_count => {
+                std.debug.assert(self.isCurrentThread());
+                self.handleConnectionEvent(event);
+            },
+        }
     }
 
     fn legacyStatus(_: *anyopaque, _: api.ConnectionStatus) void {
@@ -1144,26 +1105,17 @@ const ConnectionDaemon = struct {
         resumeGate,
         onReachability: io.ReachabilityInfo,
         onBetterPath,
-        onConnectionEstablished: net.Connection.Events.Success,
-        onConnectionNeedsRebind,
-        onConnectionFailed: net.Connection.Events.Failure,
-        onConnectionStopped,
-        onConnectionSetEnvironmentValue: struct {
-            key: []const u8,
-            value: ?[]const u8,
-        },
-        onConnectionDataCount: api.DataCount,
+        onConnectionEvent: ConnectionEvent,
 
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
             switch (self) {
-                .onConnectionEstablished => |success| {
-                    var info = success.info;
-                    info.deinit(allocator);
-                },
-                .onConnectionSetEnvironmentValue => |update| {
-                    allocator.free(update.key);
-                    if (update.value) |value| allocator.free(value);
+                .onConnectionEvent => |event| switch (event) {
+                    .established => |success| {
+                        var info = success.info;
+                        info.deinit(allocator);
+                    },
+                    else => {},
                 },
                 else => {},
             }
@@ -1335,7 +1287,13 @@ const ConnectionDaemon = struct {
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
-            .onConnectionEstablished => |success| {
+            .onConnectionEvent => |event| self.handleConnectionEvent(event),
+        }
+    }
+
+    fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
+        switch (event) {
+            .established => |success| {
                 self.handleConnectionEstablished(success) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
@@ -1344,17 +1302,16 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
-            .onConnectionNeedsRebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
-            .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
-            .onConnectionStopped => self.handleConnectionStopped(),
-            .onConnectionSetEnvironmentValue => |update| {
-                // Finalization can queue a clear while the actor is stopping.
-                // Deliver it, but do not restore stale values after shutdown.
+            .needs_rebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
+            .failed => |failure| self.handleConnectionFailed(failure),
+            .stopped => self.handleConnectionStopped(),
+            .set_env => |update| {
+                // Finalization clears values while stopping; late updates stay ignored.
                 if (self.daemon.state == .started or update.value == null) {
                     self.daemon.controller.setEnvironmentValue(update.key, update.value);
                 }
             },
-            .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
+            .data_count => |count| self.daemon.handleDataCount(count),
         }
     }
 

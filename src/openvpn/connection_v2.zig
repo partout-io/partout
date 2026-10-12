@@ -377,10 +377,10 @@ const OpenVPNConnection = struct {
         };
 
         const events = self.events orelse return;
-        events.established(events.ctx, .{
+        events.emit(.{ .established = .{
             .remote_endpoint = remote_endpoint,
             .info = info,
-        });
+        } });
     }
 
     fn handleSessionFailed(
@@ -403,10 +403,10 @@ const OpenVPNConnection = struct {
         // lifecycle here: this callback can run inside TLS.
         const events = self.events orelse return;
         const err_pair = partoutCodeForError(cause);
-        events.failed(events.ctx, .{
+        events.emit(.{ .failed = .{
             .err_pair = err_pair,
             .disposition = errorDisposition(cause),
-        });
+        } });
     }
 
     // MARK: - Reporting
@@ -417,7 +417,7 @@ const OpenVPNConnection = struct {
     ) void {
         const e = self.events orelse return;
         const cfg = configuration orelse {
-            e.set_env(e.ctx, EnvironmentKeys.server_configuration, null);
+            e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = null } });
             return;
         };
         const value = core.util.encodeJsonValue(self.allocator, cfg) catch {
@@ -425,7 +425,7 @@ const OpenVPNConnection = struct {
             return;
         };
         defer self.allocator.free(value);
-        e.set_env(e.ctx, EnvironmentKeys.server_configuration, value);
+        e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = value } });
     }
 
     // MARK: - Termination and cleanup
@@ -450,7 +450,7 @@ const OpenVPNConnection = struct {
         self.reportServerConfiguration(null);
         const events = self.events orelse return;
         // All owned state is settled before the synchronous terminal callback.
-        events.stopped(events.ctx);
+        events.emit(.stopped);
     }
 
     /// Resource-only cleanup, also used for startup rollback and destruction.
@@ -489,7 +489,7 @@ fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ctx.?));
     if (!self.isSessionStarted()) return;
     const events = self.events orelse return;
-    events.data_count(events.ctx, data_count);
+    events.emit(.{ .data_count = data_count });
 }
 
 // MARK: - Connection callbacks

@@ -149,13 +149,16 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
             std.debug.assert(!self.looper.isLinkAttached() and !self.looper.isTunAttached());
             self.stop_count += 1;
-            sink.stopped(sink.ctx);
+            sink.emit(.stopped);
+            if (self.daemon.state == .started) {
+                std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .disconnected);
+            }
         }
         fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.reachability_count += 1;
-            sink.data_count(sink.ctx, .{});
+            sink.emit(.{ .data_count = .{} });
         }
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -165,14 +168,14 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
                 .id = "11111111-1111-4111-8111-111111111111".*,
                 .servers = &servers,
             } }};
-            sink.established(sink.ctx, .{
+            sink.emit(.{ .established = .{
                 .remote_endpoint = net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?) catch unreachable,
                 .info = .{
                     .profile = self.profile.*,
                     .original_module_id = "11111111-1111-4111-8111-111111111111".*,
                     .modules = &modules,
                 },
-            });
+            } });
             // This storage expires before the actor can process established.
             servers[0] = api.Address.parseRaw("9.9.9.9").?;
         }
@@ -262,11 +265,11 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     try std.testing.expectEqual(@as(usize, 1), probe.stop_count);
     // A protocol failure must finalize the attempt just like setup failure:
     // shutdown and stop must run in order on the actor before status changes.
-    try daemon.testing.perform(connection_daemon, void, .{ .onConnectionFailed = .{
+    try daemon.testing.perform(connection_daemon, void, .{ .onConnectionEvent = .{ .failed = .{
         .err_pair = .{ .code = .ioFailure },
         .disposition = .reconnect,
-    } });
-    try daemon.testing.resumeGate(connection_daemon); // Drain the queued stopped event.
+    } } });
+    try daemon.testing.resumeGate(connection_daemon); // Confirm stopped reporting completed.
     try std.testing.expectEqual(@as(usize, 2), probe.shutdown_count);
     try std.testing.expectEqual(@as(usize, 2), probe.stop_count);
     try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
@@ -536,11 +539,14 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
     return monitor.reachable;
 }
 
-test "v2 daemon owns environment updates and delivers finalization clears on actor" {
+test "v2 daemon consumes borrowed reporting values inline and delivers finalization clears" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
         producer_thread: ?std.Thread.Id = null,
+        daemon: *Daemon = undefined,
+        delivered_updates: *const usize = undefined,
+        reporting_inline: bool = false,
 
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -552,15 +558,19 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
             self.producer_thread = std.Thread.getCurrentId();
             var key = "OpenVPN.serverConfiguration".*;
             var value = "{\"test\":true}".*;
-            // The actor queues the event while running this callback, so it
-            // consumes the copied strings after this operation returns.
-            sink.set_env(sink.ctx, &key, &value);
+            // Reporting consumes borrowed strings before the producer changes them.
+            sink.emit(.{ .set_env = .{ .key = &key, .value = &value } });
+            self.daemon.snapshot_publisher.setConnectionStatus(.connected);
+            sink.emit(.{ .data_count = .{ .received = 10, .sent = 20 } });
+            self.reporting_inline = self.delivered_updates.* == 1 and
+                self.daemon.snapshot_publisher.environment.data_count.received == 10 and
+                self.daemon.snapshot_publisher.environment.data_count.sent == 20;
             @memset(&key, 'x');
             @memset(&value, 'x');
         }
         fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
-            sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", null);
-            sink.stopped(sink.ctx);
+            sink.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = null } });
+            sink.emit(.stopped);
         }
         const endpoint_list = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
         fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -621,11 +631,13 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
         .options = .{},
     });
     defer sut.destroy();
+    factory.daemon = sut;
+    factory.delivered_updates = &controller.updates;
     try sut.start();
     defer sut.stop();
     const actor = sut.implementation.connection;
     try daemon.testing.perform(actor, void, .onBetterPath);
-    try daemon.testing.resumeGate(actor);
+    try std.testing.expect(factory.reporting_inline);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
     try std.testing.expectEqual(factory.producer_thread.?, controller.delivery_thread.?);
@@ -636,9 +648,16 @@ test "v2 daemon owns environment updates and delivers finalization clears on act
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
     const sink = factory.events.?;
-    sink.set_env(sink.ctx, "OpenVPN.serverConfiguration", "stale");
+    try daemon.testing.onLoop(actor, sink, struct {
+        fn run(_: anytype, events: net.Connection.Events) daemon.Error!void {
+            events.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = "stale" } });
+            events.emit(.{ .data_count = .{ .received = 99, .sent = 99 } });
+            events.emit(.stopped);
+        }
+    }.run);
     try daemon.testing.resumeGate(actor);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
+    try std.testing.expectEqual(@as(u64, 0), sut.snapshot_publisher.environment.data_count.received);
     try std.testing.expect(controller.valid_payload);
 }
 
@@ -696,7 +715,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 daemon.testing.schedule(self.daemon.implementation.connection, .{ .onReachability = .{ .reachable = true } }) catch return error.UnableToStart;
                 return .{ .established = .{ .info = info.clone(std.testing.allocator) catch return error.OutOfMemory } };
             }
-            self.events.established(self.events.ctx, .{ .info = info });
+            self.events.emit(.{ .established = .{ .info = info } });
             return .started;
         }
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
@@ -712,12 +731,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.remote = remote;
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
-            self.events.needs_rebind(self.events.ctx);
+            self.events.emit(.needs_rebind);
             return true;
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.needs_rebind(events.ctx);
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
+            events.emit(.needs_rebind);
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -726,7 +745,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -951,7 +970,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.needs_rebind(events.ctx);
+            events.emit(.needs_rebind);
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -1333,12 +1352,8 @@ test "v2 event loop completes pending performs and releases discarded payloads o
         .profile = profile,
         .original_module_id = source.net_connection.activeConnectionModule(&profile).?.id(),
     };
-    // The testing allocator detects leaks if either discarded payload is retained.
-    try daemon.testing.schedule(owner, .{ .onConnectionEstablished = .{ .info = try info.clone(allocator) } });
-    try daemon.testing.schedule(owner, .{ .onConnectionSetEnvironmentValue = .{
-        .key = try allocator.dupe(u8, "OpenVPN.serverConfiguration"),
-        .value = try allocator.dupe(u8, "discarded"),
-    } });
+    // The testing allocator detects leaks if discarded establishment metadata is retained.
+    try daemon.testing.schedule(owner, .{ .onConnectionEvent = .{ .established = .{ .info = try info.clone(allocator) } } });
     const waiter = try std.Thread.spawn(.{}, Probe.waiter, .{ owner, &probe });
     defer waiter.join();
     defer probe.released.store(true, .release);
@@ -1390,10 +1405,10 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
         try sut.start();
         defer sut.stop();
         const owner = sut.implementation.connection;
-        try daemon.testing.perform(owner, void, .{ .onConnectionFailed = .{
+        try daemon.testing.perform(owner, void, .{ .onConnectionEvent = .{ .failed = .{
             .err_pair = api.openVPNErrorPair(.tlsFailure),
             .disposition = .cancel,
-        } });
+        } } });
         try std.testing.expect(sut.state == .failed);
         try std.testing.expect(!owner.gate.isReady());
         try std.testing.expectEqual(@as(usize, if (cancels) 1 else 0), controller.cancel_count);

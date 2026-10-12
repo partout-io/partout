@@ -141,10 +141,10 @@ const WireGuardConnection = struct {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
         const events = self.events orelse return;
         log.write(.err, "WireGuard native I/O failed");
-        events.failed(events.ctx, .{
+        events.emit(.{ .failed = .{
             .err_pair = .{ .code = .ioFailure },
             .disposition = .reconnect,
-        });
+        } });
     }
 
     fn releaseIO(self: *WireGuardConnection) void {
@@ -249,7 +249,7 @@ const WireGuardConnection = struct {
         self.releaseIO();
         if (had_state) {
             log.write(.info, "Stop tunnel");
-            events.stopped(events.ctx);
+            events.emit(.stopped);
         }
     }
 
@@ -285,14 +285,14 @@ const WireGuardConnection = struct {
     fn prepareLinkRefresh(self: *WireGuardConnection, events: net.Connection.Events) void {
         if (!self.adapter.isStarted()) return;
         self.io.releaseLink();
-        events.needs_rebind(events.ctx);
+        events.emit(.needs_rebind);
     }
 
     fn reportDataCount(
         self: *const WireGuardConnection,
         events: net.Connection.Events,
     ) void {
-        events.data_count(events.ctx, self.readDataCount() orelse return);
+        events.emit(.{ .data_count = self.readDataCount() orelse return });
     }
 
     fn readDataCount(self: *const WireGuardConnection) ?api.DataCount {
@@ -368,10 +368,10 @@ const WireGuardConnection = struct {
         log.writef(.fault, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
 
         // The daemon owns shutdown and finalization after a terminal event.
-        events.failed(events.ctx, .{
+        events.emit(.{ .failed = .{
             .err_pair = .{ .code = partoutCodeForError(err) },
             .disposition = .cancel,
-        });
+        } });
     }
 
     fn reportActivationFailure(
@@ -383,10 +383,10 @@ const WireGuardConnection = struct {
         // Transient resume errors retain local retry work. A failure event
         // would make the daemon stop the connection and cancel that retry.
         if (self.adapter.isStopped()) {
-            events.failed(events.ctx, .{
+            events.emit(.{ .failed = .{
                 .err_pair = .{ .code = partoutCodeForError(err) },
                 .disposition = .reconnect,
-            });
+            } });
         }
     }
 
