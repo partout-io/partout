@@ -369,18 +369,25 @@ const ConnectionDaemon = struct {
         errdefer allocator.destroy(self);
         const mux = io_c.pp_mux_create(2) orelse return error.LooperFailure;
         errdefer io_c.pp_mux_free(mux);
-        const actor = std.Thread.spawn(.{}, run, .{self}) catch return error.OutOfMemory;
         const looper = Looper.create(allocator, .{
             .mux = mux,
             .on_finish = .{
-                .callback = unreachable,
+                .callback = struct {
+                    fn call(_: ?*anyopaque, _: ?Looper.Failure) void {
+                        unreachable;
+                    }
+                }.call,
                 .context = self,
             },
-        });
+        }) catch |err| return switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.MuxFailure => error.LooperFailure,
+        };
+        errdefer looper.destroy();
         self.* = .{
             .daemon = daemon,
             .mux = mux,
-            .actor = actor,
+            .actor = undefined,
             .looper = looper,
             .mutex = .{},
             .jobs = .{},
@@ -397,6 +404,10 @@ const ConnectionDaemon = struct {
             .is_evaluating_connection = false,
             .is_deinitializing = false,
         };
+        errdefer self.mutex.deinit();
+        errdefer self.gate.deinit();
+        errdefer self.resume_gate_timer.deinit();
+        self.actor = std.Thread.spawn(.{}, run, .{self}) catch return error.OutOfMemory;
         return self;
     }
 
@@ -477,10 +488,10 @@ const ConnectionDaemon = struct {
             if (is_stopped) return;
 
             // Wait for new jobs or I/O.
-            var failure: ?io.Failure = null;
-            const is_alive = self.looper.loopOnce(&failure);
-            if (failure) |err| {
-                log.writef(.err, "Looper failed: .{}", err);
+            var maybe_failure: ?io.Failure = null;
+            const is_alive = self.looper.loopOnce(&maybe_failure);
+            if (maybe_failure) |failure| {
+                log.writef(.err, "Looper failed: .{}", .{failure});
             }
             if (!is_alive) return;
         }
