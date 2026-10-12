@@ -23,7 +23,7 @@ pub const MockSerializedExecutor = struct {
         block: core.SerializedExecutor.Block,
         discard: ?core.SerializedExecutor.Block,
     };
-    const ExecutorActor = core.ActorWithoutFinish(MockSerializedExecutor, null, Message, error{}, perform);
+    const ExecutorActor = core.Actor(MockSerializedExecutor, null, Message, error{}, perform);
 
     allocator: std.mem.Allocator,
     actor: *ExecutorActor,

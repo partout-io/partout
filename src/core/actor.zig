@@ -21,21 +21,10 @@ const util = @import("util.zig");
 
 const Fifo = util.Fifo;
 
-/// Pass null for the driver type to use DefaultDriver.
-pub fn ActorWithoutFinish(
-    comptime Context: type,
-    comptime OptionalDriver: ?type,
-    comptime Message: type,
-    comptime Error: type,
-    comptime handler: anytype,
-) type {
-    return Actor(Context, OptionalDriver, Message, Error, handler, null);
-}
-
 /// Pass null for the driver type to use DefaultDriver. A custom driver is
 /// initialized with the shared mailbox mutex and Context pointer.
-/// It provides init(), deinit(), wait(), notify(), wake(), resetWake(), and
-/// loopOnce(context, max_wait_ms). Custom-driver contexts and external resources
+/// It provides init(), deinit(), wait(), notify(), wake(), resetWake(),
+/// loopOnce(context, max_wait_ms), and finish(context). Custom-driver contexts and external resources
 /// must be ready before create() and remain valid through shutdown().
 ///
 /// wait() releases/reacquires the shared mutex while waiting for completion;
@@ -44,13 +33,14 @@ pub fn ActorWithoutFinish(
 /// or reset. loopOnce() runs on the worker outside the mutex: zero polls, null
 /// may block until I/O, a timer, or wake(). It may perform nested actor work and
 /// must handle its own I/O failures, returning on wake so shutdown can proceed.
+/// finish() runs on the worker outside the mutex before it exits, with nested
+/// actor work still available. deinit() releases driver resources after joining.
 pub fn Actor(
     comptime Context: type,
     comptime OptionalDriver: ?type,
     comptime Message: type,
     comptime Error: type,
     comptime handler: anytype,
-    comptime on_finish: ?*const fn (*Context) void,
 ) type {
     return struct {
         const Self = @This();
@@ -239,7 +229,7 @@ pub fn Actor(
         }
 
         fn run(self: *Self) void {
-            defer if (on_finish) |callback| callback(self.context);
+            defer self.driver.finish(self.context);
 
             self.mutex.lock();
             self.thread_id = std.Thread.getCurrentId();
@@ -289,6 +279,8 @@ pub const DefaultDriver = struct {
     pub fn init(mutex: *concurrency.Mutex, _: anytype) DefaultDriver {
         return .{ .mutex = mutex };
     }
+
+    pub fn finish(_: *DefaultDriver, _: anytype) void {}
 
     pub fn deinit(self: *DefaultDriver) void {
         self.condition.deinit();

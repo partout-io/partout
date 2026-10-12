@@ -23,7 +23,6 @@ const registry = @import("registry.zig");
 const uuid = @import("uuid.zig");
 
 pub const Actor = actor.Actor;
-pub const ActorWithoutFinish = actor.ActorWithoutFinish;
 pub const Condition = concurrency.Condition;
 pub const Drainer = concurrency.Drainer;
 pub const Fifo = util.Fifo;

@@ -28,7 +28,7 @@ fn performCounter(state: *CounterState, comptime Result: type, message: CounterM
     }
 }
 
-const CounterActor = source.core.ActorWithoutFinish(
+const CounterActor = source.core.Actor(
     CounterState,
     null,
     CounterMessage,
@@ -67,7 +67,7 @@ test "actor propagates errors and rejects messages after shutdown" {
 }
 
 const ResultState = struct {
-    const Actor = source.core.ActorWithoutFinish(ResultState, null, Message, CounterError, handle);
+    const Actor = source.core.Actor(ResultState, null, Message, CounterError, handle);
     const Message = union(enum) {
         add: usize,
         nested,
@@ -117,7 +117,7 @@ test "actor returns typed results for queued and nested messages" {
 }
 
 const PayloadState = struct {
-    const Actor = source.core.ActorWithoutFinish(PayloadState, null, Message, CounterError, handle);
+    const Actor = source.core.Actor(PayloadState, null, Message, CounterError, handle);
     const Payload = struct {
         words: [64]u64 align(64),
         owner: *const usize,
@@ -217,9 +217,10 @@ test "actor keeps concurrent callers results and errors isolated" {
     for (callers) |caller| if (caller.failure) |err| return err;
 }
 
-test "actor shutdown drains scheduled work and permits typed finish callbacks" {
+test "actor driver finishes on its worker after draining scheduled work" {
     const State = struct {
-        const Actor = source.core.actor.Actor(@This(), null, Message, CounterError, handle, finish);
+        const Self = @This();
+        const Actor = source.core.actor.Actor(Self, Driver, Message, CounterError, handle);
         const Message = union(enum) { add: usize, read, fail };
         actor: ?*Actor = null,
         value: usize = 0,
@@ -227,6 +228,42 @@ test "actor shutdown drains scheduled work and permits typed finish callbacks" {
         final_value: ?usize = null,
         finish_on_queue: bool = false,
         finish_error: ?anyerror = null,
+
+        const Driver = struct {
+            driver: source.core.actor.DefaultDriver,
+
+            pub fn init(mutex: *source.core.Mutex, context: *Self) Driver {
+                return .{ .driver = .init(mutex, context) };
+            }
+
+            pub fn deinit(self: *Driver) void {
+                self.driver.deinit();
+            }
+
+            pub fn wait(self: *Driver) void {
+                self.driver.wait();
+            }
+
+            pub fn notify(self: *Driver) void {
+                self.driver.notify();
+            }
+
+            pub fn wake(self: *Driver) void {
+                self.driver.wake();
+            }
+
+            pub fn resetWake(self: *Driver) void {
+                self.driver.resetWake();
+            }
+
+            pub fn loopOnce(self: *Driver, context: *Self, max_wait_ms: ?u32) void {
+                self.driver.loopOnce(context, max_wait_ms);
+            }
+
+            pub fn finish(_: *Driver, context: *Self) void {
+                context.finish();
+            }
+        };
 
         fn handle(self: *@This(), comptime Result: type, message: Message) CounterError!Result {
             switch (message) {
