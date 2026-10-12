@@ -1109,7 +1109,7 @@ test "v2 daemon driver runs I/O timers recovery and shutdown on its actor" {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             self.writer.cancelTimer(&self.timer);
-            self.writer.writeOutOfBand(&.{"exit"}, .link, null) catch unreachable;
+            self.writer.writePackets(&.{"exit"}, .link, null) catch unreachable;
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));

@@ -46,7 +46,6 @@ pub const Looper = struct {
     pub const ResumeReadingError = helpers.ResumeReadingError;
     pub const SubmissionError = helpers.SubmissionError;
     pub const WriteError = helpers.WriteError;
-    pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
@@ -165,14 +164,5 @@ pub const Looper = struct {
 
     pub fn performTask(_: *Looper, _: helpers.Task) anyerror!void {
         @panic("Looper v2 cannot dispatch work; execution belongs to the daemon");
-    }
-
-    pub fn writeOutOfBand(
-        _: *Looper,
-        _: helpers.Packets,
-        _: io.Side,
-        _: ?io.SocketAddress,
-    ) helpers.WriteOOBError!void {
-        @panic("Looper v2 writes must be queued");
     }
 };

@@ -446,7 +446,6 @@ const ConnectionDaemon = struct {
 
     const writer_vtable: net.ConnectionWriter.VTable = .{
         .write_packets = writePackets,
-        .write_out_of_band = writeOutOfBand,
         .schedule_timer = scheduleTimer,
         .cancel_timer = cancelTimer,
     };
@@ -457,10 +456,6 @@ const ConnectionDaemon = struct {
             error.SideNotAttached, error.InvalidBuffers => {},
             else => |failure| return failure,
         };
-    }
-
-    fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
-        return writePackets(raw, packets, side, destination);
     }
 
     fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {

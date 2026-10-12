@@ -295,7 +295,7 @@ pub const Session = struct {
             .{
                 .data_channel = Session.dataChannelForKey,
                 .write_packets = Session.writeDataPackets,
-                .write_out_of_band = Session.writeOutOfBand,
+                .write_out_of_band = Session.writeDataPackets,
                 .report_inbound_data_count = Session.reportInboundDataCount,
                 .report_outbound_data_count = Session.reportOutboundDataCount,
             },
@@ -669,11 +669,6 @@ pub const Session = struct {
     fn writeDataPackets(raw: ?*anyopaque, packets: net.Packets, side: net.Side, destination: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
         return self.writer.writePackets(packets, side, destination);
-    }
-
-    fn writeOutOfBand(raw: ?*anyopaque, packets: net.Packets, side: net.Side, destination: ?net.SocketAddress) net.WriteOOBError!void {
-        const self: *Session = @ptrCast(@alignCast(raw.?));
-        return self.writer.writeOutOfBand(packets, side, destination);
     }
 
     fn writeLinkPackets(raw: ?*anyopaque, packets: net.Packets, destination: net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {

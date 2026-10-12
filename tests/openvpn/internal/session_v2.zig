@@ -184,20 +184,11 @@ test "Session preserves callback failures and classifies native side failures" {
 
 const writer_vtable: net.ConnectionWriter.VTable = .{
     .write_packets = writePackets,
-    .write_out_of_band = writeOutOfBand,
     .schedule_timer = scheduleTimer,
     .cancel_timer = cancelTimer,
 };
 
 fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
-    const looper: *Looper = @ptrCast(@alignCast(raw));
-    looper.write(packets, side, destination) catch |err| switch (err) {
-        error.SideNotAttached, error.InvalidBuffers => {},
-        else => |failure| return failure,
-    };
-}
-
-fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
     looper.write(packets, side, destination) catch |err| switch (err) {
         error.SideNotAttached, error.InvalidBuffers => {},

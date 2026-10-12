@@ -388,6 +388,7 @@ pub const DataLink = struct {
 
     pub const Callbacks = struct {
         write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
+        // FIXME: ###, Delete after v2
         write_out_of_band: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) net_mod.WriteOOBError!void,
         data_channel: *const fn (?*anyopaque, u8) ?*DataChannel,
         report_inbound_data_count: *const fn (?*anyopaque, usize) void,
