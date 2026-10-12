@@ -435,22 +435,16 @@ const ConnectionDaemon = struct {
         log.write(.debug, "Deinit daemon");
     }
 
-    // FIXME: ###, perform
     fn start(self: *ConnectionDaemon) Error!void {
-        // return self.perform(void, .start);
-        try self.submit(.start);
+        return self.perform(void, .start);
     }
 
-    // FIXME: ###, perform
     fn hold(self: *ConnectionDaemon) void {
-        // self.perform(void, .hold) catch return;
-        self.submit(.hold) catch return;
+        self.perform(void, .hold) catch return;
     }
 
-    // FIXME: ###, perform
     fn stop(self: *ConnectionDaemon) void {
-        // self.perform(void, .stop) catch return;
-        self.submit(.stop) catch return;
+        self.perform(void, .stop) catch return;
     }
 
     //#endregion
@@ -508,7 +502,13 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn submit(self: *ConnectionDaemon, message: Message) !void {
+    fn perform(self: *ConnectionDaemon, comptime Result: type, message: Message) Error!Result {
+        _ = self;
+        _ = message;
+        @panic("FIXME: ###");
+    }
+
+    fn schedule(self: *ConnectionDaemon, message: Message) !void {
         self.mutex.lock();
         defer self.mutex.unlock();
         if (!self.is_running) return;
@@ -602,7 +602,7 @@ const ConnectionDaemon = struct {
             onConnectionFailed(ctx, .{ .err_pair = .{ .code = .outOfMemory }, .disposition = .reconnect });
             return;
         };
-        self.actor.schedule(.{ .onConnectionEstablished = .{
+        self.schedule(.{ .onConnectionEstablished = .{
             .remote_endpoint = success.remote_endpoint,
             .info = info,
         } }) catch |err| {
@@ -614,7 +614,7 @@ const ConnectionDaemon = struct {
     fn onConnectionNeedsRebind(ctx: *anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
         if (self.rebind_pending.swap(true, .acq_rel)) return;
-        self.actor.schedule(.onConnectionNeedsRebind) catch |err| {
+        self.schedule(.onConnectionNeedsRebind) catch |err| {
             self.rebind_pending.store(false, .release);
             log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
         };
@@ -622,14 +622,14 @@ const ConnectionDaemon = struct {
 
     fn onConnectionFailed(ctx: *anyopaque, failure: Connection.Events.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.{ .onConnectionFailed = failure }) catch |err| {
+        self.schedule(.{ .onConnectionFailed = failure }) catch |err| {
             log.writef(.err, "Unable to enqueue connection failure: {s}", .{@errorName(err)});
         };
     }
 
     fn onConnectionStopped(ctx: *anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.onConnectionStopped) catch |err| {
+        self.schedule(.onConnectionStopped) catch |err| {
             log.writef(.err, "Unable to enqueue connection stop: {s}", .{@errorName(err)});
         };
     }
@@ -648,7 +648,7 @@ const ConnectionDaemon = struct {
             log.write(.err, "Unable to copy connection environment value");
             return;
         } else null;
-        self.actor.schedule(.{ .onConnectionSetEnvironmentValue = .{
+        self.schedule(.{ .onConnectionSetEnvironmentValue = .{
             .key = owned_key,
             .value = owned_value,
         } }) catch |err| {
@@ -660,7 +660,7 @@ const ConnectionDaemon = struct {
 
     fn onConnectionDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        self.actor.schedule(.{ .onConnectionDataCount = data_count }) catch |err| {
+        self.schedule(.{ .onConnectionDataCount = data_count }) catch |err| {
             log.writef(.err, "Unable to report connection data count: {s}", .{@errorName(err)});
         };
     }
@@ -683,7 +683,7 @@ const ConnectionDaemon = struct {
     // the platform and would otherwise deadlock with that lock held.
     fn onReachability(ctx: ?*anyopaque, reachability: io.ReachabilityInfo) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.schedule(.{ .onReachability = reachability }) catch |err| {
+        self.schedule(.{ .onReachability = reachability }) catch |err| {
             log.writef(.err, "Unable to enqueue reachability: {s}", .{@errorName(err)});
         };
     }
@@ -692,7 +692,7 @@ const ConnectionDaemon = struct {
     // whose locks must be released before calling back into the controller.
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.schedule(.onBetterPath) catch |err| {
+        self.schedule(.onBetterPath) catch |err| {
             log.writef(.err, "Unable to enqueue better path: {s}", .{@errorName(err)});
         };
     }
@@ -707,7 +707,7 @@ const ConnectionDaemon = struct {
     // This is scheduled with a delay
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.actor.perform(void, .resumeGate) catch |err| {
+        self.perform(void, .resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
         };
     }
@@ -977,7 +977,7 @@ const ConnectionDaemon = struct {
             log.writef(.err, "Unable to schedule resume connection gate, enqueue resume: {s}", .{@errorName(err)});
             // Finish the current evaluation and drain queued connection events
             // before the gate can start another attempt.
-            self.actor.schedule(.resumeGate) catch |schedule_err| {
+            self.schedule(.resumeGate) catch |schedule_err| {
                 log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
                 self.daemon.requestCancellation(null, true);
             };
@@ -1000,7 +1000,7 @@ const ConnectionDaemon = struct {
     fn onNetworkReady(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         log.write(.notice, "Network is ready, start connection");
-        self.actor.perform(void, .evaluateConnection) catch |err| {
+        self.perform(void, .evaluateConnection) catch |err| {
             log.writef(.err, "Unable to evaluate connection: {s}", .{@errorName(err)});
         };
     }
