@@ -330,10 +330,6 @@ const ConnectionDaemon = struct {
         done: bool = false,
         result: Error!void = {},
         next: ?*Job = null,
-
-        fn isOwned(self: *const Job) bool {
-            return self.command == .message;
-        }
     };
     const Command = union(enum) {
         message: Message,
@@ -1155,6 +1151,21 @@ const ConnectionDaemon = struct {
             value: ?[]const u8,
         },
         onConnectionDataCount: api.DataCount,
+
+        // Accepted deferred messages own their payload until job completion.
+        fn deinit(self: Message, allocator: std.mem.Allocator) void {
+            switch (self) {
+                .onConnectionEstablished => |success| {
+                    var info = success.info;
+                    info.deinit(allocator);
+                },
+                .onConnectionSetEnvironmentValue => |update| {
+                    allocator.free(update.key);
+                    if (update.value) |value| allocator.free(value);
+                },
+                else => {},
+            }
+        }
     };
 
     fn run(self: *ConnectionDaemon) void {
@@ -1245,13 +1256,19 @@ const ConnectionDaemon = struct {
     fn completeJob(self: *ConnectionDaemon, job: *Job, result: Error!void) bool {
         self.jobs_mutex.lock();
         const still_running = self.is_running;
-        const is_owned = job.isOwned();
+        const owned_message: ?Message = switch (job.command) {
+            .message => |message| message,
+            .perform => null,
+        };
         job.result = result;
         job.done = true;
         self.jobs_condition.broadcast();
         self.jobs_mutex.unlock();
 
-        if (is_owned) self.daemon.allocator.destroy(job);
+        if (owned_message) |message| {
+            message.deinit(self.daemon.allocator);
+            self.daemon.allocator.destroy(job);
+        }
         return still_running;
     }
 
@@ -1325,9 +1342,7 @@ const ConnectionDaemon = struct {
             .resumeGate => self.doResumeGate(),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
-            .onConnectionEstablished => |arg| {
-                var success = arg;
-                defer success.info.deinit(self.daemon.allocator);
+            .onConnectionEstablished => |success| {
                 self.handleConnectionEstablished(success) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
@@ -1340,8 +1355,6 @@ const ConnectionDaemon = struct {
             .onConnectionFailed => |arg| self.handleConnectionFailed(arg),
             .onConnectionStopped => self.handleConnectionStopped(),
             .onConnectionSetEnvironmentValue => |update| {
-                defer self.daemon.allocator.free(update.key);
-                defer if (update.value) |bytes| self.daemon.allocator.free(bytes);
                 // Finalization can queue a clear while the actor is stopping.
                 // Deliver it, but do not restore stale values after shutdown.
                 if (self.daemon.state == .started or update.value == null) {
