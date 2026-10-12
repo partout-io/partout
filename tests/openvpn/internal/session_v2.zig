@@ -80,7 +80,9 @@ test "Session uses externally supplied I/O callbacks" {
 
     session.destroy();
     session_destroyed = true;
-    try std.testing.expect(looper.loopOnce(0));
+    var failure: ?io.Failure = null;
+    try std.testing.expect(looper.impl.loopOnce(0, &failure));
+    try std.testing.expect(failure == null);
     try looper.stop();
 }
 

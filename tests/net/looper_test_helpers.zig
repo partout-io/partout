@@ -34,7 +34,17 @@ pub const Mux = struct {
 pub fn wait(loop: anytype, value: anytype, expected: usize) !void {
     for (0..500) |_| {
         if (value.load(.acquire) >= expected) return;
-        if (!loop.loopOnce(10)) return error.LooperStopped;
+        if (!try poll(loop, 10)) return error.LooperStopped;
     }
     return error.Timeout;
+}
+
+/// Preserve bounded polling while checking the explicit failure outcome.
+pub fn poll(loop: anytype, max_wait_ms: ?u32) !bool {
+    var failure: ?source.net_io.Failure = null;
+    const owner = if (@typeInfo(@TypeOf(loop.*)) == .pointer) loop.* else loop;
+    const impl = if (@hasField(@TypeOf(owner.*), "impl")) owner.impl else owner;
+    const alive = impl.loopOnce(max_wait_ms, &failure);
+    try std.testing.expect(failure == null);
+    return alive;
 }

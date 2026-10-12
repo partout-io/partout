@@ -36,24 +36,24 @@ test "looper lifecycle and timers are caller driven" {
     const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
     defer loop.destroy();
     probe.looper = loop;
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try loop.scheduleTimer(&probe.timer, 1000, .{ .context = &probe, .callback = Probe.task });
     try loop.scheduleTimer(&probe.timer, 0, .{ .context = &probe, .callback = Probe.task });
     try std.testing.expectEqual(0, probe.tasks);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(1, probe.tasks);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(2, probe.tasks);
     loop.cancelTimer(&probe.timer);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(2, probe.tasks);
     try loop.scheduleTimer(&probe.timer, 2, .{ .context = &probe, .callback = Probe.task });
-    try std.testing.expect(loop.loopOnce(null));
+    try std.testing.expect(try test_helpers.poll(&loop, null));
     try std.testing.expectEqual(3, probe.tasks);
     try loop.stop();
     try loop.stop();
-    try std.testing.expectEqual(1, probe.finishes);
-    try std.testing.expect(!loop.loopOnce(0));
+    try std.testing.expectEqual(0, probe.finishes);
+    try std.testing.expect(!try test_helpers.poll(&loop, 0));
     try std.testing.expectError(error.LooperUnavailable, loop.scheduleTimer(&probe.timer, 0, .{ .callback = Probe.task }));
 }
 
@@ -139,7 +139,7 @@ test "looper inline reads writes retries and synchronous detach" {
     try std.testing.expectEqual(1, std.c.write(fds[1], "x", 1));
     try std.testing.expectEqual(0, mock.reads);
     wake.signal();
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try wake.reset();
     try std.testing.expectEqual(1, mock.reads);
     try loop.resumeReading(.tun);
@@ -147,21 +147,21 @@ test "looper inline reads writes retries and synchronous detach" {
     const packets: helpers.Packets = &.{"abc"};
     try loop.write(packets, .tun, null);
     try std.testing.expectEqual(0, mock.successful_writes);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(0, mock.successful_writes);
-    try std.testing.expect(loop.loopOnce(null));
+    try std.testing.expect(try test_helpers.poll(&loop, null));
     try std.testing.expectEqual(1, mock.successful_writes);
     const writes_before_queue = mock.writes;
     try loop.write(packets, .tun, null);
     try std.testing.expectEqual(writes_before_queue, mock.writes);
     try std.testing.expectEqual(1, mock.successful_writes);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(2, mock.successful_writes);
     mock.block = true;
     try loop.write(packets, .tun, null);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     const writes = mock.writes;
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(writes, mock.writes);
     try loop.detach(.tun);
     try std.testing.expectEqual(2, mock.successful_writes);
@@ -196,9 +196,9 @@ test "timer callbacks can cancel and replace other ready tasks" {
     try loop.scheduleTimer(&first, 0, .{ .context = &tasks, .callback = Tasks.edit });
     try loop.scheduleTimer(&tasks.cancel, 0, .{ .context = &tasks, .callback = Tasks.called });
     try loop.scheduleTimer(&tasks.replace, 0, .{ .context = &tasks, .callback = Tasks.called });
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(0, tasks.calls);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(1, tasks.calls);
     // Tokens for already executed tasks remain harmless.
     loop.cancelTimer(&first);
@@ -227,18 +227,18 @@ test "write backpressure preserves an explicitly paused opposite side" {
         .pair = .{ .tun = tun.descriptor() },
     });
     try std.testing.expectEqual(1, std.c.write(fds[1], "x", 1));
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(1, link.reads);
     link.has_read = false;
     try std.testing.expectEqual(1, std.c.write(fds[1], "x", 1));
     try loop.write(&.{"out"}, .tun, null);
-    try std.testing.expect(loop.loopOnce(0));
-    try std.testing.expect(loop.loopOnce(null));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
+    try std.testing.expect(try test_helpers.poll(&loop, null));
     try std.testing.expectEqual(1, tun.successful_writes);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(1, link.reads);
     try loop.resumeReading(.link);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(2, link.reads);
     try loop.stop();
     try std.testing.expectEqual(1, link.cleanups);
@@ -263,7 +263,7 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     // A watchdog makes a missing wake fail without hanging the test suite.
     try loop.scheduleTimer(&probe.timer, 2000, .{ .context = &probe, .callback = Probe.task });
     const producer = try std.Thread.spawn(.{}, Producer.signal, .{wake});
-    const continued = loop.loopOnce(null);
+    const continued = try test_helpers.poll(&loop, null);
     producer.join();
     try std.testing.expect(continued);
     try std.testing.expectEqual(0, probe.tasks);
@@ -272,7 +272,7 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     var fd = [_]std.c.pollfd{.{ .fd = io.io_c.pp_mux_wake_descriptor(wake.handle), .events = std.c.POLL.IN, .revents = 0 }};
     // The shared mux consumes its wake while returning control to the owner.
     try std.testing.expectEqual(0, std.c.poll(&fd, 1, 0));
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try wake.reset();
     try std.testing.expectEqual(0, std.c.poll(&fd, 1, 0));
     try loop.stop();
@@ -296,7 +296,7 @@ test "looper borrows its mux across allocation failure and replacement" {
             defer loop.destroy();
             probe.looper = loop;
             try loop.scheduleTimer(&probe.timer, 0, .{ .context = &probe, .callback = Probe.task });
-            try std.testing.expect(loop.loopOnce(0));
+            try std.testing.expect(try test_helpers.poll(&loop, 0));
         }
         mux.signal();
         try std.testing.expect(io.io_c.pp_mux_wait(mux.handle, 0, null) > 0);

@@ -1473,6 +1473,40 @@ fn partoutCodeForLooperFailure(opt_failure: ?Looper.Failure) ?api.PartoutErrorCo
 }
 
 pub const testing = struct {
+    pub const perform = ConnectionDaemon.perform;
+    pub const schedule = ConnectionDaemon.schedule;
+    pub const isCurrentThread = ConnectionDaemon.isCurrentThread;
     pub const codeForDaemonStartError = partoutCodeForDaemonStartError;
     pub const codeForLooperFailure = partoutCodeForLooperFailure;
+
+    pub fn shutdown(owner: anytype) void {
+        owner.shutdown();
+    }
+
+    /// Runs test setup and observations on the same thread as daemon state.
+    pub fn onLoop(self: anytype, context: anytype, comptime callback: anytype) Error!void {
+        const Request = struct {
+            context: @TypeOf(context),
+            fn call(owner: *ConnectionDaemon, raw: *anyopaque) Error!void {
+                const request: *@This() = @ptrCast(@alignCast(raw));
+                return callback(owner, request.context);
+            }
+        };
+        self.jobs_mutex.lock();
+        if (self.isCurrentThread()) {
+            self.jobs_mutex.unlock();
+            return callback(self, context);
+        }
+        defer self.jobs_mutex.unlock();
+        if (!self.is_running) return error.Closed;
+        var request = Request{ .context = context };
+        var job = ConnectionDaemon.Job{ .command = .{ .perform = .{
+            .context = &request,
+            .callback = Request.call,
+        } } };
+        self.jobs.append(&job);
+        _ = io_c.pp_mux_wake(self.mux);
+        while (!job.done) self.jobs_condition.wait(&self.jobs_mutex);
+        return job.result;
+    }
 };

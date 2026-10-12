@@ -51,24 +51,24 @@ test "v2 looper runs and cancels timers on its caller" {
     const task: Looper.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
     try looper.scheduleTimer(&timer, 1, task);
     try std.testing.expectEqual(@as(usize, 0), probe.calls);
-    try std.testing.expect(looper.loopOnce(100));
+    try std.testing.expect(try test_helpers.poll(&looper, 100));
     try std.testing.expectEqual(@as(usize, 1), probe.calls);
     try std.testing.expect(probe.ran_on_caller);
 
     try looper.scheduleTimer(&timer, 0, task);
     looper.cancelTimer(&timer);
-    try std.testing.expect(looper.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 1), probe.calls);
     try looper.scheduleTimer(&timer, 1000, task);
     try looper.scheduleTimer(&timer, 0, task);
-    try std.testing.expect(looper.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
 
     try looper.scheduleTimer(&timer, 0, task);
     try looper.stop();
     try looper.stop();
-    try std.testing.expectEqual(@as(usize, 1), finish.calls);
-    try std.testing.expect(!looper.loopOnce(0));
+    try std.testing.expectEqual(@as(usize, 0), finish.calls);
+    try std.testing.expect(!try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectError(error.LooperUnavailable, looper.scheduleTimer(&timer, 0, task));
 }

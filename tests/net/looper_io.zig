@@ -235,11 +235,11 @@ test "v2 copies write payloads and descriptors across partial writes and backpre
     @memset(&payload, 'x');
     packets = .{ "changed", "changed", "changed" };
     try std.testing.expectEqual(@as(usize, 0), mock.writes);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(@as(usize, 0), mock.writes);
     for (0..10) |_| {
         if (mock.writes == 3) break;
-        try std.testing.expect(loop.loopOnce(100));
+        try std.testing.expect(try test_helpers.poll(&loop, 100));
     }
     try std.testing.expectEqual(@as(usize, 3), mock.writes);
     try std.testing.expectEqualStrings("copiedsecond", mock.output[0..mock.output_len]);
@@ -260,7 +260,7 @@ test "v2 detach stop and destroy free pending write copies" {
         var mock = Mock{ .fd = fds[0], .block_writes = true };
         try loop.attach(.{ .pair = mock.pair() });
         try loop.write(&.{ "pending", "also pending" }, .tun, null);
-        try std.testing.expect(loop.loopOnce(0));
+        try std.testing.expect(try test_helpers.poll(&loop, 0));
         switch (action) {
             .detach => try loop.detach(.tun),
             .stop => try loop.stop(),
@@ -288,7 +288,9 @@ test "v2 read and callback failures report the cause and detach the side" {
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId(), .fail_callback = failure == .callback };
         try loop.attach(probe.attach(mock.pair()));
         try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "x", 1));
-        try std.testing.expect(loop.loopOnce(10));
+        var reported_failure: ?io.Failure = null;
+        try std.testing.expect(loop.impl.loopOnce(10, &reported_failure));
+        try std.testing.expect(reported_failure != null);
         try std.testing.expect(!loop.isTunAttached());
         try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
         try std.testing.expectEqual(@as(usize, 1), probe.failures);
@@ -357,7 +359,7 @@ test "v2 failed copied batches preserve already queued writes" {
         failing.fail_index = failing.alloc_index + successful_allocations;
         try std.testing.expectError(error.OutOfMemory, loop.write(&.{ "one", "two" }, .tun, null));
         failing.fail_index = std.math.maxInt(usize);
-        try std.testing.expect(loop.loopOnce(0));
+        try std.testing.expect(try test_helpers.poll(&loop, 0));
         try std.testing.expectEqual(@as(usize, 1), mock.writes);
         try std.testing.expectEqualStrings("head", mock.output[0..mock.output_len]);
         try loop.stop();
@@ -377,7 +379,7 @@ test "v2 read callbacks pause until resumed" {
     try loop.attach(probe.attach(mock.pair()));
     try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "xy", 2));
     try test_helpers.wait(&loop, &probe.calls, 1);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expectEqual(@as(usize, 1), mock.reads);
     try loop.resumeReading(.tun);
     try test_helpers.wait(&loop, &probe.calls, 2);
@@ -397,7 +399,9 @@ test "v2 write failure reports the cause and discards later queued copies" {
     var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
     try loop.attach(probe.attach(mock.pair()));
     try loop.write(&.{ "one", "two", "later" }, .tun, null);
-    try std.testing.expect(loop.loopOnce(0));
+    var reported_failure: ?io.Failure = null;
+    try std.testing.expect(loop.impl.loopOnce(0, &reported_failure));
+    try std.testing.expect(reported_failure != null);
     try std.testing.expectEqualStrings("one", mock.output[0..mock.output_len]);
     try std.testing.expectEqual(error.LibcFailure, probe.failure.?.io.cause);
     try std.testing.expectEqual(@as(usize, 1), probe.failures);
@@ -423,9 +427,9 @@ test "v2 owned reads honor packet and byte limits across iterations" {
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
         try loop.attach(probe.attach(mock.pair()));
         try std.testing.expectEqual(@as(isize, 2), std.c.write(fds[1], "xy", 2));
-        try std.testing.expect(loop.loopOnce(0));
+        try std.testing.expect(try test_helpers.poll(&loop, 0));
         try std.testing.expectEqual(@as(usize, 1), probe.total.load(.acquire));
-        try std.testing.expect(loop.loopOnce(0));
+        try std.testing.expect(try test_helpers.poll(&loop, 0));
         try std.testing.expectEqual(@as(usize, 2), probe.total.load(.acquire));
         try std.testing.expectEqual(@as(usize, 2), probe.calls.load(.acquire));
         try loop.stop();
@@ -445,14 +449,16 @@ test "v2 reads without an observer drain data and still report failures" {
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
         try loop.attach(.{ .pair = mock.pair(), .on_failure = .{ .context = &probe, .callback = ReadProbe.failed } });
         try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "x", 1));
-        try std.testing.expect(loop.loopOnce(10));
+        var reported_failure: ?io.Failure = null;
+        try std.testing.expect(loop.impl.loopOnce(10, &reported_failure));
+        try std.testing.expectEqual(fail_read, reported_failure != null);
         if (fail_read) {
             try std.testing.expectEqual(error.LibcFailure, probe.failure.?.io.cause);
             try std.testing.expect(!loop.isTunAttached());
         } else {
             try std.testing.expectEqual(@as(usize, 1), mock.reads);
             try std.testing.expectEqual(@as(isize, 1), std.c.write(fds[1], "y", 1));
-            try std.testing.expect(loop.loopOnce(10));
+            try std.testing.expect(try test_helpers.poll(&loop, 10));
             try std.testing.expectEqual(@as(usize, 2), mock.reads);
         }
         try std.testing.expectEqual(@as(usize, 0), probe.calls.load(.acquire));
@@ -475,7 +481,7 @@ test "v2 UDP packet errors discard only the bad packet and retain the link" {
     try std.testing.expectError(error.MissingDestination, loop.write(&.{"x"}, .link, null));
     const oversized = [_]u8{0} ** 65535;
     try loop.write(&.{ &oversized, "valid" }, .link, remote);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expect(loop.isLinkAttached());
     var bytes: [64]u8 = undefined;
     var sender: io.SocketAddress = undefined;

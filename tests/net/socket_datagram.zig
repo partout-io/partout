@@ -24,7 +24,7 @@ fn wait(loop: ?*Looper, value: *const Atomic, expected: usize) !void {
     for (0..if (loop != null) @as(usize, 500) else 5000) |_| {
         if (value.load(.acquire) >= expected) return;
         if (loop) |caller| {
-            try std.testing.expect(caller.loopOnce(10));
+            try std.testing.expect(try test_helpers.poll(caller, 10));
         } else {
             _ = libc.usleep(1000);
         }
@@ -47,7 +47,7 @@ fn receive(loop: ?*Looper, link: *io.SocketWrapper, buf: []u8, address: *io.Sock
         return link.receiveFrom(buf, address) catch |err| {
             if (err != error.WouldBlock) return err;
             if (loop) |caller| {
-                try std.testing.expect(caller.loopOnce(10));
+                try std.testing.expect(try test_helpers.poll(caller, 10));
             } else {
                 _ = libc.usleep(1000);
             }
@@ -210,9 +210,9 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     defer peer.destroy();
     _ = try peer.sendTo("pause", v4);
     try wait(&loop, &echo.count, 1);
-    try std.testing.expect(loop.loopOnce(0));
+    try std.testing.expect(try test_helpers.poll(&loop, 0));
     _ = try peer.sendTo("resume", v6);
-    try std.testing.expect(loop.loopOnce(20));
+    try std.testing.expect(try test_helpers.poll(&loop, 20));
     try std.testing.expectEqual(@as(usize, 1), echo.count.load(.acquire));
     try loop.resumeReading(.link);
     try wait(&loop, &echo.count, 2);
