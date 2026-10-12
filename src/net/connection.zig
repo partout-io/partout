@@ -247,7 +247,7 @@ pub const Connection = struct {
 
         data_count: *const fn (*anyopaque, api.DataCount) void,
 
-        // Deprecated.
+        // FIXME: ###, Deprecated.
         status: *const fn (*anyopaque, api.ConnectionStatus) void,
         last_error: *const fn (*anyopaque, api.PartoutErrorPair) void,
         /// Requests host cancellation after an unrecoverable connection
@@ -296,7 +296,7 @@ pub const Connection = struct {
             fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
-        /// Deprecated.
+        /// FIXME: ###, Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool = struct {
             fn call(_: *anyopaque, _: Events) StartError!bool {
                 return error.UnableToStart;

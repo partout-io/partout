@@ -437,7 +437,7 @@ const ConnectionDaemon = struct {
             .stopped = onConnectionStopped,
             .set_env = onConnectionSetEnvironmentValue,
             .data_count = onConnectionDataCount,
-            // Deprecated callbacks must never be emitted by a v2 connection.
+            // FIXME: ###, Deprecated callbacks must never be emitted by a v2 connection.
             .status = legacyStatus,
             .last_error = legacyLastError,
             .cancel = legacyCancel,

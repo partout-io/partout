@@ -198,24 +198,24 @@ pub const WriteQueue = struct {
     }
 };
 
-// Deprecated v1-only worker helpers. Retained until the v1 looper is removed.
+// FIXME: ###, Deprecated v1-only worker helpers. Retained until the v1 looper is removed.
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
     AlreadyStarted,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 pub const WriteOOBError = io.WriteOOBError;
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 pub const CompletionError = std.mem.Allocator.Error || error{
     LooperUnavailable,
     MuxFailure,
     SideAlreadyAttached,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// Runs a generic task in the worker thread.
 pub const Task = struct {
     context: ?*anyopaque = null,
@@ -226,7 +226,7 @@ pub const Task = struct {
     }
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 pub const Completion = struct {
     // Completion state.
     done: bool = false,
@@ -236,7 +236,7 @@ pub const Completion = struct {
     next: ?*Completion = null,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// Intrusive FIFO of synchronous command completions.
 /// The queue is not thread-safe; callers must synchronize access.
 pub const CompletionQueue = struct {
@@ -256,7 +256,7 @@ pub const CompletionQueue = struct {
     }
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// Uniquely identifies a side. Acts as a discriminator
 /// if a task is submitted to a side but the side is
 /// detached before the task is actually executed.
@@ -265,7 +265,7 @@ pub const SideIdentity = struct {
     id: ?u64,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// These are the supported commands by the looper worker.
 pub const Command = union(enum) {
     attach: struct {
@@ -289,7 +289,7 @@ pub const Command = union(enum) {
     stop,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// A node in `CommandQueue`, with the payload and
 /// an optional one-shot timer for deferred scheduling.
 pub const CommandNode = struct {
@@ -307,7 +307,7 @@ pub const CommandNode = struct {
     timer_next: ?*CommandNode = null,
 };
 
-/// Deprecated: used only by the v1 looper.
+/// FIXME: ###, Deprecated: used only by the v1 looper.
 /// A plain FIFO for the pending worker commands. Not thread-safe.
 pub const CommandQueue = struct {
     pending: core.Fifo(CommandNode) = .{},
