@@ -1173,6 +1173,8 @@ const ConnectionDaemon = struct {
         var running = self.is_running;
         self.actor_id = std.Thread.getCurrentId();
         self.jobs_mutex.unlock();
+
+        // Record event loop terminations caused by the looper.
         var loop_terminated = false;
         var loop_failure: ?io.Failure = null;
 
@@ -1228,6 +1230,7 @@ const ConnectionDaemon = struct {
             _ = self.completeJob(job, error.Closed);
         }
 
+        // Signal unexpected looper failures.
         if (unexpected_exit) self.handleEventLoopFailure(loop_failure);
 
         self.jobs_mutex.lock();
