@@ -149,10 +149,9 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
             std.debug.assert(!self.looper.isLinkAttached() and !self.looper.isTunAttached());
             self.stop_count += 1;
+            const status = self.daemon.snapshot_publisher.environment.connection_status;
             sink.emit(.stopped);
-            if (self.daemon.state == .started) {
-                std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .disconnected);
-            }
+            std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == status);
         }
         fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -539,7 +538,7 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
     return monitor.reachable;
 }
 
-test "v2 daemon consumes borrowed reporting values inline and delivers finalization clears" {
+test "v2 daemon defers reporting with owned payloads and permits reentrant stop" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: ?net.Connection.Events = null,
@@ -547,6 +546,7 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
         daemon: *Daemon = undefined,
         delivered_updates: *const usize = undefined,
         reporting_inline: bool = false,
+        producing: bool = false,
 
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -556,9 +556,11 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
         fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.producer_thread = std.Thread.getCurrentId();
+            self.producing = true;
+            defer self.producing = false;
             var key = "OpenVPN.serverConfiguration".*;
             var value = "{\"test\":true}".*;
-            // Reporting consumes borrowed strings before the producer changes them.
+            // Deferred reporting must copy strings before the producer changes them.
             sink.emit(.{ .set_env = .{ .key = &key, .value = &value } });
             self.daemon.snapshot_publisher.setConnectionStatus(.connected);
             sink.emit(.{ .data_count = .{ .received = 10, .sent = 20 } });
@@ -594,6 +596,9 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
         clears: usize = 0,
         delivery_thread: ?std.Thread.Id = null,
         valid_payload: bool = true,
+        factory: *Factory = undefined,
+        stop_on_update: bool = false,
+        delivered_outside_producer: bool = true,
 
         fn setEnvironment(raw: ?*anyopaque, key: []const u8, value: ?[]const u8) void {
             const mock: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
@@ -604,6 +609,8 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
             self.valid_payload = self.valid_payload and std.mem.eql(u8, key, "OpenVPN.serverConfiguration");
             if (value) |bytes| {
                 self.updates += 1;
+                self.delivered_outside_producer = self.delivered_outside_producer and !self.factory.producing;
+                if (self.stop_on_update) self.factory.daemon.stop();
                 self.valid_payload = self.valid_payload and std.mem.eql(u8, bytes, "{\"test\":true}");
             } else {
                 self.clears += 1;
@@ -633,18 +640,23 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
     defer sut.destroy();
     factory.daemon = sut;
     factory.delivered_updates = &controller.updates;
+    controller.factory = &factory;
     try sut.start();
     defer sut.stop();
     const actor = sut.implementation.connection;
     try daemon.testing.perform(actor, .onBetterPath);
-    try std.testing.expect(factory.reporting_inline);
+    try daemon.testing.resumeGate(actor);
+    try std.testing.expect(!factory.reporting_inline);
     try std.testing.expectEqual(@as(usize, 1), controller.updates);
     try std.testing.expect(controller.valid_payload);
     try std.testing.expectEqual(factory.producer_thread.?, controller.delivery_thread.?);
     try std.testing.expect(controller.delivery_thread.? != std.Thread.getCurrentId());
 
-    sut.stop();
+    controller.stop_on_update = true;
+    try daemon.testing.perform(actor, .onBetterPath);
     try daemon.testing.resumeGate(actor);
+    try daemon.testing.resumeGate(actor);
+    try std.testing.expect(controller.delivered_outside_producer);
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
     const sink = factory.events.?;
@@ -656,7 +668,7 @@ test "v2 daemon consumes borrowed reporting values inline and delivers finalizat
         }
     }.run);
     try daemon.testing.resumeGate(actor);
-    try std.testing.expectEqual(@as(usize, 1), controller.updates);
+    try std.testing.expectEqual(@as(usize, 2), controller.updates);
     try std.testing.expectEqual(@as(u64, 0), sut.snapshot_publisher.environment.data_count.received);
     try std.testing.expect(controller.valid_payload);
 }

@@ -492,14 +492,31 @@ const ConnectionDaemon = struct {
                     log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
                 };
             },
-            .failed => {
-                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    log.writef(.err, "Unable to enqueue connection failure: {s}", .{@errorName(err)});
+            .set_env => |update| {
+                const allocator = self.daemon.allocator;
+                const key = allocator.dupe(u8, update.key) catch {
+                    log.write(.err, "Unable to copy environment key");
+                    return;
+                };
+                const value = if (update.value) |bytes| allocator.dupe(u8, bytes) catch {
+                    allocator.free(key);
+                    log.write(.err, "Unable to copy environment value");
+                    return;
+                } else null;
+                const message: Message = .{ .onConnectionEvent = .{ .set_env = .{ .key = key, .value = value } } };
+                self.schedule(message) catch |err| {
+                    // Finalization runs outside protocol callbacks after submissions close.
+                    if (err == error.Closed and self.isCurrentThread() and value == null) {
+                        self.handleConnectionEvent(message.onConnectionEvent);
+                    }
+                    message.deinit(allocator);
+                    log.writef(.err, "Unable to enqueue environment update: {s}", .{@errorName(err)});
                 };
             },
-            .stopped, .set_env, .data_count => {
-                std.debug.assert(self.isCurrentThread());
-                self.handleConnectionEvent(event);
+            .failed, .stopped, .data_count => {
+                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
+                    log.writef(.err, "Unable to enqueue connection event: {s}", .{@errorName(err)});
+                };
             },
         }
     }
@@ -1092,6 +1109,10 @@ const ConnectionDaemon = struct {
                         var info = success.info;
                         info.deinit(allocator);
                     },
+                    .set_env => |update| {
+                        allocator.free(update.key);
+                        if (update.value) |value| allocator.free(value);
+                    },
                     else => {},
                 },
                 else => {},
@@ -1158,6 +1179,11 @@ const ConnectionDaemon = struct {
         // Discard outstanding jobs.
         while (pending) |job| {
             pending = job.next;
+            // Preserve finalization clears accepted before submissions closed.
+            if (job.owned and job.message == .onConnectionEvent) {
+                const event = job.message.onConnectionEvent;
+                if (event == .set_env and event.set_env.value == null) self.handleConnectionEvent(event);
+            }
             _ = self.completeJob(job, error.Closed);
         }
 
