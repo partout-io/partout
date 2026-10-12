@@ -83,14 +83,10 @@ test "ST looper lifecycle and timers are caller driven" {
 const Mock = struct {
     fd: std.c.fd_t,
     loop: *Looper,
-    storage: [16]u8 = undefined,
-    buffers: [1]helpers.ReadBuffer = undefined,
     reads: usize = 0,
     has_read: bool = false,
-    releases: usize = 0,
     cleanups: usize = 0,
-    completions: usize = 0,
-    result: helpers.IOResult = .{},
+    successful_writes: usize = 0,
     backpressure: bool = false,
     block: bool = false,
     writes: usize = 0,
@@ -112,6 +108,7 @@ const Mock = struct {
             self.backpressure = false;
             return error.Backpressure;
         }
+        self.successful_writes += 1;
         return data.len - offset;
     }
     fn cleanup(raw: *anyopaque) void {
@@ -121,14 +118,6 @@ const Mock = struct {
     fn code(_: *anyopaque) c_int {
         return 0;
     }
-    fn acquire(raw: ?*anyopaque) []helpers.ReadBuffer {
-        const self: *Mock = @ptrCast(@alignCast(raw.?));
-        return &self.buffers;
-    }
-    fn release(raw: ?*anyopaque, _: []helpers.ReadBuffer, _: helpers.IOResult) void {
-        const self: *Mock = @ptrCast(@alignCast(raw.?));
-        self.releases += 1;
-    }
     fn onRead(raw: ?*anyopaque, packets: helpers.Packets, _: ?[]const io.SocketAddress) anyerror!helpers.ReadAction {
         const self: *Mock = @ptrCast(@alignCast(raw.?));
         self.reads += 1;
@@ -136,11 +125,6 @@ const Mock = struct {
         try std.testing.expectError(error.ReentrantCall, self.loop.detach(.tun));
         try std.testing.expectError(error.ReentrantCall, self.loop.stop());
         return .pause;
-    }
-    fn complete(raw: ?*anyopaque, result: helpers.IOResult) void {
-        const self: *Mock = @ptrCast(@alignCast(raw.?));
-        self.completions += 1;
-        self.result = result;
     }
     fn descriptor(self: *Mock) source.net_io_posix.POSIXDescriptor {
         const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
@@ -166,10 +150,9 @@ test "ST looper inline reads writes retries and synchronous detach" {
     defer _ = std.c.close(fds[0]);
     defer _ = std.c.close(fds[1]);
     var mock = Mock{ .fd = fds[0], .loop = loop };
-    mock.buffers = .{.{ .data = &mock.storage }};
+
     const args = helpers.AttachArguments{
         .pair = .{ .tun = mock.descriptor() },
-        .read_buffers = .{ .context = &mock, .acquire = Mock.acquire, .release = Mock.release },
         .on_read = .{ .context = &mock, .callback = Mock.onRead },
     };
     try loop.attach(args);
@@ -182,33 +165,29 @@ test "ST looper inline reads writes retries and synchronous detach" {
     try std.testing.expect(loop.loopOnce(0));
     try wake.reset();
     try std.testing.expectEqual(1, mock.reads);
-    try std.testing.expectEqual(1, mock.releases);
     try loop.resumeReading(.tun);
     mock.backpressure = true;
     const packets: helpers.Packets = &.{"abc"};
-    const completion = helpers.OnWriteComplete{ .context = &mock, .callback = Mock.complete };
-    try loop.write(packets, .tun, null, completion);
-    try std.testing.expectEqual(0, mock.completions);
+    try loop.write(packets, .tun, null);
+    try std.testing.expectEqual(0, mock.successful_writes);
     try std.testing.expect(loop.loopOnce(0));
-    try std.testing.expectEqual(0, mock.completions);
+    try std.testing.expectEqual(0, mock.successful_writes);
     try std.testing.expect(loop.loopOnce(null));
-    try std.testing.expectEqual(1, mock.completions);
-    try std.testing.expectEqual(1, mock.result.count);
+    try std.testing.expectEqual(1, mock.successful_writes);
     const writes_before_queue = mock.writes;
-    try loop.write(packets, .tun, null, completion);
+    try loop.write(packets, .tun, null);
     try std.testing.expectEqual(writes_before_queue, mock.writes);
-    try std.testing.expectEqual(1, mock.completions);
+    try std.testing.expectEqual(1, mock.successful_writes);
     try std.testing.expect(loop.loopOnce(0));
-    try std.testing.expectEqual(2, mock.completions);
+    try std.testing.expectEqual(2, mock.successful_writes);
     mock.block = true;
-    try loop.write(packets, .tun, null, completion);
+    try loop.write(packets, .tun, null);
     try std.testing.expect(loop.loopOnce(0));
     const writes = mock.writes;
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(writes, mock.writes);
     try loop.detach(.tun);
-    try std.testing.expectEqual(3, mock.completions);
-    try std.testing.expectEqual(error.Cancelled, mock.result.failure.?);
+    try std.testing.expectEqual(2, mock.successful_writes);
     try std.testing.expectEqual(1, mock.cleanups);
     try std.testing.expect(!loop.isAttached(.tun));
     try loop.stop();
@@ -262,26 +241,23 @@ test "ST write backpressure preserves an explicitly paused opposite side" {
     var tun = Mock{ .fd = fds[1], .loop = loop, .backpressure = true };
     // Keep borrowed callback contexts alive through destruction.
     defer loop.destroy();
-    link.buffers = .{.{ .data = &link.storage }};
-    tun.buffers = .{.{ .data = &tun.storage }};
+
     try loop.attach(.{
         .pair = .{ .link = link.descriptor() },
-        .read_buffers = .{ .context = &link, .acquire = Mock.acquire, .release = Mock.release },
         .on_read = .{ .context = &link, .callback = Mock.onRead },
     });
     try loop.attach(.{
         .pair = .{ .tun = tun.descriptor() },
-        .read_buffers = .{ .context = &tun, .acquire = Mock.acquire, .release = Mock.release },
     });
     try std.testing.expectEqual(1, std.c.write(fds[1], "x", 1));
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(1, link.reads);
     link.has_read = false;
     try std.testing.expectEqual(1, std.c.write(fds[1], "x", 1));
-    try loop.write(&.{"out"}, .tun, null, .{ .context = &tun, .callback = Mock.complete });
+    try loop.write(&.{"out"}, .tun, null);
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expect(loop.loopOnce(null));
-    try std.testing.expectEqual(1, tun.completions);
+    try std.testing.expectEqual(1, tun.successful_writes);
     try std.testing.expect(loop.loopOnce(0));
     try std.testing.expectEqual(1, link.reads);
     try loop.resumeReading(.link);

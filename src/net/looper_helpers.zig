@@ -84,8 +84,6 @@ pub const Timer = io.Timer;
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
     pair: io.DescriptorPair,
-    /// Required by v2, including when on_read is null; ignored by v1.
-    read_buffers: ?ReadBuffers = null,
     /// If absent, incoming data is read and discarded.
     on_read: ?OnRead = null,
     on_failure: ?OnFailure = null,
@@ -224,7 +222,6 @@ const WriteNode = struct {
 
 /// Owned FIFO of packet buffers with partial consumption of the head packet.
 /// The queue is not thread-safe; callers must synchronize access.
-/// FIXME: ###, Unused in v2
 pub const WriteQueue = struct {
     allocator: std.mem.Allocator,
 
@@ -299,73 +296,5 @@ pub const WriteQueue = struct {
             allocator.destroy(node);
             current = next;
         }
-    }
-};
-
-// I/O requests used by looper v2.
-
-pub const IOError = io.IOError;
-pub const IOResult = io.IOResult;
-pub const ReadBuffer = io.ReadBuffer;
-
-/// Called exactly once for an accepted write request, on the looper without its lock.
-/// Completion may run before submission returns. Rejected submissions never
-/// invoke the callback. The entire buffer slice (descriptors and payloads)
-/// must stay valid and exclusively loaned until completion; the callback context
-/// must also remain valid. The destination is stored by value.
-/// The callback may submit I/O, but must not call
-/// attach, detach, stop, or deinit. Pending requests are cancelled before
-/// detach, stop, or deinit returns; shutdown does not wait for I/O to drain.
-pub const OnWriteComplete = struct {
-    context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, IOResult) void,
-
-    pub fn call(self: OnWriteComplete, result: IOResult) void {
-        self.callback(self.context, result);
-    }
-};
-
-/// Lends payload storage to spontaneous v2 reads. The looper owns neither the
-/// descriptors nor their payloads. Both callbacks run on the looper without its
-/// lock and must not call attach, detach, stop, or deinit. The provider context
-/// must outlive the attachment.
-pub const ReadBuffers = io.ReadBuffers;
-
-pub const WriteRequest = struct {
-    packets: Packets,
-    destination: ?io.SocketAddress,
-    completion: OnWriteComplete,
-    count: usize = 0,
-    offset: usize = 0,
-    next: ?*WriteRequest = null,
-
-    pub fn pendingWrite(self: *const WriteRequest) PendingWrite {
-        return .{
-            .data = self.packets[self.count],
-            .offset = self.offset,
-            .address = self.destination,
-        };
-    }
-
-    /// Advances this write, returning whether all packets have been written.
-    pub fn advance(self: *WriteRequest, written: usize) bool {
-        const remaining = self.packets[self.count].len - self.offset;
-        std.debug.assert(written <= remaining);
-        self.offset += written;
-        if (written != remaining) return false;
-        self.offset = 0;
-        self.count += 1;
-        return self.count == self.packets.len;
-    }
-
-    pub fn complete(
-        self: *WriteRequest,
-        allocator: std.mem.Allocator,
-        failure: ?IOError,
-    ) void {
-        const completion = self.completion;
-        const result = IOResult{ .count = self.count, .failure = failure };
-        allocator.destroy(self);
-        completion.call(result);
     }
 };

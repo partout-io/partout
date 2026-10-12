@@ -6,8 +6,8 @@
 //! timers and nonblocking packet I/O on the calling thread. Serialize all access.
 //! Callbacks may submit writes, resume reads, and manage timers. They must not
 //! attach, detach, stop, destroy, or recursively call loopOnce().
-//! Packet storage is borrowed until completion; detach/stop/destroy cancel
-//! pending writes. This experimental implementation is not used by the daemon.
+//! Owns read storage and copies outgoing packets; detach/stop/destroy discard
+//! pending writes. Read packet views are valid only during on_read. This experimental implementation is not used by the daemon.
 //! The caller owns the wake descriptor, signals it from external producers, and
 //! resets it before draining external work between iterations. The looper only
 //! polls it; all access to the looper itself must still be serialized.
@@ -165,7 +165,11 @@ pub const PosixLooper = struct {
     pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
-        if (arguments.read_buffers == null or self.options.max_read_count == 0) return error.InvalidBuffers;
+        const buffer_size = switch (std.meta.activeTag(arguments.pair)) {
+            .link => self.options.link_buf_size,
+            .tun => self.options.tun_buf_size,
+        };
+        if (buffer_size == 0 or self.options.max_read_count == 0 or self.options.max_read_size == 0) return error.InvalidBuffers;
         const tag = std.meta.activeTag(arguments.pair);
         const slot = &self.sides[@intFromEnum(tag)];
         if (slot.* != null) return error.SideAlreadyAttached;
@@ -179,7 +183,7 @@ pub const PosixLooper = struct {
         }
         if (!io_c.pp_mux_add(self.mux, descriptor.fd)) return error.MuxFailure;
         errdefer _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
-        slot.* = try SideIO.create(self.allocator, tag, descriptor, arguments, self.options.max_read_count);
+        slot.* = try SideIO.create(self.allocator, tag, descriptor, arguments, self.options.max_read_count, buffer_size);
     }
 
     pub fn detach(self: *PosixLooper, tag: io.Side) helpers.DetachError!void {
@@ -202,23 +206,19 @@ pub const PosixLooper = struct {
         }
     }
 
-    /// Queues the batch for loopOnce(), borrowing it until completion.
-    /// Rejection never invokes completion.
-    pub fn write(self: *PosixLooper, packets: helpers.Packets, tag: io.Side, destination: ?io.SocketAddress, completion: helpers.OnWriteComplete) helpers.WriteError!void {
-        if (packets.len == 0) return error.InvalidBuffers;
+    /// Copies the complete batch, or leaves the queue unchanged on allocation failure.
+    pub fn write(self: *PosixLooper, packets: helpers.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
+        if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
         const side = self.sides[@intFromEnum(tag)] orelse return error.SideNotAttached;
         if (side.native_io.isUnconnected() and destination == null) return error.MissingDestination;
-        const request = try self.allocator.create(helpers.WriteRequest);
-        request.* = .{ .packets = packets, .destination = destination, .completion = completion };
-        side.write_queue.append(request);
+        try side.write_queue.append(packets, destination);
         if (side.write_retry == null) side.write_ready = true;
     }
 
     fn processWrite(self: *PosixLooper, side: *SideIO) ?helpers.Failure {
         defer side.write_ready = false;
-        while (side.write_queue.head) |request| {
-            const pending = request.pendingWrite();
+        while (side.write_queue.pending()) |pending| {
             const written = side.native_io.writePacket(pending.data, pending.offset, pending.address) catch |err| {
                 switch (err) {
                     error.WouldBlock => return null,
@@ -232,18 +232,15 @@ pub const PosixLooper = struct {
                         return null;
                     },
                     else => {
-                        _ = side.write_queue.take();
-                        const failure = side.ioFailure(err);
-                        request.complete(self.allocator, err);
-                        if (err == error.DatagramDropped) continue;
-                        return failure;
+                        if (err == error.DatagramDropped) {
+                            _ = side.write_queue.advance(pending.data.len - pending.offset);
+                            continue;
+                        }
+                        return side.ioFailure(err);
                     },
                 }
             };
-            if (request.advance(written)) {
-                _ = side.write_queue.take();
-                request.complete(self.allocator, null);
-            } else if (written == 0) {
+            if (!side.write_queue.advance(written) and written == 0) {
                 // A zero-byte stream write must not monopolize this iteration.
                 return null;
             }
@@ -252,20 +249,16 @@ pub const PosixLooper = struct {
     }
 
     fn processRead(self: *PosixLooper, side: *SideIO) ?helpers.Failure {
-        const buffers = side.read_buffers.acquire(side.read_buffers.context);
-        const result = side.readPackets(buffers, self.options.max_read_size);
-        defer {
-            @memset(side.read_packets[0..result.count], &.{});
-            side.read_buffers.release(side.read_buffers.context, buffers, result);
-        }
-        var action: helpers.ReadAction = if (buffers.len == 0) .pause else .keep;
+        const result = side.readPackets(self.options.max_read_size);
+        defer @memset(side.read_packets[0..result.count], &.{});
+        var action: helpers.ReadAction = .keep;
         if (result.count > 0) {
             if (side.on_read) |callback| {
                 const addresses = if (side.read_addresses) |values| values[0..result.count] else null;
                 action = callback.call(side.read_packets[0..result.count], addresses) catch |err| return .{ .user = err };
             }
         }
-        if (result.failure) |err| return if (err == error.InvalidBuffers) .{ .user = err } else side.ioFailure(@errorCast(err));
+        if (result.failure) |err| return side.ioFailure(err);
         if (action == .pause) side.reading = false;
         return null;
     }
@@ -286,7 +279,7 @@ pub const PosixLooper = struct {
             if (side.write_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (side.write_ready and side.write_retry == null) deadline_ns = now_ns;
             _ = io_c.pp_mux_set_read(self.mux, side.fd, side.reading and side.read_retry == null);
-            _ = io_c.pp_mux_set_write(self.mux, side.fd, side.write_queue.head != null and side.write_retry == null);
+            _ = io_c.pp_mux_set_write(self.mux, side.fd, side.write_queue.pending() != null and side.write_retry == null);
         }
         const remaining_ns = deadline_ns -| now_ns;
         const timeout_ms: c_int = if (deadline_ns == std.math.maxInt(u64)) -1 else @intCast(@min(std.math.maxInt(c_int), remaining_ns / std.time.ns_per_ms + @intFromBool(remaining_ns % std.time.ns_per_ms != 0)));
@@ -321,7 +314,8 @@ pub const PosixLooper = struct {
         _ = io_c.pp_mux_delete(self.mux, side.fd);
         if (failure) |reason| if (side.on_failure) |callback| callback.call(reason);
         side.native_io.cleanup();
-        while (side.write_queue.take()) |request| request.complete(self.allocator, error.Cancelled);
+        side.write_queue.deinit();
+        self.allocator.free(side.read_bytes);
         self.allocator.free(side.read_packets);
         if (side.read_addresses) |addresses| self.allocator.free(addresses);
         self.allocator.destroy(side);
@@ -340,20 +334,26 @@ pub const PosixLooper = struct {
         native_io: io_posix.POSIXInterface,
         on_read: ?helpers.OnRead,
         on_failure: ?helpers.OnFailure,
-        read_buffers: helpers.ReadBuffers,
+        read_bytes: []u8,
+        buffer_size: usize,
         read_packets: []helpers.Packet,
         read_addresses: ?[]io.SocketAddress,
-        write_queue: core.Fifo(helpers.WriteRequest) = .{},
+        write_queue: helpers.WriteQueue,
         reading: bool = true,
         read_ready: bool = false,
         write_ready: bool = false,
         read_retry: ?u64 = null,
         write_retry: ?u64 = null,
 
-        fn create(allocator: std.mem.Allocator, side: io.Side, descriptor: io_posix.POSIXDescriptor, arguments: helpers.AttachArguments, max_read_count: usize) std.mem.Allocator.Error!*SideIO {
-            const packets = try allocator.alloc(helpers.Packet, max_read_count);
+        fn create(allocator: std.mem.Allocator, side: io.Side, descriptor: io_posix.POSIXDescriptor, arguments: helpers.AttachArguments, max_read_count: usize, buffer_size: usize) std.mem.Allocator.Error!*SideIO {
+            // Keep each side's pool within 1 MiB, with at least one full-size packet.
+            const count = @min(max_read_count, @max(1, 1024 * 1024 / buffer_size));
+            const size = std.math.mul(usize, count, buffer_size) catch return error.OutOfMemory;
+            const bytes = try allocator.alloc(u8, size);
+            errdefer allocator.free(bytes);
+            const packets = try allocator.alloc(helpers.Packet, count);
             errdefer allocator.free(packets);
-            const addresses = if (descriptor.io.isUnconnected()) try allocator.alloc(io.SocketAddress, max_read_count) else null;
+            const addresses = if (descriptor.io.isUnconnected()) try allocator.alloc(io.SocketAddress, count) else null;
             errdefer if (addresses) |values| allocator.free(values);
             const self = try allocator.create(SideIO);
             self.* = .{
@@ -362,48 +362,36 @@ pub const PosixLooper = struct {
                 .native_io = descriptor.io,
                 .on_read = arguments.on_read,
                 .on_failure = arguments.on_failure,
-                .read_buffers = arguments.read_buffers.?,
+                .read_bytes = bytes,
+                .buffer_size = buffer_size,
                 .read_packets = packets,
                 .read_addresses = addresses,
+                .write_queue = helpers.WriteQueue.init(allocator),
             };
             return self;
         }
 
-        fn readPackets(
-            self: *SideIO,
-            buffers: []helpers.ReadBuffer,
-            max_size: usize,
-        ) helpers.IOResult {
-            var result = helpers.IOResult{};
+        const ReadResult = struct {
+            count: usize = 0,
+            failure: ?io.Error = null,
+        };
+
+        fn readPackets(self: *SideIO, max_size: usize) ReadResult {
+            var result = ReadResult{};
             var size: usize = 0;
-            const limit = @min(buffers.len, self.read_packets.len);
-            // Count discarded packets against the attempt budget too, so an
-            // oversized-packet flood cannot monopolize the looper.
-            for (0..limit) |_| {
-                const buffer = &buffers[result.count];
-                if (buffer.data.len == 0) {
-                    result.failure = error.InvalidBuffers;
-                    break;
-                }
+            // Discarded datagrams also count against the attempt budget.
+            for (0..self.read_packets.len) |_| {
+                const start = result.count * self.buffer_size;
+                const buffer = self.read_bytes[start..][0..self.buffer_size];
                 var address: io.SocketAddress = undefined;
-                const count = self.native_io.readPacket(
-                    buffer.data,
-                    &address,
-                ) catch |err| {
+                const count = self.native_io.readPacket(buffer, &address) catch |err| {
                     if (err == error.DatagramDropped) continue;
-                    if (err != error.WouldBlock) {
-                        result.failure = err;
-                    }
+                    if (err != error.WouldBlock) result.failure = err;
                     break;
                 } orelse break;
 
-                buffer.size = count;
-                buffer.source = null;
-                self.read_packets[result.count] = buffer.data[0..count];
-                if (self.read_addresses) |addresses| {
-                    buffer.source = address;
-                    addresses[result.count] = address;
-                }
+                self.read_packets[result.count] = buffer[0..count];
+                if (self.read_addresses) |addresses| addresses[result.count] = address;
                 result.count += 1;
                 size += count;
                 if (size >= max_size) break;

@@ -10,7 +10,6 @@ const net = source.net;
 
 const source = @import("source");
 const test_helpers = @import("looper_test_helpers.zig");
-const daemon_helpers = source.net_daemon_helpers;
 const Looper = source.net_looper_v2.Looper;
 const api = source.core.api;
 const io = source.net_io;
@@ -170,9 +169,7 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     defer _ = libc.close(fds[0]);
     defer _ = libc.close(fds[1]);
     var probe = Probe{};
-    const read_options: Looper.Options = .{ .on_finish = .{ .callback = Probe.finish } };
-    const read_storage = try daemon_helpers.ReadStorage.create(std.testing.allocator, read_options.max_read_count, read_options.link_buf_size);
-    defer read_storage.destroy();
+
     const wake = try test_helpers.WakePipe.init();
     defer wake.deinit();
     var loop = try Looper.init(std.testing.allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = Probe.finish } });
@@ -181,9 +178,7 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
         const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
         tun.test_descriptor = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &probe, .vtable = &Probe.vtable } } };
         const descriptor = try tun.tunDescriptor();
-        try std.testing.expectError(error.InvalidBuffers, loop.attach(.{ .pair = .{ .tun = descriptor } }));
-        try std.testing.expect(!tun.is_closed);
-        try loop.attach(.{ .read_buffers = read_storage.provider(), .pair = .{ .tun = descriptor } });
+        try loop.attach(.{ .pair = .{ .tun = descriptor } });
         try std.testing.expectEqual(@as(usize, 0), probe.closed);
     }
     try loop.detach(.tun);

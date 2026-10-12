@@ -236,14 +236,10 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
         errdefer allocator.destroy(looper);
         looper.* = try Looper.init(allocator, options);
         errdefer looper.deinit();
-        const link_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.link_buf_size);
-        errdefer link_storage.destroy();
-        const tun_storage = try daemon_helpers.ReadStorage.create(allocator, options.max_read_count, options.tun_buf_size);
         probe.looper = looper;
         connection_daemon.connection = .{ .ptr = &probe, .vtable = &Probe.vtable, .daemon_io = .link };
         connection_daemon.endpoint_resolver = net.EndpointResolver.init(allocator, &endpoints);
         connection_daemon.looper = looper;
-        connection_daemon.read_storage = .{ link_storage, tun_storage };
         sut.state = .started;
     }
     defer sut.stop();

@@ -4,11 +4,8 @@
 
 const std = @import("std");
 
-const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
-const io_c = io.io_c;
-const log = core.logging;
 
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
@@ -61,7 +58,9 @@ pub const WindowsLooper = struct {
         self: *WindowsLooper,
         arguments: helpers.AttachArguments,
     ) helpers.AttachError!void {
-        if (arguments.read_buffers == null or self.options.max_read_count == 0) {
+        if (self.options.max_read_count == 0 or self.options.max_read_size == 0 or
+            (if (arguments.pair == .link) self.options.link_buf_size else self.options.tun_buf_size) == 0)
+        {
             return error.InvalidBuffers;
         }
         @panic("WindowsLooper.attach is not implemented");
@@ -72,7 +71,6 @@ pub const WindowsLooper = struct {
         _: helpers.Packets,
         _: io.Side,
         _: ?io.SocketAddress,
-        _: helpers.OnWriteComplete,
     ) helpers.WriteError!void {
         @panic("WindowsLooper.write is not implemented");
     }

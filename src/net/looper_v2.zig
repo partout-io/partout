@@ -3,18 +3,17 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Caller-driven platform I/O. The caller serializes access and owns the wake
-//! descriptor. loopOnce() runs callbacks inline; writes borrow until completion.
+//! descriptor. loopOnce() runs callbacks inline. Read storage and queued writes
+//! are owned by the looper; read packet views expire when the callback returns.
 //! Legacy worker APIs remain as explicit panics during the daemon migration.
 
 const std = @import("std");
 const builtin = @import("builtin");
 
-const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const looper_posix = @import("looper_posix.zig");
 const looper_windows = @import("looper_windows.zig");
-const log = core.logging;
 
 pub const testing_helpers = if (builtin.is_test) helpers else void;
 
@@ -25,10 +24,6 @@ pub const Looper = struct {
         looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
-    pub const ReadBuffer = helpers.ReadBuffer;
-    pub const IOResult = helpers.IOResult;
-    pub const OnWriteComplete = helpers.OnWriteComplete;
-    pub const ReadBuffers = helpers.ReadBuffers;
     pub const OnRead = helpers.OnRead;
     pub const ReadAction = helpers.ReadAction;
     pub const Packet = helpers.Packet;
@@ -136,30 +131,17 @@ pub const Looper = struct {
         return self.impl.resumeReading(side);
     }
 
-    /// Writes borrowed packets in FIFO order.
-    /// Borrows the entire packet slice, including descriptors, until completion.
-    /// The destination is stored by value.
-    /// Requires a nonempty batch and a destination for unconnected UDP.
-    /// See OnWriteComplete for lifetime and cancellation rules.
-    pub fn writeQueued(
+    /// Copies the complete batch before returning; loopOnce() writes it in FIFO order.
+    /// The destination is stored by value. Empty batches are no-ops.
+    /// Unconnected UDP requires a destination. Side failures use on_failure;
+    /// rejected datagrams are dropped without detaching the socket.
+    pub fn write(
         self: *Looper,
         packets: Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
-        completion: OnWriteComplete,
     ) WriteError!void {
-        return self.impl.write(packets, side, destination, completion);
-    }
-
-    /// Copies packets before returning; loopOnce() performs the actual I/O.
-    pub fn write(self: *Looper, packets: Packets, side: io.Side, destination: ?io.SocketAddress) (SubmissionError || error{MissingDestination})!void {
-        if (packets.len == 0) return;
-        const copy = try io.WriteCopy.create(self.allocator, packets);
-        errdefer copy.destroy();
-        self.writeQueued(copy.packets, side, destination, .{ .context = copy, .callback = io.WriteCopy.complete }) catch |err| switch (err) {
-            error.SideNotAttached, error.InvalidBuffers => copy.destroy(),
-            else => |failure| return failure,
-        };
+        return self.impl.write(packets, side, destination);
     }
 
     // Unsupported legacy worker APIs.

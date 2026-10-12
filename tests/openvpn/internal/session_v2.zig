@@ -191,12 +191,18 @@ const writer_vtable: net.ConnectionWriter.VTable = .{
 
 fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
-    return io.WriteCopy.submit(looper.allocator, looper, packets, side, destination);
+    looper.write(packets, side, destination) catch |err| switch (err) {
+        error.SideNotAttached, error.InvalidBuffers => {},
+        else => |failure| return failure,
+    };
 }
 
 fn writeOutOfBand(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) io.WriteOOBError!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
-    return io.WriteCopy.submit(looper.allocator, looper, packets, side, destination);
+    looper.write(packets, side, destination) catch |err| switch (err) {
+        error.SideNotAttached, error.InvalidBuffers => {},
+        else => |failure| return failure,
+    };
 }
 
 fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
