@@ -30,7 +30,8 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn loopOnce(self: *WindowsLooper, _: ?u32) bool {
+    pub fn loopOnce(self: *WindowsLooper, _: ?u32, failure: *?helpers.Failure) bool {
+        failure.* = null;
         if (self.stopped) return false;
         @panic("WindowsLooper.loopOnce is not implemented");
     }
