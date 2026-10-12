@@ -447,9 +447,8 @@ const ConnectionDaemon = struct {
 
     //#region Any thread - asynchronous events
 
-    // Lifecycle callbacks defer work that may reenter protocol state or change I/O.
-    // Failure notifications may also arrive on Go workers. Reporting and stopped
-    // callbacks run directly on the event-loop thread; borrowed data stays inline.
+    // Queue connection events outside protocol callbacks, copying borrowed payloads.
+    // Failure notifications may also arrive on background workers.
 
     // This is where connection events are rerouted through the actor
     fn events(self: *ConnectionDaemon) Connection.Events {
@@ -480,7 +479,7 @@ const ConnectionDaemon = struct {
                     .info = info,
                 } } }) catch |err| {
                     info.deinit(self.daemon.allocator);
-                    log.writef(.fault, "Unable to enqueue established connection: {s}", .{@errorName(err)});
+                    logEventSubmissionFailure(event, err);
                 };
             },
             .needs_rebind => {
@@ -489,7 +488,7 @@ const ConnectionDaemon = struct {
                 self.rebind_pending = true;
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
                     self.rebind_pending = false;
-                    log.writef(.err, "Unable to enqueue connection refresh: {s}", .{@errorName(err)});
+                    logEventSubmissionFailure(event, err);
                 };
             },
             .set_env => |update| {
@@ -508,16 +507,25 @@ const ConnectionDaemon = struct {
                     // Finalization runs outside protocol callbacks after submissions close.
                     if (err == error.Closed and self.isCurrentThread() and value == null) {
                         self.handleConnectionEvent(message.onConnectionEvent);
+                    } else {
+                        logEventSubmissionFailure(event, err);
                     }
                     message.deinit(allocator);
-                    log.writef(.err, "Unable to enqueue environment update: {s}", .{@errorName(err)});
                 };
             },
             .failed, .stopped, .data_count => {
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    log.writef(.err, "Unable to enqueue connection event: {s}", .{@errorName(err)});
+                    logEventSubmissionFailure(event, err);
                 };
             },
+        }
+    }
+
+    fn logEventSubmissionFailure(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
+        if (err == error.Closed) {
+            log.writef(.debug, "Discard connection event {s}, event loop closed", .{@tagName(event)});
+        } else {
+            log.writef(.err, "Unable to enqueue connection event {s}: {s}", .{ @tagName(event), @errorName(err) });
         }
     }
 
@@ -680,8 +688,7 @@ const ConnectionDaemon = struct {
         const connection = self.connection orelse @panic("stopConnection but no connection");
         connection.shutdown(reason);
         if (reason == .explicit_stop and self.looper.isLinkAttached()) {
-            // Shutdown may queue an OpenVPN UDP exit notification. Attempt it
-            // before detaching, without restarting protocol callbacks or waiting.
+            // Attempt shutdown writes before detaching, without running callbacks or waiting.
             const failure = self.looper.flushWrites(.link) catch |err| blk: {
                 log.writef(.err, "Unable to flush shutdown packets: {s}", .{@errorName(err)});
                 break :blk null;
@@ -1134,6 +1141,7 @@ const ConnectionDaemon = struct {
         var running = self.is_running;
         self.actor_id = std.Thread.getCurrentId();
         self.jobs_mutex.unlock();
+        log.write(.debug, "Connection event loop started");
 
         // Record event loop terminations caused by the looper.
         var loop_terminated = false;
@@ -1155,7 +1163,11 @@ const ConnectionDaemon = struct {
                 // Run jobs if thread is still running.
                 const result = if (running) self.executeJob(job) else error.Closed;
                 result catch |err| {
-                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
+                    switch (err) {
+                        error.Closed => log.write(.debug, "Discard connection event loop job, loop closed"),
+                        error.AlreadyStarted => log.write(.debug, "Ignore start, connection daemon already started"),
+                        else => log.writef(.err, "Connection event loop job failed: {s}", .{@errorName(err)}),
+                    }
                 };
                 running = self.completeJob(job, result);
             }
@@ -1164,8 +1176,8 @@ const ConnectionDaemon = struct {
             // Wait for new jobs or I/O.
             var maybe_failure: ?io.Failure = null;
             const should_loop = self.looper.loopOnce(&maybe_failure);
-            if (maybe_failure) |failure| {
-                log.writef(.err, "Looper failed: .{}", .{failure});
+            if (should_loop) {
+                if (maybe_failure) |failure| log.writef(.err, "Connection I/O failed: .{}", .{failure});
             }
             // A hard looper failure may also stop the thread.
             if (!should_loop) {
@@ -1202,6 +1214,7 @@ const ConnectionDaemon = struct {
         self.jobs_mutex.lock();
         self.actor_id = null;
         self.jobs_mutex.unlock();
+        log.write(.debug, "Connection event loop stopped");
     }
 
     fn executeJob(self: *ConnectionDaemon, job: *const Job) Error!void {
@@ -1284,7 +1297,7 @@ const ConnectionDaemon = struct {
         switch (event) {
             .established => |success| {
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
@@ -1305,7 +1318,11 @@ const ConnectionDaemon = struct {
     }
 
     fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
-        log.write(.fault, "ConnectionDaemon event loop terminated unexpectedly");
+        if (failure) |value| {
+            log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
+        } else {
+            log.write(.fault, "Connection event loop terminated unexpectedly without an I/O failure");
+        }
         const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
             .{ .code = code }
         else
