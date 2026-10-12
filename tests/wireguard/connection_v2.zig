@@ -397,6 +397,10 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
 
     try std.testing.expectEqual(@as(u32, 1), connection.testing.dataCountIntervalMs(created));
     try std.testing.expect(try startConnection(created));
+    // Startup reports immediately, before the owner polls its first timer.
+    try std.testing.expectEqual(@as(usize, 1), recorder.data_count_reports);
+    try std.testing.expectEqual(@as(u64, 10), recorder.data_count.received);
+    try std.testing.expectEqual(@as(u64, 20), recorder.data_count.sent);
     const initial_reports = recorder.data_count_reports;
     try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
     try std.testing.expectEqual(initial_reports + 1, recorder.data_count_reports);

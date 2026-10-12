@@ -693,6 +693,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         socket_connected: ?bool = null,
         remote: ?net.RemoteDescriptor = null,
         start_count: usize = 0,
+        startup_count_reports: usize = 0,
         commit_count: usize = 0,
         commit_error: ?net.ConnectionStartError = null,
         tun_cleanup_count: usize = 0,
@@ -725,11 +726,25 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 // would land. It must see commit completed when the actor resumes.
                 self.startup_reachability_pending = true;
                 daemon.testing.schedule(self.daemon.implementation.connection, .{ .onReachability = .{ .reachable = true } }) catch return error.UnableToStart;
+                // WireGuard reports its initial counters before returning success.
+                self.events.emit(.{ .data_count = .{ .received = 123, .sent = 456 } });
                 return .{ .established = .{ .info = info.clone(std.testing.allocator) catch return error.OutOfMemory } };
             }
             self.events.emit(.{ .established = .{ .info = info } });
+            self.events.emit(.{ .data_count = .{ .received = 123, .sent = 456 } });
             return .started;
         }
+        fn reportDataCount(raw: *anyopaque, count: api.DataCount) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
+            std.debug.assert(self.commit_count == 1 and self.established_tun != null);
+            std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .connected);
+            std.debug.assert(count.received == 123 and count.sent == 456);
+            self.startup_count_reports += 1;
+        }
+        fn status(_: *anyopaque, _: api.ConnectionStatus) void {}
+        fn lastErrorEvent(_: *anyopaque, _: api.PartoutErrorPair) void {}
+        fn remove(_: *anyopaque, _: daemon.EventKey) void {}
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
@@ -859,7 +874,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 factory_table.create = Probe.socket;
                 const sut = try Daemon.create(allocator, &profile, .{
                     .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
-                    .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000 },
+                    .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000, .events = .{ .ctx = &probe, .status = Probe.status, .last_error = Probe.lastErrorEvent, .data_count = Probe.reportDataCount, .remove_key = Probe.remove } },
                 });
                 defer sut.destroy();
                 probe.daemon = sut;
@@ -870,7 +885,9 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (scenario.sync_establish and daemon_io != .looper) {
                     try std.testing.expect(probe.startup_reachability_saw_commit);
                 }
+                try std.testing.expectEqual(@as(usize, if (daemon_io != .looper and commit_error == null) 1 else 0), probe.startup_count_reports);
                 if (commit_error) |err| {
+                    try std.testing.expectEqual(@as(u64, 0), sut.snapshot_publisher.environment.data_count.received);
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
                     try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
                     try std.testing.expect(probe.established_tun == null);
@@ -894,6 +911,8 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 if (daemon_io != .looper) {
                     const owner = sut.implementation.connection;
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    try std.testing.expectEqual(@as(u64, 123), sut.snapshot_publisher.environment.data_count.received);
+                    try std.testing.expectEqual(@as(u64, 456), sut.snapshot_publisher.environment.data_count.sent);
                     try std.testing.expect(probe.established_tun != null);
                     try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
                 }
