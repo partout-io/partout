@@ -1242,17 +1242,6 @@ const ConnectionDaemon = struct {
         self.jobs_mutex.unlock();
     }
 
-    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
-        log.write(.fault, "ConnectionDaemon event loop terminated unexpectedly");
-        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
-            .{ .code = code }
-        else
-            null;
-        if (err_pair) |err| self.daemon.handleLastError(err);
-        self.daemon.controller.setReasserting(false);
-        self.daemon.requestCancellation(err_pair, true);
-    }
-
     fn executeJob(self: *ConnectionDaemon, command: Command) Error!void {
         switch (command) {
             .message => |message| return try self.dispatch(void, message),
@@ -1370,6 +1359,17 @@ const ConnectionDaemon = struct {
             },
             .onConnectionDataCount => |count| self.daemon.handleDataCount(count),
         }
+    }
+
+    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
+        log.write(.fault, "ConnectionDaemon event loop terminated unexpectedly");
+        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
+            .{ .code = code }
+        else
+            null;
+        if (err_pair) |err| self.daemon.handleLastError(err);
+        self.daemon.controller.setReasserting(false);
+        self.daemon.requestCancellation(err_pair, true);
     }
 
     fn isCurrentThread(self: *const ConnectionDaemon) bool {
