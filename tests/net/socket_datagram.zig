@@ -133,9 +133,9 @@ test "v2 one UDP link echoes several peers across both address families" {
     }
     var tun = TunProbe{};
 
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
 
     try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
@@ -191,9 +191,9 @@ test "v2 one UDP link echoes several peers across both address families" {
 }
 
 test "v2 UDP pause, resume and replacement apply to the logical link" {
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .max_read_count = 1, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .max_read_count = 1, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
 
     const server = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
@@ -229,9 +229,9 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
 }
 
 test "v2 UDP truncation drops the packet and retains the link" {
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .link_buf_size = 4, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .link_buf_size = 4, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
 
     var echo = Echo{ .looper = &loop };
@@ -284,9 +284,9 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         var tun = TunProbe{ .payload = "plain" };
         var probe = Probe{};
 
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Implementation.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+        var loop = try Implementation.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         if (Implementation != Looper) try loop.start();
         const caller: ?*Looper = if (Implementation == Looper) &loop else null;

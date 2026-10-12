@@ -834,15 +834,14 @@ pub const Daemon = struct {
         const looper = try self.allocator.create(Looper);
         errdefer self.allocator.destroy(looper);
         looper.* = Looper.init(self.allocator, .{
+            .mux = null, // Ignored by v1, which owns its mux.
             .on_finish = .{
                 .context = self,
                 .callback = onLooperTerminate,
             },
         }) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidWakeDescriptor,
-            error.MuxFailure,
-            => return error.LooperFailure,
+            error.MuxFailure => return error.LooperFailure,
         };
         errdefer looper.deinit();
 

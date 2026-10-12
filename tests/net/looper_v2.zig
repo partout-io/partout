@@ -38,11 +38,11 @@ const FinishCallProbe = struct {
 
 test "v2 looper runs and cancels timers on its caller" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
     var finish = FinishCallProbe{};
     var looper = try Looper.init(std.testing.allocator, .{
-        .wake_fd = wake.fds[0],
+        .mux = wake.handle,
         .on_finish = .{ .context = &finish, .callback = FinishCallProbe.onFinish },
     });
     defer looper.deinit();

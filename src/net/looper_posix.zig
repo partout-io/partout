@@ -7,10 +7,9 @@
 //! Callbacks may submit writes, resume reads, and manage timers. They must not
 //! attach, detach, stop, destroy, or recursively call loopOnce().
 //! Owns read storage and copies outgoing packets; detach/stop/destroy discard
-//! pending writes. Read packet views are valid only during on_read. This experimental implementation is not used by the daemon.
-//! The caller owns the wake descriptor, signals it from external producers, and
-//! resets it before draining external work between iterations. The looper only
-//! polls it; all access to the looper itself must still be serialized.
+//! pending writes. Read packet views are valid only during on_read.
+//! Borrows its caller's mux, including its built-in wake source. The caller owns
+//! the mux until after looper destruction and serializes access to both.
 
 const std = @import("std");
 const core = @import("../core/exports.zig");
@@ -38,7 +37,6 @@ pub const PosixLooper = struct {
 
     allocator: std.mem.Allocator,
     options: helpers.Options,
-    mux: io_c.pp_mux,
     stopped: bool = false,
     // Protects active stack frames from callback-driven destruction, not threads.
     busy: bool = false,
@@ -46,21 +44,15 @@ pub const PosixLooper = struct {
     timers: core.Fifo(Scheduled) = .{},
     next_timer_id: u64 = 1,
 
-    /// Borrows a readable wake descriptor (e.g. a pipe or eventfd). Keep it open
-    /// through destroy(); the looper never reads, resets, writes, or closes it.
+    /// Borrows a mux with capacity for LINK and TUN. Its I/O callbacks belong
+    /// to this looper until destroy(); the caller retains the mux and wake source.
     pub fn create(
         allocator: std.mem.Allocator,
         options: helpers.Options,
-    ) (helpers.InitError || error{InvalidWakeDescriptor})!*PosixLooper {
-        const wake_fd = options.wake_fd orelse return error.InvalidWakeDescriptor;
-        if (wake_fd < 0) return error.InvalidWakeDescriptor;
-        // The external wake is a normal readable mux entry: pp_mux_wait leaves
-        // it signalled for its owner, unlike the mux's own internal wake pipe.
-        const mux = io_c.pp_mux_create(3) orelse return error.MuxFailure;
-        errdefer io_c.pp_mux_free(mux);
-        if (!io_c.pp_mux_add(mux, wake_fd)) return error.MuxFailure;
+    ) helpers.InitError!*PosixLooper {
+        const mux = options.mux orelse return error.MuxFailure;
         const self = try allocator.create(PosixLooper);
-        self.* = .{ .allocator = allocator, .options = options, .mux = mux };
+        self.* = .{ .allocator = allocator, .options = options };
         io_c.pp_mux_set_on_readable(mux, onReadable, self);
         io_c.pp_mux_set_on_writable(mux, onWritable, self);
         return self;
@@ -70,14 +62,15 @@ pub const PosixLooper = struct {
         if (self.busy) @panic("Looper.destroy() must run outside callbacks");
         self.busy = true;
         self.clear();
-        io_c.pp_mux_free(self.mux);
+        io_c.pp_mux_set_on_readable(self.options.mux, null, null);
+        io_c.pp_mux_set_on_writable(self.options.mux, null, null);
         self.allocator.destroy(self);
     }
 
     /// Zero polls without blocking; null waits for I/O, wake, or the next deadline.
     /// Otherwise waits at most max_wait_ms. Returns false after stop/fatal failure.
-    /// Wake readiness lets the iteration return with true, leaving the signal for
-    /// the caller to reset. The caller must keep its wake source valid.
+    /// Wake readiness returns control to the caller; pp_mux_wait consumes the
+    /// mux wake signal. The caller must keep the borrowed mux valid.
     /// Tasks scheduled by callbacks become eligible on the next iteration.
     pub fn loopOnce(self: *PosixLooper, max_wait_ms: ?u32) bool {
         if (self.busy) @panic("Looper.loopOnce() must not be reentrant");
@@ -176,13 +169,13 @@ pub const PosixLooper = struct {
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
-        if (descriptor.fd < 0 or descriptor.fd == self.options.wake_fd.? or
+        if (descriptor.fd < 0 or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
             (descriptor.io.isUnconnected() and tag != .link)) return error.MuxFailure;
         for (self.sides) |other| {
             if (other) |side| if (side.fd == descriptor.fd) return error.MuxFailure;
         }
-        if (!io_c.pp_mux_add(self.mux, descriptor.fd)) return error.MuxFailure;
-        errdefer _ = io_c.pp_mux_delete(self.mux, descriptor.fd);
+        if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) return error.MuxFailure;
+        errdefer _ = io_c.pp_mux_delete(self.options.mux, descriptor.fd);
         slot.* = try SideIO.create(self.allocator, tag, descriptor, arguments, self.options.max_read_count, buffer_size);
     }
 
@@ -278,13 +271,13 @@ pub const PosixLooper = struct {
             if (side.read_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (side.write_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (side.write_ready and side.write_retry == null) deadline_ns = now_ns;
-            _ = io_c.pp_mux_set_read(self.mux, side.fd, side.reading and side.read_retry == null);
-            _ = io_c.pp_mux_set_write(self.mux, side.fd, side.write_queue.pending() != null and side.write_retry == null);
+            _ = io_c.pp_mux_set_read(self.options.mux, side.fd, side.reading and side.read_retry == null);
+            _ = io_c.pp_mux_set_write(self.options.mux, side.fd, side.write_queue.pending() != null and side.write_retry == null);
         }
         const remaining_ns = deadline_ns -| now_ns;
         const timeout_ms: c_int = if (deadline_ns == std.math.maxInt(u64)) -1 else @intCast(@min(std.math.maxInt(c_int), remaining_ns / std.time.ns_per_ms + @intFromBool(remaining_ns % std.time.ns_per_ms != 0)));
         var code: c_int = 0;
-        if (io_c.pp_mux_wait(self.mux, timeout_ms, &code) < 0) return code;
+        if (io_c.pp_mux_wait(self.options.mux, timeout_ms, &code) < 0) return code;
         return null;
     }
 
@@ -311,7 +304,7 @@ pub const PosixLooper = struct {
         const slot = &self.sides[@intFromEnum(tag)];
         const side = slot.* orelse return;
         slot.* = null;
-        _ = io_c.pp_mux_delete(self.mux, side.fd);
+        _ = io_c.pp_mux_delete(self.options.mux, side.fd);
         if (failure) |reason| if (side.on_failure) |callback| callback.call(reason);
         side.native_io.cleanup();
         side.write_queue.deinit();

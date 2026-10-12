@@ -47,10 +47,10 @@ test "Session uses externally supplied I/O callbacks" {
     };
 
     const allocator = std.testing.allocator;
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
     var looper = try Looper.init(allocator, .{
-        .wake_fd = wake.fds[0],
+        .mux = wake.handle,
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();
@@ -109,10 +109,10 @@ test "Session reports protocol failures without owning shutdown policy" {
 
     const allocator = std.testing.allocator;
     var event_state = RecordingEvents.State{};
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
     var looper = try Looper.init(allocator, .{
-        .wake_fd = wake.fds[0],
+        .mux = wake.handle,
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },

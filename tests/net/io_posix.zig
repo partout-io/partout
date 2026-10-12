@@ -170,9 +170,9 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     defer _ = libc.close(fds[1]);
     var probe = Probe{};
 
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(std.testing.allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = Probe.finish } });
+    var loop = try Looper.init(std.testing.allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = Probe.finish } });
     defer loop.deinit();
     {
         const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);

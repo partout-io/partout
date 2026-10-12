@@ -11,10 +11,9 @@ const log = core.logging;
 // FIXME: ###, anyerror
 
 pub const Options = struct {
-    /// Borrowed caller-owned wake descriptor; required by v2, ignored by v1.
-    /// Keep it open through looper destruction.
-    // FIXME: ###, Make non-optional after v2
-    wake_fd: ?io.FileDescriptor = null,
+    /// Borrowed mux for v2; null is rejected. Keep it alive through looper destruction.
+    /// V1 ignores this field and creates its own mux.
+    mux: io.io_c.pp_mux,
     on_finish: OnFinish,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,
@@ -90,7 +89,7 @@ pub const AttachArguments = struct {
 };
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-pub const InitError = std.mem.Allocator.Error || error{ MuxFailure, InvalidWakeDescriptor };
+pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 pub const StartError = std.mem.Allocator.Error || std.Thread.SpawnError || error{
     AlreadyStarted,
 };

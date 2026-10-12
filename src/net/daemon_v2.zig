@@ -358,7 +358,7 @@ const ConnectionDaemon = struct {
         const allocator = daemon.allocator;
         const self = try allocator.create(ConnectionDaemon);
         errdefer allocator.destroy(self);
-        const mux = io.io_c.pp_mux_create(1) orelse return error.LooperFailure;
+        const mux = io.io_c.pp_mux_create(2) orelse return error.LooperFailure;
         errdefer io.io_c.pp_mux_free(mux);
         self.* = .{
             .daemon = daemon,
@@ -671,14 +671,14 @@ const ConnectionDaemon = struct {
     fn createConnection(self: *ConnectionDaemon) Error!void {
         std.debug.assert(self.connection == null);
         const options: Looper.Options = .{
-            .wake_fd = io.io_c.pp_mux_wake_descriptor(self.mux),
+            .mux = self.mux,
             .on_finish = .{ .context = self, .callback = onLooperTerminate },
         };
         const looper = try self.daemon.allocator.create(Looper);
         errdefer self.daemon.allocator.destroy(looper);
         looper.* = Looper.init(self.daemon.allocator, options) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
-            error.MuxFailure, error.InvalidWakeDescriptor => error.LooperFailure,
+            error.MuxFailure => error.LooperFailure,
         };
         errdefer looper.deinit();
         const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{

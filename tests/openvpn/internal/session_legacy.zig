@@ -73,6 +73,7 @@ test "Session borrows an externally managed Looper" {
 
     const allocator = std.testing.allocator;
     var looper = try Looper.init(allocator, .{
+        .mux = null,
         .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();
@@ -134,6 +135,7 @@ test "Session reports protocol failures without owning shutdown policy" {
     const allocator = std.testing.allocator;
     var event_state = RecordingEvents.State{};
     var looper = try Looper.init(allocator, .{
+        .mux = null,
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },
@@ -190,6 +192,7 @@ test "Session releases a link processor once when attach fails" {
 
     const allocator = std.testing.allocator;
     var looper = try Looper.init(allocator, .{
+        .mux = null,
         .on_finish = .{ .callback = struct {
             fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
         }.call },

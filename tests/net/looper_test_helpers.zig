@@ -4,21 +4,29 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-/// Each test owns the wake source until after its looper is destroyed.
-pub const WakePipe = struct {
-    fds: [2]std.c.fd_t,
+const source = @import("source");
 
-    pub fn init() !WakePipe {
+const io_c = source.net_io.io_c;
+
+/// Each test owns the mux until after its looper is destroyed.
+pub const Mux = struct {
+    handle: io_c.pp_mux,
+
+    pub fn init() !Mux {
         if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
-        var self: WakePipe = undefined;
-        if (std.c.pipe(&self.fds) != 0) return error.PipeFailed;
-        return self;
+        return .{ .handle = io_c.pp_mux_create(2) orelse return error.MuxCreationFailed };
     }
 
-    pub fn deinit(self: WakePipe) void {
-        if (comptime builtin.os.tag == .windows) return;
-        _ = std.c.close(self.fds[0]);
-        _ = std.c.close(self.fds[1]);
+    pub fn deinit(self: Mux) void {
+        io_c.pp_mux_free(self.handle);
+    }
+
+    pub fn signal(self: Mux) void {
+        std.debug.assert(io_c.pp_mux_wake(self.handle));
+    }
+
+    pub fn reset(self: Mux) !void {
+        try std.testing.expect(io_c.pp_mux_reset_wake(self.handle));
     }
 };
 

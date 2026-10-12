@@ -161,11 +161,11 @@ test "v2 owned reads bound batches and drain remaining packets" {
             for ([_]usize{ 128, 7 }) |max_read_count| {
                 const fds = try pipe();
                 defer closePipe(fds);
-                const wake = try test_helpers.WakePipe.init();
+                const wake = try test_helpers.Mux.init();
                 defer wake.deinit();
                 var mock = Mock{ .fd = fds[0] };
                 var loop = try Looper.init(allocator, .{
-                    .wake_fd = wake.fds[0],
+                    .mux = wake.handle,
                     .on_finish = .{ .callback = finish },
                     .max_read_size = max_read_size,
                     .max_read_count = max_read_count,
@@ -195,11 +195,11 @@ test "v2 reads reuse owned storage without allocating between iterations" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
     var failing = std.testing.FailingAllocator.init(allocator, .{});
     var loop = try Looper.init(failing.allocator(), .{
-        .wake_fd = wake.fds[0],
+        .mux = wake.handle,
         .on_finish = .{ .callback = finish },
         .tun_buf_size = 16,
     });
@@ -223,9 +223,9 @@ test "v2 copies write payloads and descriptors across partial writes and backpre
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[1], .partial_once = true, .backpressure_once = true };
     try loop.attach(.{ .pair = mock.pair() });
@@ -252,9 +252,9 @@ test "v2 detach stop and destroy free pending write copies" {
     inline for (.{ Action.detach, Action.stop, Action.deinit }) |action| {
         const fds = try pipe();
         defer closePipe(fds);
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
         var destroyed = false;
         defer if (!destroyed) loop.deinit();
         var mock = Mock{ .fd = fds[0], .block_writes = true };
@@ -280,9 +280,9 @@ test "v2 read and callback failures report the cause and detach the side" {
     for (std.enums.values(Failure)) |failure| {
         const fds = try pipe();
         defer closePipe(fds);
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[0], .fail_read = failure == .io, .fail_read_after = if (failure == .partial) 1 else null };
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId(), .fail_callback = failure == .callback };
@@ -304,9 +304,9 @@ test "v2 validates attachment sizes and write destinations before taking ownersh
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish }, .tun_buf_size = 0 });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish }, .tun_buf_size = 0 });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[0] };
     try std.testing.expectError(error.InvalidBuffers, loop.attach(.{ .pair = mock.pair() }));
@@ -323,9 +323,9 @@ test "v2 initialization and owned read attachment roll back allocation failures"
         fn run(test_allocator: std.mem.Allocator) !void {
             const fds = try pipe();
             defer closePipe(fds);
-            const wake = try test_helpers.WakePipe.init();
+            const wake = try test_helpers.Mux.init();
             defer wake.deinit();
-            var loop = try Looper.init(test_allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+            var loop = try Looper.init(test_allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
             defer loop.deinit();
             var mock = Mock{ .fd = fds[0] };
             loop.attach(.{ .pair = mock.pair() }) catch |err| {
@@ -346,10 +346,10 @@ test "v2 failed copied batches preserve already queued writes" {
     for (0..4) |successful_allocations| {
         const fds = try pipe();
         defer closePipe(fds);
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
         var failing = std.testing.FailingAllocator.init(allocator, .{});
-        var loop = try Looper.init(failing.allocator(), .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(failing.allocator(), .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[1] };
         try loop.attach(.{ .pair = mock.pair() });
@@ -368,9 +368,9 @@ test "v2 read callbacks pause until resumed" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish }, .max_read_count = 1 });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish }, .max_read_count = 1 });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[0] };
     var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId(), .pause = true };
@@ -389,9 +389,9 @@ test "v2 write failure reports the cause and discards later queued copies" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[1], .fail_after = 1 };
     var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
@@ -410,10 +410,10 @@ test "v2 owned reads honor packet and byte limits across iterations" {
     for ([_]bool{ false, true }) |limit_bytes| {
         const fds = try pipe();
         defer closePipe(fds);
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
         var loop = try Looper.init(allocator, .{
-            .wake_fd = wake.fds[0],
+            .mux = wake.handle,
             .on_finish = .{ .callback = finish },
             .max_read_count = if (limit_bytes) 2 else 1,
             .max_read_size = if (limit_bytes) 1 else 1024,
@@ -437,9 +437,9 @@ test "v2 reads without an observer drain data and still report failures" {
     for ([_]bool{ false, true }) |fail_read| {
         const fds = try pipe();
         defer closePipe(fds);
-        const wake = try test_helpers.WakePipe.init();
+        const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[0], .fail_read = fail_read };
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
@@ -462,9 +462,9 @@ test "v2 reads without an observer drain data and still report failures" {
 
 test "v2 UDP packet errors discard only the bad packet and retain the link" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const wake = try test_helpers.WakePipe.init();
+    const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .wake_fd = wake.fds[0], .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
     defer loop.deinit();
     const socket = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;

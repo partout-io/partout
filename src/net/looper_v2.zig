@@ -2,8 +2,8 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Caller-driven platform I/O. The caller serializes access and owns the wake
-//! descriptor. loopOnce() runs callbacks inline. Read storage and queued writes
+//! Caller-driven platform I/O. The caller serializes access and owns the mux
+//! and its wake source. loopOnce() runs callbacks inline. Read storage and queued writes
 //! are owned by the looper; read packet views expire when the callback returns.
 //! Legacy worker APIs remain as explicit panics during the daemon migration.
 
@@ -50,7 +50,7 @@ pub const Looper = struct {
     allocator: std.mem.Allocator,
     impl: *Impl,
 
-    /// Allocates a looper whose storage is released by `destroy()`.
+    /// Allocates a looper borrowing the caller's mux through destroy().
     pub fn create(
         allocator: std.mem.Allocator,
         options: Options,
