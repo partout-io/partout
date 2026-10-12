@@ -344,6 +344,7 @@ const ConnectionDaemon = struct {
     looper: *Looper,
     mutex: core.Mutex,
     jobs: core.Fifo(Job),
+    is_running: bool,
 
     // Internal state
     connection: ?Connection,
@@ -353,7 +354,6 @@ const ConnectionDaemon = struct {
     gate: ConnectionGate,
     resume_gate_timer: core.RunAfter,
     is_evaluating_connection: bool,
-    is_deinitializing: bool,
 
     //#region Caller thread - daemon lifecycle
 
@@ -391,6 +391,7 @@ const ConnectionDaemon = struct {
             .looper = looper,
             .mutex = .{},
             .jobs = .{},
+            .is_running = true,
             .module = module,
             .registry = objects.registry,
             .resolver = objects.resolver,
@@ -402,7 +403,6 @@ const ConnectionDaemon = struct {
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
             .is_evaluating_connection = false,
-            .is_deinitializing = false,
         };
         errdefer self.mutex.deinit();
         errdefer self.gate.deinit();
@@ -412,13 +412,13 @@ const ConnectionDaemon = struct {
     }
 
     fn destroy(self: *ConnectionDaemon) void {
+        // Signal thread stop and wait for it to finish.
+        self.shutdown();
+        self.actor.join();
+
         // Daemon checked the shared lifecycle precondition. Drain callbacks
         // before releasing this implementation and its borrowed Daemon.
         self.resume_gate_timer.deinit();
-
-        // Suppress the actor's unexpected-termination path: stop() already
-        // released the connection resources.
-        self.is_deinitializing = true;
 
         self.monitor.setEventHandler(null);
         self.monitor.stopObserving();
@@ -426,10 +426,6 @@ const ConnectionDaemon = struct {
         self.gate.deinit();
         if (self.connection != null)
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
-
-        // Stop the looper and wait for it to finish.
-        self.submit(.stop) catch {};
-        self.actor.join();
 
         self.mutex.deinit();
         io_c.pp_mux_free(self.mux);
@@ -465,44 +461,70 @@ const ConnectionDaemon = struct {
             // Do not destroy the looper in self.destroy() twice.
             self.looper.destroy();
         }
-        while (true) {
+        var running = true;
+        while (running) {
             // Fetch pending jobs if any.
             self.mutex.lock();
+            running = self.is_running;
             _ = io_c.pp_mux_reset_wake(self.mux);
             const maybe_jobs = self.jobs.takeAll();
             self.mutex.unlock();
 
             // Drain fetched jobs.
             var pending = maybe_jobs;
-            var is_stopped = false;
             while (pending) |job| {
                 pending = job.next;
-                log.writef(.debug, "Run job: {s}", .{@tagName(job.message)});
-                const keep_alive = self.dispatch(job.message) catch |err| blk: {
-                    log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
-                    break :blk true;
-                };
-                if (!keep_alive) is_stopped = true;
+                // Ignore but deallocate jobs if thread was stopped.
+                if (running) {
+                    log.writef(.debug, "Run job: {s}", .{@tagName(job.message)});
+                    const keep_alive = self.dispatch(job.message) catch |err| blk: {
+                        log.writef(.err, "Unable to run job: {s}", .{@errorName(err)});
+                        break :blk true;
+                    };
+                    // A dispatched message may also stop the thread.
+                    if (!keep_alive) running = false;
+                }
                 self.daemon.allocator.destroy(job);
             }
-            if (is_stopped) return;
+            if (!running) break;
 
             // Wait for new jobs or I/O.
             var maybe_failure: ?io.Failure = null;
-            const is_alive = self.looper.loopOnce(&maybe_failure);
+            const should_loop = self.looper.loopOnce(&maybe_failure);
             if (maybe_failure) |failure| {
                 log.writef(.err, "Looper failed: .{}", .{failure});
             }
-            if (!is_alive) return;
+            // A hard looper failure may also stop the thread.
+            if (!should_loop) running = false;
+        }
+
+        // Signal finalization to close job submissions.
+        self.mutex.lock();
+        self.is_running = false;
+        var pending = self.jobs.takeAll();
+        self.mutex.unlock();
+
+        // Drain outstanding jobs.
+        while (pending) |job| {
+            pending = job.next;
+            self.daemon.allocator.destroy(job);
         }
     }
 
     fn submit(self: *ConnectionDaemon, message: Message) !void {
         self.mutex.lock();
         defer self.mutex.unlock();
+        if (!self.is_running) return;
         var job = try self.daemon.allocator.create(Job);
         job.message = message;
         self.jobs.append(job);
+        _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    fn shutdown(self: *ConnectionDaemon) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.is_running = false;
         _ = io_c.pp_mux_wake(self.mux);
     }
 
@@ -1330,8 +1352,6 @@ const ConnectionDaemon = struct {
     }
 
     fn actorDidFinish(self: *ConnectionDaemon) void {
-        if (self.is_deinitializing) return;
-
         log.write(.fault, "ConnectionDaemon actor terminated");
 
         // The callback still runs on the actor thread, so it can complete the
