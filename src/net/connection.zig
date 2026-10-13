@@ -205,6 +205,8 @@ pub const Connection = struct {
 
     pub const ShutdownReason = union(enum) {
         explicit_stop,
+        /// Graceful restart requested by needs_rebind.
+        rebind,
         failure: Events.FailureDisposition,
     };
 
@@ -213,6 +215,7 @@ pub const Connection = struct {
     /// Notification payloads borrowed for the duration of Events.emit().
     pub const Event = union(enum) {
         established: Events.Success,
+        /// Refresh the link in place when rebind is supported, otherwise restart gracefully.
         needs_rebind,
         failed: Events.Failure,
         stopped,
@@ -308,12 +311,9 @@ pub const Connection = struct {
             fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
         }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
+        /// Null requests a graceful session restart instead of an in-place rebind.
         /// In link mode, takes link ownership on entry, including on failure.
-        rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
-            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
-                return false;
-            }
-        }.call,
+        rebind: ?*const fn (*anyopaque, RemoteDescriptor) StartError!bool = null,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
@@ -343,7 +343,7 @@ pub const Connection = struct {
         stop: *const fn (*anyopaque, u32, Events) void,
 
         /// A refresh pauses link submissions and receives a replacement through
-        /// rebind, retaining TUN without re-establishing the connection.
+        /// rebind, retaining TUN without re-establishing the connection when supported.
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
         /// Destroys this object. This is the very last step of the lifecycle.
@@ -370,7 +370,8 @@ pub const Connection = struct {
     }
 
     pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
-        return self.vtable.rebind(self.ptr, remote);
+        const callback = self.vtable.rebind orelse return false;
+        return callback(self.ptr, remote);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
