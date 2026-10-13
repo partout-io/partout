@@ -949,6 +949,97 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     }
 }
 
+test "v2 needs_rebind restarts sessions without reporting a failure" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Probe = struct {
+        starts: usize = 0,
+        stops: usize = 0,
+        reason: ?net.Connection.ShutdownReason = null,
+
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            return .{ .ptr = raw.?, .vtable = &vtable, .daemon_io = .none };
+        }
+        fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.starts += 1;
+            return .started;
+        }
+        fn shutdown(raw: *anyopaque, reason: net.Connection.ShutdownReason) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.reason = reason;
+        }
+        fn stop(raw: *anyopaque, _: u32, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.stops += 1;
+            events.emit(.stopped);
+        }
+        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+            events.emit(.needs_rebind);
+            events.emit(.needs_rebind);
+        }
+        const vtable = blk: {
+            var value = FailingStartConnection.vtable;
+            value.start_v2 = start;
+            value.shutdown = shutdown;
+            value.stop = stop;
+            value.better_path = betterPath;
+            break :blk value;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const allocator = std.testing.allocator;
+    for ([_]api.ConnectionStatus{ .connecting, .connected }) |status| {
+        var probe = Probe{};
+        var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+        defer registry.deinit(allocator);
+        var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{};
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = true, .reconnection_delay_ms = 60_000 },
+        });
+        defer sut.destroy();
+        try sut.start();
+        defer sut.stop();
+        const owner = sut.implementation.connection;
+        try daemon.testing.onLoop(owner, status, struct {
+            fn run(loop: anytype, previous: api.ConnectionStatus) daemon.Error!void {
+                loop.daemon.snapshot_publisher.setConnectionStatus(previous);
+                _ = loop.gate.updateStatus(previous);
+            }
+        }.run);
+        try daemon.testing.perform(owner, .onBetterPath);
+        // Drain the refresh and its queued stopped event without enabling retries.
+        try daemon.testing.onLoop(owner, {}, struct {
+            fn run(_: anytype, _: void) daemon.Error!void {}
+        }.run);
+        try daemon.testing.onLoop(owner, {}, struct {
+            fn run(_: anytype, _: void) daemon.Error!void {}
+        }.run);
+        try std.testing.expectEqual(@as(usize, 1), probe.starts);
+        try std.testing.expectEqual(@as(usize, 1), probe.stops);
+        try std.testing.expect(probe.reason.? == .rebind);
+        try std.testing.expect(sut.snapshot_publisher.last_error == null);
+        try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+        try std.testing.expect(!owner.rebind_pending);
+        try daemon.testing.resumeGate(owner);
+        try std.testing.expectEqual(@as(usize, 2), probe.starts);
+        try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
+        try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
+    }
+}
+
 test "v2 daemon-created link is released on failed start or rebind" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = enum { start_false, start_error, rebind_false, rebind_error };

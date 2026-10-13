@@ -52,7 +52,6 @@ const ConnectionError = SessionError || error{
     InvalidEndpoint,
     ModulesAllocation,
     MuxFailure,
-    NetworkChanged,
     TunNotAvailable,
 };
 
@@ -258,8 +257,8 @@ const OpenVPNConnection = struct {
         const session = self.current_session orelse return;
         _ = session.shutdown(.{
             .gracefully = switch (reason) {
-                .explicit_stop => true,
-                .failure => self.pending_failure != null and self.pending_failure.? == error.NetworkChanged,
+                .explicit_stop, .rebind => true,
+                .failure => false,
             },
         });
     }
@@ -321,9 +320,11 @@ const OpenVPNConnection = struct {
 
     fn betterPath(
         self: *OpenVPNConnection,
-        _: net.Connection.Events,
+        events: net.Connection.Events,
     ) void {
-        self.handleConnectionFailure(error.NetworkChanged);
+        const session = self.current_session orelse return;
+        if (!session.isActive() or self.pending_failure != null) return;
+        events.emit(.needs_rebind);
     }
 
     // MARK: - Session events
@@ -437,6 +438,7 @@ const OpenVPNConnection = struct {
         const cause = self.pending_failure;
         const recoverable = switch (self.shutdown_reason) {
             .explicit_stop => false,
+            .rebind => true,
             .failure => |disposition| disposition == .reconnect,
         };
         self.releaseSession();
@@ -643,7 +645,6 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
         error.MissingSessionId,
         error.ModulesAllocation,
         error.MuxFailure,
-        error.NetworkChanged,
         error.OOBOutsideQueue,
         error.OutOfBounds,
         error.OutOfMemory,
@@ -691,7 +692,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         => .{ .code = .invalidValue },
         error.ModulesAllocation => .{ .code = .unhandled },
         error.MuxFailure => .{ .code = .fdUnavailable },
-        error.NetworkChanged => .{ .code = .networkChanged },
         error.NoRouting => api.openVPNErrorPair(.noRouting),
         error.ServerShutdown => api.openVPNErrorPair(.serverShutdown),
         error.MissingCA,

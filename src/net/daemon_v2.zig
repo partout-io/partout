@@ -962,6 +962,13 @@ const ConnectionDaemon = struct {
             .connecting, .connected => {},
             else => return,
         }
+        if (connection.vtable.rebind == null) {
+            log.write(.info, "Refresh LINK with a graceful session restart");
+            try self.stopConnection(0, .rebind);
+            self.clearConnectionTunnel();
+            self.trackConnectionStatus(.disconnected);
+            return;
+        }
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();

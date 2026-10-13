@@ -23,7 +23,7 @@ test "v2-only builds expose the explicit OpenVPN v2 implementation" {
     try std.testing.expect(source.openvpn_exports.connection_v2_vtable.create_connection == v2.createConnection);
 }
 
-test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
+test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
     // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const v2 = source.openvpn_connection_v2;
@@ -50,7 +50,8 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
 
             var token = concrete.auth_token.copy();
             defer if (token) |*value| value.deinit();
-            const reconnecting = self.reason == .failure and self.reason.failure == .reconnect;
+            const reconnecting = self.reason == .rebind or
+                (self.reason == .failure and self.reason.failure == .reconnect);
             try std.testing.expectEqual(!reconnecting, concrete.with_local_options);
             if (reconnecting) {
                 try std.testing.expect(token != null);
@@ -102,6 +103,7 @@ test "v2 OpenVPN preserves authentication only for reconnect shutdown" {
     defer looper.stop() catch {};
     for ([_]net.Connection.ShutdownReason{
         .{ .failure = .reconnect },
+        .rebind,
         .explicit_stop,
         .{ .failure = .cancel },
     }) |reason| {
@@ -192,7 +194,9 @@ test "OpenVPN connection failure dispositions" {
 
     try std.testing.expect(isRecoverableError(error.BadCredentialsWithLocalOptions));
     try std.testing.expect(isRecoverableError(error.LinkFailure));
-    try std.testing.expect(isRecoverableError(error.NetworkChanged));
+    if (!source.runtime_policy.v2_only) {
+        try std.testing.expect(isRecoverableError(error.NetworkChanged));
+    }
     try std.testing.expect(isRecoverableError(error.OutOfMemory));
     try std.testing.expect(isRecoverableError(error.ServerShutdown));
     try std.testing.expect(isRecoverableError(error.TunNotAvailable));
@@ -232,7 +236,6 @@ test "OpenVPN failures separate protocol subcodes from general codes" {
             .{ error.InvalidAddressFamily, api.PartoutErrorCode.invalidValue },
             .{ error.MissingDestination, api.PartoutErrorCode.invalidValue },
             .{ error.MuxFailure, api.PartoutErrorCode.fdUnavailable },
-            .{ error.NetworkChanged, api.PartoutErrorCode.networkChanged },
             .{ error.Timeout, api.PartoutErrorCode.timeout },
             .{ error.TunNotAvailable, api.PartoutErrorCode.tunNotAvailable },
         };
