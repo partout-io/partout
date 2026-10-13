@@ -11,6 +11,7 @@ const core = source.core;
 const connection = source.openvpn_connection;
 const mock = source.mock;
 const net = source.net;
+const io = source.net_io;
 
 const api = core.api;
 const Looper = net.Looper;
@@ -30,6 +31,8 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
     const Request = struct {
         created: net.Connection,
         reason: net.Connection.ShutdownReason,
+        rebind_events: usize = 0,
+        unexpected_events: usize = 0,
 
         fn run(raw: ?*anyopaque) !void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -39,6 +42,57 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             concrete.auth_token.update("server-issued-token");
             concrete.with_local_options = false;
             try std.testing.expect(concrete.pending_failure == null);
+            try std.testing.expect(!concrete.pending_rebind);
+            if (self.reason == .rebind) {
+                const sink = net.Connection.Events{
+                    .ctx = self,
+                    .event = recordEvent,
+                    .status = ignoreStatus,
+                    .last_error = ignoreError,
+                    .cancel = ignoreCancel,
+                };
+                concrete.events = sink;
+                const internal = source.openvpn_internal;
+                const endpoint = try net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?);
+                const session = try internal.session_v2.Session.create(std.testing.allocator, .{
+                    .writer = concrete.writer.?,
+                    .remote_endpoint = endpoint,
+                    .events = concrete.session_events,
+                    .configuration = .{},
+                    .credentials = null,
+                    .auth_token = &concrete.auth_token,
+                    .prng = internal.crypto.PRNG.system(),
+                    .caches_directory = "",
+                    .ca_filename = "",
+                    .options = .{ .backend = .mock },
+                });
+                concrete.current_session = session;
+                // Model an established session without a server handshake.
+                const data_link = internal.data.DataLink.init(std.testing.allocator, endpoint, session.link_processor, self, .{
+                    .write_packets = writeData,
+                    .write_out_of_band = writeOOB,
+                    .data_channel = noChannel,
+                    .report_inbound_data_count = ignoreDataSize,
+                    .report_outbound_data_count = ignoreDataSize,
+                });
+                session.state = .{ .active = .{
+                    .phase = .started,
+                    .context = try internal.session_context.ActiveContext.create(std.testing.allocator, data_link, false, endpoint),
+                } };
+                self.created.betterPath(sink);
+                self.created.betterPath(sink);
+                try std.testing.expect(concrete.pending_rebind);
+                try std.testing.expect(concrete.pending_failure == null);
+                try std.testing.expectEqual(@as(usize, 1), self.rebind_events);
+                self.unexpected_events = 0;
+                try std.testing.expectEqual(net.ReadAction.pause, self.created.submitPackets(.link, &.{"invalid"}, null));
+                try std.testing.expectEqual(net.ReadAction.pause, self.created.submitPackets(.tun, &.{"invalid"}, null));
+                concrete.session_events.established(concrete.session_events.ctx, session.remote_endpoint, &.{});
+                concrete.session_events.failed(concrete.session_events.ctx, error.LinkFailure);
+                try std.testing.expectEqual(@as(usize, 0), self.unexpected_events);
+                try std.testing.expect(concrete.pending_failure == null);
+                concrete.events = null;
+            }
             self.created.shutdown(self.reason);
             self.created.stop(0, .{
                 .ctx = self,
@@ -48,6 +102,7 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 .cancel = ignoreCancel,
             });
 
+            try std.testing.expect(!concrete.pending_rebind);
             var token = concrete.auth_token.copy();
             defer if (token) |*value| value.deinit();
             const reconnecting = self.reason == .rebind or
@@ -61,6 +116,27 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             }
         }
 
+        fn recordEvent(raw: *anyopaque, event: net.Connection.Event) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            switch (event) {
+                .needs_rebind => self.rebind_events += 1,
+                else => self.unexpected_events += 1,
+            }
+        }
+        fn writeData(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {}
+        fn writeOOB(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) net.WriteOOBError!void {}
+        fn noChannel(_: ?*anyopaque, _: u8) ?*source.openvpn_internal.data.DataChannel {
+            return null;
+        }
+        fn ignoreDataSize(_: ?*anyopaque, _: usize) void {}
+        fn writePackets(_: *anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {}
+        fn scheduleTimer(_: *anyopaque, _: *net.Timer, _: u64, _: io.TimedTask) net.SubmissionError!void {}
+        fn cancelTimer(_: *anyopaque, _: *net.Timer) void {}
+        const writer_vtable = net.ConnectionWriter.VTable{
+            .write_packets = writePackets,
+            .schedule_timer = scheduleTimer,
+            .cancel_timer = cancelTimer,
+        };
         fn ignoreStatus(_: *anyopaque, _: api.ConnectionStatus) void {}
         fn ignoreError(_: *anyopaque, _: api.PartoutErrorPair) void {}
         fn ignoreCount(_: *anyopaque, _: api.DataCount) void {}
@@ -95,6 +171,7 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             .factory = mock.noopSocketFactory(),
             .looper = &looper,
             .cache_dir = "/tmp",
+            .writer = net.ConnectionWriter.init(&controller, &Request.writer_vtable),
             .serialized_executor = undefined,
         },
     );

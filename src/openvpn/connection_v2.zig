@@ -81,6 +81,7 @@ const OpenVPNConnection = struct {
     /// Ownership marks an attempt awaiting finalization, even if stopped.
     current_session: ?*Session,
     pending_failure: ?ConnectionError,
+    pending_rebind: bool,
     shutdown_reason: net.Connection.ShutdownReason,
 
     // MARK: - Public API
@@ -176,6 +177,7 @@ const OpenVPNConnection = struct {
             .with_local_options = true,
             .current_session = null,
             .pending_failure = null,
+            .pending_rebind = false,
             .shutdown_reason = .explicit_stop,
         };
         log.writef(
@@ -279,7 +281,7 @@ const OpenVPNConnection = struct {
         sources: ?[]const net.SocketAddress,
     ) net.ReadAction {
         const session = self.current_session orelse return .pause;
-        if (self.pending_failure != null) return .pause;
+        if (self.pending_failure != null or self.pending_rebind) return .pause;
         if (side == .link) if (sources) |addresses| {
             if (addresses.len != packets.len) {
                 self.handleConnectionFailure(error.LinkFailure);
@@ -323,7 +325,8 @@ const OpenVPNConnection = struct {
         events: net.Connection.Events,
     ) void {
         const session = self.current_session orelse return;
-        if (!session.isActive() or self.pending_failure != null) return;
+        if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
+        self.pending_rebind = true;
         events.emit(.needs_rebind);
     }
 
@@ -339,7 +342,7 @@ const OpenVPNConnection = struct {
         remote_endpoint: net.SocketEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
-        if (self.pending_failure != null) return;
+        if (self.pending_failure != null or self.pending_rebind) return;
         std.debug.assert(self.isSessionStarted());
         log.write(.notice, "Session established");
         var address_buffer: [64]u8 = undefined;
@@ -397,7 +400,7 @@ const OpenVPNConnection = struct {
         cause: ConnectionError,
     ) void {
         const session = self.current_session orelse return;
-        if (!session.isActive() or self.pending_failure != null) return;
+        if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
         log.writef(.err, "Connection failed: {s}", .{@errorName(cause)});
         self.pending_failure = cause;
         // The owner schedules shutdown/detachment/stop. Never reenter the
@@ -467,6 +470,7 @@ const OpenVPNConnection = struct {
             session.destroy();
         }
         self.pending_failure = null;
+        self.pending_rebind = false;
         self.shutdown_reason = .explicit_stop;
     }
 };
