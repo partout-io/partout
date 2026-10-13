@@ -13,7 +13,7 @@ const std = @import("std");
 const build_options = @import("build_options");
 
 const backend = @import("internal/backend.zig");
-const connection = @import("../runtime_policy.zig").wireguard_connection;
+const connection = @import("connection.zig");
 const connection_v2 = @import("connection_v2.zig");
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");

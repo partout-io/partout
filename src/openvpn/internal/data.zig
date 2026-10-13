@@ -24,7 +24,6 @@ const CryptoKeys = crypto_mod.CryptoKeys;
 const CryptoKeysBridge = crypto_mod.CryptoKeysBridge;
 const DataConstants = constants_mod.Data;
 const LinkProcessor = processing_mod.LinkProcessor;
-const Looper = net_mod.Looper;
 const PRF = auth_mod.PRF;
 const PRNG = crypto_mod.PRNG;
 const PRNGError = crypto_mod.PRNGError;
@@ -365,12 +364,10 @@ pub const DataChannel = struct {
 
 /// Encrypts/decrypts data-channel packets and moves them between LINK and TUN.
 ///
-/// Every method is expected to execute on the owning session's looper thread.
-/// In particular, timeout writes use the looper's out-of-band path, whose API
-/// deliberately rejects calls from any other thread.
+/// The owning session serializes calls and supplies the packet write callbacks.
 pub const DataLink = struct {
     pub const SendError = DataPath.ProcessingError || processing_mod.PacketError ||
-        Looper.WriteError ||
+        (net_mod.SubmissionError || error{MissingDestination}) ||
         error{
             EndOfStream,
             InvalidAddressFamily,
@@ -381,16 +378,18 @@ pub const DataLink = struct {
             Timeout,
             WriteIncomplete,
         };
-    pub const ReceiveError = DataPath.ProcessingError || Looper.WriteError;
+    pub const ReceiveError = DataPath.ProcessingError || (net_mod.SubmissionError || error{MissingDestination});
 
     allocator: std.mem.Allocator,
-    looper: *Looper,
     remote_endpoint: SocketEndpoint,
     link_processor: *LinkProcessor,
     context: ?*anyopaque,
     callbacks: Callbacks,
 
     pub const Callbacks = struct {
+        write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
+        // FIXME: ###, Delete after v2
+        write_out_of_band: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) net_mod.WriteOOBError!void,
         data_channel: *const fn (?*anyopaque, u8) ?*DataChannel,
         report_inbound_data_count: *const fn (?*anyopaque, usize) void,
         report_outbound_data_count: *const fn (?*anyopaque, usize) void,
@@ -398,7 +397,6 @@ pub const DataLink = struct {
 
     pub fn init(
         allocator: std.mem.Allocator,
-        looper: *Looper,
         remote_endpoint: SocketEndpoint,
         link_processor: *LinkProcessor,
         context: ?*anyopaque,
@@ -406,7 +404,6 @@ pub const DataLink = struct {
     ) DataLink {
         return .{
             .allocator = allocator,
-            .looper = looper,
             .remote_endpoint = remote_endpoint,
             .link_processor = link_processor,
             .context = context,
@@ -434,7 +431,7 @@ pub const DataLink = struct {
             self.context,
             flatCount(decrypted),
         );
-        try self.looper.writeQueued(asConstPackets(decrypted), .tun, null);
+        try self.callbacks.write_packets(self.context, asConstPackets(decrypted), .tun, null);
     }
 
     pub fn send(
@@ -464,12 +461,10 @@ pub const DataLink = struct {
 
         if (timeout_ms) |timeout| {
             // Out-of-band writes must happen on the looper queue.
-            std.debug.assert(self.looper.isOnQueue());
-
             const start = core_mod.concurrency.monotonicNs();
             const deadline = core_mod.concurrency.deadlineAfterMs(start, timeout);
             while (true) {
-                self.looper.writeOutOfBand(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
+                self.callbacks.write_out_of_band(self.context, processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                     const send_err: SendError = switch (err) {
                         error.WouldBlock, error.Backpressure => {
                             // This is a dumb busy-wait, but send() with timeout
@@ -500,7 +495,7 @@ pub const DataLink = struct {
                 return;
             }
         } else {
-            self.looper.writeQueued(processed.packets(), .link, self.remote_endpoint.address) catch |err| {
+            self.callbacks.write_packets(self.context, processed.packets(), .link, self.remote_endpoint.address) catch |err| {
                 log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
                     @errorName(err),
                 });

@@ -189,12 +189,17 @@ void pp_mux_set_on_writable(pp_mux mux, void (*callback)(void *ctx, pp_fd fd), v
     mux->write_ctx = ctx;
 }
 
-int pp_mux_wait(pp_mux mux, int *error_code) {
+int pp_mux_wait(pp_mux mux, int timeout_ms, int *error_code) {
     if (!mux) return PPMuxErrorNull;
 
     const int pollfds_count = pp_mux_build_pollfds(mux);
     int num;
-    PP_IO_RETRY(num, poll(mux->pollfds, (nfds_t)pollfds_count, -1));
+    do {
+        num = poll(mux->pollfds, (nfds_t)pollfds_count, timeout_ms);
+        /* Let timed callers recompute deadlines instead of restarting the full
+         * timeout after each signal. Preserve retries for indefinite waits. */
+        if (num < 0 && errno == EINTR && timeout_ms >= 0) return 0;
+    } while (num < 0 && errno == EINTR);
     if (num < 0) {
         pp_clog_v(PPLogLevelFault, "pp_mux_wait poll() failed: errno=%d", errno);
         if (error_code) *error_code = errno;

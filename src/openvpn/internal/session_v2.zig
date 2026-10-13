@@ -34,7 +34,6 @@ const ControlConstants = constants_mod.Control;
 const DataChannel = data_mod.DataChannel;
 const DataLink = data_mod.DataLink;
 const LinkProcessor = processing_mod.LinkProcessor;
-const Looper = net.Looper;
 const Negotiator = session_negotiator_mod.Negotiator;
 const NegotiationResult = session_negotiator_mod.NegotiationResult;
 const OCCPacket = packet_mod.OCCPacket;
@@ -133,20 +132,20 @@ pub const Session = struct {
     options: SessionOptions,
 
     // Link interface.
-    looper: *Looper,
+    writer: net.ConnectionWriter,
     remote_endpoint: net.SocketEndpoint,
     events: SessionEvents,
 
     // Internal state.
     state: SessionState,
     control_channel: *ControlChannel,
-    negotiation_timer: Looper.Timer,
-    ping_timer: Looper.Timer,
+    negotiation_timer: net.Timer,
+    ping_timer: net.Timer,
     link_processor: *LinkProcessor,
 
     pub const Init = struct {
         /// I/O strategy.
-        looper: *Looper,
+        writer: net.ConnectionWriter,
         remote_endpoint: net.SocketEndpoint,
         events: SessionEvents,
         /// OpenVPN configuration.
@@ -220,7 +219,7 @@ pub const Session = struct {
             .caches_directory = owned_caches_directory,
             .ca_filename = owned_ca_filename,
             .options = init.options,
-            .looper = init.looper,
+            .writer = init.writer,
             .remote_endpoint = init.remote_endpoint,
             .events = init.events,
             .state = .{
@@ -242,6 +241,7 @@ pub const Session = struct {
             .stopped => {},
             .active => |active| active.context.destroy(),
         }
+        self.writer.deinit();
         self.control_channel.destroy();
         self.link_processor.destroy();
 
@@ -277,7 +277,6 @@ pub const Session = struct {
     }
 
     pub fn start(self: *Session) StartError!void {
-        self.assertLooperThread();
         const idle = switch (self.state) {
             .stopped => |context| context,
             .active => {
@@ -290,12 +289,13 @@ pub const Session = struct {
         log.write(.info, "Start VPN session");
         const data_link = DataLink.init(
             self.allocator,
-            self.looper,
             self.remote_endpoint,
             self.link_processor,
             self,
             .{
                 .data_channel = Session.dataChannelForKey,
+                .write_packets = Session.writeDataPackets,
+                .write_out_of_band = Session.writeDataPackets,
                 .report_inbound_data_count = Session.reportInboundDataCount,
                 .report_outbound_data_count = Session.reportOutboundDataCount,
             },
@@ -321,9 +321,8 @@ pub const Session = struct {
     pub fn submitPackets(
         self: *Session,
         side: net.Side,
-        packets: Looper.Packets,
-    ) Looper.ReadAction {
-        self.assertLooperThread();
+        packets: net.Packets,
+    ) net.ReadAction {
         const active = self.state.activeState() orelse return .pause;
         if (active.phase == .stopping) {
             log.write(.debug, "Ignore packets while stopping");
@@ -348,8 +347,7 @@ pub const Session = struct {
         return .keep;
     }
 
-    pub fn looperFailed(self: *Session, side: net.Side, failure: Looper.Failure) void {
-        self.assertLooperThread();
+    pub fn looperFailed(self: *Session, side: net.Side, failure: net.Failure) void {
         const fallback = switch (side) {
             .link => error.LinkFailure,
             .tun => error.TunnelFailure,
@@ -359,10 +357,9 @@ pub const Session = struct {
     }
 
     /// Routes the externally owned looper's terminal callback into the
-    /// session. The owner must call this synchronously from `Looper.OnFinish`
+    /// session. The owner must forward the terminal callback synchronously
     /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperTerminated(self: *Session, failure: ?Looper.Failure) void {
-        self.assertLooperThread();
+    pub fn looperTerminated(self: *Session, failure: ?net.Failure) void {
         if (failure) |value| switch (value) {
             .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
                 @errorName(cause),
@@ -385,7 +382,6 @@ pub const Session = struct {
     };
 
     pub fn shutdown(self: *Session, request: ShutdownRequest) bool {
-        self.assertLooperThread();
         // Negotiation may arm a check before a later startup operation fails
         // and restores .stopped. Always sever timer callback contexts before
         // deciding whether an active shutdown transaction is needed.
@@ -414,7 +410,6 @@ pub const Session = struct {
     }
 
     pub fn stop(self: *Session) void {
-        self.assertLooperThread();
         const active = switch (self.state) {
             .stopped => {
                 return;
@@ -429,12 +424,6 @@ pub const Session = struct {
         self.state = .{ .stopped = .{
             .with_local_options = with_local_options,
         } };
-    }
-
-    fn assertLooperThread(self: *const Session) void {
-        if (!self.looper.isOnQueue()) {
-            @panic("Session operation outside looper thread");
-        }
     }
 
     // MARK: Lifecycle
@@ -464,13 +453,13 @@ pub const Session = struct {
     }
 
     fn cancelTimers(self: *Session) void {
-        self.looper.cancelTimer(&self.negotiation_timer);
-        self.looper.cancelTimer(&self.ping_timer);
+        self.writer.cancelTimer(&self.negotiation_timer);
+        self.writer.cancelTimer(&self.ping_timer);
     }
 
     // MARK: Packet I/O
 
-    fn receiveLink(self: *Session, packets: Looper.Packets) SessionError!void {
+    fn receiveLink(self: *Session, packets: net.Packets) SessionError!void {
         var processed = try self.link_processor.processInbound(packets);
         defer processed.deinit();
 
@@ -589,7 +578,6 @@ pub const Session = struct {
         var tls_transferred = false;
         errdefer if (!tls_transferred) tls.destroy();
         const negotiator = try Negotiator.create(self.allocator, .{
-            .looper = self.looper,
             .link_processor = self.link_processor,
             .remote_endpoint = &context.remote_endpoint,
             .channel = self.control_channel,
@@ -603,6 +591,7 @@ pub const Session = struct {
                 .session_options = self.options,
                 .callback_context = self,
                 .schedule_negotiation_check = Session.scheduleNegotiationCheck,
+                .write_packets = Session.writeLinkPackets,
             },
         });
         tls_transferred = true;
@@ -677,9 +666,19 @@ pub const Session = struct {
         self.reportFailure(error.TLSFailure);
     }
 
-    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) Looper.SubmissionError!void {
+    fn writeDataPackets(raw: ?*anyopaque, packets: net.Packets, side: net.Side, destination: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {
         const self: *Session = @ptrCast(@alignCast(raw.?));
-        try self.looper.scheduleReplacing(
+        return self.writer.writePackets(packets, side, destination);
+    }
+
+    fn writeLinkPackets(raw: ?*anyopaque, packets: net.Packets, destination: net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        return self.writer.writePackets(packets, .link, destination);
+    }
+
+    fn scheduleNegotiationCheck(raw: ?*anyopaque, delay_ms: u64) net.SubmissionError!void {
+        const self: *Session = @ptrCast(@alignCast(raw.?));
+        try self.writer.scheduleTimer(
             &self.negotiation_timer,
             delay_ms,
             .{ .context = self, .callback = onNegotiationTimer },
@@ -690,7 +689,7 @@ pub const Session = struct {
         const delay_ms = self.keepAliveIntervalMs(context) orelse
             self.options.ping_timeout_check_interval_ms;
         log.logTimeMs(.debug, "Schedule ping check after ", delay_ms);
-        try self.looper.scheduleReplacing(
+        try self.writer.scheduleTimer(
             &self.ping_timer,
             delay_ms,
             .{ .context = self, .callback = onPingTimer },
@@ -821,7 +820,7 @@ pub const Session = struct {
     }
 };
 
-fn sideFailureError(failure: Looper.Failure, fallback: SessionError) SessionError {
+fn sideFailureError(failure: net.Failure, fallback: SessionError) SessionError {
     return switch (failure) {
         .user => |cause| blk: {
             inline for (@typeInfo(SessionError).error_set.?) |entry| {

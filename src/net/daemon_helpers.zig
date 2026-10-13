@@ -4,15 +4,10 @@
 
 const std = @import("std");
 
-const conn_mod = @import("connection.zig");
 const core = @import("../core/exports.zig");
-const io = @import("io.zig");
 
 const api = core.api;
 const log = core.logging;
-const Connection = conn_mod.Connection;
-const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const activeConnectionModule = conn_mod.activeConnectionModule;
 
 pub const ConnectionGate = struct {
     pub const ReachabilityBlock = struct {

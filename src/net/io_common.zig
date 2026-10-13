@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Shared reachability, sides, and errors for socket and TUN I/O.
+//! Shared packets, buffers, reachability, sides, and errors for socket and TUN I/O.
 //! Platform-specific descriptors, options, and wrappers belong to the backends
 //! selected by `io.zig`. This module does not import either backend.
 
@@ -15,6 +15,53 @@ const ffi = @import("../c/exports.zig");
 
 const api = core.api;
 pub const io_c = ffi.io;
+
+/// Single binary data packet.
+pub const Packet = []const u8;
+/// Slice of packets.
+pub const Packets = []const Packet;
+
+/// Whether to continue reading or pause until the consumer resumes reads.
+pub const ReadAction = enum {
+    keep,
+    pause,
+};
+
+/// Deferred readiness, system, side I/O, or consumer callback failure.
+pub const Failure = union(enum) {
+    wait: c_int,
+    system: Error,
+    io: struct {
+        side: Side,
+        cause: Error,
+        code: ?c_int,
+    },
+    user: anyerror,
+};
+
+/// Infallible callback for delayed execution. The owner handles failures.
+pub const TimedTask = struct {
+    context: ?*anyopaque = null,
+    callback: *const fn (?*anyopaque) void,
+
+    pub fn call(self: TimedTask) void {
+        self.callback(self.context);
+    }
+};
+
+/// Identity of one replaceable delayed task. The scheduler does not retain
+/// this value's address; callers may store it inline with their state.
+pub const Timer = struct {
+    id: ?u64 = null,
+};
+
+pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+
+pub const WriteOOBError = SubmissionError || Error || error{
+    MissingDestination,
+    OOBOutsideQueue,
+    WriteIncomplete,
+};
 
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };

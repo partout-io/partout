@@ -20,7 +20,6 @@ const log = core.logging;
 const openvpn_log = logging_mod;
 
 const AuthToken = auth_mod.AuthToken;
-const Looper = net.Looper;
 const NetworkSettingsBuilder = settings_mod.NetworkSettingsBuilder;
 const PRNG = crypto_mod.PRNG;
 const Session = session_mod.Session;
@@ -53,7 +52,6 @@ const ConnectionError = SessionError || error{
     InvalidEndpoint,
     ModulesAllocation,
     MuxFailure,
-    NetworkChanged,
     TunNotAvailable,
 };
 
@@ -78,10 +76,12 @@ const OpenVPNConnection = struct {
 
     /// Stable callback sink supplied at creation.
     events: ?net.Connection.Events,
+    writer: ?net.ConnectionWriter,
     with_local_options: bool,
     /// Ownership marks an attempt awaiting finalization, even if stopped.
     current_session: ?*Session,
     pending_failure: ?ConnectionError,
+    pending_rebind: bool,
     shutdown_reason: net.Connection.ShutdownReason,
 
     // MARK: - Public API
@@ -173,9 +173,11 @@ const OpenVPNConnection = struct {
             .cache_dir = cache_dir,
             .ca_filename = ca_filename,
             .events = sandbox.events,
+            .writer = sandbox.writer,
             .with_local_options = true,
             .current_session = null,
             .pending_failure = null,
+            .pending_rebind = false,
             .shutdown_reason = .explicit_stop,
         };
         log.writef(
@@ -189,6 +191,7 @@ const OpenVPNConnection = struct {
     fn destroy(self: *OpenVPNConnection) void {
         log.write(.debug, "Deinit OpenVPNConnection v2");
         self.releaseSession();
+        if (self.writer) |*writer| writer.deinit();
         self.auth_token.deinit();
         core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.endpoints);
         self.configuration.deinit(self.allocator);
@@ -220,7 +223,7 @@ const OpenVPNConnection = struct {
         }
 
         const session = Session.create(self.allocator, .{
-            .looper = remote.looper,
+            .writer = self.writer orelse return error.UnableToStart,
             .remote_endpoint = remote.endpoint orelse return error.UnableToStart,
             .events = self.session_events,
             .configuration = self.configuration,
@@ -256,8 +259,8 @@ const OpenVPNConnection = struct {
         const session = self.current_session orelse return;
         _ = session.shutdown(.{
             .gracefully = switch (reason) {
-                .explicit_stop => true,
-                .failure => self.pending_failure != null and self.pending_failure.? == error.NetworkChanged,
+                .explicit_stop, .rebind => true,
+                .failure => false,
             },
         });
     }
@@ -274,11 +277,11 @@ const OpenVPNConnection = struct {
     fn submitPackets(
         self: *OpenVPNConnection,
         side: net.Side,
-        packets: Looper.Packets,
+        packets: net.Packets,
         sources: ?[]const net.SocketAddress,
-    ) Looper.ReadAction {
+    ) net.ReadAction {
         const session = self.current_session orelse return .pause;
-        if (self.pending_failure != null) return .pause;
+        if (self.pending_failure != null or self.pending_rebind) return .pause;
         if (side == .link) if (sources) |addresses| {
             if (addresses.len != packets.len) {
                 self.handleConnectionFailure(error.LinkFailure);
@@ -296,13 +299,13 @@ const OpenVPNConnection = struct {
     fn looperFailed(
         self: *OpenVPNConnection,
         side: net.Side,
-        failure: Looper.Failure,
+        failure: net.Failure,
     ) void {
         const session = self.current_session orelse return;
         session.looperFailed(side, failure);
     }
 
-    fn looperTerminated(self: *OpenVPNConnection, failure: ?Looper.Failure) void {
+    fn looperTerminated(self: *OpenVPNConnection, failure: ?net.Failure) void {
         const session = self.current_session orelse return;
         self.handleSessionFailed(error.LooperTerminated);
         session.looperTerminated(failure);
@@ -319,9 +322,12 @@ const OpenVPNConnection = struct {
 
     fn betterPath(
         self: *OpenVPNConnection,
-        _: net.Connection.Events,
+        events: net.Connection.Events,
     ) void {
-        self.handleConnectionFailure(error.NetworkChanged);
+        const session = self.current_session orelse return;
+        if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
+        self.pending_rebind = true;
+        events.emit(.needs_rebind);
     }
 
     // MARK: - Session events
@@ -336,7 +342,7 @@ const OpenVPNConnection = struct {
         remote_endpoint: net.SocketEndpoint,
         remote_options: *const api.OpenVPNConfiguration,
     ) void {
-        if (self.pending_failure != null) return;
+        if (self.pending_failure != null or self.pending_rebind) return;
         std.debug.assert(self.isSessionStarted());
         log.write(.notice, "Session established");
         var address_buffer: [64]u8 = undefined;
@@ -375,10 +381,10 @@ const OpenVPNConnection = struct {
         };
 
         const events = self.events orelse return;
-        events.established(events.ctx, .{
+        events.emit(.{ .established = .{
             .remote_endpoint = remote_endpoint,
             .info = info,
-        });
+        } });
     }
 
     fn handleSessionFailed(
@@ -394,17 +400,17 @@ const OpenVPNConnection = struct {
         cause: ConnectionError,
     ) void {
         const session = self.current_session orelse return;
-        if (!session.isActive() or self.pending_failure != null) return;
+        if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
         log.writef(.err, "Connection failed: {s}", .{@errorName(cause)});
         self.pending_failure = cause;
         // The owner schedules shutdown/detachment/stop. Never reenter the
         // lifecycle here: this callback can run inside TLS.
         const events = self.events orelse return;
         const err_pair = partoutCodeForError(cause);
-        events.failed(events.ctx, .{
+        events.emit(.{ .failed = .{
             .err_pair = err_pair,
             .disposition = errorDisposition(cause),
-        });
+        } });
     }
 
     // MARK: - Reporting
@@ -415,7 +421,7 @@ const OpenVPNConnection = struct {
     ) void {
         const e = self.events orelse return;
         const cfg = configuration orelse {
-            e.set_env(e.ctx, EnvironmentKeys.server_configuration, null);
+            e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = null } });
             return;
         };
         const value = core.util.encodeJsonValue(self.allocator, cfg) catch {
@@ -423,7 +429,7 @@ const OpenVPNConnection = struct {
             return;
         };
         defer self.allocator.free(value);
-        e.set_env(e.ctx, EnvironmentKeys.server_configuration, value);
+        e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = value } });
     }
 
     // MARK: - Termination and cleanup
@@ -435,6 +441,7 @@ const OpenVPNConnection = struct {
         const cause = self.pending_failure;
         const recoverable = switch (self.shutdown_reason) {
             .explicit_stop => false,
+            .rebind => true,
             .failure => |disposition| disposition == .reconnect,
         };
         self.releaseSession();
@@ -448,7 +455,7 @@ const OpenVPNConnection = struct {
         self.reportServerConfiguration(null);
         const events = self.events orelse return;
         // All owned state is settled before the synchronous terminal callback.
-        events.stopped(events.ctx);
+        events.emit(.stopped);
     }
 
     /// Resource-only cleanup, also used for startup rollback and destruction.
@@ -463,6 +470,7 @@ const OpenVPNConnection = struct {
             session.destroy();
         }
         self.pending_failure = null;
+        self.pending_rebind = false;
         self.shutdown_reason = .explicit_stop;
     }
 };
@@ -487,7 +495,7 @@ fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ctx.?));
     if (!self.isSessionStarted()) return;
     const events = self.events orelse return;
-    events.data_count(events.ctx, data_count);
+    events.emit(.{ .data_count = data_count });
 }
 
 // MARK: - Connection callbacks
@@ -522,9 +530,9 @@ fn stop(
 fn submitPackets(
     ptr: *anyopaque,
     side: net.Side,
-    packets: Looper.Packets,
+    packets: net.Packets,
     sources: ?[]const net.SocketAddress,
-) Looper.ReadAction {
+) net.ReadAction {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     return self.submitPackets(side, packets, sources);
 }
@@ -542,7 +550,7 @@ fn isPeerSource(source: net.SocketAddress, peer: net.SocketAddress) bool {
 fn looperFailed(
     ptr: *anyopaque,
     side: net.Side,
-    failure: Looper.Failure,
+    failure: net.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperFailed(side, failure);
@@ -550,7 +558,7 @@ fn looperFailed(
 
 fn looperTerminated(
     ptr: *anyopaque,
-    failure: ?Looper.Failure,
+    failure: ?net.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
     self.looperTerminated(failure);
@@ -641,7 +649,6 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
         error.MissingSessionId,
         error.ModulesAllocation,
         error.MuxFailure,
-        error.NetworkChanged,
         error.OOBOutsideQueue,
         error.OutOfBounds,
         error.OutOfMemory,
@@ -689,7 +696,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         => .{ .code = .invalidValue },
         error.ModulesAllocation => .{ .code = .unhandled },
         error.MuxFailure => .{ .code = .fdUnavailable },
-        error.NetworkChanged => .{ .code = .networkChanged },
         error.NoRouting => api.openVPNErrorPair(.noRouting),
         error.ServerShutdown => api.openVPNErrorPair(.serverShutdown),
         error.MissingCA,

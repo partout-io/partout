@@ -2,62 +2,47 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! Serial, mux-backed I/O loop for a link descriptor and a tunnel descriptor.
-//!
-//! `Looper` is the Zig counterpart of Darwin's `FdLooper`. The object must stay
-//! at a stable address from `start()` until `stop()`/`deinit()` has completed.
-//! Callback contexts are borrowed and must outlive the attachment (or the
-//! looper itself for `OnFinish`). Reads acquire caller-owned buffers on readiness
-//! and release them after on_read returns. Queued writes borrow descriptors and
-//! payloads until completion. No packet data is copied.
+//! Caller-driven platform I/O. The caller serializes access and owns the mux
+//! and its wake source. loopOnce() runs callbacks inline. Read storage and queued writes
+//! are owned by the looper; read packet views expire when the callback returns.
 
 const std = @import("std");
 const builtin = @import("builtin");
 
-const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
-const log = core.logging;
+const looper_posix = @import("looper_posix.zig");
+const looper_windows = @import("looper_windows.zig");
+
+pub const testing_helpers = if (builtin.is_test) helpers else void;
 
 pub const Looper = struct {
     pub const Impl = if (builtin.os.tag == .windows)
-        @import("looper_windows.zig").WindowsLooper
+        looper_windows.WindowsLooper
     else
-        @import("looper_posix.zig").PosixLooper;
+        looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
-    pub const ReadBuffer = helpers.ReadBuffer;
-    pub const IOResult = helpers.IOResult;
-    pub const OnWriteComplete = helpers.OnWriteComplete;
-    pub const ReadBuffers = helpers.ReadBuffers;
-    pub const OnRead = helpers.OnRead;
     pub const ReadAction = helpers.ReadAction;
     pub const Packet = helpers.Packet;
     pub const Packets = helpers.Packets;
     pub const Failure = helpers.Failure;
-    pub const OnFailure = helpers.OnFailure;
-    pub const OnFinish = helpers.OnFinish;
-    pub const Task = helpers.Task;
     pub const TimedTask = helpers.TimedTask;
     pub const Timer = helpers.Timer;
     pub const LinkDescriptor = io.LinkDescriptor;
     pub const TunDescriptor = io.TunDescriptor;
     pub const DescriptorPair = io.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
-    pub const InitError = helpers.InitError;
-    pub const StartError = helpers.StartError;
-    pub const StopError = helpers.StopError;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const ResumeReadingError = helpers.ResumeReadingError;
     pub const SubmissionError = helpers.SubmissionError;
     pub const WriteError = helpers.WriteError;
-    pub const WriteOOBError = helpers.WriteOOBError;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
 
-    /// Allocates a looper whose storage is released by `destroy()`.
+    /// Allocates a looper borrowing the caller's mux through destroy().
     pub fn create(
         allocator: std.mem.Allocator,
         options: Options,
@@ -86,63 +71,31 @@ pub const Looper = struct {
         self.impl.destroy();
     }
 
-    pub fn start(self: *Looper) helpers.StartError!void {
-        return self.impl.start();
+    pub fn loopOnce(self: *Looper, failure: *?Failure) bool {
+        return self.impl.loopOnce(null, failure);
     }
 
-    /// Requests an orderly stop and waits for the worker thread to terminate.
-    ///
-    /// The stop command runs after work that the looper has already accepted.
-    /// Entering `.stopping` rejects new work, and delayed commands that have not
-    /// become ready complete with `error.LooperUnavailable` when the worker
-    /// finishes. Calling `stop` before `start`, or after the worker has already
-    /// stopped, is a no-op.
-    ///
-    /// This function must run outside the looper thread and outside callbacks
-    /// that borrow looper-owned state. It waits for an in-progress `start` or
-    /// `stop` transition, but returns `error.LooperUnavailable` if `deinit` takes
-    /// ownership of shutdown. The synchronous stop command is caller-owned and
-    /// does not allocate.
-    ///
-    /// A failure that independently terminates the worker is logged by
-    /// `finish` and delivered to `on_finish`; it is not returned by `stop`.
-    /// `deinit` is still required to release the looper's resources.
+    /// Attempts queued writes once without running protocol callbacks or waiting.
+    pub fn flushWrites(self: *Looper, side: io.Side) DetachError!?Failure {
+        return self.impl.flushWrites(side);
+    }
+
+    /// Synchronously cancels pending work. Must run outside callbacks.
     pub fn stop(self: *Looper) helpers.StopError!void {
         return self.impl.stop();
-    }
-
-    pub fn isOnQueue(self: *Looper) bool {
-        return self.impl.isOnQueue();
-    }
-
-    /// Performs a task synchronously with the worker. Runs inline
-    /// if on the same queue to prevent deadlock. Submission does not allocate.
-    // FIXME: ###, anyerror
-    pub fn perform(
-        self: *Looper,
-        comptime Result: type,
-        context: ?*anyopaque,
-        callback: *const fn (?*anyopaque) anyerror!Result,
-    ) anyerror!Result {
-        return self.impl.perform(Result, context, callback);
-    }
-
-    // FIXME: ###, anyerror
-    pub fn performTask(self: *Looper, task: helpers.Task) anyerror!void {
-        return self.impl.performTask(task);
     }
 
     /// Replaces one delayed task and executes its callback on the looper.
     ///
     /// This operation is queue-confined. The looper owns the internal command;
     /// `timer` is only an identity token and its address is never retained.
-    pub fn scheduleReplacing(
+    pub fn scheduleTimer(
         self: *Looper,
         timer: *helpers.Timer,
         delay_ms: u64,
         task: helpers.TimedTask,
     ) helpers.SubmissionError!void {
-        return self.impl.scheduleReplacing(timer, delay_ms, task);
+        return self.impl.scheduleTimer(timer, delay_ms, task);
     }
 
     /// Cancels one delayed task. After this returns, its borrowed callback
@@ -163,38 +116,27 @@ pub const Looper = struct {
     }
 
     pub fn isLinkAttached(self: *Looper) bool {
-        return self.impl.isLinkAttached();
+        return self.impl.isAttached(.link);
     }
 
     pub fn isTunAttached(self: *Looper) bool {
-        return self.impl.isTunAttached();
+        return self.impl.isAttached(.tun);
     }
 
     pub fn resumeReading(self: *Looper, side: io.Side) helpers.ResumeReadingError!void {
         return self.impl.resumeReading(side);
     }
 
-    /// Writes borrowed packets in FIFO order.
-    /// Borrows the entire packet slice, including descriptors, until completion.
-    /// The destination is stored by value.
-    /// Requires a nonempty batch and a destination for unconnected UDP.
-    /// See OnWriteComplete for lifetime and cancellation rules.
-    pub fn writeQueued(
+    /// Copies the complete batch before returning; loopOnce() writes it in FIFO order.
+    /// The destination is stored by value. Empty batches are no-ops.
+    /// Unconnected UDP requires a destination. Side failures use on_failure;
+    /// rejected datagrams are dropped without detaching the socket.
+    pub fn write(
         self: *Looper,
         packets: Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
-        completion: OnWriteComplete,
     ) WriteError!void {
-        return self.impl.writeQueued(packets, side, destination, completion);
-    }
-
-    pub fn writeOutOfBand(
-        self: *Looper,
-        packets: helpers.Packets,
-        side: io.Side,
-        destination: ?io.SocketAddress,
-    ) helpers.WriteOOBError!void {
-        return self.impl.writeOutOfBand(packets, side, destination);
+        return self.impl.write(packets, side, destination);
     }
 };

@@ -5,13 +5,23 @@
 //! Platform-selected socket and TUN I/O with shared descriptors and options.
 
 const common = @import("io_common.zig");
-const backend = if (@import("builtin").os.tag == .windows)
-    @import("io_windows.zig")
-else
-    @import("io_posix.zig");
+const builtin = @import("builtin");
+const windows = @import("io_windows.zig");
+const posix = @import("io_posix.zig");
+const backend = if (builtin.os.tag == .windows) windows else posix;
 
 pub const io_c = common.io_c;
 pub const testing = common.testing;
+
+pub const Packet = common.Packet;
+pub const Packets = common.Packets;
+pub const ReadAction = common.ReadAction;
+
+pub const Failure = common.Failure;
+pub const TimedTask = common.TimedTask;
+pub const Timer = common.Timer;
+pub const SubmissionError = common.SubmissionError;
+pub const WriteOOBError = common.WriteOOBError;
 
 pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;
@@ -26,13 +36,12 @@ pub const SocketWrapper = backend.SocketWrapper;
 pub const TunDescriptor = backend.TunDescriptor;
 pub const TunWrapper = backend.TunWrapper;
 
-/// The looper manages exactly one link and one tun (at most).
-pub const DescriptorPair = union(Side) {
-    link: LinkDescriptor,
-    tun: TunDescriptor,
-};
-
 pub const SocketAddress = common.SocketAddress;
 pub const SocketEndpoint = common.SocketEndpoint;
 pub const SocketType = common.SocketType;
 pub const Datagram = common.Datagram;
+
+pub const DescriptorPair = union(Side) {
+    link: LinkDescriptor,
+    tun: TunDescriptor,
+};

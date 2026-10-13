@@ -9,11 +9,8 @@ const std = @import("std");
 
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
-const looper = @import("looper_runtime.zig");
 const platform = @import("sandbox.zig");
 const api = core.api;
-
-const Looper = looper.Looper;
 
 pub const CreateError = std.mem.Allocator.Error || error{
     IdGeneration,
@@ -173,7 +170,6 @@ pub const RemoteDescriptor = struct {
     link: ?io.LinkDescriptor = null,
     endpoint: ?io.SocketEndpoint = null,
     local_port: u16 = 0,
-    looper: *Looper,
 };
 
 /// A physical connection to a network service. A connection
@@ -209,11 +205,26 @@ pub const Connection = struct {
 
     pub const ShutdownReason = union(enum) {
         explicit_stop,
+        /// Graceful restart requested by needs_rebind.
+        rebind,
         failure: Events.FailureDisposition,
     };
 
     // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
-    // FIXME: ###, Connections must not know about looper
+
+    /// Notification payloads borrowed for the duration of Events.emit().
+    pub const Event = union(enum) {
+        established: Events.Success,
+        /// Refresh the link in place when rebind is supported, otherwise restart gracefully.
+        needs_rebind,
+        failed: Events.Failure,
+        stopped,
+        set_env: struct {
+            key: []const u8,
+            value: ?[]const u8,
+        },
+        data_count: api.DataCount,
+    };
 
     pub const Events = struct {
         pub const Success = struct {
@@ -231,9 +242,31 @@ pub const Connection = struct {
             disposition: FailureDisposition,
         };
 
-        ctx: *anyopaque,
+        /// Delegates directly; the receiver decides which events require deferral.
+        pub fn emit(self: Events, payload: Event) void {
+            if (self.event) |callback| {
+                callback(self.ctx, payload);
+                return;
+            }
+            // Existing sinks retain their individual callbacks during migration.
+            // FIXME: ###, Delete after v2
+            switch (payload) {
+                .established => |success| self.established(self.ctx, success),
+                .needs_rebind => self.needs_rebind(self.ctx),
+                .failed => |failure| self.failed(self.ctx, failure),
+                .stopped => self.stopped(self.ctx),
+                .set_env => |update| self.set_env(self.ctx, update.key, update.value),
+                .data_count => |count| self.data_count(self.ctx, count),
+            }
+        }
 
-        // FIXME: ###, New v2 callbacks, temporary noops
+        ctx: *anyopaque,
+        event: ?*const fn (*anyopaque, Event) void = null,
+        /// Requests host cancellation after an unrecoverable connection
+        /// failure so the daemon can apply its cancellation policy.
+        cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
+
+        // FIXME: ###, Deprecated.
         established: *const fn (*anyopaque, Success) void = struct {
             fn call(_: *anyopaque, _: Success) void {}
         }.call,
@@ -249,20 +282,14 @@ pub const Connection = struct {
         set_env: *const fn (*anyopaque, []const u8, ?[]const u8) void = struct {
             fn call(_: *anyopaque, _: []const u8, _: ?[]const u8) void {}
         }.call,
-
-        data_count: *const fn (*anyopaque, api.DataCount) void,
-
-        // Deprecated.
+        data_count: *const fn (*anyopaque, api.DataCount) void = struct {
+            fn call(_: *anyopaque, _: api.DataCount) void {}
+        }.call,
         status: *const fn (*anyopaque, api.ConnectionStatus) void,
         last_error: *const fn (*anyopaque, api.PartoutErrorPair) void,
-        /// Requests host cancellation after an unrecoverable connection
-        /// failure so the daemon can apply its cancellation policy.
-        cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
     };
 
     pub const VTable = struct {
-        /// Optional caller-owned buffers for v2 reads; released after on_read.
-        read_buffers: ?*const fn (*anyopaque, io.Side) ?Looper.ReadBuffers = null,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
         endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -284,26 +311,23 @@ pub const Connection = struct {
             fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
         }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
+        /// Null requests a graceful session restart instead of an in-place rebind.
         /// In link mode, takes link ownership on entry, including on failure.
-        rebind: *const fn (*anyopaque, RemoteDescriptor) StartError!bool = struct {
-            fn call(_: *anyopaque, _: RemoteDescriptor) StartError!bool {
-                return false;
-            }
-        }.call,
+        rebind: ?*const fn (*anyopaque, RemoteDescriptor) StartError!bool = null,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
-        submit_packets: *const fn (*anyopaque, io.Side, Looper.Packets, ?[]const io.SocketAddress) Looper.ReadAction = struct {
-            fn call(_: *anyopaque, _: io.Side, _: Looper.Packets, _: ?[]const io.SocketAddress) Looper.ReadAction {
+        submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: io.Side, _: Looper.Failure) void {}
+        looper_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
+            fn call(_: *anyopaque, _: io.Side, _: io.Failure) void {}
         }.call,
-        looper_terminated: *const fn (*anyopaque, ?Looper.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?Looper.Failure) void {}
+        looper_terminated: *const fn (*anyopaque, ?io.Failure) void = struct {
+            fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
-        /// Deprecated.
+        /// FIXME: ###, Deprecated.
         start: *const fn (*anyopaque, Events) StartError!bool = struct {
             fn call(_: *anyopaque, _: Events) StartError!bool {
                 return error.UnableToStart;
@@ -319,17 +343,12 @@ pub const Connection = struct {
         stop: *const fn (*anyopaque, u32, Events) void,
 
         /// A refresh pauses link submissions and receives a replacement through
-        /// rebind, retaining TUN without re-establishing the connection.
+        /// rebind, retaining TUN without re-establishing the connection when supported.
         network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
         better_path: *const fn (*anyopaque, Events) void,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
-
-    pub fn readBuffers(self: Connection, side: io.Side) ?Looper.ReadBuffers {
-        const callback = self.vtable.read_buffers orelse return null;
-        return callback(self.ptr, side);
-    }
 
     pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {
         return self.vtable.endpoints(self.ptr);
@@ -351,7 +370,8 @@ pub const Connection = struct {
     }
 
     pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
-        return self.vtable.rebind(self.ptr, remote);
+        const callback = self.vtable.rebind orelse return false;
+        return callback(self.ptr, remote);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
@@ -371,23 +391,23 @@ pub const Connection = struct {
     pub fn submitPackets(
         self: Connection,
         side: io.Side,
-        packets: Looper.Packets,
+        packets: io.Packets,
         sources: ?[]const io.SocketAddress,
-    ) Looper.ReadAction {
+    ) io.ReadAction {
         return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
     pub fn looperFailed(
         self: Connection,
         side: io.Side,
-        failure: Looper.Failure,
+        failure: io.Failure,
     ) void {
         self.vtable.looper_failed(self.ptr, side, failure);
     }
 
     pub fn looperTerminated(
         self: Connection,
-        failure: ?Looper.Failure,
+        failure: ?io.Failure,
     ) void {
         self.vtable.looper_terminated(self.ptr, failure);
     }

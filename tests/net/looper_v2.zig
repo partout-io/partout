@@ -6,121 +6,69 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const source = @import("source");
+const test_helpers = @import("looper_test_helpers.zig");
 
-const AtomicBool = std.atomic.Value(bool);
-const Looper = source.net_looper.Looper;
+const Looper = source.net_looper_v2.Looper;
 
 test "v2-only policy excludes the legacy looper" {
     if (!source.runtime_policy.v2_only) return error.SkipZigTest;
-    const Callbacks = struct {
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
-    };
-    inline for (.{ Looper.init, Looper.initExperimental }) |init| {
-        var looper = try init(std.testing.allocator, .{ .on_finish = .{ .callback = Callbacks.finish } });
-        defer looper.deinit();
-        try std.testing.expect(!@hasField(@TypeOf(looper.implementation), "legacy"));
-        try std.testing.expect(looper.implementation == .experimental);
-    }
-}
-
-fn waitUntil(value: *const AtomicBool) void {
-    while (!value.load(.acquire)) {
-        std.Thread.yield() catch {};
-    }
-}
-
-fn noopTask(_: ?*anyopaque) anyerror!void {}
-
-fn returnFortyTwo(_: ?*anyopaque) anyerror!u8 {
-    return 42;
-}
-
-fn scheduleTimer(
-    looper: *Looper,
-    timer: *Looper.Timer,
-    delay_ms: u64,
-    task: Looper.TimedTask,
-) !void {
-    const Request = struct {
-        looper: *Looper,
-        timer: *Looper.Timer,
-        delay_ms: u64,
-        task: Looper.TimedTask,
-
-        fn run(raw: ?*anyopaque) anyerror!void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            try self.looper.scheduleReplacing(
-                self.timer,
-                self.delay_ms,
-                self.task,
-            );
-        }
-    };
-    var request = Request{
-        .looper = looper,
-        .timer = timer,
-        .delay_ms = delay_ms,
-        .task = task,
-    };
-    try looper.performTask(.{ .context = &request, .callback = Request.run });
-}
-
-fn cancelTimer(looper: *Looper, timer: *Looper.Timer) !void {
-    const Request = struct {
-        looper: *Looper,
-        timer: *Looper.Timer,
-
-        fn run(raw: ?*anyopaque) anyerror!void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.looper.cancelTimer(self.timer);
-        }
-    };
-    var request = Request{ .looper = looper, .timer = timer };
-    try looper.performTask(.{ .context = &request, .callback = Request.run });
+    try std.testing.expect(!@hasDecl(source.runtime_policy.legacy_looper, "Looper"));
 }
 
 const TimerProbe = struct {
-    looper: *Looper,
-    did_run: AtomicBool = AtomicBool.init(false),
-    ran_on_looper: AtomicBool = AtomicBool.init(false),
+    calls: usize = 0,
+    caller_thread: std.Thread.Id,
+    ran_on_caller: bool = false,
 
     fn run(raw: ?*anyopaque) void {
         const self: *TimerProbe = @ptrCast(@alignCast(raw.?));
-        self.ran_on_looper.store(self.looper.isOnQueue(), .release);
-        self.did_run.store(true, .release);
+        self.ran_on_caller = self.caller_thread == std.Thread.getCurrentId();
+        self.calls += 1;
     }
 };
 
 const FinishCallProbe = struct {
-    called: AtomicBool = AtomicBool.init(false),
+    calls: usize = 0,
 
     fn onFinish(raw: ?*anyopaque, _: ?Looper.Failure) void {
         const self: *FinishCallProbe = @ptrCast(@alignCast(raw.?));
-        self.called.store(true, .release);
+        self.calls += 1;
     }
 };
 
-test "experimental looper dispatches tasks and timers through the shared API" {
+test "v2 looper runs and cancels timers on its caller" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const wake = try test_helpers.Mux.init();
+    defer wake.deinit();
     var finish = FinishCallProbe{};
-    var looper = try Looper.initExperimental(std.testing.allocator, .{
+    var looper = try Looper.init(std.testing.allocator, .{
+        .mux = wake.handle,
         .on_finish = .{ .context = &finish, .callback = FinishCallProbe.onFinish },
     });
     defer looper.deinit();
-    try std.testing.expect(looper.implementation == .experimental);
-    try looper.start();
-    var stopped = false;
-    defer if (!stopped) looper.stop() catch {};
-    try std.testing.expectEqual(@as(u8, 42), try looper.perform(u8, null, returnFortyTwo));
-
     var timer = Looper.Timer{};
-    var probe = TimerProbe{ .looper = &looper };
-    try scheduleTimer(&looper, &timer, 1, .{ .context = &probe, .callback = TimerProbe.run });
-    waitUntil(&probe.did_run);
-    try std.testing.expect(probe.ran_on_looper.load(.acquire));
-    try cancelTimer(&looper, &timer);
+    var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
+    const task: Looper.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
+    try looper.scheduleTimer(&timer, 1, task);
+    try std.testing.expectEqual(@as(usize, 0), probe.calls);
+    try std.testing.expect(try test_helpers.poll(&looper, 100));
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try std.testing.expect(probe.ran_on_caller);
+
+    try looper.scheduleTimer(&timer, 0, task);
+    looper.cancelTimer(&timer);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try looper.scheduleTimer(&timer, 1000, task);
+    try looper.scheduleTimer(&timer, 0, task);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 2), probe.calls);
+
+    try looper.scheduleTimer(&timer, 0, task);
     try looper.stop();
-    stopped = true;
-    try std.testing.expect(finish.called.load(.acquire));
-    try std.testing.expectError(error.LooperUnavailable, looper.performTask(.{ .callback = noopTask }));
+    try looper.stop();
+    try std.testing.expectEqual(@as(usize, 0), finish.calls);
+    try std.testing.expect(!try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 2), probe.calls);
+    try std.testing.expectError(error.LooperUnavailable, looper.scheduleTimer(&timer, 0, task));
 }

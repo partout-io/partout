@@ -3,16 +3,20 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const loop_helpers = @import("../net/looper_test_helpers.zig");
+
+const source = @import("source");
+const mock = source.mock;
 const builtin = @import("builtin");
 
-const wireguard_internal = @import("source").wireguard_internal;
+const wireguard_internal = source.wireguard_internal;
 const adapter = wireguard_internal.adapter_v2;
 const backend_mod = wireguard_internal.backend;
-const connection = @import("source").wireguard_connection_v2;
-const conn = @import("source").net_connection;
-const core = @import("source").core;
-const io = @import("source").net_io;
-const sandbox = @import("source").net_sandbox;
+const connection = source.wireguard_connection_v2;
+const conn = source.net_connection;
+const core = source.core;
+const io = source.net_io;
+const sandbox = source.net_sandbox;
 const tunnel_info = wireguard_internal.tunnel_info;
 const uapi = wireguard_internal.uapi;
 
@@ -27,7 +31,6 @@ fn waitUntil(value: *const AtomicBool) void {
 
 const ConnectionContext = connection.ConnectionContext;
 test "WireGuard connection builds UAPI configuration" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
     var configuration = try api.WireGuardConfiguration.parse(allocator,
         \\{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"listenPort":51820},
@@ -176,7 +179,6 @@ test "WireGuard connection parses runtime data count" {
 }
 
 test "WireGuard connection erases backend activation errors at the generic boundary" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 1 };
@@ -191,7 +193,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -200,18 +202,18 @@ test "WireGuard connection erases backend activation errors at the generic bound
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.UnableToStart, startConnection(created, &environment.looper));
+    try std.testing.expectError(error.UnableToStart, startConnection(created));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
@@ -226,7 +228,7 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -235,18 +237,18 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
 
-    try std.testing.expectError(error.OutOfMemory, startConnection(created, &environment.looper));
+    try std.testing.expectError(error.OutOfMemory, startConnection(created));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
 test "WireGuard v2 takes ownership of link and TUN descriptors" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -261,7 +263,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -270,7 +272,8 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
         .options = .{ .min_data_count_interval = 2345 },
     });
     var destroyed = false;
@@ -281,14 +284,14 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     var first_tun = OwnedDescriptor{};
     var second_link = OwnedDescriptor{};
     var second_tun = OwnedDescriptor{};
-    try expectEstablished(try created.startV2(.{ .link = first_link.descriptor(), .looper = &environment.looper }));
+    try expectEstablished(try created.startV2(.{ .link = first_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try created.commit(first_tun.descriptor());
     try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
 
-    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
@@ -321,7 +324,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
 
     var final_link = OwnedDescriptor{};
     var final_tun = OwnedDescriptor{};
-    try expectEstablished(try created.startV2(.{ .link = final_link.descriptor(), .looper = &environment.looper }));
+    try expectEstablished(try created.startV2(.{ .link = final_link.descriptor() }));
     try created.commit(final_tun.descriptor());
     created.destroy();
     destroyed = true;
@@ -352,7 +355,7 @@ const OwnedDescriptor = struct {
     fn lastError(_: *anyopaque) c_int {
         return 0;
     }
-    const vtable = @import("source").net_io_posix.POSIXInterface.Mock.VTable{
+    const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
         .set_event_mask = mask,
         .reset_events = reset,
         .read = read,
@@ -362,8 +365,7 @@ const OwnedDescriptor = struct {
     };
 };
 
-test "WireGuard connection drains its running data timer before stopping" {
-    const mock = @import("source").mock;
+test "WireGuard data timer runs on its owner and cancels before stop" {
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -378,7 +380,7 @@ test "WireGuard connection drains its running data timer before stopping" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -387,33 +389,29 @@ test "WireGuard connection drains its running data timer before stopping" {
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
         .options = .{ .min_data_count_interval = 1 },
     });
     defer created.destroy();
 
     try std.testing.expectEqual(@as(u32, 1), connection.testing.dataCountIntervalMs(created));
-    try std.testing.expect(try startConnection(created, &environment.looper));
-    waitUntil(&recorder.has_data_count);
-    fake_backend.block_get_config.store(true, .release);
-    defer fake_backend.release_get_config.store(true, .release);
-    waitUntil(&fake_backend.get_config_entered);
-    const Stop = struct {
-        fn run(value: conn.Connection, events: conn.Connection.Events, entered: *AtomicBool, finished: *AtomicBool) void {
-            entered.store(true, .release);
-            value.stop(1000, events);
-            finished.store(true, .release);
-        }
-    };
-    var stop_entered = AtomicBool.init(false);
-    var stop_finished = AtomicBool.init(false);
-    const worker = try std.Thread.spawn(.{}, Stop.run, .{ created, recorder.events(), &stop_entered, &stop_finished });
-    defer worker.join();
-    waitUntil(&stop_entered);
-    const stopped_while_reading = stop_finished.load(.acquire);
-    fake_backend.release_get_config.store(true, .release);
-    waitUntil(&stop_finished);
-    try std.testing.expect(!stopped_while_reading);
+    try std.testing.expect(try startConnection(created));
+    // Startup reports immediately, before the owner polls its first timer.
+    try std.testing.expectEqual(@as(usize, 1), recorder.data_count_reports);
+    try std.testing.expectEqual(@as(u64, 10), recorder.data_count.received);
+    try std.testing.expectEqual(@as(u64, 20), recorder.data_count.sent);
+    const initial_reports = recorder.data_count_reports;
+    try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
+    try std.testing.expectEqual(initial_reports + 1, recorder.data_count_reports);
+    try std.testing.expectEqual(std.Thread.getCurrentId(), recorder.data_count_thread.?);
+    // A fired timer schedules the next report on the same loop.
+    try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
+    try std.testing.expectEqual(initial_reports + 2, recorder.data_count_reports);
+    created.stop(1000, recorder.events());
+    const stopped_reports = recorder.data_count_reports;
+    try std.testing.expect(try loop_helpers.poll(&environment.looper, 5));
+    try std.testing.expectEqual(stopped_reports, recorder.data_count_reports);
 
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
     try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
@@ -428,7 +426,6 @@ test "WireGuard connection drains its running data timer before stopping" {
 }
 
 test "WireGuard connection resolves hostname endpoints through sandbox resolver" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -449,7 +446,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -458,12 +455,13 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
         .options = .{ .dns_timeout = 1234 },
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -613,7 +611,6 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 }
 
 test "WireGuard connection handles network monitor events" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -628,7 +625,7 @@ test "WireGuard connection handles network monitor events" {
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -637,11 +634,12 @@ test "WireGuard connection handles network monitor events" {
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     created.betterPath(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), recorder.rebind_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
@@ -708,7 +706,6 @@ test "WireGuard connection handles network monitor events" {
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -726,7 +723,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -735,12 +732,13 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     // Exercise suspend/resume semantics independently of the host running the
     // test; platform selection itself is just the production default policy.
     adapter.testing.setNetworkChangeBehavior(
@@ -753,10 +751,10 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     created.networkChange(.{ .reachable = false }, recorder.events());
     // The queued rebind must succeed even if an offline event overtakes it.
     var replacement_link = OwnedDescriptor{};
-    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor(), .looper = &environment.looper }));
+    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor() }));
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
     created.networkChange(.{ .reachable = true }, recorder.events());
-    connection.testing.waitForTemporaryShutdownRetry(created);
+    try waitForRetry(&environment, &fake_backend, 3);
 
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
@@ -775,7 +773,6 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
 }
 
 test "WireGuard connection retries passive backend failure without terminal events" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -790,7 +787,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -799,12 +796,13 @@ test "WireGuard connection retries passive backend failure without terminal even
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
     connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -818,7 +816,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
 
-    connection.testing.waitForTemporaryShutdownRetry(created);
+    try waitForRetry(&environment, &fake_backend, 3);
 
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
@@ -828,7 +826,6 @@ test "WireGuard connection retries passive backend failure without terminal even
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -843,7 +840,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     );
     defer tagged.deinit(allocator);
     const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
@@ -852,11 +849,12 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
 
-    try std.testing.expect(try startConnection(created, &environment.looper));
+    try std.testing.expect(try startConnection(created));
     adapter.testing.setNetworkChangeBehavior(
         connection.testing.adapter(created),
         .suspend_backend_when_offline,
@@ -869,7 +867,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
 
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
-    try std.testing.expectEqual(api.PartoutErrorCode.unhandled, recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(api.PartoutErrorCode.outOfMemory, recorder.failure.?.err_pair.code);
     try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.cancel, recorder.failure.?.disposition);
     try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
 
@@ -1110,6 +1108,8 @@ const EventRecorder = struct {
     failure_count: usize = 0,
     failure: ?conn.Connection.Events.Failure = null,
     has_data_count: AtomicBool = AtomicBool.init(false),
+    data_count_reports: usize = 0,
+    data_count_thread: ?std.Thread.Id = null,
     data_count: api.DataCount = .{},
 
     fn events(self: *EventRecorder) conn.Connection.Events {
@@ -1149,6 +1149,8 @@ fn recordStopped(ctx: *anyopaque) void {
 fn recordDataCount(ctx: *anyopaque, data_count: api.DataCount) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
     self.data_count = data_count;
+    self.data_count_reports += 1;
+    self.data_count_thread = std.Thread.getCurrentId();
     self.has_data_count.store(true, .release);
 }
 
@@ -1167,13 +1169,12 @@ fn recordNeedsRebind(ctx: *anyopaque) void {
     self.rebind_count += 1;
 }
 
-fn startConnection(created: conn.Connection, looper: *@import("source").net.Looper) !bool {
+fn startConnection(created: conn.Connection) !bool {
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
     const link = socket.linkDescriptor();
     return (try consumeStartResult(try created.startV2(.{
         .link = link,
         .local_port = if (builtin.os.tag == .windows) 51820 else (try link.localAddress()).port,
-        .looper = looper,
     }))) == .established;
 }
 
@@ -1225,7 +1226,6 @@ test "WireGuard backend dispatches the passive startup payload separately" {
 }
 
 test "WireGuard v2 adapter supports active startup and both reachability policies" {
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, alloc: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnel) backend_mod.Error!i32 {
@@ -1285,7 +1285,6 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
 
 test "WireGuard v2 none mode resolves hostnames before establishment and resets uncommitted starts" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
@@ -1304,7 +1303,7 @@ test "WireGuard v2 none mode resolves hostnames before establishment and resets 
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer profile.deinit(allocator);
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     var context = ConnectionContext.init(.{ .ptr = &fake_backend, .vtable = &vtable });
@@ -1314,10 +1313,11 @@ test "WireGuard v2 none mode resolves hostnames before establishment and resets 
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     defer created.destroy();
-    const remote = conn.RemoteDescriptor{ .looper = &environment.looper };
+    const remote = conn.RemoteDescriptor{};
 
     // Fail before the daemon sees establishment and applies routes or DNS.
     try std.testing.expectError(error.DNSResolutionFailure, created.startV2(remote));
@@ -1363,7 +1363,6 @@ test "WireGuard v2 none mode resolves hostnames before establishment and resets 
 
 test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const mock = @import("source").mock;
     const allocator = std.testing.allocator;
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
@@ -1378,7 +1377,7 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
         \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
     );
     defer profile.deinit(allocator);
-    var environment: mock.MockConnectionEnvironment = undefined;
+    var environment: TimerEnvironment = undefined;
     try environment.init(allocator);
     defer environment.deinit();
     var context = ConnectionContext.init(.{ .ptr = &fake_backend, .vtable = &vtable });
@@ -1388,12 +1387,13 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
         .factory = mock.noopSocketFactory(),
-        .looper = &environment.looper,
+        .writer = environment.writer(),
+        .looper = undefined,
     });
     var destroyed = false;
     defer if (!destroyed) created.destroy();
     try std.testing.expectEqual(.none, created.daemon_io);
-    const remote = conn.RemoteDescriptor{ .looper = &environment.looper };
+    const remote = conn.RemoteDescriptor{};
     try expectEstablished(try created.startV2(remote));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.turn_on_count);
@@ -1461,3 +1461,56 @@ fn fakeActiveTurnOn(raw: ?*anyopaque, allocator: std.mem.Allocator, settings: [:
 }
 
 fn fakeCompleteIO(_: usize, _: u32, _: i32) callconv(.c) void {}
+
+const TimerEnvironment = struct {
+    mux: loop_helpers.Mux,
+    looper: source.net_looper_v2.Looper,
+
+    fn init(self: *@This(), allocator: std.mem.Allocator) !void {
+        const mux = try loop_helpers.Mux.init();
+        errdefer mux.deinit();
+        self.* = .{
+            .mux = mux,
+            .looper = try source.net_looper_v2.Looper.init(allocator, .{
+                .mux = mux.handle,
+                .on_finish = .{ .callback = finish },
+            }),
+        };
+    }
+    fn deinit(self: *@This()) void {
+        self.looper.deinit();
+        self.mux.deinit();
+    }
+    fn finish(_: ?*anyopaque, _: ?io.Failure) void {}
+    fn writer(self: *@This()) source.net.ConnectionWriter {
+        return source.net.ConnectionWriter.init(&self.looper, &vtable);
+    }
+    fn write(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+        const loop: *source.net_looper_v2.Looper = @ptrCast(@alignCast(raw));
+        loop.write(packets, side, destination) catch |err| switch (err) {
+            error.SideNotAttached, error.InvalidBuffers => {},
+            else => |failure| return failure,
+        };
+    }
+    fn schedule(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+        const loop: *source.net_looper_v2.Looper = @ptrCast(@alignCast(raw));
+        return loop.scheduleTimer(timer, delay_ms, task);
+    }
+    fn cancel(raw: *anyopaque, timer: *io.Timer) void {
+        const loop: *source.net_looper_v2.Looper = @ptrCast(@alignCast(raw));
+        loop.cancelTimer(timer);
+    }
+    const vtable = source.net.ConnectionWriter.VTable{
+        .write_packets = write,
+        .schedule_timer = schedule,
+        .cancel_timer = cancel,
+    };
+};
+
+fn waitForRetry(environment: *TimerEnvironment, backend: *FakeBackend, expected: usize) !void {
+    const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+    while (backend.turn_on_count < expected) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        try std.testing.expect(try loop_helpers.poll(&environment.looper, 10));
+    }
+}
