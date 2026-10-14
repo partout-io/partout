@@ -1104,6 +1104,7 @@ fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorPair) void {}
 const EventRecorder = struct {
     established_count: usize = 0,
     rebind_count: usize = 0,
+    tun_request_count: usize = 0,
     stopped_count: usize = 0,
     failure_count: usize = 0,
     failure: ?conn.Connection.Events.Failure = null,
@@ -1115,6 +1116,7 @@ const EventRecorder = struct {
     fn events(self: *EventRecorder) conn.Connection.Events {
         return .{
             .ctx = self,
+            .event = recordEvent,
             .established = recordEstablished,
             .needs_rebind = recordNeedsRebind,
             .failed = recordFailed,
@@ -1126,6 +1128,17 @@ const EventRecorder = struct {
         };
     }
 };
+
+fn recordEvent(ctx: *anyopaque, event: conn.Connection.Event) void {
+    const self: *EventRecorder = @ptrCast(@alignCast(ctx));
+    if (event == .needs_rebind and event.needs_rebind != null) {
+        self.tun_request_count += 1;
+        return;
+    }
+    var legacy = self.events();
+    legacy.event = null;
+    legacy.emit(event);
+}
 
 fn recordStatus(_: *anyopaque, _: api.ConnectionStatus) void {
     @panic("WireGuard v2 emitted legacy status");
@@ -1230,7 +1243,7 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, alloc: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnel) backend_mod.Error!i32 {
             const self: *FakeBackend = @ptrCast(@alignCast(raw.?));
-            std.testing.expectEqualStrings("test", tunnel.ifname) catch unreachable;
+            std.testing.expectEqualStrings("00000000-0000-4000-8000-000000000000", tunnel.ifname) catch unreachable;
             self.turn_on_count += 1;
             if (self.last_settings) |value| alloc.free(value);
             self.last_settings = try alloc.dupe(u8, settings);
@@ -1251,12 +1264,12 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
     );
     defer configuration.deinit(allocator);
     const tun = try io.TunWrapper.create(allocator, null);
-    defer tun.destroy();
-    var sut = adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, mock.noopDNSResolver(), mock.noopSocketFactory(), &profile, &configuration, 1000);
+    var sut = try adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, .none, controller.controller(), mock.noopDNSResolver(), mock.noopSocketFactory(), &profile, &configuration, 1000);
     defer sut.deinit(allocator);
 
-    sut.sendKeepalives(); // Safe before a transport has been selected.
-    try sut.start(allocator, .{ .active = .{ .start = .{ .tun = tun, .ifname = "test" }, .controller = controller.controller() } });
+    sut.sendKeepalives(); // Safe before startup.
+    try sut.start(allocator, 0, 1280);
+    try sut.commit(allocator, .{ .fd = -1, .io = .{ .tun = tun } });
     try std.testing.expect(sut.isStarted());
     try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
     sut.sendKeepalives();
@@ -1272,7 +1285,14 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
     _ = sut.didUpdateReachable(allocator, false);
     try std.testing.expect(!sut.isStarted());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expect(sut.didUpdateReachable(allocator, true) == .resumed);
+    const result = sut.didUpdateReachable(allocator, true);
+    try std.testing.expect(result == .needs_rebind);
+    var info = result.needs_rebind.?;
+    defer info.deinit(allocator);
+    const replacement = try io.TunWrapper.create(allocator, null);
+    var recorder = EventRecorder{};
+    sut.prepareLinkRefresh(info, recorder.events());
+    try sut.commit(allocator, .{ .fd = -1, .io = .{ .tun = replacement } });
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
     _ = sut.didUpdateReachable(allocator, true);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.bump_sockets_count);
@@ -1357,8 +1377,23 @@ test "WireGuard v2 none mode resolves hostnames before establishment and resets 
     try std.testing.expectEqual(@as(usize, 1), resolver.resolve_address_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_settings.?, "endpoint=[64:ff9b::c633:6414]:51820\n") != null);
+    adapter.testing.setNetworkChangeBehavior(connection.testing.adapter(created), .suspend_backend_when_offline);
+    created.networkChange(.{ .reachable = false }, recorder.events());
+    resolver.resolve_error = null;
+    created.networkChange(.{ .reachable = true }, recorder.events());
+    try std.testing.expectEqual(@as(usize, 5), resolver.resolve_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.tun_request_count);
+    // The daemon applies settings after the request; recommit must use cached DNS.
+    resolver.resolve_error = error.ResolutionFailure;
+    var replacement_owned = OwnedDescriptor{};
+    const replacement = try io.TunWrapper.create(allocator, null);
+    replacement.test_descriptor = replacement_owned.descriptor();
+    try created.commit(.{ .fd = -1, .io = .{ .tun = replacement } });
+    try std.testing.expectEqual(@as(usize, 5), resolver.resolve_count);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
     created.stop(0, recorder.events());
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), replacement_owned.cleanups);
 }
 
 test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
@@ -1393,6 +1428,7 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
     var destroyed = false;
     defer if (!destroyed) created.destroy();
     try std.testing.expectEqual(.none, created.daemon_io);
+    connection.testing.setTemporaryShutdownRetryDelayMs(created, 1);
     const remote = conn.RemoteDescriptor{};
     try expectEstablished(try created.startV2(remote));
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
@@ -1416,12 +1452,45 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
     created.networkChange(.{ .reachable = false }, recorder.events());
     try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
     created.networkChange(.{ .reachable = true }, recorder.events());
-    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.tun_request_count);
+    try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
+    // Repeated online events while commit is pending must not request another TUN.
+    created.networkChange(.{ .reachable = true }, recorder.events());
+    try std.testing.expectEqual(@as(usize, 1), recorder.tun_request_count);
+    // A failed daemon TUN creation retains the session and schedules a local retry.
+    try std.testing.expect(created.rebindFailed(error.TunNotAvailable));
+    try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
+    try std.testing.expectEqual(@as(usize, 2), recorder.tun_request_count);
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
+    // Recommit failures retain the previous TUN; the daemon reclaims the rejected one.
+    var failed_owned = OwnedDescriptor{};
+    const failed_tun = try io.TunWrapper.create(allocator, null);
+    failed_tun.test_descriptor = failed_owned.descriptor();
+    controller.fail_configure_sockets = true;
+    try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = -1, .io = .{ .tun = failed_tun } }));
+    failed_tun.destroy();
+    try std.testing.expectEqual(@as(usize, 1), failed_owned.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
+    try std.testing.expect(created.rebindFailed(error.UnableToStart));
+    controller.fail_configure_sockets = false;
+    try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
+    try std.testing.expectEqual(@as(usize, 3), recorder.tun_request_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
+    var replacement_owned = OwnedDescriptor{};
+    const replacement = try io.TunWrapper.create(allocator, null);
+    replacement.test_descriptor = replacement_owned.descriptor();
+    try created.commit(.{ .fd = -1, .io = .{ .tun = replacement } });
+    try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
+    try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.rebind_count);
     created.stop(0, recorder.events());
     created.stop(0, recorder.events());
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
     try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
+    try std.testing.expectEqual(@as(usize, 1), replacement_owned.cleanups);
 
     // Commit failures leave the TUN with the daemon and close the new backend.
     try expectEstablished(try created.startV2(remote));
@@ -1431,7 +1500,7 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
     rejected_tun.test_descriptor = rejected.descriptor();
     controller.fail_configure_sockets = true;
     try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = -1, .io = .{ .tun = rejected_tun } }));
-    try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 4), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 0), rejected.cleanups);
     created.stop(0, recorder.events());
     try std.testing.expectEqual(@as(usize, 0), rejected.cleanups);
@@ -1444,9 +1513,12 @@ test "WireGuard v2 none mode owns committed TUN and refreshes backend sockets" {
     const final_tun = try io.TunWrapper.create(allocator, null);
     final_tun.test_descriptor = final_owned.descriptor();
     try created.commit(.{ .fd = -1, .io = .{ .tun = final_tun } });
+    created.networkChange(.{ .reachable = false }, recorder.events());
+    created.networkChange(.{ .reachable = true }, recorder.events());
+    // Destruction before recommit still owns and releases the retained TUN.
     created.destroy();
     destroyed = true;
-    try std.testing.expectEqual(@as(usize, 4), fake_backend.turn_off_count);
+    try std.testing.expectEqual(@as(usize, 5), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), final_owned.cleanups);
 }
 

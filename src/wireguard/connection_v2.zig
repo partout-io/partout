@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
@@ -13,11 +12,9 @@ const log = core.logging;
 const adapter_mod = @import("internal/adapter_v2.zig");
 const impl = @import("internal/backend.zig");
 const tunnel_info = @import("internal/tunnel_info.zig");
-const passive_io = @import("internal/passive_io.zig");
 
 const WireGuardAdapter = adapter_mod.WireGuardAdapter;
 const TunnelRemoteInfoBuilder = tunnel_info.TunnelRemoteInfoBuilder;
-const PassiveIO = passive_io.PassiveIO;
 const ConnectionError = WireGuardAdapter.ActivationError || net.SubmissionError;
 
 pub fn createConnection(
@@ -31,7 +28,7 @@ pub fn createConnection(
     return WireGuardConnection.create(
         allocator,
         ctx.backend,
-        if (builtin.os.tag == .windows) .link else .none,
+        WireGuardAdapter.default_daemon_io,
         module,
         sandbox,
     );
@@ -52,7 +49,6 @@ const WireGuardConnection = struct {
     /// Control calls and timers run on the owning event-loop thread.
     lock: core.Mutex,
     adapter: WireGuardAdapter,
-    shim: ConnectionShim(@This()),
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
     /// Captured event sink; Go workers also report I/O failures through it.
@@ -99,7 +95,6 @@ const WireGuardConnection = struct {
             .allocator = allocator,
             .lock = .{},
             .adapter = undefined,
-            .shim = try ConnectionShim(WireGuardConnection).init(daemon_io, backend, sandbox.controller),
             .configuration = configuration,
             .events = sandbox.events,
             .writer = sandbox.writer orelse @panic("WireGuardConnection v2 requires a looper writer"),
@@ -110,16 +105,18 @@ const WireGuardConnection = struct {
             .temporary_shutdown_retry_timer_active = false,
             .temporary_shutdown_retry_delay_ms = 2000,
         };
-        created.adapter = WireGuardAdapter.init(
+        created.adapter = try WireGuardAdapter.init(
             module_id,
             backend,
+            daemon_io,
+            sandbox.controller,
             sandbox.resolver,
             sandbox.factory,
             sandbox.profile,
             &created.configuration,
             sandbox.options.dns_timeout,
         );
-        created.shim.setFailureReporter(created, onIOFailure);
+        created.adapter.setFailureReporter(created, onIOFailure);
         log.write(.notice, "Using WireGuardConnection v2");
         return created.asConnection();
     }
@@ -130,7 +127,6 @@ const WireGuardConnection = struct {
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         self.adapter.deinit(allocator);
-        self.shim.deinit();
         self.configuration.deinit(allocator);
         self.lock.deinit();
         allocator.destroy(self);
@@ -150,7 +146,7 @@ const WireGuardConnection = struct {
         return .{
             .ptr = self,
             .vtable = &wireguard_connection_vtable,
-            .daemon_io = self.shim.daemonIO(),
+            .daemon_io = self.adapter.daemonIO(),
             .local_port = @intCast(self.configuration.interface.listen_port orelse 0),
         };
     }
@@ -159,9 +155,9 @@ const WireGuardConnection = struct {
         self.lock.lock();
         defer self.lock.unlock();
         _ = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
-        self.shim.replaceLink(remote);
-        errdefer self.shim.release();
-        if (!self.adapter.isStopped() or self.shim.isAwaitingCommit()) {
+        self.adapter.replaceLink(remote);
+        errdefer self.adapter.stop(self.allocator);
+        if (!self.adapter.isStopped()) {
             log.write(.debug, "Replaced link, adapter is already active");
             return .started;
         }
@@ -178,7 +174,9 @@ const WireGuardConnection = struct {
             else => error.UnableToStart,
         };
         errdefer info.deinit(self.allocator);
-        try self.shim.start(self, remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
+        self.adapter.start(self.allocator, remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info)) catch |err|
+            return activationError(err);
+        if (self.adapter.isStarted()) self.backendStarted();
         return .{ .established = .{ .info = info } };
     }
 
@@ -187,7 +185,18 @@ const WireGuardConnection = struct {
         self.lock.lock();
         defer self.lock.unlock();
         _ = self.events orelse @panic("WireGuardConnection v2 commit() requires connection events");
-        try self.shim.commit(self, descriptor);
+        const was_started = self.adapter.isStarted();
+        self.adapter.commit(self.allocator, descriptor) catch |err| return activationError(err);
+        if (!was_started and self.adapter.isStarted()) self.backendStarted();
+    }
+
+    fn rebindFailed(self: *WireGuardConnection, err: anyerror) bool {
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (!self.adapter.rebindFailed()) return false;
+        log.writef(.err, "Unable to resume WireGuard tunnel: {s}", .{@errorName(err)});
+        self.scheduleTemporaryShutdownRetry(self.events.?);
+        return true;
     }
 
     fn backendStarted(self: *WireGuardConnection) void {
@@ -200,7 +209,7 @@ const WireGuardConnection = struct {
     fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.shim.replaceLink(remote);
+        self.adapter.replaceLink(remote);
         self.adapter.sendKeepalives();
         return !self.adapter.isStopped();
     }
@@ -217,10 +226,8 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         self.lock.lock();
         defer self.lock.unlock();
-        const had_state = self.shim.hasIO() or !self.adapter.isStopped();
-        self.shim.quiesce();
+        const had_state = self.adapter.hasResources();
         self.adapter.stop(self.allocator);
-        self.shim.release();
         if (had_state) {
             log.write(.info, "Stop tunnel");
             events.emit(.stopped);
@@ -236,15 +243,13 @@ const WireGuardConnection = struct {
         self.lock.lock();
         defer self.lock.unlock();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
-            .unchanged => {},
-            // Resuming the backend retains the established connection.
-            .resumed => {},
+            .unchanged => self.prepareLinkRefresh(null, events),
+            .needs_rebind => |info| self.prepareLinkRefresh(info, events),
             .retry => |err| {
                 self.reportActivationFailure(events, err);
                 self.scheduleTemporaryShutdownRetry(events);
             },
         }
-        self.prepareLinkRefresh(events);
     }
 
     fn betterPath(
@@ -253,12 +258,13 @@ const WireGuardConnection = struct {
     ) void {
         self.lock.lock();
         defer self.lock.unlock();
-        self.prepareLinkRefresh(events);
+        self.prepareLinkRefresh(null, events);
     }
 
-    fn prepareLinkRefresh(self: *WireGuardConnection, events: net.Connection.Events) void {
-        if (!self.adapter.isStarted()) return;
-        self.shim.prepareLinkRefresh(events);
+    fn prepareLinkRefresh(self: *WireGuardConnection, info: ?api.TunnelRemoteInfoWrapper, events: net.Connection.Events) void {
+        var owned = info;
+        defer if (owned) |*value| value.deinit(self.allocator);
+        self.adapter.prepareLinkRefresh(info, events);
     }
 
     fn reportDataCount(
@@ -379,7 +385,7 @@ const WireGuardConnection = struct {
         const events = self.events orelse return;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
-            .resumed => self.prepareLinkRefresh(events),
+            .needs_rebind => |info| self.prepareLinkRefresh(info, events),
             .retry => |err| {
                 self.reportActivationFailure(events, err);
                 self.scheduleTemporaryShutdownRetry(events);
@@ -528,10 +534,16 @@ fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartErro
     return self.rebind(remote);
 }
 
+fn rebindFailed(ptr: *anyopaque, err: anyerror) bool {
+    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
+    return self.rebindFailed(err);
+}
+
 const wireguard_connection_vtable = net.Connection.VTable{
     .start_v2 = startV2,
     .commit = commit,
     .rebind = rebind,
+    .rebind_failed = rebindFailed,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,
@@ -630,173 +642,30 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorCode {
     };
 }
 
-/// Owns mode-specific resources and lifecycle; callbacks use the connection's
-/// shared activation diagnostics and data-count reporting.
-fn ConnectionShim(comptime Connection: type) type {
-    return struct {
-        const Self = @This();
-        mode: union(enum) {
-            active: struct {
-                controller: net.TunnelController,
-                state: union(enum) {
-                    stopped,
-                    awaiting_commit,
-                    committed: net.TunDescriptor,
-                } = .stopped,
-            },
-            passive: struct { io: PassiveIO },
+fn activationError(err: WireGuardAdapter.ActivationError) net.ConnectionStartError {
+    switch (err) {
+        error.CannotLocateTunnelFileDescriptor => {
+            log.write(
+                .fault,
+                "Starting tunnel failed: could not determine file descriptor",
+            );
         },
-
-        fn init(daemon_io: net.Connection.DaemonIO, backend: impl.Backend, controller: net.TunnelController) std.mem.Allocator.Error!Self {
-            return .{ .mode = switch (daemon_io) {
-                .none => .{ .active = .{ .controller = controller } },
-                .link => .{ .passive = .{ .io = try PassiveIO.init(backend.vtable.complete_io orelse @panic("complete_io undefined in backend")) } },
-                .looper => @panic("WireGuard v2 requires link or none daemon I/O"),
-            } };
-        }
-
-        fn deinit(self: *Self) void {
-            self.release();
-            switch (self.mode) {
-                .active => {},
-                .passive => |*passive| passive.io.deinit(),
-            }
-        }
-
-        fn daemonIO(self: *const Self) net.Connection.DaemonIO {
-            return switch (self.mode) {
-                .active => .none,
-                .passive => .link,
-            };
-        }
-
-        fn setFailureReporter(self: *Self, ctx: *anyopaque, report: *const fn (*anyopaque) void) void {
-            switch (self.mode) {
-                .active => {},
-                .passive => |*passive| passive.io.failure = .{ .ctx = ctx, .report = report },
-            }
-        }
-
-        fn start(self: *Self, connection: *Connection, local_port: u16, mtu: u32) net.ConnectionStartError!void {
-            switch (self.mode) {
-                .active => |*active| {
-                    connection.adapter.prepare(connection.allocator) catch |err|
-                        return activationError(err);
-                    active.state = .awaiting_commit;
-                },
-                .passive => |*passive| {
-                    try self.startAdapter(connection, .{ .passive = .{
-                        .start = passive.io.transport(local_port, mtu),
-                        .io = &passive.io,
-                    } });
-                    connection.backendStarted();
-                },
-            }
-        }
-
-        fn startAdapter(_: *Self, connection: *Connection, transport: WireGuardAdapter.Transport) net.ConnectionStartError!void {
-            connection.adapter.start(connection.allocator, transport) catch |err|
-                return activationError(err);
-        }
-
-        fn activationError(err: WireGuardAdapter.ActivationError) net.ConnectionStartError {
-            switch (err) {
-                error.CannotLocateTunnelFileDescriptor => {
-                    log.write(
-                        .fault,
-                        "Starting tunnel failed: could not determine file descriptor",
-                    );
-                },
-                error.DNSResolutionFailure, error.InvalidEndpoint => {
-                    log.write(.fault, "DNS resolution failed");
-                },
-                error.CouldNotStartBackend => {
-                    log.write(.fault, "Starting tunnel backend failed");
-                },
-                else => {
-                    // Adapter activation errors are the local diagnostic signal. The
-                    // generic connection contract deliberately exposes no WireGuard-
-                    // specific categories, so log the concrete error before erasing it.
-                    log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
-                },
-            }
-            return switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
-                error.DNSResolutionFailure => error.DNSResolutionFailure,
-                else => error.UnableToStart,
-            };
-        }
-
-        fn isAwaitingCommit(self: *const Self) bool {
-            return switch (self.mode) {
-                .active => |active| active.state == .awaiting_commit,
-                .passive => false,
-            };
-        }
-
-        fn commit(self: *Self, connection: *Connection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
-            switch (self.mode) {
-                .active => |*active| {
-                    if (active.state != .awaiting_commit) return error.UnableToStart;
-                    const tun = if (builtin.os.tag == .windows)
-                        descriptor.tun
-                    else switch (descriptor.io) {
-                        .tun => |tun| tun,
-                        else => return error.UnableToStart,
-                    };
-                    try self.startAdapter(connection, .{ .active = .{
-                        .start = .{ .tun = tun, .ifname = connection.adapter.module_id[0..] },
-                        .controller = active.controller,
-                    } });
-                    active.state = .{ .committed = descriptor };
-                    connection.backendStarted();
-                },
-                .passive => |*passive| passive.io.replaceTun(descriptor),
-            }
-        }
-
-        fn hasIO(self: *Self) bool {
-            return switch (self.mode) {
-                .active => |active| active.state != .stopped,
-                .passive => |*passive| passive.io.hasIO(),
-            };
-        }
-
-        fn prepareLinkRefresh(self: *Self, events: net.Connection.Events) void {
-            switch (self.mode) {
-                .active => {},
-                .passive => |*passive| {
-                    passive.io.releaseLink();
-                    events.emit(.needs_rebind);
-                },
-            }
-        }
-
-        fn replaceLink(self: *Self, remote: net.RemoteDescriptor) void {
-            switch (self.mode) {
-                .active => {},
-                .passive => |*passive| passive.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 requires a link descriptor")),
-            }
-        }
-
-        fn quiesce(self: *Self) void {
-            switch (self.mode) {
-                .active => {},
-                .passive => |*passive| passive.io.quiesce(),
-            }
-        }
-
-        fn release(self: *Self) void {
-            switch (self.mode) {
-                .active => |*active| {
-                    switch (active.state) {
-                        .committed => |*tun| tun.cleanup(),
-                        .stopped, .awaiting_commit => {},
-                    }
-                    active.state = .stopped;
-                },
-                .passive => |*passive| passive.io.release(),
-            }
-        }
+        error.DNSResolutionFailure, error.InvalidEndpoint => {
+            log.write(.fault, "DNS resolution failed");
+        },
+        error.CouldNotStartBackend => {
+            log.write(.fault, "Starting tunnel backend failed");
+        },
+        else => {
+            // Adapter activation errors are the local diagnostic signal. The
+            // generic connection contract deliberately exposes no WireGuard-
+            // specific categories, so log the concrete error before erasing it.
+            log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
+        },
+    }
+    return switch (err) {
+        error.OutOfMemory => error.OutOfMemory,
+        error.DNSResolutionFailure => error.DNSResolutionFailure,
+        else => error.UnableToStart,
     };
 }
