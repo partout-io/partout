@@ -21,10 +21,12 @@ extern int wgGetSocketV6(int handle);
 #endif
 extern void wgTurnOff(int handle);
 extern int64_t wgSetConfig(int handle, const char *settings);
+/* Returned config is caller-owned and must be freed with free(). */
 extern char *wgGetConfig(int handle);
 extern void wgBumpSockets(int handle);
 extern void wgBumpSocketsAndWait(int handle);
 extern void wgDisableSomeRoamingForBrokenMobileSemantics(int handle);
+extern void wgSendKeepalives(int handle);
 extern const char *wgVersion(void);
 
 #include "passive_io.h"
@@ -40,17 +42,12 @@ extern const char *wgVersion(void);
 extern int32_t wgTurnOnWithPassiveIO(const char *settings,
     const wg_passive_link *link, const wg_passive_tun *tun, void *context);
 
-/* Passive handles have their own namespace. Use only passive ABI functions
- * with these handles; native wgTurnOff/wgGetConfig/etc. operate on v1 devices.
- * Configuration/MTU/listen-port changes require restarting the passive device.
- * The config string is caller-owned and must be freed with free(). */
+/* Passive devices support the original config getter, roaming and keepalive
+ * functions. Use passive shutdown and endpoint updates below; other
+ * configuration/MTU/listen-port changes require restarting a passive device. */
 extern void wgTurnOffWithPassiveIO(int32_t handle);
-extern char *wgGetConfigWithPassiveIO(int32_t handle);
 /* Endpoint-only UAPI update. Run off the I/O queue; retains peers and sessions. */
 extern int64_t wgSetEndpointsWithPassiveIO(int32_t handle, const char *settings);
-/* Send keepalives through the replacement host link; retains Bind and sessions. */
-extern void wgSendKeepalivesWithPassiveIO(int32_t handle);
-extern void wgDisableRoamingWithPassiveIO(int32_t handle);
 
 /* Completes one accepted borrowed I/O request; not a device handle. */
 extern void wgCompleteIO(uintptr_t request, uint32_t count, int32_t status);

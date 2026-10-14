@@ -482,11 +482,20 @@ const ConnectionDaemon = struct {
                     logEventSubmissionFailure(event, err);
                 };
             },
-            .needs_rebind => {
+            .needs_rebind => |info| {
                 std.debug.assert(self.isCurrentThread());
-                if (self.rebind_pending) return;
+                if (self.rebind_pending and info == null) return;
+                const owned = if (info) |value| value.clone(self.daemon.allocator) catch {
+                    onConnectionEvent(ctx, .{ .failed = .{
+                        .err_pair = .{ .code = .outOfMemory },
+                        .disposition = .reconnect,
+                    } });
+                    return;
+                } else null;
+                const message: Message = .{ .onConnectionEvent = .{ .needs_rebind = owned } };
                 self.rebind_pending = true;
-                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
+                self.schedule(message) catch |err| {
+                    message.deinit(self.daemon.allocator);
                     self.rebind_pending = false;
                     logEventSubmissionFailure(event, err);
                 };
@@ -756,7 +765,7 @@ const ConnectionDaemon = struct {
                 var owned = success;
                 defer owned.info.deinit(self.daemon.allocator);
                 // Complete startup before yielding to queued reachability events.
-                self.handleConnectionEstablished(success) catch |err| {
+                self.handleConnectionEstablished(success, false) catch |err| {
                     log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
@@ -897,9 +906,11 @@ const ConnectionDaemon = struct {
     fn handleConnectionEstablished(
         self: *ConnectionDaemon,
         success: net.Connection.Events.Success,
+        replacing: bool,
     ) StartError!void {
         if (self.daemon.state != .started) return;
-        if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
+        const expected_status: api.ConnectionStatus = if (replacing) .connected else .connecting;
+        if (self.daemon.snapshot_publisher.environment.connection_status != expected_status) return;
         const connection = self.connection orelse @panic("handleConnectionEstablished but no connection");
 
         const tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
@@ -916,6 +927,7 @@ const ConnectionDaemon = struct {
         }
 
         log.write(.info, "Attach TUN");
+        if (replacing and self.looper.isTunAttached()) self.looper.detach(.tun) catch return error.TunNotAvailable;
         self.looper.attach(.{
             .pair = .{
                 .tun = descriptor,
@@ -952,7 +964,7 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
+    fn handleConnectionNeedsRebind(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) !void {
         defer self.rebind_pending = false;
         if (self.daemon.state != .started) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
@@ -969,11 +981,12 @@ const ConnectionDaemon = struct {
             self.trackConnectionStatus(.disconnected);
             return;
         }
-        log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
+        log.write(.info, if (info != null) "Refresh LINK and recreate TUN" else "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         const remote = try self.setupLink();
         // Entering rebind transfers a connection-owned link, even on failure.
         if (!try connection.rebind(remote)) return error.UnableToStart;
+        if (info) |value| try self.handleConnectionEstablished(.{ .info = value }, true);
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1131,6 +1144,10 @@ const ConnectionDaemon = struct {
                     .established => |success| {
                         var info = success.info;
                         info.deinit(allocator);
+                    },
+                    .needs_rebind => |info| if (info) |value| {
+                        var owned = value;
+                        owned.deinit(allocator);
                     },
                     .set_env => |update| {
                         allocator.free(update.key);
@@ -1303,7 +1320,7 @@ const ConnectionDaemon = struct {
     fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
         switch (event) {
             .established => |success| {
-                self.handleConnectionEstablished(success) catch |err| {
+                self.handleConnectionEstablished(success, false) catch |err| {
                     log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
@@ -1311,7 +1328,12 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
-            .needs_rebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
+            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| {
+                if (info != null) if (self.connection) |connection| {
+                    if (connection.rebindFailed(err)) return;
+                };
+                self.linkRefreshFailed(err);
+            },
             .failed => |failure| self.handleConnectionFailed(failure),
             .stopped => self.handleConnectionStopped(),
             .set_env => |update| {

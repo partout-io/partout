@@ -677,7 +677,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
-        endpoint_list: [3]api.ExtendedEndpoint = undefined,
+        endpoint_list: [8]api.ExtendedEndpoint = undefined,
         daemon_io: net.Connection.DaemonIO,
         sync_establish: bool,
         daemon: *Daemon = undefined,
@@ -698,13 +698,16 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         commit_error: ?net.ConnectionStartError = null,
         tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
+        recreate_tun: bool = false,
+        retry_refresh: bool = false,
+        refresh_failures: usize = 0,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
             return &self.endpoint_list;
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint };
+            self.endpoint_list = .{self.endpoint} ** 8;
             self.events = sb.events.?;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
@@ -737,7 +740,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn reportDataCount(raw: *anyopaque, count: api.DataCount) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
-            std.debug.assert(self.commit_count == 1 and self.established_tun != null);
+            std.debug.assert(self.commit_count >= 1 and self.established_tun != null);
             std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .connected);
             std.debug.assert(count.received == 123 and count.sent == 456);
             self.startup_count_reports += 1;
@@ -749,7 +752,14 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
             if (self.commit_error) |err| return err;
+            if (self.established_tun) |old| old.cleanup();
             self.established_tun = tun;
+        }
+        fn rebindFailed(raw: *anyopaque, _: anyerror) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (!self.retry_refresh) return false;
+            self.refresh_failures += 1;
+            return true;
         }
         fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -758,12 +768,20 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             self.remote = remote;
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
-            self.events.emit(.needs_rebind);
+            self.events.emit(.{ .needs_rebind = null });
             return true;
         }
-        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
-            events.emit(.needs_rebind);
+        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            if (self.recreate_tun) {
+                events.emit(.{ .needs_rebind = .{
+                    .profile = self.profile.*,
+                    .original_module_id = source.net_connection.activeConnectionModule(self.profile).?.id(),
+                } });
+                return;
+            }
+            events.emit(.{ .needs_rebind = null });
+            events.emit(.{ .needs_rebind = null });
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -772,7 +790,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            events.emit(.needs_rebind);
+            events.emit(.{ .needs_rebind = null });
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -828,6 +846,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             table.start_v2 = start;
             table.commit = commit;
             table.rebind = rebind;
+            table.rebind_failed = rebindFailed;
             table.better_path = betterPath;
             table.network_change = networkChange;
             table.stop = stop;
@@ -941,6 +960,47 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
                     try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+
+                    probe.recreate_tun = true;
+                    try daemon.testing.perform(owner, .onBetterPath);
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 2), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 2), probe.controller.set_tunnel_settings_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.start_count);
+                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    // The daemon delegates creation and commit failures to local recovery.
+                    probe.retry_refresh = true;
+                    probe.controller.set_tunnel_settings_error = error.TunNotAvailable;
+                    try daemon.testing.perform(owner, .onBetterPath);
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 1), probe.refresh_failures);
+                    try std.testing.expectEqual(@as(usize, 2), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
+                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    probe.controller.set_tunnel_settings_error = null;
+                    probe.commit_error = error.UnableToStart;
+                    try daemon.testing.perform(owner, .onBetterPath);
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 2), probe.refresh_failures);
+                    try std.testing.expectEqual(@as(usize, 3), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 2), probe.tun_cleanup_count);
+                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    probe.commit_error = null;
+                    try daemon.testing.perform(owner, .onBetterPath);
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 4), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 3), probe.tun_cleanup_count);
+                    try std.testing.expectEqual(@as(usize, 1), probe.start_count);
+                    // Without local recovery, a rejected replacement still reconnects.
+                    probe.retry_refresh = false;
+                    probe.commit_error = error.UnableToStart;
+                    try daemon.testing.perform(owner, .onBetterPath);
+                    try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try std.testing.expectEqual(@as(usize, 5), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, 5), probe.tun_cleanup_count);
+                    try std.testing.expect(probe.established_tun == null);
+                    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
                 }
                 sut.stop();
                 try std.testing.expect(probe.established_tun == null);
@@ -974,8 +1034,8 @@ test "v2 needs_rebind restarts sessions without reporting a failure" {
             events.emit(.stopped);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
-            events.emit(.needs_rebind);
+            events.emit(.{ .needs_rebind = null });
+            events.emit(.{ .needs_rebind = null });
         }
         const vtable = blk: {
             var value = FailingStartConnection.vtable;
@@ -1092,7 +1152,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
+            events.emit(.{ .needs_rebind = null });
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));

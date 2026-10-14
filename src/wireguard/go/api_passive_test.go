@@ -27,41 +27,32 @@ func startPassiveTestDevice(t *testing.T) int32 {
 	return handle
 }
 
-func TestPassiveLifecycleIsolatedFromLegacy(t *testing.T) {
+func TestPassiveLifecycleUsesOriginalRegistry(t *testing.T) {
 	handle := startPassiveTestDevice(t)
 	passive, _ := lookupPassiveBackend(handle)
-	logger := device.NewLogger(device.LogLevelSilent, "")
-	legacy := device.NewDevice(testTun(), testBind(), logger)
-	// Deliberately overlap IDs to verify that each ABI uses its own registry.
-	tunnelHandles[handle] = tunnelHandle{legacy, logger}
-	t.Cleanup(func() { wgTurnOff(handle) })
-	wgTurnOffWithPassiveIO(handle)
-	if tunnelHandles[handle].Device != legacy {
-		t.Fatal("passive shutdown changed the legacy registry")
+	if tunnelHandles[handle].Device != passive.Device {
+		t.Fatal("passive device missing from original registry")
 	}
-	if err := legacy.Up(); err != nil {
-		t.Fatalf("passive shutdown closed the legacy device: %v", err)
+	wgDisableSomeRoamingForBrokenMobileSemantics(handle)
+	wgSendKeepalives(handle)
+	wgTurnOffWithPassiveIO(handle)
+	if _, ok := tunnelHandles[handle]; ok {
+		t.Fatal("passive shutdown left original registry entry")
 	}
 	if _, err := passive.tun.Write([][]byte{{1}}, 0); !errors.Is(err, os.ErrClosed) {
 		t.Fatalf("passive TUN remains open: %v", err)
 	}
-
 	replacement := startPassiveTestDevice(t)
 	if replacement == handle {
 		t.Fatal("passive handle was reused")
 	}
-	// Move the legacy entry to overlap the replacement, then stop only v1.
-	delete(tunnelHandles, handle)
-	tunnelHandles[replacement] = tunnelHandle{legacy, logger}
-	t.Cleanup(func() { wgTurnOff(replacement) })
-	wgTurnOff(replacement)
-	wgTurnOffWithPassiveIO(handle) // A late shutdown cannot close the replacement.
+	wgTurnOffWithPassiveIO(handle)
 	current, ok := lookupPassiveBackend(replacement)
-	if !ok {
-		t.Fatal("replacement missing")
+	if !ok || tunnelHandles[replacement].Device != current.Device {
+		t.Fatal("stale shutdown removed replacement")
 	}
 	if _, err := current.tun.Write([][]byte{{1}}, 0); err != nil {
-		t.Fatal("legacy or stale shutdown closed the passive replacement")
+		t.Fatal("stale shutdown closed replacement")
 	}
 }
 

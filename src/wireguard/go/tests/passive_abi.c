@@ -87,12 +87,11 @@ static void test_borrowed_io(void) {
         "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
         "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.2/32\n", &link, &tun, &p);
     assert(handle >= 0);
-    char *config = wgGetConfigWithPassiveIO(handle);
+    char *config = wgGetConfig(handle);
     assert(config != NULL && strstr(config, "listen_port=51820") != NULL);
     free(config);
-    wgDisableRoamingWithPassiveIO(handle);
-    assert(wgGetConfig(handle) == NULL);
-    wgTurnOff(handle); // Passive and native registries are isolated.
+    wgDisableSomeRoamingForBrokenMobileSemantics(handle);
+    assert(wgSetEndpointsWithPassiveIO(handle, "listen_port=1234\n") != 0);
     uintptr_t input = 0;
     for (int i = 0; i < 3000 && !input; ++i) {
         pthread_mutex_lock(&p.mutex);
@@ -166,7 +165,7 @@ static void test_keepalive_startup(int cancel) {
     wgCompleteIO(request, cancel ? 0 : 1, cancel ? WG_IO_CLOSED : WG_IO_OK);
     assert(pthread_join(worker, NULL) == 0);
     assert(p.handle >= 0);
-    char *config = wgGetConfigWithPassiveIO(p.handle);
+    char *config = wgGetConfig(p.handle);
     assert(config && strstr(config, "persistent_keepalive_interval=25"));
     free(config);
     pthread_mutex_lock(&p.io.mutex);

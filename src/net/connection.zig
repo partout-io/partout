@@ -215,8 +215,9 @@ pub const Connection = struct {
     /// Notification payloads borrowed for the duration of Events.emit().
     pub const Event = union(enum) {
         established: Events.Success,
-        /// Refresh the link in place when rebind is supported, otherwise restart gracefully.
-        needs_rebind,
+        /// Refresh the link in place, or restart gracefully when rebind is unsupported.
+        /// Supplying info also recreates TUN/settings and hands off the replacement through commit().
+        needs_rebind: ?api.TunnelRemoteInfoWrapper,
         failed: Events.Failure,
         stopped,
         set_env: struct {
@@ -252,7 +253,10 @@ pub const Connection = struct {
             // FIXME: ###, Delete after v2
             switch (payload) {
                 .established => |success| self.established(self.ctx, success),
-                .needs_rebind => self.needs_rebind(self.ctx),
+                .needs_rebind => |info| {
+                    if (info != null) @panic("TUN recreation requires a v2 event sink");
+                    self.needs_rebind(self.ctx);
+                },
                 .failed => |failure| self.failed(self.ctx, failure),
                 .stopped => self.stopped(self.ctx),
                 .set_env => |update| self.set_env(self.ctx, update.key, update.value),
@@ -304,7 +308,7 @@ pub const Connection = struct {
                 return .failed;
             }
         }.call,
-        /// Commits TUN after synchronous establishment or the established event.
+        /// Commits TUN after establishment or a needs_rebind request with tunnel info, replacing any previous TUN.
         /// On success, transfers ownership to the connection when it performs
         /// packet I/O; on failure, the caller retains it.
         commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
@@ -314,6 +318,12 @@ pub const Connection = struct {
         /// Null requests a graceful session restart instead of an in-place rebind.
         /// In link mode, takes link ownership on entry, including on failure.
         rebind: ?*const fn (*anyopaque, RemoteDescriptor) StartError!bool = null,
+        /// Returns true when the connection owns retrying a failed refresh.
+        rebind_failed: *const fn (*anyopaque, anyerror) bool = struct {
+            fn call(_: *anyopaque, _: anyerror) bool {
+                return false;
+            }
+        }.call,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
@@ -372,6 +382,10 @@ pub const Connection = struct {
     pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
         const callback = self.vtable.rebind orelse return false;
         return callback(self.ptr, remote);
+    }
+
+    pub fn rebindFailed(self: Connection, err: anyerror) bool {
+        return self.vtable.rebind_failed(self.ptr, err);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
