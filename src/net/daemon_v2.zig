@@ -16,12 +16,12 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const core = @import("../core/exports.zig");
-const net = @import("../net/exports.zig");
 const conn_mod = @import("connection.zig");
 const daemon_mod = @import("daemon.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
 const looper_mod = @import("looper_v2.zig");
+const resolver_mod = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -31,10 +31,12 @@ const Connection = conn_mod.Connection;
 const ConnectionEvent = Connection.Event;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const EndpointResolver = net.EndpointResolver;
+const ConnectionWriter = sandbox.ConnectionWriter;
+const EndpointResolver = resolver_mod.EndpointResolver;
 const Looper = looper_mod.Looper;
 const RemoteDescriptor = conn_mod.RemoteDescriptor;
 const SnapshotPublisher = helpers.SnapshotPublisher;
+const SocketEndpoint = io.SocketEndpoint;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
 pub const Error = daemon_mod.Error;
@@ -659,7 +661,7 @@ const ConnectionDaemon = struct {
             .options = self.daemon.options.connection_options,
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
-            .writer = net.ConnectionWriter.init(self.looper, &writer_vtable),
+            .writer = ConnectionWriter.init(self.looper, &writer_vtable),
             // FIXME: ###, Delete all these from Sandbox
             .controller = self.daemon.controller,
             .resolver = self.resolver,
@@ -791,7 +793,7 @@ const ConnectionDaemon = struct {
             );
             log.writef(.notice, "Connect to {s}", .{endpoint.?});
         }
-        remote.endpoint = if (endpoint) |resolved| try net.SocketEndpoint.init(resolved) else null;
+        remote.endpoint = if (endpoint) |resolved| try SocketEndpoint.init(resolved) else null;
         const unconnected = if (remote.endpoint) |resolved|
             resolved.plainSocketType() == .udp and !conn_options.connect_udp
         else
@@ -896,7 +898,7 @@ const ConnectionDaemon = struct {
 
     fn handleConnectionEstablished(
         self: *ConnectionDaemon,
-        success: net.Connection.Events.Success,
+        success: Connection.Events.Success,
     ) StartError!void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
@@ -935,7 +937,7 @@ const ConnectionDaemon = struct {
 
     fn handleConnectionFailed(
         self: *ConnectionDaemon,
-        failure: net.Connection.Events.Failure,
+        failure: Connection.Events.Failure,
     ) void {
         if (self.daemon.state != .started) return;
         // Failure callbacks leave the session owned by Connection. Finalize
@@ -1075,7 +1077,7 @@ const ConnectionDaemon = struct {
         conn.looperFailed(.tun, failure);
     }
 
-    const writer_vtable: net.ConnectionWriter.VTable = .{
+    const writer_vtable: ConnectionWriter.VTable = .{
         .write_packets = writePackets,
         .schedule_timer = scheduleTimer,
         .cancel_timer = cancelTimer,
