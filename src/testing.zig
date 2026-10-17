@@ -55,6 +55,7 @@ pub const core_uuid = @import("core/uuid.zig");
 pub const mock = @import("testing/mock.zig");
 pub const net = @import("net/exports.zig");
 pub const net_connection = @import("net/connection.zig");
+pub const net_connection_worker = @import("net/connection_worker.zig");
 pub const net_daemon = @import("net/daemon.zig");
 pub const net_daemon_v2 = @import("net/daemon_v2.zig");
 pub const net_daemon_helpers = @import("net/daemon_helpers.zig");
