@@ -328,9 +328,11 @@ pub const WireGuardAdapter = struct {
         // Do not carry endpoint answers across an offline interval. Both the
         // hostname's A/AAAA set and the active network's DNS64 prefix may have
         // changed while the backend was down.
-        self.endpoint_resolver.reset(allocator);
         switch (self.transport) {
-            .active => {
+            .active => |active| {
+                // Preserve prepared DNS until the pending TUN handoff completes.
+                if (active.tunnel == .recommitting) return .unchanged;
+                self.endpoint_resolver.reset(allocator);
                 try self.prepare(allocator);
                 return .{ .needs_rebind = try tunnel_info.TunnelRemoteInfoBuilder.init(
                     allocator,
@@ -340,6 +342,7 @@ pub const WireGuardAdapter = struct {
                 ).build() };
             },
             .passive => {
+                self.endpoint_resolver.reset(allocator);
                 try self.activate(allocator);
                 return .{ .needs_rebind = null };
             },

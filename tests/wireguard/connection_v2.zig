@@ -1388,6 +1388,11 @@ test "WireGuard v2 none mode resolves hostnames before establishment and resets 
     try std.testing.expectEqual(@as(usize, 1), recorder.tun_request_count);
     // The daemon applies settings after the request; recommit must use cached DNS.
     resolver.resolve_error = error.ResolutionFailure;
+    // Duplicate online notifications and retries must preserve the prepared answers.
+    created.networkChange(.{ .reachable = true }, recorder.events());
+    try std.testing.expect(connection.testing.adapter(created).retryTemporaryShutdown(allocator) == .unchanged);
+    try std.testing.expectEqual(@as(usize, 5), resolver.resolve_count);
+    try std.testing.expectEqual(@as(usize, 1), recorder.tun_request_count);
     var replacement_owned = OwnedDescriptor{};
     const replacement = try io.TunWrapper.create(allocator, null);
     replacement.test_descriptor = replacement_owned.descriptor();

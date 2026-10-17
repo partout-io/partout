@@ -110,8 +110,9 @@ Active mode caches peer hostname answers in `startV2()`, before returning
 establishment and before the daemon applies tunnel settings. Commit maps the
 cached numeric addresses for the current network and starts Go, preserving v1's
 DNS/DNS64 ordering. Stopping before commit discards the cached answers.
-Offline resume currently retains the committed TUN and restarts Go; reapplying
-settings and replacing the TUN remains deferred.
+Active offline resume requests fresh tunnel settings and a replacement TUN through
+`needs_rebind(info)`. The daemon hands it back through `rebind()`, which restarts
+Go with the replacement. Preparation and activation failures retry locally.
 The connection owns handed-off resources and cleans them up after backend shutdown.
 Windows native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.
