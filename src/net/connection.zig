@@ -232,10 +232,13 @@ pub const Connection = struct {
             }
         }.call,
         /// Commits TUN after synchronous establishment or the established event.
-        /// On success, transfers ownership to the connection when it performs
-        /// packet I/O; on failure, the caller retains it.
+        /// Takes TUN ownership on entry, including on failure. The daemon calls
+        /// this only when the connection performs packet I/O, outside looper mode.
         commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
-            fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
+            fn call(_: *anyopaque, tun: io.TunDescriptor) StartError!void {
+                var owned = tun;
+                owned.cleanup();
+            }
         }.call,
         /// Replaces the link after a needs_rebind event, retaining TUN and session state.
         /// Null requests a graceful session restart instead of an in-place rebind.

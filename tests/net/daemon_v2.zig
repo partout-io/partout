@@ -755,6 +755,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
+            errdefer tun.cleanup();
             if (self.commit_error) |err| return err;
             self.established_tun = tun;
         }

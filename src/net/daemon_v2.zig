@@ -979,15 +979,18 @@ const ConnectionDaemon = struct {
             log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
-        // Retain ownership until descriptor preparation and handoff succeed.
-        errdefer tunnel.destroy();
-        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
+        // Own TUN until commit() entry or successful looper attachment.
+        const descriptor = tunnel.tunDescriptor() catch {
+            tunnel.destroy();
+            return error.TunNotAvailable;
+        };
         if (connection.daemon_io != .looper) {
             try connection.commit(descriptor);
             self.trackConnectionStatus(.connected);
             return;
         }
 
+        errdefer tunnel.destroy();
         log.write(.info, "Attach TUN");
         self.looper.attach(.{
             .pair = .{
