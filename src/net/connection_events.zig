@@ -10,8 +10,9 @@ const api = core.api;
 /// Notification payloads borrowed for the duration of ConnectionEvents.emit().
 pub const ConnectionEvent = union(enum) {
     established: ConnectionEvents.Success,
-    /// Refresh the link in place when rebind is supported, otherwise restart gracefully.
-    needs_rebind,
+    /// Refresh the link, optionally replacing TUN with the supplied settings.
+    /// Restart gracefully when in-place rebind is unsupported.
+    needs_rebind: ?api.TunnelRemoteInfoWrapper,
     failed: ConnectionEvents.Failure,
     stopped,
     set_env: struct {
@@ -47,7 +48,7 @@ pub const ConnectionEvents = struct {
         // FIXME: ###, Delete after v2
         switch (payload) {
             .established => |success| self.established(self.ctx, success),
-            .needs_rebind => self.needs_rebind(self.ctx),
+            .needs_rebind => |info| self.needs_rebind(self.ctx, info),
             .failed => |failure| self.failed(self.ctx, failure),
             .stopped => self.stopped(self.ctx),
             .set_env => |update| self.set_env(self.ctx, update.key, update.value),
@@ -65,8 +66,8 @@ pub const ConnectionEvents = struct {
     established: *const fn (*anyopaque, Success) void = struct {
         fn call(_: *anyopaque, _: Success) void {}
     }.call,
-    needs_rebind: *const fn (*anyopaque) void = struct {
-        fn call(_: *anyopaque) void {}
+    needs_rebind: *const fn (*anyopaque, ?api.TunnelRemoteInfoWrapper) void = struct {
+        fn call(_: *anyopaque, _: ?api.TunnelRemoteInfoWrapper) void {}
     }.call,
     failed: *const fn (*anyopaque, Failure) void = struct {
         fn call(_: *anyopaque, _: Failure) void {}

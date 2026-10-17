@@ -684,7 +684,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
-        endpoint_list: [3]api.ExtendedEndpoint = undefined,
+        endpoint_list: [4]api.ExtendedEndpoint = undefined,
         daemon_io: net.Connection.DaemonIO,
         sync_establish: bool,
         daemon: *Daemon = undefined,
@@ -705,13 +705,14 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         commit_error: ?net.ConnectionStartError = null,
         tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
+        recreate_tun: bool = false,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
             return &self.endpoint_list;
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint };
+            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint, self.endpoint };
             self.events = sb.events.?;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
@@ -759,19 +760,30 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             if (self.commit_error) |err| return err;
             self.established_tun = tun;
         }
-        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.established_tun != null);
             if (self.remote.?.link) |link| link.cleanup();
             self.remote = remote;
+            std.debug.assert((tun != null) == self.recreate_tun);
+            if (tun) |descriptor| {
+                self.established_tun.?.cleanup();
+                self.established_tun = descriptor;
+            }
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
-            self.events.emit(.needs_rebind);
+            self.events.emit(.{ .needs_rebind = null });
             return true;
         }
-        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
-            events.emit(.needs_rebind);
+        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            // Event storage may disappear as soon as emit returns.
+            var info = api.TunnelRemoteInfoWrapper{ .profile = self.profile.* };
+            info = info.clone(std.testing.allocator) catch unreachable;
+            defer info.deinit(std.testing.allocator);
+            const payload: ?api.TunnelRemoteInfoWrapper = if (self.recreate_tun) info else null;
+            events.emit(.{ .needs_rebind = payload });
+            events.emit(.{ .needs_rebind = payload });
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -780,7 +792,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            events.emit(.needs_rebind);
+            betterPath(raw, events);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -804,7 +816,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const self: *@This() = @fieldParentPtr("controller", controller);
             const tun = try controller.interface().setTunnelSettings(info);
             // Borrow the link fd when present; a handed-off mock TUN needs no native fd.
-            tun.test_descriptor = .{ .fd = if (self.remote.?.link) |link| link.fd else self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -847,10 +859,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         };
     };
     const allocator = std.testing.allocator;
-    const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, err: ?net.ConnectionStartError = null }{
+    const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, recreate_tun: bool = false, err: ?net.ConnectionStartError = null }{
         .{ .mode = .none },
         .{ .mode = .link },
         .{ .mode = .looper },
+        .{ .mode = .none, .recreate_tun = true },
+        .{ .mode = .link, .recreate_tun = true },
         .{ .mode = .none, .sync_establish = false },
         .{ .mode = .link, .sync_establish = false },
         .{ .mode = .none, .sync_establish = false, .err = error.UnableToStart },
@@ -865,7 +879,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const daemon_io = scenario.mode;
             const commit_error = scenario.err;
             for ([_]bool{ true, false }) |connect_udp| {
-                var probe = Probe{ .daemon_io = daemon_io, .sync_establish = scenario.sync_establish, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+                var probe = Probe{ .recreate_tun = scenario.recreate_tun, .daemon_io = daemon_io, .sync_establish = scenario.sync_establish, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
                 var tun_pipe: [2]std.c.fd_t = undefined;
                 if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
                 defer _ = std.c.close(tun_pipe[0]);
@@ -953,11 +967,42 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     }
                     try std.testing.expectEqual(@as(usize, 1), probe.start_count);
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 3 else 1), probe.controller.set_tunnel_settings_count);
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 2 else 0), probe.tun_cleanup_count);
                     try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+                    if (scenario.recreate_tun) {
+                        try daemon.testing.onLoop(owner, &probe, struct {
+                            fn run(_: anytype, value: *Probe) daemon.Error!void {
+                                value.controller.set_tunnel_settings_error = error.TunNotAvailable;
+                                Probe.betterPath(value, value.events);
+                            }
+                        }.run);
+                        const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+                        while (core.monotonicNs() < deadline) {
+                            var failed = false;
+                            try daemon.testing.onLoop(owner, &failed, struct {
+                                fn run(loop: anytype, out: *bool) daemon.Error!void {
+                                    out.* = loop.daemon.snapshot_publisher.last_error != null;
+                                }
+                            }.run);
+                            if (failed) break;
+                            core.sleepMs(1);
+                        }
+                        try std.testing.expectEqual(@as(usize, 4), probe.controller.set_tunnel_settings_count);
+                        try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
+                        try std.testing.expectEqual(@as(usize, 3), probe.tun_cleanup_count);
+                        try std.testing.expect(probe.established_tun == null);
+                        try std.testing.expect(probe.remote == null);
+                        try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                        try std.testing.expectEqual(api.PartoutErrorCode.tunNotAvailable, sut.snapshot_publisher.last_error.?.code);
+                    }
                 }
                 sut.stop();
                 try std.testing.expect(probe.established_tun == null);
+                if (daemon_io != .looper) {
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 3 else 1), probe.tun_cleanup_count);
+                }
             }
         }
     }
@@ -988,8 +1033,8 @@ test "v2 needs_rebind restarts sessions without reporting a failure" {
             events.emit(.stopped);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
-            events.emit(.needs_rebind);
+            events.emit(.{ .needs_rebind = null });
+            events.emit(.{ .needs_rebind = null });
         }
         const vtable = blk: {
             var value = FailingStartConnection.vtable;
@@ -1087,10 +1132,11 @@ test "v2 daemon-created link is released on failed start or rebind" {
                 else => .started,
             };
         }
-        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.remote.?.link.?.cleanup();
             self.remote = remote;
+            std.debug.assert(tun == null);
             self.rebind_count += 1;
             return switch (self.scenario) {
                 .rebind_false => false,
@@ -1107,7 +1153,7 @@ test "v2 daemon-created link is released on failed start or rebind" {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
-            events.emit(.needs_rebind);
+            events.emit(.{ .needs_rebind = null });
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));

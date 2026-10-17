@@ -291,13 +291,15 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
 
-    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }));
+    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }, null));
     try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
     try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
-    try created.commit(second_tun.descriptor());
+    var third_link = OwnedDescriptor{};
+    try std.testing.expect(try created.rebind(.{ .link = third_link.descriptor() }, second_tun.descriptor()));
+    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
 
     // Unexpected EOF from an owned descriptor reaches daemon recovery once.
@@ -319,6 +321,7 @@ test "WireGuard v2 takes ownership of link and TUN descriptors" {
 
     created.stop(0, recorder.events());
     created.stop(0, recorder.events());
+    try std.testing.expectEqual(@as(usize, 1), third_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
 
@@ -751,7 +754,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     created.networkChange(.{ .reachable = false }, recorder.events());
     // The queued rebind must succeed even if an offline event overtakes it.
     var replacement_link = OwnedDescriptor{};
-    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor() }));
+    try std.testing.expect(try created.rebind(.{ .link = replacement_link.descriptor() }, null));
     try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
     created.networkChange(.{ .reachable = true }, recorder.events());
     try waitForRetry(&environment, &fake_backend, 3);
@@ -1160,7 +1163,7 @@ fn recordEstablished(ctx: *anyopaque, success: conn.Connection.Events.Success) v
     self.established_count += 1;
 }
 
-fn recordNeedsRebind(ctx: *anyopaque) void {
+fn recordNeedsRebind(ctx: *anyopaque, _: ?api.TunnelRemoteInfoWrapper) void {
     const self: *EventRecorder = @ptrCast(@alignCast(ctx));
     self.rebind_count += 1;
 }

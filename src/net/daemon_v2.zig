@@ -486,10 +486,19 @@ const ConnectionDaemon = struct {
                     logEventSubmissionFailure(event, err);
                 };
             },
-            .needs_rebind => {
+            .needs_rebind => |info| {
                 std.debug.assert(self.isCurrentThread());
                 if (self.conn_request != null) return;
-                self.schedule(.{ .onConnectionEvent = event }) catch |err| {
+                const copy = cloneTunnelInfo(self.daemon.allocator, info) catch {
+                    onConnectionEvent(ctx, .{ .failed = .{
+                        .err_pair = .{ .code = .outOfMemory },
+                        .disposition = .reconnect,
+                    } });
+                    return;
+                };
+                const message: Message = .{ .onConnectionEvent = .{ .needs_rebind = copy } };
+                self.schedule(message) catch |err| {
+                    message.deinit(self.daemon.allocator);
                     logEventSubmissionFailure(event, err);
                 };
             },
@@ -736,12 +745,19 @@ const ConnectionDaemon = struct {
         _ = self.gate.setEnabled(false);
 
         log.write(.notice, "Start connection");
-        self.requestConnection(.start);
+        self.requestConnection(.start, null);
     }
 
-    fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction) void {
+    fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) void {
         if (self.conn_request != null) return;
-        const connection = self.connection orelse @panic("requestConnection but no connection");
+        self.submitConnectionRequest(action, tun_info) catch |err| self.connectionRequestFailed(action, err);
+    }
+
+    fn submitConnectionRequest(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) !void {
+        const connection = self.connection orelse @panic("submitConnectionRequest but no connection");
+        const info = try cloneTunnelInfo(self.daemon.allocator, tun_info);
+        errdefer deinitTunnelInfo(self.daemon.allocator, info);
+
         const request_id = self.next_conn_request;
         self.next_conn_request += 1;
         self.conn_request = request_id;
@@ -751,18 +767,20 @@ const ConnectionDaemon = struct {
         if (action == .start) self.trackConnectionStatus(.connecting);
         const worker = self.worker orelse {
             // Connections without daemon-owned I/O need no blocking preparation.
-            self.schedule(.{ .setupConnection = .{ .request_id = request_id, .action = action, .remote = .{} } }) catch |err|
-                self.connectionRequestFailed(action, err);
+            try self.schedule(.{ .setupConnection = .{
+                .request_id = request_id,
+                .action = action,
+                .remote = .{},
+                .tun_info = info,
+            } });
             return;
         };
         // Reserve completion storage before accepting work. Delivery cannot fail
         // for lack of memory after the worker has prepared a link.
-        const job = self.daemon.allocator.create(Job) catch |err| {
-            self.connectionRequestFailed(action, err);
-            return;
-        };
+        const job = try self.daemon.allocator.create(Job);
+        errdefer self.daemon.allocator.destroy(job);
         const options = self.daemon.options.connection_options;
-        worker.submit(.{
+        try worker.submit(.{
             .request_id = request_id,
             .action = action,
             .local_port = connection.local_port,
@@ -770,10 +788,8 @@ const ConnectionDaemon = struct {
             .connect_udp = options.connect_udp,
             .dns_timeout = options.dns_timeout,
             .link_activity_timeout = options.link_activity_timeout,
-        }, job) catch |err| {
-            self.daemon.allocator.destroy(job);
-            self.connectionRequestFailed(action, err);
-        };
+            .tun_info = info,
+        }, job);
     }
 
     fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
@@ -782,6 +798,7 @@ const ConnectionDaemon = struct {
         job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
         self.enqueue(job) catch {
             setup.deinit();
+            job.message.deinit(self.daemon.allocator);
             self.daemon.allocator.destroy(job);
         };
     }
@@ -799,7 +816,7 @@ const ConnectionDaemon = struct {
             if (setup.action == .start and !self.monitor.isReachable()) {
                 self.trackConnectionStatus(.disconnected);
             } else {
-                self.requestConnection(setup.action);
+                self.requestConnection(setup.action, setup.tun_info);
             }
             return;
         }
@@ -834,13 +851,36 @@ const ConnectionDaemon = struct {
         switch (setup.action) {
             .start => self.startConnection(remote),
             .rebind => {
-                const rebound = connection.rebind(remote) catch |err| {
+                const tun = self.recreateConnectionTun(setup.tun_info) catch |err| {
+                    // Protocol control has not taken ownership of the prepared link.
+                    if (connection.daemon_io != .looper) setup.deinit();
+                    self.linkRefreshFailed(err);
+                    return;
+                };
+                const rebound = connection.rebind(remote, tun) catch |err| {
                     self.linkRefreshFailed(err);
                     return;
                 };
                 if (!rebound) self.linkRefreshFailed(error.UnableToStart);
             },
         }
+    }
+
+    fn recreateConnectionTun(self: *ConnectionDaemon, tun_info: ?api.TunnelRemoteInfoWrapper) StartError!?io.TunDescriptor {
+        const info = tun_info orelse return null;
+        const connection = self.connection orelse @panic("recreateConnectionTun but no connection");
+        const tunnel = self.daemon.controller.setTunnelSettings(info) catch return error.TunNotAvailable;
+        errdefer tunnel.destroy();
+        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
+        if (connection.daemon_io == .looper) {
+            if (self.looper.isTunAttached()) self.looper.detach(.tun) catch return error.TunNotAvailable;
+            self.looper.attach(.{
+                .pair = .{ .tun = descriptor },
+                .on_read = .{ .context = self, .callback = onTunnelRead },
+                .on_failure = .{ .context = self, .callback = onTunnelFailure },
+            }) catch return error.TunNotAvailable;
+        }
+        return descriptor;
     }
 
     fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
@@ -1028,7 +1068,7 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
+    fn handleConnectionNeedsRebind(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) !void {
         if (self.daemon.state != .started or self.conn_request != null) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
         // Go may have established while its success event is still queued on
@@ -1044,9 +1084,9 @@ const ConnectionDaemon = struct {
             self.trackConnectionStatus(.disconnected);
             return;
         }
-        log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
+        log.write(.info, if (info != null) "Refresh LINK and TUN" else "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
-        self.requestConnection(.rebind);
+        self.requestConnection(.rebind, info);
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
@@ -1056,6 +1096,7 @@ const ConnectionDaemon = struct {
                 error.OutOfMemory => .outOfMemory,
                 error.DNSResolutionFailure => .dnsFailure,
                 error.Timeout => .timeout,
+                error.TunNotAvailable => .tunNotAvailable,
                 else => .ioFailure,
             } },
             .disposition = .reconnect,
@@ -1190,6 +1231,16 @@ const ConnectionDaemon = struct {
         test_task: if (builtin.is_test) ?testing.Task else void = if (builtin.is_test) null else {},
     };
 
+    fn cloneTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) !?api.TunnelRemoteInfoWrapper {
+        const value = info orelse return null;
+        return try value.clone(allocator);
+    }
+
+    fn deinitTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) void {
+        var value = info orelse return;
+        value.deinit(allocator);
+    }
+
     const Message = union(enum) {
         start,
         hold,
@@ -1203,11 +1254,10 @@ const ConnectionDaemon = struct {
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
             switch (self) {
+                .setupConnection => |setup| deinitTunnelInfo(allocator, setup.tun_info),
                 .onConnectionEvent => |event| switch (event) {
-                    .established => |success| {
-                        var info = success.info;
-                        info.deinit(allocator);
-                    },
+                    .established => |success| deinitTunnelInfo(allocator, success.info),
+                    .needs_rebind => |info| deinitTunnelInfo(allocator, info),
                     .set_env => |update| {
                         allocator.free(update.key);
                         if (update.value) |value| allocator.free(value);
@@ -1400,7 +1450,7 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
-            .needs_rebind => self.handleConnectionNeedsRebind() catch |err| self.linkRefreshFailed(err),
+            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.linkRefreshFailed(err),
             .failed => |failure| self.handleConnectionFailed(failure),
             .stopped => self.handleConnectionStopped(),
             .set_env => |update| {

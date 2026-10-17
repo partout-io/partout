@@ -223,9 +223,10 @@ const WireGuardConnection = struct {
         self.io.replaceTun(descriptor);
     }
 
-    fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
+        if (tun) |descriptor| self.io.replaceTun(descriptor);
         self.io.replaceLink(remote.link orelse @panic("WireGuardConnection v2 rebind() requires a link descriptor"));
         self.adapter.sendKeepalives();
         return !self.adapter.isStopped();
@@ -285,7 +286,7 @@ const WireGuardConnection = struct {
     fn prepareLinkRefresh(self: *WireGuardConnection, events: net.Connection.Events) void {
         if (!self.adapter.isStarted()) return;
         self.io.releaseLink();
-        events.emit(.needs_rebind);
+        events.emit(.{ .needs_rebind = null });
     }
 
     fn reportDataCount(
@@ -550,9 +551,9 @@ fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) net.ConnectionStartErr
     return self.commit(descriptor);
 }
 
-fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.rebind(remote);
+    return self.rebind(remote, tun);
 }
 
 const wireguard_connection_vtable = net.Connection.VTable{

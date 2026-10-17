@@ -25,13 +25,18 @@ pub const ConnectionWorker = struct {
         connect_udp: bool,
         dns_timeout: u32,
         link_activity_timeout: u32,
+        /// Owned by the request until delivery, then by the completion receiver.
+        tun_info: ?api.TunnelRemoteInfoWrapper = null,
     };
     pub const Completion = struct {
         request_id: u64,
         action: Action,
         remote: anyerror!connection.RemoteDescriptor,
+        /// Owned by the completion receiver.
+        tun_info: ?api.TunnelRemoteInfoWrapper = null,
 
-        /// Releases a result that was not handed to the connection/looper.
+        /// Releases a link that was not handed to the connection/looper.
+        /// The receiver releases tun_info separately, including after successful handoff.
         pub fn deinit(self: Completion) void {
             const remote = self.remote catch return;
             if (remote.link) |link| link.cleanup();
@@ -124,6 +129,7 @@ pub const ConnectionWorker = struct {
             .request_id = work.request.request_id,
             .action = work.request.action,
             .remote = remote,
+            .tun_info = work.request.tun_info,
         });
     }
 

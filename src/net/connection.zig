@@ -240,10 +240,11 @@ pub const Connection = struct {
                 owned.cleanup();
             }
         }.call,
-        /// Replaces the link after a needs_rebind event, retaining TUN and session state.
+        /// Replaces the link and optional TUN, retaining session state.
         /// Null requests a graceful session restart instead of an in-place rebind.
-        /// In link mode, takes link ownership on entry, including on failure.
-        rebind: ?*const fn (*anyopaque, RemoteDescriptor) StartError!bool = null,
+        /// Takes optional TUN ownership on entry, including on failure, except in
+        /// looper mode where it is borrowed. In link mode, also takes link ownership.
+        rebind: ?*const fn (*anyopaque, RemoteDescriptor, ?io.TunDescriptor) StartError!bool = null,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
@@ -299,9 +300,9 @@ pub const Connection = struct {
         return self.vtable.commit(self.ptr, tun);
     }
 
-    pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
+    pub fn rebind(self: Connection, remote: RemoteDescriptor, tun: ?io.TunDescriptor) StartError!bool {
         const callback = self.vtable.rebind orelse return false;
-        return callback(self.ptr, remote);
+        return callback(self.ptr, remote, tun);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {

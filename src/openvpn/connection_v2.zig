@@ -327,7 +327,7 @@ const OpenVPNConnection = struct {
         const session = self.current_session orelse return;
         if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
         self.pending_rebind = true;
-        events.emit(.needs_rebind);
+        events.emit(.{ .needs_rebind = null });
     }
 
     // MARK: - Session events
