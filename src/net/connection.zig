@@ -245,12 +245,6 @@ pub const Connection = struct {
         /// Takes optional TUN ownership on entry, including on failure, except in
         /// looper mode where it is borrowed. In link mode, also takes link ownership.
         rebind: ?*const fn (*anyopaque, RemoteDescriptor, ?io.TunDescriptor) StartError!bool = null,
-        /// Returns true when the connection owns retrying a failed refresh.
-        rebind_failed: *const fn (*anyopaque, anyerror) bool = struct {
-            fn call(_: *anyopaque, _: anyerror) bool {
-                return false;
-            }
-        }.call,
         /// Sources accompany unconnected UDP reads, one per packet; otherwise null.
         submit_packets: *const fn (*anyopaque, io.Side, io.Packets, ?[]const io.SocketAddress) io.ReadAction = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Packets, _: ?[]const io.SocketAddress) io.ReadAction {
@@ -309,10 +303,6 @@ pub const Connection = struct {
     pub fn rebind(self: Connection, remote: RemoteDescriptor, tun: ?io.TunDescriptor) StartError!bool {
         const callback = self.vtable.rebind orelse return false;
         return callback(self.ptr, remote, tun);
-    }
-
-    pub fn rebindFailed(self: Connection, err: anyerror) bool {
-        return self.vtable.rebind_failed(self.ptr, err);
     }
 
     pub fn shutdown(self: Connection, reason: ShutdownReason) void {
