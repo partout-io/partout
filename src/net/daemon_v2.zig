@@ -851,12 +851,12 @@ const ConnectionDaemon = struct {
         switch (setup.action) {
             .start => self.startConnection(remote),
             .rebind => {
-                const tun = self.recreateConnectionTun(setup.tun_info) catch |err| {
+                const tun = if (setup.tun_info) |info| self.createConnectionTun(info) catch |err| {
                     // Protocol control has not taken ownership of the prepared link.
                     if (connection.daemon_io != .looper) setup.deinit();
                     self.linkRefreshFailed(err);
                     return;
-                };
+                } else null;
                 const rebound = connection.rebind(remote, tun) catch |err| {
                     self.linkRefreshFailed(err);
                     return;
@@ -864,11 +864,6 @@ const ConnectionDaemon = struct {
                 if (!rebound) self.linkRefreshFailed(error.UnableToStart);
             },
         }
-    }
-
-    fn recreateConnectionTun(self: *ConnectionDaemon, tun_info: ?api.TunnelRemoteInfoWrapper) StartError!?io.TunDescriptor {
-        const info = tun_info orelse return null;
-        return try self.createConnectionTun(info);
     }
 
     // Return connection-owned TUN, or a borrowed descriptor after looper attachment.
