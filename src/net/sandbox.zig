@@ -10,7 +10,7 @@
 const std = @import("std");
 
 const core = @import("../core/exports.zig");
-const conn = @import("connection.zig");
+const events_mod = @import("connection_events.zig");
 const io = @import("io.zig");
 const runtime_policy = @import("../runtime_policy.zig");
 const looper = @import("looper.zig");
@@ -27,7 +27,7 @@ pub const Sandbox = struct {
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
-    events: ?conn.Connection.Events = null,
+    events: ?events_mod.ConnectionEvents = null,
     writer: ?ConnectionWriter = null,
     // FIXME: ###, Delete all these from Sandbox
     controller: TunnelController,
