@@ -929,9 +929,11 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     try daemon.testing.perform(owner, .onBetterPath);
                     // Duplicate queued requests and requests during handoff share one rebind.
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try waitForRebind(owner, &probe, 1);
                     try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
                     try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } });
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
+                    try waitForRebind(owner, &probe, 2);
                     try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
                     if (daemon_io == .none) {
                         try std.testing.expect(probe.remote.?.link == null);
@@ -1396,6 +1398,22 @@ fn cancelGateTimer(owner: anytype) !void {
             loop.looper.cancelTimer(&loop.resume_gate_timer);
         }
     }.run);
+}
+
+fn waitForRebind(owner: anytype, probe: anytype, expected: usize) !void {
+    const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+    const Context = struct { probe: @TypeOf(probe), expected: usize, done: bool = false };
+    var context = Context{ .probe = probe, .expected = expected };
+    while (core.monotonicNs() < deadline) {
+        try daemon.testing.onLoop(owner, &context, struct {
+            fn run(loop: anytype, state: *Context) daemon.Error!void {
+                state.done = !loop.rebind_pending and state.probe.rebind_count == state.expected;
+            }
+        }.run);
+        if (context.done) return;
+        core.sleepMs(1);
+    }
+    return error.Timeout;
 }
 
 fn waitForGate(owner: anytype) !void {
