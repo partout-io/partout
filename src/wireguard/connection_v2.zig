@@ -190,15 +190,6 @@ const WireGuardConnection = struct {
         if (!was_started and self.adapter.isStarted()) self.backendStarted();
     }
 
-    fn rebindFailed(self: *WireGuardConnection, err: anyerror) bool {
-        self.lock.lock();
-        defer self.lock.unlock();
-        if (!self.adapter.rebindFailed()) return false;
-        log.writef(.err, "Unable to resume WireGuard tunnel: {s}", .{@errorName(err)});
-        self.scheduleTemporaryShutdownRetry(self.events.?);
-        return true;
-    }
-
     fn backendStarted(self: *WireGuardConnection) void {
         self.reportDataCount(self.events.?);
         self.startDataCountTimer() catch |err| {
@@ -211,8 +202,12 @@ const WireGuardConnection = struct {
         defer self.lock.unlock();
         const was_started = self.adapter.isStarted();
         const rebound = self.adapter.rebind(self.allocator, remote, tun) catch |err| return activationError(err);
+        if (!rebound) {
+            self.scheduleTemporaryShutdownRetry(self.events.?);
+            return true;
+        }
         if (!was_started and self.adapter.isStarted()) self.backendStarted();
-        return rebound;
+        return !self.adapter.isStopped();
     }
 
     fn stop(
@@ -535,16 +530,10 @@ fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor
     return self.rebind(remote, tun);
 }
 
-fn rebindFailed(ptr: *anyopaque, err: anyerror) bool {
-    const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.rebindFailed(err);
-}
-
 const wireguard_connection_vtable = net.Connection.VTable{
     .start_v2 = startV2,
     .commit = commit,
     .rebind = rebind,
-    .rebind_failed = rebindFailed,
     .stop = stop,
     .network_change = networkChange,
     .better_path = betterPath,

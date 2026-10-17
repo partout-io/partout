@@ -433,23 +433,25 @@ pub const WireGuardAdapter = struct {
         }
     }
 
+    /// False means the suspended adapter needs a local retry.
     pub fn rebind(self: *WireGuardAdapter, allocator: std.mem.Allocator, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) ActivationError!bool {
         self.replaceLink(remote);
-        if (tun) |descriptor| try self.commit(allocator, descriptor);
+        if (tun) |descriptor| self.commit(allocator, descriptor) catch |err| return self.rebindError(err);
         self.sendKeepalives();
-        return !self.isStopped();
+        return true;
     }
 
-    pub fn rebindFailed(self: *WireGuardAdapter) bool {
-        if (self.state != .temporary_shutdown) return false;
+    fn rebindError(self: *WireGuardAdapter, err: ActivationError) ActivationError!bool {
+        if (self.state != .temporary_shutdown) return err;
         switch (self.transport) {
             .active => |*active| {
-                if (active.tunnel != .recommitting) return false;
+                if (active.tunnel != .recommitting) return err;
                 const previous = active.tunnel.recommitting;
                 active.tunnel = .{ .committed = previous };
-                return true;
+                log.writef(.err, "Unable to resume WireGuard tunnel: {s}", .{@errorName(err)});
+                return false;
             },
-            .passive => return false,
+            .passive => return err,
         }
     }
 
