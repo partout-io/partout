@@ -406,8 +406,10 @@ pub const WireGuardAdapter = struct {
     }
     // Transport lifecycle and handoff; the backend state machine above follows v1.
 
-    /// On failure the caller retains the replacement; a suspended backend stays retryable.
+    /// Takes TUN ownership on entry; a suspended backend stays retryable on failure.
     pub fn commit(self: *WireGuardAdapter, allocator: std.mem.Allocator, descriptor: net.TunDescriptor) ActivationError!void {
+        var incoming = descriptor;
+        errdefer incoming.cleanup();
         switch (self.transport) {
             .active => |*active| {
                 if (active.tunnel != .awaiting_commit and active.tunnel != .recommitting)
@@ -429,6 +431,13 @@ pub const WireGuardAdapter = struct {
             },
             .passive => |*passive| passive.io.replaceTun(descriptor),
         }
+    }
+
+    pub fn rebind(self: *WireGuardAdapter, allocator: std.mem.Allocator, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) ActivationError!bool {
+        self.replaceLink(remote);
+        if (tun) |descriptor| try self.commit(allocator, descriptor);
+        self.sendKeepalives();
+        return !self.isStopped();
     }
 
     pub fn rebindFailed(self: *WireGuardAdapter) bool {

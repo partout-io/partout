@@ -684,7 +684,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
-        endpoint_list: [8]api.ExtendedEndpoint = undefined,
+        endpoint_list: [4]api.ExtendedEndpoint = undefined,
         daemon_io: net.Connection.DaemonIO,
         sync_establish: bool,
         daemon: *Daemon = undefined,
@@ -706,15 +706,13 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
         recreate_tun: bool = false,
-        retry_refresh: bool = false,
-        refresh_failures: usize = 0,
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
             return &self.endpoint_list;
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.endpoint_list = .{self.endpoint} ** 8;
+            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint, self.endpoint };
             self.events = sb.events.?;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
@@ -747,7 +745,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn reportDataCount(raw: *anyopaque, count: api.DataCount) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
-            std.debug.assert(self.commit_count >= 1 and self.established_tun != null);
+            std.debug.assert(self.commit_count == 1 and self.established_tun != null);
             std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == .connected);
             std.debug.assert(count.received == 123 and count.sent == 456);
             self.startup_count_reports += 1;
@@ -758,21 +756,20 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         fn commit(raw: *anyopaque, tun: io.TunDescriptor) net.ConnectionStartError!void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.commit_count += 1;
+            errdefer tun.cleanup();
             if (self.commit_error) |err| return err;
-            if (self.established_tun) |old| old.cleanup();
             self.established_tun = tun;
         }
-        fn rebindFailed(raw: *anyopaque, _: anyerror) bool {
-            const self: *@This() = @ptrCast(@alignCast(raw));
-            if (!self.retry_refresh) return false;
-            self.refresh_failures += 1;
-            return true;
-        }
-        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(self.established_tun != null);
             if (self.remote.?.link) |link| link.cleanup();
             self.remote = remote;
+            std.debug.assert((tun != null) == self.recreate_tun);
+            if (tun) |descriptor| {
+                self.established_tun.?.cleanup();
+                self.established_tun = descriptor;
+            }
             self.rebind_count += 1;
             // Requests arriving during the handoff must also be coalesced.
             self.events.emit(.{ .needs_rebind = null });
@@ -780,15 +777,13 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            if (self.recreate_tun) {
-                events.emit(.{ .needs_rebind = .{
-                    .profile = self.profile.*,
-                    .original_module_id = source.net_connection.activeConnectionModule(self.profile).?.id(),
-                } });
-                return;
-            }
-            events.emit(.{ .needs_rebind = null });
-            events.emit(.{ .needs_rebind = null });
+            // Event storage may disappear as soon as emit returns.
+            var info = api.TunnelRemoteInfoWrapper{ .profile = self.profile.* };
+            info = info.clone(std.testing.allocator) catch unreachable;
+            defer info.deinit(std.testing.allocator);
+            const payload: ?api.TunnelRemoteInfoWrapper = if (self.recreate_tun) info else null;
+            events.emit(.{ .needs_rebind = payload });
+            events.emit(.{ .needs_rebind = payload });
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -797,7 +792,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            events.emit(.{ .needs_rebind = null });
+            betterPath(raw, events);
         }
         fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -821,7 +816,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const self: *@This() = @fieldParentPtr("controller", controller);
             const tun = try controller.interface().setTunnelSettings(info);
             // Borrow the link fd when present; a handed-off mock TUN needs no native fd.
-            tun.test_descriptor = .{ .fd = if (self.remote.?.link) |link| link.fd else self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -853,7 +848,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             table.start_v2 = start;
             table.commit = commit;
             table.rebind = rebind;
-            table.rebind_failed = rebindFailed;
             table.better_path = betterPath;
             table.network_change = networkChange;
             table.stop = stop;
@@ -865,10 +859,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         };
     };
     const allocator = std.testing.allocator;
-    const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, err: ?net.ConnectionStartError = null }{
+    const scenarios = [_]struct { mode: net.Connection.DaemonIO, sync_establish: bool = true, recreate_tun: bool = false, err: ?net.ConnectionStartError = null }{
         .{ .mode = .none },
         .{ .mode = .link },
         .{ .mode = .looper },
+        .{ .mode = .none, .recreate_tun = true },
+        .{ .mode = .link, .recreate_tun = true },
         .{ .mode = .none, .sync_establish = false },
         .{ .mode = .link, .sync_establish = false },
         .{ .mode = .none, .sync_establish = false, .err = error.UnableToStart },
@@ -883,7 +879,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
             const daemon_io = scenario.mode;
             const commit_error = scenario.err;
             for ([_]bool{ true, false }) |connect_udp| {
-                var probe = Probe{ .daemon_io = daemon_io, .sync_establish = scenario.sync_establish, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
+                var probe = Probe{ .recreate_tun = scenario.recreate_tun, .daemon_io = daemon_io, .sync_establish = scenario.sync_establish, .commit_error = commit_error, .endpoint = api.ExtendedEndpoint.init(if (proto == .udp6 or proto == .tcp6) "::1" else "127.0.0.1", .init(proto, 1194)).? };
                 var tun_pipe: [2]std.c.fd_t = undefined;
                 if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
                 defer _ = std.c.close(tun_pipe[0]);
@@ -971,55 +967,185 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     }
                     try std.testing.expectEqual(@as(usize, 1), probe.start_count);
                     try std.testing.expectEqual(@as(usize, 1), probe.commit_count);
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 3 else 1), probe.controller.set_tunnel_settings_count);
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 2 else 0), probe.tun_cleanup_count);
                     try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-
-                    probe.recreate_tun = true;
-                    try daemon.testing.perform(owner, .onBetterPath);
-                    try std.testing.expectError(error.AlreadyStarted, sut.start());
-                    try std.testing.expectEqual(@as(usize, 2), probe.commit_count);
-                    try std.testing.expectEqual(@as(usize, 2), probe.controller.set_tunnel_settings_count);
-                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
-                    try std.testing.expectEqual(@as(usize, 1), probe.start_count);
-                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-                    // The daemon delegates creation and commit failures to local recovery.
-                    probe.retry_refresh = true;
-                    probe.controller.set_tunnel_settings_error = error.TunNotAvailable;
-                    try daemon.testing.perform(owner, .onBetterPath);
-                    try std.testing.expectError(error.AlreadyStarted, sut.start());
-                    try std.testing.expectEqual(@as(usize, 1), probe.refresh_failures);
-                    try std.testing.expectEqual(@as(usize, 2), probe.commit_count);
-                    try std.testing.expectEqual(@as(usize, 1), probe.tun_cleanup_count);
-                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-                    probe.controller.set_tunnel_settings_error = null;
-                    probe.commit_error = error.UnableToStart;
-                    try daemon.testing.perform(owner, .onBetterPath);
-                    try std.testing.expectError(error.AlreadyStarted, sut.start());
-                    try std.testing.expectEqual(@as(usize, 2), probe.refresh_failures);
-                    try std.testing.expectEqual(@as(usize, 3), probe.commit_count);
-                    try std.testing.expectEqual(@as(usize, 2), probe.tun_cleanup_count);
-                    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-                    probe.commit_error = null;
-                    try daemon.testing.perform(owner, .onBetterPath);
-                    try std.testing.expectError(error.AlreadyStarted, sut.start());
-                    try std.testing.expectEqual(@as(usize, 4), probe.commit_count);
-                    try std.testing.expectEqual(@as(usize, 3), probe.tun_cleanup_count);
-                    try std.testing.expectEqual(@as(usize, 1), probe.start_count);
-                    // Without local recovery, a rejected replacement still reconnects.
-                    probe.retry_refresh = false;
-                    probe.commit_error = error.UnableToStart;
-                    try daemon.testing.perform(owner, .onBetterPath);
-                    try std.testing.expectError(error.AlreadyStarted, sut.start());
-                    try std.testing.expectEqual(@as(usize, 5), probe.commit_count);
-                    try std.testing.expectEqual(@as(usize, 5), probe.tun_cleanup_count);
-                    try std.testing.expect(probe.established_tun == null);
-                    try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                    if (scenario.recreate_tun) {
+                        try daemon.testing.onLoop(owner, &probe, struct {
+                            fn run(_: anytype, value: *Probe) daemon.Error!void {
+                                value.controller.set_tunnel_settings_error = error.TunNotAvailable;
+                                Probe.betterPath(value, value.events);
+                            }
+                        }.run);
+                        const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+                        while (core.monotonicNs() < deadline) {
+                            var failed = false;
+                            try daemon.testing.onLoop(owner, &failed, struct {
+                                fn run(loop: anytype, out: *bool) daemon.Error!void {
+                                    out.* = loop.daemon.snapshot_publisher.last_error != null;
+                                }
+                            }.run);
+                            if (failed) break;
+                            core.sleepMs(1);
+                        }
+                        try std.testing.expectEqual(@as(usize, 4), probe.controller.set_tunnel_settings_count);
+                        try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
+                        try std.testing.expectEqual(@as(usize, 3), probe.tun_cleanup_count);
+                        try std.testing.expect(probe.established_tun == null);
+                        try std.testing.expect(probe.remote == null);
+                        try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                        try std.testing.expectEqual(api.PartoutErrorCode.tunNotAvailable, sut.snapshot_publisher.last_error.?.code);
+                    }
                 }
                 sut.stop();
                 try std.testing.expect(probe.established_tun == null);
+                if (daemon_io != .looper) {
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 3 else 1), probe.tun_cleanup_count);
+                }
             }
         }
     }
+}
+
+test "v2 looper owns TUN across startup and optional rebind replacement" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Probe = struct {
+        daemon: *Daemon = undefined,
+        profile: *const api.Profile = undefined,
+        allocator: std.mem.Allocator = undefined,
+        tun_fd: io.FileDescriptor,
+        controller: mock_mod.MockTunnelController = .{},
+        recreate_tun: bool = false,
+        rebind_count: usize = 0,
+        tun_cleanup_count: usize = 0,
+
+        fn create(raw: ?*anyopaque, allocator: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.profile = sb.profile;
+            self.allocator = allocator;
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .looper };
+        }
+        fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const info = api.TunnelRemoteInfoWrapper{ .profile = self.profile.* };
+            return .{ .established = .{ .info = info.clone(self.allocator) catch return error.OutOfMemory } };
+        }
+        fn commit(_: *anyopaque, _: io.TunDescriptor) net.ConnectionStartError!void {
+            @panic("looper-owned TUN must not be committed to the connection");
+        }
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?io.TunDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const looper = self.daemon.implementation.connection.looper;
+            std.debug.assert(looper.isLinkAttached() and looper.isTunAttached());
+            std.debug.assert(remote.link != null);
+            std.debug.assert((tun != null) == self.recreate_tun);
+            if (tun) |descriptor| std.debug.assert(descriptor.fd == self.tun_fd);
+            // Replacing TUN releases its predecessor before borrowing the new one.
+            std.debug.assert(self.tun_cleanup_count == @intFromBool(self.recreate_tun));
+            self.rebind_count += 1;
+            return true;
+        }
+        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            events.emit(.{ .needs_rebind = if (self.recreate_tun) .{ .profile = self.profile.* } else null });
+        }
+        fn socket(_: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
+            const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
+            return wrapper.linkDescriptor();
+        }
+        fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*io.TunWrapper {
+            const controller: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
+            const self: *@This() = @fieldParentPtr("controller", controller);
+            const tun = try controller.interface().setTunnelSettings(info);
+            tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            return tun;
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+            return error.WouldBlock;
+        }
+        fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            return data.len - offset;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.tun_cleanup_count += 1;
+        }
+        fn lastError(_: *anyopaque) c_int {
+            return 0;
+        }
+        const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = lastError,
+        };
+        const vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.start_v2 = start;
+            table.commit = commit;
+            table.rebind = rebind;
+            table.better_path = betterPath;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const allocator = std.testing.allocator;
+    var tun_pipe: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
+    defer _ = std.c.close(tun_pipe[0]);
+    defer _ = std.c.close(tun_pipe[1]);
+    var probe = Probe{ .tun_fd = tun_pipe[0] };
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller_table = probe.controller.interface().vtable.*;
+    controller_table.set_tunnel_settings = Probe.setTunnel;
+    var factory_table = mock_mod.noopSocketFactory().vtable.*;
+    factory_table.create = Probe.socket;
+    var monitor = mock_mod.MockNetworkMonitor{};
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = .{ .ptr = &probe.controller, .vtable = &controller_table },
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = .{ .vtable = &factory_table },
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .reconnection_delay_ms = 60_000 },
+    });
+    defer sut.destroy();
+    probe.daemon = sut;
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try waitForConnectionRequest(owner);
+    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try std.testing.expectEqual(@as(usize, 1), probe.controller.set_tunnel_settings_count);
+    for ([_]bool{ false, true }, 1..) |recreate, expected| {
+        try daemon.testing.onLoop(owner, recreate, struct {
+            fn run(loop: anytype, value: bool) daemon.Error!void {
+                const context: *Probe = @ptrCast(@alignCast(loop.connection.?.ptr));
+                context.recreate_tun = value;
+            }
+        }.run);
+        try daemon.testing.perform(owner, .onBetterPath);
+        try waitForRebind(owner, &probe, expected);
+        try std.testing.expectEqual(@as(usize, 1) + @intFromBool(recreate), probe.controller.set_tunnel_settings_count);
+        try std.testing.expectEqual(@as(usize, @intFromBool(recreate)), probe.tun_cleanup_count);
+        try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    }
+    sut.stop();
+    try std.testing.expectEqual(@as(usize, 2), probe.tun_cleanup_count);
+    try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
 }
 
 test "v2 needs_rebind restarts sessions without reporting a failure" {
@@ -1146,10 +1272,11 @@ test "v2 daemon-created link is released on failed start or rebind" {
                 else => .started,
             };
         }
-        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.remote.?.link.?.cleanup();
             self.remote = remote;
+            std.debug.assert(tun == null);
             self.rebind_count += 1;
             return switch (self.scenario) {
                 .rebind_false => false,

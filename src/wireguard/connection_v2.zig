@@ -206,12 +206,13 @@ const WireGuardConnection = struct {
         };
     }
 
-    fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+    fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
         self.lock.lock();
         defer self.lock.unlock();
-        self.adapter.replaceLink(remote);
-        self.adapter.sendKeepalives();
-        return !self.adapter.isStopped();
+        const was_started = self.adapter.isStarted();
+        const rebound = self.adapter.rebind(self.allocator, remote, tun) catch |err| return activationError(err);
+        if (!was_started and self.adapter.isStarted()) self.backendStarted();
+        return rebound;
     }
 
     fn stop(
@@ -529,9 +530,9 @@ fn commit(ptr: *anyopaque, descriptor: net.TunDescriptor) net.ConnectionStartErr
     return self.commit(descriptor);
 }
 
-fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!bool {
+fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    return self.rebind(remote);
+    return self.rebind(remote, tun);
 }
 
 fn rebindFailed(ptr: *anyopaque, err: anyerror) bool {

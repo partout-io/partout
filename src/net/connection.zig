@@ -231,16 +231,20 @@ pub const Connection = struct {
                 return .failed;
             }
         }.call,
-        /// Commits TUN after establishment or a needs_rebind request with tunnel info, replacing any previous TUN.
-        /// On success, transfers ownership to the connection when it performs
-        /// packet I/O; on failure, the caller retains it.
+        /// Commits TUN after synchronous establishment or the established event.
+        /// Takes TUN ownership on entry, including on failure. The daemon calls
+        /// this only when the connection performs packet I/O, outside looper mode.
         commit: *const fn (*anyopaque, io.TunDescriptor) StartError!void = struct {
-            fn call(_: *anyopaque, _: io.TunDescriptor) StartError!void {}
+            fn call(_: *anyopaque, tun: io.TunDescriptor) StartError!void {
+                var owned = tun;
+                owned.cleanup();
+            }
         }.call,
-        /// Replaces the link after a needs_rebind event, retaining TUN and session state.
+        /// Replaces the link and optional TUN, retaining session state.
         /// Null requests a graceful session restart instead of an in-place rebind.
-        /// In link mode, takes link ownership on entry, including on failure.
-        rebind: ?*const fn (*anyopaque, RemoteDescriptor) StartError!bool = null,
+        /// Takes optional TUN ownership on entry, including on failure, except in
+        /// looper mode where it is borrowed. In link mode, also takes link ownership.
+        rebind: ?*const fn (*anyopaque, RemoteDescriptor, ?io.TunDescriptor) StartError!bool = null,
         /// Returns true when the connection owns retrying a failed refresh.
         rebind_failed: *const fn (*anyopaque, anyerror) bool = struct {
             fn call(_: *anyopaque, _: anyerror) bool {
@@ -302,9 +306,9 @@ pub const Connection = struct {
         return self.vtable.commit(self.ptr, tun);
     }
 
-    pub fn rebind(self: Connection, remote: RemoteDescriptor) StartError!bool {
+    pub fn rebind(self: Connection, remote: RemoteDescriptor, tun: ?io.TunDescriptor) StartError!bool {
         const callback = self.vtable.rebind orelse return false;
-        return callback(self.ptr, remote);
+        return callback(self.ptr, remote, tun);
     }
 
     pub fn rebindFailed(self: Connection, err: anyerror) bool {
