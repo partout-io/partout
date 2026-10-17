@@ -241,7 +241,6 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     // Test delayed gate readiness independently of automatic connection starts.
     connection_daemon.gate.setReadyHandler(null);
     monitor.reachable = true;
-    sut.snapshot_publisher.setConnectionStatus(.connecting);
 
     // The factory rejects the link. The delayed callback must reenable the
     // gate even though no connection session ever started or emitted events.
@@ -255,6 +254,13 @@ test "v2 daemon dispatches controls to actor and owns queued establishment metad
     sut.options.reconnection_delay_ms = 60_000;
 
     try daemon.testing.perform(connection_daemon, .{ .onReachability = .{ .reachable = false } });
+    // Seed a connecting session for the synthetic establishment event after
+    // the failed preparation has returned the real attempt to disconnected.
+    try daemon.testing.onLoop(connection_daemon, sut, struct {
+        fn run(_: anytype, state: *Daemon) daemon.Error!void {
+            state.snapshot_publisher.setConnectionStatus(.connecting);
+        }
+    }.run);
     try daemon.testing.perform(connection_daemon, .onBetterPath);
     try daemon.testing.resumeGate(connection_daemon); // Drain establishment and setup failure.
     try std.testing.expectEqual(@as(usize, 1), probe.reachability_count);
@@ -1613,7 +1619,7 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
 test "v2 worker preserves loop progress and rejects stale preparation results" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Stage = enum { dns, socket };
-    const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop };
+    const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop, preparation_failed };
     const Probe = struct {
         stage: Stage,
         fail_first: bool,
@@ -1631,6 +1637,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
         ticks: std.atomic.Value(usize) = .init(0),
         reads: std.atomic.Value(usize) = .init(0),
         starts: usize = 0,
+        preparation_status: api.ConnectionStatus = .disconnected,
         timer: io.Timer = .{},
         original_callback: daemon_helpers.ConnectionWorker.Callback = undefined,
 
@@ -1745,7 +1752,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
         }
     };
     for ([_]Stage{ .dns, .socket }) |stage| {
-        for ([_]Ending{ .stop, .shutdown, .replace, .replace_failed, .queued_stop }) |ending| {
+        for ([_]Ending{ .stop, .shutdown, .replace, .replace_failed, .queued_stop, .preparation_failed }) |ending| {
             var tun_fds: [2]std.c.fd_t = undefined;
             var link_fds: [2]std.c.fd_t = undefined;
             try std.testing.expectEqual(0, std.c.pipe(&tun_fds));
@@ -1756,7 +1763,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
             defer _ = std.c.close(link_fds[1]);
             const flags = std.c.fcntl(tun_fds[0], std.c.F.GETFL, @as(c_int, 0));
             try std.testing.expect(std.c.fcntl(tun_fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
-            var probe = Probe{ .stage = stage, .fail_first = ending == .replace_failed, .tun_fd = tun_fds[0], .link_fd = link_fds[0] };
+            var probe = Probe{ .stage = stage, .fail_first = ending == .replace_failed or ending == .preparation_failed, .tun_fd = tun_fds[0], .link_fd = link_fds[0] };
             const allocator = std.testing.allocator;
             var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
             defer registry.deinit(allocator);
@@ -1793,6 +1800,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
             }
             try daemon.testing.onLoop(owner, &probe, struct {
                 fn run(loop: anytype, state: *Probe) daemon.Error!void {
+                    state.preparation_status = state.daemon.snapshot_publisher.environment.connection_status;
                     std.debug.assert(!loop.looper.isLinkAttached());
                     loop.looper.attach(.{
                         .pair = .{ .tun = .{ .fd = state.tun_fd, .io = .{ .mock = .{ .ptr = state, .vtable = &Probe.tun_io } } } },
@@ -1801,12 +1809,14 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
                     loop.looper.scheduleTimer(&state.timer, 1, .{ .context = state, .callback = Probe.tick }) catch return error.LooperFailure;
                 }
             }.run);
+            try std.testing.expectEqual(api.ConnectionStatus.connecting, probe.preparation_status);
             try std.testing.expectEqual(@as(isize, 1), std.c.write(tun_fds[1], "x", 1));
             while (probe.ticks.load(.acquire) == 0 or probe.reads.load(.acquire) == 0) {
                 if (core.monotonicNs() >= deadline) return error.Timeout;
                 core.sleepMs(1);
             }
             switch (ending) {
+                .preparation_failed => {},
                 .stop => sut.stop(),
                 .shutdown => {
                     daemon.testing.shutdown(owner);
@@ -1830,6 +1840,11 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
             }
             if (ending != .shutdown) try waitForConnectionRequest(owner);
             try std.testing.expectEqual(@as(usize, if (replace) 1 else 0), probe.starts);
+            if (ending == .preparation_failed) {
+                try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                try std.testing.expectEqual(daemon.testing.codeForDaemonStartError(error.UnableToStart), sut.snapshot_publisher.last_error.?.code);
+                sut.stop();
+            }
             if (replace) {
                 // A stale failure must not overwrite the new attempt's state.
                 try std.testing.expect(sut.snapshot_publisher.last_error == null);

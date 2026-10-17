@@ -743,6 +743,9 @@ const ConnectionDaemon = struct {
         const request_id = self.next_conn_request;
         self.next_conn_request += 1;
         self.conn_request = request_id;
+        // DNS and socket setup are part of connecting, even while the worker
+        // prepares the link. Rebind keeps the existing connection status.
+        if (action == .start) self.trackConnectionStatus(.connecting);
         const worker = self.worker orelse {
             // Connections without daemon-owned I/O need no blocking preparation.
             self.schedule(.{ .setupConnection = .{ .request_id = request_id, .action = action, .remote = .{} } }) catch |err|
@@ -837,7 +840,7 @@ const ConnectionDaemon = struct {
             .start => {
                 log.writef(.err, "Unable to set up link: {s}", .{@errorName(err)});
                 _ = self.daemon.handleStartError(error.UnableToStart);
-                self.scheduleResumeGate();
+                self.trackConnectionStatus(.disconnected);
             },
             .rebind => self.linkRefreshFailed(err),
         }
@@ -846,7 +849,6 @@ const ConnectionDaemon = struct {
     fn startConnection(self: *ConnectionDaemon, remote: RemoteDescriptor) void {
         const connection = self.connection orelse @panic("startConnection but no connection");
         // Start on the actor, detaching any looper-owned link on failure.
-        self.trackConnectionStatus(.connecting);
         // Entering startV2 transfers a connection-owned link, even on failure.
         const result = connection.startV2(remote) catch |err| {
             log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
