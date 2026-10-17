@@ -777,16 +777,10 @@ const ConnectionDaemon = struct {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
         const job: *Job = @ptrCast(@alignCast(context));
         job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
-        self.jobs_mutex.lock();
-        if (self.is_running) {
-            self.jobs.append(job);
-            _ = io_c.pp_mux_wake(self.mux);
-            self.jobs_mutex.unlock();
-        } else {
-            self.jobs_mutex.unlock();
+        self.enqueue(job) catch {
             setup.deinit();
             self.daemon.allocator.destroy(job);
-        }
+        };
     }
 
     fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
@@ -1317,12 +1311,19 @@ const ConnectionDaemon = struct {
     }
 
     fn schedule(self: *ConnectionDaemon, message: Message) !void {
+        const job = try self.daemon.allocator.create(Job);
+        errdefer self.daemon.allocator.destroy(job);
+        job.* = .{ .message = message, .owned = true };
+        try self.enqueue(job);
+    }
+
+    // Ownership transfers to the event loop only when enqueue succeeds.
+    // Preallocated worker completions can use this path without allocating.
+    fn enqueue(self: *ConnectionDaemon, job: *Job) error{Closed}!void {
         self.jobs_mutex.lock();
         defer self.jobs_mutex.unlock();
         if (!self.is_running) return error.Closed;
 
-        const job = try self.daemon.allocator.create(Job);
-        job.* = .{ .message = message, .owned = true };
         self.jobs.append(job);
         _ = io_c.pp_mux_wake(self.mux);
     }
