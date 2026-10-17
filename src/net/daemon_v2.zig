@@ -352,12 +352,10 @@ const ConnectionDaemon = struct {
     connection: ?Connection,
     conn_request: ?u64 = null,
     next_conn_request: u64 = 0,
-    rebind_pending: bool,
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
     gate: ConnectionGate,
     resume_gate_timer: Looper.Timer,
-    is_evaluating_connection: bool,
 
     //#region Caller thread - daemon lifecycle
 
@@ -405,11 +403,9 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
-            .rebind_pending = false,
             .endpoint_resolver = null,
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
-            .is_evaluating_connection = false,
         };
         errdefer self.jobs_mutex.deinit();
         errdefer self.jobs_condition.deinit();
@@ -489,10 +485,8 @@ const ConnectionDaemon = struct {
             },
             .needs_rebind => {
                 std.debug.assert(self.isCurrentThread());
-                if (self.rebind_pending) return;
-                self.rebind_pending = true;
+                if (self.conn_request != null) return;
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    self.rebind_pending = false;
                     logEventSubmissionFailure(event, err);
                 };
             },
@@ -717,13 +711,10 @@ const ConnectionDaemon = struct {
             return;
         }
         _ = self.connection orelse @panic("evaluateConnection but no connection");
-        if (self.is_evaluating_connection) {
+        if (self.conn_request != null) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
         }
-
-        self.is_evaluating_connection = true;
-        defer self.is_evaluating_connection = false;
 
         if (!force and !self.monitor.isReachable()) {
             log.write(.info, "Ignore evaluation, wait for reachable network");
@@ -747,6 +738,7 @@ const ConnectionDaemon = struct {
     };
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction) void {
+        if (self.conn_request != null) return;
         const request_id = self.next_conn_request;
         self.next_conn_request += 1;
         self.conn_request = request_id;
@@ -801,7 +793,11 @@ const ConnectionDaemon = struct {
             if (remote.link) |link| link.cleanup();
             return;
         }
-        self.conn_request = null;
+        // Keep the request pending through protocol control, whose callbacks
+        // may synchronously request another rebind.
+        defer if (self.conn_request == setup.request_id) {
+            self.conn_request = null;
+        };
         if (self.daemon.state != .started) {
             if (remote.link) |link| link.cleanup();
             return;
@@ -828,7 +824,6 @@ const ConnectionDaemon = struct {
         switch (setup.action) {
             .start => self.startConnection(remote),
             .rebind => {
-                defer self.rebind_pending = false;
                 const rebound = connection.rebind(remote) catch |err| {
                     self.linkRefreshFailed(err);
                     return;
@@ -846,10 +841,7 @@ const ConnectionDaemon = struct {
                 _ = self.daemon.handleStartError(error.UnableToStart);
                 self.scheduleResumeGate();
             },
-            .rebind => {
-                self.rebind_pending = false;
-                self.linkRefreshFailed(err);
-            },
+            .rebind => self.linkRefreshFailed(err),
         }
     }
 
@@ -1023,11 +1015,7 @@ const ConnectionDaemon = struct {
     }
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon) !void {
-        var requested = false;
-        defer if (!requested) {
-            self.rebind_pending = false;
-        };
-        if (self.daemon.state != .started) return;
+        if (self.daemon.state != .started or self.conn_request != null) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.
@@ -1045,7 +1033,6 @@ const ConnectionDaemon = struct {
         log.write(.info, "Refresh LINK, retaining TUN and tunnel settings");
         if (self.looper.isLinkAttached()) try self.looper.detach(.link);
         self.requestConnection(.rebind);
-        requested = true;
     }
 
     fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {

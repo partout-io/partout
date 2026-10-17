@@ -1034,7 +1034,7 @@ test "v2 needs_rebind restarts sessions without reporting a failure" {
         try std.testing.expect(probe.reason.? == .rebind);
         try std.testing.expect(sut.snapshot_publisher.last_error == null);
         try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
-        try std.testing.expect(!owner.rebind_pending);
+        try std.testing.expect(owner.conn_request == null);
         try daemon.testing.resumeGate(owner);
         try std.testing.expectEqual(@as(usize, 2), probe.starts);
         try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
@@ -1407,7 +1407,7 @@ fn waitForRebind(owner: anytype, probe: anytype, expected: usize) !void {
     while (core.monotonicNs() < deadline) {
         try daemon.testing.onLoop(owner, &context, struct {
             fn run(loop: anytype, state: *Context) daemon.Error!void {
-                state.done = !loop.rebind_pending and state.probe.rebind_count == state.expected;
+                state.done = loop.conn_request == null and state.probe.rebind_count == state.expected;
             }
         }.run);
         if (context.done) return;
