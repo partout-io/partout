@@ -9,6 +9,7 @@
 //! SettingsDaemon is synchronous; callers serialize its controls. ConnectionDaemon
 //! owns an actor that serializes connection work and updates to shared state.
 //! Lifecycle callbacks defer actor work; reporting callbacks run on the event-loop thread.
+//! A serial worker owns endpoint resolution and prepares links outside the event loop.
 //! Ordinary reconnects retain Connection; terminal looper failure ends the event loop.
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
 
@@ -21,7 +22,6 @@ const daemon_mod = @import("daemon.zig");
 const helpers = @import("daemon_helpers.zig");
 const io = @import("io.zig");
 const looper_mod = @import("looper_v2.zig");
-const resolver_mod = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
@@ -32,11 +32,10 @@ const ConnectionEvent = Connection.Event;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
 const ConnectionWriter = sandbox.ConnectionWriter;
-const EndpointResolver = resolver_mod.EndpointResolver;
+const ConnectionWorker = helpers.ConnectionWorker;
 const Looper = looper_mod.Looper;
 const RemoteDescriptor = conn_mod.RemoteDescriptor;
 const SnapshotPublisher = helpers.SnapshotPublisher;
-const SocketEndpoint = io.SocketEndpoint;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
 pub const Error = daemon_mod.Error;
@@ -329,12 +328,8 @@ const SettingsDaemon = struct {
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
-    const ConnectionAction = enum { start, rebind };
-    const ConnectionSetup = struct {
-        request_id: u64,
-        action: ConnectionAction,
-        remote: RemoteDescriptor,
-    };
+    const ConnectionAction = ConnectionWorker.Action;
+    const ConnectionSetup = ConnectionWorker.Completion;
 
     // Shared lifecycle and reporting, plus connection-specific dependencies.
     daemon: *Daemon,
@@ -358,8 +353,7 @@ const ConnectionDaemon = struct {
     connection: ?Connection,
     conn_request: ?u64 = null,
     next_conn_request: u64 = 0,
-    // Valid while connection is non-null; only this class accesses them.
-    endpoint_resolver: ?EndpointResolver,
+    worker: ?*ConnectionWorker = null,
     gate: ConnectionGate,
     resume_gate_timer: Looper.Timer,
 
@@ -409,7 +403,6 @@ const ConnectionDaemon = struct {
             .factory = objects.factory,
             .monitor = objects.monitor,
             .connection = null,
-            .endpoint_resolver = null,
             .gate = ConnectionGate.init(null),
             .resume_gate_timer = .{},
         };
@@ -424,11 +417,13 @@ const ConnectionDaemon = struct {
         // Signal thread stop and wait for it to finish.
         self.shutdown();
         self.actor.join();
+        // Preparation may outlive stop; join it only on the destroying caller.
+        if (self.worker) |worker| worker.destroy();
         if (self.connection != null)
             @panic("ConnectionDaemon.destroy() cannot release live connection resources");
         self.looper.destroy();
 
-        // The worker finalized connection state and quiesced callbacks before exit.
+        // The event loop finalized connection state and quiesced callbacks before exit.
         self.gate.deinit();
         self.jobs_mutex.deinit();
         self.jobs_condition.deinit();
@@ -630,6 +625,7 @@ const ConnectionDaemon = struct {
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
         self.conn_request = null;
+        if (self.worker) |worker| worker.close();
         self.looper.cancelTimer(&self.resume_gate_timer);
 
         self.monitor.setEventHandler(null);
@@ -672,15 +668,21 @@ const ConnectionDaemon = struct {
             .factory = self.factory,
             .looper = undefined,
         });
+        errdefer connection.destroy();
+        const worker = if (connection.daemon_io != .none)
+            try ConnectionWorker.create(self.daemon.allocator, self.resolver, self.factory, connection.endpoints(), .{
+                .context = self,
+                .call = onConnectionPrepared,
+            })
+        else
+            null;
+        self.worker = worker;
         self.connection = connection;
-        self.endpoint_resolver = if (connection.endpoints()) |endpoints| EndpointResolver.init(self.daemon.allocator, endpoints) else null;
     }
 
     fn releaseConnection(self: *ConnectionDaemon) void {
         const connection = self.connection orelse @panic("releaseConnection but no connection");
         connection.destroy();
-        if (self.endpoint_resolver) |*resolver| resolver.deinit();
-        self.endpoint_resolver = null;
         self.connection = null;
     }
 
@@ -737,56 +739,56 @@ const ConnectionDaemon = struct {
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction) void {
         if (self.conn_request != null) return;
+        const connection = self.connection orelse @panic("requestConnection but no connection");
         const request_id = self.next_conn_request;
         self.next_conn_request += 1;
         self.conn_request = request_id;
-        // FIXME: ###, Run preparation and completion submission on a worker.
-        const remote = self.prepareLink() catch |err| {
+        const worker = self.worker orelse {
+            // Connections without daemon-owned I/O need no blocking preparation.
+            self.schedule(.{ .setupConnection = .{ .request_id = request_id, .action = action, .remote = .{} } }) catch |err|
+                self.connectionRequestFailed(action, err);
+            return;
+        };
+        // Reserve completion storage before accepting work. Delivery cannot fail
+        // for lack of memory after the worker has prepared a link.
+        const job = self.daemon.allocator.create(Job) catch |err| {
             self.connectionRequestFailed(action, err);
             return;
         };
-        self.schedule(.{ .setupConnection = .{ .request_id = request_id, .action = action, .remote = remote } }) catch |err| {
-            if (remote.link) |link| link.cleanup();
+        const options = self.daemon.options.connection_options;
+        worker.submit(.{
+            .request_id = request_id,
+            .action = action,
+            .local_port = connection.local_port,
+            .reachability = self.factory.currentReachability(),
+            .connect_udp = options.connect_udp,
+            .dns_timeout = options.dns_timeout,
+            .link_activity_timeout = options.link_activity_timeout,
+        }, job) catch |err| {
+            self.daemon.allocator.destroy(job);
             self.connectionRequestFailed(action, err);
         };
     }
 
-    fn prepareLink(self: *ConnectionDaemon) !RemoteDescriptor {
-        const connection = self.connection orelse @panic("prepareLink but no connection");
-        const conn_options = self.daemon.options.connection_options;
-        var remote = RemoteDescriptor{};
-        if (connection.daemon_io == .none) return remote;
-        log.write(.notice, "Create new link");
-        const reachability = self.factory.currentReachability();
-        var endpoint: ?api.ExtendedEndpoint = null;
-        if (self.endpoint_resolver) |*resolver| {
-            log.write(.notice, "Cycle to next endpoint");
-            // FIXME: ###, Pick endpoint, resolve DNS, and connect atomically in SocketFactory.
-            endpoint = try resolver.next(&self.resolver, reachability, conn_options.dns_timeout);
-            log.writef(.notice, "Connect to {s}", .{endpoint.?});
+    fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        const job: *Job = @ptrCast(@alignCast(context));
+        job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
+        self.jobs_mutex.lock();
+        if (self.is_running) {
+            self.jobs.append(job);
+            _ = io_c.pp_mux_wake(self.mux);
+            self.jobs_mutex.unlock();
+        } else {
+            self.jobs_mutex.unlock();
+            setup.deinit();
+            self.daemon.allocator.destroy(job);
         }
-        remote.endpoint = if (endpoint) |resolved| try SocketEndpoint.init(resolved) else null;
-        const unconnected = if (remote.endpoint) |resolved|
-            resolved.plainSocketType() == .udp and !conn_options.connect_udp
-        else
-            true;
-        var descriptor = try self.factory.create(
-            self.daemon.allocator,
-            if (unconnected) null else endpoint,
-            connection.local_port,
-            reachability,
-            conn_options.link_activity_timeout,
-        );
-        errdefer descriptor.cleanup();
-        if (unconnected) remote.local_port = (try descriptor.localAddress()).port;
-        remote.link = descriptor;
-        return remote;
     }
 
     fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
-        const remote = setup.remote;
-        if (self.conn_request != setup.request_id) {
-            if (remote.link) |link| link.cleanup();
+        if (self.conn_request != setup.request_id or self.daemon.state != .started) {
+            setup.deinit();
             return;
         }
         // Keep the request pending through protocol control, whose callbacks
@@ -794,16 +796,16 @@ const ConnectionDaemon = struct {
         defer if (self.conn_request == setup.request_id) {
             self.conn_request = null;
         };
-        if (self.daemon.state != .started) {
-            if (remote.link) |link| link.cleanup();
+        const remote = setup.remote catch |err| {
+            self.connectionRequestFailed(setup.action, err);
             return;
-        }
-        var connection = self.connection orelse @panic("setupConnection but no connection");
+        };
+        const connection = self.connection orelse @panic("setupConnection but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
         if (remote.link) |link| {
             // Passive protocols retain their bind across host socket replacement.
-            if (self.endpoint_resolver == null) connection.local_port = remote.local_port;
+            if (remote.endpoint == null) self.connection.?.local_port = remote.local_port;
             log.write(.notice, "Link is active");
             log.writef(.info, "Link type is {s}", .{
                 if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
@@ -1292,8 +1294,7 @@ const ConnectionDaemon = struct {
     fn completeJob(self: *ConnectionDaemon, job: *Job, result: Error!void) bool {
         if (result) |_| {} else |err| {
             if (job.owned and err == error.Closed and job.message == .setupConnection) {
-                const setup = job.message.setupConnection;
-                if (setup.remote.link) |link| link.cleanup();
+                job.message.setupConnection.deinit();
             }
         }
         const owned = job.owned;

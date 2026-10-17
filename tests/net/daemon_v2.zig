@@ -880,7 +880,9 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 probe.daemon = sut;
                 try sut.start();
                 defer sut.stop();
+                try waitForConnectionRequest(sut.implementation.connection);
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
+                try waitForConnectionRequest(sut.implementation.connection);
                 try std.testing.expectError(error.AlreadyStarted, sut.start());
                 if (scenario.sync_establish and daemon_io != .looper) {
                     try std.testing.expect(probe.startup_reachability_saw_commit);
@@ -928,10 +930,12 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     const tun = probe.established_tun.?;
                     try daemon.testing.perform(owner, .onBetterPath);
                     // Duplicate queued requests and requests during handoff share one rebind.
+                    try waitForConnectionRequest(sut.implementation.connection);
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try waitForRebind(owner, &probe, 1);
                     try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
                     try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } });
+                    try waitForConnectionRequest(sut.implementation.connection);
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try waitForRebind(owner, &probe, 2);
                     try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
@@ -1137,13 +1141,15 @@ test "v2 daemon-created link is released on failed start or rebind" {
         defer sut.destroy();
         try sut.start();
         defer sut.stop();
-        // Drain the initial gate evaluation before requesting a link refresh.
+        // Wait for initial preparation before requesting a link refresh.
+        try waitForConnectionRequest(sut.implementation.connection);
         try std.testing.expectError(error.AlreadyStarted, sut.start());
         const refresh = scenario == .rebind_false or scenario == .rebind_error;
         if (refresh) {
             try std.testing.expectEqual(@as(usize, 1), probe.start_count);
             try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
             try daemon.testing.perform(sut.implementation.connection, .onBetterPath);
+            try waitForConnectionRequest(sut.implementation.connection);
             try std.testing.expectError(error.AlreadyStarted, sut.start());
         }
         sut.stop();
@@ -1254,7 +1260,7 @@ test "v2 event loop flushes graceful shutdown and finalizes terminal failure on 
         }
         fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.onActor();
+            std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };
         }
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
@@ -1398,6 +1404,21 @@ fn cancelGateTimer(owner: anytype) !void {
             loop.looper.cancelTimer(&loop.resume_gate_timer);
         }
     }.run);
+}
+
+fn waitForConnectionRequest(owner: anytype) !void {
+    const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+    while (core.monotonicNs() < deadline) {
+        var finished = false;
+        try daemon.testing.onLoop(owner, &finished, struct {
+            fn run(loop: anytype, out: *bool) daemon.Error!void {
+                out.* = loop.conn_request == null;
+            }
+        }.run);
+        if (finished) return;
+        core.sleepMs(1);
+    }
+    return error.Timeout;
 }
 
 fn waitForRebind(owner: anytype, probe: anytype, expected: usize) !void {
@@ -1587,4 +1608,270 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
         try std.testing.expect(sut.state == .stopped);
         try std.testing.expectEqualStrings("tlsFailure", sut.snapshot_publisher.last_error.?.sub_code.?);
     }
+}
+
+test "v2 worker preserves loop progress and rejects stale preparation results" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Stage = enum { dns, socket };
+    const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop };
+    const Probe = struct {
+        stage: Stage,
+        fail_first: bool,
+        daemon: *Daemon = undefined,
+        allocator: std.mem.Allocator = undefined,
+        source_endpoints: ?[]api.ExtendedEndpoint = null,
+        tun_fd: io.FileDescriptor,
+        link_fd: io.FileDescriptor,
+        entered: std.atomic.Value(bool) = .init(false),
+        released: std.atomic.Value(bool) = .init(false),
+        dns_calls: std.atomic.Value(usize) = .init(0),
+        socket_calls: std.atomic.Value(usize) = .init(0),
+        cleaned: std.atomic.Value(usize) = .init(0),
+        completions: std.atomic.Value(usize) = .init(0),
+        ticks: std.atomic.Value(usize) = .init(0),
+        reads: std.atomic.Value(usize) = .init(0),
+        starts: usize = 0,
+        timer: io.Timer = .{},
+        original_callback: daemon_helpers.ConnectionWorker.Callback = undefined,
+
+        fn block(self: *@This()) void {
+            std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
+            self.entered.store(true, .release);
+            while (!self.released.load(.acquire)) core.sleepMs(1);
+        }
+        fn map(raw: ?*anyopaque, allocator: std.mem.Allocator, address: []const u8, _: ?io.ReachabilityInfo, _: u32) net.DNSResolver.Error![]u8 {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            if (self.dns_calls.fetchAdd(1, .acq_rel) == 0 and self.stage == .dns) self.block();
+            // The source Connection may already have destroyed its endpoints.
+            std.debug.assert(std.mem.eql(u8, address, "127.0.0.1"));
+            return allocator.dupe(u8, address);
+        }
+        fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            const first = self.socket_calls.fetchAdd(1, .acq_rel) == 0;
+            if (first and self.stage == .socket) self.block();
+            if (first and self.fail_first) return error.LinkNotActive;
+            return .{ .fd = self.link_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &link_io } } };
+        }
+        fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            return self.source_endpoints;
+        }
+        fn create(raw: ?*anyopaque, allocator: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            const list = try allocator.alloc(api.ExtendedEndpoint, 2);
+            errdefer allocator.free(list);
+            list[0] = try api.ExtendedEndpoint.init("127.0.0.1", .init(.udp, 1194)).?.clone(allocator);
+            errdefer list[0].deinit(allocator);
+            list[1] = try api.ExtendedEndpoint.init("127.0.0.1", .init(.udp, 1195)).?.clone(allocator);
+            self.source_endpoints = list;
+            self.allocator = allocator;
+            return .{ .ptr = self, .vtable = &connection_vtable, .daemon_io = .looper };
+        }
+        fn destroy(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            core.util.freeSlice(api.ExtendedEndpoint, self.allocator, self.source_endpoints.?);
+            self.source_endpoints = null;
+        }
+        fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
+            // The invalidated request consumed endpoint 1194 on the same worker.
+            std.debug.assert(remote.endpoint.?.address.port == 1195);
+            self.starts += 1;
+            return .started;
+        }
+        fn tick(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            _ = self.ticks.fetchAdd(1, .release);
+        }
+        fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const count = std.c.read(self.tun_fd, data.ptr, data.len);
+            if (count < 0) return error.WouldBlock;
+            return @intCast(count);
+        }
+        fn readPackets(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            _ = self.reads.fetchAdd(packets.len, .release);
+            return .pause;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            _ = self.cleaned.fetchAdd(1, .release);
+        }
+        fn noCleanup(_: *anyopaque) void {}
+        fn noRead(_: *anyopaque, _: []u8) io.Error!?usize {
+            return error.WouldBlock;
+        }
+        fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            return data.len - offset;
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn code(_: *anyopaque) c_int {
+            return 0;
+        }
+        const tun_io = source.net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = noCleanup,
+            .last_error_code = code,
+        };
+        const link_io = blk: {
+            var table = tun_io;
+            table.read = noRead;
+            table.cleanup = cleanup;
+            break :blk table;
+        };
+        const connection_vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.endpoints = endpoints;
+            table.start_v2 = start;
+            table.destroy = destroy;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+        // Observe accepted completions, then forward to the daemon's callback.
+        fn completed(raw: *anyopaque, context: *anyopaque, completion: daemon_helpers.ConnectionWorker.Completion) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.original_callback.call(self.original_callback.context, context, completion);
+            _ = self.completions.fetchAdd(1, .release);
+        }
+    };
+    for ([_]Stage{ .dns, .socket }) |stage| {
+        for ([_]Ending{ .stop, .shutdown, .replace, .replace_failed, .queued_stop }) |ending| {
+            var tun_fds: [2]std.c.fd_t = undefined;
+            var link_fds: [2]std.c.fd_t = undefined;
+            try std.testing.expectEqual(0, std.c.pipe(&tun_fds));
+            defer _ = std.c.close(tun_fds[0]);
+            defer _ = std.c.close(tun_fds[1]);
+            try std.testing.expectEqual(0, std.c.pipe(&link_fds));
+            defer _ = std.c.close(link_fds[0]);
+            defer _ = std.c.close(link_fds[1]);
+            const flags = std.c.fcntl(tun_fds[0], std.c.F.GETFL, @as(c_int, 0));
+            try std.testing.expect(std.c.fcntl(tun_fds[0], std.c.F.SETFL, flags | @as(c_int, @bitCast(std.c.O{ .NONBLOCK = true }))) >= 0);
+            var probe = Probe{ .stage = stage, .fail_first = ending == .replace_failed, .tun_fd = tun_fds[0], .link_fd = link_fds[0] };
+            const allocator = std.testing.allocator;
+            var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+            defer registry.deinit(allocator);
+            var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+            defer profile.deinit(allocator);
+            var controller = mock_mod.MockTunnelController{};
+            var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+            var factory_table = mock_mod.noopSocketFactory().vtable.*;
+            factory_table.create = Probe.socket;
+            var resolver = mock_mod.noopDNSResolver();
+            resolver.ptr = &probe;
+            resolver.resolve_address_block = Probe.map;
+            const sut = try Daemon.create(allocator, &profile, .{
+                .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = resolver, .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                .options = .{ .reconnection_delay_ms = 60_000, .connection_options = .{ .connect_udp = true } },
+            });
+            defer sut.destroy();
+            // Release blocked work on every error path before destroy joins it.
+            defer probe.released.store(true, .release);
+            defer sut.stop();
+            probe.daemon = sut;
+            try sut.start();
+            const owner = sut.implementation.connection;
+            const worker = owner.worker.?;
+            probe.original_callback = worker.callback;
+            worker.callback = .{ .context = &probe, .call = Probe.completed };
+            // Publish callback configuration before submitting the first work item.
+            monitor.reachable = true;
+            try daemon.testing.evaluateConnection(owner);
+            const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+            while (!probe.entered.load(.acquire)) {
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+            try daemon.testing.onLoop(owner, &probe, struct {
+                fn run(loop: anytype, state: *Probe) daemon.Error!void {
+                    std.debug.assert(!loop.looper.isLinkAttached());
+                    loop.looper.attach(.{
+                        .pair = .{ .tun = .{ .fd = state.tun_fd, .io = .{ .mock = .{ .ptr = state, .vtable = &Probe.tun_io } } } },
+                        .on_read = .{ .context = state, .callback = Probe.readPackets },
+                    }) catch return error.LooperFailure;
+                    loop.looper.scheduleTimer(&state.timer, 1, .{ .context = state, .callback = Probe.tick }) catch return error.LooperFailure;
+                }
+            }.run);
+            try std.testing.expectEqual(@as(isize, 1), std.c.write(tun_fds[1], "x", 1));
+            while (probe.ticks.load(.acquire) == 0 or probe.reads.load(.acquire) == 0) {
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+            switch (ending) {
+                .stop => sut.stop(),
+                .shutdown => {
+                    daemon.testing.shutdown(owner);
+                    try waitForExit(owner);
+                },
+                .replace, .replace_failed, .queued_stop => {
+                    try daemon.testing.perform(owner, .{ .onConnectionEvent = .{ .failed = .{
+                        .err_pair = .{ .code = .ioFailure },
+                        .disposition = .reconnect,
+                    } } });
+                    try daemon.testing.evaluateConnection(owner);
+                    if (ending == .queued_stop) sut.stop();
+                },
+            }
+            probe.released.store(true, .release);
+            const replace = ending == .replace or ending == .replace_failed;
+            const expected_completions: usize = if (replace or ending == .queued_stop) 2 else 1;
+            while (probe.completions.load(.acquire) < expected_completions) {
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+            if (ending != .shutdown) try waitForConnectionRequest(owner);
+            try std.testing.expectEqual(@as(usize, if (replace) 1 else 0), probe.starts);
+            if (replace) {
+                // A stale failure must not overwrite the new attempt's state.
+                try std.testing.expect(sut.snapshot_publisher.last_error == null);
+                sut.stop();
+            }
+            const created = probe.socket_calls.load(.acquire);
+            try std.testing.expectEqual(created - @as(usize, if (probe.fail_first) 1 else 0), probe.cleaned.load(.acquire));
+            try std.testing.expect(probe.source_endpoints == null);
+        }
+    }
+}
+
+test "connection worker rolls back endpoint and thread allocations" {
+    const Fixture = struct {
+        const endpoints = [_]api.ExtendedEndpoint{
+            api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
+            api.ExtendedEndpoint.init("192.0.2.2", .init(.udp, 1194)).?,
+        };
+        fn completed(_: *anyopaque, _: *anyopaque, _: daemon_helpers.ConnectionWorker.Completion) void {
+            unreachable;
+        }
+        fn run(allocator: std.mem.Allocator) !void {
+            var context: u8 = 0;
+            const worker = try daemon_helpers.ConnectionWorker.create(
+                allocator,
+                mock_mod.noopDNSResolver(),
+                mock_mod.noopSocketFactory(),
+                &endpoints,
+                .{ .context = &context, .call = completed },
+            );
+            defer worker.destroy();
+            worker.close();
+            try std.testing.expectError(error.Closed, worker.submit(.{
+                .request_id = 1,
+                .action = .start,
+                .local_port = 0,
+                .reachability = null,
+                .connect_udp = true,
+                .dns_timeout = 1,
+                .link_activity_timeout = 1,
+            }, &context));
+        }
+    };
+    try std.testing.checkAllAllocationFailures(std.testing.allocator, Fixture.run, .{});
 }
