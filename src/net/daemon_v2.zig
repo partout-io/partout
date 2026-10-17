@@ -330,6 +330,14 @@ const SettingsDaemon = struct {
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
+    const ConnectionAction = enum { start, rebind };
+    const ConnectionSetup = struct {
+        request_id: u64,
+        action: ConnectionAction,
+        remote: RemoteDescriptor,
+        tun: ?TunDescriptor = null,
+    };
+
     // Shared lifecycle and reporting, plus connection-specific dependencies.
     daemon: *Daemon,
     module: conn_mod.ConnectionModule,
@@ -728,14 +736,6 @@ const ConnectionDaemon = struct {
         log.write(.notice, "Start connection");
         self.requestConnection(.start);
     }
-
-    const ConnectionAction = enum { start, rebind };
-    const ConnectionSetup = struct {
-        request_id: u64,
-        action: ConnectionAction,
-        remote: RemoteDescriptor,
-        tun: ?TunDescriptor = null,
-    };
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction) void {
         if (self.conn_request != null) return;
