@@ -1008,6 +1008,146 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     }
 }
 
+test "v2 looper owns TUN across startup and optional rebind replacement" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const Probe = struct {
+        daemon: *Daemon = undefined,
+        profile: *const api.Profile = undefined,
+        allocator: std.mem.Allocator = undefined,
+        tun_fd: io.FileDescriptor,
+        controller: mock_mod.MockTunnelController = .{},
+        recreate_tun: bool = false,
+        rebind_count: usize = 0,
+        tun_cleanup_count: usize = 0,
+
+        fn create(raw: ?*anyopaque, allocator: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.profile = sb.profile;
+            self.allocator = allocator;
+            return .{ .ptr = self, .vtable = &vtable, .daemon_io = .looper };
+        }
+        fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const info = api.TunnelRemoteInfoWrapper{ .profile = self.profile.* };
+            return .{ .established = .{ .info = info.clone(self.allocator) catch return error.OutOfMemory } };
+        }
+        fn commit(_: *anyopaque, _: io.TunDescriptor) net.ConnectionStartError!void {
+            @panic("looper-owned TUN must not be committed to the connection");
+        }
+        fn rebind(raw: *anyopaque, remote: net.RemoteDescriptor, tun: ?io.TunDescriptor) net.ConnectionStartError!bool {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const looper = self.daemon.implementation.connection.looper;
+            std.debug.assert(looper.isLinkAttached() and looper.isTunAttached());
+            std.debug.assert(remote.link != null);
+            std.debug.assert((tun != null) == self.recreate_tun);
+            if (tun) |descriptor| std.debug.assert(descriptor.fd == self.tun_fd);
+            // Replacing TUN releases its predecessor before borrowing the new one.
+            std.debug.assert(self.tun_cleanup_count == @intFromBool(self.recreate_tun));
+            self.rebind_count += 1;
+            return true;
+        }
+        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            events.emit(.{ .needs_rebind = if (self.recreate_tun) .{ .profile = self.profile.* } else null });
+        }
+        fn socket(_: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
+            const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
+            return wrapper.linkDescriptor();
+        }
+        fn setTunnel(raw: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) net.TunnelController.Error!*io.TunWrapper {
+            const controller: *mock_mod.MockTunnelController = @ptrCast(@alignCast(raw.?));
+            const self: *@This() = @fieldParentPtr("controller", controller);
+            const tun = try controller.interface().setTunnelSettings(info);
+            tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
+            return tun;
+        }
+        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+        fn reset(_: *anyopaque) io.Error!void {}
+        fn read(_: *anyopaque, _: []u8) io.Error!?usize {
+            return error.WouldBlock;
+        }
+        fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
+            return data.len - offset;
+        }
+        fn cleanup(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            self.tun_cleanup_count += 1;
+        }
+        fn lastError(_: *anyopaque) c_int {
+            return 0;
+        }
+        const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .last_error_code = lastError,
+        };
+        const vtable = blk: {
+            var table = FailingStartConnection.vtable;
+            table.start_v2 = start;
+            table.commit = commit;
+            table.rebind = rebind;
+            table.better_path = betterPath;
+            break :blk table;
+        };
+        const implementation = net.ConnectionImplementation.VTable{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    const allocator = std.testing.allocator;
+    var tun_pipe: [2]std.c.fd_t = undefined;
+    if (std.c.pipe(&tun_pipe) != 0) return error.PipeFailed;
+    defer _ = std.c.close(tun_pipe[0]);
+    defer _ = std.c.close(tun_pipe[1]);
+    var probe = Probe{ .tun_fd = tun_pipe[0] };
+    var registry = try net.ConnectionRegistry.init(allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation }});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller_table = probe.controller.interface().vtable.*;
+    controller_table.set_tunnel_settings = Probe.setTunnel;
+    var factory_table = mock_mod.noopSocketFactory().vtable.*;
+    factory_table.create = Probe.socket;
+    var monitor = mock_mod.MockNetworkMonitor{};
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = .{ .ptr = &probe.controller, .vtable = &controller_table },
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = .{ .vtable = &factory_table },
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .reconnection_delay_ms = 60_000 },
+    });
+    defer sut.destroy();
+    probe.daemon = sut;
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try waitForConnectionRequest(owner);
+    try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    try std.testing.expectEqual(@as(usize, 1), probe.controller.set_tunnel_settings_count);
+    for ([_]bool{ false, true }, 1..) |recreate, expected| {
+        try daemon.testing.onLoop(owner, recreate, struct {
+            fn run(loop: anytype, value: bool) daemon.Error!void {
+                const context: *Probe = @ptrCast(@alignCast(loop.connection.?.ptr));
+                context.recreate_tun = value;
+            }
+        }.run);
+        try daemon.testing.perform(owner, .onBetterPath);
+        try waitForRebind(owner, &probe, expected);
+        try std.testing.expectEqual(@as(usize, 1) + @intFromBool(recreate), probe.controller.set_tunnel_settings_count);
+        try std.testing.expectEqual(@as(usize, @intFromBool(recreate)), probe.tun_cleanup_count);
+        try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
+    }
+    sut.stop();
+    try std.testing.expectEqual(@as(usize, 2), probe.tun_cleanup_count);
+    try std.testing.expect(!owner.looper.isLinkAttached() and !owner.looper.isTunAttached());
+}
+
 test "v2 needs_rebind restarts sessions without reporting a failure" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {

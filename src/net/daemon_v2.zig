@@ -868,12 +868,21 @@ const ConnectionDaemon = struct {
 
     fn recreateConnectionTun(self: *ConnectionDaemon, tun_info: ?api.TunnelRemoteInfoWrapper) StartError!?io.TunDescriptor {
         const info = tun_info orelse return null;
-        const connection = self.connection orelse @panic("recreateConnectionTun but no connection");
-        const tunnel = self.daemon.controller.setTunnelSettings(info) catch return error.TunNotAvailable;
+        return try self.createConnectionTun(info);
+    }
+
+    // Return connection-owned TUN, or a borrowed descriptor after looper attachment.
+    fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
+        const connection = self.connection orelse @panic("createConnectionTun but no connection");
+        const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
+            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+            return error.TunNotAvailable;
+        };
         errdefer tunnel.destroy();
         const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
         if (connection.daemon_io == .looper) {
             if (self.looper.isTunAttached()) self.looper.detach(.tun) catch return error.TunNotAvailable;
+            log.write(.info, "Attach TUN");
             self.looper.attach(.{
                 .pair = .{ .tun = descriptor },
                 .on_read = .{ .context = self, .callback = onTunnelRead },
@@ -1015,36 +1024,10 @@ const ConnectionDaemon = struct {
         if (self.daemon.snapshot_publisher.environment.connection_status != .connecting) return;
         const connection = self.connection orelse @panic("handleConnectionEstablished but no connection");
 
-        const tunnel = self.daemon.controller.setTunnelSettings(success.info) catch |err| {
-            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
-            return error.TunNotAvailable;
-        };
-        // Own TUN until commit() entry or successful looper attachment.
-        const descriptor = tunnel.tunDescriptor() catch {
-            tunnel.destroy();
-            return error.TunNotAvailable;
-        };
-        if (connection.daemon_io != .looper) {
-            try connection.commit(descriptor);
-            self.trackConnectionStatus(.connected);
-            return;
-        }
-
-        errdefer tunnel.destroy();
-        log.write(.info, "Attach TUN");
-        self.looper.attach(.{
-            .pair = .{
-                .tun = descriptor,
-            },
-            .on_read = .{
-                .context = self,
-                .callback = onTunnelRead,
-            },
-            .on_failure = .{
-                .context = self,
-                .callback = onTunnelFailure,
-            },
-        }) catch return error.TunNotAvailable;
+        const descriptor = try self.createConnectionTun(success.info);
+        // In looper mode the helper already attached TUN. Otherwise commit()
+        // takes ownership on entry, including on failure.
+        if (connection.daemon_io != .looper) try connection.commit(descriptor);
 
         self.trackConnectionStatus(.connected);
     }
