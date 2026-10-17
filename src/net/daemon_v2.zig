@@ -806,12 +806,12 @@ const ConnectionDaemon = struct {
             if (remote.link) |link| link.cleanup();
             return;
         }
-        const connection = self.connection orelse @panic("setupConnection but no connection");
+        var connection = self.connection orelse @panic("setupConnection but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
         if (remote.link) |link| {
             // Passive protocols retain their bind across host socket replacement.
-            if (self.endpoint_resolver == null) self.connection.?.local_port = remote.local_port;
+            if (self.endpoint_resolver == null) connection.local_port = remote.local_port;
             log.write(.notice, "Link is active");
             log.writef(.info, "Link type is {s}", .{
                 if (remote.endpoint) |value| value.type.raw() else api.IPSocketType.udp.raw(),
