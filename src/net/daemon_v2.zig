@@ -796,7 +796,7 @@ const ConnectionDaemon = struct {
     fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         const remote = setup.remote;
         // FIXME: ###, Transfer TUN ownership when its handoff is implemented.
-        defer if (setup.tun) |descriptor| descriptor.cleanup();
+        defer if (setup.tun) |tun| tun.cleanup();
         if (self.conn_request != setup.request_id) {
             if (remote.link) |link| link.cleanup();
             return;
@@ -809,7 +809,7 @@ const ConnectionDaemon = struct {
         const connection = self.connection orelse @panic("setupConnection but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
-        if (remote.link) |descriptor| {
+        if (remote.link) |link| {
             // Passive protocols retain their bind across host socket replacement.
             if (self.endpoint_resolver == null) self.connection.?.local_port = remote.local_port;
             log.write(.notice, "Link is active");
@@ -819,7 +819,7 @@ const ConnectionDaemon = struct {
             if (connection.daemon_io == .looper) {
                 log.write(.info, "Attach LINK");
                 try self.looper.attach(.{
-                    .pair = .{ .link = descriptor },
+                    .pair = .{ .link = link },
                     .on_read = .{ .context = self, .callback = onLinkRead },
                     .on_failure = .{ .context = self, .callback = onLinkFailure },
                 });
