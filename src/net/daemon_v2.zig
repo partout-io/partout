@@ -37,7 +37,6 @@ const Looper = looper_mod.Looper;
 const RemoteDescriptor = conn_mod.RemoteDescriptor;
 const SnapshotPublisher = helpers.SnapshotPublisher;
 const SocketEndpoint = io.SocketEndpoint;
-const TunDescriptor = io.TunDescriptor;
 const activeConnectionModule = conn_mod.activeConnectionModule;
 
 pub const Error = daemon_mod.Error;
@@ -335,7 +334,6 @@ const ConnectionDaemon = struct {
         request_id: u64,
         action: ConnectionAction,
         remote: RemoteDescriptor,
-        tun: ?TunDescriptor = null,
     };
 
     // Shared lifecycle and reporting, plus connection-specific dependencies.
@@ -787,8 +785,6 @@ const ConnectionDaemon = struct {
 
     fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         const remote = setup.remote;
-        // FIXME: ###, Transfer TUN ownership when its handoff is implemented.
-        defer if (setup.tun) |tun| tun.cleanup();
         if (self.conn_request != setup.request_id) {
             if (remote.link) |link| link.cleanup();
             return;
@@ -1298,7 +1294,6 @@ const ConnectionDaemon = struct {
             if (job.owned and err == error.Closed and job.message == .setupConnection) {
                 const setup = job.message.setupConnection;
                 if (setup.remote.link) |link| link.cleanup();
-                if (setup.tun) |tun| tun.cleanup();
             }
         }
         const owned = job.owned;
