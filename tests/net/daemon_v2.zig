@@ -1047,6 +1047,7 @@ test "v2 needs_rebind restarts sessions without reporting a failure" {
         try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
         try std.testing.expect(owner.conn_request == null);
         try daemon.testing.resumeGate(owner);
+        try waitForConnectionRequest(owner);
         try std.testing.expectEqual(@as(usize, 2), probe.starts);
         try std.testing.expectEqual(api.ConnectionStatus.connecting, sut.snapshot_publisher.environment.connection_status);
         try std.testing.expectEqual(@as(usize, 0), controller.cancel_count);
