@@ -350,6 +350,8 @@ const ConnectionDaemon = struct {
 
     // Internal state
     connection: ?Connection,
+    conn_request: ?u64 = null,
+    next_conn_request: u64 = 0,
     rebind_pending: bool,
     // Valid while connection is non-null; only this class accesses them.
     endpoint_resolver: ?EndpointResolver,
@@ -627,6 +629,7 @@ const ConnectionDaemon = struct {
 
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
+        self.conn_request = null;
         self.looper.cancelTimer(&self.resume_gate_timer);
 
         self.monitor.setEventHandler(null);
@@ -689,6 +692,7 @@ const ConnectionDaemon = struct {
         reason: Connection.ShutdownReason,
     ) !void {
         const connection = self.connection orelse @panic("stopConnection but no connection");
+        self.conn_request = null;
         connection.shutdown(reason);
         if (self.looper.isLinkAttached()) {
             // Attempt shutdown writes before detaching, without running callbacks or waiting.
@@ -712,7 +716,7 @@ const ConnectionDaemon = struct {
             log.write(.info, "Ignore evaluation, daemon not started");
             return;
         }
-        std.debug.assert(self.connection != null);
+        _ = self.connection orelse @panic("evaluateConnection but no connection");
         if (self.is_evaluating_connection) {
             log.write(.debug, "Ignore evaluation, another one pending");
             return;
@@ -736,18 +740,22 @@ const ConnectionDaemon = struct {
 
     const ConnectionAction = enum { start, rebind };
     const ConnectionSetup = struct {
+        request_id: u64,
         action: ConnectionAction,
         remote: RemoteDescriptor,
         tun: ?TunDescriptor = null,
     };
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction) void {
+        const request_id = self.next_conn_request;
+        self.next_conn_request += 1;
+        self.conn_request = request_id;
         // FIXME: ###, Run preparation and completion submission on a worker.
         const remote = self.prepareLink() catch |err| {
             self.connectionRequestFailed(action, err);
             return;
         };
-        self.schedule(.{ .setupConnection = .{ .action = action, .remote = remote } }) catch |err| {
+        self.schedule(.{ .setupConnection = .{ .request_id = request_id, .action = action, .remote = remote } }) catch |err| {
             if (remote.link) |link| link.cleanup();
             self.connectionRequestFailed(action, err);
         };
@@ -785,9 +793,15 @@ const ConnectionDaemon = struct {
         return remote;
     }
 
-    fn setupConnection(self: *ConnectionDaemon, action: ConnectionAction, remote: RemoteDescriptor, tun: ?TunDescriptor) !void {
+    fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
+        const remote = setup.remote;
         // FIXME: ###, Transfer TUN ownership when its handoff is implemented.
-        defer if (tun) |descriptor| descriptor.cleanup();
+        defer if (setup.tun) |descriptor| descriptor.cleanup();
+        if (self.conn_request != setup.request_id) {
+            if (remote.link) |link| link.cleanup();
+            return;
+        }
+        self.conn_request = null;
         if (self.daemon.state != .started) {
             if (remote.link) |link| link.cleanup();
             return;
@@ -811,7 +825,7 @@ const ConnectionDaemon = struct {
                 });
             }
         }
-        switch (action) {
+        switch (setup.action) {
             .start => self.startConnection(remote),
             .rebind => {
                 defer self.rebind_pending = false;
@@ -825,6 +839,7 @@ const ConnectionDaemon = struct {
     }
 
     fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
+        self.conn_request = null;
         switch (action) {
             .start => {
                 log.writef(.err, "Unable to set up link: {s}", .{@errorName(err)});
@@ -1049,6 +1064,7 @@ const ConnectionDaemon = struct {
     fn handleConnectionStopped(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status == .disconnected) return;
+        self.conn_request = null;
         self.clearConnectionTunnel();
         self.trackConnectionStatus(.disconnected);
     }
@@ -1097,6 +1113,7 @@ const ConnectionDaemon = struct {
     }
 
     fn pause(self: *ConnectionDaemon) void {
+        self.conn_request = null;
         self.looper.cancelTimer(&self.resume_gate_timer);
         _ = self.gate.setEnabled(false);
     }
@@ -1359,7 +1376,7 @@ const ConnectionDaemon = struct {
             .hold => self.doStop(.preserve_environment),
             .stop => self.doStop(.clear_environment),
             .resumeGate => self.doResumeGate(),
-            .setupConnection => |setup| self.setupConnection(setup.action, setup.remote, setup.tun) catch |err| self.connectionRequestFailed(setup.action, err),
+            .setupConnection => |setup| self.setupConnection(setup) catch |err| self.connectionRequestFailed(setup.action, err),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
