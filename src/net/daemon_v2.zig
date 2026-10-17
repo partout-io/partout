@@ -354,6 +354,7 @@ const ConnectionDaemon = struct {
     connection: ?Connection,
     conn_request: ?u64 = null,
     next_conn_request: u64 = 0,
+    preparation_stale: bool = false,
     worker: ?*ConnectionWorker = null,
     gate: ConnectionGate,
     resume_gate_timer: Looper.Timer,
@@ -744,6 +745,7 @@ const ConnectionDaemon = struct {
         const request_id = self.next_conn_request;
         self.next_conn_request += 1;
         self.conn_request = request_id;
+        self.preparation_stale = false;
         // DNS and socket setup are part of connecting, even while the worker
         // prepares the link. Rebind keeps the existing connection status.
         if (action == .start) self.trackConnectionStatus(.connecting);
@@ -787,6 +789,18 @@ const ConnectionDaemon = struct {
     fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         if (self.conn_request != setup.request_id or self.daemon.state != .started) {
             setup.deinit();
+            return;
+        }
+        // A path notification can overtake DNS/socket preparation. Discard
+        // its result and prepare for the latest path before handing off I/O.
+        if (self.preparation_stale) {
+            setup.deinit();
+            self.conn_request = null;
+            if (setup.action == .start and !self.monitor.isReachable()) {
+                self.trackConnectionStatus(.disconnected);
+            } else {
+                self.requestConnection(setup.action);
+            }
             return;
         }
         // Keep the request pending through protocol control, whose callbacks
@@ -933,6 +947,7 @@ const ConnectionDaemon = struct {
     // resulting connection start are serialized with the corresponding
     // network-change event.
     fn handleReachabilitySignal(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
+        if (self.conn_request != null) self.preparation_stale = true;
         _ = self.gate.updateReachability(reachability.reachable);
         self.handleReachability(reachability);
     }
@@ -947,6 +962,7 @@ const ConnectionDaemon = struct {
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
+        if (self.conn_request != null) self.preparation_stale = true;
         const connection = self.connection orelse @panic("handleBetterPath but no connection");
         connection.betterPath(self.events());
     }

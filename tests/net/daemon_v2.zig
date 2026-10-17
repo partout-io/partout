@@ -1620,7 +1620,7 @@ test "v2 terminal protocol failure pauses retries and honors cancellation policy
 test "v2 worker preserves loop progress and rejects stale preparation results" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Stage = enum { dns, socket };
-    const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop, preparation_failed };
+    const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop, preparation_failed, network_changed, better_path };
     const Probe = struct {
         stage: Stage,
         fail_first: bool,
@@ -1753,7 +1753,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
         }
     };
     for ([_]Stage{ .dns, .socket }) |stage| {
-        for ([_]Ending{ .stop, .shutdown, .replace, .replace_failed, .queued_stop, .preparation_failed }) |ending| {
+        for ([_]Ending{ .stop, .shutdown, .replace, .replace_failed, .queued_stop, .preparation_failed, .network_changed, .better_path }) |ending| {
             var tun_fds: [2]std.c.fd_t = undefined;
             var link_fds: [2]std.c.fd_t = undefined;
             try std.testing.expectEqual(0, std.c.pipe(&tun_fds));
@@ -1817,6 +1817,8 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
                 core.sleepMs(1);
             }
             switch (ending) {
+                .network_changed => try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } }),
+                .better_path => try daemon.testing.perform(owner, .onBetterPath),
                 .preparation_failed => {},
                 .stop => sut.stop(),
                 .shutdown => {
@@ -1833,7 +1835,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
                 },
             }
             probe.released.store(true, .release);
-            const replace = ending == .replace or ending == .replace_failed;
+            const replace = ending == .replace or ending == .replace_failed or ending == .network_changed or ending == .better_path;
             const expected_completions: usize = if (replace or ending == .queued_stop) 2 else 1;
             while (probe.completions.load(.acquire) < expected_completions) {
                 if (core.monotonicNs() >= deadline) return error.Timeout;
