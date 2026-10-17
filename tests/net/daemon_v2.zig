@@ -11,6 +11,7 @@ const io = source.net_io;
 const core = source.core;
 const daemon = source.net_daemon_v2;
 const daemon_helpers = source.net_daemon_helpers;
+const ConnectionWorker = source.net_connection_worker.ConnectionWorker;
 const net = source.net;
 const Looper = source.net_looper_v2.Looper;
 const mock_mod = source.mock;
@@ -1639,7 +1640,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
         starts: usize = 0,
         preparation_status: api.ConnectionStatus = .disconnected,
         timer: io.Timer = .{},
-        original_callback: daemon_helpers.ConnectionWorker.Callback = undefined,
+        original_callback: ConnectionWorker.Callback = undefined,
 
         fn block(self: *@This()) void {
             std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
@@ -1745,7 +1746,7 @@ test "v2 worker preserves loop progress and rejects stale preparation results" {
             .create_connection = create,
         };
         // Observe accepted completions, then forward to the daemon's callback.
-        fn completed(raw: *anyopaque, context: *anyopaque, completion: daemon_helpers.ConnectionWorker.Completion) void {
+        fn completed(raw: *anyopaque, context: *anyopaque, completion: ConnectionWorker.Completion) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.original_callback.call(self.original_callback.context, context, completion);
             _ = self.completions.fetchAdd(1, .release);
@@ -1863,12 +1864,12 @@ test "connection worker rolls back endpoint and thread allocations" {
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
             api.ExtendedEndpoint.init("192.0.2.2", .init(.udp, 1194)).?,
         };
-        fn completed(_: *anyopaque, _: *anyopaque, _: daemon_helpers.ConnectionWorker.Completion) void {
+        fn completed(_: *anyopaque, _: *anyopaque, _: ConnectionWorker.Completion) void {
             unreachable;
         }
         fn run(allocator: std.mem.Allocator) !void {
             var context: u8 = 0;
-            const worker = try daemon_helpers.ConnectionWorker.create(
+            const worker = try ConnectionWorker.create(
                 allocator,
                 mock_mod.noopDNSResolver(),
                 mock_mod.noopSocketFactory(),
