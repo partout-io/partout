@@ -46,8 +46,7 @@ pub const ConnectionContext = struct {
 
 const WireGuardConnection = struct {
     allocator: std.mem.Allocator,
-    /// Control calls and timers run on the owning event-loop thread.
-    lock: core.Mutex,
+    /// Adapter state and timers are confined to the owning event-loop thread.
     adapter: WireGuardAdapter,
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
@@ -93,7 +92,6 @@ const WireGuardConnection = struct {
 
         created.* = .{
             .allocator = allocator,
-            .lock = .{},
             .adapter = undefined,
             .configuration = configuration,
             .events = sandbox.events,
@@ -128,7 +126,6 @@ const WireGuardConnection = struct {
         self.cancelTemporaryShutdownRetry();
         self.adapter.deinit(allocator);
         self.configuration.deinit(allocator);
-        self.lock.deinit();
         allocator.destroy(self);
     }
 
@@ -152,8 +149,6 @@ const WireGuardConnection = struct {
     }
 
     fn startV2(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
-        self.lock.lock();
-        defer self.lock.unlock();
         _ = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
         log.write(.info, "Start tunnel");
         const info = (self.adapter.start(self.allocator, remote) catch |err|
@@ -164,8 +159,6 @@ const WireGuardConnection = struct {
 
     fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
         log.write(.info, "Commit WireGuard TUN");
-        self.lock.lock();
-        defer self.lock.unlock();
         _ = self.events orelse @panic("WireGuardConnection v2 commit() requires connection events");
         const was_started = self.adapter.isStarted();
         self.adapter.commit(self.allocator, descriptor) catch |err| return activationError(err);
@@ -180,8 +173,6 @@ const WireGuardConnection = struct {
     }
 
     fn rebind(self: *WireGuardConnection, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) net.ConnectionStartError!bool {
-        self.lock.lock();
-        defer self.lock.unlock();
         const was_started = self.adapter.isStarted();
         const rebound = self.adapter.rebind(self.allocator, remote, tun) catch |err| return activationError(err);
         if (!rebound) {
@@ -202,8 +193,6 @@ const WireGuardConnection = struct {
         _ = timeout_ms;
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
-        self.lock.lock();
-        defer self.lock.unlock();
         const had_state = self.adapter.hasResources();
         self.adapter.stop(self.allocator);
         if (had_state) {
@@ -218,8 +207,6 @@ const WireGuardConnection = struct {
         events: net.Connection.Events,
     ) void {
         self.cancelTemporaryShutdownRetry();
-        self.lock.lock();
-        defer self.lock.unlock();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => self.prepareLinkRefresh(null, events),
             .needs_rebind => |info| self.prepareLinkRefresh(info, events),
@@ -234,8 +221,6 @@ const WireGuardConnection = struct {
         self: *WireGuardConnection,
         events: net.Connection.Events,
     ) void {
-        self.lock.lock();
-        defer self.lock.unlock();
         self.prepareLinkRefresh(null, events);
     }
 
@@ -271,11 +256,9 @@ const WireGuardConnection = struct {
     }
 
     fn stopDataCountTimer(self: *WireGuardConnection) void {
-        self.lock.lock();
         const was_active = self.data_count_timer_active;
         self.data_count_timer_active = false;
         self.writer.cancelTimer(&self.data_count_timer);
-        self.lock.unlock();
         if (was_active) {
             log.write(.debug, "Cancelled WireGuardConnection.dataCountTimer");
         }
@@ -283,8 +266,6 @@ const WireGuardConnection = struct {
 
     fn onDataCountTimer(ctx: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
-        self.lock.lock();
-        defer self.lock.unlock();
         if (!self.data_count_timer_active) return;
         const events = self.events orelse return;
 
@@ -348,16 +329,12 @@ const WireGuardConnection = struct {
     }
 
     fn cancelTemporaryShutdownRetry(self: *WireGuardConnection) void {
-        self.lock.lock();
         self.temporary_shutdown_retry_timer_active = false;
         self.writer.cancelTimer(&self.temporary_shutdown_retry_timer);
-        self.lock.unlock();
     }
 
     fn onTemporaryShutdownRetry(ctx: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
-        self.lock.lock();
-        defer self.lock.unlock();
         if (!self.temporary_shutdown_retry_timer_active) return;
         self.temporary_shutdown_retry_timer_active = false;
         const events = self.events orelse return;
