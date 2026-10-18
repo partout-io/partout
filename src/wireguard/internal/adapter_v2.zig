@@ -50,16 +50,12 @@ pub const WireGuardAdapter = struct {
 
     pub const default_daemon_io: net.Connection.DaemonIO = if (builtin.os.tag == .windows) .link else .none;
 
-    /// Owns the handed-off TUN and the mode-specific native I/O lifecycle.
+    /// Owns mode-specific resources; State tracks their lifecycle.
     const Transport = union(enum) {
         active: struct {
             controller: net.TunnelController,
-            tunnel: union(enum) {
-                stopped,
-                awaiting_commit,
-                committed: net.TunDescriptor,
-                recommitting: net.TunDescriptor,
-            } = .stopped,
+            /// Owned while started, temporarily shut down, or awaiting recommit.
+            tunnel: net.TunDescriptor = undefined,
         },
         passive: struct {
             start: impl.StartTunnelPassive = undefined,
@@ -85,12 +81,18 @@ pub const WireGuardAdapter = struct {
         /// No backend or temporary-restart work is active.
         stopped,
 
+        /// Active startup has prepared DNS and is waiting for its first TUN.
+        awaiting_commit,
+
         /// wg-go is running with this opaque backend handle.
         started: i32,
 
         /// The device went offline, so wg-go was torn down while the tunnel
         /// configuration remains available for a fresh DNS resolution/restart.
         temporary_shutdown,
+
+        /// Active resume retains the old TUN while awaiting its replacement.
+        recommitting,
     };
 
     const ConfigurationScope = enum {
@@ -158,10 +160,10 @@ pub const WireGuardAdapter = struct {
 
         log.writef(.info, "Start {s} adapter", .{@tagName(self.transport)});
         switch (self.transport) {
-            .active => |*active| {
+            .active => {
                 // Cache hostnames before the daemon applies tunnel settings.
                 try self.endpoint_resolver.cacheAll(allocator);
-                active.tunnel = .awaiting_commit;
+                self.state = .awaiting_commit;
             },
             .passive => |*passive| {
                 passive.start = passive.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
@@ -177,17 +179,20 @@ pub const WireGuardAdapter = struct {
         errdefer incoming.cleanup();
         switch (self.transport) {
             .active => |*active| {
-                if (active.tunnel != .awaiting_commit and active.tunnel != .recommitting)
-                    return error.CouldNotStartBackend;
-                if (active.tunnel == .recommitting and !self.last_reachable)
-                    return error.CouldNotStartBackend;
-                const previous = active.tunnel;
-                active.tunnel = .{ .committed = descriptor };
-                errdefer active.tunnel = previous;
-                try self.activate(allocator);
-                if (previous == .recommitting) {
-                    var old = previous.recommitting;
-                    old.cleanup();
+                switch (self.state) {
+                    .awaiting_commit => {
+                        active.tunnel = descriptor;
+                        try self.activate(allocator);
+                    },
+                    .recommitting => {
+                        if (!self.last_reachable) return error.CouldNotStartBackend;
+                        var previous = active.tunnel;
+                        active.tunnel = descriptor;
+                        errdefer active.tunnel = previous;
+                        try self.activate(allocator);
+                        previous.cleanup();
+                    },
+                    else => return error.CouldNotStartBackend,
                 }
             },
             .passive => |*passive| passive.io.replaceTun(descriptor),
@@ -199,10 +204,9 @@ pub const WireGuardAdapter = struct {
         self.replaceLink(remote);
         if (tun) |descriptor| self.commit(allocator, descriptor) catch |err| {
             switch (self.transport) {
-                .active => |*active| {
-                    if (self.state != .temporary_shutdown or active.tunnel != .recommitting) return err;
-                    const previous = active.tunnel.recommitting;
-                    active.tunnel = .{ .committed = previous };
+                .active => {
+                    if (self.state != .recommitting) return err;
+                    self.state = .temporary_shutdown;
                     log.writef(.err, "Unable to resume WireGuard tunnel: {s}", .{@errorName(err)});
                     return false;
                 },
@@ -216,23 +220,24 @@ pub const WireGuardAdapter = struct {
     pub fn stop(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
         if (!self.isStopped()) log.write(.info, "Stop adapter");
         // A prepared active connection can be stopped before commit starts Go.
+        const previous = self.state;
         switch (self.state) {
             .started => |handle| {
                 self.quiesce();
                 self.backend.turnOff(handle);
             },
-            .stopped, .temporary_shutdown => {},
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => {},
         }
         self.state = .stopped;
         self.last_reachable = false;
         self.endpoint_resolver.reset(allocator);
         switch (self.transport) {
             .active => |*active| {
-                switch (active.tunnel) {
-                    .committed, .recommitting => |*tun| tun.cleanup(),
+                switch (previous) {
+                    .started, .temporary_shutdown, .recommitting => active.tunnel.cleanup(),
                     .stopped, .awaiting_commit => {},
                 }
-                active.tunnel = .stopped;
+                active.tunnel = undefined;
             },
             .passive => |*passive| passive.io.release(),
         }
@@ -243,13 +248,7 @@ pub const WireGuardAdapter = struct {
     }
 
     pub fn isStopped(self: *const WireGuardAdapter) bool {
-        return switch (self.state) {
-            .stopped => switch (self.transport) {
-                .active => |active| active.tunnel == .stopped,
-                .passive => true,
-            },
-            .started, .temporary_shutdown => false,
-        };
+        return self.state == .stopped;
     }
 
     pub fn hasResources(self: *WireGuardAdapter) bool {
@@ -273,7 +272,7 @@ pub const WireGuardAdapter = struct {
     ) impl.Error!?api.DataCount {
         const handle = switch (self.state) {
             .started => |value| value,
-            .stopped, .temporary_shutdown => return null,
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => return null,
         };
         const text = (try self.backend.getConfig(allocator, handle)) orelse return null;
         defer allocator.free(text);
@@ -312,21 +311,20 @@ pub const WireGuardAdapter = struct {
                 }
                 return .unchanged;
             },
-            .temporary_shutdown => {
+            .temporary_shutdown, .recommitting => {
                 if (!is_reachable) return .unchanged;
                 return self.resumeTemporaryShutdown(allocator);
             },
-            .stopped => return .unchanged,
+            .stopped, .awaiting_commit => return .unchanged,
         }
     }
 
     pub fn prepareLinkRefresh(self: *WireGuardAdapter, info: ?api.TunnelRemoteInfoWrapper, events: net.Connection.Events) void {
         if (info == null and !self.isStarted()) return;
         switch (self.transport) {
-            .active => |*active| {
-                if (info == null or active.tunnel != .committed) return;
-                const previous = active.tunnel.committed;
-                active.tunnel = .{ .recommitting = previous };
+            .active => {
+                if (info == null or self.state != .temporary_shutdown) return;
+                self.state = .recommitting;
             },
             .passive => |*passive| passive.io.releaseLink(),
         }
@@ -347,7 +345,7 @@ pub const WireGuardAdapter = struct {
     pub fn sendKeepalives(self: *const WireGuardAdapter) void {
         switch (self.state) {
             .started => |handle| self.backend.sendKeepalives(handle),
-            .stopped, .temporary_shutdown => {},
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => {},
         }
     }
 
@@ -381,7 +379,7 @@ pub const WireGuardAdapter = struct {
         log.writef(.debug, "Start {s} wg-go backend", .{@tagName(self.transport)});
         const handle = (switch (self.transport) {
             .active => |active| self.backend.turnOn(allocator, wg_config, .{
-                .tun = if (builtin.os.tag == .windows) active.tunnel.committed.tun else switch (active.tunnel.committed.io) {
+                .tun = if (builtin.os.tag == .windows) active.tunnel.tun else switch (active.tunnel.io) {
                     .tun => |tun| tun,
                     else => return error.CannotLocateTunnelFileDescriptor,
                 },
@@ -470,19 +468,18 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
     ) ActivationError!NetworkChangeResult {
         log.write(.debug, "Connectivity online, resuming backend.");
+        // Preserve prepared DNS until the pending TUN handoff completes.
+        if (self.state == .recommitting) return .unchanged;
         // Do not carry endpoint answers across an offline interval. Both the
         // hostname's A/AAAA set and the active network's DNS64 prefix may have
         // changed while the backend was down.
+        self.endpoint_resolver.reset(allocator);
         switch (self.transport) {
-            .active => |active| {
-                // Preserve prepared DNS until the pending TUN handoff completes.
-                if (active.tunnel == .recommitting) return .unchanged;
-                self.endpoint_resolver.reset(allocator);
+            .active => {
                 try self.endpoint_resolver.cacheAll(allocator);
                 return .{ .needs_rebind = try self.buildTunnelInfo(allocator) };
             },
             .passive => {
-                self.endpoint_resolver.reset(allocator);
                 try self.activate(allocator);
                 return .{ .needs_rebind = null };
             },
