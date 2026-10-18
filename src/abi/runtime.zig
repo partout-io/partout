@@ -217,7 +217,7 @@ pub const DaemonRuntime = struct {
         if (build_options.wireguard) {
             const ctx = self.contexts.putUninitialized(.WireGuard);
             const impl: net.ConnectionImplementation = if (experimental_wireguard) blk: {
-                ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_passive_backend } } };
+                ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_backend } } };
                 break :blk .{ .ptr = &ctx.WireGuard.experimental, .vtable = &wireguard.connection_v2_vtable };
             } else blk: {
                 ctx.* = .{ .WireGuard = .{ .legacy = .{ .backend = wireguard.go_backend } } };

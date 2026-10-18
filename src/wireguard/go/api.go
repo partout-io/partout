@@ -185,6 +185,13 @@ func wgDisableSomeRoamingForBrokenMobileSemantics(tunnelHandle int32) {
 	dev.DisableSomeRoamingForBrokenMobileSemantics()
 }
 
+//export wgSendKeepalives
+func wgSendKeepalives(handle int32) {
+	if dev, ok := tunnelHandles[handle]; ok {
+		dev.SendKeepalivesToPeersWithCurrentKeypair()
+	}
+}
+
 //export wgVersion
 func wgVersion() *C.char {
 	info, ok := debug.ReadBuildInfo()
