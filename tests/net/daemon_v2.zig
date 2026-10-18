@@ -706,9 +706,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
         recreate_tun: bool = false,
-        block_socket: std.atomic.Value(bool) = .init(false),
-        socket_entered: std.atomic.Value(bool) = .init(false),
-        release_socket: std.atomic.Value(bool) = .init(false),
         fn endpoints(raw: *anyopaque) ?[]const api.ExtendedEndpoint {
             const self: *@This() = @ptrCast(@alignCast(raw));
             return &self.endpoint_list;
@@ -808,10 +805,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            if (self.block_socket.swap(false, .acq_rel)) {
-                self.socket_entered.store(true, .release);
-                while (!self.release_socket.load(.acquire)) core.sleepMs(1);
-            }
             self.socket_connected = endpoint != null;
             // The factory probe records the requested mode; use a real local UDP
             // descriptor so daemon attachment and cleanup also execute.
@@ -906,7 +899,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000, .events = .{ .ctx = &probe, .status = Probe.status, .last_error = Probe.lastErrorEvent, .data_count = Probe.reportDataCount, .remove_key = Probe.remove } },
                 });
                 defer sut.destroy();
-                defer probe.release_socket.store(true, .release);
                 probe.daemon = sut;
                 try sut.start();
                 defer sut.stop();
@@ -964,29 +956,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try waitForRebind(owner, &probe, 1);
                     try std.testing.expectEqual(@as(usize, 1), probe.rebind_count);
-                    const upgrade_pending = scenario.recreate_tun and daemon_io == .link;
-                    if (upgrade_pending) try daemon.testing.onLoop(owner, &probe, struct {
-                        fn run(_: anytype, value: *Probe) daemon.Error!void {
-                            value.recreate_tun = false;
-                            value.block_socket.store(true, .release);
-                        }
-                    }.run);
                     try daemon.testing.perform(owner, .{ .onReachability = .{ .reachable = true } });
-                    if (upgrade_pending) {
-                        const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
-                        while (!probe.socket_entered.load(.acquire)) {
-                            if (core.monotonicNs() >= deadline) return error.Timeout;
-                            core.sleepMs(1);
-                        }
-                        // Upgrade the link-only request while its worker is blocked.
-                        try daemon.testing.onLoop(owner, &probe, struct {
-                            fn run(_: anytype, value: *Probe) daemon.Error!void {
-                                value.recreate_tun = true;
-                                Probe.betterPath(value, value.events);
-                            }
-                        }.run);
-                        probe.release_socket.store(true, .release);
-                    }
                     try waitForConnectionRequest(sut.implementation.connection);
                     try std.testing.expectError(error.AlreadyStarted, sut.start());
                     try waitForRebind(owner, &probe, 2);

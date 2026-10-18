@@ -355,7 +355,6 @@ const ConnectionDaemon = struct {
     conn_request: ?u64 = null,
     next_conn_request: u64 = 0,
     is_stale_conn_request: bool = false,
-    pending_tun_info: ?api.TunnelRemoteInfoWrapper = null,
     worker: ?*ConnectionWorker = null,
     gate: ConnectionGate,
     resume_gate_timer: Looper.Timer,
@@ -489,10 +488,7 @@ const ConnectionDaemon = struct {
             },
             .needs_rebind => |info| {
                 std.debug.assert(self.isCurrentThread());
-                if (self.conn_request != null) {
-                    self.rememberTunnelInfo(info);
-                    return;
-                }
+                if (self.conn_request != null) return;
                 const copy = cloneTunnelInfo(self.daemon.allocator, info) catch {
                     onConnectionEvent(ctx, .{ .failed = .{
                         .err_pair = .{ .code = .outOfMemory },
@@ -534,26 +530,6 @@ const ConnectionDaemon = struct {
                 };
             },
         }
-    }
-
-    fn rememberTunnelInfo(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) void {
-        const value = info orelse return;
-        const copy = value.clone(self.daemon.allocator) catch {
-            onConnectionEvent(self, .{ .failed = .{
-                .err_pair = .{ .code = .outOfMemory },
-                .disposition = .reconnect,
-            } });
-            return;
-        };
-        deinitTunnelInfo(self.daemon.allocator, self.pending_tun_info);
-        self.pending_tun_info = copy;
-    }
-
-    fn clearConnectionRequest(self: *ConnectionDaemon) void {
-        self.conn_request = null;
-        self.is_stale_conn_request = false;
-        deinitTunnelInfo(self.daemon.allocator, self.pending_tun_info);
-        self.pending_tun_info = null;
     }
 
     fn logEventSubmissionFailure(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
@@ -659,7 +635,7 @@ const ConnectionDaemon = struct {
 
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
-        self.clearConnectionRequest();
+        self.conn_request = null;
         if (self.worker) |worker| worker.close();
         self.looper.cancelTimer(&self.resume_gate_timer);
 
@@ -729,7 +705,7 @@ const ConnectionDaemon = struct {
         reason: Connection.ShutdownReason,
     ) !void {
         const connection = self.connection orelse @panic("stopConnection but no connection");
-        self.clearConnectionRequest();
+        self.conn_request = null;
         connection.shutdown(reason);
         if (self.looper.isLinkAttached()) {
             // Attempt shutdown writes before detaching, without running callbacks or waiting.
@@ -832,31 +808,22 @@ const ConnectionDaemon = struct {
             setup.deinit();
             return;
         }
-        const upgrade = self.pending_tun_info;
-        self.pending_tun_info = null;
-        defer deinitTunnelInfo(self.daemon.allocator, upgrade);
-        const tun_info = upgrade orelse setup.tun_info;
         // A path notification can overtake DNS/socket preparation. Discard
         // its result and prepare for the latest path before handing off I/O.
         if (self.is_stale_conn_request) {
             setup.deinit();
-            self.clearConnectionRequest();
+            self.conn_request = null;
             if (setup.action == .start and !self.monitor.isReachable()) {
                 self.trackConnectionStatus(.disconnected);
             } else {
-                self.requestConnection(setup.action, tun_info);
+                self.requestConnection(setup.action, setup.tun_info);
             }
             return;
         }
         // Keep the request pending through protocol control, whose callbacks
         // may synchronously request another rebind.
         defer if (self.conn_request == setup.request_id) {
-            const pending = self.pending_tun_info;
-            self.pending_tun_info = null;
-            defer deinitTunnelInfo(self.daemon.allocator, pending);
-            self.clearConnectionRequest();
-            // A richer request emitted during a link-only handoff still needs TUN.
-            if (tun_info == null and pending != null) self.requestConnection(.rebind, pending);
+            self.conn_request = null;
         };
         const remote = setup.remote catch |err| {
             self.connectionRequestFailed(setup.action, err);
@@ -884,7 +851,7 @@ const ConnectionDaemon = struct {
         switch (setup.action) {
             .start => self.startConnection(remote),
             .rebind => {
-                const tun = if (tun_info) |info| self.createConnectionTun(info) catch |err| {
+                const tun = if (setup.tun_info) |info| self.createConnectionTun(info) catch |err| {
                     // Protocol control has not taken ownership of the prepared link.
                     if (connection.daemon_io != .looper) setup.deinit();
                     self.linkRefreshFailed(err);
@@ -921,7 +888,7 @@ const ConnectionDaemon = struct {
     }
 
     fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
-        self.clearConnectionRequest();
+        self.conn_request = null;
         switch (action) {
             .start => {
                 log.writef(.err, "Unable to set up link: {s}", .{@errorName(err)});
@@ -1080,11 +1047,7 @@ const ConnectionDaemon = struct {
     }
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) !void {
-        if (self.daemon.state != .started) return;
-        if (self.conn_request != null) {
-            self.rememberTunnelInfo(info);
-            return;
-        }
+        if (self.daemon.state != .started or self.conn_request != null) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
         // Go may have established while its success event is still queued on
         // this actor. Refresh must also finish in that connecting interval.
@@ -1121,7 +1084,7 @@ const ConnectionDaemon = struct {
     fn handleConnectionStopped(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
         if (self.daemon.snapshot_publisher.environment.connection_status == .disconnected) return;
-        self.clearConnectionRequest();
+        self.conn_request = null;
         self.clearConnectionTunnel();
         self.trackConnectionStatus(.disconnected);
     }
@@ -1170,7 +1133,7 @@ const ConnectionDaemon = struct {
     }
 
     fn pause(self: *ConnectionDaemon) void {
-        self.clearConnectionRequest();
+        self.conn_request = null;
         self.looper.cancelTimer(&self.resume_gate_timer);
         _ = self.gate.setEnabled(false);
     }
