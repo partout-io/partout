@@ -112,7 +112,8 @@ cached numeric addresses for the current network and starts Go, preserving v1's
 DNS/DNS64 ordering. Stopping before commit discards the cached answers.
 Active offline resume requests fresh tunnel settings and a replacement TUN through
 `needs_rebind(info)`. The daemon hands it back through `rebind()`, which restarts
-Go with the replacement. Preparation and activation failures retry locally.
+Go with the replacement. Preparation failures use the daemon's normal reconnect
+path; backend activation failures retry locally.
 The connection owns handed-off resources and cleans them up after backend shutdown.
 Windows native descriptor I/O remains unimplemented. The runtime log identifies this
 implementation with `Using WireGuardConnection v2`.

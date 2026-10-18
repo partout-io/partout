@@ -684,7 +684,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
-        endpoint_list: [8]api.ExtendedEndpoint = undefined,
+        endpoint_list: [4]api.ExtendedEndpoint = undefined,
         daemon_io: net.Connection.DaemonIO,
         sync_establish: bool,
         daemon: *Daemon = undefined,
@@ -706,7 +706,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         tun_cleanup_count: usize = 0,
         rebind_count: usize = 0,
         recreate_tun: bool = false,
-        fail_socket: std.atomic.Value(bool) = .init(false),
         block_socket: std.atomic.Value(bool) = .init(false),
         socket_entered: std.atomic.Value(bool) = .init(false),
         release_socket: std.atomic.Value(bool) = .init(false),
@@ -716,7 +715,7 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.endpoint_list = @splat(self.endpoint);
+            self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint, self.endpoint };
             self.events = sb.events.?;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
@@ -813,7 +812,6 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                 self.socket_entered.store(true, .release);
                 while (!self.release_socket.load(.acquire)) core.sleepMs(1);
             }
-            if (self.fail_socket.swap(false, .acq_rel)) return error.LinkNotActive;
             self.socket_connected = endpoint != null;
             // The factory probe records the requested mode; use a real local UDP
             // descriptor so daemon attachment and cleanup also execute.
@@ -1004,53 +1002,36 @@ test "v2 I/O modes control socket creation, attachment, and descriptor handoff" 
                     try std.testing.expectEqual(tun.fd, probe.established_tun.?.fd);
                     try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
                     if (scenario.recreate_tun) {
-                        for ([_]bool{ false, true }) |fail_link| {
-                            if (fail_link and daemon_io == .none) continue;
-                            try daemon.testing.onLoop(owner, .{ &probe, fail_link }, struct {
-                                fn run(loop: anytype, state: struct { *Probe, bool }) daemon.Error!void {
-                                    const value = state[0];
-                                    loop.daemon.options.reconnection_delay_ms = 100;
-                                    if (state[1]) {
-                                        value.fail_socket.store(true, .release);
-                                    } else {
-                                        value.controller.set_tunnel_settings_error = error.TunNotAvailable;
-                                    }
-                                    Probe.betterPath(value, value.events);
-                                }
-                            }.run);
-                            try waitForRebindRetry(owner);
-                            try daemon.testing.onLoop(owner, .{ &probe, fail_link }, struct {
-                                fn run(loop: anytype, state: struct { *Probe, bool }) daemon.Error!void {
-                                    const value = state[0];
-                                    const previous: usize = if (state[1]) 3 else 2;
-                                    std.debug.assert(value.rebind_count == previous and value.tun_cleanup_count == previous);
-                                    std.debug.assert(value.established_tun != null and value.remote != null);
-                                    std.debug.assert(loop.daemon.snapshot_publisher.environment.connection_status == .connected);
-                                    std.debug.assert(loop.daemon.snapshot_publisher.last_error == null);
-                                    value.controller.set_tunnel_settings_error = null;
-                                }
-                            }.run);
-                            try waitForRebind(owner, &probe, if (fail_link) 4 else 3);
-                            try std.testing.expectEqual(@as(usize, 1), probe.start_count);
-                            try std.testing.expectEqual(@as(usize, if (fail_link) 6 else 5), probe.controller.set_tunnel_settings_count);
-                            try std.testing.expectEqual(@as(usize, if (fail_link) 4 else 3), probe.tun_cleanup_count);
-                            try std.testing.expectEqual(api.ConnectionStatus.connected, sut.snapshot_publisher.environment.connection_status);
-                        }
-                        // Stop must cancel a pending local retry and release its metadata.
                         try daemon.testing.onLoop(owner, &probe, struct {
-                            fn run(loop: anytype, value: *Probe) daemon.Error!void {
-                                loop.daemon.options.reconnection_delay_ms = 60_000;
+                            fn run(_: anytype, value: *Probe) daemon.Error!void {
                                 value.controller.set_tunnel_settings_error = error.TunNotAvailable;
                                 Probe.betterPath(value, value.events);
                             }
                         }.run);
-                        try waitForRebindRetry(owner);
+                        const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+                        while (core.monotonicNs() < deadline) {
+                            var failed = false;
+                            try daemon.testing.onLoop(owner, &failed, struct {
+                                fn run(loop: anytype, out: *bool) daemon.Error!void {
+                                    out.* = loop.daemon.snapshot_publisher.last_error != null;
+                                }
+                            }.run);
+                            if (failed) break;
+                            core.sleepMs(1);
+                        }
+                        try std.testing.expectEqual(@as(usize, 4), probe.controller.set_tunnel_settings_count);
+                        try std.testing.expectEqual(@as(usize, 2), probe.rebind_count);
+                        try std.testing.expectEqual(@as(usize, 3), probe.tun_cleanup_count);
+                        try std.testing.expect(probe.established_tun == null);
+                        try std.testing.expect(probe.remote == null);
+                        try std.testing.expectEqual(api.ConnectionStatus.disconnected, sut.snapshot_publisher.environment.connection_status);
+                        try std.testing.expectEqual(api.PartoutErrorCode.tunNotAvailable, sut.snapshot_publisher.last_error.?.code);
                     }
                 }
                 sut.stop();
                 try std.testing.expect(probe.established_tun == null);
                 if (daemon_io != .looper) {
-                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) (if (daemon_io == .link) 5 else 4) else 1), probe.tun_cleanup_count);
+                    try std.testing.expectEqual(@as(usize, if (scenario.recreate_tun) 3 else 1), probe.tun_cleanup_count);
                 }
             }
         }
@@ -1691,21 +1672,6 @@ fn waitForGate(owner: anytype) !void {
             }
         }.run);
         if (ready) return;
-        core.sleepMs(1);
-    }
-    return error.Timeout;
-}
-
-fn waitForRebindRetry(owner: anytype) !void {
-    const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
-    while (core.monotonicNs() < deadline) {
-        var retrying = false;
-        try daemon.testing.onLoop(owner, &retrying, struct {
-            fn run(loop: anytype, out: *bool) daemon.Error!void {
-                out.* = loop.retrying_rebind;
-            }
-        }.run);
-        if (retrying) return;
         core.sleepMs(1);
     }
     return error.Timeout;

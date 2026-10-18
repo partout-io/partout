@@ -356,8 +356,6 @@ const ConnectionDaemon = struct {
     next_conn_request: u64 = 0,
     is_stale_conn_request: bool = false,
     pending_tun_info: ?api.TunnelRemoteInfoWrapper = null,
-    retrying_rebind: bool = false,
-    rebind_retry_timer: Looper.Timer = .{},
     worker: ?*ConnectionWorker = null,
     gate: ConnectionGate,
     resume_gate_timer: Looper.Timer,
@@ -552,8 +550,6 @@ const ConnectionDaemon = struct {
     }
 
     fn clearConnectionRequest(self: *ConnectionDaemon) void {
-        self.looper.cancelTimer(&self.rebind_retry_timer);
-        self.retrying_rebind = false;
         self.conn_request = null;
         self.is_stale_conn_request = false;
         deinitTunnelInfo(self.daemon.allocator, self.pending_tun_info);
@@ -778,7 +774,7 @@ const ConnectionDaemon = struct {
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) void {
         if (self.conn_request != null) return;
-        self.submitConnectionRequest(action, tun_info) catch |err| self.connectionRequestFailed(action, tun_info, err);
+        self.submitConnectionRequest(action, tun_info) catch |err| self.connectionRequestFailed(action, err);
     }
 
     fn submitConnectionRequest(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) !void {
@@ -854,7 +850,7 @@ const ConnectionDaemon = struct {
         }
         // Keep the request pending through protocol control, whose callbacks
         // may synchronously request another rebind.
-        defer if (self.conn_request == setup.request_id and !self.retrying_rebind) {
+        defer if (self.conn_request == setup.request_id) {
             const pending = self.pending_tun_info;
             self.pending_tun_info = null;
             defer deinitTunnelInfo(self.daemon.allocator, pending);
@@ -863,7 +859,7 @@ const ConnectionDaemon = struct {
             if (tun_info == null and pending != null) self.requestConnection(.rebind, pending);
         };
         const remote = setup.remote catch |err| {
-            self.connectionRequestFailed(setup.action, tun_info, err);
+            self.connectionRequestFailed(setup.action, err);
             return;
         };
         const connection = self.connection orelse @panic("setupConnection but no connection");
@@ -889,12 +885,9 @@ const ConnectionDaemon = struct {
             .start => self.startConnection(remote),
             .rebind => {
                 const tun = if (tun_info) |info| self.createConnectionTun(info) catch |err| {
-                    if (connection.daemon_io == .looper) {
-                        self.looper.detach(.link) catch {};
-                    } else {
-                        setup.deinit();
-                    }
-                    self.connectionRequestFailed(.rebind, tun_info, err);
+                    // Protocol control has not taken ownership of the prepared link.
+                    if (connection.daemon_io != .looper) setup.deinit();
+                    self.linkRefreshFailed(err);
                     return;
                 } else null;
                 const rebound = connection.rebind(remote, tun) catch |err| {
@@ -927,19 +920,7 @@ const ConnectionDaemon = struct {
         return descriptor;
     }
 
-    fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, info: ?api.TunnelRemoteInfoWrapper, err: anyerror) void {
-        if (action == .rebind and err != error.OutOfMemory) {
-            log.writef(.err, "Unable to prepare connection refresh, retry locally: {s}", .{@errorName(err)});
-            self.rememberTunnelInfo(info);
-            // Keep a request reserved until retry so later events can upgrade it.
-            if (self.conn_request == null) {
-                self.conn_request = self.next_conn_request;
-                self.next_conn_request += 1;
-            }
-            self.retrying_rebind = true;
-            self.scheduleRebindRetry();
-            return;
-        }
+    fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
         self.clearConnectionRequest();
         switch (action) {
             .start => {
@@ -949,26 +930,6 @@ const ConnectionDaemon = struct {
             },
             .rebind => self.linkRefreshFailed(err),
         }
-    }
-
-    fn scheduleRebindRetry(self: *ConnectionDaemon) void {
-        self.looper.scheduleTimer(&self.rebind_retry_timer, self.daemon.options.reconnection_delay_ms, .{
-            .context = self,
-            .callback = onRebindRetry,
-        }) catch |err| self.linkRefreshFailed(err);
-    }
-
-    fn onRebindRetry(ctx: ?*anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        if (!self.monitor.isReachable()) {
-            self.scheduleRebindRetry();
-            return;
-        }
-        const info = self.pending_tun_info;
-        self.pending_tun_info = null;
-        defer deinitTunnelInfo(self.daemon.allocator, info);
-        self.clearConnectionRequest();
-        self.requestConnection(.rebind, info);
     }
 
     fn startConnection(self: *ConnectionDaemon, remote: RemoteDescriptor) void {
@@ -1486,7 +1447,7 @@ const ConnectionDaemon = struct {
             .hold => self.doStop(.preserve_environment),
             .stop => self.doStop(.clear_environment),
             .resumeGate => self.doResumeGate(),
-            .setupConnection => |setup| self.setupConnection(setup) catch |err| self.connectionRequestFailed(setup.action, setup.tun_info, err),
+            .setupConnection => |setup| self.setupConnection(setup) catch |err| self.connectionRequestFailed(setup.action, err),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
