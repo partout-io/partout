@@ -520,7 +520,14 @@ test "v2 UDP packet errors discard only the bad packet and retain the link" {
     try std.testing.expect(loop.isLinkAttached());
     var bytes: [64]u8 = undefined;
     var sender: io.SocketAddress = undefined;
-    const size = try peer.receiveFrom(&bytes, &sender);
+    const size = for (0..500) |_| {
+        break peer.receiveFrom(&bytes, &sender) catch |err| {
+            if (err != error.WouldBlock) return err;
+            try std.testing.expect(try test_helpers.poll(&loop, 10));
+            continue;
+        };
+    } else return error.Timeout;
     try std.testing.expectEqualStrings("valid", bytes[0..size]);
+    try std.testing.expect(loop.isLinkAttached());
     try loop.stop();
 }
