@@ -1271,7 +1271,8 @@ test "WireGuard v2 adapter supports active startup and both reachability policie
     defer sut.deinit(allocator);
 
     sut.sendKeepalives(); // Safe before startup.
-    try sut.start(allocator, 0, 1280);
+    var initial_info = (try sut.start(allocator, .{})).?;
+    defer initial_info.deinit(allocator);
     try sut.commit(allocator, .{ .fd = -1, .io = .{ .tun = tun } });
     try std.testing.expect(sut.isStarted());
     try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);

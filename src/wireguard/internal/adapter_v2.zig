@@ -138,15 +138,27 @@ pub const WireGuardAdapter = struct {
         self.endpoint_resolver.deinit(allocator);
     }
 
+    /// Takes link ownership on entry. Returns owned tunnel info for a new start,
+    /// or null when only replacing the link of an already active adapter.
     pub fn start(
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
-        local_port: u16,
-        mtu: u32,
-    ) ActivationError!void {
-        if (!self.isStopped())
-            @panic("WireGuardAdapter.start() requires a stopped adapter");
+        remote: net.RemoteDescriptor,
+    ) ActivationError!?api.TunnelRemoteInfoWrapper {
+        self.replaceLink(remote);
         errdefer self.shutdown(allocator);
+        if (!self.isStopped()) {
+            log.write(.debug, "Replaced link, adapter is already active");
+            return null;
+        }
+
+        var info = try tunnel_info.TunnelRemoteInfoBuilder.init(
+            allocator,
+            self.profile,
+            self.module_id,
+            self.configuration,
+        ).build();
+        errdefer info.deinit(allocator);
 
         log.writef(.info, "Start {s} adapter", .{@tagName(self.transport)});
         switch (self.transport) {
@@ -155,10 +167,11 @@ pub const WireGuardAdapter = struct {
                 active.tunnel = .awaiting_commit;
             },
             .passive => |*passive| {
-                passive.start = passive.io.transport(local_port, mtu);
+                passive.start = passive.io.transport(remote.local_port, tunnel_info.TunnelRemoteInfoBuilder.effectiveMTU(info));
                 try self.activate(allocator);
             },
         }
+        return info;
     }
 
     pub fn stop(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
@@ -491,7 +504,7 @@ pub const WireGuardAdapter = struct {
         };
     }
 
-    pub fn replaceLink(self: *WireGuardAdapter, remote: net.RemoteDescriptor) void {
+    fn replaceLink(self: *WireGuardAdapter, remote: net.RemoteDescriptor) void {
         switch (self.transport) {
             .active => {},
             .passive => |*passive| passive.io.replaceLink(remote.link orelse @panic("WireGuard v2 requires a link descriptor")),

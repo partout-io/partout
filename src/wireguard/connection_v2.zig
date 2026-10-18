@@ -155,27 +155,9 @@ const WireGuardConnection = struct {
         self.lock.lock();
         defer self.lock.unlock();
         _ = self.events orelse @panic("WireGuardConnection v2 start() requires connection events");
-        self.adapter.replaceLink(remote);
-        errdefer self.adapter.stop(self.allocator);
-        if (!self.adapter.isStopped()) {
-            log.write(.debug, "Replaced link, adapter is already active");
-            return .started;
-        }
-
         log.write(.info, "Start tunnel");
-
-        var info = TunnelRemoteInfoBuilder.init(
-            self.allocator,
-            self.adapter.profile,
-            self.adapter.module_id,
-            &self.configuration,
-        ).build() catch |err| return switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            else => error.UnableToStart,
-        };
-        errdefer info.deinit(self.allocator);
-        self.adapter.start(self.allocator, remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info)) catch |err|
-            return activationError(err);
+        const info = (self.adapter.start(self.allocator, remote) catch |err|
+            return activationError(err)) orelse return .started;
         if (self.adapter.isStarted()) self.backendStarted();
         return .{ .established = .{ .info = info } };
     }
