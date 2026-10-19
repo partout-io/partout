@@ -276,9 +276,6 @@ pub const ConnectionOptions = struct {
 
     /// The minimum interval before updating data count, in milliseconds.
     min_data_count_interval: u32 = 1000,
-
-    /// Generic user data represented as JSON.
-    user_info: ?api.JSONValue = null,
 };
 
 /// Packet writes and timers supplied by the connection owner.
