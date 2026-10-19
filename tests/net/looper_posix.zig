@@ -14,7 +14,7 @@ const WakeMux = test_helpers.Mux;
 const Probe = struct {
     looper: *Looper = undefined,
     tasks: usize = 0,
-    timer: helpers.Timer = .{},
+    timer: io.Timer = .{},
     fn task(raw: ?*anyopaque) void {
         const self: *Probe = @ptrCast(@alignCast(raw.?));
         self.tasks += 1;
@@ -90,7 +90,7 @@ const Mock = struct {
     fn code(_: *anyopaque) c_int {
         return 0;
     }
-    fn onRead(raw: ?*anyopaque, packets: helpers.Packets, _: ?[]const io.SocketAddress) anyerror!helpers.ReadAction {
+    fn onRead(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *Mock = @ptrCast(@alignCast(raw.?));
         self.reads += 1;
         try std.testing.expectEqualStrings("x", packets[0]);
@@ -140,7 +140,7 @@ test "looper inline reads writes retries and synchronous detach" {
     try std.testing.expectEqual(1, mock.reads);
     try loop.resumeReading(.tun);
     mock.backpressure = true;
-    const packets: helpers.Packets = &.{"abc"};
+    const packets: io.Packets = &.{"abc"};
     try loop.write(packets, .tun, null);
     try std.testing.expectEqual(0, mock.successful_writes);
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -169,8 +169,8 @@ test "looper inline reads writes retries and synchronous detach" {
 test "timer callbacks can cancel and replace other ready tasks" {
     const Tasks = struct {
         loop: *Looper,
-        cancel: helpers.Timer = .{},
-        replace: helpers.Timer = .{},
+        cancel: io.Timer = .{},
+        replace: io.Timer = .{},
         calls: usize = 0,
         fn edit(raw: ?*anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -189,7 +189,7 @@ test "timer callbacks can cancel and replace other ready tasks" {
     });
     defer loop.destroy();
     var tasks = Tasks{ .loop = loop };
-    var first = helpers.Timer{};
+    var first = io.Timer{};
     try loop.scheduleTimer(&first, 0, .{ .context = &tasks, .callback = Tasks.edit });
     try loop.scheduleTimer(&tasks.cancel, 0, .{ .context = &tasks, .callback = Tasks.called });
     try loop.scheduleTimer(&tasks.replace, 0, .{ .context = &tasks, .callback = Tasks.called });

@@ -19,12 +19,6 @@ pub const Options = struct {
     max_read_count: usize = 128,
 };
 
-pub const Packet = io.Packet;
-
-pub const Packets = io.Packets;
-
-pub const ReadAction = io.ReadAction;
-
 /// Invoked on read events from either looper side. Payloads and addresses are
 /// borrowed until the callback returns. Unconnected UDP supplies one source
 /// address per packet, in the same order; connected sockets and TUN supply null.
@@ -32,34 +26,28 @@ pub const OnRead = struct {
     context: ?*anyopaque = null,
     callback: *const fn (
         ?*anyopaque,
-        Packets,
+        io.Packets,
         ?[]const io.SocketAddress,
-    ) anyerror!ReadAction,
+    ) anyerror!io.ReadAction,
 
     pub fn call(
         self: OnRead,
-        packets: Packets,
+        packets: io.Packets,
         addresses: ?[]const io.SocketAddress,
-    ) anyerror!ReadAction {
+    ) anyerror!io.ReadAction {
         return self.callback(self.context, packets, addresses);
     }
 };
 
-pub const Failure = io.Failure;
-
 /// Invoked on any failure event.
 pub const OnFailure = struct {
     context: ?*anyopaque = null,
-    callback: *const fn (?*anyopaque, Failure) void,
+    callback: *const fn (?*anyopaque, io.Failure) void,
 
-    pub fn call(self: OnFailure, failure: Failure) void {
+    pub fn call(self: OnFailure, failure: io.Failure) void {
         self.callback(self.context, failure);
     }
 };
-
-pub const TimedTask = io.TimedTask;
-
-pub const Timer = io.Timer;
 
 /// The arguments to attach a side of the looper.
 pub const AttachArguments = struct {
@@ -69,11 +57,9 @@ pub const AttachArguments = struct {
     on_failure: ?OnFailure = null,
 };
 
-pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 
-pub const AttachError = SubmissionError || error{
+pub const AttachError = io.SubmissionError || error{
     InvalidBuffers,
     MuxFailure,
     SideAlreadyAttached,
@@ -82,11 +68,9 @@ pub const AttachError = SubmissionError || error{
 
 pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 
-pub const ResumeReadingError = SubmissionError;
-
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
 
-pub const WriteError = SubmissionError || error{
+pub const WriteError = io.SubmissionError || error{
     SideNotAttached,
     InvalidBuffers,
     MissingDestination,
@@ -128,7 +112,7 @@ pub const WriteQueue = struct {
     /// Copies and appends the entire packet batch, or leaves the queue unchanged.
     pub fn append(
         self: *WriteQueue,
-        packets: Packets,
+        packets: io.Packets,
         destination: ?io.SocketAddress,
     ) std.mem.Allocator.Error!void {
         var batch = core.Fifo(WriteNode){};

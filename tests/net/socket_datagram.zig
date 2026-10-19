@@ -62,7 +62,7 @@ const Echo = struct {
     ipv6: Atomic = .init(0),
     failures: Atomic = .init(0),
     pause_once: bool = false,
-    fn read(raw: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) anyerror!Looper.ReadAction {
+    fn read(raw: ?*anyopaque, packets: io.Packets, sources: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *Echo = @ptrCast(@alignCast(raw.?));
         const addresses = sources orelse return error.MissingAddresses;
         try std.testing.expectEqual(packets.len, addresses.len);
@@ -85,7 +85,7 @@ const Echo = struct {
         }
         return .keep;
     }
-    fn failed(raw: ?*anyopaque, _: Looper.Failure) void {
+    fn failed(raw: ?*anyopaque, _: io.Failure) void {
         const self: *Echo = @ptrCast(@alignCast(raw.?));
         _ = self.failures.fetchAdd(1, .release);
     }
@@ -272,7 +272,7 @@ test "unconnected socket wrapper rolls back ownership on allocation failure" {
 test "unified read callback has no addresses for connected UDP and TUN" {
     const Probe = struct {
         count: Atomic = .init(0),
-        fn read(raw: ?*anyopaque, packets: Looper.Packets, addresses: ?[]const io.SocketAddress) !Looper.ReadAction {
+        fn read(raw: ?*anyopaque, packets: io.Packets, addresses: ?[]const io.SocketAddress) !io.ReadAction {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             try std.testing.expect(addresses == null);
             try std.testing.expectEqual(@as(usize, 1), packets.len);

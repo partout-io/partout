@@ -27,10 +27,10 @@ const ReadProbe = struct {
     lifecycle_rejected: bool = false,
     pause: bool = false,
     fail_callback: bool = false,
-    failure: ?Looper.Failure = null,
+    failure: ?io.Failure = null,
     failures: usize = 0,
 
-    fn read(raw: ?*anyopaque, packets: Looper.Packets, addresses: ?[]const io.SocketAddress) anyerror!Looper.ReadAction {
+    fn read(raw: ?*anyopaque, packets: io.Packets, addresses: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.on_caller = self.on_caller and self.caller_thread == std.Thread.getCurrentId();
         try std.testing.expect(addresses == null);
@@ -51,13 +51,13 @@ const ReadProbe = struct {
         return if (self.pause) .pause else .keep;
     }
 
-    fn failed(raw: ?*anyopaque, failure: Looper.Failure) void {
+    fn failed(raw: ?*anyopaque, failure: io.Failure) void {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.failures += 1;
         self.failure = failure;
     }
 
-    fn attach(self: *@This(), pair: Looper.DescriptorPair) Looper.AttachArguments {
+    fn attach(self: *@This(), pair: io.DescriptorPair) Looper.AttachArguments {
         return .{
             .pair = pair,
             .on_read = .{ .context = self, .callback = read },
@@ -130,7 +130,7 @@ const Mock = struct {
         .last_error_code = lastError,
     };
 
-    fn pair(self: *Mock) Looper.DescriptorPair {
+    fn pair(self: *Mock) io.DescriptorPair {
         return .{ .tun = .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &vtable } } } };
     }
 };
@@ -230,7 +230,7 @@ test "copies write payloads and descriptors across partial writes and backpressu
     var mock = Mock{ .fd = fds[1], .partial_once = true, .backpressure_once = true };
     try loop.attach(.{ .pair = mock.pair() });
     var payload = "copied".*;
-    var packets = [_]Looper.Packet{ &payload, "", "second" };
+    var packets = [_]io.Packet{ &payload, "", "second" };
     try loop.write(&packets, .tun, null);
     @memset(&payload, 'x');
     packets = .{ "changed", "changed", "changed" };

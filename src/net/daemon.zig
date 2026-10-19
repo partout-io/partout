@@ -394,7 +394,7 @@ const ConnectionDaemon = struct {
     is_stale_conn_request: bool = false,
     worker: ?*ConnectionWorker = null,
     gate: ConnectionGate,
-    resume_gate_timer: Looper.Timer,
+    resume_gate_timer: io.Timer,
 
     //#region Caller thread - daemon lifecycle
 
@@ -1157,25 +1157,25 @@ const ConnectionDaemon = struct {
     // The event loop invokes looper callbacks on the actor thread. They may run
     // protocol work directly; lifecycle events are queued until loopOnce returns.
 
-    fn onLinkRead(ctx: ?*anyopaque, packets: Looper.Packets, sources: ?[]const io.SocketAddress) !Looper.ReadAction {
+    fn onLinkRead(ctx: ?*anyopaque, packets: io.Packets, sources: ?[]const io.SocketAddress) !io.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkRead but no connection");
         return conn.submitPackets(.link, packets, sources);
     }
 
-    fn onLinkFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {
+    fn onLinkFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkFailure but no connection");
         conn.looperFailed(.link, failure);
     }
 
-    fn onTunnelRead(ctx: ?*anyopaque, packets: Looper.Packets, _: ?[]const io.SocketAddress) !Looper.ReadAction {
+    fn onTunnelRead(ctx: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) !io.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
         return conn.submitPackets(.tun, packets, null);
     }
 
-    fn onTunnelFailure(ctx: ?*anyopaque, failure: Looper.Failure) void {
+    fn onTunnelFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelFailure but no connection");
         conn.looperFailed(.tun, failure);
@@ -1506,7 +1506,7 @@ fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
     };
 }
 
-fn partoutCodeForLooperFailure(opt_failure: ?Looper.Failure) ?api.PartoutErrorCode {
+fn partoutCodeForLooperFailure(opt_failure: ?io.Failure) ?api.PartoutErrorCode {
     const failure = opt_failure orelse return null;
     return switch (failure) {
         .wait, .system, .io => .ioFailure,

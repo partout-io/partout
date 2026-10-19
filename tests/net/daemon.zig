@@ -800,7 +800,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
                 self.established_tun = null;
             }
         }
-        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, endpoint: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.socket_connected = endpoint != null;
             // The factory probe records the requested mode; use a real local UDP
@@ -1292,7 +1292,7 @@ test "daemon-created link is released on failed start or rebind" {
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
             events.emit(.{ .needs_rebind = null });
         }
-        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
+        fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             const wrapper = try io.SocketWrapper.create(allocator, null, .{ .port = port }) orelse return error.LinkNotActive;
             const descriptor = wrapper.linkDescriptor();
@@ -1450,7 +1450,7 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             self.onActor();
             self.destroyed += 1;
         }
-        fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!Looper.LinkDescriptor {
+        fn socket(raw: ?*anyopaque, _: std.mem.Allocator, _: ?api.ExtendedEndpoint, _: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };

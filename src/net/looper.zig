@@ -23,20 +23,9 @@ pub const Looper = struct {
         looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
-    pub const ReadAction = helpers.ReadAction;
-    pub const Packet = helpers.Packet;
-    pub const Packets = helpers.Packets;
-    pub const Failure = helpers.Failure;
-    pub const TimedTask = helpers.TimedTask;
-    pub const Timer = helpers.Timer;
-    pub const LinkDescriptor = io.LinkDescriptor;
-    pub const TunDescriptor = io.TunDescriptor;
-    pub const DescriptorPair = io.DescriptorPair;
     pub const AttachArguments = helpers.AttachArguments;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
-    pub const ResumeReadingError = helpers.ResumeReadingError;
-    pub const SubmissionError = helpers.SubmissionError;
     pub const WriteError = helpers.WriteError;
 
     allocator: std.mem.Allocator,
@@ -71,12 +60,12 @@ pub const Looper = struct {
         self.impl.destroy();
     }
 
-    pub fn loopOnce(self: *Looper, failure: *?Failure) bool {
+    pub fn loopOnce(self: *Looper, failure: *?io.Failure) bool {
         return self.impl.loopOnce(null, failure);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.
-    pub fn flushWrites(self: *Looper, side: io.Side) DetachError!?Failure {
+    pub fn flushWrites(self: *Looper, side: io.Side) DetachError!?io.Failure {
         return self.impl.flushWrites(side);
     }
 
@@ -91,17 +80,17 @@ pub const Looper = struct {
     /// `timer` is only an identity token and its address is never retained.
     pub fn scheduleTimer(
         self: *Looper,
-        timer: *helpers.Timer,
+        timer: *io.Timer,
         delay_ms: u64,
-        task: helpers.TimedTask,
-    ) helpers.SubmissionError!void {
+        task: io.TimedTask,
+    ) io.SubmissionError!void {
         return self.impl.scheduleTimer(timer, delay_ms, task);
     }
 
     /// Cancels one delayed task. After this returns, its borrowed callback
     /// context cannot be invoked, even if the scheduler deadline races with
     /// cancellation. A token whose task has already run is harmless.
-    pub fn cancelTimer(self: *Looper, timer: *helpers.Timer) void {
+    pub fn cancelTimer(self: *Looper, timer: *io.Timer) void {
         return self.impl.cancelTimer(timer);
     }
 
@@ -123,7 +112,7 @@ pub const Looper = struct {
         return self.impl.isAttached(.tun);
     }
 
-    pub fn resumeReading(self: *Looper, side: io.Side) helpers.ResumeReadingError!void {
+    pub fn resumeReading(self: *Looper, side: io.Side) io.SubmissionError!void {
         return self.impl.resumeReading(side);
     }
 
@@ -133,7 +122,7 @@ pub const Looper = struct {
     /// rejected datagrams are dropped without detaching the socket.
     pub fn write(
         self: *Looper,
-        packets: Packets,
+        packets: io.Packets,
         side: io.Side,
         destination: ?io.SocketAddress,
     ) WriteError!void {

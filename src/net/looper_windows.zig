@@ -31,7 +31,7 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn loopOnce(self: *WindowsLooper, _: ?u32, failure: *?helpers.Failure) bool {
+    pub fn loopOnce(self: *WindowsLooper, _: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
         if (self.stopped) return false;
         @panic("WindowsLooper.loopOnce is not implemented");
@@ -44,14 +44,14 @@ pub const WindowsLooper = struct {
 
     pub fn scheduleTimer(
         _: *WindowsLooper,
-        _: *helpers.Timer,
+        _: *io.Timer,
         _: u64,
-        _: helpers.TimedTask,
-    ) helpers.SubmissionError!void {
+        _: io.TimedTask,
+    ) io.SubmissionError!void {
         @panic("WindowsLooper.scheduleTimer is not implemented");
     }
 
-    pub fn cancelTimer(_: *WindowsLooper, _: *helpers.Timer) void {
+    pub fn cancelTimer(_: *WindowsLooper, _: *io.Timer) void {
         @panic("WindowsLooper.cancelTimer is not implemented");
     }
 
@@ -69,14 +69,14 @@ pub const WindowsLooper = struct {
 
     pub fn write(
         _: *WindowsLooper,
-        _: helpers.Packets,
+        _: io.Packets,
         _: io.Side,
         _: ?io.SocketAddress,
     ) helpers.WriteError!void {
         @panic("WindowsLooper.write is not implemented");
     }
 
-    pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?helpers.Failure {
+    pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?io.Failure {
         @panic("WindowsLooper.flushWrites is not implemented");
     }
 
@@ -90,7 +90,7 @@ pub const WindowsLooper = struct {
         return false;
     }
 
-    pub fn resumeReading(_: *WindowsLooper, _: io.Side) helpers.ResumeReadingError!void {
+    pub fn resumeReading(_: *WindowsLooper, _: io.Side) io.SubmissionError!void {
         @panic("WindowsLooper.resumeReading is not implemented");
     }
 };

@@ -8,6 +8,7 @@ const builtin = @import("builtin");
 const source = @import("source");
 const test_helpers = @import("looper_test_helpers.zig");
 
+const io = source.net_io;
 const Looper = source.net_looper.Looper;
 
 const TimerProbe = struct {
@@ -30,9 +31,9 @@ test "looper runs and cancels timers on its caller" {
         .mux = wake.handle,
     });
     defer looper.deinit();
-    var timer = Looper.Timer{};
+    var timer = io.Timer{};
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
-    const task: Looper.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
+    const task: io.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
     try looper.scheduleTimer(&timer, 1, task);
     try std.testing.expectEqual(@as(usize, 0), probe.calls);
     try std.testing.expect(try test_helpers.poll(&looper, 100));
