@@ -337,7 +337,7 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
     var platform = try Platform.init(.{ .ref = &policy, .fnt = functions });
     defer platform.deinit();
     const reservation = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })).?;
-    const port = (try reservation.localAddress()).port;
+    const port = (try reservation.linkDescriptor().localAddress()).port;
     reservation.destroy();
 
     var factory = platform.socketFactory();

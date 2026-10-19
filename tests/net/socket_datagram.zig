@@ -31,7 +31,7 @@ fn wait(loop: ?*Looper, value: *const Atomic, expected: usize) !void {
     return error.Timeout;
 }
 fn destination(link: *io.SocketWrapper, family: u8) !io.SocketAddress {
-    const local = try link.localAddress();
+    const local = try link.linkDescriptor().localAddress();
     var address = std.mem.zeroes(io.SocketAddress);
     address.family = family;
     address.port = local.port;
@@ -43,7 +43,7 @@ fn destination(link: *io.SocketWrapper, family: u8) !io.SocketAddress {
 }
 fn receive(loop: ?*Looper, link: *io.SocketWrapper, buf: []u8, address: *io.SocketAddress) !usize {
     for (0..if (loop != null) @as(usize, 500) else 5000) |_| {
-        return link.receiveFrom(buf, address) catch |err| {
+        return (link.linkDescriptor().io.readPacket(buf, address) catch |err| {
             if (err != error.WouldBlock) return err;
             if (loop) |caller| {
                 try std.testing.expect(try test_helpers.poll(caller, 10));
@@ -51,7 +51,7 @@ fn receive(loop: ?*Looper, link: *io.SocketWrapper, buf: []u8, address: *io.Sock
                 _ = libc.usleep(1000);
             }
             continue;
-        };
+        }) orelse return error.EndOfStream;
     }
     return error.Timeout;
 }
@@ -143,7 +143,7 @@ test "one UDP link echoes several peers across both address families" {
     var configure_count: usize = 0;
     const server = (try io.SocketWrapper.create(allocator, null, .{ .configure = configured, .configure_ctx = &configure_count })) orelse return error.SocketFailed;
     try std.testing.expectEqual(@as(usize, 1), configure_count);
-    try std.testing.expect(server.isUnconnected());
+    try std.testing.expect(server.linkDescriptor().io.isUnconnected());
     try std.testing.expect(server.remoteAddress() == null);
     const descriptor = server.linkDescriptor();
     try std.testing.expect(descriptor.io == .socket);
@@ -162,9 +162,9 @@ test "one UDP link echoes several peers across both address families" {
     defer second.destroy();
     const third = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
     defer third.destroy();
-    _ = try first.sendTo("one", v4);
-    _ = try second.sendTo("two", v4);
-    _ = try third.sendTo("", v6);
+    _ = try first.linkDescriptor().io.writePacket("one", 0, v4);
+    _ = try second.linkDescriptor().io.writePacket("two", 0, v4);
+    _ = try third.linkDescriptor().io.writePacket("", 0, v6);
     var buf: [32]u8 = undefined;
     var address: io.SocketAddress = undefined;
     var n = try receive(&loop, first, &buf, &address);
@@ -212,10 +212,10 @@ test "UDP pause, resume and replacement apply to the logical link" {
     };
     const peer = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     defer peer.destroy();
-    _ = try peer.sendTo("pause", v4);
+    _ = try peer.linkDescriptor().io.writePacket("pause", 0, v4);
     try wait(&loop, &echo.count, 1);
     try std.testing.expect(try test_helpers.poll(&loop, 0));
-    _ = try peer.sendTo("resume", v6);
+    _ = try peer.linkDescriptor().io.writePacket("resume", 0, v6);
     try std.testing.expect(try test_helpers.poll(&loop, 20));
     try std.testing.expectEqual(@as(usize, 1), echo.count.load(.acquire));
     try loop.resumeReading(.link);
@@ -227,7 +227,7 @@ test "UDP pause, resume and replacement apply to the logical link" {
         replacement.destroy();
         return err;
     };
-    _ = try peer.sendTo("new", new_address);
+    _ = try peer.linkDescriptor().io.writePacket("new", 0, new_address);
     try wait(&loop, &echo.count, 3);
     try loop.stop();
 }
@@ -250,8 +250,8 @@ test "UDP truncation drops the packet and retains the link" {
     };
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer peer.destroy();
-    _ = try peer.sendTo("oversized", address);
-    _ = try peer.sendTo("ok", address);
+    _ = try peer.linkDescriptor().io.writePacket("oversized", 0, address);
+    _ = try peer.linkDescriptor().io.writePacket("ok", 0, address);
     var buf: [4]u8 = undefined;
     var from: io.SocketAddress = undefined;
     try std.testing.expectEqual(@as(usize, 2), try receive(&loop, peer, &buf, &from));
@@ -324,7 +324,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
         var buf: [32]u8 = undefined;
         var sender: io.SocketAddress = undefined;
         _ = try receive(caller, server, &buf, &sender);
-        _ = try server.sendTo("plain", sender);
+        _ = try server.linkDescriptor().io.writePacket("plain", 0, sender);
         try wait(caller, &probe.count, 2);
         try loop.stop();
     }
@@ -343,7 +343,7 @@ test "connected socket wrapper does not retain endpoint text" {
     @memset(&text, 'x');
     try std.testing.expectEqualDeep(address, socket.remoteAddress().?);
     try std.testing.expectEqual(source.core.api.IPSocketType.udp, socket.remote_endpoint.?.type);
-    try std.testing.expect(!socket.isUnconnected());
+    try std.testing.expect(!socket.linkDescriptor().io.isUnconnected());
     try std.testing.expectEqual(@as(usize, 5), try socket.linkDescriptor().io.writePacket("owned", 0, null));
     var buf: [32]u8 = undefined;
     var source_address: io.SocketAddress = undefined;
@@ -354,14 +354,14 @@ test "connected socket wrapper does not retain endpoint text" {
 test "connected socket wrapper resolves hostnames and retains the selected peer" {
     const peer = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     defer peer.destroy();
-    const bound = try peer.localAddress();
+    const bound = try peer.linkDescriptor().localAddress();
     var hostname = "localhost".*;
     const socket = (try io.SocketWrapper.create(allocator, .{ .address = &hostname, .proto = .init(.udp, bound.port) }, .{
         .timeout_ms = 1000,
     })) orelse return error.SocketFailed;
     defer socket.destroy();
     @memset(&hostname, 'x');
-    try std.testing.expect(!socket.isUnconnected());
+    try std.testing.expect(!socket.linkDescriptor().io.isUnconnected());
     const remote = socket.remoteAddress().?;
     try std.testing.expectEqualDeep(try destination(peer, remote.family), remote);
     const native = socket.linkDescriptor().io;
@@ -370,7 +370,7 @@ test "connected socket wrapper resolves hostnames and retains the selected peer"
     var sender: io.SocketAddress = undefined;
     const n = try receive(null, peer, &buf, &sender);
     try std.testing.expectEqualStrings("request", buf[0..n]);
-    _ = try peer.sendTo("reply", sender);
+    _ = try peer.linkDescriptor().io.writePacket("reply", 0, sender);
     for (0..5000) |_| {
         const count = native.read(&buf) catch |err| {
             if (err != error.WouldBlock) return err;
@@ -389,8 +389,8 @@ test "unconnected socket family restrictions remain explicit" {
     defer v4.destroy();
     const v6 = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = false })) orelse return error.SocketFailed;
     defer v6.destroy();
-    try std.testing.expectEqual(@as(u8, 4), (try v4.localAddress()).family);
-    try std.testing.expectEqual(@as(u8, 6), (try v6.localAddress()).family);
-    try std.testing.expectError(error.DatagramDropped, v4.sendTo("wrong family", try destination(v6, 6)));
-    try std.testing.expectError(error.DatagramDropped, v6.sendTo("wrong family", try destination(v4, 4)));
+    try std.testing.expectEqual(@as(u8, 4), (try v4.linkDescriptor().localAddress()).family);
+    try std.testing.expectEqual(@as(u8, 6), (try v6.linkDescriptor().localAddress()).family);
+    try std.testing.expectError(error.DatagramDropped, v4.linkDescriptor().io.writePacket("wrong family", 0, try destination(v6, 6)));
+    try std.testing.expectError(error.DatagramDropped, v6.linkDescriptor().io.writePacket("wrong family", 0, try destination(v4, 4)));
 }

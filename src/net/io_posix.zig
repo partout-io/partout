@@ -193,10 +193,6 @@ pub const SocketWrapper = struct {
         return wrapper;
     }
 
-    pub fn isUnconnected(self: *const SocketWrapper) bool {
-        return self.remote_endpoint == null;
-    }
-
     pub fn destroy(self: *SocketWrapper) void {
         log.write(.debug, "Destroy SocketWrapper");
         self.free();
@@ -247,6 +243,10 @@ pub const SocketWrapper = struct {
         return .{ .socket = self };
     }
 
+    fn isUnconnected(self: *const SocketWrapper) bool {
+        return self.remote_endpoint == null;
+    }
+
     fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) Error!void {
         if (!io_c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
     }
@@ -276,7 +276,7 @@ pub const SocketWrapper = struct {
         return io_c.pp_socket_last_error_binding();
     }
 
-    pub fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
+    fn receiveFrom(self: *SocketWrapper, buf: []u8, address: *io.SocketAddress) Error!usize {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         const count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, address);
         if (count == io_c.PPIOErrorWouldBlock) return error.WouldBlock;
@@ -284,7 +284,7 @@ pub const SocketWrapper = struct {
         return @intCast(count);
     }
 
-    pub fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
+    fn sendTo(self: *const SocketWrapper, data: []const u8, address: io.SocketAddress) Error!usize {
         if (!self.isUnconnected()) return error.InvalidSocketMode;
         if (address.family != 4 and address.family != 6) return error.InvalidAddressFamily;
         return mapWriteResult(.link, io_c.pp_socket_write(self.socket, data.ptr, data.len, &address), false) catch |err| {
@@ -308,7 +308,7 @@ pub const SocketWrapper = struct {
         };
     }
 
-    pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
+    fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
         var address: io.SocketAddress = undefined;
         if (!io_c.pp_socket_get_address(self.socket, &address)) return error.LibcFailure;
         return address;
@@ -319,7 +319,7 @@ pub const SocketWrapper = struct {
         return endpoint.address;
     }
 
-    pub fn muxDescriptor(self: SocketWrapper) ?io_c.pp_fd {
+    fn muxDescriptor(self: SocketWrapper) ?io_c.pp_fd {
         const fd = io_c.pp_socket_get_watch_fd(self.socket);
         return if (io_c.pp_fd_is_valid(fd)) fd else null;
     }
@@ -378,7 +378,7 @@ pub const TunWrapper = struct {
         io_c.pp_tun_free(self.tun);
     }
 
-    pub fn nativeIO(self: *TunWrapper) POSIXInterface {
+    fn nativeIO(self: *TunWrapper) POSIXInterface {
         return .{ .tun = self };
     }
 
@@ -411,12 +411,6 @@ pub const TunWrapper = struct {
         if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.fd;
         const fd = io_c.pp_tun_get_watch_fd(self.tun);
         return if (io_c.pp_fd_is_valid(fd)) fd else null;
-    }
-
-    pub fn name(self: TunWrapper) ?[]const u8 {
-        const tun = self.tun orelse return null;
-        const c_name = io_c.pp_tun_name(tun) orelse return null;
-        return std.mem.span(c_name);
     }
 
     pub fn tunDescriptor(self: *TunWrapper) Error!TunDescriptor {

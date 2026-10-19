@@ -526,7 +526,7 @@ test "UDP packet errors discard only the bad packet and retain the link" {
     const socket = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
     defer peer.destroy();
-    var remote = try peer.localAddress();
+    var remote = try peer.linkDescriptor().localAddress();
     remote.address[0..4].* = .{ 127, 0, 0, 1 };
     try loop.attach(.{ .pair = .{ .link = socket.linkDescriptor() } });
     try std.testing.expectError(error.MissingDestination, loop.write(&.{"x"}, .link, null));
@@ -537,11 +537,11 @@ test "UDP packet errors discard only the bad packet and retain the link" {
     var bytes: [64]u8 = undefined;
     var sender: io.SocketAddress = undefined;
     const size = for (0..500) |_| {
-        break peer.receiveFrom(&bytes, &sender) catch |err| {
+        break (peer.linkDescriptor().io.readPacket(&bytes, &sender) catch |err| {
             if (err != error.WouldBlock) return err;
             try std.testing.expect(try test_helpers.poll(&loop, 10));
             continue;
-        };
+        }) orelse return error.EndOfStream;
     } else return error.Timeout;
     try std.testing.expectEqualStrings("valid", bytes[0..size]);
     try std.testing.expect(loop.isLinkAttached());
