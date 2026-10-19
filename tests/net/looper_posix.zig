@@ -4,7 +4,7 @@
 const std = @import("std");
 const source = @import("source");
 const Looper = source.net_looper_posix.PosixLooper;
-const helpers = source.net_looper_v2.testing_helpers;
+const helpers = source.net_looper.testing_helpers;
 const io = source.net_io;
 const allocator = std.testing.allocator;
 
@@ -13,14 +13,8 @@ const WakeMux = test_helpers.Mux;
 
 const Probe = struct {
     looper: *Looper = undefined,
-    finishes: usize = 0,
     tasks: usize = 0,
     timer: helpers.Timer = .{},
-    fn finish(raw: ?*anyopaque, failure: ?helpers.Failure) void {
-        const self: *Probe = @ptrCast(@alignCast(raw.?));
-        std.debug.assert(failure == null);
-        self.finishes += 1;
-    }
     fn task(raw: ?*anyopaque) void {
         const self: *Probe = @ptrCast(@alignCast(raw.?));
         self.tasks += 1;
@@ -33,7 +27,9 @@ test "looper lifecycle and timers are caller driven" {
     var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     probe.looper = loop;
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -52,7 +48,6 @@ test "looper lifecycle and timers are caller driven" {
     try std.testing.expectEqual(3, probe.tasks);
     try loop.stop();
     try loop.stop();
-    try std.testing.expectEqual(0, probe.finishes);
     try std.testing.expect(!try test_helpers.poll(&loop, 0));
     try std.testing.expectError(error.LooperUnavailable, loop.scheduleTimer(&probe.timer, 0, .{ .callback = Probe.task }));
 }
@@ -117,10 +112,11 @@ const Mock = struct {
 };
 
 test "looper inline reads writes retries and synchronous detach" {
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
@@ -186,10 +182,11 @@ test "timer callbacks can cancel and replace other ready tasks" {
             self.calls += 1;
         }
     };
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     var tasks = Tasks{ .loop = loop };
     var first = helpers.Timer{};
@@ -206,10 +203,11 @@ test "timer callbacks can cancel and replace other ready tasks" {
 }
 
 test "write backpressure preserves an explicitly paused opposite side" {
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
     defer _ = std.c.close(fds[0]);
@@ -256,7 +254,9 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     var destroyed = false;
     defer if (!destroyed) loop.destroy();
     probe.looper = loop;
@@ -286,8 +286,12 @@ test "looper borrows its mux across allocation failure and replacement" {
     const mux = try WakeMux.init();
     defer mux.deinit();
     var probe = Probe{};
-    const options = helpers.Options{ .mux = mux.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } };
-    try std.testing.expectError(error.MuxFailure, Looper.create(allocator, .{ .mux = null, .on_finish = options.on_finish }));
+    const options = helpers.Options{
+        .mux = mux.handle,
+    };
+    try std.testing.expectError(error.MuxFailure, Looper.create(allocator, .{
+        .mux = null,
+    }));
     var failing = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
     try std.testing.expectError(error.OutOfMemory, Looper.create(failing.allocator(), options));
     for (0..2) |_| {
@@ -302,5 +306,4 @@ test "looper borrows its mux across allocation failure and replacement" {
         try std.testing.expect(io.io_c.pp_mux_wait(mux.handle, 0, null) > 0);
     }
     try std.testing.expectEqual(@as(usize, 2), probe.tasks);
-    try std.testing.expectEqual(@as(usize, 0), probe.finishes);
 }

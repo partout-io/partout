@@ -11,17 +11,19 @@ const api = core.api;
 const log = core.logging;
 
 const impl = @import("backend.zig");
+const passive_io = @import("passive_io.zig");
 const resolver = @import("resolver.zig");
 const tunnel_info = @import("tunnel_info.zig");
 const uapi = @import("uapi.zig");
 
+const PassiveIO = passive_io.PassiveIO;
 const PeerEndpointResolver = resolver.PeerEndpointResolver;
 const TunnelRemoteInfoBuilder = tunnel_info.TunnelRemoteInfoBuilder;
 
 /// Selects network-change semantics independently of the platform name.
 ///
-/// One environment can keep wg-go alive and replace its path-bound sockets;
-/// another must recreate the backend once a usable network is available.
+/// One environment keeps wg-go alive while its sockets are replaced;
+/// another recreates the backend once a usable network is available.
 const NetworkChangeBehavior = enum {
     refresh_sockets,
     suspend_backend_when_offline,
@@ -37,37 +39,50 @@ const NetworkChangeBehavior = enum {
 pub const WireGuardAdapter = struct {
     module_id: api.UUID,
     backend: impl.Backend,
-    controller: net.TunnelController,
     profile: *const api.Profile,
     configuration: *const api.WireGuardConfiguration,
     endpoint_resolver: PeerEndpointResolver,
     network_change_behavior: NetworkChangeBehavior,
     state: State = .stopped,
     /// Latest reachability event, used only to gate background restart retries.
-    last_reachable: ?bool = null,
-    tunnel: ?*net.TunWrapper = null,
+    last_reachable: bool = false,
+    transport: Transport,
+
+    pub const default_daemon_io: net.Connection.DaemonIO = if (builtin.os.tag == .windows) .link else .none;
+
+    /// Owns mode-specific resources; State tracks their lifecycle.
+    const Transport = union(enum) {
+        active: struct {
+            controller: net.TunnelController,
+            /// Owned while started, temporarily shut down, or awaiting recommit.
+            tunnel: net.TunDescriptor = undefined,
+        },
+        passive: struct {
+            start: impl.StartTunnelPassive = undefined,
+            io: PassiveIO,
+        },
+    };
 
     /// Concrete failures produced while activating the WireGuard tunnel.
     /// The connection preserves allocator failures and logs/erases the
     /// WireGuard-specific failures to `UnableToStart` at the generic boundary.
-    pub const ActivationError = BuildConfigurationError ||
-        TunnelRemoteInfoBuilder.Error ||
-        net.TunnelController.Error ||
-        StartBackendError;
+    pub const ActivationError = BuildConfigurationError || TunnelRemoteInfoBuilder.Error || StartBackendError;
 
     const NetworkChangeResult = union(enum) {
         unchanged,
-        resumed,
+        needs_rebind: ?api.TunnelRemoteInfoWrapper,
         retry: ActivationError,
     };
 
     const BuildConfigurationError = resolver.ResolutionError || uapi.BuildConfigurationError;
-    const ConfigureSocketsError = impl.Error || net.TunnelController.Error;
-    const StartBackendError = ConfigureSocketsError || error{CouldNotStartBackend};
+    const StartBackendError = impl.Error || net.TunnelController.Error || error{CouldNotStartBackend};
 
     const State = union(enum) {
         /// No backend or temporary-restart work is active.
         stopped,
+
+        /// Active startup has prepared DNS and is waiting for its first TUN.
+        awaiting_commit,
 
         /// wg-go is running with this opaque backend handle.
         started: i32,
@@ -75,6 +90,9 @@ pub const WireGuardAdapter = struct {
         /// The device went offline, so wg-go was torn down while the tunnel
         /// configuration remains available for a fresh DNS resolution/restart.
         temporary_shutdown,
+
+        /// Active resume retains the old TUN while awaiting its replacement.
+        recommitting,
     };
 
     const ConfigurationScope = enum {
@@ -85,17 +103,17 @@ pub const WireGuardAdapter = struct {
     pub fn init(
         module_id: api.UUID,
         backend: impl.Backend,
+        daemon_io: net.Connection.DaemonIO,
         controller: net.TunnelController,
         dns_resolver: net.DNSResolver,
         factory: net.SocketFactory,
         profile: *const api.Profile,
         configuration: *const api.WireGuardConfiguration,
         dns_timeout_ms: u32,
-    ) WireGuardAdapter {
+    ) std.mem.Allocator.Error!WireGuardAdapter {
         return .{
             .module_id = module_id,
             .backend = backend,
-            .controller = controller,
             .profile = profile,
             .configuration = configuration,
             .endpoint_resolver = PeerEndpointResolver.init(
@@ -105,155 +123,167 @@ pub const WireGuardAdapter = struct {
                 dns_timeout_ms,
             ),
             .network_change_behavior = .current(),
+            .transport = switch (daemon_io) {
+                .none => .{ .active = .{ .controller = controller } },
+                .link => .{ .passive = .{ .io = try PassiveIO.init(backend.vtable.complete_io orelse @panic("complete_io undefined in backend")) } },
+                .looper => @panic("WireGuard requires link or none daemon I/O"),
+            },
         };
     }
 
     pub fn deinit(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
         log.write(.debug, "Deinit WireGuardAdapter");
         self.stop(allocator);
+        switch (self.transport) {
+            .active => {},
+            .passive => |*passive| passive.io.deinit(),
+        }
         self.endpoint_resolver.deinit(allocator);
     }
 
+    /// Takes link ownership on entry. Returns owned tunnel info for a new start,
+    /// or null when only replacing the link of an already active adapter.
     pub fn start(
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
-    ) ActivationError!void {
-        if (!self.isStopped())
-            @panic("WireGuardAdapter.start() requires a stopped adapter");
-        errdefer self.shutdown(allocator);
+        remote: net.RemoteDescriptor,
+    ) ActivationError!?api.TunnelRemoteInfoWrapper {
+        self.replaceLink(remote);
+        errdefer self.stop(allocator);
+        if (!self.isStopped()) {
+            log.write(.debug, "Replaced link, adapter is already active");
+            return null;
+        }
 
-        log.write(.info, "Start adapter");
-        self.activate(allocator) catch |err| {
-            log.writef(.fault, "Unable to start: {s}", .{@errorName(err)});
-            return err;
+        var info = try self.buildTunnelInfo(allocator);
+        errdefer info.deinit(allocator);
+
+        log.writef(.info, "Start {s} adapter", .{@tagName(self.transport)});
+        switch (self.transport) {
+            .active => {
+                // Cache hostnames before the daemon applies tunnel settings.
+                try self.endpoint_resolver.cacheAll(allocator);
+                self.state = .awaiting_commit;
+            },
+            .passive => |*passive| {
+                passive.start = passive.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
+                try self.activate(allocator);
+            },
+        }
+        return info;
+    }
+
+    /// Takes TUN ownership on entry; a suspended backend stays retryable on failure.
+    pub fn commit(self: *WireGuardAdapter, allocator: std.mem.Allocator, descriptor: net.TunDescriptor) ActivationError!void {
+        var incoming = descriptor;
+        errdefer incoming.cleanup();
+        switch (self.transport) {
+            .active => |*active| {
+                switch (self.state) {
+                    .awaiting_commit => {
+                        active.tunnel = descriptor;
+                        try self.activate(allocator);
+                    },
+                    .recommitting => {
+                        if (!self.last_reachable) return error.CouldNotStartBackend;
+                        var previous = active.tunnel;
+                        active.tunnel = descriptor;
+                        errdefer active.tunnel = previous;
+                        try self.activate(allocator);
+                        previous.cleanup();
+                    },
+                    else => return error.CouldNotStartBackend,
+                }
+            },
+            .passive => |*passive| passive.io.replaceTun(descriptor),
+        }
+    }
+
+    /// False means the suspended adapter needs a local retry.
+    pub fn rebind(self: *WireGuardAdapter, allocator: std.mem.Allocator, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor) ActivationError!bool {
+        self.replaceLink(remote);
+        if (tun) |descriptor| self.commit(allocator, descriptor) catch |err| {
+            switch (self.transport) {
+                .active => {
+                    if (self.state != .recommitting) return err;
+                    self.state = .temporary_shutdown;
+                    log.writef(.err, "Unable to resume WireGuard tunnel: {s}", .{@errorName(err)});
+                    return false;
+                },
+                .passive => return err,
+            }
         };
+        self.sendKeepalives();
+        return true;
     }
 
     pub fn stop(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
-        if (self.isStopped()) return;
-        log.write(.info, "Stop adapter");
-        self.shutdown(allocator);
+        if (!self.isStopped()) log.write(.info, "Stop adapter");
+        // A prepared active connection can be stopped before commit starts Go.
+        const previous = self.state;
+        switch (self.state) {
+            .started => |handle| {
+                self.quiesce();
+                self.backend.turnOff(handle);
+            },
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => {},
+        }
+        self.state = .stopped;
+        self.last_reachable = false;
+        self.endpoint_resolver.reset(allocator);
+        switch (self.transport) {
+            .active => |*active| {
+                switch (previous) {
+                    .started, .temporary_shutdown, .recommitting => active.tunnel.cleanup(),
+                    .stopped, .awaiting_commit => {},
+                }
+                active.tunnel = undefined;
+            },
+            .passive => |*passive| passive.io.release(),
+        }
+    }
+
+    pub fn isStarted(self: *const WireGuardAdapter) bool {
+        return self.state == .started;
     }
 
     pub fn isStopped(self: *const WireGuardAdapter) bool {
-        return switch (self.state) {
-            .stopped => true,
-            .started, .temporary_shutdown => false,
+        return self.state == .stopped;
+    }
+
+    pub fn hasResources(self: *WireGuardAdapter) bool {
+        if (!self.isStopped()) return true;
+        return switch (self.transport) {
+            .active => false,
+            .passive => |*passive| passive.io.hasIO(),
         };
     }
 
-    fn activate(
-        self: *WireGuardAdapter,
-        allocator: std.mem.Allocator,
-    ) ActivationError!void {
-        try self.endpoint_resolver.cacheAll(allocator);
-
-        var remote_info = try TunnelRemoteInfoBuilder.init(
-            allocator,
-            self.profile,
-            self.module_id,
-            self.configuration,
-        ).build();
-        defer remote_info.deinit(allocator);
-        try self.setNetworkSettings(remote_info);
-
-        const wg_config = try buildConfiguration(
-            allocator,
-            self.configuration,
-            &self.endpoint_resolver,
-            .full,
-        );
-        defer allocator.free(wg_config);
-
-        const handle = try self.startBackend(allocator, wg_config);
-        self.state = .{ .started = handle };
-    }
-
-    fn setNetworkSettings(
-        self: *WireGuardAdapter,
-        remote_info: api.TunnelRemoteInfoWrapper,
-    ) net.TunnelController.Error!void {
-        const new_tunnel = self.controller.setTunnelSettings(remote_info) catch |err| {
-            log.writef(.err, "Unable to configure tunnel settings: {s}", .{@errorName(err)});
-            return err;
+    pub fn daemonIO(self: *const WireGuardAdapter) net.Connection.DaemonIO {
+        return switch (self.transport) {
+            .active => .none,
+            .passive => .link,
         };
-
-        // The new settings should produce a new tun interface
-        if (self.tunnel) |old_tunnel| {
-            old_tunnel.destroy();
-        }
-        self.tunnel = new_tunnel;
-        log.write(.info, "Tunnel interface is now UP");
-        if (self.tunnel == null) {
-            // This is expected on Windows: wg-go opens the adapter itself by
-            // the interface name passed to `turnOn`. Other controllers may
-            // still omit a native descriptor when no socket setup is needed.
-            return;
-        }
-
-        if (builtin.os.tag != .windows) {
-            if (self.tunnel.?.muxDescriptor()) |descriptor| {
-                log.writef(.debug, "Tunnel file descriptor: Optional({any})", .{descriptor});
-            } else {
-                log.write(.debug, "Tunnel file descriptor: nil");
-            }
-        }
     }
 
-    pub fn interfaceName(self: *const WireGuardAdapter) ?[]const u8 {
-        if (builtin.os.tag == .windows) {
-            return self.module_id[0..];
-        }
-        const tunnel = self.tunnel orelse return null;
-        return tunnel.name();
-    }
-
-    fn startBackend(
+    pub fn dataCountFromRuntimeConfig(
         self: *const WireGuardAdapter,
         allocator: std.mem.Allocator,
-        wg_config: [:0]const u8,
-    ) StartBackendError!i32 {
-        log.write(.debug, "Start wg-go backend");
-        const handle = self.backend.turnOn(allocator, wg_config, .{
-            .tun = self.tunnel orelse return error.CannotLocateTunnelFileDescriptor,
-            .ifname = self.module_id[0..],
-        }) catch |err| {
-            log.writef(.err, "Starting tunnel failed: {s}", .{@errorName(err)});
-            return err;
+    ) impl.Error!?api.DataCount {
+        const handle = switch (self.state) {
+            .started => |value| value,
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => return null,
         };
-        if (handle < 0) {
-            log.writef(.err, "Starting tunnel failed with wgTurnOn returning {d}", .{handle});
-            return error.CouldNotStartBackend;
-        }
-        log.writef(.debug, "wg-go backend started with handle {d}", .{handle});
-        errdefer self.backend.turnOff(handle);
-
-        if (builtin.os.tag == .ios) {
-            self.backend.disableRoaming(handle);
-        }
-        try self.configureSockets(allocator, handle);
-        return handle;
+        const text = (try self.backend.getConfig(allocator, handle)) orelse return null;
+        defer allocator.free(text);
+        return uapi.parseRuntimeDataCount(text);
     }
 
-    fn configureSockets(
-        self: *const WireGuardAdapter,
-        allocator: std.mem.Allocator,
-        handle: i32,
-    ) ConfigureSocketsError!void {
-        const descriptors = self.backend.socketDescriptors(allocator, handle) catch |err| {
-            log.writef(.err, "Unable to fetch backend socket descriptors: {s}", .{@errorName(err)});
-            return err;
-        };
-        defer allocator.free(descriptors);
-
-        if (descriptors.len == 0) {
-            if (builtin.abi.isAndroid()) {
-                log.write(.fault, "Socket descriptors are empty");
-            }
-            return;
+    pub fn setFailureReporter(self: *WireGuardAdapter, ctx: *anyopaque, report: *const fn (*anyopaque) void) void {
+        switch (self.transport) {
+            .active => {},
+            .passive => |*passive| passive.io.failure = .{ .ctx = ctx, .report = report },
         }
-        log.writef(.info, "Socket descriptors: {any}", .{descriptors});
-        try self.controller.configureSockets(descriptors);
     }
 
     pub fn didUpdateReachable(
@@ -267,15 +297,13 @@ pub const WireGuardAdapter = struct {
         switch (self.state) {
             .started => |handle| {
                 switch (self.network_change_behavior) {
-                    .refresh_sockets => {
-                        // The backend remains live even for an unreachable path
-                        // notification. Bumping makes wg-go discard path-bound
-                        // sockets; the replacements are then protected again.
-                        self.refreshSockets(allocator, handle);
-                    },
+                    // Retain learned endpoints. Active backends replace their
+                    // sockets; passive connections request host replacement.
+                    .refresh_sockets => self.refreshSockets(allocator, handle),
                     .suspend_backend_when_offline => if (!is_reachable) {
                         log.write(.debug, "Connectivity offline, pausing backend.");
                         self.state = .temporary_shutdown;
+                        self.quiesce();
                         self.backend.turnOff(handle);
                     } else {
                         self.updatePeerEndpoints(allocator, handle);
@@ -283,12 +311,107 @@ pub const WireGuardAdapter = struct {
                 }
                 return .unchanged;
             },
-            .temporary_shutdown => {
+            .temporary_shutdown, .recommitting => {
                 if (!is_reachable) return .unchanged;
                 return self.resumeTemporaryShutdown(allocator);
             },
-            .stopped => return .unchanged,
+            .stopped, .awaiting_commit => return .unchanged,
         }
+    }
+
+    pub fn prepareLinkRefresh(self: *WireGuardAdapter, info: ?api.TunnelRemoteInfoWrapper, events: net.Connection.Events) void {
+        if (info == null and !self.isStarted()) return;
+        switch (self.transport) {
+            .active => {
+                if (info == null or self.state != .temporary_shutdown) return;
+                self.state = .recommitting;
+            },
+            .passive => |*passive| passive.io.releaseLink(),
+        }
+        events.emit(.{ .needs_rebind = info });
+    }
+
+    /// Retries only if no newer reachability event made the pending attempt
+    /// stale. Scheduling is owned by the connection so this method always runs
+    /// on the daemon actor with the rest of the adapter state machine.
+    pub fn retryTemporaryShutdown(
+        self: *WireGuardAdapter,
+        allocator: std.mem.Allocator,
+    ) NetworkChangeResult {
+        if (self.state != .temporary_shutdown or !self.last_reachable) return .unchanged;
+        return self.resumeTemporaryShutdown(allocator);
+    }
+
+    pub fn sendKeepalives(self: *const WireGuardAdapter) void {
+        switch (self.state) {
+            .started => |handle| self.backend.sendKeepalives(handle),
+            .stopped, .awaiting_commit, .temporary_shutdown, .recommitting => {},
+        }
+    }
+
+    fn buildTunnelInfo(self: *const WireGuardAdapter, allocator: std.mem.Allocator) TunnelRemoteInfoBuilder.Error!api.TunnelRemoteInfoWrapper {
+        return TunnelRemoteInfoBuilder.init(allocator, self.profile, self.module_id, self.configuration).build();
+    }
+
+    fn activate(
+        self: *WireGuardAdapter,
+        allocator: std.mem.Allocator,
+    ) ActivationError!void {
+        try self.endpoint_resolver.cacheAll(allocator);
+
+        const wg_config = try buildConfiguration(
+            allocator,
+            self.configuration,
+            &self.endpoint_resolver,
+            .full,
+        );
+        defer allocator.free(wg_config);
+
+        const handle = try self.startBackend(allocator, wg_config);
+        self.state = .{ .started = handle };
+    }
+
+    fn startBackend(
+        self: *WireGuardAdapter,
+        allocator: std.mem.Allocator,
+        wg_config: [:0]const u8,
+    ) StartBackendError!i32 {
+        log.writef(.debug, "Start {s} wg-go backend", .{@tagName(self.transport)});
+        const handle = (switch (self.transport) {
+            .active => |active| self.backend.turnOn(allocator, wg_config, .{
+                .tun = if (builtin.os.tag == .windows) active.tunnel.tun else switch (active.tunnel.io) {
+                    .tun => |tun| tun,
+                    else => return error.CannotLocateTunnelFileDescriptor,
+                },
+                .ifname = self.module_id[0..],
+            }),
+            .passive => |*passive| blk: {
+                passive.io.activate();
+                break :blk self.backend.turnOnPassive(allocator, wg_config, passive.start);
+            },
+        }) catch |err| {
+            log.writef(.err, "Starting tunnel failed: {s}", .{@errorName(err)});
+            return err;
+        };
+        if (handle < 0) {
+            log.writef(.err, "Starting tunnel failed with backend returning {d}", .{handle});
+            return error.CouldNotStartBackend;
+        }
+        log.writef(.debug, "wg-go backend started with handle {d}", .{handle});
+        errdefer self.backend.turnOff(handle);
+
+        if (builtin.os.tag == .ios) {
+            self.backend.disableRoaming(handle);
+        }
+        try self.configureSockets(allocator, handle);
+        return handle;
+    }
+
+    fn configureSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) StartBackendError!void {
+        if (self.transport != .active) return;
+        const descriptors = try self.backend.socketDescriptors(allocator, handle);
+        defer allocator.free(descriptors);
+        if (descriptors.len > 0) try self.transport.active.controller.configureSockets(descriptors);
     }
 
     fn updatePeerEndpoints(self: *WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
@@ -319,6 +442,7 @@ pub const WireGuardAdapter = struct {
     }
 
     fn refreshSockets(self: *const WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
+        if (self.transport != .active) return;
         self.backend.bumpSockets(handle, true);
         self.configureSockets(allocator, handle) catch |err| {
             log.writef(.err, "Unable to update reachability: {s}", .{@errorName(err)});
@@ -329,78 +453,51 @@ pub const WireGuardAdapter = struct {
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
     ) NetworkChangeResult {
-        self.resumeBackend(allocator) catch |err| {
+        return self.resumeBackend(allocator) catch |err| {
             // Restart failure is transient state-machine work, not a new
             // terminal connection error. Swift logs it and retries while the
             // latest reachability state remains up. The error is also surfaced
-            // to the connection for last-error/status parity.
+            // to the connection for retry scheduling.
             log.writef(.err, "Failed to restart backend: {s}", .{@errorName(err)});
             return .{ .retry = err };
         };
-        return .resumed;
     }
 
     fn resumeBackend(
         self: *WireGuardAdapter,
         allocator: std.mem.Allocator,
-    ) ActivationError!void {
+    ) ActivationError!NetworkChangeResult {
         log.write(.debug, "Connectivity online, resuming backend.");
+        // Preserve prepared DNS until the pending TUN handoff completes.
+        if (self.state == .recommitting) return .unchanged;
         // Do not carry endpoint answers across an offline interval. Both the
         // hostname's A/AAAA set and the active network's DNS64 prefix may have
         // changed while the backend was down.
         self.endpoint_resolver.reset(allocator);
-        try self.activate(allocator);
-    }
-
-    /// Retries only if no newer reachability event made the pending attempt
-    /// stale. Scheduling is owned by the connection so this method always runs
-    /// on the daemon actor with the rest of the adapter state machine.
-    pub fn retryTemporaryShutdown(
-        self: *WireGuardAdapter,
-        allocator: std.mem.Allocator,
-    ) NetworkChangeResult {
-        if (!self.shouldRetryTemporaryShutdown()) return .unchanged;
-        return self.resumeTemporaryShutdown(allocator);
-    }
-
-    fn shouldRetryTemporaryShutdown(self: *const WireGuardAdapter) bool {
-        return self.isTemporarilyShutdown() and (self.last_reachable orelse false);
-    }
-
-    fn isTemporarilyShutdown(self: *const WireGuardAdapter) bool {
-        return self.state == .temporary_shutdown;
-    }
-
-    fn shutdown(self: *WireGuardAdapter, allocator: std.mem.Allocator) void {
-        switch (self.state) {
-            .started => |handle| self.backend.turnOff(handle),
-            .stopped, .temporary_shutdown => {},
+        switch (self.transport) {
+            .active => {
+                try self.endpoint_resolver.cacheAll(allocator);
+                return .{ .needs_rebind = try self.buildTunnelInfo(allocator) };
+            },
+            .passive => {
+                try self.activate(allocator);
+                return .{ .needs_rebind = null };
+            },
         }
-        self.state = .stopped;
-        self.last_reachable = null;
-        self.endpoint_resolver.reset(allocator);
-        self.clearTunnel();
     }
 
-    fn clearTunnel(self: *WireGuardAdapter) void {
-        if (self.tunnel) |tun| {
-            tun.destroy();
-            self.tunnel = null;
+    fn replaceLink(self: *WireGuardAdapter, remote: net.RemoteDescriptor) void {
+        switch (self.transport) {
+            .active => {},
+            .passive => |*passive| passive.io.replaceLink(remote.link orelse @panic("WireGuard requires a link descriptor")),
         }
-        self.controller.clearTunnelSettings(false);
     }
 
-    pub fn dataCountFromRuntimeConfig(
-        self: *const WireGuardAdapter,
-        allocator: std.mem.Allocator,
-    ) impl.Error!?api.DataCount {
-        const handle = switch (self.state) {
-            .started => |value| value,
-            .stopped, .temporary_shutdown => return null,
-        };
-        const text = (try self.backend.getConfig(allocator, handle)) orelse return null;
-        defer allocator.free(text);
-        return uapi.parseRuntimeDataCount(text);
+    fn quiesce(self: *WireGuardAdapter) void {
+        switch (self.transport) {
+            .active => {},
+            .passive => |*passive| passive.io.quiesce(),
+        }
     }
 };
 

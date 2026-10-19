@@ -157,7 +157,7 @@ pub const SocketWrapper = struct {
 
     /// Creates a connected socket (resolving hostnames in C), or one unconnected UDP socket for the requested families.
     /// A null endpoint selects unconnected UDP.
-    /// Ownership transfers on successful looper_v2 attachment.
+    /// Ownership transfers on successful looper attachment.
     pub fn create(
         allocator: std.mem.Allocator,
         endpoint: ?api.ExtendedEndpoint,
@@ -378,7 +378,6 @@ pub const TunWrapper = struct {
         io_c.pp_tun_free(self.tun);
     }
 
-    // FIXME: ###, Drop after v2
     pub fn nativeIO(self: *TunWrapper) POSIXInterface {
         return .{ .tun = self };
     }
@@ -408,7 +407,6 @@ pub const TunWrapper = struct {
         return io_c.pp_io_last_error_binding();
     }
 
-    // FIXME: ###, Drop after v2
     pub fn muxDescriptor(self: TunWrapper) ?io_c.pp_fd {
         if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.fd;
         const fd = io_c.pp_tun_get_watch_fd(self.tun);

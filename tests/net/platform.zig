@@ -234,7 +234,8 @@ test "settings-only daemons release owned TUN descriptors" {
     defer profile.deinit(allocator);
     var registry = try source.net.ConnectionRegistry.init(allocator, &.{});
     defer registry.deinit(allocator);
-    inline for (.{ source.net_daemon.Daemon, source.net_daemon_v2.Daemon }) |Daemon| {
+    {
+        const Daemon = source.net_daemon.Daemon;
         var fds: [2]c_int = undefined;
         if (std.c.pipe(&fds) != 0) return error.PipeFailed;
         defer _ = libc.close(fds[1]);
@@ -310,7 +311,7 @@ test "platform cancellation formats extended errors only at the C boundary" {
     try std.testing.expectEqual(@as(usize, 3), recorder.calls);
 }
 
-test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory" {
+test "unconnected UDP falls back to IPv4 and connected sockets are attempted once" {
     if (comptime @import("builtin").os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const Policy = struct {
@@ -339,7 +340,7 @@ test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory"
     const port = (try reservation.localAddress()).port;
     reservation.destroy();
 
-    var factory = platform.socketFactoryV2();
+    var factory = platform.socketFactory();
     var descriptor = try factory.create(allocator, null, port, reachable(true), 100);
     defer descriptor.cleanup();
     const local = try descriptor.localAddress();
@@ -352,10 +353,7 @@ test "v2 unconnected UDP falls back to IPv4 without changing the legacy factory"
     try std.testing.expectError(error.LinkNotActive, factory.create(allocator, null, port, reachable(true), 100));
     try std.testing.expectEqual(@as(usize, 2), policy.ipv4_calls);
 
-    // V1 gets no fallback, and a connected v2 socket is attempted only once.
-    const before_legacy = policy.ipv4_calls;
-    try std.testing.expectError(error.LinkNotActive, platform.socketFactory().create(allocator, null, 0, reachable(true), 100));
-    try std.testing.expectEqual(before_legacy, policy.ipv4_calls);
+    // A connected socket is attempted only once.
     const before_connected = policy.calls;
     try std.testing.expectError(error.LinkNotActive, factory.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, 51820) }, port, reachable(true), 100));
     try std.testing.expectEqual(before_connected + 1, policy.calls);

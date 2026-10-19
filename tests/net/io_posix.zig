@@ -10,7 +10,7 @@ const net = source.net;
 
 const source = @import("source");
 const test_helpers = @import("looper_test_helpers.zig");
-const Looper = source.net_looper_v2.Looper;
+const Looper = source.net_looper.Looper;
 const api = source.core.api;
 const io = source.net_io;
 const io_posix = source.net_io_posix;
@@ -136,7 +136,7 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         closed: usize = 0,
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
+
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
         fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
@@ -172,7 +172,9 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
 
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(std.testing.allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = Probe.finish } });
+    var loop = try Looper.init(std.testing.allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
     {
         const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);

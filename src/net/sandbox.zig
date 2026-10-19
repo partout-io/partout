@@ -12,11 +12,8 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const events_mod = @import("connection_events.zig");
 const io = @import("io.zig");
-const runtime_policy = @import("../runtime_policy.zig");
-const looper = @import("looper.zig");
 const api = core.api;
 
-const Looper = if (runtime_policy.v2_only) void else looper.Looper;
 const TunWrapper = io.TunWrapper;
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
@@ -33,9 +30,6 @@ pub const Sandbox = struct {
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
-    /// Legacy v1 capabilities; v2 connections do not use these.
-    looper: *Looper,
-    serialized_executor: SerializedExecutor = undefined,
 };
 
 /// Interacts with the platform API to establish the physical
@@ -269,8 +263,6 @@ pub const NetworkMonitor = struct {
         return self.vtable.is_reachable(self.ptr);
     }
 };
-
-pub const SerializedExecutor = core.SerializedExecutor;
 
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {

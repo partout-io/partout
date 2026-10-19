@@ -211,8 +211,6 @@ pub const Connection = struct {
         failure: Events.FailureDisposition,
     };
 
-    // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
-
     pub const Event = events_mod.ConnectionEvent;
     pub const Events = events_mod.ConnectionEvents;
 
@@ -226,7 +224,7 @@ pub const Connection = struct {
         /// In link mode, takes link ownership on entry, including on failure.
         /// Return established instead of emitting Events.established when startup
         /// completes synchronously; its info ownership transfers to the caller.
-        start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!StartResult = struct {
+        start: *const fn (*anyopaque, RemoteDescriptor) StartError!StartResult = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!StartResult {
                 return .failed;
             }
@@ -258,13 +256,6 @@ pub const Connection = struct {
             fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
-        /// FIXME: ###, Deprecated.
-        start: *const fn (*anyopaque, Events) StartError!bool = struct {
-            fn call(_: *anyopaque, _: Events) StartError!bool {
-                return error.UnableToStart;
-            }
-        }.call,
-
         /// Quiesces protocol activity and sends a best-effort exit notification
         /// while I/O is attached. Carries the owner's reason so finalization
         /// can preserve state needed for a retry. Does not release connection state.
@@ -285,15 +276,11 @@ pub const Connection = struct {
         return self.vtable.endpoints(self.ptr);
     }
 
-    pub fn startV2(
+    pub fn start(
         self: Connection,
         remote: RemoteDescriptor,
     ) StartError!StartResult {
-        return self.vtable.start_v2(self.ptr, remote);
-    }
-
-    pub fn start(self: Connection, events: Events) StartError!bool {
-        return self.vtable.start(self.ptr, events);
+        return self.vtable.start(self.ptr, remote);
     }
 
     pub fn commit(self: Connection, tun: io.TunDescriptor) StartError!void {

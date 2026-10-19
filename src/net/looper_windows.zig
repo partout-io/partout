@@ -39,7 +39,6 @@ pub const WindowsLooper = struct {
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
         if (self.stopped) return;
         self.stopped = true;
-        self.options.on_finish.call(null);
     }
 
     pub fn scheduleTimer(

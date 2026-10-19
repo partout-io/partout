@@ -37,31 +37,6 @@ test "connection options match Swift defaults" {
     try std.testing.expect(options.user_info == null);
 }
 
-test "serialized executor reports rejected work" {
-    const Rejecting = struct {
-        fn run(
-            _: *anyopaque,
-            _: *anyopaque,
-            _: sandbox.SerializedExecutor.Block,
-            _: ?sandbox.SerializedExecutor.Block,
-        ) sandbox.SerializedExecutor.RunError!void {
-            return error.Closed;
-        }
-
-        fn block(_: *anyopaque) void {}
-    };
-    var context: u8 = 0;
-    const executor = sandbox.SerializedExecutor{
-        .ptr = &context,
-        .run_block = Rejecting.run,
-    };
-
-    try std.testing.expectError(
-        error.Closed,
-        executor.tryRun(&context, Rejecting.block),
-    );
-}
-
 test "finds the active connection module" {
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator,
@@ -113,9 +88,6 @@ test "reports interactive OpenVPN connections" {
 test "empty connection registry reports absent implementation" {
     const mock = mock_mod;
     const allocator = std.testing.allocator;
-    var environment: mock.MockConnectionEnvironment = undefined;
-    try environment.init(allocator);
-    defer environment.deinit();
     var registry = try ConnectionRegistry.init(allocator, &.{});
     defer registry.deinit(allocator);
     var profile = try api.Profile.parse(allocator, mock.connectionProfileJson());
@@ -129,8 +101,6 @@ test "empty connection registry reports absent implementation" {
             .controller = mock.noopTunnelController(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
-            .looper = &environment.looper,
-            .serialized_executor = environment.serializedExecutor(),
         }),
     );
 }

@@ -21,14 +21,12 @@ const test_core_util = @import("core/util.zig");
 const test_core_uuid = @import("core/uuid.zig");
 const test_net_connection = @import("net/connection.zig");
 const test_net_daemon = @import("net/daemon.zig");
-const test_net_daemon_v2 = @import("net/daemon_v2.zig");
 const test_net_io = @import("net/io.zig");
 const test_net_io_common = @import("net/io_common.zig");
 const test_net_io_posix = @import("net/io_posix.zig");
 const test_net_socket_datagram = @import("net/socket_datagram.zig");
-const test_net_looper_legacy = @import("net/looper_legacy.zig");
 const test_net_looper_posix = @import("net/looper_posix.zig");
-const test_net_looper_v2 = @import("net/looper_v2.zig");
+const test_net_looper = @import("net/looper.zig");
 const test_net_looper_io = @import("net/looper_io.zig");
 const test_net_looper_helpers = @import("net/looper_helpers.zig");
 const test_net_mux = @import("net/mux.zig");
@@ -50,8 +48,7 @@ const test_openvpn_internal_packet = @import("openvpn/internal/packet.zig");
 const test_openvpn_internal_processing = @import("openvpn/internal/processing.zig");
 const test_openvpn_internal_push = @import("openvpn/internal/push.zig");
 const test_openvpn_internal_serialization = @import("openvpn/internal/serialization.zig");
-const test_openvpn_internal_session_legacy = @import("openvpn/internal/session_legacy.zig");
-const test_openvpn_internal_session_v2 = @import("openvpn/internal/session_v2.zig");
+const test_openvpn_internal_session = @import("openvpn/internal/session.zig");
 const test_openvpn_internal_session_context = @import("openvpn/internal/session_context.zig");
 const test_openvpn_internal_session_negotiator = @import("openvpn/internal/session_negotiator.zig");
 const test_openvpn_internal_settings = @import("openvpn/internal/settings.zig");
@@ -59,7 +56,6 @@ const test_openvpn_internal_tls = @import("openvpn/internal/tls.zig");
 const test_openvpn_parser = @import("openvpn/parser.zig");
 const test_openvpn_serializer = @import("openvpn/serializer.zig");
 const test_wireguard_connection = @import("wireguard/connection.zig");
-const test_wireguard_connection_v2 = @import("wireguard/connection_v2.zig");
 const test_wireguard_passive_io = @import("wireguard/passive_io.zig");
 const test_wireguard_exports = @import("wireguard/exports.zig");
 const test_wireguard_parser = @import("wireguard/parser.zig");
@@ -89,10 +85,7 @@ comptime {
     _ = test_core_util;
     _ = test_core_uuid;
     _ = test_net_connection;
-    if (!source.runtime_policy.v2_only) {
-        _ = test_net_daemon;
-    }
-    _ = test_net_daemon_v2;
+    _ = test_net_daemon;
     _ = test_net_io;
     _ = test_net_io_common;
     if (builtin.os.tag != .windows) {
@@ -100,10 +93,7 @@ comptime {
         _ = test_net_looper_posix;
         _ = test_net_socket_datagram;
     }
-    if (!source.runtime_policy.v2_only) {
-        _ = test_net_looper_legacy;
-    }
-    _ = test_net_looper_v2;
+    _ = test_net_looper;
     _ = test_net_looper_io;
     _ = test_net_looper_helpers;
     _ = test_net_mux;
@@ -126,10 +116,7 @@ comptime {
         _ = test_openvpn_internal_processing;
         _ = test_openvpn_internal_push;
         _ = test_openvpn_internal_serialization;
-        if (!source.runtime_policy.v2_only) {
-            _ = test_openvpn_internal_session_legacy;
-        }
-        _ = test_openvpn_internal_session_v2;
+        _ = test_openvpn_internal_session;
         _ = test_openvpn_internal_session_context;
         _ = test_openvpn_internal_session_negotiator;
         _ = test_openvpn_internal_settings;
@@ -139,7 +126,6 @@ comptime {
     }
     if (source.wireguard_enabled) {
         _ = test_wireguard_connection;
-        _ = test_wireguard_connection_v2;
         _ = test_wireguard_passive_io;
         _ = test_wireguard_exports;
         _ = test_wireguard_parser;

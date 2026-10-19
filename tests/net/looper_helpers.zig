@@ -5,55 +5,9 @@
 const std = @import("std");
 
 const source = @import("source");
-const queue_mod = source.net_looper_v2.testing_helpers;
-const Completion = queue_mod.Completion;
-const CompletionQueue = queue_mod.CompletionQueue;
-const CommandNode = queue_mod.CommandNode;
-const CommandQueue = queue_mod.CommandQueue;
+const io = source.net_io;
+const queue_mod = source.net_looper.testing_helpers;
 const WriteQueue = queue_mod.WriteQueue;
-
-test "completion queue releases completions in FIFO order" {
-    var queue = CompletionQueue{};
-    var first = Completion{};
-    var second = Completion{};
-
-    queue.append(&first, null);
-    queue.append(&second, error.LooperUnavailable);
-
-    try std.testing.expect(first.next == &second);
-    try std.testing.expect(second.next == null);
-    try std.testing.expect(!first.done);
-    try std.testing.expect(!second.done);
-    try std.testing.expect(second.failure.? == error.LooperUnavailable);
-
-    queue.releaseAll();
-
-    try std.testing.expect(first.done);
-    try std.testing.expect(second.done);
-    try std.testing.expect(first.next == null);
-    try std.testing.expect(second.next == null);
-
-    var third = Completion{};
-    queue.append(&third, error.SideAlreadyAttached);
-    queue.releaseAll();
-    try std.testing.expect(third.done);
-    try std.testing.expect(third.failure.? == error.SideAlreadyAttached);
-}
-
-test "command queue detaches ready commands in FIFO order" {
-    var queue = CommandQueue{};
-    var first = CommandNode{ .command = .stop };
-    var second = CommandNode{ .command = .stop };
-
-    queue.append(&first);
-    queue.append(&second);
-
-    const pending = queue.takeReady().?;
-    try std.testing.expect(pending == &first);
-    try std.testing.expect(pending.next == &second);
-    try std.testing.expect(second.next == null);
-    try std.testing.expect(queue.takeReady() == null);
-}
 
 test "write queue preserves FIFO order and partial progress" {
     var queue = WriteQueue.init(std.testing.allocator);
@@ -133,7 +87,6 @@ fn expectPending(queue: *const WriteQueue, data: []const u8, offset: usize) !voi
 }
 
 test "write queue owns UDP payloads and destinations and rolls back failed batches" {
-    const io = @import("source").net_io;
     var address = std.mem.zeroes(io.SocketAddress);
     address.family = 6;
     address.scope_id = 7;

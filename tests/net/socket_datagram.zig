@@ -5,7 +5,7 @@ const std = @import("std");
 const source = @import("source");
 const test_helpers = @import("looper_test_helpers.zig");
 const io = source.net_io;
-const Looper = source.net_looper_v2.Looper;
+const Looper = source.net_looper.Looper;
 const allocator = std.testing.allocator;
 const Atomic = std.atomic.Value(usize);
 const libc = struct {
@@ -19,7 +19,6 @@ fn configured(raw: ?*anyopaque, _: io.SocketDescriptor, _: ?*const io.Reachabili
     return true;
 }
 
-fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 fn wait(loop: ?*Looper, value: *const Atomic, expected: usize) !void {
     for (0..if (loop != null) @as(usize, 500) else 5000) |_| {
         if (value.load(.acquire) >= expected) return;
@@ -124,7 +123,7 @@ const TunProbe = struct {
     };
 };
 
-test "v2 one UDP link echoes several peers across both address families" {
+test "one UDP link echoes several peers across both address families" {
     var fds: [2]std.c.fd_t = undefined;
     if (std.c.pipe(&fds) != 0) return error.PipeFailed;
     defer {
@@ -135,7 +134,9 @@ test "v2 one UDP link echoes several peers across both address families" {
 
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
 
     try loop.attach(.{ .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } } });
@@ -190,10 +191,13 @@ test "v2 one UDP link echoes several peers across both address families" {
     try std.testing.expectEqual(@as(usize, 1), echo.ipv6.load(.acquire));
 }
 
-test "v2 UDP pause, resume and replacement apply to the logical link" {
+test "UDP pause, resume and replacement apply to the logical link" {
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .max_read_count = 1, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+        .max_read_count = 1,
+    });
     defer loop.deinit();
 
     const server = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
@@ -228,10 +232,13 @@ test "v2 UDP pause, resume and replacement apply to the logical link" {
     try loop.stop();
 }
 
-test "v2 UDP truncation drops the packet and retains the link" {
+test "UDP truncation drops the packet and retains the link" {
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .link_buf_size = 4, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+        .link_buf_size = 4,
+    });
     defer loop.deinit();
 
     var echo = Echo{ .looper = &loop };
@@ -274,7 +281,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
             return .pause;
         }
     };
-    inline for (.{ source.net_looper.Looper, Looper }) |Implementation| {
+    {
         var fds: [2]std.c.fd_t = undefined;
         if (std.c.pipe(&fds) != 0) return error.PipeFailed;
         defer {
@@ -286,10 +293,11 @@ test "unified read callback has no addresses for connected UDP and TUN" {
 
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Implementation.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{
+            .mux = wake.handle,
+        });
         defer loop.deinit();
-        if (Implementation != Looper) try loop.start();
-        const caller: ?*Looper = if (Implementation == Looper) &loop else null;
+        const caller = &loop;
 
         try loop.attach(.{
             .pair = .{ .tun = .{ .fd = fds[0], .io = .{ .mock = .{ .ptr = &tun, .vtable = &TunProbe.vtable } } } },
@@ -312,11 +320,7 @@ test "unified read callback has no addresses for connected UDP and TUN" {
             client.destroy();
             return err;
         };
-        if (Implementation == Looper) {
-            try loop.write(&.{"request"}, .link, peer);
-        } else {
-            try loop.writeQueued(&.{"request"}, .link, peer);
-        }
+        try loop.write(&.{"request"}, .link, peer);
         var buf: [32]u8 = undefined;
         var sender: io.SocketAddress = undefined;
         _ = try receive(caller, server, &buf, &sender);

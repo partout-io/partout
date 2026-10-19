@@ -6,14 +6,12 @@ const builtin = @import("builtin");
 const source = @import("source");
 const test_helpers = @import("looper_test_helpers.zig");
 const io = source.net_io;
-const Looper = source.net_looper_v2.Looper;
+const Looper = source.net_looper.Looper;
 const allocator = std.testing.allocator;
 const Atomic = std.atomic.Value(usize);
 const libc = struct {
     extern "c" fn close(std.c.fd_t) c_int;
 };
-
-fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
 
 const ReadProbe = struct {
     loop: *Looper,
@@ -154,7 +152,7 @@ fn closePipe(fds: [2]std.c.fd_t) void {
     _ = libc.close(fds[1]);
 }
 
-test "v2 owned reads bound batches and drain remaining packets" {
+test "owned reads bound batches and drain remaining packets" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     for ([_]io.Side{ .link, .tun }) |side| {
         for ([_]usize{ 256 * 1024, 8 }) |max_read_size| {
@@ -166,7 +164,7 @@ test "v2 owned reads bound batches and drain remaining packets" {
                 var mock = Mock{ .fd = fds[0] };
                 var loop = try Looper.init(allocator, .{
                     .mux = wake.handle,
-                    .on_finish = .{ .callback = finish },
+
                     .max_read_size = max_read_size,
                     .max_read_count = max_read_count,
                 });
@@ -191,7 +189,7 @@ test "v2 owned reads bound batches and drain remaining packets" {
     }
 }
 
-test "v2 reads reuse owned storage without allocating between iterations" {
+test "reads reuse owned storage without allocating between iterations" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
@@ -200,7 +198,7 @@ test "v2 reads reuse owned storage without allocating between iterations" {
     var failing = std.testing.FailingAllocator.init(allocator, .{});
     var loop = try Looper.init(failing.allocator(), .{
         .mux = wake.handle,
-        .on_finish = .{ .callback = finish },
+
         .tun_buf_size = 16,
     });
     defer loop.deinit();
@@ -219,13 +217,15 @@ test "v2 reads reuse owned storage without allocating between iterations" {
     try loop.stop();
 }
 
-test "v2 copies write payloads and descriptors across partial writes and backpressure" {
+test "copies write payloads and descriptors across partial writes and backpressure" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[1], .partial_once = true, .backpressure_once = true };
     try loop.attach(.{ .pair = mock.pair() });
@@ -246,7 +246,7 @@ test "v2 copies write payloads and descriptors across partial writes and backpre
     try loop.stop();
 }
 
-test "v2 shutdown flush attempts writes without dispatching callbacks or waiting" {
+test "shutdown flush attempts writes without dispatching callbacks or waiting" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Mode = enum { writable, blocked, failed };
     for ([_]Mode{ .writable, .blocked, .failed }) |mode| {
@@ -254,7 +254,9 @@ test "v2 shutdown flush attempts writes without dispatching callbacks or waiting
         defer closePipe(fds);
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{
+            .mux = wake.handle,
+        });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[0], .block_writes = mode == .blocked, .fail_after = if (mode == .failed) 0 else null };
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
@@ -281,7 +283,7 @@ test "v2 shutdown flush attempts writes without dispatching callbacks or waiting
     }
 }
 
-test "v2 detach stop and destroy free pending write copies" {
+test "detach stop and destroy free pending write copies" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Action = enum { detach, stop, deinit };
     inline for (.{ Action.detach, Action.stop, Action.deinit }) |action| {
@@ -289,7 +291,9 @@ test "v2 detach stop and destroy free pending write copies" {
         defer closePipe(fds);
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{
+            .mux = wake.handle,
+        });
         var destroyed = false;
         defer if (!destroyed) loop.deinit();
         var mock = Mock{ .fd = fds[0], .block_writes = true };
@@ -309,7 +313,7 @@ test "v2 detach stop and destroy free pending write copies" {
     }
 }
 
-test "v2 read and callback failures report the cause and detach the side" {
+test "read and callback failures report the cause and detach the side" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Failure = enum { io, partial, callback };
     for (std.enums.values(Failure)) |failure| {
@@ -317,7 +321,9 @@ test "v2 read and callback failures report the cause and detach the side" {
         defer closePipe(fds);
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{
+            .mux = wake.handle,
+        });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[0], .fail_read = failure == .io, .fail_read_after = if (failure == .partial) 1 else null };
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId(), .fail_callback = failure == .callback };
@@ -337,13 +343,13 @@ test "v2 read and callback failures report the cause and detach the side" {
     }
 }
 
-test "v2 validates attachment sizes and write destinations before taking ownership" {
+test "validates attachment sizes and write destinations before taking ownership" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish }, .tun_buf_size = 0 });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .tun_buf_size = 0 });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[0] };
     try std.testing.expectError(error.InvalidBuffers, loop.attach(.{ .pair = mock.pair() }));
@@ -354,7 +360,7 @@ test "v2 validates attachment sizes and write destinations before taking ownersh
     try std.testing.expectError(error.LooperUnavailable, loop.write(&.{"x"}, .tun, null));
 }
 
-test "v2 initialization and owned read attachment roll back allocation failures" {
+test "initialization and owned read attachment roll back allocation failures" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = struct {
         fn run(test_allocator: std.mem.Allocator) !void {
@@ -362,7 +368,9 @@ test "v2 initialization and owned read attachment roll back allocation failures"
             defer closePipe(fds);
             const wake = try test_helpers.Mux.init();
             defer wake.deinit();
-            var loop = try Looper.init(test_allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+            var loop = try Looper.init(test_allocator, .{
+                .mux = wake.handle,
+            });
             defer loop.deinit();
             var mock = Mock{ .fd = fds[0] };
             loop.attach(.{ .pair = mock.pair() }) catch |err| {
@@ -377,7 +385,7 @@ test "v2 initialization and owned read attachment roll back allocation failures"
     try std.testing.checkAllAllocationFailures(allocator, Scenario.run, .{});
 }
 
-test "v2 failed copied batches preserve already queued writes" {
+test "failed copied batches preserve already queued writes" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     // Each packet owns its copied payload and queue node.
     for (0..4) |successful_allocations| {
@@ -386,7 +394,9 @@ test "v2 failed copied batches preserve already queued writes" {
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
         var failing = std.testing.FailingAllocator.init(allocator, .{});
-        var loop = try Looper.init(failing.allocator(), .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(failing.allocator(), .{
+            .mux = wake.handle,
+        });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[1] };
         try loop.attach(.{ .pair = mock.pair() });
@@ -401,13 +411,13 @@ test "v2 failed copied batches preserve already queued writes" {
     }
 }
 
-test "v2 read callbacks pause until resumed" {
+test "read callbacks pause until resumed" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish }, .max_read_count = 1 });
+    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .max_read_count = 1 });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[0] };
     var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId(), .pause = true };
@@ -422,13 +432,15 @@ test "v2 read callbacks pause until resumed" {
     try loop.stop();
 }
 
-test "v2 write failure reports the cause and discards later queued copies" {
+test "write failure reports the cause and discards later queued copies" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const fds = try pipe();
     defer closePipe(fds);
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
     var mock = Mock{ .fd = fds[1], .fail_after = 1 };
     var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
@@ -444,7 +456,7 @@ test "v2 write failure reports the cause and discards later queued copies" {
     try std.testing.expectEqual(@as(usize, 1), mock.cleaned);
 }
 
-test "v2 owned reads honor packet and byte limits across iterations" {
+test "owned reads honor packet and byte limits across iterations" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     for ([_]bool{ false, true }) |limit_bytes| {
         const fds = try pipe();
@@ -453,7 +465,7 @@ test "v2 owned reads honor packet and byte limits across iterations" {
         defer wake.deinit();
         var loop = try Looper.init(allocator, .{
             .mux = wake.handle,
-            .on_finish = .{ .callback = finish },
+
             .max_read_count = if (limit_bytes) 2 else 1,
             .max_read_size = if (limit_bytes) 1 else 1024,
         });
@@ -471,14 +483,16 @@ test "v2 owned reads honor packet and byte limits across iterations" {
     }
 }
 
-test "v2 reads without an observer drain data and still report failures" {
+test "reads without an observer drain data and still report failures" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     for ([_]bool{ false, true }) |fail_read| {
         const fds = try pipe();
         defer closePipe(fds);
         const wake = try test_helpers.Mux.init();
         defer wake.deinit();
-        var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+        var loop = try Looper.init(allocator, .{
+            .mux = wake.handle,
+        });
         defer loop.deinit();
         var mock = Mock{ .fd = fds[0], .fail_read = fail_read };
         var probe = ReadProbe{ .loop = &loop, .caller_thread = std.Thread.getCurrentId() };
@@ -501,11 +515,13 @@ test "v2 reads without an observer drain data and still report failures" {
     }
 }
 
-test "v2 UDP packet errors discard only the bad packet and retain the link" {
+test "UDP packet errors discard only the bad packet and retain the link" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = finish } });
+    var loop = try Looper.init(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
     const socket = (try io.SocketWrapper.create(allocator, null, .{})) orelse return error.SocketFailed;
     const peer = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })) orelse return error.SocketFailed;
