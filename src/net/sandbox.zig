@@ -269,11 +269,9 @@ pub const ConnectionOptions = struct {
     connect_udp: bool = true,
 
     /// The DNS resolution timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern
     dns_timeout: u32 = 3000,
 
     /// The link activity timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern
     link_activity_timeout: u32 = 5000,
 
     /// The minimum interval before updating data count, in milliseconds.
