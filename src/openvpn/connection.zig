@@ -148,7 +148,6 @@ const OpenVPNConnection = struct {
 
         const created = try allocator.create(OpenVPNConnection);
         var session_options = context.session_options;
-        session_options.write_timeout_ms = sandbox.options.link_write_timeout;
         session_options.min_data_count_interval_ms =
             sandbox.options.min_data_count_interval;
 

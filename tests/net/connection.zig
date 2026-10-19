@@ -32,7 +32,6 @@ test "connection options match Swift defaults" {
 
     try std.testing.expectEqual(@as(u32, 3000), options.dns_timeout);
     try std.testing.expectEqual(@as(u32, 5000), options.link_activity_timeout);
-    try std.testing.expectEqual(@as(u32, 5000), options.link_write_timeout);
     try std.testing.expectEqual(@as(u32, 1000), options.min_data_count_interval);
     try std.testing.expect(options.user_info == null);
 }

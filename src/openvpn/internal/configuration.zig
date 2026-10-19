@@ -14,7 +14,6 @@ const PRNG = crypto_mod.PRNG;
 pub const SessionOptions = struct {
     backend: CryptoBackend,
     max_packets: usize = 100,
-    write_timeout_ms: u64 = 5_000,
     hard_reset_timeout_ms: u64 = 10_000,
     negotiation_timeout_ms: u64 = 30_000,
     soft_negotiation_timeout_ms: u64 = 120_000,

@@ -276,10 +276,6 @@ pub const ConnectionOptions = struct {
     // FIXME: ###, Delete, it's a link concern
     link_activity_timeout: u32 = 5000,
 
-    /// The link write timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern (replace timeout with fixed number of sendExit() attempts)
-    link_write_timeout: u32 = 5000,
-
     /// The minimum interval before updating data count, in milliseconds.
     min_data_count_interval: u32 = 1000,
 
