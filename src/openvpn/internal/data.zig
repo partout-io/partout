@@ -478,9 +478,8 @@ pub const DataLinkPair = struct {
     pub fn send(
         self: DataLinkPair,
         packets: []const []const u8,
-        key: ?u8,
     ) !void {
-        return self.link.send(packets, key orelse self.key);
+        return self.link.send(packets, self.key);
     }
 
     pub fn receive(

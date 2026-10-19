@@ -421,7 +421,7 @@ pub const Session = struct {
         const packet: []const u8 = &exit;
         // Queue one best-effort exit notification; the daemon flushes LINK
         // before detaching it during shutdown.
-        try pair.send(&.{packet}, null);
+        try pair.send(&.{packet});
         log.write(.info, "Sent OCCPacket correctly");
     }
 
@@ -529,7 +529,7 @@ pub const Session = struct {
         const context = self.state.activeContext() orelse return;
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeout(context);
-        try pair.send(packets, null);
+        try pair.send(packets);
     }
 
     // MARK: Negotiation
@@ -706,7 +706,7 @@ pub const Session = struct {
         if (self.keepAliveIntervalMs(context) != null) {
             log.write(.debug, "Send ping");
             const ping_packet: []const u8 = &constants_mod.Data.ping_string;
-            try pair.send(&.{ping_packet}, null);
+            try pair.send(&.{ping_packet});
         }
         try self.scheduleNextPing(context);
     }

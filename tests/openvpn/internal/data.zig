@@ -187,14 +187,14 @@ test "DataLink submits encrypted packets once and propagates writer rejection" {
         .report_outbound_data_count = Probe.reportOutbound,
     });
     const pair = data.DataLinkPair{ .link = &link, .key = channel.key };
-    try pair.send(&.{"payload"}, null);
+    try pair.send(&.{"payload"});
     try std.testing.expectEqual(@as(usize, 1), probe.writes);
     try std.testing.expect(probe.outbound_bytes > 0);
 
     for ([_]source.net.SubmissionError{ error.LooperUnavailable, error.OutOfMemory }) |err| {
         probe.rejection = err;
         const before = probe.writes;
-        try std.testing.expectError(err, pair.send(&.{"payload"}, null));
+        try std.testing.expectError(err, pair.send(&.{"payload"}));
         try std.testing.expectEqual(before + 1, probe.writes);
     }
 }
