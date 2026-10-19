@@ -98,7 +98,7 @@ struct PartoutVpnChannelRuntime::Impl {
         if (!value || value != channel) throw hresult_invalid_argument();
     }
 
-    // FIXME: ###, Retain log level
+    // FIXME: ###, Windows, Retain log level
     void Log(std::wstring_view message) const noexcept {
         try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
         try {

@@ -35,13 +35,13 @@ PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
 PartoutTunnelController::~PartoutTunnelController() { Stop(); }
 
 bool PartoutTunnelController::Associate(uintptr_t socket) noexcept {
-    // FIXME: ###, Associate transports after the Windows socket backend rewrite.
+    // FIXME: ###, Windows, Associate transports after the socket backend rewrite.
     (void)socket;
     return false;
 }
 
 bool PartoutTunnelController::Start(const char *info_json) noexcept {
-    // FIXME: ###, Derive addresses, routes, DNS and MTU from info_json.
+    // FIXME: ###, Windows, Derive addresses, routes, DNS and MTU from info_json.
     (void)info_json;
     try {
         if (!channel_ || !transport_) return false;
@@ -100,7 +100,7 @@ static pp_tun tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_set_tunnel(%p, %p, %p)", ref, uuid, info_json);
     const auto controller = get_controller(ref);
     if (!controller || !controller->Start(info_json)) return nullptr;
-    // FIXME: ###, A packet-I/O pp_tun implementation is still pending.
+    // FIXME: ###, Windows, A packet-I/O pp_tun implementation is still pending.
     return nullptr;
 }
 

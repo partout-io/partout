@@ -7,6 +7,7 @@ const std = @import("std");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 
+// FIXME: ###, Windows, WindowsLooper
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     options: helpers.Options,
@@ -47,12 +48,11 @@ pub const WindowsLooper = struct {
         _: u64,
         _: helpers.TimedTask,
     ) helpers.SubmissionError!void {
-        // FIXME: ###, Implement timers
-        @panic("WindowsLooper.scheduleReplacing is not implemented");
+        @panic("WindowsLooper.scheduleTimer is not implemented");
     }
 
     pub fn cancelTimer(_: *WindowsLooper, _: *helpers.Timer) void {
-        // FIXME: ###, Implement timers
+        @panic("WindowsLooper.cancelTimer is not implemented");
     }
 
     pub fn attach(

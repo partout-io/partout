@@ -31,7 +31,7 @@ pub const TunDescriptor = struct {
     }
 };
 
-// FIXME: ###, Windows SocketWrapper
+// FIXME: ###, Windows, SocketWrapper
 pub const SocketWrapper = struct {
     allocator: std.mem.Allocator,
 
@@ -53,7 +53,7 @@ pub const SocketWrapper = struct {
         self.allocator.destroy(self);
     }
 
-    // FIXME: ###, Supply the bound address and native handle with Windows I/O.
+    // FIXME: ###, Windows, Supply the bound address and native handle with Windows I/O.
     pub fn localAddress(_: *const SocketWrapper) !io.SocketAddress {
         @panic("Windows SocketWrapper.localAddress is not implemented");
     }
@@ -63,7 +63,7 @@ pub const SocketWrapper = struct {
     }
 };
 
-// FIXME: ###, Windows TunWrapper
+// FIXME: ###, Windows, TunWrapper
 pub const TunWrapper = struct {
     allocator: std.mem.Allocator,
 
