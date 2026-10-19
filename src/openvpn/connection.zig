@@ -361,8 +361,7 @@ const OpenVPNConnection = struct {
             .modules = modules,
         };
 
-        const events = self.events;
-        events.emit(.{ .established = .{
+        self.events.emit(.{ .established = .{
             .remote_endpoint = remote_endpoint,
             .info = info,
         } });
@@ -386,9 +385,8 @@ const OpenVPNConnection = struct {
         self.pending_failure = cause;
         // The owner schedules shutdown/detachment/stop. Never reenter the
         // lifecycle here: this callback can run inside TLS.
-        const events = self.events;
         const err_pair = partoutCodeForError(cause);
-        events.emit(.{ .failed = .{
+        self.events.emit(.{ .failed = .{
             .err_pair = err_pair,
             .disposition = errorDisposition(cause),
         } });
@@ -400,9 +398,8 @@ const OpenVPNConnection = struct {
         self: *OpenVPNConnection,
         configuration: ?*const api.OpenVPNConfiguration,
     ) void {
-        const e = self.events;
         const cfg = configuration orelse {
-            e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = null } });
+            self.events.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = null } });
             return;
         };
         const value = core.util.encodeJsonValue(self.allocator, cfg) catch {
@@ -410,7 +407,7 @@ const OpenVPNConnection = struct {
             return;
         };
         defer self.allocator.free(value);
-        e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = value } });
+        self.events.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = value } });
     }
 
     // MARK: - Termination and cleanup
@@ -434,9 +431,8 @@ const OpenVPNConnection = struct {
         }
         if (!has_session) return;
         self.reportServerConfiguration(null);
-        const events = self.events;
         // All owned state is settled before the synchronous terminal callback.
-        events.emit(.stopped);
+        self.events.emit(.stopped);
     }
 
     /// Resource-only cleanup, also used for startup rollback and destruction.
@@ -475,8 +471,7 @@ fn sessionFailed(ctx: ?*anyopaque, cause: SessionError) void {
 fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ctx.?));
     if (!self.isSessionStarted()) return;
-    const events = self.events;
-    events.emit(.{ .data_count = data_count });
+    self.events.emit(.{ .data_count = data_count });
 }
 
 // MARK: - Connection callbacks

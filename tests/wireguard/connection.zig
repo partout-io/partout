@@ -857,10 +857,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         .suspend_backend_when_offline,
     );
     created.networkChange(.{ .reachable = false });
-    connection.testing.simulateTemporaryShutdownRetrySchedulingFailure(
-        created,
-        recorder.events(),
-    );
+    connection.testing.simulateTemporaryShutdownRetrySchedulingFailure(created);
 
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
