@@ -63,6 +63,5 @@ pub const Timer = io.Timer;
 pub const TunDescriptor = io.TunDescriptor;
 pub const TunWrapper = io.TunWrapper;
 pub const Waiter = io.Waiter;
-pub const WriteOOBError = io.WriteOOBError;
 
 pub const canChangeStatus = conn.canChangeStatus;

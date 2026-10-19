@@ -74,7 +74,6 @@ pub const SessionError = error{
     MissingDestination,
     MissingSessionId,
     NoRouting,
-    OOBOutsideQueue,
     OutOfBounds,
     OutOfMemory,
     Overflow,
@@ -90,7 +89,6 @@ pub const SessionError = error{
     UnsupportedCompression,
     UnsupportedCryptoBackend,
     WouldBlock,
-    WriteIncomplete,
     WrongControlDataPrefix,
 };
 
@@ -295,7 +293,6 @@ pub const Session = struct {
             .{
                 .data_channel = Session.dataChannelForKey,
                 .write_packets = Session.writeDataPackets,
-                .write_out_of_band = Session.writeDataPackets,
                 .report_inbound_data_count = Session.reportInboundDataCount,
                 .report_outbound_data_count = Session.reportOutboundDataCount,
             },
@@ -445,10 +442,9 @@ pub const Session = struct {
         log.write(.info, "Send OCCPacket exit");
         const exit = OCCPacket.exit.serialized();
         const packet: []const u8 = &exit;
-        // Zero timeout sends OOB without waiting.
-        // FIXME: ###, Honor the caller's stop timeout with daemon-coordinated retries
-        // before detaching LINK; this single OOB attempt currently ignores it.
-        try pair.send(&.{packet}, null, 0);
+        // Queue one best-effort exit notification; the daemon flushes LINK
+        // before detaching it during shutdown.
+        try pair.send(&.{packet}, null);
         log.write(.info, "Sent OCCPacket correctly");
     }
 
@@ -556,7 +552,7 @@ pub const Session = struct {
         const context = self.state.activeContext() orelse return;
         const pair = context.current_data_pair orelse return;
         try self.checkPingTimeout(context);
-        try pair.send(packets, null, null);
+        try pair.send(packets, null);
     }
 
     // MARK: Negotiation
@@ -733,7 +729,7 @@ pub const Session = struct {
         if (self.keepAliveIntervalMs(context) != null) {
             log.write(.debug, "Send ping");
             const ping_packet: []const u8 = &constants_mod.Data.ping_string;
-            try pair.send(&.{ping_packet}, null, null);
+            try pair.send(&.{ping_packet}, null);
         }
         try self.scheduleNextPing(context);
     }

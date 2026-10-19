@@ -640,7 +640,6 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
         error.MissingSessionId,
         error.ModulesAllocation,
         error.MuxFailure,
-        error.OOBOutsideQueue,
         error.OutOfBounds,
         error.OutOfMemory,
         error.Overflow,
@@ -653,7 +652,6 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
         error.TunnelFailure,
         error.TunNotAvailable,
         error.WouldBlock,
-        error.WriteIncomplete,
         error.WrongControlDataPrefix,
         => .reconnect,
     };
@@ -716,7 +714,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         error.LooperTerminated,
         error.LooperUnavailable,
         error.MissingSessionId,
-        error.OOBOutsideQueue,
         error.OutOfBounds,
         error.OutOfMemory,
         error.Overflow,
@@ -726,7 +723,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         error.SessionStale,
         error.TunnelFailure,
         error.WouldBlock,
-        error.WriteIncomplete,
         error.WrongControlDataPrefix,
         => api.openVPNErrorPair(.connectionFailure),
     };

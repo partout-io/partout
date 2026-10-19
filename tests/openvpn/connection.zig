@@ -56,7 +56,6 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 // Model an established session without a server handshake.
                 const data_link = internal.data.DataLink.init(std.testing.allocator, endpoint, session.link_processor, self, .{
                     .write_packets = writeData,
-                    .write_out_of_band = writeOOB,
                     .data_channel = noChannel,
                     .report_inbound_data_count = ignoreDataSize,
                     .report_outbound_data_count = ignoreDataSize,
@@ -107,7 +106,6 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
             }
         }
         fn writeData(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {}
-        fn writeOOB(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) net.WriteOOBError!void {}
         fn noChannel(_: ?*anyopaque, _: u8) ?*source.openvpn_internal.data.DataChannel {
             return null;
         }

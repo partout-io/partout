@@ -367,17 +367,7 @@ pub const DataChannel = struct {
 /// The owning session serializes calls and supplies the packet write callbacks.
 pub const DataLink = struct {
     pub const SendError = DataPath.ProcessingError || processing_mod.PacketError ||
-        (net_mod.SubmissionError || error{MissingDestination}) ||
-        error{
-            EndOfStream,
-            InvalidAddressFamily,
-            InvalidOffset,
-            InvalidSocketMode,
-            LibcFailure,
-            OOBOutsideQueue,
-            Timeout,
-            WriteIncomplete,
-        };
+        net_mod.SubmissionError || error{MissingDestination};
     pub const ReceiveError = DataPath.ProcessingError || (net_mod.SubmissionError || error{MissingDestination});
 
     allocator: std.mem.Allocator,
@@ -388,8 +378,6 @@ pub const DataLink = struct {
 
     pub const Callbacks = struct {
         write_packets: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) (net_mod.SubmissionError || error{MissingDestination})!void,
-        // FIXME: ###, Delete after v2
-        write_out_of_band: *const fn (?*anyopaque, net_mod.Packets, net_mod.Side, ?net_mod.SocketAddress) net_mod.WriteOOBError!void,
         data_channel: *const fn (?*anyopaque, u8) ?*DataChannel,
         report_inbound_data_count: *const fn (?*anyopaque, usize) void,
         report_outbound_data_count: *const fn (?*anyopaque, usize) void,
@@ -438,7 +426,6 @@ pub const DataLink = struct {
         self: *const DataLink,
         packets: []const []const u8,
         key: u8,
-        timeout_ms: ?u64,
     ) SendError!void {
         const channel = self.callbacks.data_channel(self.context, key) orelse {
             log.write(.debug, "Ignoring sent packets, no DataChannel");
@@ -459,49 +446,12 @@ pub const DataLink = struct {
         var processed = try self.link_processor.processOutbound(asConstPackets(encrypted));
         defer processed.deinit();
 
-        if (timeout_ms) |timeout| {
-            // Out-of-band writes must happen on the looper queue.
-            const start = core_mod.concurrency.monotonicNs();
-            const deadline = core_mod.concurrency.deadlineAfterMs(start, timeout);
-            while (true) {
-                self.callbacks.write_out_of_band(self.context, processed.packets(), .link, self.remote_endpoint.address) catch |err| {
-                    const send_err: SendError = switch (err) {
-                        error.WouldBlock, error.Backpressure => {
-                            // This is a dumb busy-wait, but send() with timeout
-                            // is only used for the best-effort exit-notification
-                            // OCCPacket during shutdown.
-                            if (core_mod.concurrency.monotonicNs() < deadline) continue;
-                            log.writef(.err, "Data: Synchronous LINK write timed out after: {s}", .{
-                                @errorName(err),
-                            });
-                            return error.Timeout;
-                        },
-                        error.EndOfStream => error.EndOfStream,
-                        error.InvalidAddressFamily => error.InvalidAddressFamily,
-                        error.InvalidOffset => error.InvalidOffset,
-                        error.InvalidSocketMode => error.InvalidSocketMode,
-                        error.LibcFailure, error.DatagramDropped => error.LibcFailure,
-                        error.LooperUnavailable => error.LooperUnavailable,
-                        error.MissingDestination => error.MissingDestination,
-                        error.OOBOutsideQueue => error.OOBOutsideQueue,
-                        error.OutOfMemory => error.OutOfMemory,
-                        error.WriteIncomplete => error.WriteIncomplete,
-                    };
-                    log.writef(.err, "Data: Failed synchronous LINK write during send data: {s}", .{
-                        @errorName(send_err),
-                    });
-                    return send_err;
-                };
-                return;
-            }
-        } else {
-            self.callbacks.write_packets(self.context, processed.packets(), .link, self.remote_endpoint.address) catch |err| {
-                log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
-                    @errorName(err),
-                });
-                return err;
-            };
-        }
+        self.callbacks.write_packets(self.context, processed.packets(), .link, self.remote_endpoint.address) catch |err| {
+            log.writef(.err, "Data: Failed LINK write during send data: {s}", .{
+                @errorName(err),
+            });
+            return err;
+        };
     }
 
     fn flatCount(packets: []const []u8) usize {
@@ -529,9 +479,8 @@ pub const DataLinkPair = struct {
         self: DataLinkPair,
         packets: []const []const u8,
         key: ?u8,
-        timeout_ms: ?u64,
     ) !void {
-        return self.link.send(packets, key orelse self.key, timeout_ms);
+        return self.link.send(packets, key orelse self.key);
     }
 
     pub fn receive(

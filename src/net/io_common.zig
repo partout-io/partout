@@ -57,12 +57,6 @@ pub const Timer = struct {
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
 
-pub const WriteOOBError = SubmissionError || Error || error{
-    MissingDestination,
-    OOBOutsideQueue,
-    WriteIncomplete,
-};
-
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };
 pub const ReachabilityInfo = io_c.pp_reachability;
