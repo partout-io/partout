@@ -793,7 +793,6 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
         }
         fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
-            const events = self.events;
             if (self.startup_reachability_pending) {
                 self.startup_reachability_pending = false;
                 self.startup_reachability_saw_commit = self.commit_count == 1;
