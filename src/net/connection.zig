@@ -259,12 +259,12 @@ pub const Connection = struct {
         shutdown: *const fn (*anyopaque, ShutdownReason) void = struct {
             fn call(_: *anyopaque, _: ShutdownReason) void {}
         }.call,
-        stop: *const fn (*anyopaque, Events) void,
+        stop: *const fn (*anyopaque) void,
 
         /// A refresh pauses link submissions and receives a replacement through
         /// rebind, retaining TUN without re-establishing the connection when supported.
-        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
-        better_path: *const fn (*anyopaque, Events) void,
+        network_change: *const fn (*anyopaque, io.ReachabilityInfo) void,
+        better_path: *const fn (*anyopaque) void,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
@@ -295,8 +295,8 @@ pub const Connection = struct {
 
     /// Finalizes the connection after I/O is detached. No further events
     /// must be emitted after this returns.
-    pub fn stop(self: Connection, events: Events) void {
-        self.vtable.stop(self.ptr, events);
+    pub fn stop(self: Connection) void {
+        self.vtable.stop(self.ptr);
     }
 
     pub fn submitPackets(
@@ -319,13 +319,12 @@ pub const Connection = struct {
     pub fn networkChange(
         self: Connection,
         reachability: io.ReachabilityInfo,
-        events: Events,
     ) void {
-        self.vtable.network_change(self.ptr, reachability, events);
+        self.vtable.network_change(self.ptr, reachability);
     }
 
-    pub fn betterPath(self: Connection, events: Events) void {
-        self.vtable.better_path(self.ptr, events);
+    pub fn betterPath(self: Connection) void {
+        self.vtable.better_path(self.ptr);
     }
 
     pub fn destroy(self: Connection) void {

@@ -97,6 +97,11 @@ test "empty connection registry reports absent implementation" {
         error.MissingConnectionImplementation,
         registry.createConnection(allocator, module, .{
             .profile = &profile,
+            .events = .{ .ctx = &profile, .event = struct {
+                fn unexpected(_: *anyopaque, _: conn.Connection.Event) void {
+                    @panic("Missing implementation must not emit events");
+                }
+            }.unexpected },
             .controller = mock.noopTunnelController(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),

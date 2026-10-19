@@ -728,7 +728,7 @@ const ConnectionDaemon = struct {
         try self.detachLooperSides();
         // FIXME: ###, Honor stop timeout
         _ = timeout_ms;
-        connection.stop(self.events());
+        connection.stop();
     }
 
     fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
@@ -1012,7 +1012,7 @@ const ConnectionDaemon = struct {
     fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
         const connection = self.connection orelse @panic("handleReachability but no connection");
-        connection.networkChange(reachability, self.events());
+        connection.networkChange(reachability);
     }
 
     // Forwards the event to the underlying connection
@@ -1020,7 +1020,7 @@ const ConnectionDaemon = struct {
         if (self.daemon.state != .started) return;
         if (self.conn_request != null) self.is_stale_conn_request = true;
         const connection = self.connection orelse @panic("handleBetterPath but no connection");
-        connection.betterPath(self.events());
+        connection.betterPath();
     }
 
     fn handleConnectionEstablished(

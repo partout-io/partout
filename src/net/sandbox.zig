@@ -24,7 +24,7 @@ pub const Sandbox = struct {
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
-    events: ?events_mod.ConnectionEvents = null,
+    events: events_mod.ConnectionEvents,
     writer: ?ConnectionWriter = null,
     controller: TunnelController,
     resolver: DNSResolver,

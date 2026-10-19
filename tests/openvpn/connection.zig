@@ -33,11 +33,6 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
             try std.testing.expect(concrete.pending_failure == null);
             try std.testing.expect(!concrete.pending_rebind);
             if (self.reason == .rebind) {
-                const sink = net.Connection.Events{
-                    .ctx = self,
-                    .event = recordEvent,
-                };
-                concrete.events = sink;
                 const internal = source.openvpn_internal;
                 const endpoint = try net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?);
                 const session = try internal.session.Session.create(std.testing.allocator, .{
@@ -64,8 +59,8 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
                     .phase = .started,
                     .context = try internal.session_context.ActiveContext.create(std.testing.allocator, data_link, false, endpoint),
                 } };
-                self.created.betterPath(sink);
-                self.created.betterPath(sink);
+                self.created.betterPath();
+                self.created.betterPath();
                 try std.testing.expect(concrete.pending_rebind);
                 try std.testing.expect(concrete.pending_failure == null);
                 try std.testing.expectEqual(@as(usize, 1), self.rebind_events);
@@ -76,13 +71,9 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 concrete.session_events.failed(concrete.session_events.ctx, error.LinkFailure);
                 try std.testing.expectEqual(@as(usize, 0), self.unexpected_events);
                 try std.testing.expect(concrete.pending_failure == null);
-                concrete.events = null;
             }
             self.created.shutdown(self.reason);
-            self.created.stop(.{
-                .ctx = self,
-                .event = recordEvent,
-            });
+            self.created.stop();
 
             try std.testing.expect(!concrete.pending_rebind);
             var token = concrete.auth_token.copy();
@@ -134,12 +125,14 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
     };
     var context = connection.ConnectionContext{ .session_options = .{ .backend = .mock } };
     var controller = mock.MockTunnelController{};
+    var request = Request{ .created = undefined, .reason = undefined };
     const created = try connection.createConnection(
         &context,
         allocator,
         source.net_connection.activeConnectionModule(&profile).?,
         .{
             .profile = &profile,
+            .events = .{ .ctx = &request, .event = Request.recordEvent },
             .controller = controller.interface(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
@@ -149,13 +142,14 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
         },
     );
     defer created.destroy();
+    request.created = created;
     for ([_]net.Connection.ShutdownReason{
         .{ .failure = .reconnect },
         .rebind,
         .explicit_stop,
         .{ .failure = .cancel },
     }) |reason| {
-        var request = Request{ .created = created, .reason = reason };
+        request.reason = reason;
         try Request.run(&request);
     }
 }

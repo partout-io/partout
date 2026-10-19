@@ -51,7 +51,7 @@ const WireGuardConnection = struct {
     /// Owns the profile-expanded clone referenced by the adapter.
     configuration: api.WireGuardConfiguration,
     /// Captured event sink; Go workers also report I/O failures through it.
-    events: ?net.Connection.Events,
+    events: net.Connection.Events,
     writer: net.ConnectionWriter,
     data_count_timer: net.Timer,
     data_count_timer_active: bool,
@@ -131,7 +131,7 @@ const WireGuardConnection = struct {
 
     fn onIOFailure(raw: *anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
-        const events = self.events orelse return;
+        const events = self.events;
         log.write(.err, "WireGuard native I/O failed");
         events.emit(.{ .failed = .{
             .err_pair = .{ .code = .ioFailure },
@@ -149,7 +149,6 @@ const WireGuardConnection = struct {
     }
 
     fn start(self: *WireGuardConnection, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
-        _ = self.events orelse @panic("WireGuardConnection start() requires connection events");
         log.write(.info, "Start tunnel");
         const info = (self.adapter.start(self.allocator, remote) catch |err|
             return activationError(err)) orelse return .started;
@@ -159,14 +158,13 @@ const WireGuardConnection = struct {
 
     fn commit(self: *WireGuardConnection, descriptor: net.TunDescriptor) net.ConnectionStartError!void {
         log.write(.info, "Commit WireGuard TUN");
-        _ = self.events orelse @panic("WireGuardConnection commit() requires connection events");
         const was_started = self.adapter.isStarted();
         self.adapter.commit(self.allocator, descriptor) catch |err| return activationError(err);
         if (!was_started and self.adapter.isStarted()) self.backendStarted();
     }
 
     fn backendStarted(self: *WireGuardConnection) void {
-        self.reportDataCount(self.events.?);
+        self.reportDataCount(self.events);
         self.startDataCountTimer() catch |err| {
             log.writef(.err, "Unable to start data count timer: {s}", .{@errorName(err)});
         };
@@ -176,14 +174,15 @@ const WireGuardConnection = struct {
         const was_started = self.adapter.isStarted();
         const rebound = self.adapter.rebind(self.allocator, remote, tun) catch |err| return activationError(err);
         if (!rebound) {
-            self.scheduleTemporaryShutdownRetry(self.events.?);
+            self.scheduleTemporaryShutdownRetry(self.events);
             return true;
         }
         if (!was_started and self.adapter.isStarted()) self.backendStarted();
         return !self.adapter.isStopped();
     }
 
-    fn stop(self: *WireGuardConnection, events: net.Connection.Events) void {
+    fn stop(self: *WireGuardConnection) void {
+        const events = self.events;
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         const had_state = self.adapter.hasResources();
@@ -194,11 +193,8 @@ const WireGuardConnection = struct {
         }
     }
 
-    fn networkChange(
-        self: *WireGuardConnection,
-        reachability: net.ReachabilityInfo,
-        events: net.Connection.Events,
-    ) void {
+    fn networkChange(self: *WireGuardConnection, reachability: net.ReachabilityInfo) void {
+        const events = self.events;
         self.cancelTemporaryShutdownRetry();
         switch (self.adapter.didUpdateReachable(self.allocator, reachability.reachable)) {
             .unchanged => self.prepareLinkRefresh(null, events),
@@ -210,11 +206,8 @@ const WireGuardConnection = struct {
         }
     }
 
-    fn betterPath(
-        self: *WireGuardConnection,
-        events: net.Connection.Events,
-    ) void {
-        self.prepareLinkRefresh(null, events);
+    fn betterPath(self: *WireGuardConnection) void {
+        self.prepareLinkRefresh(null, self.events);
     }
 
     fn prepareLinkRefresh(self: *WireGuardConnection, info: ?api.TunnelRemoteInfoWrapper, events: net.Connection.Events) void {
@@ -260,7 +253,7 @@ const WireGuardConnection = struct {
     fn onDataCountTimer(ctx: ?*anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
         if (!self.data_count_timer_active) return;
-        const events = self.events orelse return;
+        const events = self.events;
 
         self.reportDataCount(events);
         self.writer.scheduleTimer(&self.data_count_timer, self.data_count_interval_ms, .{
@@ -330,7 +323,7 @@ const WireGuardConnection = struct {
         const self: *WireGuardConnection = @ptrCast(@alignCast(ctx.?));
         if (!self.temporary_shutdown_retry_timer_active) return;
         self.temporary_shutdown_retry_timer_active = false;
-        const events = self.events orelse return;
+        const events = self.events;
         switch (self.adapter.retryTemporaryShutdown(self.allocator)) {
             .unchanged => {},
             .needs_rebind => |info| self.prepareLinkRefresh(info, events),
@@ -492,23 +485,19 @@ const wireguard_connection_vtable = net.Connection.VTable{
     .destroy = destroy,
 };
 
-fn stop(ptr: *anyopaque, events: net.Connection.Events) void {
+fn stop(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.stop(events);
+    self.stop();
 }
 
-fn networkChange(
-    ptr: *anyopaque,
-    reachability: net.ReachabilityInfo,
-    events: net.Connection.Events,
-) void {
+fn networkChange(ptr: *anyopaque, reachability: net.ReachabilityInfo) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.networkChange(reachability, events);
+    self.networkChange(reachability);
 }
 
-fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
+fn betterPath(ptr: *anyopaque) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.betterPath(events);
+    self.betterPath();
 }
 
 fn destroy(ptr: *anyopaque) void {

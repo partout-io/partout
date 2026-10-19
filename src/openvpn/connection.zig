@@ -75,7 +75,7 @@ const OpenVPNConnection = struct {
     ca_filename: []const u8,
 
     /// Stable callback sink supplied at creation.
-    events: ?net.Connection.Events,
+    events: net.Connection.Events,
     writer: ?net.ConnectionWriter,
     with_local_options: bool,
     /// Ownership marks an attempt awaiting finalization, even if stopped.
@@ -264,7 +264,7 @@ const OpenVPNConnection = struct {
         });
     }
 
-    fn stop(self: *OpenVPNConnection, _: net.Connection.Events) void {
+    fn stop(self: *OpenVPNConnection) void {
         self.finalizeSession();
     }
 
@@ -299,23 +299,16 @@ const OpenVPNConnection = struct {
         session.ioFailed(side, failure);
     }
 
-    fn networkChange(
-        _: *OpenVPNConnection,
-        _: net.ReachabilityInfo,
-        _: net.Connection.Events,
-    ) void {
+    fn networkChange(_: *OpenVPNConnection, _: net.ReachabilityInfo) void {
         // Active links report better-path or I/O failure themselves. The
         // daemon gates a new start on reachability after disconnection.
     }
 
-    fn betterPath(
-        self: *OpenVPNConnection,
-        events: net.Connection.Events,
-    ) void {
+    fn betterPath(self: *OpenVPNConnection) void {
         const session = self.current_session orelse return;
         if (!session.isActive() or self.pending_failure != null or self.pending_rebind) return;
         self.pending_rebind = true;
-        events.emit(.{ .needs_rebind = null });
+        self.events.emit(.{ .needs_rebind = null });
     }
 
     // MARK: - Session events
@@ -368,7 +361,7 @@ const OpenVPNConnection = struct {
             .modules = modules,
         };
 
-        const events = self.events orelse return;
+        const events = self.events;
         events.emit(.{ .established = .{
             .remote_endpoint = remote_endpoint,
             .info = info,
@@ -393,7 +386,7 @@ const OpenVPNConnection = struct {
         self.pending_failure = cause;
         // The owner schedules shutdown/detachment/stop. Never reenter the
         // lifecycle here: this callback can run inside TLS.
-        const events = self.events orelse return;
+        const events = self.events;
         const err_pair = partoutCodeForError(cause);
         events.emit(.{ .failed = .{
             .err_pair = err_pair,
@@ -407,7 +400,7 @@ const OpenVPNConnection = struct {
         self: *OpenVPNConnection,
         configuration: ?*const api.OpenVPNConfiguration,
     ) void {
-        const e = self.events orelse return;
+        const e = self.events;
         const cfg = configuration orelse {
             e.emit(.{ .set_env = .{ .key = EnvironmentKeys.server_configuration, .value = null } });
             return;
@@ -441,7 +434,7 @@ const OpenVPNConnection = struct {
         }
         if (!has_session) return;
         self.reportServerConfiguration(null);
-        const events = self.events orelse return;
+        const events = self.events;
         // All owned state is settled before the synchronous terminal callback.
         events.emit(.stopped);
     }
@@ -482,7 +475,7 @@ fn sessionFailed(ctx: ?*anyopaque, cause: SessionError) void {
 fn sessionDataCount(ctx: ?*anyopaque, data_count: api.DataCount) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ctx.?));
     if (!self.isSessionStarted()) return;
-    const events = self.events orelse return;
+    const events = self.events;
     events.emit(.{ .data_count = data_count });
 }
 
@@ -506,9 +499,9 @@ fn shutdown(ptr: *anyopaque, reason: net.Connection.ShutdownReason) void {
     self.shutdown(reason);
 }
 
-fn stop(ptr: *anyopaque, events: net.Connection.Events) void {
+fn stop(ptr: *anyopaque) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.stop(events);
+    self.stop();
 }
 
 fn submitPackets(
@@ -540,18 +533,14 @@ fn ioFailed(
     self.ioFailed(side, failure);
 }
 
-fn networkChange(
-    ptr: *anyopaque,
-    reachability: net.ReachabilityInfo,
-    events: net.Connection.Events,
-) void {
+fn networkChange(ptr: *anyopaque, reachability: net.ReachabilityInfo) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.networkChange(reachability, events);
+    self.networkChange(reachability);
 }
 
-fn betterPath(ptr: *anyopaque, events: net.Connection.Events) void {
+fn betterPath(ptr: *anyopaque) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.betterPath(events);
+    self.betterPath();
 }
 
 fn destroy(ptr: *anyopaque) void {

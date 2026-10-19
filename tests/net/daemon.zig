@@ -42,7 +42,7 @@ test "daemon terminates and cancels after terminal looper failure" {
             return .{ .ptr = ptr.?, .vtable = &vtable, .daemon_io = .none };
         }
 
-        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+        fn terminate(raw: *anyopaque) void {
             const connection: *FailingStartConnection = @ptrCast(@alignCast(raw));
             const owner = connection.terminal_daemon.?.implementation.connection;
             std.debug.assert(daemon.testing.isCurrentThread(owner));
@@ -123,6 +123,7 @@ test "daemon terminates and cancels after terminal looper failure" {
 test "daemon dispatches controls to actor and owns queued establishment metadata" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
+        events: net.Connection.Events = undefined,
         looper: *Looper = undefined,
         daemon: *Daemon = undefined,
         profile: *const api.Profile = undefined,
@@ -143,8 +144,9 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
                 else => std.debug.assert(reason == .explicit_stop),
             }
         }
-        fn stop(raw: *anyopaque, sink: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const sink = self.events;
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
             std.debug.assert(!self.looper.isLinkAttached() and !self.looper.isTunAttached());
@@ -153,14 +155,16 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
             sink.emit(.stopped);
             std.debug.assert(self.daemon.snapshot_publisher.environment.connection_status == status);
         }
-        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo, sink: net.Connection.Events) void {
+        fn reachability(raw: *anyopaque, _: net.ReachabilityInfo) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const sink = self.events;
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             self.reachability_count += 1;
             sink.emit(.{ .data_count = .{} });
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const sink = self.events;
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             var servers = [_]api.Address{api.Address.parseRaw("1.1.1.1").?};
             const modules = [_]api.TaggedModule{.{ .DNS = .{
@@ -185,6 +189,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
         }
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events;
             self.looper = @ptrCast(@alignCast(sb.writer.?.ptr));
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
@@ -508,11 +513,11 @@ const FailingStartConnection = struct {
         return error.UnableToStart;
     }
 
-    fn stop(_: *anyopaque, _: net.Connection.Events) void {}
+    fn stop(_: *anyopaque) void {}
 
-    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
+    fn networkChange(_: *anyopaque, _: net.ReachabilityInfo) void {}
 
-    fn betterPath(_: *anyopaque, _: net.Connection.Events) void {}
+    fn betterPath(_: *anyopaque) void {}
 
     fn destroy(_: *anyopaque) void {}
 
@@ -545,7 +550,7 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 test "daemon defers reporting with owned payloads and permits reentrant stop" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
-        events: ?net.Connection.Events = null,
+        events: net.Connection.Events = undefined,
         producer_thread: ?std.Thread.Id = null,
         daemon: *Daemon = undefined,
         delivered_updates: *const usize = undefined,
@@ -557,8 +562,9 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
             self.events = sb.events;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
         }
-        fn betterPath(raw: *anyopaque, sink: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const sink = self.events;
             self.producer_thread = std.Thread.getCurrentId();
             self.producing = true;
             defer self.producing = false;
@@ -574,7 +580,9 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
             @memset(&key, 'x');
             @memset(&value, 'x');
         }
-        fn stop(_: *anyopaque, sink: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const sink = self.events;
             sink.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = null } });
             sink.emit(.stopped);
         }
@@ -663,7 +671,7 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
     try std.testing.expect(controller.delivered_outside_producer);
     try std.testing.expectEqual(@as(usize, 1), controller.clears);
     // A late update must not recreate environment state after shutdown.
-    const sink = factory.events.?;
+    const sink = factory.events;
     try daemon.testing.onLoop(actor, sink, struct {
         fn run(_: anytype, events: net.Connection.Events) daemon.Error!void {
             events.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = "stale" } });
@@ -710,7 +718,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
         fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.endpoint_list = .{ self.endpoint, self.endpoint, self.endpoint, self.endpoint };
-            self.events = sb.events.?;
+            self.events = sb.events;
             self.profile = sb.profile;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = self.daemon_io };
         }
@@ -772,8 +780,9 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             self.events.emit(.{ .needs_rebind = null });
             return true;
         }
-        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             // Event storage may disappear as soon as emit returns.
             var info = api.TunnelRemoteInfoWrapper{ .profile = self.profile.* };
             info = info.clone(std.testing.allocator) catch unreachable;
@@ -782,16 +791,17 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             events.emit(.{ .needs_rebind = payload });
             events.emit(.{ .needs_rebind = payload });
         }
-        fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo, events: net.Connection.Events) void {
+        fn networkChange(raw: *anyopaque, _: net.ReachabilityInfo) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             if (self.startup_reachability_pending) {
                 self.startup_reachability_pending = false;
                 self.startup_reachability_saw_commit = self.commit_count == 1;
                 return;
             }
-            betterPath(raw, events);
+            betterPath(raw);
         }
-        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             if (self.daemon_io != .looper) {
                 if (self.remote) |remote| if (remote.link) |link| link.cleanup();
@@ -972,7 +982,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
                         try daemon.testing.onLoop(owner, &probe, struct {
                             fn run(_: anytype, value: *Probe) daemon.Error!void {
                                 value.controller.set_tunnel_settings_error = error.TunNotAvailable;
-                                Probe.betterPath(value, value.events);
+                                Probe.betterPath(value);
                             }
                         }.run);
                         const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
@@ -1008,6 +1018,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
 test "looper owns TUN across startup and optional rebind replacement" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
+        events: net.Connection.Events = undefined,
         daemon: *Daemon = undefined,
         profile: *const api.Profile = undefined,
         allocator: std.mem.Allocator = undefined,
@@ -1019,6 +1030,7 @@ test "looper owns TUN across startup and optional rebind replacement" {
 
         fn create(raw: ?*anyopaque, allocator: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events;
             self.profile = sb.profile;
             self.allocator = allocator;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .looper };
@@ -1043,8 +1055,9 @@ test "looper owns TUN across startup and optional rebind replacement" {
             self.rebind_count += 1;
             return true;
         }
-        fn betterPath(raw: *anyopaque, events: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             events.emit(.{ .needs_rebind = if (self.recreate_tun) .{ .profile = self.profile.* } else null });
         }
         fn socket(_: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
@@ -1148,11 +1161,14 @@ test "looper owns TUN across startup and optional rebind replacement" {
 test "needs_rebind restarts sessions without reporting a failure" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
+        events: net.Connection.Events = undefined,
         starts: usize = 0,
         stops: usize = 0,
         reason: ?net.Connection.ShutdownReason = null,
 
-        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events;
             return .{ .ptr = raw.?, .vtable = &vtable, .daemon_io = .none };
         }
         fn start(raw: *anyopaque, _: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
@@ -1164,12 +1180,15 @@ test "needs_rebind restarts sessions without reporting a failure" {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.reason = reason;
         }
-        fn stop(raw: *anyopaque, events: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             self.stops += 1;
             events.emit(.stopped);
         }
-        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             events.emit(.{ .needs_rebind = null });
             events.emit(.{ .needs_rebind = null });
         }
@@ -1241,6 +1260,7 @@ test "daemon-created link is released on failed start or rebind" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
+        events: net.Connection.Events = undefined,
         scenario: Scenario,
         socket_count: usize = 0,
         start_count: usize = 0,
@@ -1255,8 +1275,9 @@ test "daemon-created link is released on failed start or rebind" {
         fn endpoints(_: *anyopaque) ?[]const api.ExtendedEndpoint {
             return &endpoint_list;
         }
-        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, _: net.Sandbox) net.ConnectionCreateError!net.Connection {
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.events = sb.events;
             return .{ .ptr = self, .vtable = &vtable, .daemon_io = .link };
         }
         fn start(raw: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
@@ -1286,10 +1307,12 @@ test "daemon-created link is released on failed start or rebind" {
             if (self.remote) |remote| remote.link.?.cleanup();
             self.remote = null;
         }
-        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
             destroy(raw);
         }
-        fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
+        fn betterPath(raw: *anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw));
+            const events = self.events;
             events.emit(.{ .needs_rebind = null });
         }
         fn socket(raw: ?*anyopaque, allocator: std.mem.Allocator, _: ?api.ExtendedEndpoint, port: u16, _: ?io.ReachabilityInfo, _: c_int) net.SocketFactory.Error!io.LinkDescriptor {
@@ -1416,7 +1439,7 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             _ = self.reads.fetchAdd(packets.len, .release);
             return .keep;
         }
-        fn terminate(raw: *anyopaque, _: net.Connection.Events) void {
+        fn terminate(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             self.daemon.implementation.connection.looper.stop() catch unreachable;
@@ -1431,7 +1454,7 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
                 std.debug.assert(err == error.LooperUnavailable);
             };
         }
-        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             std.debug.assert(!self.daemon.implementation.connection.looper.isLinkAttached());
