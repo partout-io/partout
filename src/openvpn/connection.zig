@@ -265,12 +265,7 @@ const OpenVPNConnection = struct {
         });
     }
 
-    fn stop(
-        self: *OpenVPNConnection,
-        // FIXME: ###, Remove, handle timeout in daemon
-        _: u32,
-        _: net.Connection.Events,
-    ) void {
+    fn stop(self: *OpenVPNConnection, _: net.Connection.Events) void {
         self.finalizeSession();
     }
 
@@ -518,13 +513,9 @@ fn shutdown(ptr: *anyopaque, reason: net.Connection.ShutdownReason) void {
     self.shutdown(reason);
 }
 
-fn stop(
-    ptr: *anyopaque,
-    timeout_ms: u32,
-    events: net.Connection.Events,
-) void {
+fn stop(ptr: *anyopaque, events: net.Connection.Events) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.stop(timeout_ms, events);
+    self.stop(events);
 }
 
 fn submitPackets(

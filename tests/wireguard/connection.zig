@@ -317,8 +317,8 @@ test "WireGuard takes ownership of link and TUN descriptors" {
     try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
     try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);
 
-    created.stop(0, recorder.events());
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
+    created.stop(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), third_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
@@ -409,7 +409,7 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
     // A fired timer schedules the next report on the same loop.
     try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
     try std.testing.expectEqual(initial_reports + 2, recorder.data_count_reports);
-    created.stop(1000, recorder.events());
+    created.stop(recorder.events());
     const stopped_reports = recorder.data_count_reports;
     try std.testing.expect(try loop_helpers.poll(&environment.looper, 5));
     try std.testing.expectEqual(stopped_reports, recorder.data_count_reports);
@@ -468,7 +468,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         .suspend_backend_when_offline,
     );
     created.networkChange(.{ .reachable = true }, recorder.events());
-    created.stop(1000, recorder.events());
+    created.stop(recorder.events());
 
     try std.testing.expectEqual(@as(usize, 1), resolver.resolve_count);
     try std.testing.expect(resolver.last_flags.contains(.allAddresses));
@@ -686,7 +686,7 @@ test "WireGuard connection handles network monitor events" {
         try std.testing.expectEqual(@as(usize, 1), fake_backend.set_config_count);
         try std.testing.expectEqual(@as(usize, 1), fake_backend.disable_roaming_count);
 
-        created.stop(1000, recorder.events());
+        created.stop(recorder.events());
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     } else {
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
@@ -766,7 +766,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
     try std.testing.expectEqual(@as(usize, 0), retained_tun.cleanups);
 
-    created.stop(1000, recorder.events());
+    created.stop(recorder.events());
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), retained_tun.cleanups);
 }
@@ -869,8 +869,8 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
 
     // Emulate the daemon finalizing the connection after receiving failure.
-    created.stop(0, recorder.events());
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
+    created.stop(recorder.events());
     try std.testing.expect(connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
@@ -1341,7 +1341,7 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
 
     // Cancellation before commit must discard cached answers, despite no Go handle.
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
     resolver.records = &.{.{ .address = "198.51.100.20", .is_ipv6 = false }};
     try expectEstablished(try created.start(remote));
     try std.testing.expectEqual(@as(usize, 4), resolver.resolve_count);
@@ -1378,7 +1378,7 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
     try std.testing.expect(try created.rebind(.{}, .{ .fd = -1, .io = .{ .tun = replacement } }));
     try std.testing.expectEqual(@as(usize, 5), resolver.resolve_count);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
     try std.testing.expectEqual(@as(usize, 1), replacement_owned.cleanups);
 }
@@ -1464,8 +1464,8 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.rebind_count);
-    created.stop(0, recorder.events());
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
+    created.stop(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
     try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
     try std.testing.expectEqual(@as(usize, 1), replacement_owned.cleanups);
@@ -1479,7 +1479,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = -1, .io = .{ .tun = rejected_tun } }));
     try std.testing.expectEqual(@as(usize, 4), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), rejected.cleanups);
-    created.stop(0, recorder.events());
+    created.stop(recorder.events());
     try std.testing.expectEqual(@as(usize, 1), rejected.cleanups);
     try std.testing.expectEqual(@as(usize, 2), recorder.stopped_count);
     try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);

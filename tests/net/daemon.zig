@@ -143,7 +143,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
                 else => std.debug.assert(reason == .explicit_stop),
             }
         }
-        fn stop(raw: *anyopaque, _: u32, sink: net.Connection.Events) void {
+        fn stop(raw: *anyopaque, sink: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             std.debug.assert(daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             std.debug.assert(self.shutdown_count == self.stop_count + 1);
@@ -508,7 +508,7 @@ const FailingStartConnection = struct {
         return error.UnableToStart;
     }
 
-    fn stop(_: *anyopaque, _: u32, _: net.Connection.Events) void {}
+    fn stop(_: *anyopaque, _: net.Connection.Events) void {}
 
     fn networkChange(_: *anyopaque, _: net.ReachabilityInfo, _: net.Connection.Events) void {}
 
@@ -574,7 +574,7 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
             @memset(&key, 'x');
             @memset(&value, 'x');
         }
-        fn stop(_: *anyopaque, _: u32, sink: net.Connection.Events) void {
+        fn stop(_: *anyopaque, sink: net.Connection.Events) void {
             sink.emit(.{ .set_env = .{ .key = "OpenVPN.serverConfiguration", .value = null } });
             sink.emit(.stopped);
         }
@@ -791,7 +791,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             }
             betterPath(raw, events);
         }
-        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             if (self.daemon_io != .looper) {
                 if (self.remote) |remote| if (remote.link) |link| link.cleanup();
@@ -1164,7 +1164,7 @@ test "needs_rebind restarts sessions without reporting a failure" {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.reason = reason;
         }
-        fn stop(raw: *anyopaque, _: u32, events: net.Connection.Events) void {
+        fn stop(raw: *anyopaque, events: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.stops += 1;
             events.emit(.stopped);
@@ -1286,7 +1286,7 @@ test "daemon-created link is released on failed start or rebind" {
             if (self.remote) |remote| remote.link.?.cleanup();
             self.remote = null;
         }
-        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
             destroy(raw);
         }
         fn betterPath(_: *anyopaque, events: net.Connection.Events) void {
@@ -1439,7 +1439,7 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
                 std.debug.assert(err == error.LooperUnavailable);
             };
         }
-        fn stop(raw: *anyopaque, _: u32, _: net.Connection.Events) void {
+        fn stop(raw: *anyopaque, _: net.Connection.Events) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             std.debug.assert(!self.daemon.implementation.connection.looper.isLinkAttached());

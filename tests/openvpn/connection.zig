@@ -79,7 +79,7 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 concrete.events = null;
             }
             self.created.shutdown(self.reason);
-            self.created.stop(0, .{
+            self.created.stop(.{
                 .ctx = self,
                 .event = recordEvent,
             });

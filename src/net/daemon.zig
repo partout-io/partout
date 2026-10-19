@@ -726,7 +726,9 @@ const ConnectionDaemon = struct {
             if (failure) |value| log.writef(.err, "Shutdown write failed: .{}", .{value});
         }
         try self.detachLooperSides();
-        connection.stop(timeout_ms, self.events());
+        // FIXME: ###, Honor stop timeout
+        _ = timeout_ms;
+        connection.stop(self.events());
     }
 
     fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {

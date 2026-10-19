@@ -183,14 +183,7 @@ const WireGuardConnection = struct {
         return !self.adapter.isStopped();
     }
 
-    fn stop(
-        self: *WireGuardConnection,
-        timeout_ms: u32,
-        events: net.Connection.Events,
-    ) void {
-        // Match Swift: wg-go shutdown is normally immediate, so the generic
-        // connection timeout has nothing useful to interrupt here.
-        _ = timeout_ms;
+    fn stop(self: *WireGuardConnection, events: net.Connection.Events) void {
         self.stopDataCountTimer();
         self.cancelTemporaryShutdownRetry();
         const had_state = self.adapter.hasResources();
@@ -499,13 +492,9 @@ const wireguard_connection_vtable = net.Connection.VTable{
     .destroy = destroy,
 };
 
-fn stop(
-    ptr: *anyopaque,
-    timeout_ms: u32,
-    events: net.Connection.Events,
-) void {
+fn stop(ptr: *anyopaque, events: net.Connection.Events) void {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
-    self.stop(timeout_ms, events);
+    self.stop(events);
 }
 
 fn networkChange(

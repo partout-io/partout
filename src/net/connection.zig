@@ -262,7 +262,7 @@ pub const Connection = struct {
         shutdown: *const fn (*anyopaque, ShutdownReason) void = struct {
             fn call(_: *anyopaque, _: ShutdownReason) void {}
         }.call,
-        stop: *const fn (*anyopaque, u32, Events) void,
+        stop: *const fn (*anyopaque, Events) void,
 
         /// A refresh pauses link submissions and receives a replacement through
         /// rebind, retaining TUN without re-establishing the connection when supported.
@@ -298,12 +298,8 @@ pub const Connection = struct {
 
     /// Finalizes the connection after I/O is detached. No further events
     /// must be emitted after this returns.
-    pub fn stop(
-        self: Connection,
-        timeout_ms: u32,
-        events: Events,
-    ) void {
-        self.vtable.stop(self.ptr, timeout_ms, events);
+    pub fn stop(self: Connection, events: Events) void {
+        self.vtable.stop(self.ptr, events);
     }
 
     pub fn submitPackets(
