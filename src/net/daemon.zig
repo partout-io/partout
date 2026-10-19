@@ -685,7 +685,6 @@ const ConnectionDaemon = struct {
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
             .writer = ConnectionWriter.init(self.looper, &writer_vtable),
-            // FIXME: ###, Delete all these from Sandbox
             .controller = self.daemon.controller,
             .resolver = self.resolver,
             .factory = self.factory,

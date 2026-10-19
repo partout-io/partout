@@ -26,7 +26,6 @@ pub const Sandbox = struct {
     cache_dir: []const u8 = "",
     events: ?events_mod.ConnectionEvents = null,
     writer: ?ConnectionWriter = null,
-    // FIXME: ###, Delete all these from Sandbox
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,

@@ -8,7 +8,7 @@ const core = @import("../core/exports.zig");
 const io = @import("io.zig");
 const log = core.logging;
 
-// FIXME: ###, anyerror
+// FIXME: ###, Abuse of anyerror in callbacks
 
 pub const Options = struct {
     /// Borrowed mux; null is rejected. Keep it alive through looper destruction.
