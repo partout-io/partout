@@ -1166,7 +1166,7 @@ const ConnectionDaemon = struct {
     fn onLinkFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onLinkFailure but no connection");
-        conn.looperFailed(.link, failure);
+        conn.ioFailed(.link, failure);
     }
 
     fn onTunnelRead(ctx: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) !io.ReadAction {
@@ -1178,7 +1178,7 @@ const ConnectionDaemon = struct {
     fn onTunnelFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         const conn = self.connection orelse @panic("onTunnelFailure but no connection");
-        conn.looperFailed(.tun, failure);
+        conn.ioFailed(.tun, failure);
     }
 
     const writer_vtable: ConnectionWriter.VTable = .{

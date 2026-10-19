@@ -290,19 +290,13 @@ const OpenVPNConnection = struct {
         return session.submitPackets(side, packets);
     }
 
-    fn looperFailed(
+    fn ioFailed(
         self: *OpenVPNConnection,
         side: net.Side,
         failure: net.Failure,
     ) void {
         const session = self.current_session orelse return;
-        session.looperFailed(side, failure);
-    }
-
-    fn looperTerminated(self: *OpenVPNConnection, failure: ?net.Failure) void {
-        const session = self.current_session orelse return;
-        self.handleSessionFailed(error.LooperTerminated);
-        session.looperTerminated(failure);
+        session.ioFailed(side, failure);
     }
 
     fn networkChange(
@@ -537,21 +531,13 @@ fn isPeerSource(source: net.SocketAddress, peer: net.SocketAddress) bool {
     return std.mem.eql(u8, source.address[0..size], peer.address[0..size]);
 }
 
-fn looperFailed(
+fn ioFailed(
     ptr: *anyopaque,
     side: net.Side,
     failure: net.Failure,
 ) void {
     const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.looperFailed(side, failure);
-}
-
-fn looperTerminated(
-    ptr: *anyopaque,
-    failure: ?net.Failure,
-) void {
-    const self: *OpenVPNConnection = @ptrCast(@alignCast(ptr));
-    self.looperTerminated(failure);
+    self.ioFailed(side, failure);
 }
 
 fn networkChange(
@@ -581,8 +567,7 @@ const openvpn_connection_vtable = net.Connection.VTable{
     .shutdown = shutdown,
     .stop = stop,
     .submit_packets = submitPackets,
-    .looper_failed = looperFailed,
-    .looper_terminated = looperTerminated,
+    .io_failed = ioFailed,
     .network_change = networkChange,
     .better_path = betterPath,
     .destroy = destroy,
@@ -625,7 +610,6 @@ fn errorDisposition(cause: ConnectionError) net.Connection.Events.FailureDisposi
         error.InvalidSessionId,
         error.LibcFailure,
         error.LinkFailure,
-        error.LooperTerminated,
         error.LooperUnavailable,
         error.MissingSessionId,
         error.ModulesAllocation,
@@ -701,7 +685,6 @@ fn partoutCodeForError(err: ConnectionError) api.PartoutErrorPair {
         error.InvalidSessionId,
         error.LibcFailure,
         error.LinkFailure,
-        error.LooperTerminated,
         error.LooperUnavailable,
         error.MissingSessionId,
         error.OutOfBounds,

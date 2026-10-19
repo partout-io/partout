@@ -1369,7 +1369,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
         destroyed: usize = 0,
         stopped: usize = 0,
         starts: usize = 0,
-        termination_count: usize = 0,
         output: [64]u8 = undefined,
         output_len: usize = 0,
 
@@ -1421,13 +1420,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
             self.daemon.implementation.connection.looper.stop() catch unreachable;
-        }
-        fn terminated(raw: *anyopaque, failure: ?io.Failure) void {
-            const self: *@This() = @ptrCast(@alignCast(raw));
-            self.onActor();
-            std.debug.assert(failure == null);
-            self.writer.cancelTimer(&self.timer);
-            self.termination_count += 1;
         }
         fn shutdown(raw: *anyopaque, _: net.Connection.ShutdownReason) void {
             const self: *@This() = @ptrCast(@alignCast(raw));
@@ -1502,7 +1494,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             table.start = start;
             table.submit_packets = submit;
             table.better_path = terminate;
-            table.looper_terminated = terminated;
             table.shutdown = shutdown;
             table.stop = stop;
             table.destroy = destroy;

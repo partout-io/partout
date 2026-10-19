@@ -68,7 +68,6 @@ pub const SessionError = error{
     InvalidSocketMode,
     LibcFailure,
     LinkFailure,
-    LooperTerminated,
     LooperUnavailable,
     MissingCA,
     MissingDestination,
@@ -344,34 +343,13 @@ pub const Session = struct {
         return .keep;
     }
 
-    pub fn looperFailed(self: *Session, side: net.Side, failure: net.Failure) void {
+    pub fn ioFailed(self: *Session, side: net.Side, failure: net.Failure) void {
         const fallback = switch (side) {
             .link => error.LinkFailure,
             .tun => error.TunnelFailure,
         };
         const cause = sideFailureError(failure, fallback);
         self.reportFailure(cause);
-    }
-
-    /// Routes the externally owned looper's terminal callback into the
-    /// session. The owner must forward the terminal callback synchronously
-    /// while the Session is alive, and must stop forwarding before `destroy`.
-    pub fn looperTerminated(self: *Session, failure: ?net.Failure) void {
-        if (failure) |value| switch (value) {
-            .user => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
-                @errorName(cause),
-            }),
-            .io => |details| log.writef(.err, "Session looper finished with error: {s}", .{
-                @errorName(details.cause),
-            }),
-            .system => |cause| log.writef(.err, "Session looper finished with error: {s}", .{
-                @errorName(cause),
-            }),
-            .wait => |code| log.writef(.err, "Session looper finished with error: wait({d})", .{
-                code,
-            }),
-        };
-        self.stop();
     }
 
     pub const ShutdownRequest = struct {
@@ -413,8 +391,7 @@ pub const Session = struct {
             },
             .active => |value| value,
         };
-        // Terminal looper failures bypass shutdown(), so cancel both
-        // queue-owned timers here as well as in the normal shutdown path.
+        // Also cancel timers when stopping a session without prior shutdown.
         self.cancelTimers();
         const with_local_options = active.context.with_local_options;
         active.context.destroy();

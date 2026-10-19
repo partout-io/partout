@@ -249,11 +249,8 @@ pub const Connection = struct {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
+        io_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Failure) void {}
-        }.call,
-        looper_terminated: *const fn (*anyopaque, ?io.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?io.Failure) void {}
         }.call,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
@@ -311,19 +308,12 @@ pub const Connection = struct {
         return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
-    pub fn looperFailed(
+    pub fn ioFailed(
         self: Connection,
         side: io.Side,
         failure: io.Failure,
     ) void {
-        self.vtable.looper_failed(self.ptr, side, failure);
-    }
-
-    pub fn looperTerminated(
-        self: Connection,
-        failure: ?io.Failure,
-    ) void {
-        self.vtable.looper_terminated(self.ptr, failure);
+        self.vtable.io_failed(self.ptr, side, failure);
     }
 
     pub fn networkChange(
