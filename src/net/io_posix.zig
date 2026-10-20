@@ -6,12 +6,13 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
 const api = core.api;
 const log = core.logging;
 const util = core.util;
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 const Error = io.Error;
 const SocketOptions = io.SocketOptions;

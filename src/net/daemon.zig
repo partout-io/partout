@@ -16,6 +16,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const conn_mod = @import("connection.zig");
 const helpers = @import("daemon_helpers.zig");
@@ -25,7 +26,7 @@ const looper_mod = @import("looper.zig");
 const sandbox = @import("sandbox.zig");
 
 const api = core.api;
-const io_c = io.io_c;
+const io_c = ffi.io;
 const log = core.logging;
 const Connection = conn_mod.Connection;
 const ConnectionEvent = Connection.Event;

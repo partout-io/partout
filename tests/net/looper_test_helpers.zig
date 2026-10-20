@@ -5,8 +5,9 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const source = @import("source");
+const ffi = source.ffi;
 
-const io_c = source.net_io.io_c;
+const io_c = ffi.io;
 
 /// Each test owns the mux until after its looper is destroyed.
 pub const Mux = struct {

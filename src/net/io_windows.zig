@@ -2,10 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const ffi = @import("../c/exports.zig");
 const api = @import("../core/exports.zig").api;
 
 const io = @import("io_common.zig");
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 // Native handle types used by the Windows host ABI.
 pub const FileDescriptor = io_c.pp_fd;

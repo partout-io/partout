@@ -3,6 +3,8 @@
 
 const std = @import("std");
 const source = @import("source");
+const ffi = source.ffi;
+const io_c = ffi.io;
 const Looper = source.net_looper_posix.PosixLooper;
 const helpers = source.net_looper.testing_helpers;
 const io = source.net_io;
@@ -269,7 +271,7 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     try std.testing.expectEqual(0, probe.tasks);
     loop.cancelTimer(&probe.timer);
 
-    var fd = [_]std.c.pollfd{.{ .fd = io.io_c.pp_mux_wake_descriptor(wake.handle), .events = std.c.POLL.IN, .revents = 0 }};
+    var fd = [_]std.c.pollfd{.{ .fd = io_c.pp_mux_wake_descriptor(wake.handle), .events = std.c.POLL.IN, .revents = 0 }};
     // The shared mux consumes its wake while returning control to the owner.
     try std.testing.expectEqual(0, std.c.poll(&fd, 1, 0));
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -303,7 +305,7 @@ test "looper borrows its mux across allocation failure and replacement" {
             try std.testing.expect(try test_helpers.poll(&loop, 0));
         }
         mux.signal();
-        try std.testing.expect(io.io_c.pp_mux_wait(mux.handle, 0, null) > 0);
+        try std.testing.expect(io_c.pp_mux_wait(mux.handle, 0, null) > 0);
     }
     try std.testing.expectEqual(@as(usize, 2), probe.tasks);
 }

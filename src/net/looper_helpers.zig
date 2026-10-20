@@ -4,15 +4,17 @@
 
 const std = @import("std");
 
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const io_c = ffi.io;
 const log = core.logging;
 
 // FIXME: ###, Abuse of anyerror in callbacks
 
 pub const Options = struct {
     /// Borrowed mux; null is rejected. Keep it alive through looper destruction.
-    mux: io.io_c.pp_mux,
+    mux: io_c.pp_mux,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,
     max_read_size: usize = 256 * 1024,

@@ -9,12 +9,13 @@ const core = source.core;
 const net = source.net;
 
 const source = @import("source");
+const ffi = source.ffi;
 const test_helpers = @import("looper_test_helpers.zig");
 const Looper = source.net_looper.Looper;
 const api = source.core.api;
 const io = source.net_io;
 const io_posix = source.net_io_posix;
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 const mapReadResult = io_posix.mapReadResult;
 const mapWriteResult = io_posix.mapWriteResult;

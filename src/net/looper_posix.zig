@@ -12,11 +12,12 @@
 //! the mux until after looper destruction and serializes access to both.
 
 const std = @import("std");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 pub const PosixLooper = struct {
     const retry_delay_ms = 10;

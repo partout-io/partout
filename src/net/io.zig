@@ -10,7 +10,6 @@ const windows = @import("io_windows.zig");
 const posix = @import("io_posix.zig");
 const backend = if (builtin.os.tag == .windows) windows else posix;
 
-pub const io_c = common.io_c;
 pub const testing = common.testing;
 
 pub const Packet = common.Packet;

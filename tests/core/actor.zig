@@ -5,7 +5,8 @@
 const std = @import("std");
 
 const source = @import("source");
-const mux_c = source.ffi.io;
+const ffi = source.ffi;
+const io_c = ffi.io;
 
 const CounterError = error{
     Rejected,
@@ -285,9 +286,9 @@ const DrivenState = struct {
     const Actor = source.core.actor.Actor(@This(), Driver, Message, CounterError, handle);
     const Message = union(enum) { add: usize, echo: usize, read, nested, fail, block };
 
-    wake_mux: mux_c.pp_mux,
-    poll_mux: mux_c.pp_mux,
-    io_mux: mux_c.pp_mux,
+    wake_mux: io_c.pp_mux,
+    poll_mux: io_c.pp_mux,
+    io_mux: io_c.pp_mux,
     actor: ?*Actor = null,
     value: usize = 0,
     loop_thread: ?std.Thread.Id = null,
@@ -309,21 +310,21 @@ const DrivenState = struct {
     release_job: AtomicBool = .init(false),
 
     fn init() !DrivenState {
-        const wake_mux = mux_c.pp_mux_create(1) orelse return error.MuxCreationFailed;
-        errdefer mux_c.pp_mux_free(wake_mux);
-        const poll_mux = mux_c.pp_mux_create(2) orelse return error.MuxCreationFailed;
-        errdefer mux_c.pp_mux_free(poll_mux);
-        const io_mux = mux_c.pp_mux_create(1) orelse return error.MuxCreationFailed;
-        errdefer mux_c.pp_mux_free(io_mux);
-        try std.testing.expect(mux_c.pp_mux_add(poll_mux, mux_c.pp_mux_wake_descriptor(wake_mux)));
-        try std.testing.expect(mux_c.pp_mux_add(poll_mux, mux_c.pp_mux_wake_descriptor(io_mux)));
+        const wake_mux = io_c.pp_mux_create(1) orelse return error.MuxCreationFailed;
+        errdefer io_c.pp_mux_free(wake_mux);
+        const poll_mux = io_c.pp_mux_create(2) orelse return error.MuxCreationFailed;
+        errdefer io_c.pp_mux_free(poll_mux);
+        const io_mux = io_c.pp_mux_create(1) orelse return error.MuxCreationFailed;
+        errdefer io_c.pp_mux_free(io_mux);
+        try std.testing.expect(io_c.pp_mux_add(poll_mux, io_c.pp_mux_wake_descriptor(wake_mux)));
+        try std.testing.expect(io_c.pp_mux_add(poll_mux, io_c.pp_mux_wake_descriptor(io_mux)));
         return .{ .wake_mux = wake_mux, .poll_mux = poll_mux, .io_mux = io_mux };
     }
 
     fn deinit(self: *DrivenState) void {
-        mux_c.pp_mux_free(self.poll_mux);
-        mux_c.pp_mux_free(self.io_mux);
-        mux_c.pp_mux_free(self.wake_mux);
+        io_c.pp_mux_free(self.poll_mux);
+        io_c.pp_mux_free(self.io_mux);
+        io_c.pp_mux_free(self.wake_mux);
     }
 
     const Driver = struct {
@@ -331,7 +332,7 @@ const DrivenState = struct {
         completion: source.core.actor.DefaultDriver(DrivenState, null),
 
         pub fn init(mutex: *source.core.Mutex, state: *DrivenState) Driver {
-            mux_c.pp_mux_set_on_readable(state.poll_mux, onReadable, state);
+            io_c.pp_mux_set_on_readable(state.poll_mux, onReadable, state);
             return .{ .state = state, .completion = .init(mutex, state) };
         }
 
@@ -371,12 +372,12 @@ const DrivenState = struct {
     }
 
     fn wake(self: *DrivenState) void {
-        if (!mux_c.pp_mux_wake(self.wake_mux)) self.failed.store(true, .release);
+        if (!io_c.pp_mux_wake(self.wake_mux)) self.failed.store(true, .release);
         _ = self.wakes.fetchAdd(1, .release);
     }
 
     fn resetWake(self: *DrivenState) void {
-        if (!mux_c.pp_mux_reset_wake(self.wake_mux)) self.failed.store(true, .release);
+        if (!io_c.pp_mux_reset_wake(self.wake_mux)) self.failed.store(true, .release);
     }
 
     fn loopOnce(self: *DrivenState, max_wait_ms: ?u32) void {
@@ -395,14 +396,14 @@ const DrivenState = struct {
         }
         // Bound the test's idle wait so a lost wake fails instead of hanging.
         const timeout: c_int = @intCast(max_wait_ms orelse 5000);
-        const result = mux_c.pp_mux_wait(self.poll_mux, timeout, null);
+        const result = io_c.pp_mux_wait(self.poll_mux, timeout, null);
         if (result < 0 or (max_wait_ms == null and result == 0)) self.failed.store(true, .release);
     }
 
-    fn onReadable(raw: ?*anyopaque, fd: mux_c.pp_fd) callconv(.c) void {
+    fn onReadable(raw: ?*anyopaque, fd: io_c.pp_fd) callconv(.c) void {
         const self: *DrivenState = @ptrCast(@alignCast(raw.?));
-        if (fd != mux_c.pp_mux_wake_descriptor(self.io_mux)) return;
-        if (!mux_c.pp_mux_reset_wake(self.io_mux)) self.failed.store(true, .release);
+        if (fd != io_c.pp_mux_wake_descriptor(self.io_mux)) return;
+        if (!io_c.pp_mux_reset_wake(self.io_mux)) self.failed.store(true, .release);
         if (!self.actor.?.isOnQueue()) self.failed.store(true, .release);
         self.io_value = self.value;
         self.nested_io_result = self.actor.?.perform(usize, .{ .echo = 42 }) catch {
@@ -478,7 +479,7 @@ test "actor driver services I/O between queued jobs and permits nested callbacks
     try actor.schedule(.block);
     try waitForFlag(&state.job_entered);
     for (0..64) |_| try actor.schedule(.{ .add = 1 });
-    try std.testing.expect(mux_c.pp_mux_wake(state.io_mux));
+    try std.testing.expect(io_c.pp_mux_wake(state.io_mux));
     state.release_job.store(true, .release);
     try std.testing.expectEqual(@as(usize, 64), try actor.perform(usize, .read));
     actor.shutdown();

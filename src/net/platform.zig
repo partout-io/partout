@@ -320,7 +320,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     const tun = maybe_tun orelse {
         return error.TunNotAvailable;
     };
-    errdefer io.io_c.pp_tun_free(tun);
+    errdefer io_c.pp_tun_free(tun);
     return TunWrapper.create(allocator, tun);
 }
 

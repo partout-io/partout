@@ -7,7 +7,8 @@ const std = @import("std");
 const core = @import("source").core;
 const io = @import("source").net_io;
 const platform_source = @import("source").net_platform;
-const io_c = @import("source").ffi.io;
+const ffi = @import("source").ffi;
+const io_c = ffi.io;
 
 const Platform = platform_source.Platform;
 const ReachabilityInfo = io.ReachabilityInfo;
