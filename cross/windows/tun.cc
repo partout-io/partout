@@ -82,6 +82,7 @@ static PartoutTunnelController *get_controller(void *ref) {
     return static_cast<PartoutTunnelController *>(ref);
 }
 
+// FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
 static void tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
@@ -104,19 +105,23 @@ static pp_tun tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_
     return nullptr;
 }
 
+// FIXME: ###, Windows, Publish tunnel snapshots to the host.
 static void tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_report_snapshot(%p, %p)", ref, snapshot_json);
 }
 
+// FIXME: ###, Windows, Publish environment updates to the host.
 static void tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_set_environment_value(%p, %p, %p)", ref, key, value);
 }
 
+// FIXME: ###, Windows, Honor kill_switch when clearing tunnel settings.
 static void tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_clear_tunnel(%p, %d)", ref, kill_switch);
     if (const auto controller = get_controller(ref)) controller->Stop();
 }
 
+// FIXME: ###, Windows, Cancel the VPN channel and report error_message.
 static void tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     pp_clog_v(PPLogLevelDebug, "tun: ctrl_cancel_tunnel(%p, %p)", ref, error_message);
 }

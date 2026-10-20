@@ -19,7 +19,7 @@ pub const LinkDescriptor = struct {
         return self.socket.localAddress();
     }
 
-    pub fn cleanup(self: *LinkDescriptor) void {
+    pub fn cleanup(self: LinkDescriptor) void {
         self.socket.destroy();
     }
 };
@@ -36,6 +36,7 @@ pub const TunDescriptor = struct {
 pub const SocketWrapper = struct {
     allocator: std.mem.Allocator,
 
+    // FIXME: ###, Windows, Open and configure the native socket using endpoint and options.
     pub fn create(
         allocator: std.mem.Allocator,
         endpoint: ?api.ExtendedEndpoint,
@@ -50,6 +51,7 @@ pub const SocketWrapper = struct {
         return self;
     }
 
+    // FIXME: ###, Windows, Close the native socket and watch handle.
     pub fn destroy(self: *SocketWrapper) void {
         self.allocator.destroy(self);
     }
@@ -59,6 +61,7 @@ pub const SocketWrapper = struct {
         @panic("Windows SocketWrapper.localAddress is not implemented");
     }
 
+    // FIXME: ###, Windows, Expose native packet I/O and readiness through the descriptor.
     pub fn linkDescriptor(self: *SocketWrapper) LinkDescriptor {
         return .{ .socket = self };
     }
@@ -67,17 +70,24 @@ pub const SocketWrapper = struct {
 // FIXME: ###, Windows, TunWrapper
 pub const TunWrapper = struct {
     allocator: std.mem.Allocator,
+    tun: io_c.pp_tun,
 
-    pub fn create(allocator: std.mem.Allocator, _: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
+    pub fn create(allocator: std.mem.Allocator, tun: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
         const self = try allocator.create(TunWrapper);
-        self.* = .{ .allocator = allocator };
+        self.* = .{
+            .allocator = allocator,
+            .tun = tun,
+        };
         return self;
     }
 
+    // FIXME: ###, Windows, Release the native tunnel and packet-I/O resources.
     pub fn destroy(self: *TunWrapper) void {
+        io_c.pp_tun_free(self.tun);
         self.allocator.destroy(self);
     }
 
+    // FIXME: ###, Windows, Expose native TUN packet I/O and readiness.
     pub fn tunDescriptor(_: *TunWrapper) !TunDescriptor {
         @panic("Windows TunWrapper.tunDescriptor is not implemented");
     }

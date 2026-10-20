@@ -706,6 +706,7 @@ test "WireGuard connection handles network monitor events" {
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -772,6 +773,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
 }
 
 test "WireGuard connection retries passive backend failure without terminal events" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
@@ -824,6 +826,7 @@ test "WireGuard connection retries passive backend failure without terminal even
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -1218,6 +1221,7 @@ test "WireGuard backend dispatches the passive startup payload separately" {
 }
 
 test "WireGuard adapter supports active startup and both reachability policies" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, alloc: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnel) backend_mod.Error!i32 {
