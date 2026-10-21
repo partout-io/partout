@@ -16,8 +16,8 @@
 
 const conn = @import("connection.zig");
 const daemon = @import("daemon.zig");
-const looper = @import("looper.zig");
 const io = @import("io.zig");
+const looper = @import("looper.zig");
 const platform = @import("platform.zig");
 const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
