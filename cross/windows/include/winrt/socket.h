@@ -28,6 +28,8 @@ void winrt_socket_free(winrt_socket socket);
  * timeout_ms; unconnected UDP binds a numeric local endpoint. */
 bool winrt_socket_open(winrt_socket socket, const char *host, uint16_t port,
     const winrt_socket_open_options *options);
+/* Returns the bound/connected local endpoint, including the assigned local port. */
+bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address);
 /* Worker-thread callbacks are serialized per socket. Buffers and source are
  * borrowed until return; only unconnected UDP supplies source. Error is zero
  * for data, 1 for TCP EOF, otherwise an HRESULT. False pauses packet delivery.

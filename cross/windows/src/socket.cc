@@ -65,6 +65,7 @@ struct WinrtSocket {
     bool receiving = false;
     std::shared_ptr<SocketReceiveState> receive_state;
     bool unconnected = false;
+    HostName bound_host{nullptr};
     // WinRT wildcard binds can listen on both families. The receive path must
     // retain the requested family policy even when the OS bind is broader.
     bool accepts_ipv4 = true;
@@ -93,19 +94,23 @@ void wait_for_connect(IAsyncAction const &action, int timeout_ms) {
     action.GetResults();
 }
 
-winrt_socket_address source_address(DatagramSocketMessageReceivedEventArgs const &args) {
+winrt_socket_address socket_address(HostName const &host, hstring const &port) {
     winrt_socket_address result{};
-    auto text = std::wstring(args.RemoteAddress().CanonicalName());
+    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
+        throw hresult_invalid_argument();
+    auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
     if (zone != std::wstring::npos) {
         result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
         text.resize(zone);
     }
-    const bool ipv4 = args.RemoteAddress().Type() == HostNameType::Ipv4;
+    const bool ipv4 = host.Type() == HostNameType::Ipv4;
     result.family = ipv4 ? 4 : 6;
     if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
         throw hresult_invalid_argument();
-    result.port = static_cast<uint16_t>(std::stoul(std::wstring(args.RemotePort())));
+    const auto number = std::stoul(std::wstring(port));
+    if (number > UINT16_MAX) throw hresult_invalid_argument();
+    result.port = static_cast<uint16_t>(number);
     return result;
 }
 
@@ -149,7 +154,7 @@ void register_datagram(WinrtSocket &socket, bool unconnected) {
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 winrt_socket_address source{};
-                if (unconnected) source = source_address(args);
+                if (unconnected) source = socket_address(args.RemoteAddress(), args.RemotePort());
                 state->deliver(buffer.data(), buffer.Length(),
                     unconnected ? &source : nullptr, 0);
             } catch (...) {
@@ -229,6 +234,7 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
             } else {
                 socket->datagram.BindEndpointAsync(host, local_service).get();
             }
+            socket->bound_host = host;
         } else if (socket->datagram) {
             wait_for_connect(socket->datagram.ConnectAsync(host, service), options->timeout_ms);
         } else {
@@ -251,6 +257,31 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
         winrt_log(WinrtLogError, "winrt_socket_open failed: unexpected exception");
     }
     return false;
+}
+
+bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
+    try {
+        if (!socket || !address) throw hresult_invalid_argument();
+        Apartment apartment;
+        HostName host{nullptr};
+        hstring port;
+        if (socket->datagram) {
+            const auto info = socket->datagram.Information();
+            host = info.LocalAddress();
+            port = info.LocalPort();
+            // Service binds may report :: even for our IPv4-only policy.
+            // Preserve the requested binding while using the OS-assigned port.
+            if (socket->bound_host) host = socket->bound_host;
+        } else if (socket->stream) {
+            const auto info = socket->stream.Information();
+            host = info.LocalAddress();
+            port = info.LocalPort();
+        }
+        *address = socket_address(host, port);
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 void winrt_socket_free(winrt_socket socket) {

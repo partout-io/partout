@@ -17,7 +17,6 @@ pub const OnReceive = ?*const fn (?*anyopaque, [*c]const u8, usize, [*c]const io
 pub const LinkDescriptor = *SocketWrapper;
 pub const TunDescriptor = *TunWrapper;
 
-// FIXME: ###, Windows, SocketWrapper
 pub const SocketWrapper = struct {
     allocator: std.mem.Allocator,
     socket: WinRT.winrt_socket,
@@ -30,7 +29,6 @@ pub const SocketWrapper = struct {
         endpoint: ?api.ExtendedEndpoint,
         options: io.SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
-        // FIXME: ###, Windows, Support sockets without the WinRT bridge.
         if (!build_options.winrt) return null;
         if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
         const peer = endpoint orelse api.ExtendedEndpoint{
@@ -78,18 +76,23 @@ pub const SocketWrapper = struct {
         return self;
     }
 
-    // FIXME: ###, Windows, Close the native socket and watch handle.
     pub fn destroy(self: *SocketWrapper) void {
         if (build_options.winrt) WinRT.winrt_socket_free(self.socket);
         self.allocator.destroy(self);
     }
 
-    // FIXME: ###, Windows, Supply the bound address and native handle with Windows I/O.
-    pub fn localAddress(_: *const SocketWrapper) !io.SocketAddress {
-        @panic("Windows SocketWrapper.localAddress is not implemented");
+    pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
+        if (!build_options.winrt) return error.LooperUnavailable;
+        var address: WinRT.winrt_socket_address = undefined;
+        if (!WinRT.winrt_socket_get_address(self.socket, &address)) return error.LibcFailure;
+        return .{
+            .address = address.address,
+            .scope_id = address.scope_id,
+            .port = address.port,
+            .family = address.family,
+        };
     }
 
-    // FIXME: ###, Windows, Expose native packet I/O and readiness through the descriptor.
     pub fn cleanup(self: *SocketWrapper) void {
         self.destroy();
     }
