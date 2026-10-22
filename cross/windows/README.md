@@ -78,8 +78,9 @@ plugin headers.
 
 Transport association, socket I/O and the TUN packet bridge are implemented.
 Channel startup applies negotiated IP addresses, inclusion/exclusion routes,
-DNS resolution rules and MTU from the remote IP/DNS modules. Windows caps the
-MTU at 1400; route gateways and DNS search suffix lists have no corresponding
+DNS resolution rules and MTU from the remote IP/DNS modules. The receive pool
+uses the negotiated MTU; the send pool adds 100 bytes for encapsulation.
+Route gateways and DNS search suffix lists have no corresponding
 channel setting. Encrypted DNS is rejected rather than silently downgraded.
 Controller notifications remain unimplemented.
 

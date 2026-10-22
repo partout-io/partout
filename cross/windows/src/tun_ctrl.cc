@@ -66,18 +66,26 @@ static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, si
         else channel.FlushVpnReceivePacketBuffers();
     };
     VpnPacketBuffer packet{nullptr};
+    const char *stage = "get buffer";
+    uint32_t capacity = 0;
     try {
         packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
         const auto buffer = packet.Buffer();
-        if (length > buffer.Capacity()) throw hresult_invalid_argument();
+        capacity = buffer.Capacity();
+        stage = "copy packet";
+        if (length > capacity) throw hresult_invalid_argument();
         memcpy(buffer.data(), bytes, length);
         buffer.Length(static_cast<uint32_t>(length));
+        stage = "append";
         append(packet);
         packet = nullptr; // Ownership returned to the channel.
+        stage = "flush";
         flush();
         return 0;
     } catch (...) {
         const auto error = to_hresult().value;
+        winrt_log(WinrtLogError, "WinRT %s write failed during %s: HRESULT 0x%08x, length=%zu, capacity=%u",
+            send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
         if (packet) try {
             packet.Buffer().Length(0);
@@ -132,7 +140,7 @@ bool PartoutTunnelController::Start(const char *info_json) noexcept {
             settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
             settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
             VpnInterfaceId{nullptr}, settings.routes, settings.domains,
-            settings.mtu, settings.max_frame, false, transport_);
+            settings.mtu, settings.maxFrame(), false, transport_);
         started_ = true;
         winrt_socket_set_channel_writer(socket_, [channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
             const auto result = write_channel(channel, bytes, length, true);
@@ -201,7 +209,12 @@ void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
         return;
     }
     std::lock_guard lock(tun->receive_mutex);
-    for (const auto &packet : packets) {
+    // VpnPacketBufferList's iterable view may be empty despite a nonzero Size.
+    // Rotate through the native list, restoring ownership before invoking user code.
+    const auto count = packets.Size();
+    for (uint32_t i = 0; i < count; ++i) {
+        const auto packet = packets.RemoveAtBegin();
+        packets.Append(packet);
         const auto buffer = packet.Buffer();
         if (!tun->callback || !tun->callback(tun->context, buffer.data(), buffer.Length()))
             counters_->tun_dropped.fetch_add(1, std::memory_order_relaxed);

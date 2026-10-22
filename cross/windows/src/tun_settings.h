@@ -24,7 +24,8 @@ struct TunnelSettings {
     VpnRouteAssignment routes;
     VpnDomainNameAssignment domains;
     uint32_t mtu = 1400;
-    static constexpr uint32_t max_frame = 1500;
+    static constexpr uint32_t encapsulation_headroom = 100;
+    uint32_t maxFrame() const { return mtu + encapsulation_headroom; }
 
     static bool has(JsonObject const &object, wchar_t const *key) {
         return object.HasKey(key) && object.GetNamedValue(key).ValueType() != JsonValueType::Null;
@@ -70,23 +71,28 @@ struct TunnelSettings {
         auto addresses = v4 ? ipv4 : ipv6;
         for (const auto &value : array(settings, L"subnets"))
             addresses.Append(subnet(value.GetString(), family, false).Address());
-        const auto readRoutes = [&](wchar_t const *key, Windows::Foundation::Collections::IVector<VpnRoute> result) {
+        const auto readRoutes = [&](wchar_t const *key, Windows::Foundation::Collections::IVector<VpnRoute> result, bool included) {
             if (!result) result = single_threaded_vector<VpnRoute>();
             for (const auto &value : array(settings, key)) {
                 const auto route = value.GetObject();
                 // Windows routes select an interface, not a per-route gateway.
                 if (has(route, L"gateway")) ip(route.GetNamedString(L"gateway"), family);
-                result.Append(subnet(has(route, L"destination") ? route.GetNamedString(L"destination") :
-                    hstring{v4 ? L"0.0.0.0/0" : L"::/0"}, family, true));
+                const auto destination = subnet(has(route, L"destination") ? route.GetNamedString(L"destination") :
+                    hstring{v4 ? L"0.0.0.0/0" : L"::/0"}, family, true);
+                // Override the physical default by prefix length, regardless of interface metrics.
+                if (included && destination.PrefixSize() == 0) {
+                    result.Append(subnet(v4 ? L"0.0.0.0/1" : L"::/1", family, true));
+                    result.Append(subnet(v4 ? L"128.0.0.0/1" : L"8000::/1", family, true));
+                } else result.Append(destination);
             }
             return result;
         };
         if (v4) {
-            routes.Ipv4InclusionRoutes(readRoutes(L"includedRoutes", routes.Ipv4InclusionRoutes()));
-            routes.Ipv4ExclusionRoutes(readRoutes(L"excludedRoutes", routes.Ipv4ExclusionRoutes()));
+            routes.Ipv4InclusionRoutes(readRoutes(L"includedRoutes", routes.Ipv4InclusionRoutes(), true));
+            routes.Ipv4ExclusionRoutes(readRoutes(L"excludedRoutes", routes.Ipv4ExclusionRoutes(), false));
         } else {
-            routes.Ipv6InclusionRoutes(readRoutes(L"includedRoutes", routes.Ipv6InclusionRoutes()));
-            routes.Ipv6ExclusionRoutes(readRoutes(L"excludedRoutes", routes.Ipv6ExclusionRoutes()));
+            routes.Ipv6InclusionRoutes(readRoutes(L"includedRoutes", routes.Ipv6InclusionRoutes(), true));
+            routes.Ipv6ExclusionRoutes(readRoutes(L"excludedRoutes", routes.Ipv6ExclusionRoutes(), false));
         }
     }
 
@@ -130,13 +136,9 @@ struct TunnelSettings {
             if (has(value, L"ipv6")) result.applyIP(value.GetNamedObject(L"ipv6"), HostNameType::Ipv6);
             if (has(value, L"mtu")) {
                 const double mtu = value.GetNamedNumber(L"mtu");
-                if (!std::isfinite(mtu) || mtu != std::floor(mtu) || mtu < 68 || mtu > 65535)
+                if (!std::isfinite(mtu) || mtu != std::floor(mtu) || mtu < 68 || mtu > 65535 - encapsulation_headroom)
                     throw hresult_invalid_argument(L"Invalid negotiated MTU");
                 result.mtu = static_cast<uint32_t>(mtu);
-                if (result.mtu > 1400) {
-                    winrt_log(WinrtLogNotice, "VPN channel MTU capped from %u to 1400", result.mtu);
-                    result.mtu = 1400;
-                }
             }
         }
         if (result.ipv4.Size() == 0 && result.ipv6.Size() == 0)

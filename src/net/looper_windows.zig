@@ -64,6 +64,7 @@ pub const WindowsLooper = struct {
         for (0..self.options.max_read_count) |_| {
             const node = self.callbacks.removeWhere({}, Received.isReady) orelse break;
             const side = node.side;
+            side.dispatched += 1;
             self.mutex.unlock();
             const keep = deliver(side, node.data.ptr, node.data.len, if (node.source) |*address| address else null, node.code);
             self.mutex.lock();
@@ -248,6 +249,9 @@ pub const WindowsLooper = struct {
         };
         slot.* = null;
         side.detached.store(true, .release);
+        core.logging.writef(.notice, "Windows looper {s}: queued={}, dispatched={}, reading={}", .{
+            @tagName(tag), side.queued, side.dispatched, side.reading,
+        });
         switch (side.arguments.pair) {
             inline else => |wrapper| wrapper.stopWrites(),
         }
@@ -293,6 +297,8 @@ pub const WindowsLooper = struct {
         owner: *WindowsLooper,
         arguments: helpers.AttachArguments,
         reading: bool = true,
+        queued: u64 = 0,
+        dispatched: u64 = 0,
         allocation_failure: ?Received = null,
         references: std.atomic.Value(usize) = .init(1),
         detached: std.atomic.Value(bool) = .init(false),
@@ -362,6 +368,7 @@ pub const WindowsLooper = struct {
         };
         side.retain();
         self.callbacks.append(node);
+        side.queued += 1;
         self.timer_condition.broadcast();
         return side.reading and side.allocation_failure == null and code == 0;
     }
