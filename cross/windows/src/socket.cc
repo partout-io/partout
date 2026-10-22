@@ -56,6 +56,9 @@ struct SocketReceiveState {
     void deliverLocked(const uint8_t *bytes, size_t size,
                        const winrt_socket_address *source, int32_t error) {
         if (!callback || (paused && !error)) return;
+        if (error) winrt_log(WinrtLogError,
+            "WinRT socket receive failed: code=0x%08x (1=TCP EOF), channel_owned=%s",
+            static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         paused = !callback(context, bytes, size, source, error);
     }
 };
@@ -370,7 +373,10 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
         } while (offset < length);
         return 0;
     } catch (...) {
-        return to_hresult().value;
+        const auto error = to_hresult().value;
+        winrt_log(WinrtLogError, "WinRT socket write failed: HRESULT 0x%08x, length=%zu",
+            static_cast<unsigned int>(error), length);
+        return error;
     }
 }
 
