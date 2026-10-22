@@ -32,6 +32,7 @@ int main() try {
     const auto domains = settings.domains.DomainNameList();
     assert(domains.Size() == 1 && domains.GetAt(0).DomainName().CanonicalName() == L"example.org");
     assert(domains.GetAt(0).DnsServers().Size() == 2);
+    assert(domains.GetAt(0).WebProxyServers() && domains.GetAt(0).WebProxyServers().Size() == 0);
 
     const auto v4 = TunnelSettings::parse(R"({"modules":[
         {"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":1300}},
@@ -39,6 +40,7 @@ int main() try {
     ]})");
     assert(v4.ipv6.Size() == 0 && v4.mtu == 1300);
     assert(v4.domains.DomainNameList().Size() == 1); // The catch-all rule has a null DomainName.
+    assert(v4.domains.DomainNameList().GetAt(0).WebProxyServers());
     const auto v6 = TunnelSettings::parse(R"({"modules":[
         {"type":"IP","value":{"ipv6":{"subnets":["fd00::2/128"]}}}
     ]})");

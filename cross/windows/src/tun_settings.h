@@ -105,8 +105,9 @@ struct TunnelSettings {
         auto names = array(settings, L"searchDomains");
         const auto policy = settings.GetNamedString(L"domainPolicy", L"");
         const bool match = policy == L"match" || policy == L"matchAndSearch";
+        const auto proxies = single_threaded_vector<HostName>();
         const auto append = [&](hstring const &name) {
-            domains.DomainNameList().Append(VpnDomainNameInfo{name, VpnDomainNameType::Suffix, servers, nullptr});
+            domains.DomainNameList().Append(VpnDomainNameInfo{name, VpnDomainNameType::Suffix, servers, proxies});
         };
         if (!match || names.Size() == 0) append(L".");
         else for (const auto &value : names) append(value.GetString());
