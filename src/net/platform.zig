@@ -112,7 +112,9 @@ pub const Platform = struct {
             log.writef(.debug, "Platform: Set delegate ({*})", .{ref});
             const set_delegate = self.fnt.set_delegate orelse
                 @panic("Platform function table has no set_delegate callback");
+            log.write(.debug, "Platform.attach: set_delegate entered");
             set_delegate(ref, &self.delegate);
+            log.write(.debug, "Platform.attach: set_delegate returned");
             self.delegate_attached = true;
         }
     }

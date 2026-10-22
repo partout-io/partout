@@ -196,11 +196,14 @@ pub export fn partout_daemon_start(
     // Take ownership of the bindings now that the runtime exists
     releases_bindings = false;
 
+    log.write(.debug, "partout_daemon_start: runtime.start entered");
     runtime.start() catch |err| {
+        log.writef(.err, "partout_daemon_start: runtime.start failed: {s}", .{@errorName(err)});
         runtime.stop();
         runtime.destroy(allocator);
         return mapErrorToCode(err);
     };
+    log.write(.debug, "partout_daemon_start: runtime.start returned");
     const is_daemon = runtime.options.is_daemon;
     if (is_daemon) daemon_process_lock.prepare();
     daemon_runtime = runtime;

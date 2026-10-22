@@ -609,6 +609,8 @@ const ConnectionDaemon = struct {
     // Gate callbacks and protocol controls run inline on the same actor thread.
 
     fn doStart(self: *ConnectionDaemon) Error!void {
+        log.write(.debug, "ConnectionDaemon.doStart entered");
+        errdefer |err| log.writef(.err, "ConnectionDaemon.doStart failed: {s}", .{@errorName(err)});
         if (self.daemon.state != .initial) return error.AlreadyStarted;
         try self.createConnection();
         try self.daemon.beginStart();
@@ -644,6 +646,7 @@ const ConnectionDaemon = struct {
         } else {
             _ = self.gate.setEnabled(true);
         }
+        log.write(.debug, "ConnectionDaemon.doStart returned");
     }
 
     fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
