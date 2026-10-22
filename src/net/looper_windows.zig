@@ -192,11 +192,7 @@ pub const WindowsLooper = struct {
     ) helpers.AttachError!void {
         self.mutex.lock();
         defer self.mutex.unlock();
-        if (self.options.max_read_count == 0 or self.options.max_read_size == 0 or
-            (if (arguments.pair == .link) self.options.link_buf_size else self.options.tun_buf_size) == 0)
-        {
-            return error.InvalidBuffers;
-        }
+        if (self.options.max_read_count == 0) return error.InvalidBuffers;
         if (self.stopped) return error.LooperUnavailable;
         // TUN is deliberately unsupported by this socket receive bridge.
         const socket = switch (arguments.pair) {
@@ -233,9 +229,8 @@ pub const WindowsLooper = struct {
             if (builtin.is_test) if (self.testing_before_write) |hook| hook.call();
             if (try socket.write(packet, destination)) |failure| {
                 if (side.detached.load(.acquire)) return error.SideNotAttached;
-                // Native callback serialization prevents delivery after detach,
-                // including when a failure callback itself detaches this side.
-                socket.notifyFailure(failure.io.code.?);
+                // Queue directly; the retained side and queue lock cover detach.
+                _ = onReceive(side, null, 0, null, failure.io.code.?);
                 return;
             }
         }

@@ -105,15 +105,17 @@ pub const SocketWrapper = struct {
         return self;
     }
 
-    /// The native wrapper serializes callbacks on WinRT workers. Clearing the
-    /// callback drains active delivery before releasing its borrowed context.
+    /// Register once on attach, clear on detach. Clearing drains native delivery
+    /// before releasing the borrowed context. The callback only queues input.
     pub fn setOnReceive(
         self: *SocketWrapper,
         callback: OnReceive,
         context: ?*anyopaque,
     ) io.SubmissionError!void {
-        if (!build_options.winrt or !WinRT.winrt_socket_set_on_receive(self.socket, null, null))
-            return error.LooperUnavailable;
+        if (!build_options.winrt) return error.LooperUnavailable;
+        if (callback == null) {
+            if (!WinRT.winrt_socket_set_on_receive(self.socket, null, null)) return error.LooperUnavailable;
+        } else if (self.on_receive != null) return error.LooperUnavailable;
         self.on_receive = callback;
         self.receive_context = context;
         if (callback != null and !WinRT.winrt_socket_set_on_receive(self.socket, onNativeReceive, self)) {
@@ -131,9 +133,7 @@ pub const SocketWrapper = struct {
         code: i32,
     ) callconv(.c) bool {
         const self: *SocketWrapper = @ptrCast(@alignCast(context.?));
-        // The consumer may detach and release the wrapper during this call.
         const callback = self.on_receive orelse return false;
-        const callback_context = self.receive_context;
         var address: io.SocketAddress = undefined;
         if (source != null) address = .{
             .address = source[0].address,
@@ -141,16 +141,12 @@ pub const SocketWrapper = struct {
             .port = source[0].port,
             .family = source[0].family,
         };
-        return callback(callback_context, bytes, length, if (source == null) null else &address, code);
+        return callback(self.receive_context, bytes, length, if (source == null) null else &address, code);
     }
 
     pub fn resumeReading(self: *SocketWrapper) io.SubmissionError!void {
         if (!build_options.winrt or !WinRT.winrt_socket_resume_reading(self.socket))
             return error.LooperUnavailable;
-    }
-
-    pub fn notifyFailure(self: *SocketWrapper, code: i32) void {
-        if (build_options.winrt) WinRT.winrt_socket_notify_failure(self.socket, code);
     }
 
     pub fn stopWrites(self: *SocketWrapper) void {

@@ -33,14 +33,13 @@ bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address
 /* Worker-thread callbacks are serialized per socket. Buffers and source are
  * borrowed until return; only unconnected UDP supplies source. Error is zero
  * for data, 1 for TCP EOF, otherwise an HRESULT. False pauses packet delivery.
- * Clearing drains callbacks and may be called reentrantly. Keep context alive
- * until cleared. TCP delivers stream chunks, without application framing. */
+ * Register on attach, clear on detach; replacing a callback is rejected.
+ * Clearing drains callbacks. Callbacks must not reenter socket APIs. Keep context
+ * alive until cleared. TCP delivers stream chunks, without application framing. */
 typedef bool (*winrt_socket_on_receive)(void *context, const uint8_t *bytes,
     size_t length, const winrt_socket_address *source, int32_t error);
 bool winrt_socket_set_on_receive(winrt_socket socket, winrt_socket_on_receive callback, void *context);
 bool winrt_socket_resume_reading(winrt_socket socket);
-/* Failure delivery shares callback serialization, including while paused. */
-void winrt_socket_notify_failure(winrt_socket socket, int32_t error);
 /* Serialized synchronous completion of WriteAsync; writes one whole datagram
  * or all stream bytes. Returns zero or HRESULT. Unconnected UDP needs destination. */
 int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,

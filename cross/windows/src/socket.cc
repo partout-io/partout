@@ -36,23 +36,24 @@ struct SocketApartment {
 // Serializing delivery also lets callback removal drain the borrowed context.
 struct SocketReceiveState {
     std::shared_ptr<SocketApartment> apartment;
-    std::recursive_mutex mutex;
+    std::mutex mutex;
     std::mutex write_mutex;
     std::atomic<bool> writes_stopped{false};
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
-    uint64_t generation = 0;
     bool reading = false;
     bool paused = false;
 
     void deliver(const uint8_t *bytes, size_t size,
                  const winrt_socket_address *source, int32_t error) {
         std::lock_guard lock(mutex);
+        deliverLocked(bytes, size, source, error);
+    }
+
+    void deliverLocked(const uint8_t *bytes, size_t size,
+                       const winrt_socket_address *source, int32_t error) {
         if (!callback || (paused && !error)) return;
-        const auto version = generation;
-        const bool keep = callback(context, bytes, size, source, error);
-        // Closing or replacing the consumer from its callback is supported.
-        if (version == generation) paused = !keep;
+        paused = !callback(context, bytes, size, source, error);
     }
 };
 
@@ -128,7 +129,7 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
                 state->reading = false;
-                state->deliver(nullptr, 0, nullptr, 1);
+                state->deliverLocked(nullptr, 0, nullptr, 1);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
@@ -136,7 +137,7 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
     } catch (...) {
         std::lock_guard lock(state->mutex);
         state->reading = false;
-        state->deliver(nullptr, 0, nullptr, to_hresult().value);
+        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
     }
 }
 
@@ -350,15 +351,17 @@ bool winrt_socket_set_on_receive(winrt_socket socket,
     if (!socket || !socket->receive_state) return false;
     const auto state = socket->receive_state;
     try {
-        std::lock_guard lock(state->mutex);
-        ++state->generation;
-        state->callback = callback;
-        state->context = context;
-        state->paused = false;
-        if (callback && socket->stream && !state->reading) {
-            state->reading = true;
-            read_stream(state, socket->stream);
+        bool start_read;
+        {
+            std::lock_guard lock(state->mutex);
+            if (callback && state->callback) return false;
+            state->callback = callback;
+            state->context = context;
+            state->paused = false;
+            start_read = callback && socket->stream && !state->reading;
+            if (start_read) state->reading = true;
         }
+        if (start_read) read_stream(state, socket->stream);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);
@@ -373,26 +376,23 @@ bool winrt_socket_resume_reading(winrt_socket socket) {
     if (!socket || !socket->receive_state) return false;
     const auto state = socket->receive_state;
     try {
-        std::lock_guard lock(state->mutex);
-        // Resume can race with detach, but must never restore a cleared context.
-        if (!state->callback) return false;
-        ++state->generation;
-        state->paused = false;
-        if (socket->stream && !state->reading) {
-            state->reading = true;
-            read_stream(state, socket->stream);
+        bool start_read;
+        {
+            std::lock_guard lock(state->mutex);
+            // Resume must never restore a cleared context.
+            if (!state->callback) return false;
+            state->paused = false;
+            start_read = socket->stream && !state->reading;
+            if (start_read) state->reading = true;
         }
+        if (start_read) read_stream(state, socket->stream);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);
         state->reading = false;
-        state->deliver(nullptr, 0, nullptr, to_hresult().value);
+        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
         return false;
     }
 }
 
-void winrt_socket_notify_failure(winrt_socket socket, int32_t error) {
-    const auto state = socket->receive_state;
-    state->deliver(nullptr, 0, nullptr, error);
-}
 }

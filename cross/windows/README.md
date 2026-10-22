@@ -35,8 +35,8 @@ the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
 
 UDP uses the OS `MessageReceived` event. TCP runs an asynchronous read loop.
 Both deliver buffers or errors to the registered callback and borrowed context.
-Clearing the callback drains delivery, including reentrant removal. Buffer
-contents are borrowed until the callback returns. Writes wait for WinRT's
+Clearing the callback drains delivery; callbacks only queue input and must not
+reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
 asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
 
 The WindowsLooper owns attachment callbacks and forwards received buffers.
