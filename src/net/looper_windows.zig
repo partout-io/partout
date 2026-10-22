@@ -17,6 +17,11 @@ pub const WindowsLooper = struct {
     stopped: bool = false,
     sides: [2]?*SideIO = .{ null, null },
     mutex: core.Mutex = .{},
+    timer_alarm: core.RunAfter = .{},
+    alarm_deadline_ns: ?u64 = null,
+    timer_condition: core.Condition = .{},
+    timers: core.Fifo(Scheduled) = .{},
+    next_timer_id: u64 = 1,
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -32,38 +37,140 @@ pub const WindowsLooper = struct {
 
     pub fn destroy(self: *WindowsLooper) void {
         self.stop() catch unreachable;
+        // The alarm borrows only self, never a timer's task context.
+        self.timer_alarm.deinit();
+        self.timer_condition.deinit();
         self.mutex.deinit();
         self.allocator.destroy(self);
     }
 
-    pub fn loopOnce(self: *WindowsLooper, _: ?u32, failure: *?io.Failure) bool {
+    pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
         self.mutex.lock();
         defer self.mutex.unlock();
-        return !self.stopped;
+        // Keep the normal driver nonblocking: its mailbox wake is independent
+        // of this looper. Explicit bounded polls may wait for the timer alarm.
+        if (max_wait_ms) |wait_ms| {
+            const until = core.concurrency.deadlineAfterMs(core.monotonicNs(), wait_ms);
+            while (!self.stopped and !self.hasDueTimerLocked()) {
+                if (core.monotonicNs() >= until) break;
+                self.timer_condition.waitUntil(&self.mutex, until);
+            }
+        }
+        if (self.stopped) return false;
+        const now = core.monotonicNs();
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next) node.ready = node.deadline_ns <= now;
+        // Newly scheduled tasks become eligible on the next iteration. Keep
+        // uncalled tasks in the queue so callbacks can cancel or replace them.
+        while (self.timers.removeWhere({}, Scheduled.isReady)) |node| {
+            const task = node.task;
+            self.allocator.destroy(node);
+            self.mutex.unlock();
+            task.call();
+            self.mutex.lock();
+            if (self.stopped) return false;
+        }
+        self.armTimerLocked();
+        return true;
     }
 
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
         self.mutex.lock();
         self.stopped = true;
+        self.timer_alarm.cancel();
+        self.alarm_deadline_ns = null;
+        while (self.timers.take()) |node| self.allocator.destroy(node);
+        self.timer_condition.broadcast();
         self.mutex.unlock();
         try self.detach(.link);
         try self.detach(.tun);
     }
 
-    // FIXME: ###, Windows, Schedule timers on the Windows event loop.
+    /// Queue-confined, like the public timer API. Failed replacement preserves
+    /// the previous task, and the caller's timer address is never retained.
     pub fn scheduleTimer(
-        _: *WindowsLooper,
-        _: *io.Timer,
-        _: u64,
-        _: io.TimedTask,
+        self: *WindowsLooper,
+        timer: *io.Timer,
+        delay_ms: u64,
+        task: io.TimedTask,
     ) io.SubmissionError!void {
-        // @panic("WindowsLooper.scheduleTimer is not implemented");
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        if (self.stopped) return error.LooperUnavailable;
+        const node = try self.allocator.create(Scheduled);
+        errdefer self.allocator.destroy(node);
+        self.timer_alarm.start() catch return error.LooperUnavailable;
+        node.* = .{
+            .id = self.next_timer_id,
+            .deadline_ns = core.concurrency.deadlineAfterMs(core.monotonicNs(), delay_ms),
+            .task = task,
+        };
+        self.next_timer_id +%= 1;
+        if (self.next_timer_id == 0) self.next_timer_id = 1;
+        if (timer.id) |id| {
+            if (self.timers.removeWhere(id, Scheduled.hasId)) |old| self.allocator.destroy(old);
+        }
+        self.timers.append(node);
+        timer.id = node.id;
+        self.armTimerLocked();
     }
 
-    // FIXME: ###, Windows, Cancel scheduled Windows timers.
-    pub fn cancelTimer(_: *WindowsLooper, _: *io.Timer) void {
-        // @panic("WindowsLooper.cancelTimer is not implemented");
+    pub fn cancelTimer(self: *WindowsLooper, timer: *io.Timer) void {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        const id = timer.id orelse return;
+        if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
+        timer.id = null;
+        self.armTimerLocked();
+    }
+
+    const Scheduled = struct {
+        id: u64,
+        deadline_ns: u64,
+        task: io.TimedTask,
+        ready: bool = false,
+        next: ?*Scheduled = null,
+
+        fn hasId(self: *const Scheduled, id: u64) bool {
+            return self.id == id;
+        }
+
+        fn isReady(self: *const Scheduled, _: void) bool {
+            return self.ready;
+        }
+    };
+
+    fn hasDueTimerLocked(self: *WindowsLooper) bool {
+        const now = core.monotonicNs();
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next) {
+            if (node.deadline_ns <= now) return true;
+        }
+        return false;
+    }
+
+    fn armTimerLocked(self: *WindowsLooper) void {
+        var deadline: ?u64 = null;
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next) {
+            deadline = @min(deadline orelse node.deadline_ns, node.deadline_ns);
+        }
+        if (deadline == self.alarm_deadline_ns) return;
+        self.alarm_deadline_ns = deadline;
+        if (deadline) |value| {
+            const ns = value -| core.monotonicNs();
+            const ms = ns / std.time.ns_per_ms + @intFromBool(ns % std.time.ns_per_ms != 0);
+            // start() succeeded before publishing any scheduled entry.
+            self.timer_alarm.scheduleReplacing(ms, onTimerAlarm, self) catch unreachable;
+        } else self.timer_alarm.cancel();
+    }
+
+    fn onTimerAlarm(context: ?*anyopaque) void {
+        const self: *WindowsLooper = @ptrCast(@alignCast(context.?));
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        self.timer_condition.broadcast();
     }
 
     pub fn attach(

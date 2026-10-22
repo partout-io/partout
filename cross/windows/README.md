@@ -42,6 +42,16 @@ asynchronous operation to complete. See `include/winrt/socket.h` for the contrac
 The WindowsLooper owns attachment callbacks and forwards received buffers.
 The native socket owns the lifetime of its OS callbacks and pending reads.
 
+Timers use one `RunAfter` alarm for the earliest pending deadline. The alarm
+only wakes the looper; `loopOnce()` invokes due tasks on its caller thread.
+Scheduling and cancellation are queue-confined, and timer tokens are copied by
+value. Replacement preserves the old task on allocation failure; cancellation
+and stop remove tasks before their borrowed contexts can be released. Tasks
+scheduled by a timer callback become eligible on the next iteration.
+
+The normal `loopOnce(null)` driver remains nonblocking so its caller can service
+the separate mailbox. Explicit bounded polls can wait for the timer alarm.
+
 ## VPN channel runtime
 
 C++ plugins include `partout_winrt.h` and construct `PartoutVpnChannelRuntime`
@@ -57,7 +67,7 @@ plugin headers.
 
 Transport association and socket I/O are implemented. Channel addresses are
 still placeholders; packet TUN I/O, encapsulation/decapsulation, controller
-notifications and WindowsLooper timers remain unimplemented.
+notifications remain unimplemented.
 
 ## Build
 

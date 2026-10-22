@@ -24,11 +24,10 @@ const TimerProbe = struct {
 };
 
 test "looper runs and cancels timers on its caller" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const wake = try test_helpers.Mux.init();
-    defer wake.deinit();
+    const wake: ?test_helpers.Mux = if (builtin.os.tag == .windows) null else try test_helpers.Mux.init();
+    defer if (wake) |value| value.deinit();
     var looper = try Looper.init(std.testing.allocator, .{
-        .mux = wake.handle,
+        .mux = if (wake) |value| value.handle else null,
     });
     defer looper.deinit();
     var timer = io.Timer{};
@@ -55,6 +54,103 @@ test "looper runs and cancels timers on its caller" {
     try std.testing.expect(!try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
     try std.testing.expectError(error.LooperUnavailable, looper.scheduleTimer(&timer, 0, task));
+}
+
+test "Windows timer callback can cancel a due task and rearm for the next iteration" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    const Probe = struct {
+        looper: *Looper,
+        first: io.Timer = .{},
+        other: io.Timer = .{},
+        calls: usize = 0,
+        other_calls: usize = 0,
+
+        fn run(context: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(context.?));
+            self.calls += 1;
+            self.looper.cancelTimer(&self.other);
+            if (self.calls == 1) {
+                self.looper.scheduleTimer(&self.first, 0, .{ .context = self, .callback = run }) catch unreachable;
+            }
+        }
+
+        fn otherRun(context: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(context.?));
+            self.other_calls += 1;
+        }
+    };
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    defer looper.deinit();
+    var probe = Probe{ .looper = &looper };
+    try looper.scheduleTimer(&probe.first, 0, .{ .context = &probe, .callback = Probe.run });
+    try looper.scheduleTimer(&probe.other, 0, .{ .context = &probe, .callback = Probe.otherRun });
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try std.testing.expectEqual(@as(usize, 0), probe.other_calls);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 2), probe.calls);
+}
+
+test "Windows timer alarm wakes a bounded poll for an earlier deadline" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    defer looper.deinit();
+    var later = io.Timer{};
+    var earlier = io.Timer{};
+    var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
+    const task: io.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
+    try looper.scheduleTimer(&later, 5000, task);
+    try looper.scheduleTimer(&earlier, 10, task);
+    const start = source.core.monotonicNs();
+    try std.testing.expect(try test_helpers.poll(&looper, 2000));
+    const elapsed = source.core.monotonicNs() - start;
+    // A generous bound distinguishes an alarm wake from the poll timeout.
+    try std.testing.expect(elapsed < std.time.ns_per_s);
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try std.testing.expect(probe.ran_on_caller);
+    looper.cancelTimer(&later);
+}
+
+test "Windows timer replacement failure preserves the old task and token" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var looper = try Looper.init(failing.allocator(), .{ .mux = null });
+    defer looper.deinit();
+    var timer = io.Timer{};
+    var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
+    try looper.scheduleTimer(&timer, 0, .{ .context = &probe, .callback = TimerProbe.run });
+    const old_id = timer.id;
+    failing.fail_index = failing.alloc_index;
+    try std.testing.expectError(error.OutOfMemory, looper.scheduleTimer(&timer, 1000, .{
+        .context = &probe,
+        .callback = TimerProbe.run,
+    }));
+    try std.testing.expectEqual(old_id, timer.id);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.calls);
+    try std.testing.expect(probe.ran_on_caller);
+}
+
+test "Windows timer expiry cannot invoke a context after cancellation or stop" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    defer looper.deinit();
+    var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
+    // The scheduler stores the token value, not this temporary's address.
+    var copied: io.Timer = timer: {
+        var temporary = io.Timer{};
+        try looper.scheduleTimer(&temporary, 1, .{ .context = &probe, .callback = TimerProbe.run });
+        break :timer temporary;
+    };
+    source.core.sleepMs(20);
+    try std.testing.expectEqual(@as(usize, 0), probe.calls);
+    looper.cancelTimer(&copied);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 0), probe.calls);
+    try looper.scheduleTimer(&copied, 0, .{ .context = &probe, .callback = TimerProbe.run });
+    try looper.stop();
+    try std.testing.expect(!try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 0), probe.calls);
 }
 
 const WindowsWriteProbe = struct {
