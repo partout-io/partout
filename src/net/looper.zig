@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
-//! caller's mux and runs callbacks inline in loopOnce(). Windows forwards socket
-//! receives directly on WinRT workers and ignores the mux. Read packet views
+//! caller's mux. Both platforms run callbacks inline in loopOnce(); Windows
+//! queues WinRT socket receives and ignores the mux. Read packet views
 //! expire when the callback returns.
 
 const std = @import("std");

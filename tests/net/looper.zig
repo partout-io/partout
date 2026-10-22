@@ -190,12 +190,14 @@ test "Windows looper owns sides and routes socket write failure" {
     try std.testing.expect(!looper.isTunAttached());
     try std.testing.expectError(error.SideAlreadyAttached, looper.attach(.{ .pair = .{ .link = socket } }));
     try std.testing.expectError(error.MissingDestination, looper.write(&packets, .link, null));
-    // IPv6 is invalid for this IPv4-only socket. Failure may detach synchronously.
+    // IPv6 is invalid for this IPv4-only socket. Failure dispatch waits for poll.
     var destination = std.mem.zeroes(io.SocketAddress);
     destination.family = 6;
     destination.address[15] = 1;
     destination.port = 1194;
     try looper.write(&packets, .link, destination);
+    try std.testing.expectEqual(@as(usize, 0), probe.failures);
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 1), probe.failures);
     try std.testing.expect(probe.code != null);
     try std.testing.expect(!looper.isLinkAttached());
@@ -218,21 +220,30 @@ const WindowsSockets = struct {
 
 const WindowsDetachRace = struct {
     looper: *Looper,
-    payload: []const u8,
+    entered: std.atomic.Value(bool) = .init(false),
+    released: std.atomic.Value(bool) = .init(false),
+    caller_thread: std.Thread.Id,
+    ran_on_caller: bool = false,
     done: std.atomic.Value(bool) = .init(false),
     detached: std.atomic.Value(bool) = .init(false),
     failures: std.atomic.Value(usize) = .init(0),
     write_error: ?anyerror = null,
 
     fn write(self: *WindowsDetachRace) void {
-        const packets = [_]io.Packet{ self.payload, "must not send after detach" };
+        const packets = [_]io.Packet{"must not send after detach"};
         self.looper.write(&packets, .link, null) catch |err| {
             self.write_error = err;
         };
         self.done.store(true, .release);
     }
+    fn beforeWrite(context: ?*anyopaque) void {
+        const self: *WindowsDetachRace = @ptrCast(@alignCast(context.?));
+        self.entered.store(true, .release);
+        while (!self.released.load(.acquire)) source.core.sleepMs(1);
+    }
     fn read(context: ?*anyopaque, _: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *WindowsDetachRace = @ptrCast(@alignCast(context.?));
+        self.ran_on_caller = self.caller_thread == std.Thread.getCurrentId();
         try self.looper.detach(.link);
         self.detached.store(true, .release);
         return .keep;
@@ -243,7 +254,7 @@ const WindowsDetachRace = struct {
     }
 };
 
-test "Windows receive callback detaches while a socket batch is writing" {
+test "Windows queued receive detaches before native write admission" {
     if (builtin.os.tag != .windows) return error.SkipZigTest;
     const c = source.ffi.io;
     const ws = WindowsSockets;
@@ -274,10 +285,8 @@ test "Windows receive callback detaches while a socket batch is writing" {
     try std.testing.expect(ws.setsockopt(peer, 65535, 0x1006, &timeout, @sizeOf(u32)) == 0);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
-    const payload = try std.testing.allocator.alloc(u8, 16 * 1024 * 1024);
-    defer std.testing.allocator.free(payload);
-    @memset(payload, 'w');
-    var race = WindowsDetachRace{ .looper = &looper, .payload = payload };
+    var race = WindowsDetachRace{ .looper = &looper, .caller_thread = std.Thread.getCurrentId() };
+    looper.impl.testing_before_write = .{ .context = &race, .callback = WindowsDetachRace.beforeWrite };
     try looper.attach(.{
         .pair = .{ .link = socket },
         .on_read = .{ .context = &race, .callback = WindowsDetachRace.read },
@@ -286,23 +295,28 @@ test "Windows receive callback detaches while a socket batch is writing" {
     transferred = true;
     const writer = try std.Thread.spawn(.{}, WindowsDetachRace.write, .{&race});
     defer {
+        race.released.store(true, .release);
         _ = ws.shutdown(peer, 2);
         writer.join();
     }
     var buffer: [64 * 1024]u8 = undefined;
-    // Receiving one byte proves the writer acquired the side and started I/O.
-    try std.testing.expectEqual(@as(c_int, 1), ws.recv(peer, &buffer, 1, 0));
-    try std.testing.expect(!race.done.load(.acquire));
+    // Hold the writer after the detached precheck, before native admission.
+    for (0..5000) |_| {
+        if (race.entered.load(.acquire)) break;
+        ws.Sleep(1);
+    }
+    try std.testing.expect(race.entered.load(.acquire));
     try std.testing.expectEqual(@as(c_int, 1), ws.send(peer, "x", 1, 0));
     for (0..5000) |_| {
         if (race.detached.load(.acquire)) break;
-        ws.Sleep(1);
+        try std.testing.expect(try test_helpers.poll(&looper, 1));
     }
     try std.testing.expect(race.detached.load(.acquire));
     try std.testing.expect(!looper.isLinkAttached());
-    // Detach returns promptly, while the first retained write can still finish.
-    // Releasing its final reference then closes the transport and produces EOF.
-    var received: usize = 1;
+    try std.testing.expect(race.ran_on_caller);
+    race.released.store(true, .release);
+    // Native admission must reject the retained write, then release the socket.
+    var received: usize = 0;
     while (true) {
         const count = ws.recv(peer, &buffer, buffer.len, 0);
         try std.testing.expect(count >= 0);
@@ -314,7 +328,7 @@ test "Windows receive callback detaches while a socket batch is writing" {
         ws.Sleep(1);
     }
     try std.testing.expect(race.done.load(.acquire));
-    try std.testing.expectEqual(payload.len, received);
+    try std.testing.expectEqual(@as(usize, 0), received);
     try std.testing.expectEqual(error.SideNotAttached, race.write_error.?);
     try std.testing.expectEqual(@as(usize, 0), race.failures.load(.acquire));
 }

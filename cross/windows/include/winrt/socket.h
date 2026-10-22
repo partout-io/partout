@@ -43,6 +43,8 @@ void winrt_socket_notify_failure(winrt_socket socket, int32_t error);
  * or all stream bytes. Returns zero or HRESULT. Unconnected UDP needs destination. */
 int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
     const winrt_socket_address *destination);
+/* Reject queued/future writes with E_ABORT; an already admitted write may finish. */
+void winrt_socket_stop_writes(winrt_socket socket);
 #ifdef __cplusplus
 }
 #include <winrt/Windows.Foundation.h>

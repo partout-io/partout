@@ -150,6 +150,10 @@ pub const SocketWrapper = struct {
         if (build_options.winrt) WinRT.winrt_socket_notify_failure(self.socket, code);
     }
 
+    pub fn stopWrites(self: *SocketWrapper) void {
+        if (build_options.winrt) WinRT.winrt_socket_stop_writes(self.socket);
+    }
+
     /// Completes a whole packet write; UDP requires a destination when unconnected.
     /// Native failures are returned by value for the looper's on_failure callback.
     pub fn write(

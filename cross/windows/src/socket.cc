@@ -12,6 +12,7 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Networking.h>
 #include <chrono>
+#include <atomic>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -37,6 +38,7 @@ struct SocketReceiveState {
     std::shared_ptr<SocketApartment> apartment;
     std::recursive_mutex mutex;
     std::mutex write_mutex;
+    std::atomic<bool> writes_stopped{false};
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
     uint64_t generation = 0;
@@ -268,6 +270,7 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
         const bool ipv4 = socket->accepts_ipv4, ipv6 = socket->accepts_ipv6;
         // Retain transports and the lock independently of wrapper destruction.
         std::lock_guard lock(state->write_mutex);
+        if (state->writes_stopped.load()) return E_ABORT;
         IOutputStream output{nullptr};
         if (stream) {
             output = stream.OutputStream();
@@ -305,6 +308,10 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
     } catch (...) {
         return to_hresult().value;
     }
+}
+
+void winrt_socket_stop_writes(winrt_socket socket) {
+    socket->receive_state->writes_stopped.store(true);
 }
 
 bool winrt_socket_set_on_receive(winrt_socket socket,
