@@ -32,3 +32,13 @@ if(PARTOUT_INSTALL_RUNTIME_TARGETS)
         RUNTIME DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
     )
 endif()
+
+if(WIN32 AND PP_BUILD_LIBRARY)
+    # Zig installs the PDB beside its DLL; preserve it in the final package so
+    # native debuggers can find the matching symbols without extra search paths.
+    install(FILES "${PP_BUILD_OUTPUT}/partout/bin/partout.pdb"
+        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+        CONFIGURATIONS Debug RelWithDebInfo
+        OPTIONAL
+    )
+endif()
