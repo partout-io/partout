@@ -176,10 +176,11 @@ pub const SocketWrapper = struct {
     }
 };
 
-// FIXME: ###, Windows, TunWrapper
 pub const TunWrapper = struct {
     allocator: std.mem.Allocator,
     tun: io_c.pp_tun,
+    on_receive: OnReceive = null,
+    receive_context: ?*anyopaque = null,
 
     pub fn create(allocator: std.mem.Allocator, tun: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
         const self = try allocator.create(TunWrapper);
@@ -190,13 +191,11 @@ pub const TunWrapper = struct {
         return self;
     }
 
-    // FIXME: ###, Windows, Release the native tunnel and packet-I/O resources.
     pub fn destroy(self: *TunWrapper) void {
         io_c.pp_tun_free(self.tun);
         self.allocator.destroy(self);
     }
 
-    // FIXME: ###, Windows, Expose native TUN packet I/O and readiness.
     pub fn cleanup(self: *TunWrapper) void {
         self.destroy();
     }
@@ -209,8 +208,33 @@ pub const TunWrapper = struct {
         return self;
     }
 
-    // FIXME: ###, Windows, Expose the native TUN watch handle.
-    pub fn muxDescriptor(_: *const TunWrapper) ?io_c.pp_fd {
-        @panic("Windows TunWrapper.muxDescriptor is not implemented");
+    pub fn setOnReceive(self: *TunWrapper, callback: OnReceive, context: ?*anyopaque) io.SubmissionError!void {
+        if (!build_options.winrt) return error.LooperUnavailable;
+        const native: WinRT.winrt_tun = @ptrCast(self.tun);
+        if (callback == null) {
+            if (!WinRT.winrt_tun_set_on_receive(native, null, null)) return error.LooperUnavailable;
+        } else if (self.on_receive != null) return error.LooperUnavailable;
+        self.on_receive = callback;
+        self.receive_context = context;
+        if (callback != null and !WinRT.winrt_tun_set_on_receive(native, onNativeReceive, self)) {
+            self.on_receive = null;
+            self.receive_context = null;
+            return error.LooperUnavailable;
+        }
+    }
+
+    fn onNativeReceive(context: ?*anyopaque, bytes: [*c]const u8, length: usize) callconv(.c) bool {
+        const self: *TunWrapper = @ptrCast(@alignCast(context.?));
+        return if (self.on_receive) |callback| callback(self.receive_context, bytes, length, null, 0) else false;
+    }
+
+    pub fn stopWrites(self: *TunWrapper) void {
+        if (build_options.winrt) WinRT.winrt_tun_stop_writes(@ptrCast(self.tun));
+    }
+
+    pub fn write(self: *TunWrapper, packet: io.Packet) io.SubmissionError!?io.Failure {
+        if (!build_options.winrt) return error.LooperUnavailable;
+        const code = WinRT.winrt_tun_write(@ptrCast(self.tun), packet.ptr, packet.len);
+        return if (code == 0) null else .{ .io = .{ .side = .tun, .cause = error.LibcFailure, .code = code } };
     }
 };

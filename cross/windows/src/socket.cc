@@ -13,6 +13,7 @@
 #include <winrt/Windows.Networking.h>
 #include <chrono>
 #include <atomic>
+#include <condition_variable>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -43,6 +44,8 @@ struct SocketReceiveState {
     void *context = nullptr;
     bool reading = false;
     bool paused = false;
+    bool channel_owned = false;
+    std::condition_variable read_stopped;
 
     void deliver(const uint8_t *bytes, size_t size,
                  const winrt_socket_address *source, int32_t error) {
@@ -120,16 +123,22 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
         co_await resume_background();
         Buffer buffer{64 * 1024};
         for (;;) {
+            IAsyncOperationWithProgress<IBuffer, uint32_t> read{nullptr};
             {
                 std::lock_guard lock(state->mutex);
-                if (!state->callback || state->paused) { state->reading = false; co_return; }
+                if (!state->callback || state->paused || state->channel_owned) {
+                    state->reading = false;
+                    state->read_stopped.notify_all();
+                    co_return;
+                }
+                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
             }
-            auto received = co_await stream.InputStream().ReadAsync(
-                buffer, buffer.Capacity(), InputStreamOptions::Partial);
+            auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
                 state->reading = false;
-                state->deliverLocked(nullptr, 0, nullptr, 1);
+                state->read_stopped.notify_all();
+                if (!state->channel_owned) state->deliverLocked(nullptr, 0, nullptr, 1);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
@@ -137,7 +146,8 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
     } catch (...) {
         std::lock_guard lock(state->mutex);
         state->reading = false;
-        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
+        state->read_stopped.notify_all();
+        if (!state->channel_owned) state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
     }
 }
 
@@ -177,6 +187,28 @@ WinrtSocket::~WinrtSocket() noexcept {
 
 IInspectable winrt_socket_transport(winrt_socket socket) {
     return socket ? socket->transport() : nullptr;
+}
+
+std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket) {
+    return [state = socket->receive_state](const uint8_t *bytes, size_t length) {
+        state->deliver(bytes, length, nullptr, 0);
+    };
+}
+
+void winrt_socket_take_over(winrt_socket socket) {
+    const auto state = socket->receive_state;
+    std::lock_guard writes(state->write_mutex);
+    {
+        std::lock_guard lock(state->mutex);
+        state->channel_owned = true;
+    }
+    if (socket->datagram && socket->receiving) {
+        socket->datagram.MessageReceived(socket->receive_token);
+        socket->receiving = false;
+    }
+    if (socket->stream) socket->stream.CancelIOAsync().get();
+    std::unique_lock lock(state->mutex);
+    state->read_stopped.wait(lock, [&] { return !state->reading; });
 }
 
 extern "C" {
@@ -358,7 +390,7 @@ bool winrt_socket_set_on_receive(winrt_socket socket,
             state->callback = callback;
             state->context = context;
             state->paused = false;
-            start_read = callback && socket->stream && !state->reading;
+            start_read = callback && socket->stream && !state->reading && !state->channel_owned;
             if (start_read) state->reading = true;
         }
         if (start_read) read_stream(state, socket->stream);
@@ -382,7 +414,7 @@ bool winrt_socket_resume_reading(winrt_socket socket) {
             // Resume must never restore a cleared context.
             if (!state->callback) return false;
             state->paused = false;
-            start_read = socket->stream && !state->reading;
+            start_read = socket->stream && !state->reading && !state->channel_owned;
             if (start_read) state->reading = true;
         }
         if (start_read) read_stream(state, socket->stream);

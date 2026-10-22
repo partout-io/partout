@@ -49,6 +49,11 @@ void winrt_socket_stop_writes(winrt_socket socket);
 #ifdef __cplusplus
 }
 #include <winrt/Windows.Foundation.h>
+#include <functional>
 // Borrow the transport for VPN channel association; no socket internals escape.
 winrt::Windows::Foundation::IInspectable winrt_socket_transport(winrt_socket socket);
+// Retains callback state, not the socket wrapper. Safe after link detach.
+std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket);
+// Stop/drain direct reads before StartWithMainTransport takes receive ownership.
+void winrt_socket_take_over(winrt_socket socket);
 #endif

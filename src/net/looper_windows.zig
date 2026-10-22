@@ -194,11 +194,6 @@ pub const WindowsLooper = struct {
         defer self.mutex.unlock();
         if (self.options.max_read_count == 0) return error.InvalidBuffers;
         if (self.stopped) return error.LooperUnavailable;
-        // TUN is deliberately unsupported by this socket receive bridge.
-        const socket = switch (arguments.pair) {
-            .link => |socket| socket,
-            .tun => return error.LooperUnavailable,
-        };
         const slot = &self.sides[@intFromEnum(std.meta.activeTag(arguments.pair))];
         if (slot.* != null) return error.SideAlreadyAttached;
         const side = try self.allocator.create(SideIO);
@@ -206,7 +201,9 @@ pub const WindowsLooper = struct {
         side.* = .{ .allocator = self.allocator, .owner = self, .arguments = arguments };
         slot.* = side;
         errdefer slot.* = null;
-        try socket.setOnReceive(onReceive, side);
+        switch (arguments.pair) {
+            inline else => |wrapper| try wrapper.setOnReceive(onReceive, side),
+        }
     }
 
     /// Writes complete before returning, so there is no separate flush queue.
@@ -219,15 +216,16 @@ pub const WindowsLooper = struct {
         if (packets.len == 0) return;
         const side = try self.acquireSide(tag);
         defer side.release();
-        const socket = switch (side.arguments.pair) {
-            .link => |socket| socket,
-            .tun => return error.LooperUnavailable,
-        };
-        if (socket.unconnected and destination == null) return error.MissingDestination;
+        if (side.arguments.pair == .link and side.arguments.pair.link.unconnected and destination == null)
+            return error.MissingDestination;
         for (packets) |packet| {
             if (side.detached.load(.acquire)) return error.SideNotAttached;
             if (builtin.is_test) if (self.testing_before_write) |hook| hook.call();
-            if (try socket.write(packet, destination)) |failure| {
+            const result = switch (side.arguments.pair) {
+                .link => |socket| try socket.write(packet, destination),
+                .tun => |tun| try tun.write(packet),
+            };
+            if (result) |failure| {
                 if (side.detached.load(.acquire)) return error.SideNotAttached;
                 // Queue directly; the retained side and queue lock cover detach.
                 _ = onReceive(side, null, 0, null, failure.io.code.?);
@@ -250,16 +248,15 @@ pub const WindowsLooper = struct {
         };
         slot.* = null;
         side.detached.store(true, .release);
-        side.arguments.pair.link.stopWrites();
+        switch (side.arguments.pair) {
+            inline else => |wrapper| wrapper.stopWrites(),
+        }
         while (self.callbacks.removeWhere(side, Received.belongsTo)) |node| self.freeReceived(node);
         self.mutex.unlock();
         // Never hold the looper lock while draining native callbacks: a consumer
         // may reenter detach. Writers retain the side until their batch exits.
         switch (side.arguments.pair) {
-            .link => |socket| {
-                socket.setOnReceive(null, null) catch unreachable;
-            },
-            .tun => unreachable, // No TUN attachment is accepted yet.
+            inline else => |wrapper| wrapper.setOnReceive(null, null) catch unreachable,
         }
         side.release();
     }
@@ -272,7 +269,6 @@ pub const WindowsLooper = struct {
     }
 
     pub fn resumeReading(self: *WindowsLooper, side: io.Side) io.SubmissionError!void {
-        if (side != .link) return error.LooperUnavailable;
         const attachment = self.acquireSide(side) catch return error.LooperUnavailable;
         defer attachment.release();
         self.mutex.lock();
@@ -280,7 +276,7 @@ pub const WindowsLooper = struct {
         self.timer_condition.broadcast();
         self.mutex.unlock();
         // Re-registering must not race with detach clearing the callback.
-        try attachment.arguments.pair.link.resumeReading();
+        if (attachment.arguments.pair == .link) try attachment.arguments.pair.link.resumeReading();
     }
 
     fn acquireSide(self: *WindowsLooper, tag: io.Side) error{ LooperUnavailable, SideNotAttached }!*SideIO {
@@ -308,8 +304,7 @@ pub const WindowsLooper = struct {
         fn release(self: *SideIO) void {
             if (self.references.fetchSub(1, .acq_rel) != 1) return;
             switch (self.arguments.pair) {
-                .link => |socket| socket.cleanup(),
-                .tun => unreachable,
+                inline else => |wrapper| wrapper.cleanup(),
             }
             self.allocator.destroy(self);
         }
@@ -396,7 +391,7 @@ pub const WindowsLooper = struct {
         const on_failure = arguments.on_failure;
         if (code != 0) {
             if (on_failure) |callback| callback.call(.{ .io = .{
-                .side = .link,
+                .side = std.meta.activeTag(arguments.pair),
                 .cause = if (code == 1) error.EndOfStream else error.LibcFailure,
                 .code = if (code == 1) null else code,
             } });

@@ -39,8 +39,18 @@ Clearing the callback drains delivery; callbacks only queue input and must not
 reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
 asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
 
-The WindowsLooper owns attachment callbacks and forwards received buffers.
-The native socket owns the lifetime of its OS callbacks and pending reads.
+The WindowsLooper queues owned input for both link and TUN attachments and
+dispatches their callbacks on its caller. The native socket owns the lifetime
+of its OS callbacks and pending reads. Before channel startup, direct socket
+reads are stopped (pending TCP reads are cancelled and drained).
+
+After startup, `Encapsulate` queues plain IP packets on the TUN side and
+`Decapsulate` queues transport data on the link side. Neither waits for protocol
+processing. TUN writes copy packets into channel receive buffers and call
+`AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`; link writes
+continue through the socket. This requires the channel append/flush APIs
+(Windows build 20348 or later). Detach drains input callbacks and rejects new
+writes, while retained attachments let already admitted writes finish.
 
 Timers use one `RunAfter` alarm for the earliest pending deadline. The alarm
 only wakes the looper; `loopOnce()` invokes due tasks on its caller thread.
@@ -65,9 +75,9 @@ CMake builds Partout as a shared library and installs `partout.h` and
 runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
-Transport association and socket I/O are implemented. Channel addresses are
-still placeholders; packet TUN I/O, encapsulation/decapsulation, controller
-notifications remain unimplemented.
+Transport association, socket I/O and the TUN packet bridge are implemented.
+Channel addresses/routes are still placeholders; applying negotiated settings
+and controller notifications remain unimplemented.
 
 ## Build
 

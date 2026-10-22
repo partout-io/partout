@@ -13,7 +13,7 @@ static void bridge_log(winrt_log_level level, const char *message) {
     if ((unsigned int)level < sizeof(levels) / sizeof(levels[0])) pp_clog(levels[level], message);
 }
 
-void pp_tun_free(pp_tun tun) { pp_free(tun); }
+void pp_tun_free(pp_tun tun) { winrt_tun_free((winrt_tun)tun); }
 
 static void on_reachability(void *context, bool reachable) {
     const pp_tun_ctrl_delegate *delegate = context;
@@ -43,10 +43,7 @@ static bool configure_sockets(void *ref, const pp_reachability *info, const pp_s
     return true;
 }
 static pp_tun set_tunnel(void *ref, const char *uuid, const char *info_json) {
-    (void)winrt_tun_ctrl_set_tunnel(ref, uuid, info_json);
-    /* Channel startup is implemented; native packet TUN I/O is still pending.
-     * Wrap a native TUN in the portable ABI here once that I/O exists. */
-    return NULL;
+    return (pp_tun)winrt_tun_ctrl_set_tunnel(ref, uuid, info_json);
 }
 
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
