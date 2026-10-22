@@ -18,7 +18,7 @@ typedef struct {
  * Reachability notifications are currently unimplemented. */
 void winrt_tun_ctrl_set_delegate(void *controller, const winrt_tun_ctrl_delegate *delegate);
 bool winrt_tun_ctrl_configure_sockets(void *controller, const winrt_socket *sockets, size_t count);
-/* Starts the channel with placeholder settings and returns an owned TUN handle. */
+/* Starts the channel with negotiated settings and returns an owned TUN handle. */
 typedef struct WinrtTunHandle *winrt_tun;
 typedef bool (*winrt_tun_on_receive)(void *context, const uint8_t *bytes, size_t length);
 winrt_tun winrt_tun_ctrl_set_tunnel(void *controller, const char *uuid, const char *info_json);

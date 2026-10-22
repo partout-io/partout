@@ -1,5 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
+#include "tun_settings.h"
 #include <windows.h>
 #include "winrt/tun.h"
 #include "winrt/log.h"
@@ -112,27 +113,20 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
 }
 
 bool PartoutTunnelController::Start(const char *info_json) noexcept {
-    // FIXME: ###, Windows, Derive addresses, routes, DNS and MTU from info_json.
-    (void)info_json;
     try {
         if (!channel_ || !transport_) return false;
         if (started_) return true;
-        auto ipv4 = single_threaded_vector<HostName>();
-        ipv4.Append(HostName{L"203.0.113.2"});
-        auto ipv4_routes = single_threaded_vector<VpnRoute>();
-        ipv4_routes.Append(VpnRoute{HostName{L"203.0.113.0"}, 24});
-        VpnRouteAssignment routes;
-        routes.Ipv4InclusionRoutes(ipv4_routes);
-        VpnDomainNameAssignment domains;
+        const auto settings = partout::windows::TunnelSettings::parse(info_json);
         winrt_socket_take_over(socket_);
         channel_.StartWithMainTransport(
-            ipv4.GetView(), nullptr, VpnInterfaceId{nullptr}, routes, domains,
-            1500, 1600, false, transport_);
+            settings.ipv4.GetView(), settings.ipv6.GetView(), VpnInterfaceId{nullptr}, settings.routes, settings.domains,
+            settings.mtu, settings.max_frame, false, transport_);
         started_ = true;
         winrt_socket_set_channel_writer(socket_, [channel = channel_](const uint8_t *bytes, size_t length) {
             return write_channel(channel, bytes, length, true);
         });
-        winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (placeholder settings)");
+        winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
+            settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
         return true;
     } catch (...) {
         winrt_log(WinrtLogError, "PartoutTunnelController.Start failed: HRESULT 0x%08x",

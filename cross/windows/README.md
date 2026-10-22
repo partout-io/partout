@@ -77,8 +77,11 @@ runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
 Transport association, socket I/O and the TUN packet bridge are implemented.
-Channel addresses/routes are still placeholders; applying negotiated settings
-and controller notifications remain unimplemented.
+Channel startup applies negotiated IP addresses, inclusion/exclusion routes,
+DNS resolution rules and MTU from the remote IP/DNS modules. Windows caps the
+MTU at 1400; route gateways and DNS search suffix lists have no corresponding
+channel setting. Encrypted DNS is rejected rather than silently downgraded.
+Controller notifications remain unimplemented.
 
 ## Build
 
@@ -95,3 +98,11 @@ With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
 builds without WinRT use `tun_windows_dummy.c`, an intentional fallback for
 tests and builds that do not need native VPN support.
+
+The standalone settings mapping test uses real WinRT settings objects, without
+a VPN host. From the same developer shell (adjust the archive path for your build):
+
+```powershell
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+& .cmake-winrt/tun-settings-test.exe
+```
