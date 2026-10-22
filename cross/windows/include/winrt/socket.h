@@ -56,4 +56,7 @@ winrt::Windows::Foundation::IInspectable winrt_socket_transport(winrt_socket soc
 std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket);
 // Stop/drain direct reads before StartWithMainTransport takes receive ownership.
 void winrt_socket_take_over(winrt_socket socket);
+// After channel startup, send encapsulated packets through its send-buffer pool.
+void winrt_socket_set_channel_writer(winrt_socket socket,
+    std::function<int32_t(const uint8_t *, size_t)> writer);
 #endif

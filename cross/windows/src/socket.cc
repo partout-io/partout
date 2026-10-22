@@ -39,6 +39,7 @@ struct SocketReceiveState {
     std::shared_ptr<SocketApartment> apartment;
     std::mutex mutex;
     std::mutex write_mutex;
+    std::function<int32_t(const uint8_t *, size_t)> channel_write;
     std::atomic<bool> writes_stopped{false};
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
@@ -214,6 +215,12 @@ void winrt_socket_take_over(winrt_socket socket) {
     state->read_stopped.wait(lock, [&] { return !state->reading; });
 }
 
+void winrt_socket_set_channel_writer(winrt_socket socket,
+    std::function<int32_t(const uint8_t *, size_t)> writer) {
+    std::lock_guard lock(socket->receive_state->write_mutex);
+    socket->receive_state->channel_write = std::move(writer);
+}
+
 extern "C" {
 
 winrt_socket winrt_socket_create(winrt_socket_proto proto) {
@@ -338,6 +345,10 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
         // Retain transports and the lock independently of wrapper destruction.
         std::lock_guard lock(state->write_mutex);
         if (state->writes_stopped.load()) return E_ABORT;
+        if (state->channel_write) {
+            check_hresult(state->channel_write(bytes, length));
+            return 0;
+        }
         IOutputStream output{nullptr};
         if (stream) {
             output = stream.OutputStream();

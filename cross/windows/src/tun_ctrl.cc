@@ -47,32 +47,45 @@ extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive cal
 
 extern "C" void winrt_tun_stop_writes(winrt_tun tun) { tun->state->writes_stopped.store(true); }
 
-extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
-    if (!tun || !bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
-    const auto state = tun->state;
-    std::lock_guard lock(state->write_mutex);
-    if (state->writes_stopped.load()) return E_ABORT;
+static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, size_t length, bool send) {
+    if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
+    const auto append = [&](VpnPacketBuffer const &packet) {
+        if (send) channel.AppendVpnSendPacketBuffer(packet);
+        else channel.AppendVpnReceivePacketBuffer(packet);
+    };
+    const auto flush = [&] {
+        if (send) channel.FlushVpnSendPacketBuffers();
+        else channel.FlushVpnReceivePacketBuffers();
+    };
     VpnPacketBuffer packet{nullptr};
     try {
-        packet = state->channel.GetVpnReceivePacketBuffer();
+        packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
         const auto buffer = packet.Buffer();
         if (length > buffer.Capacity()) throw hresult_invalid_argument();
         memcpy(buffer.data(), bytes, length);
         buffer.Length(static_cast<uint32_t>(length));
-        state->channel.AppendVpnReceivePacketBuffer(packet);
+        append(packet);
         packet = nullptr; // Ownership returned to the channel.
-        state->channel.FlushVpnReceivePacketBuffers();
+        flush();
         return 0;
     } catch (...) {
         const auto error = to_hresult().value;
         // Return an unused pool buffer even if preparing the packet failed.
         if (packet) try {
             packet.Buffer().Length(0);
-            state->channel.AppendVpnReceivePacketBuffer(packet);
-            state->channel.FlushVpnReceivePacketBuffers();
+            append(packet);
+            flush();
         } catch (...) {}
         return error;
     }
+}
+
+extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
+    if (!tun) return E_INVALIDARG;
+    const auto state = tun->state;
+    std::lock_guard lock(state->write_mutex);
+    if (state->writes_stopped.load()) return E_ABORT;
+    return write_channel(state->channel, bytes, length, false);
 }
 
 PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
@@ -116,6 +129,9 @@ bool PartoutTunnelController::Start(const char *info_json) noexcept {
             ipv4.GetView(), nullptr, VpnInterfaceId{nullptr}, routes, domains,
             1500, 1600, false, transport_);
         started_ = true;
+        winrt_socket_set_channel_writer(socket_, [channel = channel_](const uint8_t *bytes, size_t length) {
+            return write_channel(channel, bytes, length, true);
+        });
         winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (placeholder settings)");
         return true;
     } catch (...) {

@@ -47,8 +47,9 @@ reads are stopped (pending TCP reads are cancelled and drained).
 After startup, `Encapsulate` queues plain IP packets on the TUN side and
 `Decapsulate` queues transport data on the link side. Neither waits for protocol
 processing. TUN writes copy packets into channel receive buffers and call
-`AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`; link writes
-continue through the socket. This requires the channel append/flush APIs
+`AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`. Link writes use
+the socket during negotiation, then the channel send-buffer append/flush APIs
+after startup. This requires the channel append/flush APIs
 (Windows build 20348 or later). Detach drains input callbacks and rejects new
 writes, while retained attachments let already admitted writes finish.
 
