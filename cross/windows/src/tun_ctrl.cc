@@ -113,24 +113,35 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
 }
 
 bool PartoutTunnelController::Start(const char *info_json) noexcept {
+    const char *stage = "parse settings";
     try {
         if (!channel_ || !transport_) return false;
         if (started_) return true;
         const auto settings = partout::windows::TunnelSettings::parse(info_json);
+        stage = "socket handoff";
+        winrt_log(WinrtLogDebug, "PartoutTunnelController: Socket handoff entered");
         winrt_socket_take_over(socket_);
+        stage = "StartWithMainTransport";
+        winrt_log(WinrtLogDebug, "PartoutTunnelController: StartWithMainTransport entered (IPv4=%u, IPv6=%u, DNS rules=%u, MTU=%u, frame=%u)",
+            settings.ipv4.Size(), settings.ipv6.Size(), settings.domains.DomainNameList().Size(), settings.mtu, settings.max_frame);
         channel_.StartWithMainTransport(
             settings.ipv4.GetView(), settings.ipv6.GetView(), VpnInterfaceId{nullptr}, settings.routes, settings.domains,
             settings.mtu, settings.max_frame, false, transport_);
         started_ = true;
+        stage = "install channel writer";
         winrt_socket_set_channel_writer(socket_, [channel = channel_](const uint8_t *bytes, size_t length) {
             return write_channel(channel, bytes, length, true);
         });
         winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
             settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
         return true;
+    } catch (hresult_error const &error) {
+        winrt_log(WinrtLogError, "PartoutTunnelController.Start failed during %s: HRESULT 0x%08x (%ls)",
+            stage, static_cast<unsigned int>(error.code().value), error.message().c_str());
+        return false;
     } catch (...) {
-        winrt_log(WinrtLogError, "PartoutTunnelController.Start failed: HRESULT 0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
+        winrt_log(WinrtLogError, "PartoutTunnelController.Start failed during %s: HRESULT 0x%08x",
+            stage, static_cast<unsigned int>(to_hresult().value));
         return false;
     }
 }
