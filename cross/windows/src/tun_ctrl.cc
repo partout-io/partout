@@ -17,8 +17,15 @@ using namespace winrt::Windows::Foundation;
 using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Vpn;
 
+// Shared with retained TUN handles and the socket writer; no controller capture.
+struct WinrtPacketCounters {
+    std::atomic<uint64_t> tun_read{0}, tun_dropped{0}, link_send{0}, link_send_failed{0};
+    std::atomic<uint64_t> link_read{0}, tun_write{0}, tun_write_failed{0};
+};
+
 struct WinrtTun {
     VpnChannel channel;
+    std::shared_ptr<WinrtPacketCounters> counters;
     std::mutex receive_mutex;
     winrt_tun_on_receive callback = nullptr;
     void *context = nullptr;
@@ -86,11 +93,13 @@ extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t l
     const auto state = tun->state;
     std::lock_guard lock(state->write_mutex);
     if (state->writes_stopped.load()) return E_ABORT;
-    return write_channel(state->channel, bytes, length, false);
+    const auto result = write_channel(state->channel, bytes, length, false);
+    (result == 0 ? state->counters->tun_write : state->counters->tun_write_failed).fetch_add(1, std::memory_order_relaxed);
+    return result;
 }
 
 PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
-    : channel_(channel) {}
+    : channel_(channel), counters_(std::make_shared<WinrtPacketCounters>()) {}
 
 PartoutTunnelController::~PartoutTunnelController() { Stop(); }
 
@@ -125,8 +134,10 @@ bool PartoutTunnelController::Start(const char *info_json) noexcept {
             VpnInterfaceId{nullptr}, settings.routes, settings.domains,
             settings.mtu, settings.max_frame, false, transport_);
         started_ = true;
-        winrt_socket_set_channel_writer(socket_, [channel = channel_](const uint8_t *bytes, size_t length) {
-            return write_channel(channel, bytes, length, true);
+        winrt_socket_set_channel_writer(socket_, [channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
+            const auto result = write_channel(channel, bytes, length, true);
+            (result == 0 ? counters->link_send : counters->link_send_failed).fetch_add(1, std::memory_order_relaxed);
+            return result;
         });
         winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
             settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
@@ -164,10 +175,15 @@ void PartoutTunnelController::Stop() noexcept {
         winrt_log(WinrtLogError, "PartoutTunnelController.Stop failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
     }
+    winrt_log(WinrtLogNotice,
+        "VPN packets (controller totals): TUN read=%llu, TUN dropped=%llu, link send=%llu, link send failed=%llu, link read=%llu, TUN write=%llu, TUN write failed=%llu",
+        counters_->tun_read.load(), counters_->tun_dropped.load(), counters_->link_send.load(),
+        counters_->link_send_failed.load(), counters_->link_read.load(), counters_->tun_write.load(), counters_->tun_write_failed.load());
 }
 
 winrt_tun PartoutTunnelController::Open(const char *info_json) {
     auto state = std::make_shared<WinrtTun>(channel_);
+    state->counters = counters_;
     auto handle = std::make_unique<WinrtTunHandle>(WinrtTunHandle{state});
     if (!Start(info_json)) return nullptr;
     std::lock_guard lock(input_mutex_);
@@ -179,15 +195,21 @@ void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     // Leave input buffers in the platform list: Windows reclaims them on return.
     std::shared_ptr<WinrtTun> tun;
     { std::lock_guard lock(input_mutex_); tun = tun_; }
-    if (!tun) return;
+    counters_->tun_read.fetch_add(packets.Size(), std::memory_order_relaxed);
+    if (!tun) {
+        counters_->tun_dropped.fetch_add(packets.Size(), std::memory_order_relaxed);
+        return;
+    }
     std::lock_guard lock(tun->receive_mutex);
     for (const auto &packet : packets) {
         const auto buffer = packet.Buffer();
-        if (tun->callback) tun->callback(tun->context, buffer.data(), buffer.Length());
+        if (!tun->callback || !tun->callback(tun->context, buffer.data(), buffer.Length()))
+            counters_->tun_dropped.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
 void PartoutTunnelController::Decapsulate(VpnPacketBuffer const &packet) {
+    counters_->link_read.fetch_add(1, std::memory_order_relaxed);
     const auto buffer = packet.Buffer();
     std::function<void(const uint8_t *, size_t)> receive;
     { std::lock_guard lock(input_mutex_); receive = link_receive_; }
