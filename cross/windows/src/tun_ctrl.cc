@@ -129,14 +129,13 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
             winrt_socket_set_adapter(socket, udp_adapter_);
             if (idle_transport_) return true;
             if (transport_) throw hresult_illegal_method_call();
-            const auto hosts = channel_.Configuration().ServerHostNameList();
-            if (!hosts.Size()) throw hresult_invalid_argument();
             Sockets::DatagramSocket idle;
             try {
                 channel_.AssociateTransport(idle, nullptr);
                 // UDP connect sends no application payload. This socket exists
                 // only to satisfy the framework; no WG peer is mapped onto it.
-                const auto connect = idle.ConnectAsync(hosts.GetAt(0), L"9");
+                // TEST-NET-1 avoids DNS and any dependency on a real server.
+                const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
                 if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
                     connect.Cancel();
                     throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
