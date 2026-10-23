@@ -5,6 +5,7 @@
 #pragma once
 
 #include <winrt/Windows.Networking.Vpn.h>
+#include <winrt/Windows.Networking.Sockets.h>
 #include "winrt/tun.h"
 #include <functional>
 #include <memory>
@@ -31,6 +32,8 @@ public:
 private:
     winrt::Windows::Networking::Vpn::VpnChannel channel_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
+    winrt::Windows::Networking::Sockets::DatagramSocket idle_transport_{nullptr};
+    winrt::Windows::Networking::Connectivity::NetworkAdapter udp_adapter_{nullptr};
     bool started_ = false;
     winrt_socket socket_ = nullptr; // Borrowed until Start; the link owns it.
     std::shared_ptr<WinrtTun> tun_;

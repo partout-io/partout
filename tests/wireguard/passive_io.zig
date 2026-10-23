@@ -66,9 +66,18 @@ test "Windows passive UDP preserves multiple peer sources and reply destinations
     endpoint.address[3] = 1;
     endpoint.port = (try socket.localAddress()).port;
     const transport = receiver.transport(endpoint.port, 1400);
-    for (&peers, 0..) |*peer, index| {
+    var previous_port: u16 = 0;
+    // Repeat peer 0 from a new bind while the receiver remains attached.
+    // This exercises endpoint roaming without a fixed receive-source mapping.
+    for ([_]usize{ 0, 1, 0 }) |index| {
+        const peer = &peers[index];
         peer.allocator = std.testing.allocator;
         const peer_socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
+        const new_port = (try peer_socket.localAddress()).port;
+        if (index == 0) {
+            try std.testing.expect(new_port != previous_port);
+            previous_port = new_port;
+        }
         peer.replaceLink(peer_socket);
         const port = (try peer_socket.localAddress()).port;
         const peer_transport = peer.transport(port, 1400);

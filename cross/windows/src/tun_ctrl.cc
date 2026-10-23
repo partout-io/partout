@@ -9,6 +9,7 @@
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <atomic>
+#include <chrono>
 #include <cstring>
 #include <mutex>
 
@@ -116,6 +117,38 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
     try {
         const auto transport = winrt_socket_transport(socket);
         if (!channel_ || !transport) return false;
+#if PP_WINRT_INDEPENDENT_UDP
+        if (winrt_socket_is_unconnected(socket)) {
+            // The channel needs a transport, but it must not own WG's UDP bind.
+            // Keep the adapter across WG bind replacement, including after Start.
+            if (!udp_adapter_) {
+                const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
+                if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
+                udp_adapter_ = profile.NetworkAdapter();
+            }
+            winrt_socket_set_adapter(socket, udp_adapter_);
+            if (idle_transport_) return true;
+            if (transport_) throw hresult_illegal_method_call();
+            const auto hosts = channel_.Configuration().ServerHostNameList();
+            if (!hosts.Size()) throw hresult_invalid_argument();
+            Sockets::DatagramSocket idle;
+            try {
+                channel_.AssociateTransport(idle, nullptr);
+                // UDP connect sends no application payload. This socket exists
+                // only to satisfy the framework; no WG peer is mapped onto it.
+                const auto connect = idle.ConnectAsync(hosts.GetAt(0), L"9");
+                if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
+                    connect.Cancel();
+                    throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+                }
+                connect.GetResults();
+            } catch (...) { idle.Close(); throw; }
+            idle_transport_ = idle;
+            transport_ = idle;
+            winrt_log(WinrtLogNotice, "WinRT two-socket experiment: independent UDP; idle channel transport ready");
+            return true;
+        }
+#endif
         if (transport_ == transport) return true;
         channel_.AssociateTransport(transport, nullptr);
         transport_ = transport;
@@ -143,7 +176,7 @@ bool PartoutTunnelController::Start(const char *info_json) noexcept {
             VpnInterfaceId{nullptr}, settings.routes, settings.domains,
             settings.mtu, settings.maxFrame(), false, transport_);
         started_ = true;
-        winrt_socket_set_channel_writer(socket_, [channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
+        if (!idle_transport_) winrt_socket_set_channel_writer(socket_, [channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
             const auto result = write_channel(channel, bytes, length, true);
             (result == 0 ? counters->link_send : counters->link_send_failed).fetch_add(1, std::memory_order_relaxed);
             return result;
@@ -174,7 +207,15 @@ void PartoutTunnelController::Stop() noexcept {
         tun->callback = nullptr;
         tun->context = nullptr;
     }
-    if (!started_) return;
+    // Close the experiment's transport even if channel startup failed.
+    const auto close_idle = [&] {
+        if (!idle_transport_) return;
+        try { idle_transport_.Close(); } catch (...) {}
+        idle_transport_ = nullptr;
+        transport_ = nullptr;
+        udp_adapter_ = nullptr;
+    };
+    if (!started_) { close_idle(); return; }
     try {
         std::unique_lock<std::mutex> writes;
         if (tun) writes = std::unique_lock(tun->write_mutex);
@@ -184,6 +225,7 @@ void PartoutTunnelController::Stop() noexcept {
         winrt_log(WinrtLogError, "PartoutTunnelController.Stop failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
     }
+    close_idle();
     winrt_log(WinrtLogNotice,
         "VPN packets (controller totals): TUN read=%llu, TUN dropped=%llu, link send=%llu, link send failed=%llu, link read=%llu, TUN write=%llu, TUN write failed=%llu",
         counters_->tun_read.load(), counters_->tun_dropped.load(), counters_->link_send.load(),

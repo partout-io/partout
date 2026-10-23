@@ -41,6 +41,7 @@ struct SocketReceiveState {
     std::mutex write_mutex;
     std::function<int32_t(const uint8_t *, size_t)> channel_write;
     std::atomic<bool> writes_stopped{false};
+    std::atomic<uint64_t> received{0}, sent{0};
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
     bool reading = false;
@@ -73,6 +74,7 @@ struct WinrtSocket {
     bool receiving = false;
     std::shared_ptr<SocketReceiveState> receive_state;
     bool unconnected = false;
+    winrt::Windows::Networking::Connectivity::NetworkAdapter adapter{nullptr};
     HostName bound_host{nullptr};
     // WinRT wildcard binds can listen on both families. The receive path must
     // retain the requested family policy even when the OS bind is broader.
@@ -170,6 +172,7 @@ void register_datagram(WinrtSocket &socket, bool unconnected) {
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 winrt_socket_address source{};
                 if (unconnected) source = socket_address(args.RemoteAddress(), args.RemotePort());
+                state->received.fetch_add(1, std::memory_order_relaxed);
                 state->deliver(buffer.data(), buffer.Length(),
                     unconnected ? &source : nullptr, 0);
             } catch (...) {
@@ -183,6 +186,8 @@ void register_datagram(WinrtSocket &socket, bool unconnected) {
 
 WinrtSocket::~WinrtSocket() noexcept {
     winrt_socket_set_on_receive(this, nullptr, nullptr);
+    if (adapter) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
+        receive_state->received.load(), receive_state->sent.load());
     // Each cleanup is independent, so a failed event revocation cannot skip Close.
     try { if (datagram && receiving) datagram.MessageReceived(receive_token); } catch (...) {}
     try { if (datagram) datagram.Close(); } catch (...) {}
@@ -191,6 +196,16 @@ WinrtSocket::~WinrtSocket() noexcept {
 
 IInspectable winrt_socket_transport(winrt_socket socket) {
     return socket ? socket->transport() : nullptr;
+}
+
+bool winrt_socket_is_unconnected(winrt_socket socket) {
+    return socket && socket->datagram && socket->unconnected;
+}
+
+void winrt_socket_set_adapter(winrt_socket socket,
+    winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter) {
+    if (!winrt_socket_is_unconnected(socket) || !adapter) throw hresult_invalid_argument();
+    socket->adapter = adapter;
 }
 
 std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket) {
@@ -223,10 +238,12 @@ void winrt_socket_set_channel_writer(winrt_socket socket,
 
 extern "C" {
 
-winrt_socket winrt_socket_create(winrt_socket_proto proto) {
+winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
     try {
         Apartment apartment;
         auto socket = std::make_unique<WinrtSocket>();
+        if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
+        socket->unconnected = unconnected;
         socket->apartment = std::make_shared<SocketApartment>();
         socket->receive_state = std::make_shared<SocketReceiveState>();
         socket->receive_state->apartment = socket->apartment;
@@ -245,7 +262,7 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
                            const winrt_socket_open_options *options) {
     try {
         if (!socket || !hostname || !*hostname || !options || options->timeout_ms < 0 ||
-            (options->unconnected && !socket->datagram) ||
+            (options->unconnected != socket->unconnected) ||
             (options->dual_stack && !options->unconnected)) {
             throw hresult_invalid_argument();
         }
@@ -272,7 +289,13 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
             const bool ipv4_wildcard = host.CanonicalName() == L"0.0.0.0";
             const bool ipv6_wildcard = host.CanonicalName() == L"::";
             const auto local_service = port == 0 ? hstring{} : service;
-            if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
+            if (socket->adapter) {
+                if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
+                socket->datagram.BindServiceNameAsync(local_service, socket->adapter).get();
+                winrt_log(WinrtLogNotice, "WinRT independent UDP: bound port %ls on adapter %ls",
+                    socket->datagram.Information().LocalPort().c_str(),
+                    to_hstring(socket->adapter.NetworkAdapterId()).c_str());
+            } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
                 socket->datagram.BindServiceNameAsync(local_service).get();
             } else {
                 socket->datagram.BindEndpointAsync(host, local_service).get();
@@ -382,6 +405,7 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
                 throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));
             offset += written;
         } while (offset < length);
+        state->sent.fetch_add(1, std::memory_order_relaxed);
         return 0;
     } catch (...) {
         const auto error = to_hresult().value;

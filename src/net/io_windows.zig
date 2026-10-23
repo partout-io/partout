@@ -42,7 +42,7 @@ pub const SocketWrapper = struct {
         const socket = WinRT.winrt_socket_create(switch (peer.plainSocketType()) {
             .tcp => WinRT.WinrtSocketProtoTCP,
             .udp => WinRT.WinrtSocketProtoUDP,
-        }) orelse return null;
+        }, endpoint == null) orelse return null;
         errdefer WinRT.winrt_socket_free(socket);
         // uintptr_t carries the WinRT wrapper through the same callback ABI as
         // POSIX descriptors. It must never be used as a Winsock SOCKET.

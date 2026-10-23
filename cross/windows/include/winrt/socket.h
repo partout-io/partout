@@ -22,7 +22,7 @@ typedef struct {
     int timeout_ms;
 } winrt_socket_open_options;
 
-winrt_socket winrt_socket_create(winrt_socket_proto proto);
+winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected);
 void winrt_socket_free(winrt_socket socket);
 /* Configure the transport before calling open. Connected opens are bounded by
  * timeout_ms; unconnected UDP binds a numeric local endpoint. */
@@ -49,9 +49,14 @@ void winrt_socket_stop_writes(winrt_socket socket);
 #ifdef __cplusplus
 }
 #include <winrt/Windows.Foundation.h>
+#include <winrt/Windows.Networking.Connectivity.h>
 #include <functional>
 // Borrow the transport for VPN channel association; no socket internals escape.
 winrt::Windows::Foundation::IInspectable winrt_socket_transport(winrt_socket socket);
+bool winrt_socket_is_unconnected(winrt_socket socket);
+// Before open: constrain independent UDP to the selected physical adapter.
+void winrt_socket_set_adapter(winrt_socket socket,
+    winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter);
 // Retains callback state, not the socket wrapper. Safe after link detach.
 std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket);
 // Stop/drain direct reads before StartWithMainTransport takes receive ownership.
