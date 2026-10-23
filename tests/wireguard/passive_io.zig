@@ -24,6 +24,94 @@ const Completion = struct {
     }
 };
 
+// Quarantine and zero freed storage so accessing a destroyed packet's slice
+// cannot accidentally work because the allocator left its metadata intact.
+const ClearingAllocator = struct {
+    arena: std.heap.ArenaAllocator,
+    frees: usize = 0,
+
+    fn allocator(self: *ClearingAllocator) std.mem.Allocator {
+        return .{ .ptr = self, .vtable = &.{
+            .alloc = alloc,
+            .resize = std.mem.Allocator.noResize,
+            .remap = std.mem.Allocator.noRemap,
+            .free = free,
+        } };
+    }
+    fn alloc(raw: *anyopaque, length: usize, alignment: std.mem.Alignment, ret: usize) ?[*]u8 {
+        const self: *ClearingAllocator = @ptrCast(@alignCast(raw));
+        return self.arena.allocator().rawAlloc(length, alignment, ret);
+    }
+    fn free(raw: *anyopaque, memory: []u8, _: std.mem.Alignment, _: usize) void {
+        const self: *ClearingAllocator = @ptrCast(@alignCast(raw));
+        self.frees += 1;
+        @memset(memory, 0);
+    }
+};
+
+test "Windows passive UDP preserves multiple peer sources and reply destinations" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
+    defer clearing.arena.deinit();
+    var receiver = try bridge.PassiveIO.init(Completion.finish);
+    receiver.allocator = clearing.allocator();
+    defer receiver.deinit();
+    var peers: [2]bridge.PassiveIO = .{ try .init(Completion.finish), try .init(Completion.finish) };
+    defer for (&peers) |*peer| peer.deinit();
+    const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
+    receiver.replaceLink(socket);
+    var endpoint = std.mem.zeroes(c.wg_endpoint);
+    endpoint.family = 4;
+    endpoint.address[0] = 127;
+    endpoint.address[3] = 1;
+    endpoint.port = (try socket.localAddress()).port;
+    const transport = receiver.transport(endpoint.port, 1400);
+    for (&peers, 0..) |*peer, index| {
+        peer.allocator = std.testing.allocator;
+        const peer_socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
+        peer.replaceLink(peer_socket);
+        const port = (try peer_socket.localAddress()).port;
+        const peer_transport = peer.transport(port, 1400);
+        const data = [_]u8{ @intCast(index), 42 };
+        var completion: Completion = .{};
+        const outgoing = [_]c.wg_packet{.{ .data = &data, .size = data.len }};
+        try std.testing.expectEqual(c.WG_IO_OK, peer_transport.link.write.?(peer_transport.context, &outgoing, 1, &endpoint, completion.token()));
+        try std.testing.expectEqual(c.WG_IO_OK, completion.status);
+        try std.testing.expectEqual(@as(usize, 1), completion.calls);
+        var bytes: [32]u8 = undefined;
+        var incoming = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+        for (0..20) |_| {
+            completion = .{};
+            try std.testing.expectEqual(c.WG_IO_OK, transport.link.read.?(transport.context, &incoming, 1, completion.token()));
+            if (completion.count != 0) break;
+        }
+        try std.testing.expectEqual(@as(u32, 1), completion.count);
+        try std.testing.expectEqual(port, incoming[0].source.port);
+        try std.testing.expectEqual(@as(u8, 4), incoming[0].source.family);
+        try std.testing.expectEqualSlices(u8, &data, bytes[0..incoming[0].size]);
+        completion = .{};
+        try std.testing.expectEqual(c.WG_IO_OK, transport.link.write.?(transport.context, &outgoing, 1, &incoming[0].source, completion.token()));
+        try std.testing.expectEqual(c.WG_IO_OK, completion.status);
+        for (0..20) |_| {
+            completion = .{};
+            try std.testing.expectEqual(c.WG_IO_OK, peer_transport.link.read.?(peer_transport.context, &incoming, 1, completion.token()));
+            if (completion.count != 0) break;
+        }
+        try std.testing.expectEqual(@as(u32, 1), completion.count);
+        try std.testing.expectEqual(endpoint.port, incoming[0].source.port);
+        try std.testing.expectEqualSlices(u8, &data, bytes[0..incoming[0].size]);
+    }
+    // Three received packets: each payload must be freed before its node.
+    try std.testing.expectEqual(@as(usize, 6), clearing.frees);
+    receiver.quiesce();
+    var completion: Completion = .{};
+    var bytes: [32]u8 = undefined;
+    var incoming = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+    try std.testing.expectEqual(c.WG_IO_OK, transport.link.read.?(transport.context, &incoming, 1, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_CLOSED, completion.status);
+    try std.testing.expectEqual(@as(usize, 1), completion.calls);
+}
+
 const PacketIO = struct {
     reads: usize = 0,
     writes: usize = 0,

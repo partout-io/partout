@@ -122,10 +122,11 @@ struct TunnelSettings {
             winrt_log(WinrtLogNotice, "VPN channel cannot configure DNS search suffixes; DNS resolution rules are applied");
     }
 
-    static TunnelSettings parse(const char *text) {
+    static TunnelSettings parse(const char *text, uint32_t default_mtu = 1400) {
         if (!text) throw hresult_invalid_argument(L"Missing negotiated tunnel settings");
         const auto root = JsonObject::Parse(to_hstring(text));
         TunnelSettings result;
+        result.mtu = default_mtu;
         for (const auto &entry : root.GetNamedArray(L"modules")) {
             const auto module = entry.GetObject();
             const auto type = module.GetNamedString(L"type");
@@ -136,6 +137,8 @@ struct TunnelSettings {
             if (has(value, L"ipv6")) result.applyIP(value.GetNamedObject(L"ipv6"), HostNameType::Ipv6);
             if (has(value, L"mtu")) {
                 const double mtu = value.GetNamedNumber(L"mtu");
+                // Zero requests the platform default (e.g. WireGuard auto MTU).
+                if (mtu == 0) continue;
                 if (!std::isfinite(mtu) || mtu != std::floor(mtu) || mtu < 68 || mtu > 65535 - encapsulation_headroom)
                     throw hresult_invalid_argument(L"Invalid negotiated MTU");
                 result.mtu = static_cast<uint32_t>(mtu);

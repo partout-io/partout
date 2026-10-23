@@ -52,8 +52,14 @@ int main() try {
     assert(v6.ipv4.Size() == 0 && v6.ipv6.Size() == 1);
     assert(v6.mtu == 1400 && v6.maxFrame() == 1500);
 
+    const auto automatic = R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":0}}]})";
+    assert(TunnelSettings::parse(automatic).mtu == 1400);
+    assert(TunnelSettings::parse(automatic, 1420).mtu == 1420);
+    assert(TunnelSettings::parse(automatic, 1420).maxFrame() == 1520);
+
     for (const auto json : {
         R"({"modules":[]})",
+        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":-1}}]})",
         R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["fd00::2/64"]}}}]})",
         R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2/33"]}}}]})",
         R"({"modules":[{"type":"IP","value":{"ipv6":{"subnets":["fd00::2"]},"mtu":1200}}]})",

@@ -7,13 +7,16 @@ const net = @import("../../net/exports.zig");
 const core = @import("../../core/exports.zig");
 const c = @import("wireguard_c");
 const backend = @import("backend.zig");
+const windows = @import("passive_io_windows.zig");
 const Endpoint = c.wg_endpoint;
 
 /// Native I/O called directly by Go workers. The bridge owns
 /// descriptors and serializes each native call with replacement and cleanup.
 /// Readiness waits release the mutex; no native worker or looper retains buffers.
 /// Shared readiness wakes drain their original waiters before admitting retries.
-pub const PassiveIO = struct {
+pub const PassiveIO = if (builtin.os.tag == .windows) windows.PassiveIO else PosixPassiveIO;
+
+const PosixPassiveIO = struct {
     lock: core.Mutex = .{},
     waiter: net.Waiter,
     complete: *const fn (usize, u32, i32) callconv(.c) void,
