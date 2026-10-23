@@ -139,3 +139,62 @@ fn expectMockDataPathRoundTrip(
         try std.testing.expectEqualSlices(u8, expected, actual);
     }
 }
+
+test "DataLink submits encrypted packets once and propagates writer rejection" {
+    const Probe = struct {
+        channel: *data.DataChannel,
+        destination: source.net.SocketAddress,
+        writes: usize = 0,
+        outbound_bytes: usize = 0,
+        rejection: ?source.net.SubmissionError = null,
+
+        fn channelForKey(raw: ?*anyopaque, key: u8) ?*data.DataChannel {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            return if (key == self.channel.key) self.channel else null;
+        }
+
+        fn write(raw: ?*anyopaque, packets: source.net.Packets, side: source.net.Side, destination: ?source.net.SocketAddress) (source.net.SubmissionError || error{MissingDestination})!void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            std.debug.assert(side == .link);
+            std.debug.assert(std.meta.eql(self.destination, destination.?));
+            std.debug.assert(packets.len == 1 and packets[0].len > 0);
+            self.writes += 1;
+            if (self.rejection) |err| return err;
+        }
+
+        fn reportOutbound(raw: ?*anyopaque, count: usize) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.outbound_bytes += count;
+        }
+
+        fn reportInbound(_: ?*anyopaque, _: usize) void {}
+    };
+    const allocator = std.testing.allocator;
+    const path = try data.testing.createMockDataPath(allocator, 1);
+    const channel = data.DataChannel.create(allocator, 2, path) catch |err| {
+        path.destroy();
+        return err;
+    };
+    defer channel.destroy();
+    const processor = try source.openvpn_internal.processing.LinkProcessor.create(allocator, null, false);
+    defer processor.destroy();
+    const endpoint = try source.net.SocketEndpoint.init(.{ .address = "192.0.2.1", .proto = .init(.udp, 1194) });
+    var probe = Probe{ .channel = channel, .destination = endpoint.address };
+    var link = data.DataLink.init(allocator, endpoint, processor, &probe, .{
+        .write_packets = Probe.write,
+        .data_channel = Probe.channelForKey,
+        .report_inbound_data_count = Probe.reportInbound,
+        .report_outbound_data_count = Probe.reportOutbound,
+    });
+    const pair = data.DataLinkPair{ .link = &link, .key = channel.key };
+    try pair.send(&.{"payload"});
+    try std.testing.expectEqual(@as(usize, 1), probe.writes);
+    try std.testing.expect(probe.outbound_bytes > 0);
+
+    for ([_]source.net.SubmissionError{ error.LooperUnavailable, error.OutOfMemory }) |err| {
+        probe.rejection = err;
+        const before = probe.writes;
+        try std.testing.expectError(err, pair.send(&.{"payload"}));
+        try std.testing.expectEqual(before + 1, probe.writes);
+    }
+}

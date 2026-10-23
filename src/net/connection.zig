@@ -211,8 +211,6 @@ pub const Connection = struct {
         failure: Events.FailureDisposition,
     };
 
-    // FIXME: ###, Connections.VTable must not receive Events (get them from Sandbox on creation)
-
     pub const Event = events_mod.ConnectionEvent;
     pub const Events = events_mod.ConnectionEvents;
 
@@ -226,7 +224,7 @@ pub const Connection = struct {
         /// In link mode, takes link ownership on entry, including on failure.
         /// Return established instead of emitting Events.established when startup
         /// completes synchronously; its info ownership transfers to the caller.
-        start_v2: *const fn (*anyopaque, RemoteDescriptor) StartError!StartResult = struct {
+        start: *const fn (*anyopaque, RemoteDescriptor) StartError!StartResult = struct {
             fn call(_: *anyopaque, _: RemoteDescriptor) StartError!StartResult {
                 return .failed;
             }
@@ -251,18 +249,8 @@ pub const Connection = struct {
                 return .pause;
             }
         }.call,
-        looper_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
+        io_failed: *const fn (*anyopaque, io.Side, io.Failure) void = struct {
             fn call(_: *anyopaque, _: io.Side, _: io.Failure) void {}
-        }.call,
-        looper_terminated: *const fn (*anyopaque, ?io.Failure) void = struct {
-            fn call(_: *anyopaque, _: ?io.Failure) void {}
-        }.call,
-
-        /// FIXME: ###, Deprecated.
-        start: *const fn (*anyopaque, Events) StartError!bool = struct {
-            fn call(_: *anyopaque, _: Events) StartError!bool {
-                return error.UnableToStart;
-            }
         }.call,
 
         /// Quiesces protocol activity and sends a best-effort exit notification
@@ -271,12 +259,12 @@ pub const Connection = struct {
         shutdown: *const fn (*anyopaque, ShutdownReason) void = struct {
             fn call(_: *anyopaque, _: ShutdownReason) void {}
         }.call,
-        stop: *const fn (*anyopaque, u32, Events) void,
+        stop: *const fn (*anyopaque) void,
 
         /// A refresh pauses link submissions and receives a replacement through
         /// rebind, retaining TUN without re-establishing the connection when supported.
-        network_change: *const fn (*anyopaque, io.ReachabilityInfo, Events) void,
-        better_path: *const fn (*anyopaque, Events) void,
+        network_change: *const fn (*anyopaque, io.ReachabilityInfo) void,
+        better_path: *const fn (*anyopaque) void,
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
@@ -285,15 +273,11 @@ pub const Connection = struct {
         return self.vtable.endpoints(self.ptr);
     }
 
-    pub fn startV2(
+    pub fn start(
         self: Connection,
         remote: RemoteDescriptor,
     ) StartError!StartResult {
-        return self.vtable.start_v2(self.ptr, remote);
-    }
-
-    pub fn start(self: Connection, events: Events) StartError!bool {
-        return self.vtable.start(self.ptr, events);
+        return self.vtable.start(self.ptr, remote);
     }
 
     pub fn commit(self: Connection, tun: io.TunDescriptor) StartError!void {
@@ -311,12 +295,8 @@ pub const Connection = struct {
 
     /// Finalizes the connection after I/O is detached. No further events
     /// must be emitted after this returns.
-    pub fn stop(
-        self: Connection,
-        timeout_ms: u32,
-        events: Events,
-    ) void {
-        self.vtable.stop(self.ptr, timeout_ms, events);
+    pub fn stop(self: Connection) void {
+        self.vtable.stop(self.ptr);
     }
 
     pub fn submitPackets(
@@ -328,31 +308,23 @@ pub const Connection = struct {
         return self.vtable.submit_packets(self.ptr, side, packets, sources);
     }
 
-    pub fn looperFailed(
+    pub fn ioFailed(
         self: Connection,
         side: io.Side,
         failure: io.Failure,
     ) void {
-        self.vtable.looper_failed(self.ptr, side, failure);
-    }
-
-    pub fn looperTerminated(
-        self: Connection,
-        failure: ?io.Failure,
-    ) void {
-        self.vtable.looper_terminated(self.ptr, failure);
+        self.vtable.io_failed(self.ptr, side, failure);
     }
 
     pub fn networkChange(
         self: Connection,
         reachability: io.ReachabilityInfo,
-        events: Events,
     ) void {
-        self.vtable.network_change(self.ptr, reachability, events);
+        self.vtable.network_change(self.ptr, reachability);
     }
 
-    pub fn betterPath(self: Connection, events: Events) void {
-        self.vtable.better_path(self.ptr, events);
+    pub fn betterPath(self: Connection) void {
+        self.vtable.better_path(self.ptr);
     }
 
     pub fn destroy(self: Connection) void {

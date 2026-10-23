@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 const net = @import("../../net/exports.zig");
 const core = @import("../../core/exports.zig");
 const c = @import("wireguard_c");
@@ -111,6 +112,8 @@ pub const PassiveIO = struct {
     }
 
     fn readBatch(self: *PassiveIO, side: net.Side, packets: [*c]c.wg_read_packet, count: u32, request: usize) i32 {
+        // FIXME: ###, Windows, Implement passive packet I/O and readiness.
+        if (builtin.os.tag == .windows) @panic("Windows WireGuard passive I/O is not implemented");
         if (request == 0 or count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
         for (packets[0..count]) |packet| if (packet.data == null or packet.capacity == 0) {
             return c.WG_IO_INVALID;
@@ -167,6 +170,8 @@ pub const PassiveIO = struct {
         return self.writeBatch(.tun, packets, count, null, request);
     }
     fn writeBatch(self: *PassiveIO, side: net.Side, packets: [*c]const c.wg_packet, count: u32, destination: ?net.SocketAddress, request: usize) i32 {
+        // FIXME: ###, Windows, Implement passive packet I/O and readiness.
+        if (builtin.os.tag == .windows) @panic("Windows WireGuard passive I/O is not implemented");
         if (request == 0 or count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return c.WG_IO_INVALID;
         for (packets[0..count]) |packet| if (packet.size > 65535 or (packet.size != 0 and packet.data == null) or (side == .tun and packet.size == 0)) {
             return c.WG_IO_INVALID;
@@ -229,6 +234,8 @@ pub const PassiveIO = struct {
     }
 
     fn waitForReadiness(self: *PassiveIO, side: net.Side, writing: bool, would_block: bool) i32 {
+        // FIXME: ###, Windows, Implement passive packet I/O and readiness.
+        if (builtin.os.tag == .windows) @panic("Windows WireGuard passive I/O is not implemented");
         const descriptor = if (side == .link) self.link else self.tun;
         if (!would_block and descriptor != null) {
             // Preserve the existing backpressure retry interval; idle reads use wake.

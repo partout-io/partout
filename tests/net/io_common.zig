@@ -3,11 +3,12 @@
 
 const std = @import("std");
 const source = @import("source");
+const ffi = source.ffi;
 const io = source.net_io_common;
-const c = io.io_c;
+const io_c = ffi.io;
 const Waiter = io.Waiter;
 
-fn failWait(_: c.pp_fd, _: bool, _: c.pp_fd) callconv(.c) c_int {
+fn failWait(_: io_c.pp_fd, _: bool, _: io_c.pp_fd) callconv(.c) c_int {
     return -1;
 }
 
@@ -33,7 +34,7 @@ test "waiter initializes its mux before waiting" {
     defer lock.unlock();
 
     try std.testing.expect(waiter.mux != null);
-    try std.testing.expect(c.pp_mux_wake(waiter.mux));
+    try std.testing.expect(io_c.pp_mux_wake(waiter.mux));
     try std.testing.expect(!try waiter.wait(null, false, &lock));
     try std.testing.expectEqual(@as(usize, 0), waiter.pending);
 }
@@ -43,9 +44,9 @@ const WakeRegression = struct {
     var original_returned = std.atomic.Value(bool).init(false);
     var native_calls = std.atomic.Value(usize).init(0);
 
-    fn waitOnce(fd: c.pp_fd, writing: bool, wake_fd: c.pp_fd) callconv(.c) c_int {
+    fn waitOnce(fd: io_c.pp_fd, writing: bool, wake_fd: io_c.pp_fd) callconv(.c) c_int {
         _ = native_calls.fetchAdd(1, .seq_cst);
-        const result = c.pp_mux_wait_once(fd, writing, wake_fd);
+        const result = io_c.pp_mux_wait_once(fd, writing, wake_fd);
         if (writing) {
             original_returned.store(true, .seq_cst);
             while (hold_original.load(.seq_cst)) source.core.sleepMs(1);

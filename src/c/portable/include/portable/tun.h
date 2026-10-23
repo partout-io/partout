@@ -16,8 +16,6 @@
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
-#if !PARTOUT_WINDOWS
-
 #if PARTOUT_MACOS || PARTOUT_LINUX
 /* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
@@ -29,18 +27,19 @@ pp_tun _Nullable pp_tun_lookup(void);
 pp_fd pp_tun_network_extension_fd(void);
 #endif
 
+#if !PARTOUT_WINDOWS
 /* Platform-specific implementations. */
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
-/* Free the wrapper and release its owned native resources. */
-void pp_tun_free(pp_tun tun);
 
 /* Return the file descriptor. Check result with pp_fd_is_valid(). */
 pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 
 /* Return the device name or NULL if none. */
 const char *_Nullable pp_tun_name(const pp_tun tun);
-
 #endif
+
+/* Free the wrapper and release its owned native resources. */
+void pp_tun_free(pp_tun tun);
 
 #pragma clang assume_nonnull end

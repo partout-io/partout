@@ -9,12 +9,13 @@ const core = source.core;
 const net = source.net;
 
 const source = @import("source");
+const ffi = source.ffi;
 const test_helpers = @import("looper_test_helpers.zig");
-const Looper = source.net_looper_v2.Looper;
+const Looper = source.net_looper.Looper;
 const api = source.core.api;
 const io = source.net_io;
 const io_posix = source.net_io_posix;
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 const mapReadResult = io_posix.mapReadResult;
 const mapWriteResult = io_posix.mapWriteResult;
@@ -56,7 +57,7 @@ test "POSIX interface dispatches to owned sockets and tunnels" {
     const native_socket = socket.linkDescriptor().io;
     defer native_socket.cleanup();
     try std.testing.expectError(error.LibcFailure, tun.tunDescriptor());
-    const native_tun = tun.nativeIO();
+    const native_tun = io_posix.POSIXInterface{ .tun = tun };
     defer tun.destroy();
     try std.testing.expect(native_tun.tun == tun);
     try std.testing.expect(native_socket.socket == socket);
@@ -84,7 +85,8 @@ test "TUN looper descriptor is made nonblocking by the wrapper" {
     const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
     defer tun.destroy();
     // Borrow the pipe solely to exercise descriptor preparation, without a native TUN.
-    tun.test_descriptor = .{ .fd = fds[0], .io = tun.nativeIO() };
+    tun.test_descriptor = .{ .fd = fds[0], .io = .{ .tun = tun } };
+    defer tun.test_descriptor = null;
     const descriptor = try tun.tunDescriptor();
     var waiter = net.Waiter.init() orelse return error.TestUnexpectedResult;
     defer waiter.deinit();
@@ -110,10 +112,9 @@ test "socket argument errors are rejected before native I/O" {
     };
     const native = io_posix.POSIXInterface{ .socket = &socket };
     var buf: [8]u8 = undefined;
-    var address: io.SocketAddress = undefined;
 
-    try std.testing.expectError(error.InvalidSocketMode, socket.receiveFrom(&buf, &address));
-    try std.testing.expectError(error.InvalidSocketMode, socket.sendTo("payload", endpoint.address));
+    try std.testing.expect(!native.isUnconnected());
+    try std.testing.expectError(error.InvalidOffset, native.writePacket("payload", 8, null));
     try std.testing.expectError(error.InvalidOffset, native.write("payload", 8));
 
     socket.remote_endpoint = null;
@@ -123,12 +124,11 @@ test "socket argument errors are rejected before native I/O" {
     for ([_]u8{ 0, 5, 255 }) |family| {
         var invalid_address = endpoint.address;
         invalid_address.family = family;
-        try std.testing.expectError(error.InvalidAddressFamily, socket.sendTo("payload", invalid_address));
         try std.testing.expectError(error.InvalidAddressFamily, native.writePacket("payload", 0, invalid_address));
     }
 
     // Valid arguments reach the invalid native handle and retain its native error.
-    try std.testing.expectError(error.LibcFailure, socket.sendTo("payload", endpoint.address));
+    try std.testing.expectError(error.LibcFailure, native.writePacket("payload", 0, endpoint.address));
     try std.testing.expectEqual(@as(c_int, @intFromEnum(std.c.E.BADF)), native.lastErrorCode());
 }
 
@@ -136,7 +136,7 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         closed: usize = 0,
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
+
         fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
         fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
@@ -172,7 +172,9 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
 
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();
-    var loop = try Looper.init(std.testing.allocator, .{ .mux = wake.handle, .on_finish = .{ .callback = Probe.finish } });
+    var loop = try Looper.init(std.testing.allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.deinit();
     {
         const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
@@ -193,7 +195,7 @@ test "POSIX readiness wait releases the ownership lock while waiting for UDP" {
     defer local.destroy();
     const peer = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
     defer peer.destroy();
-    var destination = try local.localAddress();
+    var destination = try local.linkDescriptor().localAddress();
     destination.address[0..4].* = .{ 127, 0, 0, 1 };
     const native = local.linkDescriptor().io;
     var waiter = net.Waiter.init() orelse return error.TestUnexpectedResult;
@@ -209,7 +211,7 @@ test "POSIX readiness wait releases the ownership lock while waiting for UDP" {
         fn send(lock: *core.Mutex, socket: *io.SocketWrapper, address: io.SocketAddress) void {
             lock.lock();
             defer lock.unlock();
-            _ = socket.sendTo("udp", address) catch unreachable;
+            _ = socket.linkDescriptor().io.writePacket("udp", 0, address) catch unreachable;
         }
     };
     mutex.lock();

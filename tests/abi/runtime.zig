@@ -133,17 +133,11 @@ test "daemon runtime owns options during lifecycle" {
         defer runtime.destroy(allocator);
         try std.testing.expectEqualStrings(profile_cache_directory, std.fs.path.basename(runtime.options.cache_dir));
         try std.testing.expect(portable_c.pp_file_is_directory(runtime.options.cache_dir.ptr));
-        const expected_experimental = if (source.runtime_policy.v2_only) true else experimental;
-        try std.testing.expectEqual(expected_experimental, runtime.daemon == .experimental);
         if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
             const impl = runtime.registry.implementation(.OpenVPN).?;
             const ctx = runtime.contexts.getPtr(.OpenVPN).?;
-            const expected_openvpn = source.runtime_policy.v2_only;
-            try std.testing.expectEqual(expected_openvpn, ctx.OpenVPN == .experimental);
-            const expected_vtable = if (expected_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
-            try std.testing.expect(impl.vtable == expected_vtable);
-            const expected_context: *anyopaque = if (expected_openvpn) &ctx.OpenVPN.experimental else &ctx.OpenVPN.legacy;
-            try std.testing.expect(impl.ptr == expected_context);
+            try std.testing.expect(impl.vtable == &source.openvpn_exports.connection_vtable);
+            try std.testing.expect(impl.ptr == @as(*anyopaque, &ctx.OpenVPN));
         }
         try runtime.start();
         runtime.hold();
@@ -207,114 +201,13 @@ test "requires a connection implementation for active connection profiles" {
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
     defer registry.deinit(allocator);
-    var daemon = try createDaemonWithJson(
-        allocator,
-        mock.connectionProfileJson(),
-        runtime.context(&registry),
-    );
+    const daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
     defer daemon.destroy();
-
-    try std.testing.expectError(
-        error.MissingConnectionImplementation,
-        daemon.start(),
-    );
+    try std.testing.expectError(error.MissingConnectionImplementation, daemon.start());
 }
 
-test "starts and stops connection profile through injected dependencies" {
-    const allocator = std.testing.allocator;
-    var runtime: MockDaemonRuntime = .{};
-    var registry = try mockConnectionRegistry(allocator);
-    defer registry.deinit(allocator);
-    var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.destroy();
-
-    try std.testing.expect(daemon.isConnectionProfile());
-
-    try daemon.start();
-    defer daemon.stop();
-
-    try std.testing.expectEqual(@as(usize, 1), runtime.monitor.start_count);
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .disconnected,
-        .connecting,
-        .connected,
-    }, daemon.testStatuses());
-    try std.testing.expectEqual(.connected, runtime.events.connection_status.?);
-    try std.testing.expect(runtime.events.last_error_code == null);
-    try std.testing.expect(!runtime.events.has_data_count);
-    try std.testing.expectEqual(api.DataCount{}, runtime.events.data_count);
-    try std.testing.expect(!runtime.controller.reasserting);
-
-    daemon.stop();
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{
-        .disconnected,
-        .connecting,
-        .connected,
-        .disconnecting,
-        .disconnected,
-    }, daemon.testStatuses());
-    try std.testing.expectEqual(@as(usize, 1), runtime.monitor.stop_count);
-    try std.testing.expect(runtime.events.connection_status == null);
-    try std.testing.expect(runtime.events.last_error_code == null);
-    try std.testing.expect(!runtime.events.has_data_count);
-}
-
-test "stop blocks until connection teardown finishes" {
-    const allocator = std.testing.allocator;
-    var runtime: MockDaemonRuntime = .{};
-    var blocking_connection = mock.BlockingStopConnection{};
-    var registry = try blockingConnectionRegistry(allocator, &blocking_connection);
-    defer registry.deinit(allocator);
-    var daemon = try createDaemonWithJson(
-        allocator,
-        mock.connectionProfileJson(),
-        runtime.context(&registry),
-    );
-    defer daemon.destroy();
-
-    try daemon.start();
-
-    daemon.stop();
-
-    try std.testing.expectEqual(@as(usize, 1), blocking_connection.stop_count);
-    try std.testing.expect(runtime.events.connection_status == null);
-    try std.testing.expect(runtime.events.last_error_code == null);
-}
-
-test "network monitor gates immediate connection evaluation" {
-    const allocator = std.testing.allocator;
-    var runtime: MockDaemonRuntime = .{ .monitor = .{ .reachable = false } };
-    var registry = try mockConnectionRegistry(allocator);
-    defer registry.deinit(allocator);
-    var daemon = try createDaemonWithJson(allocator, mock.connectionProfileJson(), runtime.context(&registry));
-    defer daemon.destroy();
-
-    try daemon.start();
-    defer daemon.stop();
-
-    try std.testing.expectEqualSlices(api.ConnectionStatus, &.{.disconnected}, daemon.testStatuses());
-    try std.testing.expectEqual(.disconnected, runtime.events.connection_status.?);
-    try std.testing.expect(!runtime.controller.reasserting);
-}
 fn emptyConnectionRegistry(allocator: std.mem.Allocator) error{OutOfMemory}!conn.ConnectionRegistry {
     return conn.ConnectionRegistry.init(allocator, &.{});
-}
-
-fn mockConnectionRegistry(allocator: std.mem.Allocator) error{OutOfMemory}!conn.ConnectionRegistry {
-    const implementations = [_]conn.ConnectionImplementation{
-        mock.mockConnectionImplementation(),
-    };
-    return conn.ConnectionRegistry.init(allocator, &implementations);
-}
-
-fn blockingConnectionRegistry(
-    allocator: std.mem.Allocator,
-    blocking_connection: *mock.BlockingStopConnection,
-) error{OutOfMemory}!conn.ConnectionRegistry {
-    const implementations = [_]conn.ConnectionImplementation{
-        mock.blockingConnectionImplementation(blocking_connection),
-    };
-    return conn.ConnectionRegistry.init(allocator, &implementations);
 }
 
 test "daemon options decode experimental feature flags" {
@@ -339,7 +232,7 @@ test "daemon options reject unknown feature bits" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
 }
 
-test "experimental protocol flags require daemon v2 and select implementations independently" {
+test "legacy feature flags preserve the current implementations" {
     const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },
@@ -368,25 +261,16 @@ test "experimental protocol flags require daemon v2 and select implementations i
                 return err;
             };
             defer runtime.destroy(allocator);
-            const experimental = source.runtime_policy.v2_only or (flags & partout_c.PartoutDaemonFlagExperimentalDaemon != 0);
-            const experimental_openvpn = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalOpenVPN != 0);
-            const experimental_wireguard = source.runtime_policy.v2_only or (experimental and flags & partout_c.PartoutDaemonFlagExperimentalWireGuard != 0);
-            try std.testing.expectEqual(experimental, runtime.daemon == .experimental);
             if (source.wireguard_enabled) {
                 const impl = runtime.registry.implementation(.WireGuard).?;
-                const expected = if (experimental_wireguard) &source.wireguard_exports.connection_v2_vtable else &source.wireguard_exports.connection_vtable;
-                try std.testing.expect(impl.vtable == expected);
+                try std.testing.expect(impl.vtable == &source.wireguard_exports.connection_vtable);
                 const ctx = runtime.contexts.getPtr(.WireGuard).?;
-                try std.testing.expectEqual(experimental_wireguard, ctx.WireGuard == .experimental);
-                const expected_context: *anyopaque = if (experimental_wireguard) &ctx.WireGuard.experimental else &ctx.WireGuard.legacy;
-                try std.testing.expect(impl.ptr == expected_context);
-                const backend = if (experimental_wireguard) ctx.WireGuard.experimental.backend else ctx.WireGuard.legacy.backend;
-                try std.testing.expect(backend.vtable == source.wireguard_exports.go_backend.vtable);
+                try std.testing.expect(impl.ptr == @as(*anyopaque, &ctx.WireGuard));
+                try std.testing.expect(ctx.WireGuard.backend.vtable == source.wireguard_exports.go_backend.vtable);
             }
             if (source.openvpn_enabled and source.ffi.has_default_crypto_backend) {
                 const impl = runtime.registry.implementation(.OpenVPN).?;
-                const expected = if (experimental_openvpn) &source.openvpn_exports.connection_v2_vtable else &source.openvpn_exports.connection_vtable;
-                try std.testing.expect(impl.vtable == expected);
+                try std.testing.expect(impl.vtable == &source.openvpn_exports.connection_vtable);
             }
         }
     }

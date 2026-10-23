@@ -12,18 +12,19 @@
 //! the mux until after looper destruction and serializes access to both.
 
 const std = @import("std");
+const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
-const io_c = io.io_c;
+const io_c = ffi.io;
 
 pub const PosixLooper = struct {
     const retry_delay_ms = 10;
     const Scheduled = struct {
         id: u64,
         deadline_ns: u64,
-        task: helpers.TimedTask,
+        task: io.TimedTask,
         ready: bool = false,
         next: ?*Scheduled = null,
 
@@ -138,7 +139,7 @@ pub const PosixLooper = struct {
     }
 
     /// Failed replacement preserves the old task. The token's address is not retained.
-    pub fn scheduleTimer(self: *PosixLooper, timer: *helpers.Timer, delay_ms: u64, task: helpers.TimedTask) helpers.SubmissionError!void {
+    pub fn scheduleTimer(self: *PosixLooper, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         node.* = .{ .id = self.next_timer_id, .deadline_ns = deadlineAfter(delay_ms), .task = task };
@@ -149,7 +150,7 @@ pub const PosixLooper = struct {
         timer.id = node.id;
     }
 
-    pub fn cancelTimer(self: *PosixLooper, timer: *helpers.Timer) void {
+    pub fn cancelTimer(self: *PosixLooper, timer: *io.Timer) void {
         const id = timer.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         timer.id = null;
@@ -201,7 +202,7 @@ pub const PosixLooper = struct {
     }
 
     /// Copies the complete batch, or leaves the queue unchanged on allocation failure.
-    pub fn write(self: *PosixLooper, packets: helpers.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
+    pub fn write(self: *PosixLooper, packets: io.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
         const side = self.sides[@intFromEnum(tag)] orelse return error.SideNotAttached;
@@ -212,7 +213,7 @@ pub const PosixLooper = struct {
 
     /// Makes one nonblocking drain attempt without invoking read, timer or failure callbacks.
     /// The caller may detach afterwards even if writes fail or remain blocked.
-    pub fn flushWrites(self: *PosixLooper, tag: io.Side) helpers.DetachError!?helpers.Failure {
+    pub fn flushWrites(self: *PosixLooper, tag: io.Side) helpers.DetachError!?io.Failure {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
         self.busy = true;
@@ -221,7 +222,7 @@ pub const PosixLooper = struct {
         return self.processWrite(side);
     }
 
-    fn processWrite(self: *PosixLooper, side: *SideIO) ?helpers.Failure {
+    fn processWrite(self: *PosixLooper, side: *SideIO) ?io.Failure {
         defer side.write_ready = false;
         while (side.write_queue.pending()) |pending| {
             const written = side.native_io.writePacket(pending.data, pending.offset, pending.address) catch |err| {
@@ -253,10 +254,10 @@ pub const PosixLooper = struct {
         return null;
     }
 
-    fn processRead(self: *PosixLooper, side: *SideIO) ?helpers.Failure {
+    fn processRead(self: *PosixLooper, side: *SideIO) ?io.Failure {
         const result = side.readPackets(self.options.max_read_size);
         defer @memset(side.read_packets[0..result.count], &.{});
-        var action: helpers.ReadAction = .keep;
+        var action: io.ReadAction = .keep;
         if (result.count > 0) {
             if (side.on_read) |callback| {
                 const addresses = if (side.read_addresses) |values| values[0..result.count] else null;
@@ -312,7 +313,7 @@ pub const PosixLooper = struct {
     }
 
     // All callers hold the reentrancy guard, including while cancelling writes.
-    fn removeSide(self: *PosixLooper, tag: io.Side, failure: ?helpers.Failure) void {
+    fn removeSide(self: *PosixLooper, tag: io.Side, failure: ?io.Failure) void {
         const slot = &self.sides[@intFromEnum(tag)];
         const side = slot.* orelse return;
         slot.* = null;
@@ -341,7 +342,7 @@ pub const PosixLooper = struct {
         on_failure: ?helpers.OnFailure,
         read_bytes: []u8,
         buffer_size: usize,
-        read_packets: []helpers.Packet,
+        read_packets: []io.Packet,
         read_addresses: ?[]io.SocketAddress,
         write_queue: helpers.WriteQueue,
         reading: bool = true,
@@ -356,7 +357,7 @@ pub const PosixLooper = struct {
             const size = std.math.mul(usize, count, buffer_size) catch return error.OutOfMemory;
             const bytes = try allocator.alloc(u8, size);
             errdefer allocator.free(bytes);
-            const packets = try allocator.alloc(helpers.Packet, count);
+            const packets = try allocator.alloc(io.Packet, count);
             errdefer allocator.free(packets);
             const addresses = if (descriptor.io.isUnconnected()) try allocator.alloc(io.SocketAddress, count) else null;
             errdefer if (addresses) |values| allocator.free(values);
@@ -404,7 +405,7 @@ pub const PosixLooper = struct {
             return result;
         }
 
-        fn ioFailure(self: *const SideIO, cause: io.Error) helpers.Failure {
+        fn ioFailure(self: *const SideIO, cause: io.Error) io.Failure {
             return .{ .io = .{
                 .side = self.side,
                 .cause = cause,

@@ -153,11 +153,6 @@ pub const Platform = struct {
         };
     }
 
-    /// V2 can operate an unconnected UDP link with either available family.
-    pub fn socketFactoryV2(self: *Platform) SocketFactory {
-        return .{ .ptr = self, .vtable = &platform_socket_factory_v2_vtable };
-    }
-
     pub fn networkMonitor(self: *Platform) NetworkMonitor {
         return .{
             .ptr = self,
@@ -325,7 +320,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     const tun = maybe_tun orelse {
         return error.TunNotAvailable;
     };
-    errdefer io.io_c.pp_tun_free(tun);
+    errdefer io_c.pp_tun_free(tun);
     return TunWrapper.create(allocator, tun);
 }
 
@@ -407,12 +402,7 @@ fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair)
 
 const platform_socket_factory_vtable = SocketFactory.VTable{
     .current_reachability = socketFactoryCurrentReachability,
-    .create = socketFactoryCreate,
-};
-
-const platform_socket_factory_v2_vtable = SocketFactory.VTable{
-    .current_reachability = socketFactoryCurrentReachability,
-    .create = socketFactoryCreateV2,
+    .create = socketFactoryCreateWithFallback,
 };
 
 fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
@@ -445,7 +435,7 @@ fn socketFactoryCreate(
     return wrapper.linkDescriptor();
 }
 
-fn socketFactoryCreateV2(
+fn socketFactoryCreateWithFallback(
     ptr: ?*anyopaque,
     allocator: std.mem.Allocator,
     endpoint: ?api.ExtendedEndpoint,

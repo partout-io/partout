@@ -12,29 +12,20 @@ const net = source.net;
 const io = source.net_io;
 
 const AuthToken = source.openvpn_internal.auth.AuthToken;
-const Looper = source.net_looper_v2.Looper;
+const Looper = source.net_looper.Looper;
 const PRNG = source.openvpn_internal.crypto.PRNG;
-const Session = source.openvpn_internal.session_v2.Session;
-const SessionError = source.openvpn_internal.session_v2.SessionError;
-const session_testing = source.openvpn_internal.session_v2.testing;
+const Session = source.openvpn_internal.session.Session;
+const SessionError = source.openvpn_internal.session.SessionError;
+const session_testing = source.openvpn_internal.session.testing;
 
 test "Session declarations are semantically analyzed" {
     std.testing.refAllDecls(Session);
-}
-
-test "v2-only policy selects OpenVPN session v2" {
-    if (!source.runtime_policy.v2_only) return error.SkipZigTest;
-    try std.testing.expect(source.openvpn_internal.session.Session == Session);
-    try std.testing.expect(!@hasDecl(Session, "setLink"));
-    try std.testing.expect(@hasDecl(Session, "submitPackets"));
 }
 
 test "Session uses externally supplied I/O callbacks" {
     // WindowsLooper does not implement caller-driven I/O yet.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
-        fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
-
         fn established(
             _: ?*anyopaque,
             _: source.net.SocketEndpoint,
@@ -51,7 +42,6 @@ test "Session uses externally supplied I/O callbacks" {
     defer wake.deinit();
     var looper = try Looper.init(allocator, .{
         .mux = wake.handle,
-        .on_finish = .{ .callback = Callbacks.onFinish },
     });
     defer looper.deinit();
     defer looper.stop() catch {};
@@ -115,9 +105,6 @@ test "Session reports protocol failures without owning shutdown policy" {
     defer wake.deinit();
     var looper = try Looper.init(allocator, .{
         .mux = wake.handle,
-        .on_finish = .{ .callback = struct {
-            fn call(_: ?*anyopaque, _: ?Looper.Failure) void {}
-        }.call },
     });
     defer looper.deinit();
     defer looper.stop() catch {};

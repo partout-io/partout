@@ -79,8 +79,8 @@ typedef enum {
 } partout_crypto;
 
 /* Daemon feature flags (DaemonFeatureFlag bit values). */
+/* Deprecated compatibility flags: the current implementations are always used. */
 #define PartoutDaemonFlagExperimentalDaemon (UINT64_C(1) << 0)
-/* Protocol v2 flags require PartoutDaemonFlagExperimentalDaemon. */
 #define PartoutDaemonFlagExperimentalOpenVPN (UINT64_C(1) << 1)
 #define PartoutDaemonFlagExperimentalWireGuard (UINT64_C(1) << 2)
 

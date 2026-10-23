@@ -16,10 +16,8 @@
 
 const conn = @import("connection.zig");
 const daemon = @import("daemon.zig");
-const daemon_v2 = @import("daemon_v2.zig");
 const io = @import("io.zig");
-const runtime_policy = @import("../runtime_policy.zig");
-const looper = runtime_policy.legacy_looper;
+const looper = @import("looper.zig");
 const platform = @import("platform.zig");
 const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
@@ -37,7 +35,6 @@ pub const DaemonContext = daemon.Context;
 pub const DaemonError = daemon.Error;
 pub const DaemonEventKey = daemon.EventKey;
 pub const DaemonEvents = daemon.Events;
-pub const DaemonV2 = daemon_v2.Daemon;
 pub const Datagram = io.Datagram;
 pub const DNSRecord = sandbox.DNSRecord;
 pub const DNSResolver = sandbox.DNSResolver;
@@ -45,7 +42,7 @@ pub const EndpointResolver = resolver.EndpointResolver;
 pub const Failure = io.Failure;
 pub const FileDescriptor = io.FileDescriptor;
 pub const LinkDescriptor = io.LinkDescriptor;
-pub const Looper = if (runtime_policy.v2_only) void else looper.Looper;
+pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Packets = io.Packets;
 pub const Platform = platform.Platform;
@@ -66,6 +63,5 @@ pub const Timer = io.Timer;
 pub const TunDescriptor = io.TunDescriptor;
 pub const TunWrapper = io.TunWrapper;
 pub const Waiter = io.Waiter;
-pub const WriteOOBError = io.WriteOOBError;
 
 pub const canChangeStatus = conn.canChangeStatus;

@@ -12,11 +12,8 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const events_mod = @import("connection_events.zig");
 const io = @import("io.zig");
-const runtime_policy = @import("../runtime_policy.zig");
-const looper = @import("looper.zig");
 const api = core.api;
 
-const Looper = if (runtime_policy.v2_only) void else looper.Looper;
 const TunWrapper = io.TunWrapper;
 
 /// The sandbox is supplied by the daemon to a `ConnectionModule`
@@ -27,15 +24,11 @@ pub const Sandbox = struct {
     /// Borrowed runtime cache directory. Connections that retain it must copy
     /// it during creation.
     cache_dir: []const u8 = "",
-    events: ?events_mod.ConnectionEvents = null,
+    events: events_mod.ConnectionEvents,
     writer: ?ConnectionWriter = null,
-    // FIXME: ###, Delete all these from Sandbox
     controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
-    /// Legacy v1 capabilities; v2 connections do not use these.
-    looper: *Looper,
-    serialized_executor: SerializedExecutor = undefined,
 };
 
 /// Interacts with the platform API to establish the physical
@@ -270,30 +263,19 @@ pub const NetworkMonitor = struct {
     }
 };
 
-pub const SerializedExecutor = core.SerializedExecutor;
-
 /// Fine-tunes connection behavior within a `Sandbox`.
 pub const ConnectionOptions = struct {
     /// Whether UDP link sockets connect to the resolved remote endpoint.
     connect_udp: bool = true,
 
     /// The DNS resolution timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern
     dns_timeout: u32 = 3000,
 
     /// The link activity timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern
     link_activity_timeout: u32 = 5000,
-
-    /// The link write timeout, in milliseconds.
-    // FIXME: ###, Delete, it's a link concern (replace timeout with fixed number of sendExit() attempts)
-    link_write_timeout: u32 = 5000,
 
     /// The minimum interval before updating data count, in milliseconds.
     min_data_count_interval: u32 = 1000,
-
-    /// Generic user data represented as JSON.
-    user_info: ?api.JSONValue = null,
 };
 
 /// Packet writes and timers supplied by the connection owner.

@@ -4,9 +4,10 @@
 
 const std = @import("std");
 const source = @import("source");
+const ffi = source.ffi;
 
 const logging = source.core_logging;
-const io_c = source.net_io.io_c;
+const io_c = ffi.io;
 const resolver = source.net_resolver;
 const PlatformDNS = resolver.PlatformDNS;
 const ReachabilityInfo = source.net_io.ReachabilityInfo;

@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const runtime_policy = @import("../runtime_policy.zig");
 const build_options = @import("build_options");
 
 const ffi = @import("../c/exports.zig");
@@ -14,7 +13,6 @@ const openvpn = @import("../openvpn/exports.zig");
 const wireguard = @import("../wireguard/exports.zig");
 
 const api = core.api;
-const log = core.logging;
 const partout_c = helpers.partout_c;
 const portable_c = ffi.portable;
 const util = core.util;
@@ -117,62 +115,20 @@ pub const DaemonOptions = struct {
 };
 
 pub const DaemonRuntime = struct {
-    const Daemon = union(enum) {
-        legacy: if (runtime_policy.v2_only) void else *net.Daemon,
-        experimental: *net.DaemonV2,
-
-        fn create(allocator: std.mem.Allocator, profile: *const api.Profile, context: net.DaemonContext, experimental: bool) RuntimeError!Daemon {
-            return if (runtime_policy.v2_only or experimental)
-                .{ .experimental = try net.DaemonV2.create(allocator, profile, context) }
-            else
-                .{ .legacy = try net.Daemon.create(allocator, profile, context) };
-        }
-
-        fn destroy(self: Daemon) void {
-            switch (self) {
-                inline else => |impl| if (@TypeOf(impl) != void) impl.destroy() else unreachable,
-            }
-        }
-
-        fn start(self: Daemon) RuntimeError!void {
-            return switch (self) {
-                inline else => |impl| if (@TypeOf(impl) != void) impl.start() else unreachable,
-            };
-        }
-
-        fn hold(self: Daemon) void {
-            switch (self) {
-                inline else => |impl| if (@TypeOf(impl) != void) impl.hold() else unreachable,
-            }
-        }
-
-        fn stop(self: Daemon) void {
-            switch (self) {
-                inline else => |impl| if (@TypeOf(impl) != void) impl.stop() else unreachable,
-            }
-        }
-    };
-
     const Context = union(api.ModuleType) {
         Custom: void,
         DNS: void,
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: union(enum) {
-            legacy: if (runtime_policy.v2_only) void else openvpn.ConnectionContext,
-            experimental: openvpn.ConnectionContextV2,
-        },
+        OpenVPN: openvpn.ConnectionContext,
         Provider: void,
-        WireGuard: union(enum) {
-            legacy: if (runtime_policy.v2_only) void else wireguard.ConnectionContext,
-            experimental: wireguard.ConnectionContextV2,
-        },
+        WireGuard: wireguard.ConnectionContext,
         Undefined: void,
     };
 
     registry: net.ConnectionRegistry,
-    daemon: Daemon,
+    daemon: *net.Daemon,
     platform: net.Platform,
     options: DaemonOptions,
     events: helpers.BoundDaemonEvents,
@@ -192,12 +148,6 @@ pub const DaemonRuntime = struct {
         const self = try allocator.create(DaemonRuntime);
         errdefer allocator.destroy(self);
 
-        // The shared policy excludes legacy implementations at compile time.
-        const experimental = runtime_policy.v2_only or options.feature_flags.contains(.experimentalDaemon);
-        const experimental_openvpn = runtime_policy.v2_only or (experimental and options.feature_flags.contains(.experimentalOpenVPN));
-        const experimental_wireguard = runtime_policy.v2_only or (experimental and options.feature_flags.contains(.experimentalWireGuard));
-        log.write(.notice, if (experimental) "Using daemon v2 (experimental)" else "Using daemon v1 (legacy)");
-
         // Register the known connection implementations
         self.contexts = .{};
         var impls: std.ArrayList(net.ConnectionImplementation) = .empty;
@@ -205,24 +155,14 @@ pub const DaemonRuntime = struct {
         if (build_options.openvpn and ffi.has_default_crypto_backend) {
             const ctx = self.contexts.putUninitialized(.OpenVPN);
             const backend = options.crypto_backend orelse api.defaultCryptoBackend();
-            const impl: net.ConnectionImplementation = if (experimental_openvpn) blk: {
-                ctx.* = .{ .OpenVPN = .{ .experimental = .{ .session_options = .{ .backend = backend } } } };
-                break :blk .{ .ptr = &ctx.OpenVPN.experimental, .vtable = &openvpn.connection_v2_vtable };
-            } else blk: {
-                ctx.* = .{ .OpenVPN = .{ .legacy = .{ .session_options = .{ .backend = backend } } } };
-                break :blk .{ .ptr = &ctx.OpenVPN.legacy, .vtable = &openvpn.connection_vtable };
-            };
+            ctx.* = .{ .OpenVPN = .{ .session_options = .{ .backend = backend } } };
+            const impl: net.ConnectionImplementation = .{ .ptr = &ctx.OpenVPN, .vtable = &openvpn.connection_vtable };
             try impls.append(allocator, impl);
         }
         if (build_options.wireguard) {
             const ctx = self.contexts.putUninitialized(.WireGuard);
-            const impl: net.ConnectionImplementation = if (experimental_wireguard) blk: {
-                ctx.* = .{ .WireGuard = .{ .experimental = .{ .backend = wireguard.go_backend } } };
-                break :blk .{ .ptr = &ctx.WireGuard.experimental, .vtable = &wireguard.connection_v2_vtable };
-            } else blk: {
-                ctx.* = .{ .WireGuard = .{ .legacy = .{ .backend = wireguard.go_backend } } };
-                break :blk .{ .ptr = &ctx.WireGuard.legacy, .vtable = &wireguard.connection_vtable };
-            };
+            ctx.* = .{ .WireGuard = .{ .backend = wireguard.go_backend } };
+            const impl: net.ConnectionImplementation = .{ .ptr = &ctx.WireGuard, .vtable = &wireguard.connection_vtable };
             try impls.append(allocator, impl);
         }
         self.registry = try net.ConnectionRegistry.init(allocator, impls.items);
@@ -234,7 +174,7 @@ pub const DaemonRuntime = struct {
         });
         errdefer self.platform.deinit();
         self.events = helpers.BoundDaemonEvents.init(bindings);
-        self.daemon = try Daemon.create(
+        self.daemon = try net.Daemon.create(
             allocator,
             &options.profile,
             .{
@@ -242,7 +182,7 @@ pub const DaemonRuntime = struct {
                     .registry = &self.registry,
                     .controller = self.platform.tunnelController(),
                     .resolver = self.platform.dnsResolver(),
-                    .factory = if (experimental) self.platform.socketFactoryV2() else self.platform.socketFactory(),
+                    .factory = self.platform.socketFactory(),
                     .monitor = self.platform.networkMonitor(),
                 },
                 .options = .{
@@ -253,7 +193,6 @@ pub const DaemonRuntime = struct {
                     .cache_dir = options.cache_dir,
                 },
             },
-            experimental,
         );
         errdefer self.daemon.destroy();
 

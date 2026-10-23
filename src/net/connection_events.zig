@@ -40,47 +40,9 @@ pub const ConnectionEvents = struct {
 
     /// Delegates directly; the receiver decides which events require deferral.
     pub fn emit(self: ConnectionEvents, payload: ConnectionEvent) void {
-        if (self.event) |callback| {
-            callback(self.ctx, payload);
-            return;
-        }
-        // Existing sinks retain their individual callbacks during migration.
-        // FIXME: ###, Delete after v2
-        switch (payload) {
-            .established => |success| self.established(self.ctx, success),
-            .needs_rebind => |info| self.needs_rebind(self.ctx, info),
-            .failed => |failure| self.failed(self.ctx, failure),
-            .stopped => self.stopped(self.ctx),
-            .set_env => |update| self.set_env(self.ctx, update.key, update.value),
-            .data_count => |count| self.data_count(self.ctx, count),
-        }
+        self.event(self.ctx, payload);
     }
 
     ctx: *anyopaque,
-    event: ?*const fn (*anyopaque, ConnectionEvent) void = null,
-    /// Requests host cancellation after an unrecoverable connection
-    /// failure so the daemon can apply its cancellation policy.
-    cancel: *const fn (*anyopaque, ?api.PartoutErrorPair) void,
-
-    // FIXME: ###, Deprecated.
-    established: *const fn (*anyopaque, Success) void = struct {
-        fn call(_: *anyopaque, _: Success) void {}
-    }.call,
-    needs_rebind: *const fn (*anyopaque, ?api.TunnelRemoteInfoWrapper) void = struct {
-        fn call(_: *anyopaque, _: ?api.TunnelRemoteInfoWrapper) void {}
-    }.call,
-    failed: *const fn (*anyopaque, Failure) void = struct {
-        fn call(_: *anyopaque, _: Failure) void {}
-    }.call,
-    stopped: *const fn (*anyopaque) void = struct {
-        fn call(_: *anyopaque) void {}
-    }.call,
-    set_env: *const fn (*anyopaque, []const u8, ?[]const u8) void = struct {
-        fn call(_: *anyopaque, _: []const u8, _: ?[]const u8) void {}
-    }.call,
-    data_count: *const fn (*anyopaque, api.DataCount) void = struct {
-        fn call(_: *anyopaque, _: api.DataCount) void {}
-    }.call,
-    status: *const fn (*anyopaque, api.ConnectionStatus) void,
-    last_error: *const fn (*anyopaque, api.PartoutErrorPair) void,
+    event: *const fn (*anyopaque, ConnectionEvent) void,
 };

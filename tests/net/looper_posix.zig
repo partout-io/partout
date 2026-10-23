@@ -3,8 +3,10 @@
 
 const std = @import("std");
 const source = @import("source");
+const ffi = source.ffi;
+const io_c = ffi.io;
 const Looper = source.net_looper_posix.PosixLooper;
-const helpers = source.net_looper_v2.testing_helpers;
+const helpers = source.net_looper.testing_helpers;
 const io = source.net_io;
 const allocator = std.testing.allocator;
 
@@ -13,14 +15,8 @@ const WakeMux = test_helpers.Mux;
 
 const Probe = struct {
     looper: *Looper = undefined,
-    finishes: usize = 0,
     tasks: usize = 0,
-    timer: helpers.Timer = .{},
-    fn finish(raw: ?*anyopaque, failure: ?helpers.Failure) void {
-        const self: *Probe = @ptrCast(@alignCast(raw.?));
-        std.debug.assert(failure == null);
-        self.finishes += 1;
-    }
+    timer: io.Timer = .{},
     fn task(raw: ?*anyopaque) void {
         const self: *Probe = @ptrCast(@alignCast(raw.?));
         self.tasks += 1;
@@ -33,7 +29,9 @@ test "looper lifecycle and timers are caller driven" {
     var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     probe.looper = loop;
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -52,7 +50,6 @@ test "looper lifecycle and timers are caller driven" {
     try std.testing.expectEqual(3, probe.tasks);
     try loop.stop();
     try loop.stop();
-    try std.testing.expectEqual(0, probe.finishes);
     try std.testing.expect(!try test_helpers.poll(&loop, 0));
     try std.testing.expectError(error.LooperUnavailable, loop.scheduleTimer(&probe.timer, 0, .{ .callback = Probe.task }));
 }
@@ -95,7 +92,7 @@ const Mock = struct {
     fn code(_: *anyopaque) c_int {
         return 0;
     }
-    fn onRead(raw: ?*anyopaque, packets: helpers.Packets, _: ?[]const io.SocketAddress) anyerror!helpers.ReadAction {
+    fn onRead(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *Mock = @ptrCast(@alignCast(raw.?));
         self.reads += 1;
         try std.testing.expectEqualStrings("x", packets[0]);
@@ -117,10 +114,11 @@ const Mock = struct {
 };
 
 test "looper inline reads writes retries and synchronous detach" {
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
@@ -144,7 +142,7 @@ test "looper inline reads writes retries and synchronous detach" {
     try std.testing.expectEqual(1, mock.reads);
     try loop.resumeReading(.tun);
     mock.backpressure = true;
-    const packets: helpers.Packets = &.{"abc"};
+    const packets: io.Packets = &.{"abc"};
     try loop.write(packets, .tun, null);
     try std.testing.expectEqual(0, mock.successful_writes);
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -173,8 +171,8 @@ test "looper inline reads writes retries and synchronous detach" {
 test "timer callbacks can cancel and replace other ready tasks" {
     const Tasks = struct {
         loop: *Looper,
-        cancel: helpers.Timer = .{},
-        replace: helpers.Timer = .{},
+        cancel: io.Timer = .{},
+        replace: io.Timer = .{},
         calls: usize = 0,
         fn edit(raw: ?*anyopaque) void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
@@ -186,13 +184,14 @@ test "timer callbacks can cancel and replace other ready tasks" {
             self.calls += 1;
         }
     };
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     defer loop.destroy();
     var tasks = Tasks{ .loop = loop };
-    var first = helpers.Timer{};
+    var first = io.Timer{};
     try loop.scheduleTimer(&first, 0, .{ .context = &tasks, .callback = Tasks.edit });
     try loop.scheduleTimer(&tasks.cancel, 0, .{ .context = &tasks, .callback = Tasks.called });
     try loop.scheduleTimer(&tasks.replace, 0, .{ .context = &tasks, .callback = Tasks.called });
@@ -206,10 +205,11 @@ test "timer callbacks can cancel and replace other ready tasks" {
 }
 
 test "write backpressure preserves an explicitly paused opposite side" {
-    var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     var fds: [2]std.c.fd_t = undefined;
     try std.testing.expectEqual(0, std.c.pipe(&fds));
     defer _ = std.c.close(fds[0]);
@@ -256,7 +256,9 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     var probe = Probe{};
     const wake = try WakeMux.init();
     defer wake.deinit();
-    const loop = try Looper.create(allocator, .{ .mux = wake.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } });
+    const loop = try Looper.create(allocator, .{
+        .mux = wake.handle,
+    });
     var destroyed = false;
     defer if (!destroyed) loop.destroy();
     probe.looper = loop;
@@ -269,7 +271,7 @@ test "caller mux wake interrupts an idle loop and survives looper destruction" {
     try std.testing.expectEqual(0, probe.tasks);
     loop.cancelTimer(&probe.timer);
 
-    var fd = [_]std.c.pollfd{.{ .fd = io.io_c.pp_mux_wake_descriptor(wake.handle), .events = std.c.POLL.IN, .revents = 0 }};
+    var fd = [_]std.c.pollfd{.{ .fd = io_c.pp_mux_wake_descriptor(wake.handle), .events = std.c.POLL.IN, .revents = 0 }};
     // The shared mux consumes its wake while returning control to the owner.
     try std.testing.expectEqual(0, std.c.poll(&fd, 1, 0));
     try std.testing.expect(try test_helpers.poll(&loop, 0));
@@ -286,8 +288,12 @@ test "looper borrows its mux across allocation failure and replacement" {
     const mux = try WakeMux.init();
     defer mux.deinit();
     var probe = Probe{};
-    const options = helpers.Options{ .mux = mux.handle, .on_finish = .{ .context = &probe, .callback = Probe.finish } };
-    try std.testing.expectError(error.MuxFailure, Looper.create(allocator, .{ .mux = null, .on_finish = options.on_finish }));
+    const options = helpers.Options{
+        .mux = mux.handle,
+    };
+    try std.testing.expectError(error.MuxFailure, Looper.create(allocator, .{
+        .mux = null,
+    }));
     var failing = std.testing.FailingAllocator.init(allocator, .{ .fail_index = 0 });
     try std.testing.expectError(error.OutOfMemory, Looper.create(failing.allocator(), options));
     for (0..2) |_| {
@@ -299,8 +305,7 @@ test "looper borrows its mux across allocation failure and replacement" {
             try std.testing.expect(try test_helpers.poll(&loop, 0));
         }
         mux.signal();
-        try std.testing.expect(io.io_c.pp_mux_wait(mux.handle, 0, null) > 0);
+        try std.testing.expect(io_c.pp_mux_wait(mux.handle, 0, null) > 0);
     }
     try std.testing.expectEqual(@as(usize, 2), probe.tasks);
-    try std.testing.expectEqual(@as(usize, 0), probe.finishes);
 }

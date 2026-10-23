@@ -37,7 +37,7 @@ import kotlinx.serialization.encoding.Encoder
 
 
 /**
- * A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. experimentalDaemon enables daemon v2. experimentalOpenVPN and experimentalWireGuard enable their respective v2 implementations and require experimentalDaemon.
+ * A daemon feature flag. Values are bit masks combined in the daemon ABI feature_flags field. The experimental flags are deprecated compatibility values; the current daemon and protocol implementations are always used.
  *
  * Values: experimentalDaemon,experimentalOpenVPN,experimentalWireGuard
  */

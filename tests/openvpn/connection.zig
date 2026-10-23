@@ -14,20 +14,9 @@ const net = source.net;
 const io = source.net_io;
 
 const api = core.api;
-const Looper = net.Looper;
 
-test "v2-only builds expose the explicit OpenVPN v2 implementation" {
-    if (!source.runtime_policy.v2_only) return error.SkipZigTest;
-    const v2 = source.openvpn_connection_v2;
-    try std.testing.expect(connection == v2);
-    try std.testing.expect(source.openvpn_exports.ConnectionContextV2 == v2.ConnectionContext);
-    try std.testing.expect(source.openvpn_exports.connection_v2_vtable.create_connection == v2.createConnection);
-}
-
-test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
-    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
+test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const v2 = source.openvpn_connection_v2;
     const Request = struct {
         created: net.Connection,
         reason: net.Connection.ShutdownReason,
@@ -36,7 +25,7 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
 
         fn run(raw: ?*anyopaque) !void {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            const concrete: *v2.testing.Implementation = @ptrCast(@alignCast(self.created.ptr));
+            const concrete: *connection.testing.Implementation = @ptrCast(@alignCast(self.created.ptr));
             // Model a token from PUSH_REPLY and a successful local-options
             // fallback, followed by a daemon-originated setup failure.
             concrete.auth_token.update("server-issued-token");
@@ -44,17 +33,9 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             try std.testing.expect(concrete.pending_failure == null);
             try std.testing.expect(!concrete.pending_rebind);
             if (self.reason == .rebind) {
-                const sink = net.Connection.Events{
-                    .ctx = self,
-                    .event = recordEvent,
-                    .status = ignoreStatus,
-                    .last_error = ignoreError,
-                    .cancel = ignoreCancel,
-                };
-                concrete.events = sink;
                 const internal = source.openvpn_internal;
                 const endpoint = try net.SocketEndpoint.init(api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?);
-                const session = try internal.session_v2.Session.create(std.testing.allocator, .{
+                const session = try internal.session.Session.create(std.testing.allocator, .{
                     .writer = concrete.writer.?,
                     .remote_endpoint = endpoint,
                     .events = concrete.session_events,
@@ -70,7 +51,6 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 // Model an established session without a server handshake.
                 const data_link = internal.data.DataLink.init(std.testing.allocator, endpoint, session.link_processor, self, .{
                     .write_packets = writeData,
-                    .write_out_of_band = writeOOB,
                     .data_channel = noChannel,
                     .report_inbound_data_count = ignoreDataSize,
                     .report_outbound_data_count = ignoreDataSize,
@@ -79,8 +59,8 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
                     .phase = .started,
                     .context = try internal.session_context.ActiveContext.create(std.testing.allocator, data_link, false, endpoint),
                 } };
-                self.created.betterPath(sink);
-                self.created.betterPath(sink);
+                self.created.betterPath();
+                self.created.betterPath();
                 try std.testing.expect(concrete.pending_rebind);
                 try std.testing.expect(concrete.pending_failure == null);
                 try std.testing.expectEqual(@as(usize, 1), self.rebind_events);
@@ -91,16 +71,9 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
                 concrete.session_events.failed(concrete.session_events.ctx, error.LinkFailure);
                 try std.testing.expectEqual(@as(usize, 0), self.unexpected_events);
                 try std.testing.expect(concrete.pending_failure == null);
-                concrete.events = null;
             }
             self.created.shutdown(self.reason);
-            self.created.stop(0, .{
-                .ctx = self,
-                .status = ignoreStatus,
-                .last_error = ignoreError,
-                .data_count = ignoreCount,
-                .cancel = ignoreCancel,
-            });
+            self.created.stop();
 
             try std.testing.expect(!concrete.pending_rebind);
             var token = concrete.auth_token.copy();
@@ -124,7 +97,6 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             }
         }
         fn writeData(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) (net.SubmissionError || error{MissingDestination})!void {}
-        fn writeOOB(_: ?*anyopaque, _: net.Packets, _: net.Side, _: ?net.SocketAddress) net.WriteOOBError!void {}
         fn noChannel(_: ?*anyopaque, _: u8) ?*source.openvpn_internal.data.DataChannel {
             return null;
         }
@@ -137,11 +109,6 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
             .schedule_timer = scheduleTimer,
             .cancel_timer = cancelTimer,
         };
-        fn ignoreStatus(_: *anyopaque, _: api.ConnectionStatus) void {}
-        fn ignoreError(_: *anyopaque, _: api.PartoutErrorPair) void {}
-        fn ignoreCount(_: *anyopaque, _: api.DataCount) void {}
-        fn ignoreCancel(_: *anyopaque, _: ?api.PartoutErrorPair) void {}
-        fn finish(_: ?*anyopaque, _: ?Looper.Failure) void {}
     };
     const allocator = std.testing.allocator;
     const remotes = [_]api.ExtendedEndpoint{api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?};
@@ -156,105 +123,39 @@ test "v2 OpenVPN preserves authentication for reconnect and rebind shutdown" {
         .modules = &modules,
         .active_modules_ids = &.{module_id},
     };
-    var context = v2.ConnectionContext{ .session_options = .{ .backend = .mock } };
+    var context = connection.ConnectionContext{ .session_options = .{ .backend = .mock } };
     var controller = mock.MockTunnelController{};
-    var looper = try Looper.init(allocator, .{ .mux = null, .on_finish = .{ .callback = Request.finish } });
-    defer looper.deinit();
-    const created = try v2.createConnection(
+    var request = Request{ .created = undefined, .reason = undefined };
+    const created = try connection.createConnection(
         &context,
         allocator,
         source.net_connection.activeConnectionModule(&profile).?,
         .{
             .profile = &profile,
+            .events = .{ .ctx = &request, .event = Request.recordEvent },
             .controller = controller.interface(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
-            .looper = &looper,
+
             .cache_dir = "/tmp",
             .writer = net.ConnectionWriter.init(&controller, &Request.writer_vtable),
-            .serialized_executor = undefined,
         },
     );
     defer created.destroy();
-    try looper.start();
-    defer looper.stop() catch {};
+    request.created = created;
     for ([_]net.Connection.ShutdownReason{
         .{ .failure = .reconnect },
         .rebind,
         .explicit_stop,
         .{ .failure = .cancel },
     }) |reason| {
-        var request = Request{ .created = created, .reason = reason };
-        try looper.perform(void, &request, Request.run);
+        request.reason = reason;
+        try Request.run(&request);
     }
 }
 
 test "OpenVPN connection declarations are semantically analyzed" {
     std.testing.refAllDecls(connection);
-}
-
-test "OpenVPN connection borrows the daemon looper" {
-    // FIXME: ###, Enable when WindowsLooper implements queue dispatch.
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const Callbacks = struct {
-        fn onFinish(_: ?*anyopaque, _: ?Looper.Failure) void {}
-
-        fn barrier(_: ?*anyopaque) !void {}
-    };
-
-    const allocator = std.testing.allocator;
-    var looper = try Looper.init(allocator, .{
-        .mux = null,
-        .on_finish = .{ .callback = Callbacks.onFinish },
-    });
-    defer looper.deinit();
-    try looper.start();
-    var looper_started = true;
-    defer if (looper_started) looper.stop() catch {};
-
-    const endpoint = api.ExtendedEndpoint.init(
-        "192.0.2.1",
-        .init(.udp, 1194),
-    ).?;
-    const remotes = [_]api.ExtendedEndpoint{endpoint};
-    const module_id: api.UUID = "11111111-1111-4111-8111-111111111111".*;
-    const profile_id: api.UUID = "22222222-2222-4222-8222-222222222222".*;
-    const modules = [_]api.TaggedModule{.{ .OpenVPN = .{
-        .id = module_id,
-        .configuration = .{ .remotes = &remotes },
-    } }};
-    const active_ids = [_]api.UUID{module_id};
-    const profile = api.Profile{
-        .id = profile_id,
-        .name = "OpenVPN",
-        .modules = &modules,
-        .active_modules_ids = &active_ids,
-    };
-    var context = connection.ConnectionContext{
-        .session_options = .{ .backend = .mock },
-    };
-    var controller = mock.MockTunnelController{};
-    const executor = try mock.MockSerializedExecutor.create(allocator);
-    defer executor.destroy();
-    const created = try connection.createConnection(
-        &context,
-        allocator,
-        .{ .module = &modules[0] },
-        .{
-            .profile = &profile,
-            .controller = controller.interface(),
-            .resolver = mock.noopDNSResolver(),
-            .factory = mock.noopSocketFactory(),
-            .looper = &looper,
-            .cache_dir = "/tmp",
-            .serialized_executor = executor.interface(),
-        },
-    );
-    created.destroy();
-
-    try looper.perform(void, null, Callbacks.barrier);
-    try looper.stop();
-    looper_started = false;
 }
 
 test "OpenVPN connection failure dispositions" {
@@ -271,14 +172,12 @@ test "OpenVPN connection failure dispositions" {
 
     try std.testing.expect(isRecoverableError(error.BadCredentialsWithLocalOptions));
     try std.testing.expect(isRecoverableError(error.LinkFailure));
-    if (!source.runtime_policy.v2_only) {
-        try std.testing.expect(isRecoverableError(error.NetworkChanged));
-    }
     try std.testing.expect(isRecoverableError(error.OutOfMemory));
     try std.testing.expect(isRecoverableError(error.ServerShutdown));
     try std.testing.expect(isRecoverableError(error.TunNotAvailable));
 
-    inline for (.{ source.openvpn_connection_v2, connection }) |implementation| {
+    {
+        const implementation = connection;
         inline for (.{ error.InvalidSocketMode, error.InvalidOffset, error.InvalidAddressFamily, error.MissingDestination }) |err| {
             try std.testing.expect(!implementation.testing.isRecoverableError(err));
         }
@@ -286,7 +185,8 @@ test "OpenVPN connection failure dispositions" {
 }
 
 test "OpenVPN failures separate protocol subcodes from general codes" {
-    inline for (.{ source.openvpn_connection_v2, connection }) |implementation| {
+    {
+        const implementation = connection;
         const codeForError = implementation.testing.codeForError;
         const protocol_cases = .{
             .{ error.BadCredentialsWithLocalOptions, api.OpenVPNErrorCode.recoverableAuthentication },
@@ -324,8 +224,8 @@ test "OpenVPN failures separate protocol subcodes from general codes" {
     }
 }
 
-test "v2 unconnected OpenVPN accepts only the selected IPv4 or scoped IPv6 peer" {
-    const matches = source.openvpn_connection_v2.testing.peerSourceMatches;
+test "unconnected OpenVPN accepts only the selected IPv4 or scoped IPv6 peer" {
+    const matches = source.openvpn_connection.testing.peerSourceMatches;
     for ([_][]const u8{ "192.0.2.1", "fe80::1%7" }) |address| {
         const peer = (try net.SocketEndpoint.init(.{ .address = address, .proto = .init(.udp, 1194) })).address;
         try std.testing.expect(matches(peer, peer));

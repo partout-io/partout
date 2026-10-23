@@ -145,9 +145,9 @@ test "WireGuard passive UDP preserves source and destination addresses" {
     defer peer.destroy();
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
-    const port = (try local.localAddress()).port;
+    const port = (try local.linkDescriptor().localAddress()).port;
     passive.replaceLink(local.linkDescriptor());
-    var destination = try peer.localAddress();
+    var destination = try peer.linkDescriptor().localAddress();
     destination.address[0..4].* = .{ 127, 0, 0, 1 };
     var endpoint: c.wg_endpoint = .{ .address = destination.address, .port = destination.port, .family = 4 };
     const transport = passive.transport(port, 1400);
@@ -158,17 +158,17 @@ test "WireGuard passive UDP preserves source and destination addresses" {
     var received: [32]u8 = undefined;
     var sender: io.SocketAddress = undefined;
     const size = receive: for (0..3000) |_| {
-        const size = peer.receiveFrom(&received, &sender) catch |err| {
+        const size = peer.linkDescriptor().io.readPacket(&received, &sender) catch |err| {
             if (err != error.WouldBlock) return err;
             _ = usleep(1000);
             continue;
         };
-        break :receive size;
+        break :receive size orelse return error.EndOfStream;
     } else return error.TestUnexpectedResult;
     try std.testing.expectEqual(@as(usize, 3), size);
     try std.testing.expectEqual(port, sender.port);
     try std.testing.expectEqualStrings("udp", received[0..3]);
-    try std.testing.expectEqual(@as(usize, 3), try peer.sendTo("ip!", sender));
+    try std.testing.expectEqual(@as(usize, 3), try peer.linkDescriptor().io.writePacket("ip!", 0, sender));
     var input = [_]c.wg_read_packet{.{ .data = &received, .capacity = received.len }};
     for (0..3000) |_| {
         try std.testing.expectEqual(c.WG_IO_OK, transport.link.read.?(transport.context, &input, 1, result.token()));
@@ -292,7 +292,7 @@ test "WireGuard passive destination errors and rebind gaps stay nonterminal" {
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
     const socket = (try io.SocketWrapper.create(allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.TestUnexpectedResult;
-    var address = try socket.localAddress();
+    var address = try socket.linkDescriptor().localAddress();
     address.address[0..4].* = .{ 127, 0, 0, 1 };
     passive.replaceLink(socket.linkDescriptor());
     var failure = FailureRecorder{};

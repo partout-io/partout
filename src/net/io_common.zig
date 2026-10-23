@@ -14,7 +14,7 @@ const core = @import("../core/exports.zig");
 const ffi = @import("../c/exports.zig");
 
 const api = core.api;
-pub const io_c = ffi.io;
+const io_c = ffi.io;
 
 /// Single binary data packet.
 pub const Packet = []const u8;
@@ -56,12 +56,6 @@ pub const Timer = struct {
 };
 
 pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-
-pub const WriteOOBError = SubmissionError || Error || error{
-    MissingDestination,
-    OOBOutsideQueue,
-    WriteIncomplete,
-};
 
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };

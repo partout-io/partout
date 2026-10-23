@@ -98,7 +98,7 @@ struct PartoutVpnChannelRuntime::Impl {
         if (!value || value != channel) throw hresult_invalid_argument();
     }
 
-    // FIXME: ###, Retain log level
+    // FIXME: ###, Windows, Retain log level
     void Log(std::wstring_view message) const noexcept {
         try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
         try {
@@ -183,6 +183,7 @@ void PartoutVpnChannelRuntime::Disconnect(VpnChannel const &channel) {
     impl_->Stop();
 }
 
+// FIXME: ###, Windows, Supply the protocol keepalive payload when required.
 void PartoutVpnChannelRuntime::GetKeepAlivePayload(
     VpnChannel const &channel,
     VpnPacketBuffer &keep_alive_packet
@@ -192,6 +193,7 @@ void PartoutVpnChannelRuntime::GetKeepAlivePayload(
     impl_->Log(L"PartoutVpnChannelRuntime.GetKeepAlivePayload entered (no payload)");
 }
 
+// FIXME: ###, Windows, Encrypt input packets and append encapsulated output packets.
 void PartoutVpnChannelRuntime::Encapsulate(
     VpnChannel const &channel, VpnPacketBufferList const &packets,
     VpnPacketBufferList const &encapsulated_packets
@@ -203,6 +205,7 @@ void PartoutVpnChannelRuntime::Encapsulate(
         std::to_wstring(packets.Size()) + L" packet(s)");
 }
 
+// FIXME: ###, Windows, Decrypt input packets and append data and control output packets.
 void PartoutVpnChannelRuntime::Decapsulate(
     VpnChannel const &channel,
     VpnPacketBuffer const &packet,
