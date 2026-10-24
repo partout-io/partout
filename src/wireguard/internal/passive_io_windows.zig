@@ -6,6 +6,7 @@ const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const c = @import("wireguard_c");
 const backend = @import("backend.zig");
+const common = @import("passive_io_common.zig");
 
 /// WinRT pushes owned packets into queues; Go workers drain them on read.
 /// Lifecycle calls are owner-serialized. Writes exclude descriptor replacement,
@@ -203,8 +204,7 @@ pub const PassiveIO = struct {
     }
 
     fn read(self: *PassiveIO, tag: net.Side, packets: [*c]c.wg_read_packet, count: u32, request: usize) i32 {
-        if (request == 0 or packets == null or count == 0 or count > c.WG_IO_MAX_BATCH) return c.WG_IO_INVALID;
-        for (packets[0..count]) |packet| if (packet.data == null or packet.capacity == 0) return c.WG_IO_INVALID;
+        if (!common.validRead(packets, count, request)) return c.WG_IO_INVALID;
         self.lock.lock();
         const side = &self.sides[@intFromEnum(tag)];
         // Go also cancels reads during bind replacement. Bound the wait so it
@@ -224,7 +224,7 @@ pub const PassiveIO = struct {
             if (packet.data.len > output.capacity) break;
             @memcpy(output.data[0..packet.data.len], packet.data);
             output.size = @intCast(packet.data.len);
-            output.source = .{ .address = packet.source.address, .scope_id = packet.source.scope_id, .port = packet.source.port, .family = packet.source.family };
+            output.source = common.toEndpoint(packet.source);
             completed += 1;
         };
         const status: i32 = if (self.closed) c.WG_IO_CLOSED else if (completed != 0) c.WG_IO_OK else c.WG_IO_AGAIN;
@@ -235,9 +235,8 @@ pub const PassiveIO = struct {
 
     fn writeLink(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const c.wg_endpoint, request: usize) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));
-        if (destination == null or (destination[0].family != 4 and destination[0].family != 6) or
-            (destination[0].family == 4 and destination[0].scope_id != 0)) return c.WG_IO_INVALID;
-        const address = net.SocketAddress{ .address = destination[0].address, .scope_id = destination[0].scope_id, .port = destination[0].port, .family = destination[0].family };
+        if (destination == null) return c.WG_IO_INVALID;
+        const address = common.fromEndpoint(destination.*) catch return c.WG_IO_INVALID;
         return self.write(.link, packets, count, address, request);
     }
 
@@ -247,8 +246,7 @@ pub const PassiveIO = struct {
     }
 
     fn write(self: *PassiveIO, comptime tag: net.Side, packets: [*c]const c.wg_packet, count: u32, destination: ?net.SocketAddress, request: usize) i32 {
-        if (request == 0 or packets == null or count == 0 or count > c.WG_IO_MAX_BATCH) return c.WG_IO_INVALID;
-        for (packets[0..count]) |packet| if (packet.size > 65535 or (packet.size != 0 and packet.data == null) or (tag == .tun and packet.size == 0)) return c.WG_IO_INVALID;
+        if (!common.validWrite(tag, packets, count, request)) return c.WG_IO_INVALID;
         self.writes.lock();
         self.lock.lock();
         const closed = self.closed;
