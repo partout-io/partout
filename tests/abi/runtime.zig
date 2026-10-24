@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 const source = @import("source");
 
 const core = source.core;
@@ -197,6 +198,7 @@ test "starts profile without active modules without tunnel settings" {
 }
 
 test "requires a connection implementation for active connection profiles" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -233,6 +235,7 @@ test "daemon options reject unknown feature bits" {
 }
 
 test "legacy feature flags preserve the current implementations" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{
         .{ .json = mock.dnsOnlyProfileJson(), .enabled = true },

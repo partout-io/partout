@@ -834,8 +834,13 @@ pp_crypto_ctx pp_windows_crypto_ctr_create(const char *cipher_name,
                                            const pp_crypto_keys *keys) {
     pp_assert(cipher_name && digest_name);
 
-    // only AES-CTR and HMAC-SHA256 supported
-    if (_stricmp(cipher_name, "AES-128-CTR")) {
+    // AES-CTR uses the same 16-byte counter for both key sizes.
+    size_t cipher_key_len;
+    if (!_stricmp(cipher_name, "AES-128-CTR")) {
+        cipher_key_len = 16;
+    } else if (!_stricmp(cipher_name, "AES-256-CTR")) {
+        cipher_key_len = 32;
+    } else {
         return NULL;
     }
     if (_stricmp(digest_name, "SHA256")) {
@@ -844,7 +849,7 @@ pp_crypto_ctx pp_windows_crypto_ctr_create(const char *cipher_name,
 
     pp_crypto_ctr *ctx = pp_alloc(sizeof(pp_crypto_ctr));
 
-    // no chaining mode, use ECB for manual CTR
+    // Encrypt each counter block independently; CTR is implemented below.
     PP_CRYPTO_CHECK_CREATE(BCryptOpenAlgorithmProvider(
         &ctx->hAlgCipher,
         BCRYPT_AES_ALGORITHM,
@@ -852,11 +857,17 @@ pp_crypto_ctx pp_windows_crypto_ctr_create(const char *cipher_name,
         0
     ));
 
-    // no longer fails
+    PP_CRYPTO_CHECK_CREATE(BCryptSetProperty(
+        ctx->hAlgCipher,
+        BCRYPT_CHAINING_MODE,
+        (PUCHAR)BCRYPT_CHAIN_MODE_ECB,
+        sizeof(BCRYPT_CHAIN_MODE_ECB),
+        0
+    ));
 
     ctx->buffer_hmac = pp_alloc(tag_len);
 
-    ctx->crypto.meta.cipher_key_len = 16; // AES-128
+    ctx->crypto.meta.cipher_key_len = cipher_key_len;
     ctx->crypto.meta.cipher_iv_len = 16;  // AES block size
     ctx->crypto.meta.hmac_key_len = 32;   // SHA256 output size
     ctx->crypto.meta.digest_len = tag_len;

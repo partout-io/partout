@@ -9,21 +9,30 @@ if(PP_BUILD_WINRT)
         message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
     endif()
     enable_language(CXX)
-    add_library(partout-winrt STATIC
-        cross/windows/runtime.cc
-        cross/windows/socket.cc
-        cross/windows/tun.cc
+    # The native backend cannot include Partout headers. Keep it independently
+    # compilable; runtime.cc is the only integration layer with Partout's API.
+    add_library(partout-winrt-backend OBJECT
+        cross/windows/src/socket.cc
+        cross/windows/src/tun_ctrl.cc
+        cross/windows/src/log.cc
     )
-    target_include_directories(partout-winrt PRIVATE
-        src src/c/portable/include cross/windows)
-    target_compile_features(partout-winrt PRIVATE cxx_std_20)
-    target_compile_definitions(partout-winrt PRIVATE
-        NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINRT_EXPORTS)
-    target_compile_options(partout-winrt PRIVATE /EHsc /permissive- /W4)
-    # AppContainer consumers use a CRT without the /RTC helpers.
-    set_target_properties(partout-winrt PROPERTIES
-        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-        MSVC_RUNTIME_CHECKS ""
-    )
-    target_link_libraries(partout-winrt PUBLIC windowsapp runtimeobject)
+    target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
+    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32)
+
+    # Preserve a single archive for Zig and existing consumers.
+    add_library(partout-winrt STATIC cross/windows/src/runtime.cc)
+    target_include_directories(partout-winrt PRIVATE src)
+    target_compile_definitions(partout-winrt PRIVATE PARTOUT_WINRT_EXPORTS)
+    target_link_libraries(partout-winrt PRIVATE partout-winrt-backend)
+
+    foreach(target IN ITEMS partout-winrt-backend partout-winrt)
+        target_compile_features(${target} PRIVATE cxx_std_20)
+        target_compile_definitions(${target} PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
+        target_compile_options(${target} PRIVATE /EHsc /permissive- /W4)
+        # AppContainer consumers use a CRT without the /RTC helpers.
+        set_target_properties(${target} PROPERTIES
+            MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+            MSVC_RUNTIME_CHECKS ""
+        )
+    endforeach()
 endif()

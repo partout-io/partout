@@ -62,6 +62,7 @@ pub const net_looper = @import("net/looper.zig");
 pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const net_resolver = @import("net/resolver.zig");
+pub const winrt_enabled = build_options.winrt;
 pub const openvpn_enabled = build_options.openvpn;
 pub const openvpn_connection = if (openvpn_enabled) openvpn_connection_module else struct {};
 pub const openvpn_exports = if (openvpn_enabled) openvpn_exports_module else struct {};

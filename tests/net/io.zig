@@ -3,10 +3,47 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
+const source = @import("source");
 
 const io = @import("source").net_io;
 
 const reachabilityNone = io.testing.reachabilityNone;
+
+test "WinRT local address reports wildcard family and assigned UDP port" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const cases = [_]struct { ipv4: bool, ipv6: bool, family: u8 }{
+        .{ .ipv4 = true, .ipv6 = false, .family = 4 },
+        .{ .ipv4 = false, .ipv6 = true, .family = 6 },
+        .{ .ipv4 = true, .ipv6 = true, .family = 6 },
+    };
+    for (cases) |case| {
+        const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{
+            .ipv4 = case.ipv4,
+            .ipv6 = case.ipv6,
+        })) orelse return error.SocketFailed;
+        defer socket.destroy();
+        const address = try socket.localAddress();
+        try std.testing.expectEqual(case.family, address.family);
+        try std.testing.expect(address.port != 0);
+        try std.testing.expectEqual(@as(u32, 0), address.scope_id);
+        try std.testing.expectEqualSlices(u8, &([_]u8{0} ** 16), &address.address);
+        try std.testing.expectEqualDeep(address, try socket.localAddress());
+    }
+}
+
+test "WinRT local address reports connected UDP loopback endpoint" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const socket = (try io.SocketWrapper.create(std.testing.allocator, .{
+        .address = "127.0.0.1",
+        .proto = .init(.udp, 9),
+    }, .{ .timeout_ms = 5000 })) orelse return error.SocketFailed;
+    defer socket.destroy();
+    const address = try socket.localAddress();
+    try std.testing.expectEqual(@as(u8, 4), address.family);
+    try std.testing.expectEqualSlices(u8, &.{ 127, 0, 0, 1 }, address.address[0..4]);
+    try std.testing.expect(address.port != 0);
+}
 
 test "constructs empty reachability" {
     const reachability = reachabilityNone();

@@ -13,7 +13,7 @@ const log = core.logging;
 // FIXME: ###, Abuse of anyerror in callbacks
 
 pub const Options = struct {
-    /// Borrowed mux; null is rejected. Keep it alive through looper destruction.
+    /// POSIX borrows this mux through destruction and rejects null. Windows ignores it.
     mux: io_c.pp_mux,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,

@@ -6,6 +6,7 @@
 #include <chrono>
 #include <condition_variable>
 #include <memory>
+#include <atomic>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -17,11 +18,9 @@
 #define _Nonnull
 #endif
 
-#include "runtime.h"
-#include "tun_ctrl_windows.h"
-extern "C" {
-#include "portable/common.h"
-}
+#include "partout_winrt.h"
+#include "tun_ctrl.h"
+#include "winrt/log.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -42,6 +41,7 @@ struct PartoutVpnChannelRuntime::Impl {
     partout_init_args init_args;
     partout_daemon_options options;
     bool daemon_started = false;
+    std::atomic<std::shared_ptr<PartoutTunnelController>> controller;
     enum class StartupStatus { waiting, connecting, connected, failed };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
@@ -116,6 +116,7 @@ struct PartoutVpnChannelRuntime::Impl {
             partout_daemon_stop();
             daemon_started = false;
         }
+        controller.store(nullptr);
     }
 
     void Connect() {
@@ -131,14 +132,17 @@ struct PartoutVpnChannelRuntime::Impl {
             args.profile = profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
-            bindings.controller = new PartoutTunnelController{channel};
+            const auto active_controller = std::make_shared<PartoutTunnelController>(channel);
+            controller.store(active_controller);
+            bindings.controller = active_controller.get();
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
             bindings.events.ctx = this;
             bindings.events.set_connection_status = [](void *ctx, const char *status) noexcept {
                 static_cast<Impl *>(ctx)->OnConnectionStatus(status);
             };
             bindings.release = [](partout_daemon_bindings *owned) noexcept {
-                delete static_cast<PartoutTunnelController *>(owned->controller);
+                // Runtime retains the controller through stop; packet callbacks
+                // take a shared reference while forwarding their borrowed input.
                 owned->controller = nullptr;
             };
             args.bindings = &bindings;
@@ -152,7 +156,7 @@ struct PartoutVpnChannelRuntime::Impl {
             Log(L"PartoutVpnChannelRuntime: Connection established");
         } catch (...) {
             const auto failure = to_hresult();
-            pp_clog_v(PPLogLevelError, "PartoutVpnChannelRuntime.Connect failed: HRESULT 0x%08x",
+            winrt_log(WinrtLogError, "PartoutVpnChannelRuntime.Connect failed: HRESULT 0x%08x",
                 static_cast<unsigned int>(failure.value));
             Stop();
             Log(L"PartoutVpnChannelRuntime.Connect failed");
@@ -193,19 +197,15 @@ void PartoutVpnChannelRuntime::GetKeepAlivePayload(
     impl_->Log(L"PartoutVpnChannelRuntime.GetKeepAlivePayload entered (no payload)");
 }
 
-// FIXME: ###, Windows, Encrypt input packets and append encapsulated output packets.
 void PartoutVpnChannelRuntime::Encapsulate(
     VpnChannel const &channel, VpnPacketBufferList const &packets,
     VpnPacketBufferList const &encapsulated_packets
 ) {
     impl_->CheckChannel(channel);
     (void)encapsulated_packets;
-    // Input buffers stay in the platform-owned list, as in the original plugin.
-    impl_->Log(L"PartoutVpnChannelRuntime.Encapsulate entered: " +
-        std::to_wstring(packets.Size()) + L" packet(s)");
+    if (const auto controller = impl_->controller.load()) controller->Encapsulate(packets);
 }
 
-// FIXME: ###, Windows, Decrypt input packets and append data and control output packets.
 void PartoutVpnChannelRuntime::Decapsulate(
     VpnChannel const &channel,
     VpnPacketBuffer const &packet,
@@ -213,8 +213,7 @@ void PartoutVpnChannelRuntime::Decapsulate(
     VpnPacketBufferList const &control_packets
 ) {
     impl_->CheckChannel(channel);
-    (void)packet;
     (void)decapsulated_packets;
     (void)control_packets;
-    impl_->Log(L"PartoutVpnChannelRuntime.Decapsulate entered (payload ignored)");
+    if (const auto controller = impl_->controller.load()) controller->Decapsulate(packet);
 }

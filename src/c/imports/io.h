@@ -7,3 +7,6 @@
 #include <portable/socket.h>
 #include <portable/tun.h>
 #include <portable/tun_ctrl.h>
+#if PARTOUT_WINDOWS
+#include <winrt/tun.h>
+#endif

@@ -32,6 +32,20 @@ pub const POSIXDescriptor = struct {
         self.io.cleanup();
     }
 
+    pub fn socketWrapper(self: POSIXDescriptor) ?*SocketWrapper {
+        return switch (self.io) {
+            .socket => |socket| socket,
+            else => null,
+        };
+    }
+
+    pub fn tunWrapper(self: POSIXDescriptor) ?*TunWrapper {
+        return switch (self.io) {
+            .tun => |tun| tun,
+            else => null,
+        };
+    }
+
     pub fn localAddress(self: POSIXDescriptor) !io.SocketAddress {
         return switch (self.io) {
             .socket => |socket| socket.localAddress(),
@@ -218,7 +232,7 @@ pub const SocketWrapper = struct {
         });
         const socket = io_c.pp_socket_open(
             c_address.ptr(),
-            socketProto(endpoint),
+            io.socketProto(endpoint),
             endpoint.proto.port,
             &.{
                 .unconnected = unconnected,
@@ -332,13 +346,6 @@ pub const SocketWrapper = struct {
         };
     }
 };
-
-fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
-    return switch (endpoint.plainSocketType()) {
-        .udp => io_c.PPSocketProtoUDP,
-        .tcp => io_c.PPSocketProtoTCP,
-    };
-}
 
 pub const TunWrapper = struct {
     allocator: std.mem.Allocator,

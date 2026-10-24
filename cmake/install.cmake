@@ -17,7 +17,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 if(WIN32)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/runtime.h"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif()
@@ -30,5 +30,15 @@ if(PARTOUT_INSTALL_RUNTIME_TARGETS)
     install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_INSTALL_RUNTIME_TARGETS}
         LIBRARY DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
         RUNTIME DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+    )
+endif()
+
+if(WIN32 AND PP_BUILD_LIBRARY)
+    # Zig installs the PDB beside its DLL; preserve it in the final package so
+    # native debuggers can find the matching symbols without extra search paths.
+    install(FILES "${PP_BUILD_OUTPUT}/partout/bin/partout.pdb"
+        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
+        CONFIGURATIONS Debug RelWithDebInfo
+        OPTIONAL
     )
 endif()
