@@ -117,7 +117,6 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
     try {
         const auto transport = winrt_socket_transport(socket);
         if (!channel_ || !transport) return false;
-#if PP_WINRT_INDEPENDENT_UDP
         if (winrt_socket_is_unconnected(socket)) {
             // The channel needs a transport, but it must not own WG's UDP bind.
             // Keep the adapter across WG bind replacement, including after Start.
@@ -144,10 +143,9 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
             } catch (...) { idle.Close(); throw; }
             idle_transport_ = idle;
             transport_ = idle;
-            winrt_log(WinrtLogNotice, "WinRT two-socket experiment: independent UDP; idle channel transport ready");
+            winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
             return true;
         }
-#endif
         if (transport_ == transport) return true;
         channel_.AssociateTransport(transport, nullptr);
         transport_ = transport;
@@ -206,7 +204,7 @@ void PartoutTunnelController::Stop() noexcept {
         tun->callback = nullptr;
         tun->context = nullptr;
     }
-    // Close the experiment's transport even if channel startup failed.
+    // Close the idle transport even if channel startup failed.
     const auto close_idle = [&] {
         if (!idle_transport_) return;
         try { idle_transport_.Close(); } catch (...) {}

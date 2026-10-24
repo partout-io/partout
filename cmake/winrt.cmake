@@ -1,7 +1,6 @@
 # WinRT uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
 # separately from Zig's portable C sources; consumers opt in when needed.
 option(PP_BUILD_WINRT "Build the WinRT VPN channel bridge" OFF)
-option(PP_WINRT_INDEPENDENT_UDP "Experiment: application-owned UDP alongside an idle VPN transport" OFF)
 if(PP_BUILD_WINRT)
     if(CMAKE_VERSION VERSION_LESS 4.0)
         message(FATAL_ERROR "PP_BUILD_WINRT requires CMake 4.0 or newer")
@@ -18,8 +17,6 @@ if(PP_BUILD_WINRT)
         cross/windows/src/log.cc
     )
     target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
-    target_compile_definitions(partout-winrt-backend PRIVATE
-        PP_WINRT_INDEPENDENT_UDP=$<BOOL:${PP_WINRT_INDEPENDENT_UDP}>)
     target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32)
 
     # Preserve a single archive for Zig and existing consumers.
