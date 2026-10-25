@@ -10,7 +10,7 @@ portable ABI adapters. Dependencies run from Partout to the backend:
 
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
-                                              -> PartoutTunnelController
+                                              -> Partout::TunnelController
 Partout io_windows.zig       -> winrt/socket.h  -> src/socket.cc
 Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 ```
@@ -22,8 +22,8 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
 | `include/winrt/` | Backend-owned socket, tunnel controller and logging interfaces; no Partout headers. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
-| `src/socket.cc` | Owns UDP/TCP transports, receive callbacks, TCP read loop, writes and callback lifetime. |
-| `include/winrt/tun.h`, `src/tun.cc` | C tunnel ABI and C++ `PartoutTunnelController`, transport association and channel startup/stop. |
+| `include/winrt/socket.h`, `src/socket.cc` | C socket ABI and C++ `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
+| `include/winrt/tun.h`, `src/tun.cc` | C tunnel ABI and C++ `Partout::TunnelController`, transport association and channel startup/stop. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |

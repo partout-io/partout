@@ -72,29 +72,6 @@ struct SocketReceiveState {
     }
 };
 
-struct __winrt_socket_struct {
-    // Keep the MTA alive until transports and outstanding callbacks are released.
-    std::shared_ptr<SocketApartment> apartment;
-    winrt::Windows::Networking::Sockets::DatagramSocket datagram{nullptr};
-    winrt::Windows::Networking::Sockets::StreamSocket stream{nullptr};
-    winrt::event_token receive_token{};
-    bool receiving = false;
-    std::shared_ptr<SocketReceiveState> receive_state;
-    bool unconnected = false;
-    winrt::Windows::Networking::Connectivity::NetworkAdapter adapter{nullptr};
-    HostName bound_host{nullptr};
-    // WinRT wildcard binds can listen on both families. The receive path must
-    // retain the requested family policy even when the OS bind is broader.
-    bool accepts_ipv4 = true;
-    bool accepts_ipv6 = true;
-
-    winrt::Windows::Foundation::IInspectable transport() const {
-        if (datagram) return datagram;
-        return stream;
-    }
-
-    ~__winrt_socket_struct() noexcept;
-};
 namespace {
 
 // Open runs on the daemon's worker, which need not already have a COM apartment.
@@ -166,130 +143,53 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
     }
 }
 
-void register_datagram(__winrt_socket_struct &socket) {
-    const auto state = socket.receive_state;
-    // WinRT requires registration before bind/connect. Attach only changes
-    // the consumer; the OS handler remains registered until the socket closes.
-    socket.receive_token = socket.datagram.MessageReceived(
-        [state, unconnected = socket.unconnected, ipv4 = socket.accepts_ipv4, ipv6 = socket.accepts_ipv6](
-            DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
-            try {
-                const auto family = args.RemoteAddress().Type();
-                if ((family == HostNameType::Ipv4 && !ipv4) ||
-                    (family == HostNameType::Ipv6 && !ipv6)) return;
-                auto reader = args.GetDataReader();
-                const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
-                winrt_socket_address source{};
-                if (unconnected) source = socket_address(args.RemoteAddress(), args.RemotePort());
-                state->received.fetch_add(1, std::memory_order_relaxed);
-                state->deliver(buffer.data(), buffer.Length(),
-                    unconnected ? &source : nullptr, 0);
-            } catch (...) {
-                state->deliver(nullptr, 0, nullptr, to_hresult().value);
-            }
-        });
-    socket.receiving = true;
-}
-
 } // namespace
 
-__winrt_socket_struct::~__winrt_socket_struct() noexcept {
-    winrt_socket_set_on_receive(this, nullptr, nullptr);
-    if (adapter) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
-        receive_state->received.load(), receive_state->sent.load());
+Partout::Socket::Socket(winrt_socket_proto proto, bool unconnected) {
+    if (proto != WinrtSocketProtoUDP && proto != WinrtSocketProtoTCP)
+        throw hresult_invalid_argument();
+    if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
+    Apartment apartment;
+    unconnected_ = unconnected;
+    apartment_ = std::make_shared<SocketApartment>();
+    receive_state_ = std::make_shared<SocketReceiveState>();
+    receive_state_->apartment = apartment_;
+    if (proto == WinrtSocketProtoUDP) datagram_ = DatagramSocket{};
+    else stream_ = StreamSocket{};
+}
+
+Partout::Socket::~Socket() noexcept {
+    SetOnReceive(nullptr, nullptr);
+    if (adapter_) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
+        receive_state_->received.load(), receive_state_->sent.load());
     // Each cleanup is independent, so a failed event revocation cannot skip Close.
-    try { if (datagram && receiving) datagram.MessageReceived(receive_token); } catch (...) {}
-    try { if (datagram) datagram.Close(); } catch (...) {}
-    try { if (stream) stream.Close(); } catch (...) {}
+    try { if (datagram_ && receiving_) datagram_.MessageReceived(receive_token_); } catch (...) {}
+    try { if (datagram_) datagram_.Close(); } catch (...) {}
+    try { if (stream_) stream_.Close(); } catch (...) {}
 }
 
-IInspectable winrt_socket_transport(winrt_socket socket) {
-    if (!socket) return nullptr;
-    return socket->transport();
-}
-
-bool winrt_socket_is_unconnected(winrt_socket socket) {
-    return socket && socket->datagram && socket->unconnected;
-}
-
-void winrt_socket_set_adapter(winrt_socket socket,
-    winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter) {
-    if (!winrt_socket_is_unconnected(socket) || !adapter) throw hresult_invalid_argument();
-    socket->adapter = adapter;
-}
-
-std::function<void(const uint8_t *, size_t)> winrt_socket_channel_receiver(winrt_socket socket) {
-    return [state = socket->receive_state](const uint8_t *bytes, size_t length) {
-        state->deliver(bytes, length, nullptr, 0);
-    };
-}
-
-void winrt_socket_take_over(winrt_socket socket) {
-    const auto state = socket->receive_state;
-    std::lock_guard writes(state->write_mutex);
-    {
-        std::lock_guard lock(state->mutex);
-        state->channel_owned = true;
-    }
-    if (socket->datagram && socket->receiving) {
-        socket->datagram.MessageReceived(socket->receive_token);
-        socket->receiving = false;
-    }
-    if (socket->stream) socket->stream.CancelIOAsync().get();
-    std::unique_lock lock(state->mutex);
-    state->read_stopped.wait(lock, [&] { return !state->reading; });
-}
-
-void winrt_socket_set_channel_writer(winrt_socket socket,
-    std::function<int32_t(const uint8_t *, size_t)> writer) {
-    std::lock_guard lock(socket->receive_state->write_mutex);
-    socket->receive_state->channel_write = std::move(writer);
-}
-
-extern "C" {
-
-winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
+bool Partout::Socket::Open(const char *hostname, uint16_t port,
+    const winrt_socket_open_options *options) {
     try {
-        Apartment apartment;
-        auto socket = std::make_unique<__winrt_socket_struct>();
-        if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
-        socket->unconnected = unconnected;
-        socket->apartment = std::make_shared<SocketApartment>();
-        socket->receive_state = std::make_shared<SocketReceiveState>();
-        socket->receive_state->apartment = socket->apartment;
-        if (proto == WinrtSocketProtoUDP) socket->datagram = DatagramSocket{};
-        else if (proto == WinrtSocketProtoTCP) socket->stream = StreamSocket{};
-        else throw hresult_invalid_argument();
-        return socket.release();
-    } catch (...) {
-        winrt_log(WinrtLogError, "winrt_socket_create failed: HRESULT 0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
-        return nullptr;
-    }
-}
-
-bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
-                           const winrt_socket_open_options *options) {
-    try {
-        if (!socket || !hostname || !*hostname || !options || options->timeout_ms < 0 ||
-            (options->dual_stack && !socket->unconnected)) {
+        if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
+            (options->dual_stack && !unconnected_)) {
             throw hresult_invalid_argument();
         }
         Apartment apartment;
         const HostName host{to_hstring(hostname)};
         const bool numeric = host.Type() == HostNameType::Ipv4 || host.Type() == HostNameType::Ipv6;
-        const bool unconnected = socket->unconnected;
+        const bool unconnected = unconnected_;
         if ((unconnected && !numeric) ||
             (options->dual_stack && host.Type() != HostNameType::Ipv6)) {
             throw hresult_invalid_argument();
         }
         const auto service = to_hstring(port);
         if (unconnected) {
-            socket->accepts_ipv4 = host.Type() == HostNameType::Ipv4 || options->dual_stack;
-            socket->accepts_ipv6 = host.Type() == HostNameType::Ipv6;
+            accepts_ipv4_ = host.Type() == HostNameType::Ipv4 || options->dual_stack;
+            accepts_ipv6_ = host.Type() == HostNameType::Ipv6;
         }
-        if (socket->datagram) {
-            register_datagram(*socket);
+        if (datagram_) {
+            RegisterDatagram();
         }
         if (unconnected) {
             // WinRT rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
@@ -298,26 +198,26 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
             const bool ipv4_wildcard = host.CanonicalName() == L"0.0.0.0";
             const bool ipv6_wildcard = host.CanonicalName() == L"::";
             const auto local_service = port == 0 ? hstring{} : service;
-            if (socket->adapter) {
+            if (adapter_) {
                 if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
-                socket->datagram.BindServiceNameAsync(local_service, socket->adapter).get();
+                datagram_.BindServiceNameAsync(local_service, adapter_).get();
                 winrt_log(WinrtLogNotice, "WinRT independent UDP: bound port %ls on adapter %ls",
-                    socket->datagram.Information().LocalPort().c_str(),
-                    to_hstring(socket->adapter.NetworkAdapterId()).c_str());
+                    datagram_.Information().LocalPort().c_str(),
+                    to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
-                socket->datagram.BindServiceNameAsync(local_service).get();
+                datagram_.BindServiceNameAsync(local_service).get();
             } else {
-                socket->datagram.BindEndpointAsync(host, local_service).get();
+                datagram_.BindEndpointAsync(host, local_service).get();
             }
-            socket->bound_host = host;
-        } else if (socket->datagram) {
-            wait_for_connect(socket->datagram.ConnectAsync(host, service), options->timeout_ms);
+            bound_host_ = host;
+        } else if (datagram_) {
+            wait_for_connect(datagram_.ConnectAsync(host, service), options->timeout_ms);
         } else {
-            wait_for_connect(socket->stream.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
+            wait_for_connect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
                 options->timeout_ms);
         }
         winrt_log(WinrtLogDebug, "WinRT socket: Opened %s %s:%u, mode=%s, dual_stack=%s",
-            socket->datagram ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
+            datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
             unconnected ? "unconnected (bound)" : "connected",
             options->dual_stack ? "true" : "false");
         return true;
@@ -334,46 +234,63 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
     return false;
 }
 
-bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
-    if (!socket || !address) return false;
+bool Partout::Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
+    if (!receive_state_) return false;
+    const auto state = receive_state_;
     try {
-        Apartment apartment;
-        HostName host{nullptr};
-        hstring port;
-        if (socket->datagram) {
-            const auto info = socket->datagram.Information();
-            host = info.LocalAddress();
-            port = info.LocalPort();
-            // Service binds may report :: even for our IPv4-only policy.
-            // Preserve the requested binding while using the OS-assigned port.
-            if (socket->bound_host) host = socket->bound_host;
-        } else if (socket->stream) {
-            const auto info = socket->stream.Information();
-            host = info.LocalAddress();
-            port = info.LocalPort();
+        bool start_read;
+        {
+            std::lock_guard lock(state->mutex);
+            if (callback && state->callback) return false;
+            state->callback = callback;
+            state->context = context;
+            start_read = state->prepareReadLocked(static_cast<bool>(stream_));
         }
-        *address = socket_address(host, port);
+        if (!start_read) return true;
+        read_stream(state, stream_);
         return true;
     } catch (...) {
+        std::lock_guard lock(state->mutex);
+        state->callback = nullptr;
+        state->context = nullptr;
+        state->reading = false;
         return false;
     }
 }
 
-void winrt_socket_free(winrt_socket socket) {
-    delete socket;
+bool Partout::Socket::ResumeReading() {
+    if (!receive_state_) return false;
+    const auto state = receive_state_;
+    try {
+        bool start_read;
+        {
+            std::lock_guard lock(state->mutex);
+            // Resume must never restore a cleared context.
+            if (!state->callback) return false;
+            start_read = state->prepareReadLocked(static_cast<bool>(stream_));
+        }
+        if (!start_read) return true;
+        read_stream(state, stream_);
+        return true;
+    } catch (...) {
+        std::lock_guard lock(state->mutex);
+        state->reading = false;
+        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
+        return false;
+    }
 }
 
-int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
+int32_t Partout::Socket::Write(const uint8_t *bytes, size_t length,
     const winrt_socket_address *destination) {
     try {
-        if (!socket || (!bytes && length) || length > UINT32_MAX)
+        if ((!bytes && length) || length > UINT32_MAX)
             throw hresult_invalid_argument();
         Apartment apartment;
-        const auto state = socket->receive_state;
-        const auto stream = socket->stream;
-        const auto datagram = socket->datagram;
-        const bool unconnected = socket->unconnected;
-        const bool ipv4 = socket->accepts_ipv4, ipv6 = socket->accepts_ipv6;
+        const auto state = receive_state_;
+        const auto stream = stream_;
+        const auto datagram = datagram_;
+        const bool unconnected = unconnected_;
+        const bool ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_;
         // Retain transports and the lock independently of wrapper destruction.
         std::lock_guard lock(state->write_mutex);
         if (state->writes_stopped.load()) return E_ABORT;
@@ -424,56 +341,151 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
     }
 }
 
-void winrt_socket_stop_writes(winrt_socket socket) {
-    if (!socket || !socket->receive_state) return;
-    socket->receive_state->writes_stopped.store(true);
+void Partout::Socket::StopWrites() {
+    if (!receive_state_) return;
+    receive_state_->writes_stopped.store(true);
+}
+
+bool Partout::Socket::GetAddress(winrt_socket_address *address) {
+    if (!address) return false;
+    try {
+        Apartment apartment;
+        HostName host{nullptr};
+        hstring port;
+        if (datagram_) {
+            const auto info = datagram_.Information();
+            host = info.LocalAddress();
+            port = info.LocalPort();
+            // Service binds may report :: even for our IPv4-only policy.
+            // Preserve the requested binding while using the OS-assigned port.
+            if (bound_host_) host = bound_host_;
+        } else if (stream_) {
+            const auto info = stream_.Information();
+            host = info.LocalAddress();
+            port = info.LocalPort();
+        }
+        *address = socket_address(host, port);
+        return true;
+    } catch (...) {
+        return false;
+    }
+}
+
+IInspectable Partout::Socket::Transport() const {
+    if (datagram_) return datagram_;
+    return stream_;
+}
+
+bool Partout::Socket::IsUnconnected() const {
+    return datagram_ && unconnected_;
+}
+
+void Partout::Socket::SetAdapter(
+    winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter) {
+    if (!IsUnconnected() || !adapter) throw hresult_invalid_argument();
+    adapter_ = adapter;
+}
+
+std::function<void(const uint8_t *, size_t)> Partout::Socket::ChannelReceiver() const {
+    return [state = receive_state_](const uint8_t *bytes, size_t length) {
+        state->deliver(bytes, length, nullptr, 0);
+    };
+}
+
+void Partout::Socket::TakeOver() {
+    const auto state = receive_state_;
+    std::lock_guard writes(state->write_mutex);
+    {
+        std::lock_guard lock(state->mutex);
+        state->channel_owned = true;
+    }
+    if (datagram_ && receiving_) {
+        datagram_.MessageReceived(receive_token_);
+        receiving_ = false;
+    }
+    if (stream_) stream_.CancelIOAsync().get();
+    std::unique_lock lock(state->mutex);
+    state->read_stopped.wait(lock, [&] { return !state->reading; });
+}
+
+void Partout::Socket::SetChannelWriter(
+    std::function<int32_t(const uint8_t *, size_t)> writer) {
+    std::lock_guard lock(receive_state_->write_mutex);
+    receive_state_->channel_write = std::move(writer);
+}
+
+void Partout::Socket::RegisterDatagram() {
+    const auto state = receive_state_;
+    // WinRT requires registration before bind/connect. Attach only changes
+    // the consumer; the OS handler remains registered until the socket closes.
+    receive_token_ = datagram_.MessageReceived(
+        [state, unconnected = unconnected_, ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_](
+            DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
+            try {
+                const auto family = args.RemoteAddress().Type();
+                if ((family == HostNameType::Ipv4 && !ipv4) ||
+                    (family == HostNameType::Ipv6 && !ipv6)) return;
+                auto reader = args.GetDataReader();
+                const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
+                winrt_socket_address source{};
+                if (unconnected) source = socket_address(args.RemoteAddress(), args.RemotePort());
+                state->received.fetch_add(1, std::memory_order_relaxed);
+                state->deliver(buffer.data(), buffer.Length(),
+                    unconnected ? &source : nullptr, 0);
+            } catch (...) {
+                state->deliver(nullptr, 0, nullptr, to_hresult().value);
+            }
+        });
+    receiving_ = true;
+}
+
+extern "C" {
+
+winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
+    try {
+        return new Partout::Socket(proto, unconnected);
+    } catch (...) {
+        winrt_log(WinrtLogError, "winrt_socket_create failed: HRESULT 0x%08x",
+            static_cast<unsigned int>(to_hresult().value));
+        return nullptr;
+    }
+}
+
+void winrt_socket_free(winrt_socket socket) {
+    delete socket;
+}
+
+bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
+    const winrt_socket_open_options *options) {
+    if (!socket) return false;
+    return socket->Open(hostname, port, options);
 }
 
 bool winrt_socket_set_on_receive(winrt_socket socket,
     winrt_socket_on_receive callback, void *context) {
-    if (!socket || !socket->receive_state) return false;
-    const auto state = socket->receive_state;
-    try {
-        bool start_read;
-        {
-            std::lock_guard lock(state->mutex);
-            if (callback && state->callback) return false;
-            state->callback = callback;
-            state->context = context;
-            start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
-        }
-        if (!start_read) return true;
-        read_stream(state, socket->stream);
-        return true;
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->callback = nullptr;
-        state->context = nullptr;
-        state->reading = false;
-        return false;
-    }
+    if (!socket) return false;
+    return socket->SetOnReceive(callback, context);
 }
 
 bool winrt_socket_resume_reading(winrt_socket socket) {
-    if (!socket || !socket->receive_state) return false;
-    const auto state = socket->receive_state;
-    try {
-        bool start_read;
-        {
-            std::lock_guard lock(state->mutex);
-            // Resume must never restore a cleared context.
-            if (!state->callback) return false;
-            start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
-        }
-        if (!start_read) return true;
-        read_stream(state, socket->stream);
-        return true;
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->reading = false;
-        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
-        return false;
-    }
+    if (!socket) return false;
+    return socket->ResumeReading();
+}
+
+int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
+    const winrt_socket_address *destination) {
+    if (!socket) return E_INVALIDARG;
+    return socket->Write(bytes, length, destination);
+}
+
+void winrt_socket_stop_writes(winrt_socket socket) {
+    if (!socket) return;
+    socket->StopWrites();
+}
+
+bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
+    if (!socket) return false;
+    return socket->GetAddress(address);
 }
 
 }

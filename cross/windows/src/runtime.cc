@@ -41,7 +41,7 @@ struct PartoutVpnChannelRuntime::Impl {
     partout_init_args init_args;
     partout_daemon_options options;
     bool daemon_started = false;
-    std::atomic<std::shared_ptr<PartoutTunnelController>> controller;
+    std::atomic<std::shared_ptr<Partout::TunnelController>> controller;
     enum class StartupStatus { waiting, connecting, connected, failed };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
@@ -135,7 +135,7 @@ struct PartoutVpnChannelRuntime::Impl {
             args.profile = profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
-            const auto active_controller = std::make_shared<PartoutTunnelController>(channel);
+            const auto active_controller = std::make_shared<Partout::TunnelController>(channel);
             controller.store(active_controller);
             bindings.controller = active_controller.get();
             // Impl outlives the daemon; Stop() drains callbacks before destruction.

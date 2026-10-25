@@ -85,22 +85,23 @@ static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, si
     }
 }
 
-PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
+Partout::TunnelController::TunnelController(VpnChannel const &channel)
     : channel_(channel), counters_(std::make_shared<WinrtPacketCounters>()) {}
 
-PartoutTunnelController::~PartoutTunnelController() { Stop(); }
+Partout::TunnelController::~TunnelController() { Stop(); }
 
-bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
+bool Partout::TunnelController::Associate(Socket *socket) noexcept {
     try {
-        const auto transport = winrt_socket_transport(socket);
+        if (!socket) return false;
+        const auto transport = socket->Transport();
         if (!channel_ || !transport) return false;
-        if (!winrt_socket_is_unconnected(socket)) {
+        if (!socket->IsUnconnected()) {
             if (transport_ == transport) return true;
             channel_.AssociateTransport(transport, nullptr);
             transport_ = transport;
             socket_ = socket;
             std::lock_guard lock(input_mutex_);
-            link_receive_ = winrt_socket_channel_receiver(socket);
+            link_receive_ = socket->ChannelReceiver();
             return true;
         }
         // The channel needs a transport, but it must not own WG's UDP bind.
@@ -110,7 +111,7 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
             if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
             udp_adapter_ = profile.NetworkAdapter();
         }
-        winrt_socket_set_adapter(socket, udp_adapter_);
+        socket->SetAdapter(udp_adapter_);
         if (idle_transport_) return true;
         if (transport_) throw hresult_illegal_method_call();
         Sockets::DatagramSocket idle;
@@ -131,18 +132,18 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
         winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
         return true;
     } catch (...) {
-        winrt_log(WinrtLogError, "PartoutTunnelController.Associate failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::TunnelController.Associate failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return false;
     }
 }
 
-bool PartoutTunnelController::Start(const char *info_json) noexcept {
+bool Partout::TunnelController::Start(const char *info_json) noexcept {
     try {
         if (!channel_ || !transport_) return false;
         if (started_) return true;
         const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
-        if (!idle_transport_) winrt_socket_take_over(socket_);
+        if (!idle_transport_) socket_->TakeOver();
         // Windows requires null for an absent address family, not an empty view.
         channel_.StartWithMainTransport(
             settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
@@ -150,26 +151,26 @@ bool PartoutTunnelController::Start(const char *info_json) noexcept {
             VpnInterfaceId{nullptr}, settings.routes, settings.domains,
             settings.mtu, settings.maxFrame(), false, transport_);
         started_ = true;
-        if (!idle_transport_) winrt_socket_set_channel_writer(socket_, [channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
+        if (!idle_transport_) socket_->SetChannelWriter([channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
             const auto result = write_channel(channel, bytes, length, true);
             (result == 0 ? counters->link_send : counters->link_send_failed).fetch_add(1, std::memory_order_relaxed);
             return result;
         });
-        winrt_log(WinrtLogDebug, "PartoutTunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
+        winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
             settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
         return true;
     } catch (hresult_error const &error) {
-        winrt_log(WinrtLogError, "PartoutTunnelController.Start failed: HRESULT 0x%08x (%ls)",
+        winrt_log(WinrtLogError, "Partout::TunnelController.Start failed: HRESULT 0x%08x (%ls)",
             static_cast<unsigned int>(error.code().value), error.message().c_str());
         return false;
     } catch (...) {
-        winrt_log(WinrtLogError, "PartoutTunnelController.Start failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::TunnelController.Start failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return false;
     }
 }
 
-void PartoutTunnelController::Stop() noexcept {
+void Partout::TunnelController::Stop() noexcept {
     std::shared_ptr<WinrtTun> tun;
     {
         std::lock_guard lock(input_mutex_);
@@ -199,7 +200,7 @@ void PartoutTunnelController::Stop() noexcept {
         channel_.Stop();
         started_ = false;
     } catch (...) {
-        winrt_log(WinrtLogError, "PartoutTunnelController.Stop failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::TunnelController.Stop failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
     }
     close_idle();
@@ -209,7 +210,7 @@ void PartoutTunnelController::Stop() noexcept {
         counters_->link_send_failed.load(), counters_->link_read.load(), counters_->tun_write.load(), counters_->tun_write_failed.load());
 }
 
-winrt_tun PartoutTunnelController::Open(const char *info_json) {
+winrt_tun Partout::TunnelController::Open(const char *info_json) {
     auto state = std::make_shared<WinrtTun>(channel_);
     state->counters = counters_;
     auto handle = std::make_unique<WinrtTunHandle>(WinrtTunHandle{state});
@@ -219,7 +220,7 @@ winrt_tun PartoutTunnelController::Open(const char *info_json) {
     return handle.release();
 }
 
-void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
+void Partout::TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     // Leave input buffers in the platform list: Windows reclaims them on return.
     std::shared_ptr<WinrtTun> tun;
     { std::lock_guard lock(input_mutex_); tun = tun_; }
@@ -241,7 +242,7 @@ void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     }
 }
 
-void PartoutTunnelController::Decapsulate(VpnPacketBuffer const &packet) {
+void Partout::TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     counters_->link_read.fetch_add(1, std::memory_order_relaxed);
     const auto buffer = packet.Buffer();
     std::function<void(const uint8_t *, size_t)> receive;
@@ -251,8 +252,8 @@ void PartoutTunnelController::Decapsulate(VpnPacketBuffer const &packet) {
 }
 
 // ref is a retained channel context owned by the daemon bindings.
-static PartoutTunnelController *get_controller(void *ref) {
-    return static_cast<PartoutTunnelController *>(ref);
+static Partout::TunnelController *get_controller(void *ref) {
+    return static_cast<Partout::TunnelController *>(ref);
 }
 
 extern "C" {
