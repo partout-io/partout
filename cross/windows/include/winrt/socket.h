@@ -17,7 +17,6 @@ typedef struct {
     uint8_t family;
 } winrt_socket_address;
 typedef struct {
-    bool unconnected;
     bool dual_stack;
     int timeout_ms;
 } winrt_socket_open_options;

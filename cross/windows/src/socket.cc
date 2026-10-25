@@ -49,6 +49,13 @@ struct SocketReceiveState {
     bool channel_owned = false;
     std::condition_variable read_stopped;
 
+    bool prepareReadLocked(bool has_stream) {
+        paused = false;
+        if (!callback || !has_stream || reading || channel_owned) return false;
+        reading = true;
+        return true;
+    }
+
     void deliver(const uint8_t *bytes, size_t size,
                  const winrt_socket_address *source, int32_t error) {
         std::lock_guard lock(mutex);
@@ -157,12 +164,12 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
     }
 }
 
-void register_datagram(WinrtSocket &socket, bool unconnected) {
+void register_datagram(WinrtSocket &socket) {
     const auto state = socket.receive_state;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
     socket.receive_token = socket.datagram.MessageReceived(
-        [state, unconnected, ipv4 = socket.accepts_ipv4, ipv6 = socket.accepts_ipv6](
+        [state, unconnected = socket.unconnected, ipv4 = socket.accepts_ipv4, ipv6 = socket.accepts_ipv6](
             DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
             try {
                 const auto family = args.RemoteAddress().Type();
@@ -262,27 +269,26 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
                            const winrt_socket_open_options *options) {
     try {
         if (!socket || !hostname || !*hostname || !options || options->timeout_ms < 0 ||
-            (options->unconnected != socket->unconnected) ||
-            (options->dual_stack && !options->unconnected)) {
+            (options->dual_stack && !socket->unconnected)) {
             throw hresult_invalid_argument();
         }
         Apartment apartment;
         const HostName host{to_hstring(hostname)};
         const bool numeric = host.Type() == HostNameType::Ipv4 || host.Type() == HostNameType::Ipv6;
-        if ((options->unconnected && !numeric) ||
+        const bool unconnected = socket->unconnected;
+        if ((unconnected && !numeric) ||
             (options->dual_stack && host.Type() != HostNameType::Ipv6)) {
             throw hresult_invalid_argument();
         }
         const auto service = to_hstring(port);
-        socket->unconnected = options->unconnected;
-        if (options->unconnected) {
+        if (unconnected) {
             socket->accepts_ipv4 = host.Type() == HostNameType::Ipv4 || options->dual_stack;
             socket->accepts_ipv6 = host.Type() == HostNameType::Ipv6;
         }
         if (socket->datagram) {
-            register_datagram(*socket, options->unconnected);
+            register_datagram(*socket);
         }
-        if (options->unconnected) {
+        if (unconnected) {
             // WinRT rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
             // bind covers all interfaces; the receive handler enforces family
             // policy because WinRT exposes no IPV6_V6ONLY control.
@@ -309,7 +315,7 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
         }
         winrt_log(WinrtLogDebug, "WinRT socket: Opened %s %s:%u, mode=%s, dual_stack=%s",
             socket->datagram ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-            options->unconnected ? "unconnected (bound)" : "connected",
+            unconnected ? "unconnected (bound)" : "connected",
             options->dual_stack ? "true" : "false");
         return true;
     } catch (hresult_error const &error) {
@@ -430,9 +436,7 @@ bool winrt_socket_set_on_receive(winrt_socket socket,
             if (callback && state->callback) return false;
             state->callback = callback;
             state->context = context;
-            state->paused = false;
-            start_read = callback && socket->stream && !state->reading && !state->channel_owned;
-            if (start_read) state->reading = true;
+            start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
         }
         if (start_read) read_stream(state, socket->stream);
         return true;
@@ -454,9 +458,7 @@ bool winrt_socket_resume_reading(winrt_socket socket) {
             std::lock_guard lock(state->mutex);
             // Resume must never restore a cleared context.
             if (!state->callback) return false;
-            state->paused = false;
-            start_read = socket->stream && !state->reading && !state->channel_owned;
-            if (start_read) state->reading = true;
+            start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
         }
         if (start_read) read_stream(state, socket->stream);
         return true;

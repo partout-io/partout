@@ -47,13 +47,17 @@ struct PartoutVpnChannelRuntime::Impl {
     std::condition_variable startup_changed;
     StartupStatus startup_status = StartupStatus::waiting;
 
+    bool StartupCompleteLocked() const {
+        return startup_status == StartupStatus::connected ||
+            startup_status == StartupStatus::failed;
+    }
+
     // Called by the daemon, including during partout_daemon_start(). Only
     // publish state here: stopping the daemon from its callback would deadlock.
     void OnConnectionStatus(const char *status) noexcept {
         if (!status) return;
         std::scoped_lock lock(startup_mutex);
-        if (startup_status == StartupStatus::connected ||
-            startup_status == StartupStatus::failed) return;
+        if (StartupCompleteLocked()) return;
         const std::string_view value{status};
         if (value == "connecting") {
             startup_status = StartupStatus::connecting;
@@ -70,8 +74,7 @@ struct PartoutVpnChannelRuntime::Impl {
     void WaitForConnection() {
         std::unique_lock lock(startup_mutex);
         const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(60), [this] {
-            return startup_status == StartupStatus::connected ||
-                startup_status == StartupStatus::failed;
+            return StartupCompleteLocked();
         });
         if (!completed) {
             throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Partout connection timed out");

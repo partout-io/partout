@@ -44,15 +44,13 @@ pub const SocketWrapper = struct {
             .tcp => WinRT.WinrtSocketProtoTCP,
             .udp => WinRT.WinrtSocketProtoUDP,
         }, unconnected) orelse return null;
-        errdefer WinRT.winrt_socket_free(socket);
+        var transferred = false;
+        defer if (!transferred) WinRT.winrt_socket_free(socket);
         // uintptr_t carries the WinRT wrapper through the same callback ABI as
         // POSIX descriptors. It must never be used as a Winsock SOCKET.
         const reachability = options.reachability orelse io.reachabilityNone();
         if (options.configure) |configure| {
-            if (!configure(options.configure_ctx, @intFromPtr(socket), &reachability)) {
-                WinRT.winrt_socket_free(socket);
-                return null;
-            }
+            if (!configure(options.configure_ctx, @intFromPtr(socket), &reachability)) return null;
         }
         // AssociateTransport has completed before either bind or connect.
         if (!WinRT.winrt_socket_open(
@@ -60,20 +58,17 @@ pub const SocketWrapper = struct {
             c_address.ptr(),
             peer.proto.port,
             &.{
-                .unconnected = unconnected,
                 .dual_stack = unconnected and options.ipv4 and options.ipv6,
                 .timeout_ms = options.timeout_ms,
             },
-        )) {
-            WinRT.winrt_socket_free(socket);
-            return null;
-        }
+        )) return null;
         const self = try allocator.create(SocketWrapper);
         self.* = .{
             .allocator = allocator,
             .socket = socket,
             .unconnected = unconnected,
         };
+        transferred = true;
         return self;
     }
 

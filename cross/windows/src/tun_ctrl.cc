@@ -26,7 +26,6 @@ struct WinrtPacketCounters {
 
 struct WinrtTun {
     VpnChannel channel;
-    bool independent_udp = false;
     std::shared_ptr<WinrtPacketCounters> counters;
     std::mutex receive_mutex;
     winrt_tun_on_receive callback = nullptr;
@@ -234,7 +233,6 @@ winrt_tun PartoutTunnelController::Open(const char *info_json) {
     state->counters = counters_;
     auto handle = std::make_unique<WinrtTunHandle>(WinrtTunHandle{state});
     if (!Start(info_json)) return nullptr;
-    state->independent_udp = static_cast<bool>(idle_transport_);
     std::lock_guard lock(input_mutex_);
     tun_ = std::move(state);
     return handle.release();
@@ -244,7 +242,7 @@ void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     // Leave input buffers in the platform list: Windows reclaims them on return.
     std::shared_ptr<WinrtTun> tun;
     { std::lock_guard lock(input_mutex_); tun = tun_; }
-    const auto first = counters_->tun_read.fetch_add(packets.Size(), std::memory_order_relaxed);
+    counters_->tun_read.fetch_add(packets.Size(), std::memory_order_relaxed);
     if (!tun) {
         counters_->tun_dropped.fetch_add(packets.Size(), std::memory_order_relaxed);
         return;
@@ -257,19 +255,6 @@ void PartoutTunnelController::Encapsulate(VpnPacketBufferList const &packets) {
         const auto packet = packets.RemoveAtBegin();
         packets.Append(packet);
         const auto buffer = packet.Buffer();
-        if (tun->independent_udp && first + i < 8) {
-            const auto bytes = buffer.data();
-            const auto length = buffer.Length();
-            const unsigned version = length ? bytes[0] >> 4 : 0;
-            wchar_t source[INET6_ADDRSTRLEN]{}, destination[INET6_ADDRSTRLEN]{};
-            if ((version == 4 && length >= 20) || (version == 6 && length >= 40)) {
-                const auto family = version == 4 ? AF_INET : AF_INET6;
-                InetNtopW(family, bytes + (version == 4 ? 12 : 8), source, INET6_ADDRSTRLEN);
-                InetNtopW(family, bytes + (version == 4 ? 16 : 24), destination, INET6_ADDRSTRLEN);
-            }
-            winrt_log(WinrtLogNotice, "WinRT independent UDP TUN input: IPv%u %ls -> %ls, length=%u",
-                version, source, destination, length);
-        }
         if (!tun->callback || !tun->callback(tun->context, buffer.data(), buffer.Length()))
             counters_->tun_dropped.fetch_add(1, std::memory_order_relaxed);
     }
