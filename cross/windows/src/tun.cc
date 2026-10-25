@@ -4,7 +4,6 @@
 #include <windows.h>
 #include "winrt/tun.h"
 #include "winrt/log.h"
-#include "tun_ctrl.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>

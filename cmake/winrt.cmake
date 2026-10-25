@@ -13,7 +13,7 @@ if(PP_BUILD_WINRT)
     # compilable; runtime.cc is the only integration layer with Partout's API.
     add_library(partout-winrt-backend OBJECT
         cross/windows/src/socket.cc
-        cross/windows/src/tun_ctrl.cc
+        cross/windows/src/tun.cc
         cross/windows/src/tun_settings.cc
         cross/windows/src/log.cc
     )
