@@ -27,7 +27,7 @@ pub const SocketWrapper = struct {
         endpoint: ?api.ExtendedEndpoint,
         options: io.SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
-        if (!build_options.winrt) return null;
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         const unconnected = endpoint == null;
         if (unconnected and !options.ipv4 and !options.ipv6) return null;
         const peer = endpoint orelse api.ExtendedEndpoint{
@@ -71,12 +71,13 @@ pub const SocketWrapper = struct {
     }
 
     pub fn destroy(self: *SocketWrapper) void {
-        if (build_options.winrt) io_c.winrt_socket_free(self.socket);
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
+        io_c.winrt_socket_free(self.socket);
         self.allocator.destroy(self);
     }
 
     pub fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
-        if (!build_options.winrt) return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         var address: io_c.winrt_socket_address = undefined;
         if (!io_c.winrt_socket_get_address(self.socket, &address)) return error.LibcFailure;
         return .{
@@ -106,7 +107,7 @@ pub const SocketWrapper = struct {
         callback: OnReceive,
         context: ?*anyopaque,
     ) io.SubmissionError!void {
-        if (!build_options.winrt) return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         if (callback == null) {
             if (!io_c.winrt_socket_set_on_receive(self.socket, null, null)) return error.LooperUnavailable;
         } else if (self.on_receive != null) return error.LooperUnavailable;
@@ -139,12 +140,13 @@ pub const SocketWrapper = struct {
     }
 
     pub fn resumeReading(self: *SocketWrapper) io.SubmissionError!void {
-        if (!build_options.winrt or !io_c.winrt_socket_resume_reading(self.socket))
-            return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
+        if (!io_c.winrt_socket_resume_reading(self.socket)) return error.LooperUnavailable;
     }
 
     pub fn stopWrites(self: *SocketWrapper) void {
-        if (build_options.winrt) io_c.winrt_socket_stop_writes(self.socket);
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
+        io_c.winrt_socket_stop_writes(self.socket);
     }
 
     /// Completes a whole packet write; UDP requires a destination when unconnected.
@@ -154,7 +156,7 @@ pub const SocketWrapper = struct {
         packet: io.Packet,
         destination: ?io.SocketAddress,
     ) io.SubmissionError!?io.Failure {
-        if (!build_options.winrt) return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         const native: ?io_c.winrt_socket_address = if (destination) |address| .{
             .address = address.address,
             .scope_id = address.scope_id,
@@ -177,6 +179,7 @@ pub const TunWrapper = struct {
     receive_context: ?*anyopaque = null,
 
     pub fn create(allocator: std.mem.Allocator, tun: io_c.pp_tun) std.mem.Allocator.Error!*TunWrapper {
+        if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const self = try allocator.create(TunWrapper);
         self.* = .{
             .allocator = allocator,
@@ -203,7 +206,7 @@ pub const TunWrapper = struct {
     }
 
     pub fn setOnReceive(self: *TunWrapper, callback: OnReceive, context: ?*anyopaque) io.SubmissionError!void {
-        if (!build_options.winrt) return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const native: io_c.winrt_tun = @ptrCast(self.tun);
         if (callback == null) {
             if (!io_c.winrt_tun_set_on_receive(native, null, null)) return error.LooperUnavailable;
@@ -223,11 +226,12 @@ pub const TunWrapper = struct {
     }
 
     pub fn stopWrites(self: *TunWrapper) void {
-        if (build_options.winrt) io_c.winrt_tun_stop_writes(@ptrCast(self.tun));
+        if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
+        io_c.winrt_tun_stop_writes(@ptrCast(self.tun));
     }
 
     pub fn write(self: *TunWrapper, packet: io.Packet) io.SubmissionError!?io.Failure {
-        if (!build_options.winrt) return error.LooperUnavailable;
+        if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const code = io_c.winrt_tun_write(@ptrCast(self.tun), packet.ptr, packet.len);
         return if (code == 0) null else .{ .io = .{ .side = .tun, .cause = error.LibcFailure, .code = code } };
     }
