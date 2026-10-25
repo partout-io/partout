@@ -27,7 +27,7 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
-| `../../src/net/looper_windows.zig` | Queued packet callbacks, attachment lifetime and timers; ignores the shared mux option. |
+| `../../src/net/looper_windows.zig` | Dispatches native packet callbacks and timers, waiting on the daemon's shared wake event. |
 | `../../src/wireguard/internal/passive_io_windows.zig` | Queues native receives for Go's passive read callbacks and forwards writes. |
 | `../../src/c/portable/tun_windows.c` | Converts Partout's portable controller ABI into backend calls, or supplies fallback stubs without WinRT. |
 
@@ -95,15 +95,19 @@ implemented.
 
 ### Timers
 
-Timers use one `RunAfter` alarm for the earliest pending deadline. The alarm
-only wakes the looper; `loopOnce()` invokes due tasks on its caller thread.
+`loopOnce()` waits on the existing daemon mailbox event with a timeout for the
+earliest timer deadline. Native receive callbacks signal that same event; no
+socket readiness polling or separate timer-alarm thread is needed. Due tasks
+and packet callbacks execute on the caller thread.
 Scheduling and cancellation are queue-confined, and timer tokens are copied by
 value. Replacement preserves the old task on allocation failure; cancellation
 and stop remove tasks before their borrowed contexts can be released. Tasks
 scheduled by a timer callback become eligible on the next iteration.
 
-The normal `loopOnce(null)` driver remains nonblocking so its caller can service
-the separate mailbox. Explicit bounded polls can wait for the timer alarm.
+The normal `loopOnce(null)` driver sleeps until packets, a mailbox wake, or a
+timer deadline require work. Bounded waits remain available for tests. The
+supplied mux is borrowed only for its wake event; a looper created without one
+owns a private wake source. The daemon's command loop remains unchanged.
 
 ## VPN channel runtime
 

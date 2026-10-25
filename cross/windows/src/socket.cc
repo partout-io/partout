@@ -25,14 +25,6 @@ using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Sockets;
 using namespace winrt::Windows::Storage::Streams;
 
-// Creation, configuration and open are separate calls. An MTA usage cookie
-// keeps WinRT objects valid between them, including on uninitialized Zig threads.
-struct SocketApartment {
-    CO_MTA_USAGE_COOKIE cookie{};
-    SocketApartment() { check_hresult(CoIncrementMTAUsage(&cookie)); }
-    ~SocketApartment() { CoDecrementMTAUsage(cookie); }
-};
-
 namespace {
 
 // Open runs on the daemon's worker, which need not already have a COM apartment.
@@ -48,7 +40,8 @@ namespace Partout {
 // Outstanding OS operations retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
 struct Socket::ReceiveState {
-    std::shared_ptr<SocketApartment> apartment;
+    // Keep WinRT valid across calls and until the last native receive completes.
+    CO_MTA_USAGE_COOKIE apartment{};
     std::mutex mutex;
     std::atomic<uint64_t> received{0};
     winrt_socket_on_receive callback = nullptr;
@@ -58,11 +51,20 @@ struct Socket::ReceiveState {
     bool channel_owned = false;
     std::condition_variable read_stopped;
 
+    ReceiveState() { check_hresult(CoIncrementMTAUsage(&apartment)); }
+    ~ReceiveState() { CoDecrementMTAUsage(apartment); }
+
     bool prepareReadLocked(bool has_stream) {
         paused = false;
         if (!callback || !has_stream || reading || channel_owned) return false;
         reading = true;
         return true;
+    }
+
+    void finishReadLocked(int32_t error = 0) {
+        reading = false;
+        read_stopped.notify_all();
+        if (error && !channel_owned) deliverLocked(nullptr, 0, nullptr, error);
     }
 
     void deliver(const uint8_t *bytes, size_t size,
@@ -87,9 +89,7 @@ Socket::Socket(winrt_socket_proto proto, bool unconnected) {
     if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
     Apartment apartment;
     unconnected_ = unconnected;
-    apartment_ = std::make_shared<SocketApartment>();
     receive_state_ = std::make_shared<ReceiveState>();
-    receive_state_->apartment = apartment_;
     if (proto == WinrtSocketProtoUDP) datagram_ = DatagramSocket{};
     else stream_ = StreamSocket{};
 }
@@ -98,8 +98,8 @@ Socket::~Socket() noexcept {
     SetOnReceive(nullptr, nullptr);
     if (adapter_) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
         receive_state_->received.load(), sent_);
-    // Each cleanup is independent, so a failed event revocation cannot skip Close.
-    try { if (datagram_ && receiving_) datagram_.MessageReceived(receive_token_); } catch (...) {}
+    receive_registration_.revoke();
+    // Close each transport independently.
     try { if (datagram_) datagram_.Close(); } catch (...) {}
     try { if (stream_) stream_.Close(); } catch (...) {}
 }
@@ -114,20 +114,19 @@ bool Socket::Open(const char *hostname, uint16_t port,
         Apartment apartment;
         const HostName host{to_hstring(hostname)};
         const bool numeric = host.Type() == HostNameType::Ipv4 || host.Type() == HostNameType::Ipv6;
-        const bool unconnected = unconnected_;
-        if ((unconnected && !numeric) ||
+        if ((unconnected_ && !numeric) ||
             (options->dual_stack && host.Type() != HostNameType::Ipv6)) {
             throw hresult_invalid_argument();
         }
         const auto service = to_hstring(port);
-        if (unconnected) {
+        if (unconnected_) {
             accepts_ipv4_ = host.Type() == HostNameType::Ipv4 || options->dual_stack;
             accepts_ipv6_ = host.Type() == HostNameType::Ipv6;
         }
         if (datagram_) {
             RegisterDatagram();
         }
-        if (unconnected) {
+        if (unconnected_) {
             // WinRT rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
             // bind covers all interfaces; the receive handler enforces family
             // policy because WinRT exposes no IPV6_V6ONLY control.
@@ -154,7 +153,7 @@ bool Socket::Open(const char *hostname, uint16_t port,
         }
         winrt_log(WinrtLogDebug, "WinRT socket: Opened %s %s:%u, mode=%s, dual_stack=%s",
             datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-            unconnected ? "unconnected (bound)" : "connected",
+            unconnected_ ? "unconnected (bound)" : "connected",
             options->dual_stack ? "true" : "false");
         return true;
     } catch (hresult_error const &error) {
@@ -171,7 +170,6 @@ bool Socket::Open(const char *hostname, uint16_t port,
 }
 
 bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
-    if (!receive_state_) return false;
     const auto state = receive_state_;
     try {
         bool start_read;
@@ -195,7 +193,6 @@ bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
 }
 
 bool Socket::ResumeReading() {
-    if (!receive_state_) return false;
     const auto state = receive_state_;
     try {
         bool start_read;
@@ -305,7 +302,7 @@ IInspectable Socket::Transport() const {
 }
 
 bool Socket::IsUnconnected() const {
-    return datagram_ && unconnected_;
+    return unconnected_;
 }
 
 void Socket::SetAdapter(
@@ -326,10 +323,7 @@ void Socket::TakeOver() {
         std::lock_guard lock(state->mutex);
         state->channel_owned = true;
     }
-    if (datagram_ && receiving_) {
-        datagram_.MessageReceived(receive_token_);
-        receiving_ = false;
-    }
+    receive_registration_.revoke();
     if (stream_) stream_.CancelIOAsync().get();
     std::unique_lock lock(state->mutex);
     state->read_stopped.wait(lock, [&] { return !state->reading; });
@@ -377,8 +371,7 @@ fire_and_forget Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSo
             {
                 std::lock_guard lock(state->mutex);
                 if (!state->callback || state->paused || state->channel_owned) {
-                    state->reading = false;
-                    state->read_stopped.notify_all();
+                    state->finishReadLocked();
                     co_return;
                 }
                 read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
@@ -386,20 +379,14 @@ fire_and_forget Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSo
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->reading = false;
-                state->read_stopped.notify_all();
-                if (state->channel_owned) co_return;
-                state->deliverLocked(nullptr, 0, nullptr, 1);
+                state->finishReadLocked(1);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
         }
     } catch (...) {
         std::lock_guard lock(state->mutex);
-        state->reading = false;
-        state->read_stopped.notify_all();
-        if (state->channel_owned) co_return;
-        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
+        state->finishReadLocked(to_hresult().value);
     }
 }
 
@@ -407,7 +394,7 @@ void Socket::RegisterDatagram() {
     const auto state = receive_state_;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
-    receive_token_ = datagram_.MessageReceived(
+    receive_registration_ = datagram_.MessageReceived(auto_revoke,
         [state, unconnected = unconnected_, ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_](
             DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
             try {
@@ -425,7 +412,6 @@ void Socket::RegisterDatagram() {
                 state->deliver(nullptr, 0, nullptr, to_hresult().value);
             }
         });
-    receiving_ = true;
 }
 
 } // namespace Partout

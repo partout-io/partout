@@ -11,8 +11,6 @@
 #include <functional>
 #include <memory>
 
-struct SocketApartment;
-
 namespace Partout {
 
 // Callers serialize writes with other writes, open/configuration, channel
@@ -61,12 +59,10 @@ private:
     void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
-    std::shared_ptr<SocketApartment> apartment_;
+    std::shared_ptr<ReceiveState> receive_state_;
     winrt::Windows::Networking::Sockets::DatagramSocket datagram_{nullptr};
     winrt::Windows::Networking::Sockets::StreamSocket stream_{nullptr};
-    winrt::event_token receive_token_{};
-    bool receiving_ = false;
-    std::shared_ptr<ReceiveState> receive_state_;
+    winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
     std::function<int32_t(const uint8_t *, size_t)> channel_write_;
     std::atomic<bool> writes_stopped_{false};
     uint64_t sent_ = 0;

@@ -4,7 +4,7 @@
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
 //! caller's mux. Both platforms run callbacks inline in loopOnce(); Windows
-//! queues WinRT socket receives and ignores the mux. Read packet views
+//! queues WinRT receives and waits on the mux's mailbox wake event. Read packet views
 //! expire when the callback returns.
 
 const std = @import("std");
@@ -32,7 +32,7 @@ pub const Looper = struct {
     allocator: std.mem.Allocator,
     impl: *Impl,
 
-    /// Allocates a looper. Only POSIX borrows the caller's mux through destroy().
+    /// Allocates a looper. A supplied mux is borrowed through destroy().
     pub fn create(
         allocator: std.mem.Allocator,
         options: Options,

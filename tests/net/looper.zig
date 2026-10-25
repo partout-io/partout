@@ -91,7 +91,7 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
     try std.testing.expectEqual(@as(usize, 2), probe.calls);
 }
 
-test "Windows timer alarm wakes a bounded poll for an earlier deadline" {
+test "Windows dispatcher waits for the earlier timer deadline" {
     if (builtin.os.tag != .windows) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
@@ -104,11 +104,59 @@ test "Windows timer alarm wakes a bounded poll for an earlier deadline" {
     const start = source.core.monotonicNs();
     try std.testing.expect(try test_helpers.poll(&looper, 2000));
     const elapsed = source.core.monotonicNs() - start;
-    // A generous bound distinguishes an alarm wake from the poll timeout.
+    // A generous bound distinguishes the timer deadline from the poll timeout.
     try std.testing.expect(elapsed < std.time.ns_per_s);
     try std.testing.expectEqual(@as(usize, 1), probe.calls);
     try std.testing.expect(probe.ran_on_caller);
     looper.cancelTimer(&later);
+}
+
+test "Windows dispatcher shares the daemon wake event without spinning or losing a wake" {
+    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    const c = source.ffi.io;
+    const mux = c.pp_mux_create(1) orelse return error.MuxCreationFailed;
+    defer c.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
+    defer looper.deinit();
+
+    // Commands already queued before entering the wait must remain observable.
+    try std.testing.expect(c.pp_mux_wake(mux));
+    try std.testing.expect(try test_helpers.poll(&looper, null));
+
+    const Probe = struct {
+        loop: *Looper,
+        entered: std.atomic.Value(bool) = .init(false),
+        done: std.atomic.Value(bool) = .init(false),
+        alive: bool = false,
+        failure: ?io.Failure = null,
+
+        fn run(self: *@This()) void {
+            self.entered.store(true, .release);
+            self.alive = self.loop.loopOnce(&self.failure);
+            self.done.store(true, .release);
+        }
+    };
+    var probe = Probe{ .loop = &looper };
+    const worker = try std.Thread.spawn(.{}, Probe.run, .{&probe});
+    defer {
+        _ = c.pp_mux_wake(mux);
+        worker.join();
+    }
+    for (0..5000) |_| {
+        if (probe.entered.load(.acquire)) break;
+        source.core.sleepMs(1);
+    }
+    try std.testing.expect(probe.entered.load(.acquire));
+    source.core.sleepMs(20);
+    try std.testing.expect(!probe.done.load(.acquire));
+    try std.testing.expect(c.pp_mux_wake(mux));
+    for (0..5000) |_| {
+        if (probe.done.load(.acquire)) break;
+        source.core.sleepMs(1);
+    }
+    try std.testing.expect(probe.done.load(.acquire));
+    try std.testing.expect(probe.alive);
+    try std.testing.expect(probe.failure == null);
 }
 
 test "Windows timer replacement failure preserves the old task and token" {

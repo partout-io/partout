@@ -8,19 +8,22 @@ const builtin = @import("builtin");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const core = @import("../core/exports.zig");
+const ffi = @import("../c/exports.zig");
+const io_c = ffi.io;
 
-/// WinRT queues owned packets; loopOnce dispatches callbacks on its caller.
+/// WinRT queues owned packets; loopOnce waits for work and dispatches callbacks
+/// on its caller. Native callbacks signal the caller's existing mailbox wake event;
+/// no socket readiness polling or separate timer thread is needed.
 /// Lifecycle operations and loopOnce are caller-serialized, including detach.
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     options: helpers.Options,
+    owns_mux: bool,
 
     stopped: bool = false,
     sides: [2]?*SideIO = .{ null, null },
     mutex: core.Mutex = .{},
-    timer_alarm: core.RunAfter = .{},
-    alarm_deadline_ns: ?u64 = null,
-    timer_condition: core.Condition = .{},
+    waiting: bool = false,
     timers: core.Fifo(Scheduled) = .{},
     next_timer_id: u64 = 1,
     callbacks: core.Fifo(Received) = .{},
@@ -31,19 +34,21 @@ pub const WindowsLooper = struct {
         options: helpers.Options,
     ) helpers.InitError!*WindowsLooper {
         const self = try allocator.create(WindowsLooper);
+        errdefer allocator.destroy(self);
+        var configured = options;
+        configured.mux = options.mux orelse io_c.pp_mux_create(1) orelse return error.MuxFailure;
         self.* = .{
             .allocator = allocator,
-            .options = options,
+            .options = configured,
+            .owns_mux = options.mux == null,
         };
         return self;
     }
 
     pub fn destroy(self: *WindowsLooper) void {
         self.stop() catch unreachable;
-        // The alarm borrows only self, never a timer's task context.
-        self.timer_alarm.deinit();
-        self.timer_condition.deinit();
         self.mutex.deinit();
+        if (self.owns_mux) io_c.pp_mux_free(self.options.mux);
         self.allocator.destroy(self);
     }
 
@@ -51,14 +56,34 @@ pub const WindowsLooper = struct {
         failure.* = null;
         self.mutex.lock();
         defer self.mutex.unlock();
-        // Keep the normal driver nonblocking: its mailbox wake is independent
-        // of this looper. Explicit bounded polls may wait for the timer alarm.
-        if (max_wait_ms) |wait_ms| {
-            const until = core.concurrency.deadlineAfterMs(core.monotonicNs(), wait_ms);
-            while (!self.stopped and !self.hasDueTimerLocked() and !self.hasCallbackLocked()) {
-                if (core.monotonicNs() >= until) break;
-                self.timer_condition.waitUntil(&self.mutex, until);
+        const until = if (max_wait_ms) |wait_ms|
+            core.concurrency.deadlineAfterMs(core.monotonicNs(), wait_ms)
+        else
+            null;
+        while (!self.stopped and !self.hasCallbackLocked()) {
+            const now = core.monotonicNs();
+            var deadline = until;
+            var pending = self.timers.head;
+            while (pending) |node| : (pending = node.next)
+                deadline = @min(deadline orelse node.deadline_ns, node.deadline_ns);
+            const timeout_ms: c_int = if (deadline) |value| blk: {
+                const remaining = value -| now;
+                const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
+                break :blk @intCast(@min(ms, std.math.maxInt(c_int)));
+            } else -1;
+            self.waiting = true;
+            self.mutex.unlock();
+            var code: c_int = 0;
+            const result = io_c.pp_mux_wait(self.options.mux, timeout_ms, &code);
+            self.mutex.lock();
+            self.waiting = false;
+            if (result < 0) {
+                failure.* = .{ .wait = if (code == 0) result else code };
+                return false;
             }
+            // Windows can report a timeout before the monotonic deadline.
+            // Honor actual wake events immediately so the daemon can drain jobs.
+            if (result > 0 or deadline == null or core.monotonicNs() >= deadline.?) break;
         }
         if (self.stopped) return false;
         for (0..self.options.max_read_count) |_| {
@@ -85,17 +110,20 @@ pub const WindowsLooper = struct {
             self.mutex.lock();
             if (self.stopped) return false;
         }
-        self.armTimerLocked();
         return true;
+    }
+
+    // Called with mutex held. Queued input/deadlines cover notifications before
+    // the wait; signalling only a current waiter avoids leaving stale wake events.
+    fn notifyLocked(self: *WindowsLooper) void {
+        if (self.waiting) _ = io_c.pp_mux_wake(self.options.mux);
     }
 
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
         self.mutex.lock();
         self.stopped = true;
-        self.timer_alarm.cancel();
-        self.alarm_deadline_ns = null;
         while (self.timers.take()) |node| self.allocator.destroy(node);
-        self.timer_condition.broadcast();
+        self.notifyLocked();
         self.mutex.unlock();
         try self.detach(.link);
         try self.detach(.tun);
@@ -114,7 +142,6 @@ pub const WindowsLooper = struct {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         errdefer self.allocator.destroy(node);
-        self.timer_alarm.start() catch return error.LooperUnavailable;
         node.* = .{
             .id = self.next_timer_id,
             .deadline_ns = core.concurrency.deadlineAfterMs(core.monotonicNs(), delay_ms),
@@ -127,7 +154,7 @@ pub const WindowsLooper = struct {
         }
         self.timers.append(node);
         timer.id = node.id;
-        self.armTimerLocked();
+        self.notifyLocked();
     }
 
     pub fn cancelTimer(self: *WindowsLooper, timer: *io.Timer) void {
@@ -136,7 +163,7 @@ pub const WindowsLooper = struct {
         const id = timer.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         timer.id = null;
-        self.armTimerLocked();
+        self.notifyLocked();
     }
 
     const Scheduled = struct {
@@ -154,38 +181,6 @@ pub const WindowsLooper = struct {
             return self.ready;
         }
     };
-
-    fn hasDueTimerLocked(self: *WindowsLooper) bool {
-        const now = core.monotonicNs();
-        var pending = self.timers.head;
-        while (pending) |node| : (pending = node.next) {
-            if (node.deadline_ns <= now) return true;
-        }
-        return false;
-    }
-
-    fn armTimerLocked(self: *WindowsLooper) void {
-        var deadline: ?u64 = null;
-        var pending = self.timers.head;
-        while (pending) |node| : (pending = node.next) {
-            deadline = @min(deadline orelse node.deadline_ns, node.deadline_ns);
-        }
-        if (deadline == self.alarm_deadline_ns) return;
-        self.alarm_deadline_ns = deadline;
-        if (deadline) |value| {
-            const ns = value -| core.monotonicNs();
-            const ms = ns / std.time.ns_per_ms + @intFromBool(ns % std.time.ns_per_ms != 0);
-            // start() succeeded before publishing any scheduled entry.
-            self.timer_alarm.scheduleReplacing(ms, onTimerAlarm, self) catch unreachable;
-        } else self.timer_alarm.cancel();
-    }
-
-    fn onTimerAlarm(context: ?*anyopaque) void {
-        const self: *WindowsLooper = @ptrCast(@alignCast(context.?));
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        self.timer_condition.broadcast();
-    }
 
     pub fn attach(
         self: *WindowsLooper,
@@ -277,7 +272,7 @@ pub const WindowsLooper = struct {
         defer attachment.release();
         self.mutex.lock();
         attachment.reading = true;
-        self.timer_condition.broadcast();
+        self.notifyLocked();
         self.mutex.unlock();
         // Re-registering must not race with detach clearing the callback.
         if (attachment.arguments.pair == .link)
@@ -370,7 +365,7 @@ pub const WindowsLooper = struct {
         side.retain();
         self.callbacks.append(node);
         side.queued += 1;
-        self.timer_condition.broadcast();
+        self.notifyLocked();
         return side.reading and side.allocation_failure == null and code == 0;
     }
 
