@@ -33,9 +33,21 @@ struct SocketApartment {
     ~SocketApartment() { CoDecrementMTAUsage(cookie); }
 };
 
+namespace {
+
+// Open runs on the daemon's worker, which need not already have a COM apartment.
+struct Apartment {
+    Apartment() { init_apartment(apartment_type::multi_threaded); }
+    ~Apartment() { uninit_apartment(); }
+};
+
+} // namespace
+
+namespace Partout {
+
 // Outstanding OS operations retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
-struct SocketReceiveState {
+struct Socket::ReceiveState {
     std::shared_ptr<SocketApartment> apartment;
     std::mutex mutex;
     std::atomic<uint64_t> received{0};
@@ -69,81 +81,6 @@ struct SocketReceiveState {
     }
 };
 
-namespace {
-
-// Open runs on the daemon's worker, which need not already have a COM apartment.
-struct Apartment {
-    Apartment() { init_apartment(apartment_type::multi_threaded); }
-    ~Apartment() { uninit_apartment(); }
-};
-
-void wait_for_connect(IAsyncAction const &action, int timeout_ms) {
-    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
-        action.Cancel();
-        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
-    }
-    action.GetResults();
-}
-
-winrt_socket_address socket_address(HostName const &host, hstring const &port) {
-    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
-        throw hresult_invalid_argument();
-    winrt_socket_address result{};
-    auto text = std::wstring(host.CanonicalName());
-    const auto zone = text.find(L'%');
-    if (zone != std::wstring::npos) {
-        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
-        text.resize(zone);
-    }
-    const bool ipv4 = host.Type() == HostNameType::Ipv4;
-    result.family = ipv4 ? 4 : 6;
-    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
-        throw hresult_invalid_argument();
-    const auto number = std::stoul(std::wstring(port));
-    if (number > UINT16_MAX) throw hresult_invalid_argument();
-    result.port = static_cast<uint16_t>(number);
-    return result;
-}
-
-fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSocket stream) {
-    try {
-        co_await resume_background();
-        Buffer buffer{64 * 1024};
-        for (;;) {
-            IAsyncOperationWithProgress<IBuffer, uint32_t> read{nullptr};
-            {
-                std::lock_guard lock(state->mutex);
-                if (!state->callback || state->paused || state->channel_owned) {
-                    state->reading = false;
-                    state->read_stopped.notify_all();
-                    co_return;
-                }
-                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
-            }
-            auto received = co_await read;
-            if (received.Length() == 0) {
-                std::lock_guard lock(state->mutex);
-                state->reading = false;
-                state->read_stopped.notify_all();
-                if (state->channel_owned) co_return;
-                state->deliverLocked(nullptr, 0, nullptr, 1);
-                co_return;
-            }
-            state->deliver(received.data(), received.Length(), nullptr, 0);
-        }
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->reading = false;
-        state->read_stopped.notify_all();
-        if (state->channel_owned) co_return;
-        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
-    }
-}
-
-} // namespace
-
-namespace Partout {
-
 Socket::Socket(winrt_socket_proto proto, bool unconnected) {
     if (proto != WinrtSocketProtoUDP && proto != WinrtSocketProtoTCP)
         throw hresult_invalid_argument();
@@ -151,7 +88,7 @@ Socket::Socket(winrt_socket_proto proto, bool unconnected) {
     Apartment apartment;
     unconnected_ = unconnected;
     apartment_ = std::make_shared<SocketApartment>();
-    receive_state_ = std::make_shared<SocketReceiveState>();
+    receive_state_ = std::make_shared<ReceiveState>();
     receive_state_->apartment = apartment_;
     if (proto == WinrtSocketProtoUDP) datagram_ = DatagramSocket{};
     else stream_ = StreamSocket{};
@@ -210,9 +147,9 @@ bool Socket::Open(const char *hostname, uint16_t port,
             }
             bound_host_ = host;
         } else if (datagram_) {
-            wait_for_connect(datagram_.ConnectAsync(host, service), options->timeout_ms);
+            WaitForConnect(datagram_.ConnectAsync(host, service), options->timeout_ms);
         } else {
-            wait_for_connect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
+            WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
                 options->timeout_ms);
         }
         winrt_log(WinrtLogDebug, "WinRT socket: Opened %s %s:%u, mode=%s, dual_stack=%s",
@@ -246,7 +183,7 @@ bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
             start_read = state->prepareReadLocked(static_cast<bool>(stream_));
         }
         if (!start_read) return true;
-        read_stream(state, stream_);
+        ReadStream(state, stream_);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);
@@ -269,7 +206,7 @@ bool Socket::ResumeReading() {
             start_read = state->prepareReadLocked(static_cast<bool>(stream_));
         }
         if (!start_read) return true;
-        read_stream(state, stream_);
+        ReadStream(state, stream_);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);
@@ -355,7 +292,7 @@ bool Socket::GetAddress(winrt_socket_address *address) {
             host = info.LocalAddress();
             port = info.LocalPort();
         }
-        *address = socket_address(host, port);
+        *address = ParseAddress(host, port);
         return true;
     } catch (...) {
         return false;
@@ -403,6 +340,69 @@ void Socket::SetChannelWriter(
     channel_write_ = std::move(writer);
 }
 
+void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
+    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
+        action.Cancel();
+        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
+    }
+    action.GetResults();
+}
+
+winrt_socket_address Socket::ParseAddress(HostName const &host, hstring const &port) {
+    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
+        throw hresult_invalid_argument();
+    winrt_socket_address result{};
+    auto text = std::wstring(host.CanonicalName());
+    const auto zone = text.find(L'%');
+    if (zone != std::wstring::npos) {
+        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
+        text.resize(zone);
+    }
+    const bool ipv4 = host.Type() == HostNameType::Ipv4;
+    result.family = ipv4 ? 4 : 6;
+    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
+        throw hresult_invalid_argument();
+    const auto number = std::stoul(std::wstring(port));
+    if (number > UINT16_MAX) throw hresult_invalid_argument();
+    result.port = static_cast<uint16_t>(number);
+    return result;
+}
+
+fire_and_forget Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSocket stream) {
+    try {
+        co_await resume_background();
+        Buffer buffer{64 * 1024};
+        for (;;) {
+            IAsyncOperationWithProgress<IBuffer, uint32_t> read{nullptr};
+            {
+                std::lock_guard lock(state->mutex);
+                if (!state->callback || state->paused || state->channel_owned) {
+                    state->reading = false;
+                    state->read_stopped.notify_all();
+                    co_return;
+                }
+                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
+            }
+            auto received = co_await read;
+            if (received.Length() == 0) {
+                std::lock_guard lock(state->mutex);
+                state->reading = false;
+                state->read_stopped.notify_all();
+                if (state->channel_owned) co_return;
+                state->deliverLocked(nullptr, 0, nullptr, 1);
+                co_return;
+            }
+            state->deliver(received.data(), received.Length(), nullptr, 0);
+        }
+    } catch (...) {
+        std::lock_guard lock(state->mutex);
+        state->reading = false;
+        state->read_stopped.notify_all();
+        if (state->channel_owned) co_return;
+        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
+    }
+}
+
 void Socket::RegisterDatagram() {
     const auto state = receive_state_;
     // WinRT requires registration before bind/connect. Attach only changes
@@ -417,7 +417,7 @@ void Socket::RegisterDatagram() {
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 winrt_socket_address source{};
-                if (unconnected) source = socket_address(args.RemoteAddress(), args.RemotePort());
+                if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
                 state->received.fetch_add(1, std::memory_order_relaxed);
                 state->deliver(buffer.data(), buffer.Length(),
                     unconnected ? &source : nullptr, 0);

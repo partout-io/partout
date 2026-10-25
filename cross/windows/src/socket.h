@@ -12,7 +12,6 @@
 #include <memory>
 
 struct SocketApartment;
-struct SocketReceiveState;
 
 namespace Partout {
 
@@ -52,6 +51,13 @@ public:
     void SetChannelWriter(std::function<int32_t(const uint8_t *, size_t)> writer);
 
 private:
+    struct ReceiveState;
+
+    static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
+    static winrt_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host,
+        winrt::hstring const &port);
+    static winrt::fire_and_forget ReadStream(std::shared_ptr<ReceiveState> state,
+        winrt::Windows::Networking::Sockets::StreamSocket stream);
     void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
@@ -60,7 +66,7 @@ private:
     winrt::Windows::Networking::Sockets::StreamSocket stream_{nullptr};
     winrt::event_token receive_token_{};
     bool receiving_ = false;
-    std::shared_ptr<SocketReceiveState> receive_state_;
+    std::shared_ptr<ReceiveState> receive_state_;
     std::function<int32_t(const uint8_t *, size_t)> channel_write_;
     std::atomic<bool> writes_stopped_{false};
     uint64_t sent_ = 0;
