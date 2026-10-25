@@ -576,6 +576,16 @@ const ConnectionDaemon = struct {
         };
     }
 
+    // Looper timers run inside loopOnce(). Defer gate changes until it returns,
+    // because a ready transition may start a connection and attach I/O.
+    fn onResumeGate(ctx: ?*anyopaque) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        self.schedule(.resumeGate) catch |err| {
+            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
+            self.daemon.requestCancellation(null, true);
+        };
+    }
+
     // Network callbacks may originate while the platform owns a lock that is
     // also needed by tunnel-controller callbacks. Never wait for the actor
     // here: starting a connection can synchronously report a snapshot back to
@@ -593,16 +603,6 @@ const ConnectionDaemon = struct {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
         self.schedule(.onBetterPath) catch |err| {
             log.writef(.err, "Unable to enqueue better path: {s}", .{@errorName(err)});
-        };
-    }
-
-    // Looper timers run inside loopOnce(). Defer gate changes until it returns,
-    // because a ready transition may start a connection and attach I/O.
-    fn onResumeGate(ctx: ?*anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.schedule(.resumeGate) catch |err| {
-            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
-            self.daemon.requestCancellation(null, true);
         };
     }
 
@@ -632,7 +632,7 @@ const ConnectionDaemon = struct {
         // Notify connection gate ready to the daemon
         self.gate.setReadyHandler(.{
             .ptr = self,
-            .notify = onNetworkReady,
+            .notify = handleNetworkReady,
         });
         // Read current reachability
         self.gate.setReachabilityBlock(.{
@@ -759,49 +759,6 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn handleResumeGate(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
-            return;
-        }
-        log.write(.info, "Resume connection gate now");
-        _ = self.gate.setEnabled(true);
-    }
-
-    // The ready event gates the signals from:
-    //
-    // - gate.updateStatus()
-    // - gate.updateReachability()
-    fn onNetworkReady(ctx: ?*anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        log.write(.notice, "Network is ready, start connection");
-        self.evaluateConnection(false);
-    }
-
-    fn isReachable(ctx: ?*const anyopaque) bool {
-        const self: *const ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        return self.monitor.isReachable();
-    }
-
-    // Updates the gate on the actor so that a ready transition and the
-    // resulting connection start are serialized with the corresponding
-    // network-change event.
-    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
-        if (self.conn_request != null) self.is_stale_conn_request = true;
-        _ = self.gate.updateReachability(reachability.reachable);
-        if (self.daemon.state != .started) return;
-        const connection = self.connection orelse @panic("handleReachability but no connection");
-        connection.networkChange(reachability);
-    }
-
-    // Forwards the event to the underlying connection
-    fn handleBetterPath(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) return;
-        if (self.conn_request != null) self.is_stale_conn_request = true;
-        const connection = self.connection orelse @panic("handleBetterPath but no connection");
-        connection.betterPath();
-    }
-
     fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
         switch (event) {
             .established => |success| {
@@ -904,6 +861,49 @@ const ConnectionDaemon = struct {
         self.trackConnectionStatus(.disconnected);
     }
 
+    fn handleResumeGate(self: *ConnectionDaemon) void {
+        if (self.daemon.state != .started) {
+            log.write(.info, "Ignore resume connection gate, daemon not started");
+            return;
+        }
+        log.write(.info, "Resume connection gate now");
+        _ = self.gate.setEnabled(true);
+    }
+
+    // The ready event gates the signals from:
+    //
+    // - gate.updateStatus()
+    // - gate.updateReachability()
+    fn handleNetworkReady(ctx: ?*anyopaque) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        log.write(.notice, "Network is ready, start connection");
+        self.evaluateConnection(false);
+    }
+
+    fn isReachable(ctx: ?*const anyopaque) bool {
+        const self: *const ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        return self.monitor.isReachable();
+    }
+
+    // Updates the gate on the actor so that a ready transition and the
+    // resulting connection start are serialized with the corresponding
+    // network-change event.
+    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
+        if (self.conn_request != null) self.is_stale_conn_request = true;
+        _ = self.gate.updateReachability(reachability.reachable);
+        if (self.daemon.state != .started) return;
+        const connection = self.connection orelse @panic("handleReachability but no connection");
+        connection.networkChange(reachability);
+    }
+
+    // Forwards the event to the underlying connection
+    fn handleBetterPath(self: *ConnectionDaemon) void {
+        if (self.daemon.state != .started) return;
+        if (self.conn_request != null) self.is_stale_conn_request = true;
+        const connection = self.connection orelse @panic("handleBetterPath but no connection");
+        connection.betterPath();
+    }
+
     fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
         if (failure) |value| {
             log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
@@ -994,11 +994,11 @@ const ConnectionDaemon = struct {
         start,
         hold,
         stop,
-        resumeGate,
         setupConnection: ConnectionSetup,
+        onConnectionEvent: ConnectionEvent,
+        resumeGate,
         onReachability: io.ReachabilityInfo,
         onBetterPath,
-        onConnectionEvent: ConnectionEvent,
 
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
@@ -1182,11 +1182,11 @@ const ConnectionDaemon = struct {
             .start => try self.handleStart(),
             .hold => self.handleStop(.preserve_environment),
             .stop => self.handleStop(.clear_environment),
-            .resumeGate => self.handleResumeGate(),
             .setupConnection => |setup| self.handleConnectionSetup(setup) catch |err| self.handleConnectionRequestFailed(setup.action, err),
+            .onConnectionEvent => |event| self.handleConnectionEvent(event),
+            .resumeGate => self.handleResumeGate(),
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
-            .onConnectionEvent => |event| self.handleConnectionEvent(event),
         }
     }
 
