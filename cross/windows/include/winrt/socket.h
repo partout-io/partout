@@ -17,21 +17,10 @@ typedef enum { WinrtSocketProtoTCP, WinrtSocketProtoUDP } winrt_socket_proto;
 /* The opaque socket type. */
 typedef struct __winrt_socket_struct *winrt_socket;
 
-/* Close the owned socket and free the wrapper. */
-void winrt_socket_free(winrt_socket socket);
-
-/* Create the transport before configuring and opening it. */
-winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected);
-
 typedef struct {
     bool dual_stack;
     int timeout_ms;
 } winrt_socket_open_options;
-
-/* Configure the transport before calling open. Connected opens are bounded by
- * timeout_ms; unconnected UDP binds a numeric local endpoint. */
-bool winrt_socket_open(winrt_socket socket, const char *host, uint16_t port,
-    const winrt_socket_open_options *options);
 
 /* Numeric endpoint. family is 4 or 6; port and scope_id are host endian. */
 typedef struct {
@@ -49,6 +38,17 @@ typedef struct {
  * alive until cleared. TCP delivers stream chunks, without application framing. */
 typedef bool (*winrt_socket_on_receive)(void *context, const uint8_t *bytes,
     size_t length, const winrt_socket_address *source, int32_t error);
+
+/* Close the owned socket and free the wrapper. */
+void winrt_socket_free(winrt_socket socket);
+
+/* Create the transport before configuring and opening it. */
+winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected);
+
+/* Configure the transport before calling open. Connected opens are bounded by
+ * timeout_ms; unconnected UDP binds a numeric local endpoint. */
+bool winrt_socket_open(winrt_socket socket, const char *host, uint16_t port,
+    const winrt_socket_open_options *options);
 
 bool winrt_socket_set_on_receive(winrt_socket socket, winrt_socket_on_receive callback, void *context);
 
