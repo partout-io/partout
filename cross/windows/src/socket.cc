@@ -72,7 +72,7 @@ struct SocketReceiveState {
     }
 };
 
-struct WinrtSocket {
+struct __winrt_socket_struct {
     // Keep the MTA alive until transports and outstanding callbacks are released.
     std::shared_ptr<SocketApartment> apartment;
     winrt::Windows::Networking::Sockets::DatagramSocket datagram{nullptr};
@@ -93,7 +93,7 @@ struct WinrtSocket {
         return stream;
     }
 
-    ~WinrtSocket() noexcept;
+    ~__winrt_socket_struct() noexcept;
 };
 namespace {
 
@@ -166,7 +166,7 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
     }
 }
 
-void register_datagram(WinrtSocket &socket) {
+void register_datagram(__winrt_socket_struct &socket) {
     const auto state = socket.receive_state;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
@@ -193,7 +193,7 @@ void register_datagram(WinrtSocket &socket) {
 
 } // namespace
 
-WinrtSocket::~WinrtSocket() noexcept {
+__winrt_socket_struct::~__winrt_socket_struct() noexcept {
     winrt_socket_set_on_receive(this, nullptr, nullptr);
     if (adapter) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
         receive_state->received.load(), receive_state->sent.load());
@@ -251,7 +251,7 @@ extern "C" {
 winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
     try {
         Apartment apartment;
-        auto socket = std::make_unique<WinrtSocket>();
+        auto socket = std::make_unique<__winrt_socket_struct>();
         if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
         socket->unconnected = unconnected;
         socket->apartment = std::make_shared<SocketApartment>();
