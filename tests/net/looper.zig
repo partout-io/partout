@@ -261,48 +261,34 @@ const WindowsSockets = struct {
     extern "ws2_32" fn setsockopt(usize, c_int, c_int, *const anyopaque, c_int) callconv(.winapi) c_int;
     extern "ws2_32" fn recv(usize, [*]u8, c_int, c_int) callconv(.winapi) c_int;
     extern "ws2_32" fn send(usize, [*]const u8, c_int, c_int) callconv(.winapi) c_int;
-    extern "ws2_32" fn shutdown(usize, c_int) callconv(.winapi) c_int;
     extern "ws2_32" fn closesocket(usize) callconv(.winapi) c_int;
-    extern "kernel32" fn Sleep(u32) callconv(.winapi) void;
 };
 
-const WindowsDetachRace = struct {
+const WindowsDetachProbe = struct {
     looper: *Looper,
-    entered: std.atomic.Value(bool) = .init(false),
-    released: std.atomic.Value(bool) = .init(false),
     caller_thread: std.Thread.Id,
     ran_on_caller: bool = false,
-    done: std.atomic.Value(bool) = .init(false),
-    detached: std.atomic.Value(bool) = .init(false),
-    failures: std.atomic.Value(usize) = .init(0),
-    write_error: ?anyerror = null,
+    detached: bool = false,
+    failures: usize = 0,
+    reads: usize = 0,
 
-    fn write(self: *WindowsDetachRace) void {
-        const packets = [_]io.Packet{"must not send after detach"};
-        self.looper.write(&packets, .link, null) catch |err| {
-            self.write_error = err;
-        };
-        self.done.store(true, .release);
-    }
-    fn beforeWrite(context: ?*anyopaque) void {
-        const self: *WindowsDetachRace = @ptrCast(@alignCast(context.?));
-        self.entered.store(true, .release);
-        while (!self.released.load(.acquire)) source.core.sleepMs(1);
-    }
     fn read(context: ?*anyopaque, _: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
-        const self: *WindowsDetachRace = @ptrCast(@alignCast(context.?));
+        const self: *WindowsDetachProbe = @ptrCast(@alignCast(context.?));
         self.ran_on_caller = self.caller_thread == std.Thread.getCurrentId();
+        self.reads += 1;
+        if (self.reads == 1) return .pause;
+        if (self.reads == 2) return .keep;
         try self.looper.detach(.link);
-        self.detached.store(true, .release);
+        self.detached = true;
         return .keep;
     }
     fn failed(context: ?*anyopaque, _: io.Failure) void {
-        const self: *WindowsDetachRace = @ptrCast(@alignCast(context.?));
-        _ = self.failures.fetchAdd(1, .monotonic);
+        const self: *WindowsDetachProbe = @ptrCast(@alignCast(context.?));
+        self.failures += 1;
     }
 };
 
-test "Windows queued receive detaches before native write admission" {
+test "Windows TCP receive resumes and detaches its side on the looper thread" {
     if (builtin.os.tag != .windows) return error.SkipZigTest;
     const c = source.ffi.io;
     const ws = WindowsSockets;
@@ -333,50 +319,39 @@ test "Windows queued receive detaches before native write admission" {
     try std.testing.expect(ws.setsockopt(peer, 65535, 0x1006, &timeout, @sizeOf(u32)) == 0);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
-    var race = WindowsDetachRace{ .looper = &looper, .caller_thread = std.Thread.getCurrentId() };
-    looper.impl.testing_before_write = .{ .context = &race, .callback = WindowsDetachRace.beforeWrite };
+    var probe = WindowsDetachProbe{ .looper = &looper, .caller_thread = std.Thread.getCurrentId() };
     try looper.attach(.{
         .pair = .{ .link = socket },
-        .on_read = .{ .context = &race, .callback = WindowsDetachRace.read },
-        .on_failure = .{ .context = &race, .callback = WindowsDetachRace.failed },
+        .on_read = .{ .context = &probe, .callback = WindowsDetachProbe.read },
+        .on_failure = .{ .context = &probe, .callback = WindowsDetachProbe.failed },
     });
     transferred = true;
-    const writer = try std.Thread.spawn(.{}, WindowsDetachRace.write, .{&race});
-    defer {
-        race.released.store(true, .release);
-        _ = ws.shutdown(peer, 2);
-        writer.join();
-    }
-    var buffer: [64 * 1024]u8 = undefined;
-    // Hold the writer after the detached precheck, before native admission.
-    for (0..5000) |_| {
-        if (race.entered.load(.acquire)) break;
-        ws.Sleep(1);
-    }
-    try std.testing.expect(race.entered.load(.acquire));
     try std.testing.expectEqual(@as(c_int, 1), ws.send(peer, "x", 1, 0));
     for (0..5000) |_| {
-        if (race.detached.load(.acquire)) break;
+        if (probe.reads == 1) break;
         try std.testing.expect(try test_helpers.poll(&looper, 1));
     }
-    try std.testing.expect(race.detached.load(.acquire));
-    try std.testing.expect(!looper.isLinkAttached());
-    try std.testing.expect(race.ran_on_caller);
-    race.released.store(true, .release);
-    // Native admission must reject the retained write, then release the socket.
-    var received: usize = 0;
-    while (true) {
-        const count = ws.recv(peer, &buffer, buffer.len, 0);
-        try std.testing.expect(count >= 0);
-        if (count == 0) break;
-        received += @intCast(count);
-    }
+    try std.testing.expectEqual(@as(usize, 1), probe.reads);
+    try std.testing.expectEqual(@as(c_int, 1), ws.send(peer, "y", 1, 0));
+    // Receive while paused, then resume the consumer and the native read loop.
+    try std.testing.expect(try test_helpers.poll(&looper, 20));
+    try std.testing.expectEqual(@as(usize, 1), probe.reads);
+    try looper.resumeReading(.link);
     for (0..5000) |_| {
-        if (race.done.load(.acquire)) break;
-        ws.Sleep(1);
+        if (probe.reads == 2) break;
+        try std.testing.expect(try test_helpers.poll(&looper, 1));
     }
-    try std.testing.expect(race.done.load(.acquire));
-    try std.testing.expectEqual(@as(usize, 0), received);
-    try std.testing.expectEqual(error.SideNotAttached, race.write_error.?);
-    try std.testing.expectEqual(@as(usize, 0), race.failures.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 2), probe.reads);
+    try std.testing.expectEqual(@as(c_int, 1), ws.send(peer, "z", 1, 0));
+    for (0..5000) |_| {
+        if (probe.detached) break;
+        try std.testing.expect(try test_helpers.poll(&looper, 1));
+    }
+    try std.testing.expect(probe.detached);
+    try std.testing.expect(!looper.isLinkAttached());
+    try std.testing.expect(probe.ran_on_caller);
+    try std.testing.expectError(error.SideNotAttached, looper.write(&.{"after detach"}, .link, null));
+    var buffer: [1]u8 = undefined;
+    try std.testing.expectEqual(@as(c_int, 0), ws.recv(peer, &buffer, buffer.len, 0));
+    try std.testing.expectEqual(@as(usize, 0), probe.failures);
 }

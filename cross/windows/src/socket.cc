@@ -13,7 +13,6 @@
 #include <winrt/Windows.Networking.h>
 #include <chrono>
 #include <atomic>
-#include <condition_variable>
 #include <cstring>
 #include <memory>
 #include <mutex>
@@ -49,21 +48,12 @@ struct Socket::ReceiveState {
     bool reading = false;
     bool paused = false;
     bool channel_owned = false;
-    std::condition_variable read_stopped;
 
     ReceiveState() { check_hresult(CoIncrementMTAUsage(&apartment)); }
     ~ReceiveState() { CoDecrementMTAUsage(apartment); }
 
-    bool prepareReadLocked(bool has_stream) {
-        paused = false;
-        if (!callback || !has_stream || reading || channel_owned) return false;
-        reading = true;
-        return true;
-    }
-
     void finishReadLocked(int32_t error = 0) {
         reading = false;
-        read_stopped.notify_all();
         if (error && !channel_owned) deliverLocked(nullptr, 0, nullptr, error);
     }
 
@@ -171,46 +161,19 @@ bool Socket::Open(const char *hostname, uint16_t port,
 
 bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
     const auto state = receive_state_;
-    try {
-        bool start_read;
-        {
-            std::lock_guard lock(state->mutex);
-            if (callback && state->callback) return false;
-            state->callback = callback;
-            state->context = context;
-            start_read = state->prepareReadLocked(static_cast<bool>(stream_));
-        }
-        if (!start_read) return true;
-        ReadStream(state, stream_);
-        return true;
-    } catch (...) {
+    {
         std::lock_guard lock(state->mutex);
-        state->callback = nullptr;
-        state->context = nullptr;
-        state->reading = false;
-        return false;
+        if (callback && state->callback) return false;
+        state->callback = callback;
+        state->context = context;
     }
+    if (!callback || StartReading()) return true;
+    SetOnReceive(nullptr, nullptr);
+    return false;
 }
 
 bool Socket::ResumeReading() {
-    const auto state = receive_state_;
-    try {
-        bool start_read;
-        {
-            std::lock_guard lock(state->mutex);
-            // Resume must never restore a cleared context.
-            if (!state->callback) return false;
-            start_read = state->prepareReadLocked(static_cast<bool>(stream_));
-        }
-        if (!start_read) return true;
-        ReadStream(state, stream_);
-        return true;
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->reading = false;
-        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
-        return false;
-    }
+    return StartReading();
 }
 
 int32_t Socket::Write(const uint8_t *bytes, size_t length,
@@ -325,8 +288,7 @@ void Socket::TakeOver() {
     }
     receive_registration_.revoke();
     if (stream_) stream_.CancelIOAsync().get();
-    std::unique_lock lock(state->mutex);
-    state->read_stopped.wait(lock, [&] { return !state->reading; });
+    if (read_) read_.get();
 }
 
 void Socket::SetChannelWriter(
@@ -362,7 +324,7 @@ winrt_socket_address Socket::ParseAddress(HostName const &host, hstring const &p
     return result;
 }
 
-fire_and_forget Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSocket stream) {
+IAsyncAction Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSocket stream) {
     try {
         co_await resume_background();
         Buffer buffer{64 * 1024};
@@ -387,6 +349,26 @@ fire_and_forget Socket::ReadStream(std::shared_ptr<ReceiveState> state, StreamSo
     } catch (...) {
         std::lock_guard lock(state->mutex);
         state->finishReadLocked(to_hresult().value);
+    }
+}
+
+bool Socket::StartReading() {
+    const auto state = receive_state_;
+    {
+        std::lock_guard lock(state->mutex);
+        // Resume must never restore a cleared context.
+        if (!state->callback) return false;
+        state->paused = false;
+        if (!stream_ || state->reading || state->channel_owned) return true;
+        state->reading = true;
+    }
+    try {
+        read_ = ReadStream(state, stream_);
+        return true;
+    } catch (...) {
+        std::lock_guard lock(state->mutex);
+        state->reading = false;
+        return false;
     }
 }
 

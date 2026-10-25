@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
 
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
@@ -14,7 +13,8 @@ const io_c = ffi.io;
 /// WinRT queues owned packets; loopOnce waits for work and dispatches callbacks
 /// on its caller. Native callbacks signal the caller's existing mailbox wake event;
 /// no socket readiness polling or separate timer thread is needed.
-/// Lifecycle operations and loopOnce are caller-serialized, including detach.
+/// All public operations run on the looper thread (or before/after it runs).
+/// Only native receives cross threads; mutex protects their queue and shared flags.
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     options: helpers.Options,
@@ -27,7 +27,6 @@ pub const WindowsLooper = struct {
     timers: core.Fifo(Scheduled) = .{},
     next_timer_id: u64 = 1,
     callbacks: core.Fifo(Received) = .{},
-    testing_before_write: if (builtin.is_test) ?io.TimedTask else void = if (builtin.is_test) null else {},
 
     pub fn create(
         allocator: std.mem.Allocator,
@@ -54,13 +53,12 @@ pub const WindowsLooper = struct {
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
-        self.mutex.lock();
-        defer self.mutex.unlock();
         const until = if (max_wait_ms) |wait_ms|
             core.concurrency.deadlineAfterMs(core.monotonicNs(), wait_ms)
         else
             null;
-        while (!self.stopped and !self.hasCallbackLocked()) {
+        if (self.stopped) return false;
+        while (true) {
             const now = core.monotonicNs();
             var deadline = until;
             var pending = self.timers.head;
@@ -71,12 +69,18 @@ pub const WindowsLooper = struct {
                 const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
                 break :blk @intCast(@min(ms, std.math.maxInt(c_int)));
             } else -1;
+            self.mutex.lock();
+            if (self.hasCallbackLocked()) {
+                self.mutex.unlock();
+                break;
+            }
             self.waiting = true;
             self.mutex.unlock();
             var code: c_int = 0;
             const result = io_c.pp_mux_wait(self.options.mux, timeout_ms, &code);
             self.mutex.lock();
             self.waiting = false;
+            self.mutex.unlock();
             if (result < 0) {
                 failure.* = .{ .wait = if (code == 0) result else code };
                 return false;
@@ -87,14 +91,22 @@ pub const WindowsLooper = struct {
         }
         if (self.stopped) return false;
         for (0..self.options.max_read_count) |_| {
-            const node = self.callbacks.removeWhere({}, Received.isReady) orelse break;
+            self.mutex.lock();
+            const node = self.callbacks.removeWhere({}, Received.isReady) orelse {
+                self.mutex.unlock();
+                break;
+            };
             const side = node.side;
+            // A protocol callback may detach its own side.
+            side.retain();
             side.dispatched += 1;
             self.mutex.unlock();
             const keep = deliver(side, node.data.ptr, node.data.len, if (node.source) |*address| address else null, node.code);
             self.mutex.lock();
             side.reading = keep;
             self.freeReceived(node);
+            self.mutex.unlock();
+            side.release();
             if (self.stopped) return false;
         }
         const now = core.monotonicNs();
@@ -105,26 +117,21 @@ pub const WindowsLooper = struct {
         while (self.timers.removeWhere({}, Scheduled.isReady)) |node| {
             const task = node.task;
             self.allocator.destroy(node);
-            self.mutex.unlock();
             task.call();
-            self.mutex.lock();
             if (self.stopped) return false;
         }
         return true;
     }
 
-    // Called with mutex held. Queued input/deadlines cover notifications before
+    // Called with mutex held. Queued input covers notifications before
     // the wait; signalling only a current waiter avoids leaving stale wake events.
     fn notifyLocked(self: *WindowsLooper) void {
         if (self.waiting) _ = io_c.pp_mux_wake(self.options.mux);
     }
 
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
-        self.mutex.lock();
         self.stopped = true;
         while (self.timers.take()) |node| self.allocator.destroy(node);
-        self.notifyLocked();
-        self.mutex.unlock();
         try self.detach(.link);
         try self.detach(.tun);
     }
@@ -137,8 +144,6 @@ pub const WindowsLooper = struct {
         delay_ms: u64,
         task: io.TimedTask,
     ) io.SubmissionError!void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         errdefer self.allocator.destroy(node);
@@ -154,16 +159,12 @@ pub const WindowsLooper = struct {
         }
         self.timers.append(node);
         timer.id = node.id;
-        self.notifyLocked();
     }
 
     pub fn cancelTimer(self: *WindowsLooper, timer: *io.Timer) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
         const id = timer.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         timer.id = null;
-        self.notifyLocked();
     }
 
     const Scheduled = struct {
@@ -186,8 +187,6 @@ pub const WindowsLooper = struct {
         self: *WindowsLooper,
         arguments: helpers.AttachArguments,
     ) helpers.AttachError!void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
         if (self.options.max_read_count == 0) return error.InvalidBuffers;
         if (self.stopped) return error.LooperUnavailable;
         const slot = &self.sides[@intFromEnum(std.meta.activeTag(arguments.pair))];
@@ -210,20 +209,16 @@ pub const WindowsLooper = struct {
         destination: ?io.SocketAddress,
     ) helpers.WriteError!void {
         if (packets.len == 0) return;
-        const side = try self.acquireSide(tag);
-        defer side.release();
+        const side = try self.getSide(tag);
         if (side.arguments.pair == .link and side.arguments.pair.link.unconnected and destination == null)
             return error.MissingDestination;
         for (packets) |packet| {
-            if (side.detached.load(.acquire)) return error.SideNotAttached;
-            if (builtin.is_test) if (self.testing_before_write) |hook| hook.call();
             const result = switch (side.arguments.pair) {
                 .link => |socket| try socket.write(packet, destination),
                 .tun => |tun| try tun.write(packet),
             };
             if (result) |failure| {
-                if (side.detached.load(.acquire)) return error.SideNotAttached;
-                // Queue directly; the retained side and queue lock cover detach.
+                // Native and synchronous write errors use the same input queue.
                 _ = onReceive(side, null, 0, null, failure.io.code.?);
                 return;
             }
@@ -243,7 +238,7 @@ pub const WindowsLooper = struct {
             return;
         };
         slot.* = null;
-        side.detached.store(true, .release);
+        side.detached = true;
         core.logging.writef(.notice, "Windows looper {s}: queued={}, dispatched={}, reading={}", .{
             @tagName(tag), side.queued, side.dispatched, side.reading,
         });
@@ -252,8 +247,7 @@ pub const WindowsLooper = struct {
         }
         while (self.callbacks.removeWhere(side, Received.belongsTo)) |node| self.freeReceived(node);
         self.mutex.unlock();
-        // Never hold the looper lock while draining native callbacks: a consumer
-        // may reenter detach. Writers retain the side until their batch exits.
+        // Native delivery takes the queue lock, so drain it with that lock released.
         switch (side.arguments.pair) {
             inline else => |wrapper| wrapper.setOnReceive(null, null) catch unreachable,
         }
@@ -261,31 +255,21 @@ pub const WindowsLooper = struct {
     }
 
     pub fn isAttached(self: *const WindowsLooper, side: io.Side) bool {
-        const mutex = @constCast(&self.mutex);
-        mutex.lock();
-        defer mutex.unlock();
         return self.sides[@intFromEnum(side)] != null;
     }
 
     pub fn resumeReading(self: *WindowsLooper, side: io.Side) io.SubmissionError!void {
-        const attachment = self.acquireSide(side) catch return error.LooperUnavailable;
-        defer attachment.release();
+        const attachment = self.getSide(side) catch return error.LooperUnavailable;
         self.mutex.lock();
         attachment.reading = true;
-        self.notifyLocked();
         self.mutex.unlock();
-        // Re-registering must not race with detach clearing the callback.
         if (attachment.arguments.pair == .link)
             attachment.arguments.pair.link.resumeReading() catch return error.LooperUnavailable;
     }
 
-    fn acquireSide(self: *WindowsLooper, tag: io.Side) error{ LooperUnavailable, SideNotAttached }!*SideIO {
-        self.mutex.lock();
-        defer self.mutex.unlock();
+    fn getSide(self: *WindowsLooper, tag: io.Side) error{ LooperUnavailable, SideNotAttached }!*SideIO {
         if (self.stopped) return error.LooperUnavailable;
-        const side = self.sides[@intFromEnum(tag)] orelse return error.SideNotAttached;
-        side.retain();
-        return side;
+        return self.sides[@intFromEnum(tag)] orelse return error.SideNotAttached;
     }
 
     const SideIO = struct {
@@ -296,15 +280,17 @@ pub const WindowsLooper = struct {
         queued: u64 = 0,
         dispatched: u64 = 0,
         allocation_failure: ?Received = null,
-        references: std.atomic.Value(usize) = .init(1),
-        detached: std.atomic.Value(bool) = .init(false),
+        // Ownership and in-progress dispatches are confined to the looper thread.
+        references: usize = 1,
+        detached: bool = false,
 
         fn retain(self: *SideIO) void {
-            _ = self.references.fetchAdd(1, .monotonic);
+            self.references += 1;
         }
 
         fn release(self: *SideIO) void {
-            if (self.references.fetchSub(1, .acq_rel) != 1) return;
+            self.references -= 1;
+            if (self.references != 0) return;
             switch (self.arguments.pair) {
                 inline else => |wrapper| wrapper.cleanup(),
             }
@@ -342,7 +328,6 @@ pub const WindowsLooper = struct {
             self.allocator.free(node.data);
             self.allocator.destroy(node);
         }
-        side.release();
     }
 
     fn onReceive(
@@ -356,13 +341,12 @@ pub const WindowsLooper = struct {
         const self = side.owner;
         self.mutex.lock();
         defer self.mutex.unlock();
-        if (side.detached.load(.acquire) or side.allocation_failure != null) return false;
+        if (side.detached or side.allocation_failure != null) return false;
         const node = self.copyReceived(side, if (length == 0) &.{} else bytes[0..length], source, code) catch blk: {
             // Reserve failure delivery without allocating on the OOM path.
             side.allocation_failure = .{ .side = side, .code = -2147024882 }; // E_OUTOFMEMORY
             break :blk &side.allocation_failure.?;
         };
-        side.retain();
         self.callbacks.append(node);
         side.queued += 1;
         self.notifyLocked();
@@ -388,7 +372,7 @@ pub const WindowsLooper = struct {
         source: [*c]const io.SocketAddress,
         code: i32,
     ) bool {
-        if (self.detached.load(.acquire)) return false;
+        if (self.detached) return false;
         const arguments = self.arguments;
         const on_read = arguments.on_read;
         const on_failure = arguments.on_failure;
@@ -404,11 +388,11 @@ pub const WindowsLooper = struct {
         const addresses: ?[]const io.SocketAddress = if (source == null) null else source[0..1];
         if (on_read) |callback| {
             const action = callback.call(&packets, addresses) catch |err| {
-                if (self.detached.load(.acquire)) return false;
+                if (self.detached) return false;
                 if (on_failure) |failure| failure.call(.{ .user = err });
                 return false;
             };
-            return action == .keep and !self.detached.load(.acquire);
+            return action == .keep and !self.detached;
         }
         return true;
     }

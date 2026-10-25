@@ -54,14 +54,16 @@ private:
     static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
     static winrt_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host,
         winrt::hstring const &port);
-    static winrt::fire_and_forget ReadStream(std::shared_ptr<ReceiveState> state,
+    static winrt::Windows::Foundation::IAsyncAction ReadStream(std::shared_ptr<ReceiveState> state,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
+    bool StartReading();
     void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
     std::shared_ptr<ReceiveState> receive_state_;
     winrt::Windows::Networking::Sockets::DatagramSocket datagram_{nullptr};
     winrt::Windows::Networking::Sockets::StreamSocket stream_{nullptr};
+    winrt::Windows::Foundation::IAsyncAction read_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
     std::function<int32_t(const uint8_t *, size_t)> channel_write_;
     std::atomic<bool> writes_stopped_{false};

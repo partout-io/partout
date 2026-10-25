@@ -41,7 +41,8 @@ Create a socket, configure it through the tunnel controller, then open it.
 For connected sockets, association must happen before connect. The Partout adapter passes
 the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
 
-UDP uses the OS `MessageReceived` event. TCP runs an asynchronous read loop.
+UDP uses the OS `MessageReceived` event. TCP owns an `IAsyncAction` read loop;
+channel takeover cancels native I/O and joins that task directly.
 Both deliver buffers or errors to the registered callback and borrowed context.
 Clearing the callback drains delivery; callbacks only queue input and must not
 reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
@@ -66,8 +67,11 @@ processing. TUN writes copy packets into channel receive buffers and call
 `AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`. Link writes use
 the socket during negotiation, then the channel send-buffer append/flush APIs
 after startup. This requires the channel append/flush APIs
-(Windows build 20348 or later). Detach drains input callbacks and rejects new
-writes, while retained attachments let already admitted writes finish.
+(Windows build 20348 or later). All WindowsLooper operations run on its owner
+thread, including writes, timers and detach. Its mutex protects only the receive
+queue and flags shared with native callbacks. Detach drains native delivery and
+discards queued input; an in-progress protocol callback retains its attachment
+until it returns, so it may safely detach its own side.
 
 ### Unconnected UDP (WireGuard)
 
