@@ -608,9 +608,9 @@ const ConnectionDaemon = struct {
     // The actor serializes these methods and their updates to the shared Daemon.
     // Gate callbacks and protocol controls run inline on the same actor thread.
 
-    fn doStart(self: *ConnectionDaemon) Error!void {
-        log.write(.debug, "ConnectionDaemon.doStart entered");
-        errdefer |err| log.writef(.err, "ConnectionDaemon.doStart failed: {s}", .{@errorName(err)});
+    fn handleStart(self: *ConnectionDaemon) Error!void {
+        log.write(.debug, "ConnectionDaemon.handleStart entered");
+        errdefer |err| log.writef(.err, "ConnectionDaemon.handleStart failed: {s}", .{@errorName(err)});
         if (self.daemon.state != .initial) return error.AlreadyStarted;
         try self.createConnection();
         try self.daemon.beginStart();
@@ -646,10 +646,10 @@ const ConnectionDaemon = struct {
         } else {
             _ = self.gate.setEnabled(true);
         }
-        log.write(.debug, "ConnectionDaemon.doStart returned");
+        log.write(.debug, "ConnectionDaemon.handleStart returned");
     }
 
-    fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
+    fn handleStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
         self.conn_request = null;
         if (self.worker) |worker| worker.close();
@@ -819,7 +819,7 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
+    fn handleConnectionPrepared(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         if (self.conn_request != setup.request_id or self.daemon.state != .started) {
             setup.deinit();
             return;
@@ -845,7 +845,7 @@ const ConnectionDaemon = struct {
             self.connectionRequestFailed(setup.action, err);
             return;
         };
-        const connection = self.connection orelse @panic("setupConnection but no connection");
+        const connection = self.connection orelse @panic("handleConnectionPrepared but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
         if (remote.link) |link| {
@@ -979,7 +979,7 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn doResumeGate(self: *ConnectionDaemon) void {
+    fn handleResumeGate(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) {
             log.write(.info, "Ignore resume connection gate, daemon not started");
             return;
@@ -1322,7 +1322,7 @@ const ConnectionDaemon = struct {
         self.jobs_mutex.unlock();
 
         // Explicit shutdown must also finalize a connection if stop was not run.
-        self.doStop(if (unexpected_exit) .preserve_environment else .clear_environment);
+        self.handleStop(if (unexpected_exit) .preserve_environment else .clear_environment);
 
         // Discard outstanding jobs.
         while (pending) |job| {
@@ -1420,13 +1420,15 @@ const ConnectionDaemon = struct {
         _ = io_c.pp_mux_wake(self.mux);
     }
 
+    // Controls use plain verbs; incoming on... callbacks enqueue messages.
+    // Dispatch invokes handle... methods on the actor; helpers use ordinary names.
     fn dispatch(self: *ConnectionDaemon, message: Message) Error!void {
         switch (message) {
-            .start => try self.doStart(),
-            .hold => self.doStop(.preserve_environment),
-            .stop => self.doStop(.clear_environment),
-            .resumeGate => self.doResumeGate(),
-            .setupConnection => |setup| self.setupConnection(setup) catch |err| self.connectionRequestFailed(setup.action, err),
+            .start => try self.handleStart(),
+            .hold => self.handleStop(.preserve_environment),
+            .stop => self.handleStop(.clear_environment),
+            .resumeGate => self.handleResumeGate(),
+            .setupConnection => |setup| self.handleConnectionPrepared(setup) catch |err| self.connectionRequestFailed(setup.action, err),
             .onReachability => |reachability| self.handleReachabilitySignal(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
