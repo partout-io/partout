@@ -480,15 +480,11 @@ const ConnectionDaemon = struct {
 
     //#region Any thread - asynchronous events
 
-    // Invoked by ConnectionWorker upon complete setup.
-    fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        const job: *Job = @ptrCast(@alignCast(context));
-        job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
-        self.enqueue(job) catch {
-            setup.deinit();
-            job.message.deinit(self.daemon.allocator);
-            self.daemon.allocator.destroy(job);
+    // This is where connection events are rerouted through the actor
+    fn events(self: *ConnectionDaemon) Connection.Events {
+        return .{
+            .ctx = self,
+            .event = onConnectionEvent,
         };
     }
 
@@ -558,6 +554,18 @@ const ConnectionDaemon = struct {
                 };
             },
         }
+    }
+
+    // Invoked by ConnectionWorker upon complete setup.
+    fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        const job: *Job = @ptrCast(@alignCast(context));
+        job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
+        self.enqueue(job) catch {
+            setup.deinit();
+            job.message.deinit(self.daemon.allocator);
+            self.daemon.allocator.destroy(job);
+        };
     }
 
     // Network callbacks may originate while the platform owns a lock that is
@@ -719,14 +727,14 @@ const ConnectionDaemon = struct {
                 const tun = if (setup.tun_info) |info| self.createConnectionTun(info) catch |err| {
                     // Protocol control has not taken ownership of the prepared link.
                     if (connection.daemon_io != .looper) setup.deinit();
-                    self.handleLinkRefreshFailed(err);
+                    self.handleConnectionLinkFailed(err);
                     return;
                 } else null;
                 const rebound = connection.rebind(remote, tun) catch |err| {
-                    self.handleLinkRefreshFailed(err);
+                    self.handleConnectionLinkFailed(err);
                     return;
                 };
-                if (!rebound) self.handleLinkRefreshFailed(error.UnableToStart);
+                if (!rebound) self.handleConnectionLinkFailed(error.UnableToStart);
             },
         }
     }
@@ -739,7 +747,7 @@ const ConnectionDaemon = struct {
                 _ = self.daemon.handleStartError(error.UnableToStart);
                 self.trackConnectionStatus(.disconnected);
             },
-            .rebind => self.handleLinkRefreshFailed(err),
+            .rebind => self.handleConnectionLinkFailed(err),
         }
     }
 
@@ -784,6 +792,30 @@ const ConnectionDaemon = struct {
         if (self.conn_request != null) self.is_stale_conn_request = true;
         const connection = self.connection orelse @panic("handleBetterPath but no connection");
         connection.betterPath();
+    }
+
+    fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
+        switch (event) {
+            .established => |success| {
+                self.handleConnectionEstablished(success) catch |err| {
+                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
+                    self.handleConnectionFailed(.{
+                        .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
+                        .disposition = .reconnect,
+                    });
+                };
+            },
+            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.handleConnectionLinkFailed(err),
+            .failed => |failure| self.handleConnectionFailed(failure),
+            .stopped => self.handleConnectionStopped(),
+            .set_env => |update| {
+                // Finalization clears values while stopping; late updates stay ignored.
+                if (self.daemon.state == .started or update.value == null) {
+                    self.daemon.controller.setEnvironmentValue(update.key, update.value);
+                }
+            },
+            .data_count => |count| self.daemon.handleDataCount(count),
+        }
     }
 
     fn handleConnectionEstablished(
@@ -842,7 +874,7 @@ const ConnectionDaemon = struct {
         self.requestConnection(.rebind, info);
     }
 
-    fn handleLinkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
+    fn handleConnectionLinkFailed(self: *ConnectionDaemon, err: anyerror) void {
         log.writef(.err, "Unable to refresh connection link: {s}", .{@errorName(err)});
         self.handleConnectionFailed(.{
             .err_pair = .{ .code = switch (err) {
@@ -1135,30 +1167,6 @@ const ConnectionDaemon = struct {
         }
     }
 
-    fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
-        switch (event) {
-            .established => |success| {
-                self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
-                    self.handleConnectionFailed(.{
-                        .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
-                        .disposition = .reconnect,
-                    });
-                };
-            },
-            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.handleLinkRefreshFailed(err),
-            .failed => |failure| self.handleConnectionFailed(failure),
-            .stopped => self.handleConnectionStopped(),
-            .set_env => |update| {
-                // Finalization clears values while stopping; late updates stay ignored.
-                if (self.daemon.state == .started or update.value == null) {
-                    self.daemon.controller.setEnvironmentValue(update.key, update.value);
-                }
-            },
-            .data_count => |count| self.daemon.handleDataCount(count),
-        }
-    }
-
     fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
         if (failure) |value| {
             log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
@@ -1445,14 +1453,6 @@ const ConnectionDaemon = struct {
         self.conn_request = null;
         self.looper.cancelTimer(&self.resume_gate_timer);
         _ = self.gate.setEnabled(false);
-    }
-
-    // This is where connection events are rerouted through the actor
-    fn events(self: *ConnectionDaemon) Connection.Events {
-        return .{
-            .ctx = self,
-            .event = onConnectionEvent,
-        };
     }
 
     fn logEventSubmissionFailure(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
