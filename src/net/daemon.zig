@@ -290,7 +290,7 @@ pub const Daemon = struct {
         self.state = .failed;
         switch (self.implementation) {
             .settings => {},
-            .connection => |connection| connection.pause(),
+            .connection => |daemon| daemon.pause(),
         }
     }
 };
