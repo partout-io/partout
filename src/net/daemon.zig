@@ -1479,7 +1479,6 @@ const ConnectionDaemon = struct {
     }
 
     //#endregion
-
 };
 
 //#region Error mapping
