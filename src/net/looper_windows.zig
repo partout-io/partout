@@ -203,7 +203,7 @@ pub const WindowsLooper = struct {
         slot.* = side;
         errdefer slot.* = null;
         switch (arguments.pair) {
-            inline else => |wrapper| try wrapper.setOnReceive(onReceive, side),
+            inline else => |wrapper| wrapper.setOnReceive(onReceive, side) catch return error.LooperUnavailable,
         }
     }
 
@@ -280,7 +280,8 @@ pub const WindowsLooper = struct {
         self.timer_condition.broadcast();
         self.mutex.unlock();
         // Re-registering must not race with detach clearing the callback.
-        if (attachment.arguments.pair == .link) try attachment.arguments.pair.link.resumeReading();
+        if (attachment.arguments.pair == .link)
+            attachment.arguments.pair.link.resumeReading() catch return error.LooperUnavailable;
     }
 
     fn acquireSide(self: *WindowsLooper, tag: io.Side) error{ LooperUnavailable, SideNotAttached }!*SideIO {

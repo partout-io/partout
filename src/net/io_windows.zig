@@ -106,17 +106,18 @@ pub const SocketWrapper = struct {
         self: *SocketWrapper,
         callback: OnReceive,
         context: ?*anyopaque,
-    ) io.SubmissionError!void {
+    ) error{ReceiveFailure}!void {
         if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         if (callback == null) {
-            if (!io_c.winrt_socket_set_on_receive(self.socket, null, null)) return error.LooperUnavailable;
-        } else if (self.on_receive != null) return error.LooperUnavailable;
+            if (!io_c.winrt_socket_set_on_receive(self.socket, null, null))
+                @panic("Failed to clear WinRT socket receive callback");
+        } else if (self.on_receive != null) return error.ReceiveFailure;
         self.on_receive = callback;
         self.receive_context = context;
         if (callback != null and !io_c.winrt_socket_set_on_receive(self.socket, onNativeReceive, self)) {
             self.on_receive = null;
             self.receive_context = null;
-            return error.LooperUnavailable;
+            return error.ReceiveFailure;
         }
     }
 
@@ -139,9 +140,9 @@ pub const SocketWrapper = struct {
         return callback(self.receive_context, bytes, length, if (source == null) null else &address, code);
     }
 
-    pub fn resumeReading(self: *SocketWrapper) io.SubmissionError!void {
+    pub fn resumeReading(self: *SocketWrapper) error{ReceiveFailure}!void {
         if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
-        if (!io_c.winrt_socket_resume_reading(self.socket)) return error.LooperUnavailable;
+        if (!io_c.winrt_socket_resume_reading(self.socket)) return error.ReceiveFailure;
     }
 
     pub fn stopWrites(self: *SocketWrapper) void {
@@ -205,18 +206,19 @@ pub const TunWrapper = struct {
         return self;
     }
 
-    pub fn setOnReceive(self: *TunWrapper, callback: OnReceive, context: ?*anyopaque) io.SubmissionError!void {
+    pub fn setOnReceive(self: *TunWrapper, callback: OnReceive, context: ?*anyopaque) error{ReceiveFailure}!void {
         if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const native: io_c.winrt_tun = @ptrCast(self.tun);
         if (callback == null) {
-            if (!io_c.winrt_tun_set_on_receive(native, null, null)) return error.LooperUnavailable;
-        } else if (self.on_receive != null) return error.LooperUnavailable;
+            if (!io_c.winrt_tun_set_on_receive(native, null, null))
+                @panic("Failed to clear WinRT TUN receive callback");
+        } else if (self.on_receive != null) return error.ReceiveFailure;
         self.on_receive = callback;
         self.receive_context = context;
         if (callback != null and !io_c.winrt_tun_set_on_receive(native, onNativeReceive, self)) {
             self.on_receive = null;
             self.receive_context = null;
-            return error.LooperUnavailable;
+            return error.ReceiveFailure;
         }
     }
 
@@ -233,6 +235,10 @@ pub const TunWrapper = struct {
     pub fn write(self: *TunWrapper, packet: io.Packet) io.SubmissionError!?io.Failure {
         if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const code = io_c.winrt_tun_write(@ptrCast(self.tun), packet.ptr, packet.len);
-        return if (code == 0) null else .{ .io = .{ .side = .tun, .cause = error.LibcFailure, .code = code } };
+        return if (code == 0) null else .{ .io = .{
+            .side = .tun,
+            .cause = error.LibcFailure,
+            .code = code,
+        } };
     }
 };
