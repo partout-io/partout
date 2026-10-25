@@ -766,7 +766,7 @@ const ConnectionDaemon = struct {
 
     fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) void {
         if (self.conn_request != null) return;
-        self.submitConnectionRequest(action, tun_info) catch |err| self.connectionRequestFailed(action, err);
+        self.submitConnectionRequest(action, tun_info) catch |err| self.handleConnectionRequestFailed(action, err);
     }
 
     fn submitConnectionRequest(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) !void {
@@ -842,7 +842,7 @@ const ConnectionDaemon = struct {
             self.conn_request = null;
         };
         const remote = setup.remote catch |err| {
-            self.connectionRequestFailed(setup.action, err);
+            self.handleConnectionRequestFailed(setup.action, err);
             return;
         };
         const connection = self.connection orelse @panic("handleConnectionPrepared but no connection");
@@ -870,14 +870,14 @@ const ConnectionDaemon = struct {
                 const tun = if (setup.tun_info) |info| self.createConnectionTun(info) catch |err| {
                     // Protocol control has not taken ownership of the prepared link.
                     if (connection.daemon_io != .looper) setup.deinit();
-                    self.linkRefreshFailed(err);
+                    self.handleLinkRefreshFailed(err);
                     return;
                 } else null;
                 const rebound = connection.rebind(remote, tun) catch |err| {
-                    self.linkRefreshFailed(err);
+                    self.handleLinkRefreshFailed(err);
                     return;
                 };
-                if (!rebound) self.linkRefreshFailed(error.UnableToStart);
+                if (!rebound) self.handleLinkRefreshFailed(error.UnableToStart);
             },
         }
     }
@@ -903,7 +903,7 @@ const ConnectionDaemon = struct {
         return descriptor;
     }
 
-    fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
+    fn handleConnectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
         self.conn_request = null;
         switch (action) {
             .start => {
@@ -911,7 +911,7 @@ const ConnectionDaemon = struct {
                 _ = self.daemon.handleStartError(error.UnableToStart);
                 self.trackConnectionStatus(.disconnected);
             },
-            .rebind => self.linkRefreshFailed(err),
+            .rebind => self.handleLinkRefreshFailed(err),
         }
     }
 
@@ -1078,7 +1078,7 @@ const ConnectionDaemon = struct {
         self.requestConnection(.rebind, info);
     }
 
-    fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
+    fn handleLinkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
         log.writef(.err, "Unable to refresh connection link: {s}", .{@errorName(err)});
         self.handleConnectionFailed(.{
             .err_pair = .{ .code = switch (err) {
@@ -1423,7 +1423,7 @@ const ConnectionDaemon = struct {
             .hold => self.handleStop(.preserve_environment),
             .stop => self.handleStop(.clear_environment),
             .resumeGate => self.handleResumeGate(),
-            .setupConnection => |setup| self.handleConnectionPrepared(setup) catch |err| self.connectionRequestFailed(setup.action, err),
+            .setupConnection => |setup| self.handleConnectionPrepared(setup) catch |err| self.handleConnectionRequestFailed(setup.action, err),
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
@@ -1441,7 +1441,7 @@ const ConnectionDaemon = struct {
                     });
                 };
             },
-            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.linkRefreshFailed(err),
+            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.handleLinkRefreshFailed(err),
             .failed => |failure| self.handleConnectionFailed(failure),
             .stopped => self.handleConnectionStopped(),
             .set_env => |update| {
