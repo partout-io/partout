@@ -668,7 +668,7 @@ const ConnectionDaemon = struct {
         self.daemon.finishStop();
     }
 
-    fn handleConnectionPrepared(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
+    fn handleConnectionSetup(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         if (self.conn_request != setup.request_id or self.daemon.state != .started) {
             setup.deinit();
             return;
@@ -1128,7 +1128,7 @@ const ConnectionDaemon = struct {
             .hold => self.handleStop(.preserve_environment),
             .stop => self.handleStop(.clear_environment),
             .resumeGate => self.handleResumeGate(),
-            .setupConnection => |setup| self.handleConnectionPrepared(setup) catch |err| self.handleConnectionRequestFailed(setup.action, err),
+            .setupConnection => |setup| self.handleConnectionSetup(setup) catch |err| self.handleConnectionRequestFailed(setup.action, err),
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
@@ -1194,10 +1194,16 @@ const ConnectionDaemon = struct {
         });
         errdefer connection.destroy();
         const worker = if (connection.daemon_io != .none)
-            try ConnectionWorker.create(self.daemon.allocator, self.resolver, self.factory, connection.endpoints(), .{
-                .context = self,
-                .call = onConnectionPrepared,
-            })
+            try ConnectionWorker.create(
+                self.daemon.allocator,
+                self.resolver,
+                self.factory,
+                connection.endpoints(),
+                .{
+                    .context = self,
+                    .call = onConnectionPrepared,
+                },
+            )
         else
             null;
         self.worker = worker;
