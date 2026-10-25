@@ -799,25 +799,6 @@ const ConnectionDaemon = struct {
         self.trackConnectionStatus(.connected);
     }
 
-    fn handleConnectionFailed(
-        self: *ConnectionDaemon,
-        failure: Connection.Events.Failure,
-    ) void {
-        if (self.daemon.state != .started) return;
-        // Failure callbacks leave the session owned by Connection. Finalize
-        // it before the gate can start another attempt.
-        self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
-            log.writef(.err, "Unable to stop failed connection: {s}", .{@errorName(err)});
-            return;
-        };
-        self.clearConnectionTunnel();
-        self.daemon.handleLastError(failure.err_pair);
-        switch (failure.disposition) {
-            .reconnect => self.trackConnectionStatus(.disconnected),
-            .cancel => self.cancelConnection(failure.err_pair),
-        }
-    }
-
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) !void {
         if (self.daemon.state != .started or self.conn_request != null) return;
         const connection = self.connection orelse @panic("handleConnectionNeedsRebind but no connection");
@@ -859,6 +840,25 @@ const ConnectionDaemon = struct {
         self.conn_request = null;
         self.clearConnectionTunnel();
         self.trackConnectionStatus(.disconnected);
+    }
+
+    fn handleConnectionFailed(
+        self: *ConnectionDaemon,
+        failure: Connection.Events.Failure,
+    ) void {
+        if (self.daemon.state != .started) return;
+        // Failure callbacks leave the session owned by Connection. Finalize
+        // it before the gate can start another attempt.
+        self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
+            log.writef(.err, "Unable to stop failed connection: {s}", .{@errorName(err)});
+            return;
+        };
+        self.clearConnectionTunnel();
+        self.daemon.handleLastError(failure.err_pair);
+        switch (failure.disposition) {
+            .reconnect => self.trackConnectionStatus(.disconnected),
+            .cancel => self.cancelConnection(failure.err_pair),
+        }
     }
 
     fn handleResumeGate(self: *ConnectionDaemon) void {
