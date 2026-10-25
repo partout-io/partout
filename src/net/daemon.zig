@@ -896,6 +896,21 @@ const ConnectionDaemon = struct {
         self.trackConnectionStatus(.disconnected);
     }
 
+    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
+        if (failure) |value| {
+            log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
+        } else {
+            log.write(.fault, "Connection event loop terminated unexpectedly without an I/O failure");
+        }
+        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
+            .{ .code = code }
+        else
+            null;
+        if (err_pair) |err| self.daemon.handleLastError(err);
+        self.daemon.controller.setReasserting(false);
+        self.daemon.requestCancellation(err_pair, true);
+    }
+
     //#endregion
 
     //#region Actor thread - I/O callbacks
@@ -1165,21 +1180,6 @@ const ConnectionDaemon = struct {
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
         }
-    }
-
-    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
-        if (failure) |value| {
-            log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
-        } else {
-            log.write(.fault, "Connection event loop terminated unexpectedly without an I/O failure");
-        }
-        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
-            .{ .code = code }
-        else
-            null;
-        if (err_pair) |err| self.daemon.handleLastError(err);
-        self.daemon.controller.setReasserting(false);
-        self.daemon.requestCancellation(err_pair, true);
     }
 
     //#endregion
