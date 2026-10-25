@@ -46,6 +46,12 @@ Both deliver buffers or errors to the registered callback and borrowed context.
 Clearing the callback drains delivery; callbacks only queue input and must not
 reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
 asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
+Callers serialize writes with other writes, socket configuration, channel
+takeover, writer replacement and destruction. The daemon actor provides this
+serialization for OpenVPN; WireGuard's passive adapter holds its write lock.
+Stopping writes and clearing receive callbacks may overlap an admitted write;
+the owner keeps the socket alive until that write returns. Receive delivery
+retains its own synchronization and state for outstanding native operations.
 
 ### Connected transports (OpenVPN)
 

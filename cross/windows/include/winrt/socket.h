@@ -39,7 +39,7 @@ typedef struct {
 typedef bool (*winrt_socket_on_receive)(void *context, const uint8_t *bytes,
     size_t length, const winrt_socket_address *source, int32_t error);
 
-/* Close the owned socket and free the wrapper. */
+/* Close the owned socket and free the wrapper after all callers have returned. */
 void winrt_socket_free(winrt_socket socket);
 
 /* Create the transport before configuring and opening it. */
@@ -55,8 +55,10 @@ bool winrt_socket_set_on_receive(winrt_socket socket, winrt_socket_on_receive ca
 /* Resume paused delivery without restoring a cleared callback. */
 bool winrt_socket_resume_reading(winrt_socket socket);
 
-/* Serialized synchronous completion of WriteAsync; writes one whole datagram
- * or all stream bytes. Returns zero or HRESULT. Unconnected UDP needs destination. */
+/* Synchronous completion of WriteAsync; writes one whole datagram or all stream
+ * bytes. Callers serialize writes with other writes, open/configuration and free.
+ * StopWrites and receive callback management may overlap a write.
+ * Returns zero or HRESULT. Unconnected UDP needs destination. */
 int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
     const winrt_socket_address *destination);
 

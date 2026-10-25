@@ -38,10 +38,7 @@ struct SocketApartment {
 struct SocketReceiveState {
     std::shared_ptr<SocketApartment> apartment;
     std::mutex mutex;
-    std::mutex write_mutex;
-    std::function<int32_t(const uint8_t *, size_t)> channel_write;
-    std::atomic<bool> writes_stopped{false};
-    std::atomic<uint64_t> received{0}, sent{0};
+    std::atomic<uint64_t> received{0};
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
     bool reading = false;
@@ -163,7 +160,7 @@ Socket::Socket(winrt_socket_proto proto, bool unconnected) {
 Socket::~Socket() noexcept {
     SetOnReceive(nullptr, nullptr);
     if (adapter_) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
-        receive_state_->received.load(), receive_state_->sent.load());
+        receive_state_->received.load(), sent_);
     // Each cleanup is independent, so a failed event revocation cannot skip Close.
     try { if (datagram_ && receiving_) datagram_.MessageReceived(receive_token_); } catch (...) {}
     try { if (datagram_) datagram_.Close(); } catch (...) {}
@@ -288,27 +285,20 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         if ((!bytes && length) || length > UINT32_MAX)
             throw hresult_invalid_argument();
         Apartment apartment;
-        const auto state = receive_state_;
-        const auto stream = stream_;
-        const auto datagram = datagram_;
-        const bool unconnected = unconnected_;
-        const bool ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_;
-        // Retain transports and the lock independently of wrapper destruction.
-        std::lock_guard lock(state->write_mutex);
-        if (state->writes_stopped.load()) return E_ABORT;
-        if (state->channel_write) {
-            check_hresult(state->channel_write(bytes, length));
+        if (writes_stopped_.load()) return E_ABORT;
+        if (channel_write_) {
+            check_hresult(channel_write_(bytes, length));
             return 0;
         }
         IOutputStream output{nullptr};
-        if (stream) {
-            output = stream.OutputStream();
-        } else if (!unconnected) {
-            output = datagram.OutputStream();
+        if (stream_) {
+            output = stream_.OutputStream();
+        } else if (!unconnected_) {
+            output = datagram_.OutputStream();
         } else {
             if (!destination || (destination->family != 4 && destination->family != 6) ||
-                (destination->family == 4 && !ipv4) ||
-                (destination->family == 6 && !ipv6))
+                (destination->family == 4 && !accepts_ipv4_) ||
+                (destination->family == 6 && !accepts_ipv6_))
                 throw hresult_invalid_argument();
             wchar_t address[INET6_ADDRSTRLEN]{};
             if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
@@ -317,7 +307,7 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
             std::wstring host{address};
             if (destination->family == 6 && destination->scope_id)
                 host += L"%" + std::to_wstring(destination->scope_id);
-            output = datagram.GetOutputStreamAsync(
+            output = datagram_.GetOutputStreamAsync(
                 HostName{host}, to_hstring(destination->port)).get();
         }
         // Keep each UDP packet in a single WriteAsync. TCP may complete short.
@@ -328,12 +318,12 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
             if (buffer.Length()) memcpy(buffer.data(), bytes + offset, buffer.Length());
             const auto written = output.WriteAsync(buffer).get();
             if (written > buffer.Length() ||
-                (datagram && written != buffer.Length()) ||
-                (stream && buffer.Length() && !written))
+                (datagram_ && written != buffer.Length()) ||
+                (stream_ && buffer.Length() && !written))
                 throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));
             offset += written;
         } while (offset < length);
-        state->sent.fetch_add(1, std::memory_order_relaxed);
+        ++sent_;
         return 0;
     } catch (...) {
         const auto error = to_hresult().value;
@@ -344,8 +334,7 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
 }
 
 void Socket::StopWrites() {
-    if (!receive_state_) return;
-    receive_state_->writes_stopped.store(true);
+    writes_stopped_.store(true);
 }
 
 bool Socket::GetAddress(winrt_socket_address *address) {
@@ -396,7 +385,6 @@ std::function<void(const uint8_t *, size_t)> Socket::ChannelReceiver() const {
 
 void Socket::TakeOver() {
     const auto state = receive_state_;
-    std::lock_guard writes(state->write_mutex);
     {
         std::lock_guard lock(state->mutex);
         state->channel_owned = true;
@@ -412,8 +400,7 @@ void Socket::TakeOver() {
 
 void Socket::SetChannelWriter(
     std::function<int32_t(const uint8_t *, size_t)> writer) {
-    std::lock_guard lock(receive_state_->write_mutex);
-    receive_state_->channel_write = std::move(writer);
+    channel_write_ = std::move(writer);
 }
 
 void Socket::RegisterDatagram() {

@@ -7,6 +7,7 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Sockets.h>
+#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -15,6 +16,9 @@ struct SocketReceiveState;
 
 namespace Partout {
 
+// Callers serialize writes with other writes, open/configuration, channel
+// takeover, writer replacement, and destruction. Keep the socket alive until
+// all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
 public:
     Socket(winrt_socket_proto proto, bool unconnected);
@@ -57,6 +61,9 @@ private:
     winrt::event_token receive_token_{};
     bool receiving_ = false;
     std::shared_ptr<SocketReceiveState> receive_state_;
+    std::function<int32_t(const uint8_t *, size_t)> channel_write_;
+    std::atomic<bool> writes_stopped_{false};
+    uint64_t sent_ = 0;
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};
     winrt::Windows::Networking::HostName bound_host_{nullptr};
