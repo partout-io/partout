@@ -710,7 +710,7 @@ const ConnectionDaemon = struct {
             self.handleConnectionRequestFailed(setup.action, err);
             return;
         };
-        const connection = self.connection orelse @panic("handleConnectionPrepared but no connection");
+        const connection = self.connection orelse @panic("handleConnectionSetup but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
         if (remote.link) |link| {
