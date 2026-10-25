@@ -12,7 +12,7 @@ portable ABI adapters. Dependencies run from Partout to the backend:
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> PartoutTunnelController
 Partout io_windows.zig       -> winrt/socket.h  -> src/socket.cc
-Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun.cc
+Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 ```
 
 ## Where code belongs
@@ -29,7 +29,7 @@ Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun.cc
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
 | `../../src/net/looper_windows.zig` | Queued packet callbacks, attachment lifetime and timers; ignores the shared mux option. |
 | `../../src/wireguard/internal/passive_io_windows.zig` | Queues native receives for Go's passive read callbacks and forwards writes. |
-| `../../src/c/portable/tun_winrt.c` | Converts Partout's portable controller ABI into backend calls. |
+| `../../src/c/portable/tun_windows.c` | Converts Partout's portable controller ABI into backend calls, or supplies fallback stubs without WinRT. |
 
 `partout-winrt-backend` compiles sockets, the controller and logging with only
 the native include directory. `partout-winrt` adds `runtime.cc` and packages all
@@ -138,7 +138,7 @@ cmake --build .cmake-winrt --target partout-winrt
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
 `-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
-builds without WinRT use `tun_windows_dummy.c`, an intentional fallback for
+builds without WinRT use the fallback branch in `tun_windows.c` for
 tests and builds that do not need native VPN support.
 
 Enable WireGuard with `-DPP_BUILD_USE_WIREGUARD=ON` when building the full

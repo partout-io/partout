@@ -440,13 +440,11 @@ fn createPartoutModule(
 
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
+            addCSourceFiles(module, &.{"src/c/portable/tun_windows.c"});
             if (config.winrt_library) |library| {
                 module.addObjectFile(library);
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
-                addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
-            } else {
-                addCSourceFiles(module, &.{"src/c/portable/tun_windows_dummy.c"});
             }
         }
         addCSources(module, config.openvpn, config.wireguard);
@@ -541,6 +539,7 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINRT", if (config.winrt_library != null) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,
