@@ -112,9 +112,9 @@ void wait_for_connect(IAsyncAction const &action, int timeout_ms) {
 }
 
 winrt_socket_address socket_address(HostName const &host, hstring const &port) {
-    winrt_socket_address result{};
     if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
         throw hresult_invalid_argument();
+    winrt_socket_address result{};
     auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
     if (zone != std::wstring::npos) {
@@ -151,7 +151,8 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
                 std::lock_guard lock(state->mutex);
                 state->reading = false;
                 state->read_stopped.notify_all();
-                if (!state->channel_owned) state->deliverLocked(nullptr, 0, nullptr, 1);
+                if (state->channel_owned) co_return;
+                state->deliverLocked(nullptr, 0, nullptr, 1);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
@@ -160,7 +161,8 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
         std::lock_guard lock(state->mutex);
         state->reading = false;
         state->read_stopped.notify_all();
-        if (!state->channel_owned) state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
+        if (state->channel_owned) co_return;
+        state->deliverLocked(nullptr, 0, nullptr, to_hresult().value);
     }
 }
 
@@ -202,7 +204,8 @@ WinrtSocket::~WinrtSocket() noexcept {
 }
 
 IInspectable winrt_socket_transport(winrt_socket socket) {
-    return socket ? socket->transport() : nullptr;
+    if (!socket) return nullptr;
+    return socket->transport();
 }
 
 bool winrt_socket_is_unconnected(winrt_socket socket) {
@@ -332,8 +335,8 @@ bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
 }
 
 bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
+    if (!socket || !address) return false;
     try {
-        if (!socket || !address) throw hresult_invalid_argument();
         Apartment apartment;
         HostName host{nullptr};
         hstring port;
@@ -422,6 +425,7 @@ int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t len
 }
 
 void winrt_socket_stop_writes(winrt_socket socket) {
+    if (!socket || !socket->receive_state) return;
     socket->receive_state->writes_stopped.store(true);
 }
 
@@ -438,7 +442,8 @@ bool winrt_socket_set_on_receive(winrt_socket socket,
             state->context = context;
             start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
         }
-        if (start_read) read_stream(state, socket->stream);
+        if (!start_read) return true;
+        read_stream(state, socket->stream);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);
@@ -460,7 +465,8 @@ bool winrt_socket_resume_reading(winrt_socket socket) {
             if (!state->callback) return false;
             start_read = state->prepareReadLocked(static_cast<bool>(socket->stream));
         }
-        if (start_read) read_stream(state, socket->stream);
+        if (!start_read) return true;
+        read_stream(state, socket->stream);
         return true;
     } catch (...) {
         std::lock_guard lock(state->mutex);

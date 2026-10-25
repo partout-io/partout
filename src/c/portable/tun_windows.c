@@ -16,22 +16,31 @@ static void bridge_log(winrt_log_level level, const char *message) {
     static const pp_log_level levels[] = {
         PPLogLevelFault, PPLogLevelError, PPLogLevelNotice, PPLogLevelInfo, PPLogLevelDebug
     };
-    if ((unsigned int)level < sizeof(levels) / sizeof(levels[0])) pp_clog(levels[level], message);
+    if ((unsigned int)level >= sizeof(levels) / sizeof(levels[0])) return;
+    pp_clog(levels[level], message);
 }
 
-void pp_tun_free(pp_tun tun) { winrt_tun_free((winrt_tun)tun); }
+void pp_tun_free(pp_tun tun) {
+    if (!tun) return;
+    winrt_tun_free((winrt_tun)tun);
+}
 
 static void on_reachability(void *context, bool reachable) {
     const pp_tun_ctrl_delegate *delegate = context;
+    if (!delegate || !delegate->on_reachability) return;
     const pp_reachability info = { .reachable = reachable };
-    if (delegate->on_reachability) delegate->on_reachability(delegate->ctx, &info);
+    delegate->on_reachability(delegate->ctx, &info);
 }
 static void on_better_path(void *context) {
     const pp_tun_ctrl_delegate *delegate = context;
-    if (delegate->on_better_path) delegate->on_better_path(delegate->ctx);
+    if (!delegate || !delegate->on_better_path) return;
+    delegate->on_better_path(delegate->ctx);
 }
 static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
-    if (!delegate) { winrt_tun_ctrl_set_delegate(ref, NULL); return; }
+    if (!delegate) {
+        winrt_tun_ctrl_set_delegate(ref, NULL);
+        return;
+    }
     const winrt_tun_ctrl_delegate native = {
         .context = (void *)delegate,
         .on_reachability = on_reachability,
@@ -39,10 +48,10 @@ static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     };
     winrt_tun_ctrl_set_delegate(ref, &native);
 }
-static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t count) {
+static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t fds_len) {
     (void)info;
-    if (count && !fds) return false;
-    for (size_t i = 0; i < count; ++i) {
+    if (fds_len && !fds) return false;
+    for (size_t i = 0; i < fds_len; ++i) {
         const winrt_socket socket = (winrt_socket)(uintptr_t)fds[i];
         if (!winrt_tun_ctrl_configure_sockets(ref, &socket, 1)) return false;
     }
@@ -52,18 +61,20 @@ static pp_tun set_tunnel(void *ref, const char *uuid, const char *info_json) {
     return (pp_tun)winrt_tun_ctrl_set_tunnel(ref, uuid, info_json);
 }
 
-pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
-    winrt_set_logger(bridge_log);
-    const pp_tun_ctrl_fnt functions = {
-        .set_delegate = set_delegate,
-        .configure_sockets = configure_sockets,
-        .set_tunnel = set_tunnel,
-        .report_snapshot = winrt_tun_ctrl_report_snapshot,
-        .set_environment_value = winrt_tun_ctrl_set_environment_value,
-        .clear_tunnel = winrt_tun_ctrl_clear_tunnel,
-        .cancel_tunnel = winrt_tun_ctrl_cancel_tunnel
-    };
-    return functions;
+static void report_snapshot(void *ref, const char *snapshot_json) {
+    winrt_tun_ctrl_report_snapshot(ref, snapshot_json);
+}
+
+static void set_environment_value(void *ref, const char *key, const char *value) {
+    winrt_tun_ctrl_set_environment_value(ref, key, value);
+}
+
+static void clear_tunnel(void *ref, bool kill_switch) {
+    winrt_tun_ctrl_clear_tunnel(ref, kill_switch);
+}
+
+static void cancel_tunnel(void *ref, const char *error_message) {
+    winrt_tun_ctrl_cancel_tunnel(ref, error_message);
 }
 
 #else
@@ -78,13 +89,13 @@ void pp_tun_free(pp_tun tun) {
     pp_free(tun);
 }
 
-static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
+static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     (void)ref;
     (void)delegate;
 }
 
-static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                         const pp_socket_fd *fds, size_t fds_len) {
+static bool configure_sockets(void *ref, const pp_reachability *info,
+                              const pp_socket_fd *fds, size_t fds_len) {
     (void)ref;
     (void)info;
     (void)fds;
@@ -92,46 +103,50 @@ static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info
     return false;
 }
 
-static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+static pp_tun set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)ref;
     (void)uuid;
     (void)info_json;
     return NULL;
 }
 
-static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
+static void report_snapshot(void *ref, const char *snapshot_json) {
     (void)ref;
     (void)snapshot_json;
 }
 
-static void pp_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
+static void set_environment_value(void *ref, const char *key, const char *value) {
     (void)ref;
     (void)key;
     (void)value;
 }
 
-static void pp_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
+static void clear_tunnel(void *ref, bool kill_switch) {
     (void)ref;
     (void)kill_switch;
 }
 
-static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
+static void cancel_tunnel(void *ref, const char *error_message) {
     (void)ref;
     (void)error_message;
 }
 
+#endif // PARTOUT_WINRT
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
-    pp_tun_ctrl_fnt fnt = {
-        .set_delegate = pp_tun_ctrl_set_delegate,
-        .configure_sockets = pp_tun_ctrl_configure_sockets,
-        .set_tunnel = pp_tun_ctrl_set_tunnel,
-        .report_snapshot = pp_tun_ctrl_report_snapshot,
-        .set_environment_value = pp_tun_ctrl_set_environment_value,
-        .clear_tunnel = pp_tun_ctrl_clear_tunnel,
-        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
+#if PARTOUT_WINRT
+    winrt_set_logger(bridge_log);
+#endif
+    const pp_tun_ctrl_fnt functions = {
+        .set_delegate = set_delegate,
+        .configure_sockets = configure_sockets,
+        .set_tunnel = set_tunnel,
+        .report_snapshot = report_snapshot,
+        .set_environment_value = set_environment_value,
+        .clear_tunnel = clear_tunnel,
+        .cancel_tunnel = cancel_tunnel
     };
-    return fnt;
+    return functions;
 }
 
-#endif // PARTOUT_WINRT
 #endif // PARTOUT_WINDOWS

@@ -53,17 +53,26 @@ extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive cal
     return true;
 }
 
-extern "C" void winrt_tun_stop_writes(winrt_tun tun) { tun->state->writes_stopped.store(true); }
+extern "C" void winrt_tun_stop_writes(winrt_tun tun) {
+    if (!tun) return;
+    tun->state->writes_stopped.store(true);
+}
 
 static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, size_t length, bool send) {
     if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
     const auto append = [&](VpnPacketBuffer const &packet) {
-        if (send) channel.AppendVpnSendPacketBuffer(packet);
-        else channel.AppendVpnReceivePacketBuffer(packet);
+        if (!send) {
+            channel.AppendVpnReceivePacketBuffer(packet);
+            return;
+        }
+        channel.AppendVpnSendPacketBuffer(packet);
     };
     const auto flush = [&] {
-        if (send) channel.FlushVpnSendPacketBuffers();
-        else channel.FlushVpnReceivePacketBuffers();
+        if (!send) {
+            channel.FlushVpnReceivePacketBuffers();
+            return;
+        }
+        channel.FlushVpnSendPacketBuffers();
     };
     VpnPacketBuffer packet{nullptr};
     const char *stage = "get buffer";
@@ -87,7 +96,8 @@ static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, si
         winrt_log(WinrtLogError, "WinRT %s write failed during %s: HRESULT 0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
-        if (packet) try {
+        if (!packet) return error;
+        try {
             packet.Buffer().Length(0);
             append(packet);
             flush();
@@ -115,41 +125,41 @@ bool PartoutTunnelController::Associate(winrt_socket socket) noexcept {
     try {
         const auto transport = winrt_socket_transport(socket);
         if (!channel_ || !transport) return false;
-        if (winrt_socket_is_unconnected(socket)) {
-            // The channel needs a transport, but it must not own WG's UDP bind.
-            // Keep the adapter across WG bind replacement, including after Start.
-            if (!udp_adapter_) {
-                const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
-                if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
-                udp_adapter_ = profile.NetworkAdapter();
-            }
-            winrt_socket_set_adapter(socket, udp_adapter_);
-            if (idle_transport_) return true;
-            if (transport_) throw hresult_illegal_method_call();
-            Sockets::DatagramSocket idle;
-            try {
-                channel_.AssociateTransport(idle, nullptr);
-                // UDP connect sends no application payload. This socket exists
-                // only to satisfy the framework; no WG peer is mapped onto it.
-                // TEST-NET-1 avoids DNS and any dependency on a real server.
-                const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
-                if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
-                    connect.Cancel();
-                    throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-                }
-                connect.GetResults();
-            } catch (...) { idle.Close(); throw; }
-            idle_transport_ = idle;
-            transport_ = idle;
-            winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
+        if (!winrt_socket_is_unconnected(socket)) {
+            if (transport_ == transport) return true;
+            channel_.AssociateTransport(transport, nullptr);
+            transport_ = transport;
+            socket_ = socket;
+            std::lock_guard lock(input_mutex_);
+            link_receive_ = winrt_socket_channel_receiver(socket);
             return true;
         }
-        if (transport_ == transport) return true;
-        channel_.AssociateTransport(transport, nullptr);
-        transport_ = transport;
-        socket_ = socket;
-        std::lock_guard lock(input_mutex_);
-        link_receive_ = winrt_socket_channel_receiver(socket);
+        // The channel needs a transport, but it must not own WG's UDP bind.
+        // Keep the adapter across WG bind replacement, including after Start.
+        if (!udp_adapter_) {
+            const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
+            if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
+            udp_adapter_ = profile.NetworkAdapter();
+        }
+        winrt_socket_set_adapter(socket, udp_adapter_);
+        if (idle_transport_) return true;
+        if (transport_) throw hresult_illegal_method_call();
+        Sockets::DatagramSocket idle;
+        try {
+            channel_.AssociateTransport(idle, nullptr);
+            // UDP connect sends no application payload. This socket exists
+            // only to satisfy the framework; no WG peer is mapped onto it.
+            // TEST-NET-1 avoids DNS and any dependency on a real server.
+            const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
+            if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
+                connect.Cancel();
+                throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+            }
+            connect.GetResults();
+        } catch (...) { idle.Close(); throw; }
+        idle_transport_ = idle;
+        transport_ = idle;
+        winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
         return true;
     } catch (...) {
         winrt_log(WinrtLogError, "PartoutTunnelController.Associate failed: HRESULT 0x%08x",
@@ -210,7 +220,10 @@ void PartoutTunnelController::Stop() noexcept {
         transport_ = nullptr;
         udp_adapter_ = nullptr;
     };
-    if (!started_) { close_idle(); return; }
+    if (!started_) {
+        close_idle();
+        return;
+    }
     try {
         std::unique_lock<std::mutex> writes;
         if (tun) writes = std::unique_lock(tun->write_mutex);
@@ -264,7 +277,8 @@ void PartoutTunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     const auto buffer = packet.Buffer();
     std::function<void(const uint8_t *, size_t)> receive;
     { std::lock_guard lock(input_mutex_); receive = link_receive_; }
-    if (receive) receive(buffer.data(), buffer.Length());
+    if (!receive) return;
+    receive(buffer.data(), buffer.Length());
 }
 
 // ref is a retained channel context owned by the daemon bindings.
@@ -289,7 +303,8 @@ extern "C" bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *
 extern "C" winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)uuid;
     const auto controller = get_controller(ref);
-    try { return controller ? controller->Open(info_json) : nullptr; }
+    if (!controller) return nullptr;
+    try { return controller->Open(info_json); }
     catch (...) { return nullptr; }
 }
 // FIXME: ###, Windows, Publish tunnel snapshots to the host.
@@ -305,7 +320,9 @@ extern "C" void winrt_tun_ctrl_set_environment_value(void *ref, const char *key,
 // FIXME: ###, Windows, Honor kill_switch when clearing tunnel settings.
 extern "C" void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     winrt_log(WinrtLogDebug, "tun: ctrl_clear_tunnel(%p, %d)", ref, kill_switch);
-    if (const auto controller = get_controller(ref)) controller->Stop();
+    const auto controller = get_controller(ref);
+    if (!controller) return;
+    controller->Stop();
 }
 
 // FIXME: ###, Windows, Cancel the VPN channel and report error_message.
