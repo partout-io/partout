@@ -6,7 +6,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
-#include "winrt/socket.h"
+#include "socket.h"
 #include "winrt/log.h"
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -447,7 +447,7 @@ extern "C" {
 
 winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
     try {
-        return new Partout::Socket(proto, unconnected);
+        return new __winrt_socket_struct{{proto, unconnected}};
     } catch (...) {
         winrt_log(WinrtLogError, "winrt_socket_create failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
@@ -462,34 +462,34 @@ void winrt_socket_free(winrt_socket socket) {
 bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
     const winrt_socket_open_options *options) {
     if (!socket) return false;
-    return socket->Open(hostname, port, options);
+    return socket->handle.Open(hostname, port, options);
 }
 
 bool winrt_socket_set_on_receive(winrt_socket socket,
     winrt_socket_on_receive callback, void *context) {
     if (!socket) return false;
-    return socket->SetOnReceive(callback, context);
+    return socket->handle.SetOnReceive(callback, context);
 }
 
 bool winrt_socket_resume_reading(winrt_socket socket) {
     if (!socket) return false;
-    return socket->ResumeReading();
+    return socket->handle.ResumeReading();
 }
 
 int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
     const winrt_socket_address *destination) {
     if (!socket) return E_INVALIDARG;
-    return socket->Write(bytes, length, destination);
+    return socket->handle.Write(bytes, length, destination);
 }
 
 void winrt_socket_stop_writes(winrt_socket socket) {
     if (!socket) return;
-    socket->StopWrites();
+    socket->handle.StopWrites();
 }
 
 bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
     if (!socket) return false;
-    return socket->GetAddress(address);
+    return socket->handle.GetAddress(address);
 }
 
 }

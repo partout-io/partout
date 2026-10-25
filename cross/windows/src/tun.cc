@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0
 #include "tun_settings.h"
 #include <windows.h>
-#include "winrt/tun.h"
+#include "tun.h"
+#include "socket.h"
 #include "winrt/log.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
@@ -303,7 +304,7 @@ bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, si
     const auto controller = get_controller(ref);
     for (size_t i = 0; i < count; ++i) {
         if (!sockets[i]) return false;
-        if (controller && !controller->Associate(sockets[i])) return false;
+        if (controller && !controller->Associate(&sockets[i]->handle)) return false;
     }
     return true;
 }

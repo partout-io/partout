@@ -19,7 +19,7 @@
 #endif
 
 #include "partout_winrt.h"
-#include "winrt/tun.h"
+#include "tun.h"
 #include "winrt/log.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
