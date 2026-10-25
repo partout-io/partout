@@ -507,7 +507,7 @@ const ConnectionDaemon = struct {
                     .info = info,
                 } } }) catch |err| {
                     info.deinit(self.daemon.allocator);
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
             .needs_rebind => |info| {
@@ -523,7 +523,7 @@ const ConnectionDaemon = struct {
                 const message: Message = .{ .onConnectionEvent = .{ .needs_rebind = copy } };
                 self.schedule(message) catch |err| {
                     message.deinit(self.daemon.allocator);
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
             .set_env => |update| {
@@ -543,16 +543,24 @@ const ConnectionDaemon = struct {
                     if (err == error.Closed and self.isCurrentThread() and value == null) {
                         self.handleConnectionEvent(message.onConnectionEvent);
                     } else {
-                        logEventSubmissionFailure(event, err);
+                        onConnectionEventFailed(event, err);
                     }
                     message.deinit(allocator);
                 };
             },
             .failed, .stopped, .data_count => {
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
+        }
+    }
+
+    fn onConnectionEventFailed(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
+        if (err == error.Closed) {
+            log.writef(.debug, "Discard connection event {s}, event loop closed", .{@tagName(event)});
+        } else {
+            log.writef(.err, "Unable to enqueue connection event {s}: {s}", .{ @tagName(event), @errorName(err) });
         }
     }
 
@@ -1453,14 +1461,6 @@ const ConnectionDaemon = struct {
         self.conn_request = null;
         self.looper.cancelTimer(&self.resume_gate_timer);
         _ = self.gate.setEnabled(false);
-    }
-
-    fn logEventSubmissionFailure(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
-        if (err == error.Closed) {
-            log.writef(.debug, "Discard connection event {s}, event loop closed", .{@tagName(event)});
-        } else {
-            log.writef(.err, "Unable to enqueue connection event {s}: {s}", .{ @tagName(event), @errorName(err) });
-        }
     }
 
     fn cloneTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) !?api.TunnelRemoteInfoWrapper {
