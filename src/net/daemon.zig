@@ -1006,14 +1006,9 @@ const ConnectionDaemon = struct {
     // Updates the gate on the actor so that a ready transition and the
     // resulting connection start are serialized with the corresponding
     // network-change event.
-    fn handleReachabilitySignal(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
+    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.conn_request != null) self.is_stale_conn_request = true;
         _ = self.gate.updateReachability(reachability.reachable);
-        self.handleReachability(reachability);
-    }
-
-    // Forwards the event to the underlying connection
-    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
         if (self.daemon.state != .started) return;
         const connection = self.connection orelse @panic("handleReachability but no connection");
         connection.networkChange(reachability);
@@ -1429,7 +1424,7 @@ const ConnectionDaemon = struct {
             .stop => self.handleStop(.clear_environment),
             .resumeGate => self.handleResumeGate(),
             .setupConnection => |setup| self.handleConnectionPrepared(setup) catch |err| self.connectionRequestFailed(setup.action, err),
-            .onReachability => |reachability| self.handleReachabilitySignal(reachability),
+            .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
         }
