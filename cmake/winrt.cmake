@@ -14,6 +14,7 @@ if(PP_BUILD_WINRT)
     add_library(partout-winrt-backend OBJECT
         cross/windows/src/socket.cc
         cross/windows/src/tun_ctrl.cc
+        cross/windows/src/tun_settings.cc
         cross/windows/src/log.cc
     )
     target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)

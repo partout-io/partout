@@ -24,6 +24,7 @@ Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun_ctrl.cc
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
 | `src/socket.cc` | Owns UDP/TCP transports, receive callbacks, TCP read loop, writes and callback lifetime. |
 | `src/tun_ctrl.h`, `src/tun_ctrl.cc` | Private `PartoutTunnelController`, transport association and channel startup/stop. |
+| `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
 | `../../src/net/looper_windows.zig` | Queued packet callbacks, attachment lifetime and timers; ignores the shared mux option. |
