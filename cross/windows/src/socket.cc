@@ -445,6 +445,10 @@ void Socket::RegisterDatagram() {
 
 extern "C" {
 
+void winrt_socket_free(winrt_socket socket) {
+    delete socket;
+}
+
 winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
     try {
         return new __winrt_socket_struct{{proto, unconnected}};
@@ -453,10 +457,6 @@ winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
             static_cast<unsigned int>(to_hresult().value));
         return nullptr;
     }
-}
-
-void winrt_socket_free(winrt_socket socket) {
-    delete socket;
 }
 
 bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
