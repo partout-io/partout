@@ -290,7 +290,7 @@ pub const Daemon = struct {
         self.state = .failed;
         switch (self.implementation) {
             .settings => {},
-            .connection => |connection| connection.pause(),
+            .connection => |daemon| daemon.pause(),
         }
     }
 };
@@ -480,9 +480,6 @@ const ConnectionDaemon = struct {
 
     //#region Any thread - asynchronous events
 
-    // Queue connection events outside protocol callbacks, copying borrowed payloads.
-    // Failure notifications may also arrive on background workers.
-
     // This is where connection events are rerouted through the actor
     fn events(self: *ConnectionDaemon) Connection.Events {
         return .{
@@ -491,6 +488,8 @@ const ConnectionDaemon = struct {
         };
     }
 
+    // Queue connection events outside protocol callbacks, copying borrowed payloads.
+    // Failure notifications may also arrive on background workers.
     fn onConnectionEvent(ctx: *anyopaque, event: ConnectionEvent) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
         switch (event) {
@@ -508,7 +507,7 @@ const ConnectionDaemon = struct {
                     .info = info,
                 } } }) catch |err| {
                     info.deinit(self.daemon.allocator);
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
             .needs_rebind => |info| {
@@ -524,7 +523,7 @@ const ConnectionDaemon = struct {
                 const message: Message = .{ .onConnectionEvent = .{ .needs_rebind = copy } };
                 self.schedule(message) catch |err| {
                     message.deinit(self.daemon.allocator);
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
             .set_env => |update| {
@@ -544,25 +543,47 @@ const ConnectionDaemon = struct {
                     if (err == error.Closed and self.isCurrentThread() and value == null) {
                         self.handleConnectionEvent(message.onConnectionEvent);
                     } else {
-                        logEventSubmissionFailure(event, err);
+                        onConnectionEventFailed(event, err);
                     }
                     message.deinit(allocator);
                 };
             },
             .failed, .stopped, .data_count => {
                 self.schedule(.{ .onConnectionEvent = event }) catch |err| {
-                    logEventSubmissionFailure(event, err);
+                    onConnectionEventFailed(event, err);
                 };
             },
         }
     }
 
-    fn logEventSubmissionFailure(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
+    fn onConnectionEventFailed(event: ConnectionEvent, err: error{ Closed, OutOfMemory }) void {
         if (err == error.Closed) {
             log.writef(.debug, "Discard connection event {s}, event loop closed", .{@tagName(event)});
         } else {
             log.writef(.err, "Unable to enqueue connection event {s}: {s}", .{ @tagName(event), @errorName(err) });
         }
+    }
+
+    // Invoked by ConnectionWorker upon complete setup.
+    fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
+        const job: *Job = @ptrCast(@alignCast(context));
+        job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
+        self.enqueue(job) catch {
+            setup.deinit();
+            job.message.deinit(self.daemon.allocator);
+            self.daemon.allocator.destroy(job);
+        };
+    }
+
+    // Looper timers run inside loopOnce(). Defer gate changes until it returns,
+    // because a ready transition may start a connection and attach I/O.
+    fn onResumeGate(ctx: ?*anyopaque) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        self.schedule(.resumeGate) catch |err| {
+            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
+            self.daemon.requestCancellation(null, true);
+        };
     }
 
     // Network callbacks may originate while the platform owns a lock that is
@@ -587,30 +608,14 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Actor thread - delayed gate resumption
-
-    // Looper timers run inside loopOnce(). Defer gate changes until it returns,
-    // because a ready transition may start a connection and attach I/O.
-
-    // This is scheduled with a delay
-    fn onResumeGate(ctx: ?*anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        self.schedule(.resumeGate) catch |err| {
-            log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
-            self.daemon.requestCancellation(null, true);
-        };
-    }
-
-    //#endregion
-
     //#region Actor thread - connection lifecycle and state
 
     // The actor serializes these methods and their updates to the shared Daemon.
     // Gate callbacks and protocol controls run inline on the same actor thread.
 
-    fn doStart(self: *ConnectionDaemon) Error!void {
-        log.write(.debug, "ConnectionDaemon.doStart entered");
-        errdefer |err| log.writef(.err, "ConnectionDaemon.doStart failed: {s}", .{@errorName(err)});
+    fn handleStart(self: *ConnectionDaemon) Error!void {
+        log.write(.debug, "ConnectionDaemon.handleStart entered");
+        errdefer |err| log.writef(.err, "ConnectionDaemon.handleStart failed: {s}", .{@errorName(err)});
         if (self.daemon.state != .initial) return error.AlreadyStarted;
         try self.createConnection();
         try self.daemon.beginStart();
@@ -627,7 +632,7 @@ const ConnectionDaemon = struct {
         // Notify connection gate ready to the daemon
         self.gate.setReadyHandler(.{
             .ptr = self,
-            .notify = onNetworkReady,
+            .notify = handleNetworkReady,
         });
         // Read current reachability
         self.gate.setReachabilityBlock(.{
@@ -646,10 +651,10 @@ const ConnectionDaemon = struct {
         } else {
             _ = self.gate.setEnabled(true);
         }
-        log.write(.debug, "ConnectionDaemon.doStart returned");
+        log.write(.debug, "ConnectionDaemon.handleStart returned");
     }
 
-    fn doStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
+    fn handleStop(self: *ConnectionDaemon, mode: Daemon.StopMode) void {
         if (!self.daemon.beginStop(mode)) return;
         self.conn_request = null;
         if (self.worker) |worker| worker.close();
@@ -679,147 +684,7 @@ const ConnectionDaemon = struct {
         self.daemon.finishStop();
     }
 
-    // Called on the actor, before accepting connection work. Publish the
-    // complete state before starting any looper callbacks.
-    fn createConnection(self: *ConnectionDaemon) Error!void {
-        std.debug.assert(self.connection == null);
-        const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
-            .profile = &self.daemon.profile,
-            .options = self.daemon.options.connection_options,
-            .cache_dir = self.daemon.options.cache_dir,
-            .events = self.events(),
-            .writer = ConnectionWriter.init(self.looper, &writer_vtable),
-            .controller = self.daemon.controller,
-            .resolver = self.resolver,
-            .factory = self.factory,
-        });
-        errdefer connection.destroy();
-        const worker = if (connection.daemon_io != .none)
-            try ConnectionWorker.create(self.daemon.allocator, self.resolver, self.factory, connection.endpoints(), .{
-                .context = self,
-                .call = onConnectionPrepared,
-            })
-        else
-            null;
-        self.worker = worker;
-        self.connection = connection;
-    }
-
-    fn releaseConnection(self: *ConnectionDaemon) void {
-        const connection = self.connection orelse @panic("releaseConnection but no connection");
-        connection.destroy();
-        self.connection = null;
-    }
-
-    // Runs as one actor operation; shutdown quiesces protocol activity before
-    // detaching I/O and releasing protocol state.
-    fn stopConnection(
-        self: *ConnectionDaemon,
-        timeout_ms: u32,
-        reason: Connection.ShutdownReason,
-    ) !void {
-        const connection = self.connection orelse @panic("stopConnection but no connection");
-        self.conn_request = null;
-        connection.shutdown(reason);
-        if (self.looper.isLinkAttached()) {
-            // Attempt shutdown writes before detaching, without running callbacks or waiting.
-            const failure = self.looper.flushWrites(.link) catch |err| blk: {
-                log.writef(.err, "Unable to flush shutdown packets: {s}", .{@errorName(err)});
-                break :blk null;
-            };
-            if (failure) |value| log.writef(.err, "Shutdown write failed: .{}", .{value});
-        }
-        try self.detachLooperSides();
-        // FIXME: ###, Honor stop timeout
-        _ = timeout_ms;
-        connection.stop();
-    }
-
-    fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
-        if (self.looper.isTunAttached()) try self.looper.detach(.tun);
-        if (self.looper.isLinkAttached()) try self.looper.detach(.link);
-    }
-
-    fn evaluateConnection(self: *ConnectionDaemon, force: bool) void {
-        if (self.daemon.state != .started) {
-            log.write(.info, "Ignore evaluation, daemon not started");
-            return;
-        }
-        _ = self.connection orelse @panic("evaluateConnection but no connection");
-        if (self.conn_request != null) {
-            log.write(.debug, "Ignore evaluation, another one pending");
-            return;
-        }
-
-        if (!force and !self.monitor.isReachable()) {
-            log.write(.info, "Ignore evaluation, wait for reachable network");
-            _ = self.gate.setEnabled(true);
-            return;
-        }
-
-        log.write(.info, "Pause connection gate during reconnection");
-        _ = self.gate.setEnabled(false);
-
-        log.write(.notice, "Start connection");
-        self.requestConnection(.start, null);
-    }
-
-    fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) void {
-        if (self.conn_request != null) return;
-        self.submitConnectionRequest(action, tun_info) catch |err| self.connectionRequestFailed(action, err);
-    }
-
-    fn submitConnectionRequest(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) !void {
-        const connection = self.connection orelse @panic("submitConnectionRequest but no connection");
-        const info = try cloneTunnelInfo(self.daemon.allocator, tun_info);
-        errdefer deinitTunnelInfo(self.daemon.allocator, info);
-
-        const request_id = self.next_conn_request;
-        self.next_conn_request += 1;
-        self.conn_request = request_id;
-        self.is_stale_conn_request = false;
-        // DNS and socket setup are part of connecting, even while the worker
-        // prepares the link. Rebind keeps the existing connection status.
-        if (action == .start) self.trackConnectionStatus(.connecting);
-        const worker = self.worker orelse {
-            // Connections without daemon-owned I/O need no blocking preparation.
-            try self.schedule(.{ .setupConnection = .{
-                .request_id = request_id,
-                .action = action,
-                .remote = .{},
-                .tun_info = info,
-            } });
-            return;
-        };
-        // Reserve completion storage before accepting work. Delivery cannot fail
-        // for lack of memory after the worker has prepared a link.
-        const job = try self.daemon.allocator.create(Job);
-        errdefer self.daemon.allocator.destroy(job);
-        const options = self.daemon.options.connection_options;
-        try worker.submit(.{
-            .request_id = request_id,
-            .action = action,
-            .local_port = connection.local_port,
-            .reachability = self.factory.currentReachability(),
-            .connect_udp = options.connect_udp,
-            .dns_timeout = options.dns_timeout,
-            .link_activity_timeout = options.link_activity_timeout,
-            .tun_info = info,
-        }, job);
-    }
-
-    fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        const job: *Job = @ptrCast(@alignCast(context));
-        job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
-        self.enqueue(job) catch {
-            setup.deinit();
-            job.message.deinit(self.daemon.allocator);
-            self.daemon.allocator.destroy(job);
-        };
-    }
-
-    fn setupConnection(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
+    fn handleConnectionSetup(self: *ConnectionDaemon, setup: ConnectionSetup) !void {
         if (self.conn_request != setup.request_id or self.daemon.state != .started) {
             setup.deinit();
             return;
@@ -842,10 +707,10 @@ const ConnectionDaemon = struct {
             self.conn_request = null;
         };
         const remote = setup.remote catch |err| {
-            self.connectionRequestFailed(setup.action, err);
+            self.handleConnectionRequestFailed(setup.action, err);
             return;
         };
-        const connection = self.connection orelse @panic("setupConnection but no connection");
+        const connection = self.connection orelse @panic("handleConnectionSetup but no connection");
         // Preparation owns the link until attachment or entry to protocol control.
         errdefer if (remote.link) |link| link.cleanup();
         if (remote.link) |link| {
@@ -870,40 +735,19 @@ const ConnectionDaemon = struct {
                 const tun = if (setup.tun_info) |info| self.createConnectionTun(info) catch |err| {
                     // Protocol control has not taken ownership of the prepared link.
                     if (connection.daemon_io != .looper) setup.deinit();
-                    self.linkRefreshFailed(err);
+                    self.handleConnectionLinkFailed(err);
                     return;
                 } else null;
                 const rebound = connection.rebind(remote, tun) catch |err| {
-                    self.linkRefreshFailed(err);
+                    self.handleConnectionLinkFailed(err);
                     return;
                 };
-                if (!rebound) self.linkRefreshFailed(error.UnableToStart);
+                if (!rebound) self.handleConnectionLinkFailed(error.UnableToStart);
             },
         }
     }
 
-    // Return connection-owned TUN, or a borrowed descriptor after looper attachment.
-    fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
-        const connection = self.connection orelse @panic("createConnectionTun but no connection");
-        const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
-            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
-            return error.TunNotAvailable;
-        };
-        errdefer tunnel.destroy();
-        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
-        if (connection.daemon_io == .looper) {
-            if (self.looper.isTunAttached()) self.looper.detach(.tun) catch return error.TunNotAvailable;
-            log.write(.info, "Attach TUN");
-            self.looper.attach(.{
-                .pair = .{ .tun = descriptor },
-                .on_read = .{ .context = self, .callback = onTunnelRead },
-                .on_failure = .{ .context = self, .callback = onTunnelFailure },
-            }) catch return error.TunNotAvailable;
-        }
-        return descriptor;
-    }
-
-    fn connectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
+    fn handleConnectionRequestFailed(self: *ConnectionDaemon, action: ConnectionAction, err: anyerror) void {
         self.conn_request = null;
         switch (action) {
             .start => {
@@ -911,120 +755,32 @@ const ConnectionDaemon = struct {
                 _ = self.daemon.handleStartError(error.UnableToStart);
                 self.trackConnectionStatus(.disconnected);
             },
-            .rebind => self.linkRefreshFailed(err),
+            .rebind => self.handleConnectionLinkFailed(err),
         }
     }
 
-    fn startConnection(self: *ConnectionDaemon, remote: RemoteDescriptor) void {
-        const connection = self.connection orelse @panic("startConnection but no connection");
-        // Start on the actor, detaching any looper-owned link on failure.
-        // Entering start transfers a connection-owned link, even on failure.
-        const result = connection.start(remote) catch |err| {
-            log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
-            _ = self.daemon.handleStartError(switch (err) {
-                error.OutOfMemory => error.OutOfMemory,
-                error.DNSResolutionFailure => error.DNSResolutionFailure,
-                error.Timeout => error.Timeout,
-                else => error.UnableToStart,
-            });
-            self.trackConnectionStatus(.disconnected);
-            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
-            self.scheduleResumeGate();
-            return;
-        };
-        switch (result) {
-            .started => {}, // Asynchronous establishment continues through events.
+    fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
+        switch (event) {
             .established => |success| {
-                var owned = success;
-                defer owned.info.deinit(self.daemon.allocator);
-                // Complete startup before yielding to queued reachability events.
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
                     });
                 };
             },
-            .failed => {
-                log.write(.err, "Connection could not start");
-                self.trackConnectionStatus(.disconnected);
-                self.stopConnection(0, .{ .failure = .reconnect }) catch {};
-                self.scheduleResumeGate();
+            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.handleConnectionLinkFailed(err),
+            .failed => |failure| self.handleConnectionFailed(failure),
+            .stopped => self.handleConnectionStopped(),
+            .set_env => |update| {
+                // Finalization clears values while stopping; late updates stay ignored.
+                if (self.daemon.state == .started or update.value == null) {
+                    self.daemon.controller.setEnvironmentValue(update.key, update.value);
+                }
             },
+            .data_count => |count| self.daemon.handleDataCount(count),
         }
-    }
-
-    fn scheduleResumeGate(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
-            return;
-        }
-        const delay_ms = self.daemon.options.reconnection_delay_ms;
-        log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
-
-        // Contextually cancels the previous attempt
-        self.looper.scheduleTimer(&self.resume_gate_timer, delay_ms, .{
-            .context = self,
-            .callback = onResumeGate,
-        }) catch |err| {
-            log.writef(.err, "Unable to schedule resume connection gate, defer resume: {s}", .{@errorName(err)});
-            // Finish the current evaluation and drain queued connection events
-            // before the gate can start another attempt.
-            self.looper.cancelTimer(&self.resume_gate_timer);
-            self.schedule(.resumeGate) catch |schedule_err| {
-                log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
-                self.daemon.requestCancellation(null, true);
-            };
-        };
-    }
-
-    fn doResumeGate(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
-            return;
-        }
-        log.write(.info, "Resume connection gate now");
-        _ = self.gate.setEnabled(true);
-    }
-
-    // The ready event gates the signals from:
-    //
-    // - gate.updateStatus()
-    // - gate.updateReachability()
-    fn onNetworkReady(ctx: ?*anyopaque) void {
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        log.write(.notice, "Network is ready, start connection");
-        self.evaluateConnection(false);
-    }
-
-    fn isReachable(ctx: ?*const anyopaque) bool {
-        const self: *const ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        return self.monitor.isReachable();
-    }
-
-    // Updates the gate on the actor so that a ready transition and the
-    // resulting connection start are serialized with the corresponding
-    // network-change event.
-    fn handleReachabilitySignal(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
-        if (self.conn_request != null) self.is_stale_conn_request = true;
-        _ = self.gate.updateReachability(reachability.reachable);
-        self.handleReachability(reachability);
-    }
-
-    // Forwards the event to the underlying connection
-    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
-        if (self.daemon.state != .started) return;
-        const connection = self.connection orelse @panic("handleReachability but no connection");
-        connection.networkChange(reachability);
-    }
-
-    // Forwards the event to the underlying connection
-    fn handleBetterPath(self: *ConnectionDaemon) void {
-        if (self.daemon.state != .started) return;
-        if (self.conn_request != null) self.is_stale_conn_request = true;
-        const connection = self.connection orelse @panic("handleBetterPath but no connection");
-        connection.betterPath();
     }
 
     fn handleConnectionEstablished(
@@ -1041,25 +797,6 @@ const ConnectionDaemon = struct {
         if (connection.daemon_io != .looper) try connection.commit(descriptor);
 
         self.trackConnectionStatus(.connected);
-    }
-
-    fn handleConnectionFailed(
-        self: *ConnectionDaemon,
-        failure: Connection.Events.Failure,
-    ) void {
-        if (self.daemon.state != .started) return;
-        // Failure callbacks leave the session owned by Connection. Finalize
-        // it before the gate can start another attempt.
-        self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
-            log.writef(.err, "Unable to stop failed connection: {s}", .{@errorName(err)});
-            return;
-        };
-        self.clearConnectionTunnel();
-        self.daemon.handleLastError(failure.err_pair);
-        switch (failure.disposition) {
-            .reconnect => self.trackConnectionStatus(.disconnected),
-            .cancel => self.cancelConnection(failure.err_pair),
-        }
     }
 
     fn handleConnectionNeedsRebind(self: *ConnectionDaemon, info: ?api.TunnelRemoteInfoWrapper) !void {
@@ -1083,7 +820,7 @@ const ConnectionDaemon = struct {
         self.requestConnection(.rebind, info);
     }
 
-    fn linkRefreshFailed(self: *ConnectionDaemon, err: anyerror) void {
+    fn handleConnectionLinkFailed(self: *ConnectionDaemon, err: anyerror) void {
         log.writef(.err, "Unable to refresh connection link: {s}", .{@errorName(err)});
         self.handleConnectionFailed(.{
             .err_pair = .{ .code = switch (err) {
@@ -1105,53 +842,81 @@ const ConnectionDaemon = struct {
         self.trackConnectionStatus(.disconnected);
     }
 
-    fn trackConnectionStatus(self: *ConnectionDaemon, status: api.ConnectionStatus) void {
-        self.daemon.snapshot_publisher.setConnectionStatus(status);
-        switch (status) {
-            .connected => {
-                self.daemon.emitRemove(.last_error_code);
-                self.daemon.snapshot_publisher.setLastError(null);
-                self.daemon.controller.setReasserting(false);
-            },
-            .connecting => {
-                self.daemon.emitRemove(.last_error_code);
-                self.daemon.snapshot_publisher.setLastError(null);
-                self.daemon.controller.setReasserting(true);
-            },
-            .disconnecting => {},
-            .disconnected => {
-                self.daemon.resetDataCount();
-                self.daemon.controller.setReasserting(false);
-                self.scheduleResumeGate();
-            },
+    fn handleConnectionFailed(
+        self: *ConnectionDaemon,
+        failure: Connection.Events.Failure,
+    ) void {
+        if (self.daemon.state != .started) return;
+        // Failure callbacks leave the session owned by Connection. Finalize
+        // it before the gate can start another attempt.
+        self.stopConnection(0, .{ .failure = failure.disposition }) catch |err| {
+            log.writef(.err, "Unable to stop failed connection: {s}", .{@errorName(err)});
+            return;
+        };
+        self.clearConnectionTunnel();
+        self.daemon.handleLastError(failure.err_pair);
+        switch (failure.disposition) {
+            .reconnect => self.trackConnectionStatus(.disconnected),
+            .cancel => self.cancelConnection(failure.err_pair),
         }
-        self.daemon.emitStatus(status);
-        self.daemon.snapshot_publisher.publishCurrentSnapshot(true);
-        _ = self.gate.updateStatus(status);
     }
 
-    fn cancelConnection(self: *ConnectionDaemon, err_pair: ?api.PartoutErrorPair) void {
-        self.daemon.enterFailedState();
+    fn handleResumeGate(self: *ConnectionDaemon) void {
+        if (self.daemon.state != .started) {
+            log.write(.info, "Ignore resume connection gate, daemon not started");
+            return;
+        }
+        log.write(.info, "Resume connection gate now");
+        _ = self.gate.setEnabled(true);
+    }
+
+    // The ready event gates the signals from:
+    //
+    // - gate.updateStatus()
+    // - gate.updateReachability()
+    fn handleNetworkReady(ctx: ?*anyopaque) void {
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        log.write(.notice, "Network is ready, start connection");
+        self.evaluateConnection(false);
+    }
+
+    fn isReachable(ctx: ?*const anyopaque) bool {
+        const self: *const ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        return self.monitor.isReachable();
+    }
+
+    // Updates the gate on the actor so that a ready transition and the
+    // resulting connection start are serialized with the corresponding
+    // network-change event.
+    fn handleReachability(self: *ConnectionDaemon, reachability: io.ReachabilityInfo) void {
+        if (self.conn_request != null) self.is_stale_conn_request = true;
+        _ = self.gate.updateReachability(reachability.reachable);
+        if (self.daemon.state != .started) return;
+        const connection = self.connection orelse @panic("handleReachability but no connection");
+        connection.networkChange(reachability);
+    }
+
+    // Forwards the event to the underlying connection
+    fn handleBetterPath(self: *ConnectionDaemon) void {
+        if (self.daemon.state != .started) return;
+        if (self.conn_request != null) self.is_stale_conn_request = true;
+        const connection = self.connection orelse @panic("handleBetterPath but no connection");
+        connection.betterPath();
+    }
+
+    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
+        if (failure) |value| {
+            log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
+        } else {
+            log.write(.fault, "Connection event loop terminated unexpectedly without an I/O failure");
+        }
+        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
+            .{ .code = code }
+        else
+            null;
+        if (err_pair) |err| self.daemon.handleLastError(err);
         self.daemon.controller.setReasserting(false);
-        if (!self.daemon.options.cancels_unrecoverable and
-            self.daemon.snapshot_publisher.environment.connection_status != .disconnected)
-        {
-            self.trackConnectionStatus(.disconnected);
-        }
-        self.daemon.requestCancellation(err_pair, false);
-    }
-
-    fn clearConnectionTunnel(self: *ConnectionDaemon) void {
-        if (self.connection != null) {
-            self.detachLooperSides() catch {};
-        }
-        self.daemon.controller.clearTunnelSettings(false);
-    }
-
-    fn pause(self: *ConnectionDaemon) void {
-        self.conn_request = null;
-        self.looper.cancelTimer(&self.resume_gate_timer);
-        _ = self.gate.setEnabled(false);
+        self.daemon.requestCancellation(err_pair, true);
     }
 
     //#endregion
@@ -1225,25 +990,15 @@ const ConnectionDaemon = struct {
         test_task: if (builtin.is_test) ?testing.Task else void = if (builtin.is_test) null else {},
     };
 
-    fn cloneTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) !?api.TunnelRemoteInfoWrapper {
-        const value = info orelse return null;
-        return try value.clone(allocator);
-    }
-
-    fn deinitTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) void {
-        var value = info orelse return;
-        value.deinit(allocator);
-    }
-
     const Message = union(enum) {
         start,
         hold,
         stop,
-        resumeGate,
         setupConnection: ConnectionSetup,
+        onConnectionEvent: ConnectionEvent,
+        resumeGate,
         onReachability: io.ReachabilityInfo,
         onBetterPath,
-        onConnectionEvent: ConnectionEvent,
 
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
@@ -1322,7 +1077,7 @@ const ConnectionDaemon = struct {
         self.jobs_mutex.unlock();
 
         // Explicit shutdown must also finalize a connection if stop was not run.
-        self.doStop(if (unexpected_exit) .preserve_environment else .clear_environment);
+        self.handleStop(if (unexpected_exit) .preserve_environment else .clear_environment);
 
         // Discard outstanding jobs.
         while (pending) |job| {
@@ -1420,56 +1175,302 @@ const ConnectionDaemon = struct {
         _ = io_c.pp_mux_wake(self.mux);
     }
 
+    // Controls use plain verbs; incoming on... callbacks enqueue messages.
+    // Dispatch invokes handle... methods on the actor; helpers use ordinary names.
     fn dispatch(self: *ConnectionDaemon, message: Message) Error!void {
         switch (message) {
-            .start => try self.doStart(),
-            .hold => self.doStop(.preserve_environment),
-            .stop => self.doStop(.clear_environment),
-            .resumeGate => self.doResumeGate(),
-            .setupConnection => |setup| self.setupConnection(setup) catch |err| self.connectionRequestFailed(setup.action, err),
-            .onReachability => |reachability| self.handleReachabilitySignal(reachability),
-            .onBetterPath => self.handleBetterPath(),
+            .start => try self.handleStart(),
+            .hold => self.handleStop(.preserve_environment),
+            .stop => self.handleStop(.clear_environment),
+            .setupConnection => |setup| self.handleConnectionSetup(setup) catch |err| self.handleConnectionRequestFailed(setup.action, err),
             .onConnectionEvent => |event| self.handleConnectionEvent(event),
+            .resumeGate => self.handleResumeGate(),
+            .onReachability => |reachability| self.handleReachability(reachability),
+            .onBetterPath => self.handleBetterPath(),
         }
     }
 
-    fn handleConnectionEvent(self: *ConnectionDaemon, event: ConnectionEvent) void {
-        switch (event) {
+    //#endregion
+
+    //#region Helpers
+
+    // Called on the actor, before accepting connection work. Publish the
+    // complete state before starting any looper callbacks.
+    fn createConnection(self: *ConnectionDaemon) Error!void {
+        std.debug.assert(self.connection == null);
+        const connection = try self.registry.createConnection(self.daemon.allocator, self.module, .{
+            .profile = &self.daemon.profile,
+            .options = self.daemon.options.connection_options,
+            .cache_dir = self.daemon.options.cache_dir,
+            .events = self.events(),
+            .writer = ConnectionWriter.init(self.looper, &writer_vtable),
+            .controller = self.daemon.controller,
+            .resolver = self.resolver,
+            .factory = self.factory,
+        });
+        errdefer connection.destroy();
+        const worker = if (connection.daemon_io != .none)
+            try ConnectionWorker.create(
+                self.daemon.allocator,
+                self.resolver,
+                self.factory,
+                connection.endpoints(),
+                .{
+                    .context = self,
+                    .call = onConnectionPrepared,
+                },
+            )
+        else
+            null;
+        self.worker = worker;
+        self.connection = connection;
+    }
+
+    fn releaseConnection(self: *ConnectionDaemon) void {
+        const connection = self.connection orelse @panic("releaseConnection but no connection");
+        connection.destroy();
+        self.connection = null;
+    }
+
+    // Runs as one actor operation; shutdown quiesces protocol activity before
+    // detaching I/O and releasing protocol state.
+    fn stopConnection(
+        self: *ConnectionDaemon,
+        timeout_ms: u32,
+        reason: Connection.ShutdownReason,
+    ) !void {
+        const connection = self.connection orelse @panic("stopConnection but no connection");
+        self.conn_request = null;
+        connection.shutdown(reason);
+        if (self.looper.isLinkAttached()) {
+            // Attempt shutdown writes before detaching, without running callbacks or waiting.
+            const failure = self.looper.flushWrites(.link) catch |err| blk: {
+                log.writef(.err, "Unable to flush shutdown packets: {s}", .{@errorName(err)});
+                break :blk null;
+            };
+            if (failure) |value| log.writef(.err, "Shutdown write failed: .{}", .{value});
+        }
+        try self.detachLooperSides();
+        // FIXME: ###, Honor stop timeout
+        _ = timeout_ms;
+        connection.stop();
+    }
+
+    fn detachLooperSides(self: *ConnectionDaemon) Looper.DetachError!void {
+        if (self.looper.isTunAttached()) try self.looper.detach(.tun);
+        if (self.looper.isLinkAttached()) try self.looper.detach(.link);
+    }
+
+    fn evaluateConnection(self: *ConnectionDaemon, force: bool) void {
+        if (self.daemon.state != .started) {
+            log.write(.info, "Ignore evaluation, daemon not started");
+            return;
+        }
+        _ = self.connection orelse @panic("evaluateConnection but no connection");
+        if (self.conn_request != null) {
+            log.write(.debug, "Ignore evaluation, another one pending");
+            return;
+        }
+
+        if (!force and !self.monitor.isReachable()) {
+            log.write(.info, "Ignore evaluation, wait for reachable network");
+            _ = self.gate.setEnabled(true);
+            return;
+        }
+
+        log.write(.info, "Pause connection gate during reconnection");
+        _ = self.gate.setEnabled(false);
+
+        log.write(.notice, "Start connection");
+        self.requestConnection(.start, null);
+    }
+
+    fn requestConnection(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) void {
+        if (self.conn_request != null) return;
+        self.submitConnectionRequest(action, tun_info) catch |err| self.handleConnectionRequestFailed(action, err);
+    }
+
+    fn submitConnectionRequest(self: *ConnectionDaemon, action: ConnectionAction, tun_info: ?api.TunnelRemoteInfoWrapper) !void {
+        const connection = self.connection orelse @panic("submitConnectionRequest but no connection");
+        const info = try cloneTunnelInfo(self.daemon.allocator, tun_info);
+        errdefer deinitTunnelInfo(self.daemon.allocator, info);
+
+        const request_id = self.next_conn_request;
+        self.next_conn_request += 1;
+        self.conn_request = request_id;
+        self.is_stale_conn_request = false;
+        // DNS and socket setup are part of connecting, even while the worker
+        // prepares the link. Rebind keeps the existing connection status.
+        if (action == .start) self.trackConnectionStatus(.connecting);
+        const worker = self.worker orelse {
+            // Connections without daemon-owned I/O need no blocking preparation.
+            try self.schedule(.{ .setupConnection = .{
+                .request_id = request_id,
+                .action = action,
+                .remote = .{},
+                .tun_info = info,
+            } });
+            return;
+        };
+        // Reserve completion storage before accepting work. Delivery cannot fail
+        // for lack of memory after the worker has prepared a link.
+        const job = try self.daemon.allocator.create(Job);
+        errdefer self.daemon.allocator.destroy(job);
+        const options = self.daemon.options.connection_options;
+        try worker.submit(.{
+            .request_id = request_id,
+            .action = action,
+            .local_port = connection.local_port,
+            .reachability = self.factory.currentReachability(),
+            .connect_udp = options.connect_udp,
+            .dns_timeout = options.dns_timeout,
+            .link_activity_timeout = options.link_activity_timeout,
+            .tun_info = info,
+        }, job);
+    }
+
+    // Return connection-owned TUN, or a borrowed descriptor after looper attachment.
+    fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
+        const connection = self.connection orelse @panic("createConnectionTun but no connection");
+        const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
+            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+            return error.TunNotAvailable;
+        };
+        errdefer tunnel.destroy();
+        const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
+        if (connection.daemon_io == .looper) {
+            if (self.looper.isTunAttached()) self.looper.detach(.tun) catch return error.TunNotAvailable;
+            log.write(.info, "Attach TUN");
+            self.looper.attach(.{
+                .pair = .{ .tun = descriptor },
+                .on_read = .{ .context = self, .callback = onTunnelRead },
+                .on_failure = .{ .context = self, .callback = onTunnelFailure },
+            }) catch return error.TunNotAvailable;
+        }
+        return descriptor;
+    }
+
+    fn startConnection(self: *ConnectionDaemon, remote: RemoteDescriptor) void {
+        const connection = self.connection orelse @panic("startConnection but no connection");
+        // Start on the actor, detaching any looper-owned link on failure.
+        // Entering start transfers a connection-owned link, even on failure.
+        const result = connection.start(remote) catch |err| {
+            log.writef(.err, "Unable to start connection: {s}", .{@errorName(err)});
+            _ = self.daemon.handleStartError(switch (err) {
+                error.OutOfMemory => error.OutOfMemory,
+                error.DNSResolutionFailure => error.DNSResolutionFailure,
+                error.Timeout => error.Timeout,
+                else => error.UnableToStart,
+            });
+            self.trackConnectionStatus(.disconnected);
+            self.stopConnection(0, .{ .failure = .reconnect }) catch {};
+            self.scheduleResumeGate();
+            return;
+        };
+        switch (result) {
+            .started => {}, // Asynchronous establishment continues through events.
             .established => |success| {
+                var owned = success;
+                defer owned.info.deinit(self.daemon.allocator);
+                // Complete startup before yielding to queued reachability events.
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
                     });
                 };
             },
-            .needs_rebind => |info| self.handleConnectionNeedsRebind(info) catch |err| self.linkRefreshFailed(err),
-            .failed => |failure| self.handleConnectionFailed(failure),
-            .stopped => self.handleConnectionStopped(),
-            .set_env => |update| {
-                // Finalization clears values while stopping; late updates stay ignored.
-                if (self.daemon.state == .started or update.value == null) {
-                    self.daemon.controller.setEnvironmentValue(update.key, update.value);
-                }
+            .failed => {
+                log.write(.err, "Connection could not start");
+                self.trackConnectionStatus(.disconnected);
+                self.stopConnection(0, .{ .failure = .reconnect }) catch {};
+                self.scheduleResumeGate();
             },
-            .data_count => |count| self.daemon.handleDataCount(count),
         }
     }
 
-    fn handleEventLoopFailure(self: *ConnectionDaemon, failure: ?io.Failure) void {
-        if (failure) |value| {
-            log.writef(.fault, "Connection event loop terminated unexpectedly: .{}", .{value});
-        } else {
-            log.write(.fault, "Connection event loop terminated unexpectedly without an I/O failure");
+    fn scheduleResumeGate(self: *ConnectionDaemon) void {
+        if (self.daemon.state != .started) {
+            log.write(.info, "Ignore resume connection gate, daemon not started");
+            return;
         }
-        const err_pair: ?api.PartoutErrorPair = if (partoutCodeForLooperFailure(failure)) |code|
-            .{ .code = code }
-        else
-            null;
-        if (err_pair) |err| self.daemon.handleLastError(err);
+        const delay_ms = self.daemon.options.reconnection_delay_ms;
+        log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
+
+        // Contextually cancels the previous attempt
+        self.looper.scheduleTimer(&self.resume_gate_timer, delay_ms, .{
+            .context = self,
+            .callback = onResumeGate,
+        }) catch |err| {
+            log.writef(.err, "Unable to schedule resume connection gate, defer resume: {s}", .{@errorName(err)});
+            // Finish the current evaluation and drain queued connection events
+            // before the gate can start another attempt.
+            self.looper.cancelTimer(&self.resume_gate_timer);
+            self.schedule(.resumeGate) catch |schedule_err| {
+                log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
+                self.daemon.requestCancellation(null, true);
+            };
+        };
+    }
+
+    fn trackConnectionStatus(self: *ConnectionDaemon, status: api.ConnectionStatus) void {
+        self.daemon.snapshot_publisher.setConnectionStatus(status);
+        switch (status) {
+            .connected => {
+                self.daemon.emitRemove(.last_error_code);
+                self.daemon.snapshot_publisher.setLastError(null);
+                self.daemon.controller.setReasserting(false);
+            },
+            .connecting => {
+                self.daemon.emitRemove(.last_error_code);
+                self.daemon.snapshot_publisher.setLastError(null);
+                self.daemon.controller.setReasserting(true);
+            },
+            .disconnecting => {},
+            .disconnected => {
+                self.daemon.resetDataCount();
+                self.daemon.controller.setReasserting(false);
+                self.scheduleResumeGate();
+            },
+        }
+        self.daemon.emitStatus(status);
+        self.daemon.snapshot_publisher.publishCurrentSnapshot(true);
+        _ = self.gate.updateStatus(status);
+    }
+
+    fn cancelConnection(self: *ConnectionDaemon, err_pair: ?api.PartoutErrorPair) void {
+        self.daemon.enterFailedState();
         self.daemon.controller.setReasserting(false);
-        self.daemon.requestCancellation(err_pair, true);
+        if (!self.daemon.options.cancels_unrecoverable and
+            self.daemon.snapshot_publisher.environment.connection_status != .disconnected)
+        {
+            self.trackConnectionStatus(.disconnected);
+        }
+        self.daemon.requestCancellation(err_pair, false);
+    }
+
+    fn clearConnectionTunnel(self: *ConnectionDaemon) void {
+        if (self.connection != null) {
+            self.detachLooperSides() catch {};
+        }
+        self.daemon.controller.clearTunnelSettings(false);
+    }
+
+    fn pause(self: *ConnectionDaemon) void {
+        self.conn_request = null;
+        self.looper.cancelTimer(&self.resume_gate_timer);
+        _ = self.gate.setEnabled(false);
+    }
+
+    fn cloneTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) !?api.TunnelRemoteInfoWrapper {
+        const value = info orelse return null;
+        return try value.clone(allocator);
+    }
+
+    fn deinitTunnelInfo(allocator: std.mem.Allocator, info: ?api.TunnelRemoteInfoWrapper) void {
+        var value = info orelse return;
+        value.deinit(allocator);
     }
 
     fn isCurrentThread(self: *const ConnectionDaemon) bool {
@@ -1478,7 +1479,6 @@ const ConnectionDaemon = struct {
     }
 
     //#endregion
-
 };
 
 //#region Error mapping
