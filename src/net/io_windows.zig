@@ -30,7 +30,8 @@ pub const SocketWrapper = struct {
         options: io.SocketOptions,
     ) std.mem.Allocator.Error!?*SocketWrapper {
         if (!build_options.winrt) return null;
-        if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
+        const unconnected = endpoint == null;
+        if (unconnected and !options.ipv4 and !options.ipv6) return null;
         const peer = endpoint orelse api.ExtendedEndpoint{
             .address = if (options.ipv6) "::" else "0.0.0.0",
             .proto = .init(.udp, options.port),
@@ -42,7 +43,7 @@ pub const SocketWrapper = struct {
         const socket = WinRT.winrt_socket_create(switch (peer.plainSocketType()) {
             .tcp => WinRT.WinrtSocketProtoTCP,
             .udp => WinRT.WinrtSocketProtoUDP,
-        }, endpoint == null) orelse return null;
+        }, unconnected) orelse return null;
         errdefer WinRT.winrt_socket_free(socket);
         // uintptr_t carries the WinRT wrapper through the same callback ABI as
         // POSIX descriptors. It must never be used as a Winsock SOCKET.
@@ -59,8 +60,8 @@ pub const SocketWrapper = struct {
             c_address.ptr(),
             peer.proto.port,
             &.{
-                .unconnected = endpoint == null,
-                .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
+                .unconnected = unconnected,
+                .dual_stack = unconnected and options.ipv4 and options.ipv6,
                 .timeout_ms = options.timeout_ms,
             },
         )) {
@@ -71,7 +72,7 @@ pub const SocketWrapper = struct {
         self.* = .{
             .allocator = allocator,
             .socket = socket,
-            .unconnected = endpoint == null,
+            .unconnected = unconnected,
         };
         return self;
     }
