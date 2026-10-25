@@ -37,27 +37,6 @@ struct WinrtTun {
 
 struct WinrtTunHandle { std::shared_ptr<WinrtTun> state; };
 
-extern "C" void winrt_tun_free(winrt_tun tun) {
-    if (!tun) return;
-    winrt_tun_stop_writes(tun);
-    winrt_tun_set_on_receive(tun, nullptr, nullptr);
-    delete tun;
-}
-
-extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context) {
-    if (!tun) return false;
-    std::lock_guard lock(tun->state->receive_mutex);
-    if (callback && tun->state->callback) return false;
-    tun->state->callback = callback;
-    tun->state->context = context;
-    return true;
-}
-
-extern "C" void winrt_tun_stop_writes(winrt_tun tun) {
-    if (!tun) return;
-    tun->state->writes_stopped.store(true);
-}
-
 static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, size_t length, bool send) {
     if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
     const auto append = [&](VpnPacketBuffer const &packet) {
@@ -104,16 +83,6 @@ static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, si
         } catch (...) {}
         return error;
     }
-}
-
-extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
-    if (!tun) return E_INVALIDARG;
-    const auto state = tun->state;
-    std::lock_guard lock(state->write_mutex);
-    if (state->writes_stopped.load()) return E_ABORT;
-    const auto result = write_channel(state->channel, bytes, length, false);
-    (result == 0 ? state->counters->tun_write : state->counters->tun_write_failed).fetch_add(1, std::memory_order_relaxed);
-    return result;
 }
 
 PartoutTunnelController::PartoutTunnelController(VpnChannel const &channel)
@@ -284,6 +253,37 @@ void PartoutTunnelController::Decapsulate(VpnPacketBuffer const &packet) {
 // ref is a retained channel context owned by the daemon bindings.
 static PartoutTunnelController *get_controller(void *ref) {
     return static_cast<PartoutTunnelController *>(ref);
+}
+
+extern "C" void winrt_tun_free(winrt_tun tun) {
+    if (!tun) return;
+    winrt_tun_stop_writes(tun);
+    winrt_tun_set_on_receive(tun, nullptr, nullptr);
+    delete tun;
+}
+
+extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context) {
+    if (!tun) return false;
+    std::lock_guard lock(tun->state->receive_mutex);
+    if (callback && tun->state->callback) return false;
+    tun->state->callback = callback;
+    tun->state->context = context;
+    return true;
+}
+
+extern "C" void winrt_tun_stop_writes(winrt_tun tun) {
+    if (!tun) return;
+    tun->state->writes_stopped.store(true);
+}
+
+extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
+    if (!tun) return E_INVALIDARG;
+    const auto state = tun->state;
+    std::lock_guard lock(state->write_mutex);
+    if (state->writes_stopped.load()) return E_ABORT;
+    const auto result = write_channel(state->channel, bytes, length, false);
+    (result == 0 ? state->counters->tun_write : state->counters->tun_write_failed).fetch_add(1, std::memory_order_relaxed);
+    return result;
 }
 
 // FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
