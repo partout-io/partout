@@ -85,12 +85,14 @@ static int32_t write_channel(VpnChannel const &channel, const uint8_t *bytes, si
     }
 }
 
-Partout::TunnelController::TunnelController(VpnChannel const &channel)
+namespace Partout {
+
+TunnelController::TunnelController(VpnChannel const &channel)
     : channel_(channel), counters_(std::make_shared<WinrtPacketCounters>()) {}
 
-Partout::TunnelController::~TunnelController() { Stop(); }
+TunnelController::~TunnelController() { Stop(); }
 
-bool Partout::TunnelController::Associate(Socket *socket) noexcept {
+bool TunnelController::Associate(Socket *socket) noexcept {
     try {
         if (!socket) return false;
         const auto transport = socket->Transport();
@@ -138,7 +140,7 @@ bool Partout::TunnelController::Associate(Socket *socket) noexcept {
     }
 }
 
-bool Partout::TunnelController::Start(const char *info_json) noexcept {
+bool TunnelController::Start(const char *info_json) noexcept {
     try {
         if (!channel_ || !transport_) return false;
         if (started_) return true;
@@ -170,7 +172,7 @@ bool Partout::TunnelController::Start(const char *info_json) noexcept {
     }
 }
 
-void Partout::TunnelController::Stop() noexcept {
+void TunnelController::Stop() noexcept {
     std::shared_ptr<WinrtTun> tun;
     {
         std::lock_guard lock(input_mutex_);
@@ -210,7 +212,7 @@ void Partout::TunnelController::Stop() noexcept {
         counters_->link_send_failed.load(), counters_->link_read.load(), counters_->tun_write.load(), counters_->tun_write_failed.load());
 }
 
-winrt_tun Partout::TunnelController::Open(const char *info_json) {
+winrt_tun TunnelController::Open(const char *info_json) {
     auto state = std::make_shared<WinrtTun>(channel_);
     state->counters = counters_;
     auto handle = std::make_unique<WinrtTunHandle>(WinrtTunHandle{state});
@@ -220,7 +222,7 @@ winrt_tun Partout::TunnelController::Open(const char *info_json) {
     return handle.release();
 }
 
-void Partout::TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
+void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     // Leave input buffers in the platform list: Windows reclaims them on return.
     std::shared_ptr<WinrtTun> tun;
     { std::lock_guard lock(input_mutex_); tun = tun_; }
@@ -242,7 +244,7 @@ void Partout::TunnelController::Encapsulate(VpnPacketBufferList const &packets) 
     }
 }
 
-void Partout::TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
+void TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     counters_->link_read.fetch_add(1, std::memory_order_relaxed);
     const auto buffer = packet.Buffer();
     std::function<void(const uint8_t *, size_t)> receive;
@@ -250,6 +252,8 @@ void Partout::TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     if (!receive) return;
     receive(buffer.data(), buffer.Length());
 }
+
+} // namespace Partout
 
 // ref is a retained channel context owned by the daemon bindings.
 static Partout::TunnelController *get_controller(void *ref) {

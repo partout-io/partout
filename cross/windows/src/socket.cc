@@ -145,7 +145,9 @@ fire_and_forget read_stream(std::shared_ptr<SocketReceiveState> state, StreamSoc
 
 } // namespace
 
-Partout::Socket::Socket(winrt_socket_proto proto, bool unconnected) {
+namespace Partout {
+
+Socket::Socket(winrt_socket_proto proto, bool unconnected) {
     if (proto != WinrtSocketProtoUDP && proto != WinrtSocketProtoTCP)
         throw hresult_invalid_argument();
     if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
@@ -158,7 +160,7 @@ Partout::Socket::Socket(winrt_socket_proto proto, bool unconnected) {
     else stream_ = StreamSocket{};
 }
 
-Partout::Socket::~Socket() noexcept {
+Socket::~Socket() noexcept {
     SetOnReceive(nullptr, nullptr);
     if (adapter_) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
         receive_state_->received.load(), receive_state_->sent.load());
@@ -168,7 +170,7 @@ Partout::Socket::~Socket() noexcept {
     try { if (stream_) stream_.Close(); } catch (...) {}
 }
 
-bool Partout::Socket::Open(const char *hostname, uint16_t port,
+bool Socket::Open(const char *hostname, uint16_t port,
     const winrt_socket_open_options *options) {
     try {
         if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
@@ -234,7 +236,7 @@ bool Partout::Socket::Open(const char *hostname, uint16_t port,
     return false;
 }
 
-bool Partout::Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
+bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
     if (!receive_state_) return false;
     const auto state = receive_state_;
     try {
@@ -258,7 +260,7 @@ bool Partout::Socket::SetOnReceive(winrt_socket_on_receive callback, void *conte
     }
 }
 
-bool Partout::Socket::ResumeReading() {
+bool Socket::ResumeReading() {
     if (!receive_state_) return false;
     const auto state = receive_state_;
     try {
@@ -280,7 +282,7 @@ bool Partout::Socket::ResumeReading() {
     }
 }
 
-int32_t Partout::Socket::Write(const uint8_t *bytes, size_t length,
+int32_t Socket::Write(const uint8_t *bytes, size_t length,
     const winrt_socket_address *destination) {
     try {
         if ((!bytes && length) || length > UINT32_MAX)
@@ -341,12 +343,12 @@ int32_t Partout::Socket::Write(const uint8_t *bytes, size_t length,
     }
 }
 
-void Partout::Socket::StopWrites() {
+void Socket::StopWrites() {
     if (!receive_state_) return;
     receive_state_->writes_stopped.store(true);
 }
 
-bool Partout::Socket::GetAddress(winrt_socket_address *address) {
+bool Socket::GetAddress(winrt_socket_address *address) {
     if (!address) return false;
     try {
         Apartment apartment;
@@ -371,28 +373,28 @@ bool Partout::Socket::GetAddress(winrt_socket_address *address) {
     }
 }
 
-IInspectable Partout::Socket::Transport() const {
+IInspectable Socket::Transport() const {
     if (datagram_) return datagram_;
     return stream_;
 }
 
-bool Partout::Socket::IsUnconnected() const {
+bool Socket::IsUnconnected() const {
     return datagram_ && unconnected_;
 }
 
-void Partout::Socket::SetAdapter(
+void Socket::SetAdapter(
     winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter) {
     if (!IsUnconnected() || !adapter) throw hresult_invalid_argument();
     adapter_ = adapter;
 }
 
-std::function<void(const uint8_t *, size_t)> Partout::Socket::ChannelReceiver() const {
+std::function<void(const uint8_t *, size_t)> Socket::ChannelReceiver() const {
     return [state = receive_state_](const uint8_t *bytes, size_t length) {
         state->deliver(bytes, length, nullptr, 0);
     };
 }
 
-void Partout::Socket::TakeOver() {
+void Socket::TakeOver() {
     const auto state = receive_state_;
     std::lock_guard writes(state->write_mutex);
     {
@@ -408,13 +410,13 @@ void Partout::Socket::TakeOver() {
     state->read_stopped.wait(lock, [&] { return !state->reading; });
 }
 
-void Partout::Socket::SetChannelWriter(
+void Socket::SetChannelWriter(
     std::function<int32_t(const uint8_t *, size_t)> writer) {
     std::lock_guard lock(receive_state_->write_mutex);
     receive_state_->channel_write = std::move(writer);
 }
 
-void Partout::Socket::RegisterDatagram() {
+void Socket::RegisterDatagram() {
     const auto state = receive_state_;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
@@ -438,6 +440,8 @@ void Partout::Socket::RegisterDatagram() {
         });
     receiving_ = true;
 }
+
+} // namespace Partout
 
 extern "C" {
 
