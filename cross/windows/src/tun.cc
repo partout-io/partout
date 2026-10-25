@@ -255,14 +255,16 @@ static PartoutTunnelController *get_controller(void *ref) {
     return static_cast<PartoutTunnelController *>(ref);
 }
 
-extern "C" void winrt_tun_free(winrt_tun tun) {
+extern "C" {
+
+void winrt_tun_free(winrt_tun tun) {
     if (!tun) return;
     winrt_tun_stop_writes(tun);
     winrt_tun_set_on_receive(tun, nullptr, nullptr);
     delete tun;
 }
 
-extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context) {
+bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context) {
     if (!tun) return false;
     std::lock_guard lock(tun->state->receive_mutex);
     if (callback && tun->state->callback) return false;
@@ -271,12 +273,12 @@ extern "C" bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive cal
     return true;
 }
 
-extern "C" void winrt_tun_stop_writes(winrt_tun tun) {
+void winrt_tun_stop_writes(winrt_tun tun) {
     if (!tun) return;
     tun->state->writes_stopped.store(true);
 }
 
-extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
+int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
     if (!tun) return E_INVALIDARG;
     const auto state = tun->state;
     std::lock_guard lock(state->write_mutex);
@@ -287,11 +289,11 @@ extern "C" int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t l
 }
 
 // FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
-extern "C" void winrt_tun_ctrl_set_delegate(void *ref, const winrt_tun_ctrl_delegate *delegate) {
+void winrt_tun_ctrl_set_delegate(void *ref, const winrt_tun_ctrl_delegate *delegate) {
     winrt_log(WinrtLogDebug, "tun: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
-extern "C" bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, size_t count) {
+bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, size_t count) {
     if (count && !sockets) return false;
     const auto controller = get_controller(ref);
     for (size_t i = 0; i < count; ++i) {
@@ -300,7 +302,7 @@ extern "C" bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *
     }
     return true;
 }
-extern "C" winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
+winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
     (void)uuid;
     const auto controller = get_controller(ref);
     if (!controller) return nullptr;
@@ -308,17 +310,17 @@ extern "C" winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, cons
     catch (...) { return nullptr; }
 }
 // FIXME: ###, Windows, Publish tunnel snapshots to the host.
-extern "C" void winrt_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
+void winrt_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     winrt_log(WinrtLogDebug, "tun: ctrl_report_snapshot(%p, %p)", ref, snapshot_json);
 }
 
 // FIXME: ###, Windows, Publish environment updates to the host.
-extern "C" void winrt_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
+void winrt_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
     winrt_log(WinrtLogDebug, "tun: ctrl_set_environment_value(%p, %p, %p)", ref, key, value);
 }
 
 // FIXME: ###, Windows, Honor kill_switch when clearing tunnel settings.
-extern "C" void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
+void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     winrt_log(WinrtLogDebug, "tun: ctrl_clear_tunnel(%p, %d)", ref, kill_switch);
     const auto controller = get_controller(ref);
     if (!controller) return;
@@ -326,6 +328,8 @@ extern "C" void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
 }
 
 // FIXME: ###, Windows, Cancel the VPN channel and report error_message.
-extern "C" void winrt_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
+void winrt_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     winrt_log(WinrtLogDebug, "tun: ctrl_cancel_tunnel(%p, %p)", ref, error_message);
+}
+
 }
