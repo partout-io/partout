@@ -18,7 +18,8 @@ const io_c = ffi.io;
 /// Only native receives cross threads; mutex protects their queue and shared flags.
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
-    options: helpers.Options,
+    mux: io_c.pp_mux,
+    max_read_count: usize,
     owns_mux: bool,
 
     stopped: bool = false,
@@ -35,11 +36,11 @@ pub const WindowsLooper = struct {
     ) helpers.InitError!*WindowsLooper {
         const self = try allocator.create(WindowsLooper);
         errdefer allocator.destroy(self);
-        var configured = options;
-        configured.mux = options.mux orelse io_c.pp_mux_create(1) orelse return error.MuxFailure;
+        const mux = options.mux orelse io_c.pp_mux_create(1) orelse return error.MuxFailure;
         self.* = .{
             .allocator = allocator,
-            .options = configured,
+            .mux = mux,
+            .max_read_count = options.max_read_count,
             .owns_mux = options.mux == null,
         };
         return self;
@@ -48,86 +49,19 @@ pub const WindowsLooper = struct {
     pub fn destroy(self: *WindowsLooper) void {
         self.stop() catch unreachable;
         self.mutex.deinit();
-        if (self.owns_mux) io_c.pp_mux_free(self.options.mux);
+        if (self.owns_mux) io_c.pp_mux_free(self.mux);
         self.allocator.destroy(self);
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
-        const until = if (max_wait_ms) |wait_ms|
-            core.concurrency.deadlineAfterMs(core.monotonicNs(), wait_ms)
-        else
-            null;
         if (self.stopped) return false;
-        while (true) {
-            const now = core.monotonicNs();
-            var deadline = until;
-            var pending = self.timers.head;
-            while (pending) |node| : (pending = node.next)
-                deadline = @min(deadline orelse node.deadline_ns, node.deadline_ns);
-            const timeout_ms: c_int = if (deadline) |value| blk: {
-                const remaining = value -| now;
-                const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
-                break :blk @intCast(@min(ms, std.math.maxInt(c_int)));
-            } else -1;
-            self.mutex.lock();
-            if (self.hasCallbackLocked()) {
-                self.mutex.unlock();
-                break;
-            }
-            self.waiting = true;
-            self.mutex.unlock();
-            var code: c_int = 0;
-            const result = io_c.pp_mux_wait(self.options.mux, timeout_ms, &code);
-            self.mutex.lock();
-            self.waiting = false;
-            self.mutex.unlock();
-            if (result < 0) {
-                failure.* = .{ .wait = if (code == 0) result else code };
-                return false;
-            }
-            // Windows can report a timeout before the monotonic deadline.
-            // Honor actual wake events immediately so the daemon can drain jobs.
-            if (result > 0 or deadline == null or core.monotonicNs() >= deadline.?) break;
+        if (self.waitForInput(max_wait_ms)) |code| {
+            failure.* = .{ .wait = code };
+            return false;
         }
-        if (self.stopped) return false;
-        for (0..self.options.max_read_count) |_| {
-            self.mutex.lock();
-            const node = self.callbacks.removeWhere({}, Received.isReady) orelse {
-                self.mutex.unlock();
-                break;
-            };
-            const side = node.side;
-            // A protocol callback may detach its own side.
-            side.retain();
-            side.dispatched += 1;
-            self.mutex.unlock();
-            const keep = deliver(side, node.data.ptr, node.data.len, if (node.source) |*address| address else null, node.code);
-            self.mutex.lock();
-            side.reading = keep;
-            self.freeReceived(node);
-            self.mutex.unlock();
-            side.release();
-            if (self.stopped) return false;
-        }
-        const now = core.monotonicNs();
-        var pending = self.timers.head;
-        while (pending) |node| : (pending = node.next) node.ready = node.deadline_ns <= now;
-        // Newly scheduled tasks become eligible on the next iteration. Keep
-        // uncalled tasks in the queue so callbacks can cancel or replace them.
-        while (self.timers.removeWhere({}, Scheduled.isReady)) |node| {
-            const task = node.task;
-            self.allocator.destroy(node);
-            task.call();
-            if (self.stopped) return false;
-        }
-        return true;
-    }
-
-    // Called with mutex held. Queued input covers notifications before
-    // the wait; signalling only a current waiter avoids leaving stale wake events.
-    fn notifyLocked(self: *WindowsLooper) void {
-        if (self.waiting) _ = io_c.pp_mux_wake(self.options.mux);
+        if (!self.dispatchInput()) return false;
+        return self.dispatchTimers();
     }
 
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
@@ -168,33 +102,17 @@ pub const WindowsLooper = struct {
         timer.id = null;
     }
 
-    const Scheduled = struct {
-        id: u64,
-        deadline_ns: u64,
-        task: io.TimedTask,
-        ready: bool = false,
-        next: ?*Scheduled = null,
-
-        fn hasId(self: *const Scheduled, id: u64) bool {
-            return self.id == id;
-        }
-
-        fn isReady(self: *const Scheduled, _: void) bool {
-            return self.ready;
-        }
-    };
-
     pub fn attach(
         self: *WindowsLooper,
         arguments: helpers.AttachArguments,
     ) helpers.AttachError!void {
-        if (self.options.max_read_count == 0) return error.InvalidBuffers;
+        if (self.max_read_count == 0) return error.InvalidBuffers;
         if (self.stopped) return error.LooperUnavailable;
         const slot = &self.sides[@intFromEnum(std.meta.activeTag(arguments.pair))];
         if (slot.* != null) return error.SideAlreadyAttached;
         const side = try self.allocator.create(SideIO);
         errdefer self.allocator.destroy(side);
-        side.* = .{ .allocator = self.allocator, .owner = self, .arguments = arguments };
+        side.* = .{ .owner = self, .arguments = arguments };
         slot.* = side;
         errdefer slot.* = null;
         switch (arguments.pair) {
@@ -270,8 +188,105 @@ pub const WindowsLooper = struct {
         return self.sides[@intFromEnum(tag)] orelse return error.SideNotAttached;
     }
 
+    fn waitForInput(self: *WindowsLooper, max_wait_ms: ?u32) ?c_int {
+        var deadline: ?u64 = if (max_wait_ms) |ms| core.concurrency.deadlineAfterMs(core.monotonicNs(), ms) else null;
+        // Only the looper mutates timers, so the deadline stays fixed while waiting.
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next)
+            deadline = @min(deadline orelse node.deadline_ns, node.deadline_ns);
+
+        while (self.beginWait()) {
+            const timeout_ms: c_int = if (deadline) |until| blk: {
+                const remaining = until -| core.monotonicNs();
+                const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
+                break :blk @intCast(@min(ms, std.math.maxInt(c_int)));
+            } else -1;
+            var code: c_int = 0;
+            const result = io_c.pp_mux_wait(self.mux, timeout_ms, &code);
+            self.mutex.lock();
+            self.waiting = false;
+            self.mutex.unlock();
+            if (result < 0) return if (code == 0) result else code;
+            // Retry early Windows timeouts; mailbox wakes must return to the daemon.
+            if (result > 0 or deadline == null or core.monotonicNs() >= deadline.?) break;
+        }
+        return null;
+    }
+
+    fn beginWait(self: *WindowsLooper) bool {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        if (self.hasCallbackLocked()) return false;
+        self.waiting = true;
+        return true;
+    }
+
+    fn dispatchInput(self: *WindowsLooper) bool {
+        for (0..self.max_read_count) |_| {
+            const node = self.takeInput() orelse break;
+            self.dispatch(node);
+            if (self.stopped) return false;
+        }
+        return true;
+    }
+
+    fn takeInput(self: *WindowsLooper) ?*Received {
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        return self.callbacks.removeWhere({}, Received.isReady);
+    }
+
+    fn dispatch(self: *WindowsLooper, node: *Received) void {
+        const side = node.side;
+        // A protocol callback may detach its own side; release after freeing input.
+        side.retain();
+        defer side.release();
+        side.dispatched += 1;
+        const keep = node.deliver();
+        self.mutex.lock();
+        defer self.mutex.unlock();
+        side.reading = keep;
+        self.freeReceived(node);
+    }
+
+    fn dispatchTimers(self: *WindowsLooper) bool {
+        const now = core.monotonicNs();
+        var pending = self.timers.head;
+        while (pending) |node| : (pending = node.next) node.ready = node.deadline_ns <= now;
+        // Newly scheduled tasks become eligible on the next iteration. Keep
+        // uncalled tasks queued so callbacks can cancel or replace them.
+        while (self.timers.removeWhere({}, Scheduled.isReady)) |node| {
+            const task = node.task;
+            self.allocator.destroy(node);
+            task.call();
+            if (self.stopped) return false;
+        }
+        return true;
+    }
+
+    // Called with mutex held. Queued input covers notifications before
+    // the wait; signalling only a current waiter avoids leaving stale wake events.
+    fn notifyLocked(self: *WindowsLooper) void {
+        if (self.waiting) _ = io_c.pp_mux_wake(self.mux);
+    }
+
+    const Scheduled = struct {
+        id: u64,
+        deadline_ns: u64,
+        task: io.TimedTask,
+        ready: bool = false,
+        next: ?*Scheduled = null,
+
+        fn hasId(self: *const Scheduled, id: u64) bool {
+            return self.id == id;
+        }
+
+        fn isReady(self: *const Scheduled, _: void) bool {
+            return self.ready;
+        }
+    };
+
     const SideIO = struct {
-        allocator: std.mem.Allocator,
         owner: *WindowsLooper,
         arguments: helpers.AttachArguments,
         reading: bool = true,
@@ -293,7 +308,7 @@ pub const WindowsLooper = struct {
             switch (self.arguments.pair) {
                 inline else => |wrapper| wrapper.cleanup(),
             }
-            self.allocator.destroy(self);
+            self.owner.allocator.destroy(self);
         }
     };
 
@@ -306,6 +321,28 @@ pub const WindowsLooper = struct {
 
         fn isReady(self: *const Received, _: void) bool {
             return self.code != 0 or self.side.reading;
+        }
+
+        fn deliver(self: *const Received) bool {
+            const side = self.side;
+            if (side.detached) return false;
+            const arguments = side.arguments;
+            if (self.code != 0) {
+                if (arguments.on_failure) |callback| callback.call(.{ .io = .{
+                    .side = std.meta.activeTag(arguments.pair),
+                    .cause = if (self.code == io_c.WinrtSocketEOF) error.EndOfStream else error.LibcFailure,
+                    .code = if (self.code == io_c.WinrtSocketEOF) null else self.code,
+                } });
+                return false;
+            }
+            const callback = arguments.on_read orelse return true;
+            const addresses: ?[1]io.SocketAddress = if (self.source) |address| .{address} else null;
+            const action = callback.call(&.{self.data}, if (addresses) |*value| value else null) catch |err| {
+                if (side.detached) return false;
+                if (arguments.on_failure) |failure| failure.call(.{ .user = err });
+                return false;
+            };
+            return action == .keep and !side.detached;
         }
 
         fn belongsTo(self: *const Received, side: *SideIO) bool {
@@ -367,36 +404,6 @@ pub const WindowsLooper = struct {
             .code = code,
         };
         return node;
-    }
-
-    fn deliver(
-        self: *SideIO,
-        bytes: [*c]const u8,
-        length: usize,
-        source: [*c]const io.SocketAddress,
-        code: i32,
-    ) bool {
-        if (self.detached) return false;
-        const arguments = self.arguments;
-        const on_read = arguments.on_read;
-        const on_failure = arguments.on_failure;
-        if (code != 0) {
-            if (on_failure) |callback| callback.call(.{ .io = .{
-                .side = std.meta.activeTag(arguments.pair),
-                .cause = if (code == io_c.WinrtSocketEOF) error.EndOfStream else error.LibcFailure,
-                .code = if (code == io_c.WinrtSocketEOF) null else code,
-            } });
-            return false;
-        }
-        const packets = [_]io.Packet{if (length == 0) &.{} else bytes[0..length]};
-        const addresses: ?[]const io.SocketAddress = if (source == null) null else source[0..1];
-        const callback = on_read orelse return true;
-        const action = callback.call(&packets, addresses) catch |err| {
-            if (self.detached) return false;
-            if (on_failure) |failure| failure.call(.{ .user = err });
-            return false;
-        };
-        return action == .keep and !self.detached;
     }
 
     pub const testing = if (builtin.is_test) struct {

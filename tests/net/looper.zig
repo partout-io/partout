@@ -456,7 +456,6 @@ test "Windows paused TUN drops new input but admits failures and resumes deliver
     // Exercise admission/dispatch without a VPN host. This unattached side has
     // no native handle to drain or destroy; queued nodes retain it during dispatch.
     var side: Looper.Impl.testing.Side = .{
-        .allocator = std.testing.allocator,
         .owner = looper.impl,
         .arguments = .{
             .pair = .{ .tun = undefined },
