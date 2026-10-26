@@ -149,6 +149,151 @@ fn waitForPendingReads(passive: *bridge.PassiveIO, side: source.net.Side, count:
     return error.TestUnexpectedResult;
 }
 
+const PosixPacketIO = struct {
+    writes: usize = 0,
+    cleanups: usize = 0,
+    block_after: ?usize = null,
+    short_write: bool = false,
+    read_error: bool = false,
+    payload: ?[]const u8 = null,
+    delivered: bool = false,
+
+    fn read(raw: *anyopaque, buffer: []u8) io.Error!?usize {
+        const self: *PosixPacketIO = @ptrCast(@alignCast(raw));
+        if (self.read_error) return error.LibcFailure;
+        if (!self.delivered) if (self.payload) |payload| {
+            @memcpy(buffer[0..payload.len], payload);
+            self.delivered = true;
+            return payload.len;
+        };
+        return error.WouldBlock;
+    }
+    fn write(raw: *anyopaque, data: []const u8, _: usize) io.Error!usize {
+        const self: *PosixPacketIO = @ptrCast(@alignCast(raw));
+        if (self.short_write) return 0;
+        if (self.writes == self.block_after) return error.Backpressure;
+        self.writes += 1;
+        return data.len;
+    }
+    fn cleanup(raw: *anyopaque) void {
+        const self: *PosixPacketIO = @ptrCast(@alignCast(raw));
+        self.cleanups += 1;
+    }
+    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
+    fn reset(_: *anyopaque) io.Error!void {}
+    fn lastError(_: *anyopaque) c_int {
+        return 0;
+    }
+    fn descriptor(self: *PosixPacketIO) io.TunDescriptor {
+        return .{ .fd = -1, .io = .{ .mock = .{ .ptr = self, .vtable = &.{
+            .read = read,
+            .write = write,
+            .cleanup = cleanup,
+            .set_event_mask = mask,
+            .reset_events = reset,
+            .last_error_code = lastError,
+        } } } };
+    }
+};
+
+test "POSIX passive initial TUN commit fills a waiting read without packet allocations" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
+    // Only the two descriptor adapters may allocate; input must bypass queues.
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 2 });
+    passive.allocator = failing.allocator();
+    var link = PosixPacketIO{};
+    var tun = PosixPacketIO{ .payload = "ip packet" };
+    passive.replaceLink(link.descriptor());
+    var bytes: [32]u8 = undefined;
+    var packet = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+    var result = Completion{};
+    var request = ReadRequest{ .passive = &passive, .side = .tun, .packets = &packet, .result = &result };
+    var thread: ?std.Thread = try std.Thread.spawn(.{}, ReadRequest.run, .{&request});
+    defer if (thread) |value| {
+        passive.quiesce();
+        value.join();
+    };
+    try waitForPendingReads(&passive, .tun, 1);
+    passive.replaceTun(tun.descriptor());
+    thread.?.join();
+    thread = null;
+    try std.testing.expectEqual(c.WG_IO_OK, result.status);
+    try std.testing.expectEqual(@as(u32, 1), result.count);
+    try std.testing.expectEqualStrings("ip packet", bytes[0..packet[0].size]);
+    try std.testing.expect(!failing.has_induced_failure);
+    passive.release();
+    try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), link.cleanups);
+}
+
+test "POSIX callback adapter releases an incoming descriptor on allocation failure" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    var tun = PosixPacketIO{};
+    try std.testing.expectError(error.OutOfMemory, source.net.CallbackIO.create(failing.allocator(), .{ .tun = tun.descriptor() }));
+    try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
+}
+
+test "POSIX passive write retries preserve the completed prefix and release readers" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    passive.allocator = std.testing.allocator;
+    defer passive.deinit();
+    var link = PosixPacketIO{};
+    var tun = PosixPacketIO{ .block_after = 1 };
+    passive.replaceLink(link.descriptor());
+    passive.replaceTun(tun.descriptor());
+    const transport = passive.transport(51820, 1400);
+    const packets = [_]c.wg_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
+    var result = Completion{};
+    try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, &packets, packets.len, result.token()));
+    try std.testing.expectEqual(c.WG_IO_AGAIN, result.status);
+    try std.testing.expectEqual(@as(u32, 1), result.count);
+    tun.block_after = null;
+    try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, packets[1..].ptr, 1, result.token()));
+    try std.testing.expectEqual(c.WG_IO_OK, result.status);
+    try std.testing.expectEqual(@as(usize, 2), tun.writes);
+    passive.release();
+    try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), link.cleanups);
+}
+
+test "POSIX passive receive and short write failures report once" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    for ([_]bool{ false, true }) |read_error| {
+        var passive = try bridge.PassiveIO.init(Completion.finish);
+        passive.allocator = std.testing.allocator;
+        defer passive.deinit();
+        var failure = FailureRecorder{};
+        passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
+        var link = PosixPacketIO{};
+        var tun = PosixPacketIO{ .read_error = read_error, .short_write = !read_error };
+        passive.replaceLink(link.descriptor());
+        passive.replaceTun(tun.descriptor());
+        const transport = passive.transport(51820, 1400);
+        var result = Completion{};
+        if (read_error) {
+            var bytes: [32]u8 = undefined;
+            var packet = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+            for (0..20) |_| {
+                try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &packet, 1, result.token()));
+                if (result.status == c.WG_IO_CLOSED) break;
+            }
+            try std.testing.expectEqual(c.WG_IO_CLOSED, result.status);
+        } else {
+            const packets = [_]c.wg_packet{.{ .data = "bad", .size = 3 }};
+            try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, &packets, 1, result.token()));
+            try std.testing.expectEqual(c.WG_IO_INVALID, result.status);
+        }
+        passive.release(); // Joins receive callbacks before inspecting their report.
+        try std.testing.expectEqual(@as(usize, 1), failure.calls);
+        try std.testing.expectEqual(@as(usize, 1), link.cleanups);
+        try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
+    }
+}
+
 test "WireGuard passive waiting reads receive without packet allocations" {
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     for ([_]source.net.Side{ .link, .tun }) |side| {

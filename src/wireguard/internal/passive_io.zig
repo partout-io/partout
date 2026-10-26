@@ -101,8 +101,10 @@ pub const PassiveIO = struct {
     fn detach(self: *PassiveIO, comptime tag: net.Side) void {
         self.lock.lock();
         const side = &self.sides[@intFromEnum(tag)];
+        // An initial TUN commit can satisfy reads waiting before attachment.
+        // Replacing an attached descriptor cancels that descriptor's readers.
+        if (side.attached) side.cancelReads();
         side.attached = false;
-        side.cancelReads();
         const descriptor = if (tag == .link) self.link else self.tun;
         if (tag == .link) self.link = null else self.tun = null;
         self.clear(side);
@@ -174,8 +176,11 @@ pub const PassiveIO = struct {
         const self = side.owner;
         self.lock.lock();
         if (self.closed or !side.attached) {
+            // A quiesced descriptor may be reused on activation. Discard input
+            // without pausing its producer; detach alone ends delivery.
+            const keep_receiving = side.attached;
             self.lock.unlock();
-            return false;
+            return keep_receiving;
         }
         if (code != 0 or (side.tag == .link and source == null)) {
             self.lock.unlock();
