@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
@@ -214,12 +215,12 @@ pub const WindowsLooper = struct {
             return error.MissingDestination;
         for (packets) |packet| {
             const result = switch (side.arguments.pair) {
-                .link => |socket| try socket.write(packet, destination),
-                .tun => |tun| try tun.write(packet),
+                .link => |socket| socket.write(packet, destination),
+                .tun => |tun| tun.write(packet),
             };
-            if (result) |failure| {
+            if (result != 0) {
                 // Native and synchronous write errors use the same input queue.
-                _ = onReceive(side, null, 0, null, failure.io.code.?);
+                _ = onReceive(side, null, 0, null, result);
                 return;
             }
         }
@@ -231,26 +232,23 @@ pub const WindowsLooper = struct {
     }
 
     pub fn detach(self: *WindowsLooper, tag: io.Side) helpers.DetachError!void {
-        self.mutex.lock();
         const slot = &self.sides[@intFromEnum(tag)];
-        const side = slot.* orelse {
-            self.mutex.unlock();
-            return;
-        };
+        const side = slot.* orelse return;
         slot.* = null;
-        side.detached = true;
-        core.logging.writef(.notice, "Windows looper {s}: queued={}, dispatched={}, reading={}", .{
-            @tagName(tag), side.queued, side.dispatched, side.reading,
-        });
+        side.detached = true; // Dispatch/lifetime state belongs to the looper.
+        // Drain without the queue lock: a native callback may still be enqueuing.
         switch (side.arguments.pair) {
-            inline else => |wrapper| wrapper.stopWrites(),
+            inline else => |wrapper| {
+                wrapper.stopWrites();
+                wrapper.setOnReceive(null, null) catch unreachable;
+            },
         }
+        self.mutex.lock();
         while (self.callbacks.removeWhere(side, Received.belongsTo)) |node| self.freeReceived(node);
         self.mutex.unlock();
-        // Native delivery takes the queue lock, so drain it with that lock released.
-        switch (side.arguments.pair) {
-            inline else => |wrapper| wrapper.setOnReceive(null, null) catch unreachable,
-        }
+        core.logging.writef(.info, "Windows looper {s}: queued={}, dispatched={}, dropped={}, reading={}", .{
+            @tagName(tag), side.queued, side.dispatched, side.dropped, side.reading,
+        });
         side.release();
     }
 
@@ -279,6 +277,7 @@ pub const WindowsLooper = struct {
         reading: bool = true,
         queued: u64 = 0,
         dispatched: u64 = 0,
+        dropped: u64 = 0,
         allocation_failure: ?Received = null,
         // Ownership and in-progress dispatches are confined to the looper thread.
         references: usize = 1,
@@ -324,10 +323,9 @@ pub const WindowsLooper = struct {
 
     fn freeReceived(self: *WindowsLooper, node: *Received) void {
         const side = node.side;
-        if (side.allocation_failure == null or node != &side.allocation_failure.?) {
-            self.allocator.free(node.data);
-            self.allocator.destroy(node);
-        }
+        if (side.allocation_failure != null and node == &side.allocation_failure.?) return;
+        self.allocator.free(node.data);
+        self.allocator.destroy(node);
     }
 
     fn onReceive(
@@ -341,7 +339,13 @@ pub const WindowsLooper = struct {
         const self = side.owner;
         self.mutex.lock();
         defer self.mutex.unlock();
-        if (side.detached or side.allocation_failure != null) return false;
+        if (side.allocation_failure != null) return false;
+        // TUN input keeps arriving while paused. Drop it before allocating;
+        // socket input must retain in-flight TCP bytes until resumeReading().
+        if (code == 0 and !side.reading and side.arguments.pair == .tun) {
+            side.dropped += 1;
+            return false;
+        }
         const node = self.copyReceived(side, if (length == 0) &.{} else bytes[0..length], source, code) catch blk: {
             // Reserve failure delivery without allocating on the OOM path.
             side.allocation_failure = .{ .side = side, .code = -2147024882 }; // E_OUTOFMEMORY
@@ -386,14 +390,17 @@ pub const WindowsLooper = struct {
         }
         const packets = [_]io.Packet{if (length == 0) &.{} else bytes[0..length]};
         const addresses: ?[]const io.SocketAddress = if (source == null) null else source[0..1];
-        if (on_read) |callback| {
-            const action = callback.call(&packets, addresses) catch |err| {
-                if (self.detached) return false;
-                if (on_failure) |failure| failure.call(.{ .user = err });
-                return false;
-            };
-            return action == .keep and !self.detached;
-        }
-        return true;
+        const callback = on_read orelse return true;
+        const action = callback.call(&packets, addresses) catch |err| {
+            if (self.detached) return false;
+            if (on_failure) |failure| failure.call(.{ .user = err });
+            return false;
+        };
+        return action == .keep and !self.detached;
     }
+
+    pub const testing = if (builtin.is_test) struct {
+        pub const Side = SideIO;
+        pub const receive = onReceive;
+    } else void;
 };

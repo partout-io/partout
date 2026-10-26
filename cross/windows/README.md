@@ -144,6 +144,17 @@ registration, removal and handle destruction. Freeing an old handle cannot clear
 its replacement. Callbacks only enqueue input and must not reenter TUN or
 controller APIs.
 
+The Zig wrappers share callback registration and draining logic, retain native
+handle types, and return native write status codes. WindowsLooper converts a
+write failure into the same queue used for asynchronous receive/write failures.
+Detach drains native callbacks before purging that side's queued input. Dispatch
+retains the side separately so a protocol callback can detach itself safely.
+
+Pausing TUN reads preserves already queued packets but drops new packet input
+before allocation until reads resume. Errors remain eligible while paused.
+Socket input retains in-flight TCP bytes until resume; native socket callbacks
+provide backpressure. Detach summaries include the paused TUN drop count.
+
 Writes copy packets into the channel synchronously. The daemon looper serializes
 writes, write shutdown and handle lifetime; teardown outside the looper follows
 daemon shutdown. No write mutex, asynchronous TUN writer or atomic stop flag is

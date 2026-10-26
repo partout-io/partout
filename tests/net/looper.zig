@@ -253,6 +253,16 @@ test "Windows looper owns sides and routes socket write failure" {
     try std.testing.expect((try looper.flushWrites(.link)) == null);
 }
 
+const WindowsRejectedReceiver = struct {
+    calls: usize = 0,
+
+    fn receive(raw: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const io.SocketAddress, _: i32) callconv(.c) bool {
+        const self: *WindowsRejectedReceiver = @ptrCast(@alignCast(raw.?));
+        self.calls += 1;
+        return false;
+    }
+};
+
 test "Windows native write failures return asynchronously through the looper" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
@@ -264,11 +274,14 @@ test "Windows native write failures return asynchronously through the looper" {
     var transferred = false;
     defer if (!transferred) socket.destroy();
     var probe = WindowsWriteProbe{ .looper = &looper, .detach_on_failure = false };
+    var rejected: WindowsRejectedReceiver = .{};
     try looper.attach(.{
         .pair = .{ .link = socket },
         .on_failure = .{ .context = &probe, .callback = WindowsWriteProbe.failed },
     });
     transferred = true;
+    // A rejected duplicate registration must preserve the original callback/context.
+    try std.testing.expectError(error.ReceiveSetupFailed, socket.setOnReceive(WindowsRejectedReceiver.receive, &rejected));
     var destination = std.mem.zeroes(io.SocketAddress);
     destination.family = 4;
     destination.address[0] = 127;
@@ -276,21 +289,22 @@ test "Windows native write failures return asynchronously through the looper" {
     destination.port = 1194;
     // Too large for UDP: submission owns the bytes, native completion fails.
     const payload = [_]u8{0} ** 65536;
-    try std.testing.expect((try socket.write(&payload, destination)) == null);
+    try std.testing.expectEqual(@as(i32, 0), socket.write(&payload, destination));
     try std.testing.expectEqual(@as(usize, 0), probe.failures);
     for (0..5000) |_| {
         if (probe.failures != 0) break;
         try std.testing.expect(try test_helpers.poll(&looper, 1));
     }
     try std.testing.expectEqual(@as(usize, 1), probe.failures);
+    try std.testing.expectEqual(@as(usize, 0), rejected.calls);
     try std.testing.expect(probe.code.? != 0);
     // A terminal failure remains visible to subsequent submissions, until stop
     // replaces it with cancellation. Neither path restarts the native writer.
-    const failed = (try socket.write("after failure", destination)).?;
-    try std.testing.expectEqual(probe.code, failed.io.code);
+    const failed = socket.write("after failure", destination);
+    try std.testing.expectEqual(probe.code.?, failed);
     socket.stopWrites();
-    const stopped = (try socket.write("after stop", destination)).?;
-    try std.testing.expectEqual(@as(?c_int, -2147467260), stopped.io.code); // E_ABORT
+    const stopped = socket.write("after stop", destination);
+    try std.testing.expectEqual(@as(i32, -2147467260), stopped); // E_ABORT
     try looper.detach(.link);
     try std.testing.expect(!looper.isLinkAttached());
 }
@@ -415,4 +429,59 @@ test "Windows TCP receive resumes and detaches its side on the looper thread" {
     var buffer: [1]u8 = undefined;
     try std.testing.expectEqual(@as(c_int, 0), ws.recv(peer, &buffer, buffer.len, 0));
     try std.testing.expectEqual(@as(usize, 0), probe.failures);
+}
+
+const WindowsAdmissionProbe = struct {
+    reads: usize = 0,
+    failures: usize = 0,
+
+    fn read(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
+        const self: *WindowsAdmissionProbe = @ptrCast(@alignCast(raw.?));
+        try std.testing.expectEqualStrings("resumed", packets[0]);
+        self.reads += 1;
+        return .keep;
+    }
+
+    fn failed(raw: ?*anyopaque, _: io.Failure) void {
+        const self: *WindowsAdmissionProbe = @ptrCast(@alignCast(raw.?));
+        self.failures += 1;
+    }
+};
+
+test "Windows paused TUN drops new input but admits failures and resumes delivery" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    defer looper.deinit();
+    var probe: WindowsAdmissionProbe = .{};
+    // Exercise admission/dispatch without a VPN host. This unattached side has
+    // no native handle to drain or destroy; queued nodes retain it during dispatch.
+    var side: Looper.Impl.testing.Side = .{
+        .allocator = std.testing.allocator,
+        .owner = looper.impl,
+        .arguments = .{
+            .pair = .{ .tun = undefined },
+            .on_read = .{ .context = &probe, .callback = WindowsAdmissionProbe.read },
+            .on_failure = .{ .context = &probe, .callback = WindowsAdmissionProbe.failed },
+        },
+        .reading = false,
+    };
+    for (0..10000) |_| {
+        try std.testing.expect(!Looper.Impl.testing.receive(&side, "paused", 6, null, 0));
+    }
+    try std.testing.expectEqual(@as(u64, 10000), side.dropped);
+    try std.testing.expectEqual(@as(u64, 0), side.queued);
+    try std.testing.expect(looper.impl.callbacks.head == null);
+
+    const native_failure: i32 = -2147467260; // E_ABORT
+    try std.testing.expect(!Looper.Impl.testing.receive(&side, null, 0, null, native_failure));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.failures);
+    try std.testing.expectEqual(@as(usize, 0), probe.reads);
+
+    side.reading = true;
+    try std.testing.expect(Looper.Impl.testing.receive(&side, "resumed", 7, null, 0));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.reads);
+    try std.testing.expectEqual(@as(usize, 1), side.references);
+    try std.testing.expect(looper.impl.callbacks.head == null);
 }
