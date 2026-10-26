@@ -141,6 +141,34 @@ const FailureRecorder = struct {
     }
 };
 
+test "WireGuard passive initial transport allocation failure stays closed and reports once" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    passive.allocator = failing.allocator();
+    var failure = FailureRecorder{};
+    passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
+    const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
+    passive.replaceLink(socket.linkDescriptor());
+    try std.testing.expect(!passive.hasIO());
+    try std.testing.expectEqual(@as(usize, 1), failure.calls);
+    passive.activate();
+    var bytes: [32]u8 = undefined;
+    var packets = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+    var completion = Completion{};
+    const callbacks = passive.transport(51820, 1400);
+    try std.testing.expectEqual(c.WG_IO_OK, callbacks.link.read.?(callbacks.context, &packets, 1, completion.token()));
+    try std.testing.expectEqual(c.WG_IO_CLOSED, completion.status);
+    try std.testing.expectEqual(@as(usize, 1), failure.calls);
+    // Replacing the failed link is an explicit recovery, unlike activation.
+    passive.allocator = std.testing.allocator;
+    const replacement = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
+    passive.replaceLink(replacement.linkDescriptor());
+    try std.testing.expect(passive.hasIO());
+    try std.testing.expect(!passive.closed);
+}
+
 fn waitForPendingReads(passive: *bridge.PassiveIO, side: source.net.Side, count: usize) !void {
     for (0..1000) |_| {
         if (bridge.PassiveIO.testing.pendingReads(passive, side) == count) return;

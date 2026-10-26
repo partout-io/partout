@@ -17,10 +17,10 @@ pub const PassiveIO = struct {
     writes: core.Mutex = .{},
     ready: core.Condition = .{},
     complete: *const fn (usize, u32, i32) callconv(.c) void,
-    link: ?*net.PacketTransport = null,
-    tun: ?*net.PacketTransport = null,
     closed: bool = true,
-    sides: [2]Side = .{ .{}, .{} },
+    // Quiesce is reversible; a failed transport requires link replacement.
+    failed: bool = false,
+    sides: [2]Side = .{ .{ .tag = .link }, .{ .tag = .tun } },
     failure: ?FailureReporter = null,
 
     const FailureReporter = struct { ctx: *anyopaque, report: *const fn (*anyopaque) void };
@@ -39,7 +39,8 @@ pub const PassiveIO = struct {
     };
     const Side = struct {
         owner: *PassiveIO = undefined,
-        tag: net.Side = .link,
+        tag: net.Side,
+        transport: ?*net.PacketTransport = null,
         attached: bool = false,
         packets: core.Fifo(Packet) = .{},
         count: usize = 0,
@@ -48,7 +49,48 @@ pub const PassiveIO = struct {
         fn cancelReads(self: *Side) void {
             while (self.readers.take()) |reader| reader.interrupted = true;
         }
+
+        fn clear(self: *Side, allocator: std.mem.Allocator) void {
+            while (self.packets.take()) |packet| {
+                allocator.free(packet.data);
+                allocator.destroy(packet);
+            }
+            self.count = 0;
+        }
+
+        fn enqueue(self: *Side, allocator: std.mem.Allocator, bytes: []const u8, source: net.SocketAddress) !void {
+            const packet = try allocator.create(Packet);
+            errdefer allocator.destroy(packet);
+            packet.* = .{ .data = try allocator.dupe(u8, bytes), .source = source };
+            self.packets.append(packet);
+            self.count += 1;
+        }
+
+        fn readQueued(self: *Side, allocator: std.mem.Allocator, outputs: []c.wg_read_packet) u32 {
+            var completed: u32 = 0;
+            for (outputs) |*output| {
+                const packet = self.packets.take() orelse break;
+                self.count -= 1;
+                defer {
+                    allocator.free(packet.data);
+                    allocator.destroy(packet);
+                }
+                if (!copyPacket(output, packet.data, packet.source)) break;
+                completed += 1;
+            }
+            return completed;
+        }
     };
+
+    const BatchResult = struct {
+        count: u32 = 0,
+        status: i32,
+        fatal: bool = false,
+    };
+
+    fn sideFor(self: *PassiveIO, tag: net.Side) *Side {
+        return &self.sides[@intFromEnum(tag)];
+    }
 
     pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {
         return .{ .complete = complete };
@@ -62,57 +104,56 @@ pub const PassiveIO = struct {
     }
 
     pub fn replaceLink(self: *PassiveIO, descriptor: net.LinkDescriptor) void {
-        self.replace(.link, descriptor);
+        self.replace(.{ .link = descriptor });
     }
 
     pub fn replaceTun(self: *PassiveIO, descriptor: net.TunDescriptor) void {
-        self.replace(.tun, descriptor);
+        self.replace(.{ .tun = descriptor });
     }
 
-    fn replace(self: *PassiveIO, comptime tag: net.Side, descriptor: if (tag == .link) net.LinkDescriptor else net.TunDescriptor) void {
+    fn replace(self: *PassiveIO, descriptor: net.PacketTransport.Descriptor) void {
+        const tag = std.meta.activeTag(descriptor);
+        const side = self.sideFor(tag);
         self.writes.lock();
         defer self.writes.unlock();
         self.detach(tag);
         self.lock.lock();
         if (tag == .tun and self.closed) {
             self.lock.unlock();
-            descriptor.cleanup();
+            net.PacketTransport.releaseDescriptor(descriptor);
             return;
         }
-        const value = net.PacketTransport.create(self.allocator, if (tag == .link) .{ .link = descriptor } else .{ .tun = descriptor }) catch {
+        if (tag == .link) {
+            self.closed = false;
+            self.failed = false;
+        }
+        const packet_transport = net.PacketTransport.create(self.allocator, descriptor) catch {
             self.lock.unlock();
             self.fail();
             return;
         };
-        if (tag == .link) {
-            self.link = value;
-            self.closed = false;
-        } else self.tun = value;
-        const side = &self.sides[@intFromEnum(tag)];
+        side.transport = packet_transport;
         side.owner = self;
-        side.tag = tag;
         side.attached = true;
         self.ready.broadcast();
         self.lock.unlock();
-        value.setOnReceive(onReceive, side) catch self.fail();
+        packet_transport.setOnReceive(onReceive, side) catch self.fail();
     }
 
     // Caller holds writes, but never the queue lock while draining callbacks.
-    fn detach(self: *PassiveIO, comptime tag: net.Side) void {
+    fn detach(self: *PassiveIO, tag: net.Side) void {
         self.lock.lock();
-        const side = &self.sides[@intFromEnum(tag)];
+        const side = self.sideFor(tag);
         // An initial TUN commit can satisfy reads waiting before attachment.
         // Replacing an attached descriptor cancels that descriptor's readers.
         if (side.attached) side.cancelReads();
         side.attached = false;
-        const descriptor = if (tag == .link) self.link else self.tun;
-        if (tag == .link) self.link = null else self.tun = null;
-        self.clear(side);
+        const packet_transport = side.transport;
+        side.transport = null;
+        side.clear(self.allocator);
         self.ready.broadcast();
         self.lock.unlock();
-        if (descriptor) |value| {
-            value.cleanup();
-        }
+        if (packet_transport) |value| value.cleanup();
     }
 
     pub fn releaseLink(self: *PassiveIO) void {
@@ -124,12 +165,14 @@ pub const PassiveIO = struct {
     pub fn hasIO(self: *PassiveIO) bool {
         self.lock.lock();
         defer self.lock.unlock();
-        return self.link != null or self.tun != null;
+        for (self.sides) |side| if (side.transport != null) return true;
+        return false;
     }
 
     pub fn activate(self: *PassiveIO) void {
         self.lock.lock();
         defer self.lock.unlock();
+        if (self.failed) return;
         self.closed = false;
     }
 
@@ -153,17 +196,14 @@ pub const PassiveIO = struct {
         self.detach(.tun);
     }
 
-    fn clear(self: *PassiveIO, side: *Side) void {
-        while (side.packets.take()) |packet| {
-            self.allocator.free(packet.data);
-            self.allocator.destroy(packet);
-        }
-        side.count = 0;
-    }
-
     fn fail(self: *PassiveIO) void {
         self.lock.lock();
-        const reporter = if (self.closed) null else self.failure;
+        if (self.closed) {
+            self.lock.unlock();
+            return;
+        }
+        const reporter = self.failure;
+        self.failed = true;
         self.closed = true;
         for (&self.sides) |*side| side.cancelReads();
         self.ready.broadcast();
@@ -192,13 +232,10 @@ pub const PassiveIO = struct {
             const output = &reader.packets[reader.completed];
             // Consume an oversized datagram without delivering truncated input.
             // Finish this wait just as the queued read path does on a drop.
-            if (length > output.capacity) {
+            if (!copyPacket(output, bytes[0..length], address)) {
                 _ = side.readers.take();
                 reader.interrupted = true;
             } else {
-                @memcpy(output.data[0..length], bytes[0..length]);
-                output.size = @intCast(length);
-                output.source = toEndpoint(address);
                 reader.completed += 1;
                 if (reader.completed == reader.packets.len) _ = side.readers.take();
             }
@@ -211,7 +248,7 @@ pub const PassiveIO = struct {
             self.lock.unlock();
             return true;
         }
-        self.enqueue(side, bytes[0..length], address) catch {
+        side.enqueue(self.allocator, bytes[0..length], address) catch {
             self.lock.unlock();
             self.fail();
             return false;
@@ -219,14 +256,6 @@ pub const PassiveIO = struct {
         self.ready.broadcast();
         self.lock.unlock();
         return true;
-    }
-
-    fn enqueue(self: *PassiveIO, side: *Side, bytes: []const u8, source: net.SocketAddress) !void {
-        const packet = try self.allocator.create(Packet);
-        errdefer self.allocator.destroy(packet);
-        packet.* = .{ .data = try self.allocator.dupe(u8, bytes), .source = source };
-        side.packets.append(packet);
-        side.count += 1;
     }
 
     pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnelPassive {
@@ -250,35 +279,35 @@ pub const PassiveIO = struct {
     fn read(self: *PassiveIO, tag: net.Side, packets: [*c]c.wg_read_packet, count: u32, request: usize) i32 {
         if (!validRead(packets, count, request)) return c.WG_IO_INVALID;
         self.lock.lock();
-        const side = &self.sides[@intFromEnum(tag)];
-        var completed: u32 = 0;
-        if (!self.closed and side.count == 0) {
-            var reader = PendingRead{ .packets = packets[0..count] };
-            side.readers.append(&reader);
-            // Go also cancels reads during bind replacement. Bound the wait so
-            // it can observe cancellation without a host descriptor change.
-            const deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), 100);
-            while (!self.closed and !reader.interrupted and reader.completed == 0 and core.monotonicNs() < deadline)
-                self.ready.waitUntil(&self.lock, deadline);
-            _ = side.readers.remove(&reader);
-            completed = if (self.closed) 0 else reader.completed;
-        } else if (!self.closed) for (packets[0..count]) |*output| {
-            const packet = side.packets.take() orelse break;
-            side.count -= 1;
-            defer {
-                self.allocator.free(packet.data);
-                self.allocator.destroy(packet);
-            }
-            // Never deliver a truncated datagram as a valid WG packet.
-            if (packet.data.len > output.capacity) break;
-            @memcpy(output.data[0..packet.data.len], packet.data);
-            output.size = @intCast(packet.data.len);
-            output.source = toEndpoint(packet.source);
-            completed += 1;
-        };
+        if (self.closed) {
+            self.lock.unlock();
+            return self.completeRequest(request, .{ .status = c.WG_IO_CLOSED });
+        }
+        const side = self.sideFor(tag);
+        const completed = if (side.count != 0)
+            side.readQueued(self.allocator, packets[0..count])
+        else
+            self.waitForPackets(side, packets[0..count]);
         const status: i32 = if (self.closed) c.WG_IO_CLOSED else if (completed != 0) c.WG_IO_OK else c.WG_IO_AGAIN;
         self.lock.unlock();
-        self.complete(request, completed, status);
+        return self.completeRequest(request, .{ .count = completed, .status = status });
+    }
+
+    // Caller holds lock throughout registration and removal. Waiting releases
+    // it so the producer can fill the borrowed buffers. Go observes cancellation
+    // between requests, so even an idle read must finish within 100 ms.
+    fn waitForPackets(self: *PassiveIO, side: *Side, outputs: []c.wg_read_packet) u32 {
+        var reader = PendingRead{ .packets = outputs };
+        side.readers.append(&reader);
+        defer _ = side.readers.remove(&reader);
+        const deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), 100);
+        while (!self.closed and !reader.interrupted and reader.completed == 0 and core.monotonicNs() < deadline)
+            self.ready.waitUntil(&self.lock, deadline);
+        return if (self.closed) 0 else reader.completed;
+    }
+
+    fn completeRequest(self: *PassiveIO, request: usize, result: BatchResult) i32 {
+        self.complete(request, result.count, result.status);
         return c.WG_IO_OK;
     }
 
@@ -286,22 +315,23 @@ pub const PassiveIO = struct {
         pub fn attach(self: *PassiveIO, tag: net.Side) void {
             self.lock.lock();
             defer self.lock.unlock();
-            const side = &self.sides[@intFromEnum(tag)];
+            const side = self.sideFor(tag);
             side.owner = self;
             side.tag = tag;
             side.attached = true;
             self.closed = false;
+            self.failed = false;
         }
 
         pub fn receive(self: *PassiveIO, tag: net.Side, bytes: []const u8, source: ?*const net.SocketAddress, code: i32) bool {
-            return onReceive(&self.sides[@intFromEnum(tag)], bytes.ptr, bytes.len, source, code);
+            return onReceive(self.sideFor(tag), bytes.ptr, bytes.len, source, code);
         }
 
         pub fn pendingReads(self: *PassiveIO, tag: net.Side) usize {
             self.lock.lock();
             defer self.lock.unlock();
             var count: usize = 0;
-            var current = self.sides[@intFromEnum(tag)].readers.head;
+            var current = self.sideFor(tag).readers.head;
             while (current) |reader| : (current = reader.next) count += 1;
             return count;
         }
@@ -319,45 +349,69 @@ pub const PassiveIO = struct {
         return self.write(.tun, packets, count, null, request);
     }
 
-    fn write(self: *PassiveIO, comptime tag: net.Side, packets: [*c]const c.wg_packet, count: u32, destination: ?net.SocketAddress, request: usize) i32 {
+    fn write(self: *PassiveIO, tag: net.Side, packets: [*c]const c.wg_packet, count: u32, destination: ?net.SocketAddress, request: usize) i32 {
         if (!validWrite(tag, packets, count, request)) return c.WG_IO_INVALID;
         self.writes.lock();
         self.lock.lock();
-        const closed = self.closed;
-        const descriptor = if (tag == .link) self.link else self.tun;
-        self.lock.unlock();
-        var completed: u32 = 0;
-        var status: i32 = if (closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
-        var dropped = false;
-        if (!closed) if (descriptor) |value| {
-            for (packets[0..count]) |packet| {
-                const data: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
-                const result = value.write(data, destination);
-                if (result != .ok) {
-                    dropped = result == .dropped;
-                    status = if (result == .again) c.WG_IO_AGAIN else c.WG_IO_INVALID;
-                    break;
-                }
-                completed += 1;
-            }
-            if (completed == count) status = c.WG_IO_OK;
-        };
-        self.writes.unlock();
-        if (status == c.WG_IO_AGAIN) {
-            self.lock.lock();
-            if (!self.closed and (descriptor != null or (tag == .tun and self.tun == null)))
-                self.ready.waitUntil(&self.lock, core.concurrency.deadlineAfterMs(core.monotonicNs(), 100));
-            status = if (self.closed) c.WG_IO_CLOSED else if (tag == .link and descriptor == null) c.WG_IO_INVALID else c.WG_IO_AGAIN;
+        if (self.closed) {
             self.lock.unlock();
-            // A missing link during rebind is a dropped send, not a terminal error.
-            self.complete(request, completed, status);
-            return c.WG_IO_OK;
+            self.writes.unlock();
+            return self.completeRequest(request, .{ .status = c.WG_IO_CLOSED });
         }
-        if (status == c.WG_IO_INVALID and !dropped) self.fail();
-        self.complete(request, completed, status);
-        return c.WG_IO_OK;
+        const packet_transport = self.sideFor(tag).transport;
+        self.lock.unlock();
+        // A missing link is a dropped send during rebind. A missing TUN waits
+        // for initial commit. Neither is a terminal transport failure.
+        var result = if (packet_transport) |value|
+            writePackets(value, packets[0..count], destination)
+        else
+            BatchResult{ .status = switch (tag) {
+                .link => c.WG_IO_INVALID,
+                .tun => c.WG_IO_AGAIN,
+            } };
+        self.writes.unlock();
+        if (result.status == c.WG_IO_AGAIN) result.status = self.waitForRetry();
+        if (result.fatal) self.fail();
+        return self.completeRequest(request, result);
+    }
+
+    fn writePackets(packet_transport: *net.PacketTransport, packets: []const c.wg_packet, destination: ?net.SocketAddress) BatchResult {
+        var result = BatchResult{ .status = c.WG_IO_OK };
+        for (packets) |packet| {
+            const bytes: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
+            switch (packet_transport.write(bytes, destination)) {
+                .ok => result.count += 1,
+                .again => {
+                    result.status = c.WG_IO_AGAIN;
+                    return result;
+                },
+                .dropped => {
+                    result.status = c.WG_IO_INVALID;
+                    return result;
+                },
+                .failed => return .{ .count = result.count, .status = c.WG_IO_INVALID, .fatal = true },
+            }
+        }
+        return result;
+    }
+
+    fn waitForRetry(self: *PassiveIO) i32 {
+        self.lock.lock();
+        defer self.lock.unlock();
+        if (!self.closed)
+            self.ready.waitUntil(&self.lock, core.concurrency.deadlineAfterMs(core.monotonicNs(), 100));
+        return if (self.closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
     }
 };
+
+fn copyPacket(output: *c.wg_read_packet, bytes: []const u8, source: net.SocketAddress) bool {
+    // An oversized datagram is discarded, never delivered as truncated input.
+    if (bytes.len > output.capacity) return false;
+    @memcpy(output.data[0..bytes.len], bytes);
+    output.size = @intCast(bytes.len);
+    output.source = toEndpoint(source);
+    return true;
+}
 
 fn validRead(packets: [*c]c.wg_read_packet, count: u32, request: usize) bool {
     if (request == 0 or count == 0 or count > c.WG_IO_MAX_BATCH or packets == null) return false;

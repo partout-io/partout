@@ -45,4 +45,5 @@ pub const DescriptorPair = union(Side) {
     tun: TunDescriptor,
 };
 
-pub const PacketTransport = common.PacketTransport(DescriptorPair);
+/// Owns callback delivery and packet submission using the selected backend.
+pub const PacketTransport = backend.PacketTransport(DescriptorPair);
