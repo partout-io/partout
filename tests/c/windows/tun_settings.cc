@@ -4,11 +4,11 @@
 #include <cassert>
 #include <cstdio>
 
-using partout::windows::TunnelSettings;
+using Partout::TunSettings;
 
 int main() try {
     winrt::init_apartment();
-    const auto settings = TunnelSettings::parse(R"({"modules":[
+    const auto settings = TunSettings::parse(R"({"modules":[
         {"type":"IP","value":{"mtu":1500,
             "ipv4":{"subnets":["10.8.0.2/24"],
                 "includedRoutes":[{}, {"destination":"192.168.1.7/24","gateway":"10.8.0.1"}],
@@ -39,22 +39,22 @@ int main() try {
     assert(domains.GetAt(0).DnsServers().Size() == 2);
     assert(domains.GetAt(0).WebProxyServers() && domains.GetAt(0).WebProxyServers().Size() == 0);
 
-    const auto v4 = TunnelSettings::parse(R"({"modules":[
+    const auto v4 = TunSettings::parse(R"({"modules":[
         {"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":1300}},
         {"type":"DNS","value":{"servers":["10.8.0.1"]}}
     ]})");
     assert(v4.ipv6.Size() == 0 && v4.mtu == 1300 && v4.maxFrame() == 1400);
     assert(v4.domains.DomainNameList().Size() == 1); // The catch-all rule has a null DomainName.
     assert(v4.domains.DomainNameList().GetAt(0).WebProxyServers());
-    const auto v6 = TunnelSettings::parse(R"({"modules":[
+    const auto v6 = TunSettings::parse(R"({"modules":[
         {"type":"IP","value":{"ipv6":{"subnets":["fd00::2/128"]}}}
     ]})");
     assert(v6.ipv4.Size() == 0 && v6.ipv6.Size() == 1);
     assert(v6.mtu == 1400 && v6.maxFrame() == 1500);
 
     const auto automatic = R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":0}}]})";
-    assert(TunnelSettings::parse(automatic).mtu == 1400);
-    assert(TunnelSettings::parse(automatic).maxFrame() == 1500);
+    assert(TunSettings::parse(automatic).mtu == 1400);
+    assert(TunSettings::parse(automatic).maxFrame() == 1500);
 
     for (const auto json : {
         R"({"modules":[]})",
@@ -66,7 +66,7 @@ int main() try {
         R"({"modules":[{"type":"DNS","value":{"protocolType":{"type":"https"}}}]})"
     }) {
         bool rejected = false;
-        try { TunnelSettings::parse(json); }
+        try { TunSettings::parse(json); }
         catch (winrt::hresult_error const &) { rejected = true; }
         assert(rejected);
     }

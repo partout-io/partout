@@ -6,10 +6,11 @@
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Networking.Vpn.h>
 
-namespace partout::windows {
+namespace Partout {
 
 // Only negotiated IP/DNS modules are consumed. No protocol or portable ABI dependency.
-struct TunnelSettings {
+class TunSettings {
+public:
     winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Networking::HostName> ipv4 =
         winrt::single_threaded_vector<winrt::Windows::Networking::HostName>();
     winrt::Windows::Foundation::Collections::IVector<winrt::Windows::Networking::HostName> ipv6 =
@@ -20,6 +21,6 @@ struct TunnelSettings {
     static constexpr uint32_t encapsulation_headroom = 100;
 
     uint32_t maxFrame() const;
-    static TunnelSettings parse(const char *text);
+    static TunSettings parse(const char *text);
 };
 }

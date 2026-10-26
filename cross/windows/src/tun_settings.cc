@@ -9,7 +9,7 @@
 #include <cmath>
 #include <string>
 
-namespace partout::windows {
+namespace Partout {
 using namespace winrt;
 using namespace Windows::Data::Json;
 using namespace Windows::Networking;
@@ -55,7 +55,7 @@ VpnRoute subnet(hstring const &text, HostNameType family, bool network) {
     return VpnRoute{host, static_cast<uint8_t>(prefix)};
 }
 
-void applyIP(TunnelSettings &result, JsonObject const &settings, HostNameType family) {
+void applyIP(TunSettings &result, JsonObject const &settings, HostNameType family) {
     const bool v4 = family == HostNameType::Ipv4;
     auto addresses = v4 ? result.ipv4 : result.ipv6;
     for (const auto &value : array(settings, L"subnets"))
@@ -85,7 +85,7 @@ void applyIP(TunnelSettings &result, JsonObject const &settings, HostNameType fa
     }
 }
 
-void applyDNS(TunnelSettings &result, JsonObject const &settings) {
+void applyDNS(TunSettings &result, JsonObject const &settings) {
     if (has(settings, L"protocolType") && settings.GetNamedObject(L"protocolType").GetNamedString(L"type") != L"cleartext")
         throw hresult_not_implemented(L"Encrypted DNS is not supported by the VPN channel settings");
     auto servers = single_threaded_vector<HostName>();
@@ -113,14 +113,14 @@ void applyDNS(TunnelSettings &result, JsonObject const &settings) {
 
 } // namespace
 
-uint32_t TunnelSettings::maxFrame() const {
+uint32_t TunSettings::maxFrame() const {
     return mtu + encapsulation_headroom;
 }
 
-TunnelSettings TunnelSettings::parse(const char *text) {
+TunSettings TunSettings::parse(const char *text) {
     if (!text) throw hresult_invalid_argument(L"Missing negotiated tunnel settings");
     const auto root = JsonObject::Parse(to_hstring(text));
-    TunnelSettings result;
+    TunSettings result;
     for (const auto &entry : root.GetNamedArray(L"modules")) {
         const auto module = entry.GetObject();
         const auto type = module.GetNamedString(L"type");
