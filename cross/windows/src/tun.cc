@@ -174,11 +174,11 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
 
 winrt_tun TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
-    auto handle = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
+    auto tun = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
     Start(info_json);
     std::lock_guard lock(state_->receive_mutex);
-    state_->tun = &handle->handle;
-    return handle.release();
+    state_->tun = &tun->handle;
+    return tun.release();
 }
 
 void TunnelController::Start(const char *info_json) {
