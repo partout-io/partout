@@ -23,7 +23,6 @@ const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 pub const Connection = conn.Connection;
-pub const CallbackIO = io.CallbackIO;
 pub const ConnectionWriter = sandbox.ConnectionWriter;
 pub const ConnectionCreateError = conn.CreateError;
 pub const ConnectionImplementation = conn.ConnectionImplementation;
@@ -46,6 +45,7 @@ pub const LinkDescriptor = io.LinkDescriptor;
 pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Packets = io.Packets;
+pub const PacketTransport = io.PacketTransport;
 pub const Platform = platform.Platform;
 pub const ReadAction = io.ReadAction;
 pub const ReachabilityInfo = io.ReachabilityInfo;

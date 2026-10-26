@@ -45,4 +45,4 @@ pub const DescriptorPair = union(Side) {
     tun: TunDescriptor,
 };
 
-pub const CallbackIO = common.CallbackIO(DescriptorPair);
+pub const PacketTransport = common.PacketTransport(DescriptorPair);

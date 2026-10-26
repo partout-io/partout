@@ -5,7 +5,7 @@
 //! Shared packets, buffers, reachability, sides, and errors for socket and TUN I/O.
 //! Platform-specific descriptors, options, and wrappers belong to the backends
 //! selected by `io.zig`. This module does not import either backend.
-//! CallbackIO receives its descriptor type from that platform selection.
+//! PacketTransport receives its descriptor type from that platform selection.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -258,7 +258,7 @@ fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddres
 /// are owner-serialized. Removing a receiver drains delivery before returning.
 /// POSIX uses one readiness-driven reader per descriptor; Windows uses native
 /// callbacks. No worker retains a consumer buffer after its callback returns.
-pub fn CallbackIO(comptime Descriptors: type) type {
+pub fn PacketTransport(comptime Descriptors: type) type {
     return struct {
         const Self = @This();
         pub const OnReceive = ?*const fn (?*anyopaque, [*c]const u8, usize, [*c]const SocketAddress, i32) callconv(.c) bool;

@@ -17,8 +17,8 @@ pub const PassiveIO = struct {
     writes: core.Mutex = .{},
     ready: core.Condition = .{},
     complete: *const fn (usize, u32, i32) callconv(.c) void,
-    link: ?*net.CallbackIO = null,
-    tun: ?*net.CallbackIO = null,
+    link: ?*net.PacketTransport = null,
+    tun: ?*net.PacketTransport = null,
     closed: bool = true,
     sides: [2]Side = .{ .{}, .{} },
     failure: ?FailureReporter = null,
@@ -79,7 +79,7 @@ pub const PassiveIO = struct {
             descriptor.cleanup();
             return;
         }
-        const value = net.CallbackIO.create(self.allocator, if (tag == .link) .{ .link = descriptor } else .{ .tun = descriptor }) catch {
+        const value = net.PacketTransport.create(self.allocator, if (tag == .link) .{ .link = descriptor } else .{ .tun = descriptor }) catch {
             self.lock.unlock();
             self.fail();
             return;
