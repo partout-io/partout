@@ -49,12 +49,13 @@ struct Socket::State {
     // Keep WinRT valid across calls and until the last native operation completes.
     CO_MTA_USAGE_COOKIE apartment{};
     std::mutex mutex;
-    std::atomic<uint64_t> received{0};
-    std::atomic<uint64_t> sent{0};
-    std::atomic<bool> writes_stopped{false};
+    uint64_t received = 0;
+    uint64_t sent = 0;
+    // Zero accepts writes; E_ABORT stops them; other HRESULTs latch a failure.
+    std::atomic<int32_t> write_status{0};
+    // The front slot stays queued until completion, including while suspended.
+    // A nonempty queue therefore already has a writer.
     std::deque<WriteRequest> writes;
-    bool writing = false;
-    int32_t write_error = 0;
     winrt_socket_on_receive callback = nullptr;
     void *context = nullptr;
     bool reading = false;
@@ -75,6 +76,7 @@ struct Socket::State {
     void deliver(const uint8_t *bytes, size_t size,
                  const winrt_socket_address *source, int32_t error) {
         std::lock_guard lock(mutex);
+        if (!error) ++received;
         deliverLocked(bytes, size, source, error);
     }
 
@@ -102,8 +104,11 @@ Socket::Socket(winrt_socket_proto proto, bool unconnected) {
 Socket::~Socket() noexcept {
     StopWrites();
     SetOnReceive(nullptr, nullptr);
-    if (adapter_) winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
-        state_->received.load(), state_->sent.load());
+    if (adapter_) {
+        std::lock_guard lock(state_->mutex);
+        winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
+            state_->received, state_->sent);
+    }
     receive_registration_.revoke();
     // Close each transport independently.
     try { if (datagram_) datagram_.Close(); } catch (...) {}
@@ -183,13 +188,29 @@ bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
         state->callback = callback;
         state->context = context;
     }
-    if (!callback || StartReading()) return true;
+    if (!callback || ResumeReading()) return true;
     SetOnReceive(nullptr, nullptr);
     return false;
 }
 
 bool Socket::ResumeReading() {
-    return StartReading();
+    const auto state = state_;
+    {
+        std::lock_guard lock(state->mutex);
+        // Resume must never restore a cleared context.
+        if (!state->callback) return false;
+        state->paused = false;
+        if (!stream_ || state->reading || state->channel_owned) return true;
+        state->reading = true;
+    }
+    try {
+        read_ = ReadStream(state, stream_);
+        return true;
+    } catch (...) {
+        std::lock_guard lock(state->mutex);
+        state->reading = false;
+        return false;
+    }
 }
 
 int32_t Socket::Write(const uint8_t *bytes, size_t length,
@@ -199,7 +220,8 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
             throw hresult_invalid_argument();
         Apartment apartment;
         const auto state = state_;
-        if (state->writes_stopped.load()) return E_ABORT;
+        const auto status = state->write_status.load();
+        if (status) return status;
         if (channel_write_) {
             check_hresult(channel_write_(bytes, length));
             return 0;
@@ -226,18 +248,14 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         bool start;
         {
             std::lock_guard lock(state->mutex);
-            if (state->writes_stopped.load()) return E_ABORT;
-            check_hresult(state->write_error);
+            start = state->writes.empty();
             state->writes.push_back(std::move(request));
-            start = !state->writing;
-            state->writing = true;
         }
         if (start) {
             try {
                 write_ = WriteQueued(state, datagram_, stream_);
             } catch (...) {
                 std::lock_guard lock(state->mutex);
-                state->writing = false;
                 state->writes.clear();
                 throw;
             }
@@ -252,7 +270,7 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
 }
 
 void Socket::StopWrites() {
-    state_->writes_stopped.store(true);
+    state_->write_status.store(E_ABORT);
 }
 
 bool Socket::GetAddress(winrt_socket_address *address) {
@@ -268,7 +286,7 @@ bool Socket::GetAddress(winrt_socket_address *address) {
             // Service binds may report :: even for our IPv4-only policy.
             // Preserve the requested binding while using the OS-assigned port.
             if (bound_host_) host = bound_host_;
-        } else if (stream_) {
+        } else {
             const auto info = stream_.Information();
             host = info.LocalAddress();
             port = info.LocalPort();
@@ -305,9 +323,9 @@ void Socket::TakeOver() {
     const auto state = state_;
     // Negotiation packets must reach the transport before VpnChannel owns it.
     if (write_) write_.get();
+    check_hresult(state->write_status.load());
     {
         std::lock_guard lock(state->mutex);
-        check_hresult(state->write_error);
         state->channel_owned = true;
     }
     receive_registration_.revoke();
@@ -383,13 +401,11 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
             State::WriteRequest request;
             {
                 std::lock_guard lock(state->mutex);
-                if (state->writes_stopped.load()) state->writes.clear();
-                if (state->writes.empty()) {
-                    state->writing = false;
+                if (state->write_status.load()) {
+                    state->writes.clear();
                     co_return;
                 }
                 request = std::move(state->writes.front());
-                state->writes.pop_front();
             }
             IOutputStream output{nullptr};
             if (request.host) {
@@ -398,48 +414,29 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
                 output = stream ? stream.OutputStream() : datagram.OutputStream();
             }
             // UDP remains one datagram. TCP retries only an unwritten suffix.
-            auto buffer = request.buffer;
+            auto &buffer = request.buffer;
             for (;;) {
                 const auto written = co_await output.WriteAsync(buffer);
-                if (written > buffer.Length() ||
-                    (datagram && written != buffer.Length()) ||
-                    (stream && buffer.Length() && !written))
-                    throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));
                 if (written == buffer.Length()) break;
+                if (datagram || !written || written > buffer.Length())
+                    throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));
                 Buffer remaining{buffer.Length() - written};
                 remaining.Length(remaining.Capacity());
                 memcpy(remaining.data(), buffer.data() + written, remaining.Length());
                 buffer = std::move(remaining);
             }
-            state->sent.fetch_add(1, std::memory_order_relaxed);
+            std::lock_guard lock(state->mutex);
+            ++state->sent;
+            state->writes.pop_front();
+            if (state->writes.empty()) co_return;
         }
     } catch (...) {
         std::lock_guard lock(state->mutex);
-        state->write_error = to_hresult().value;
+        const auto error = to_hresult().value;
         state->writes.clear();
-        state->writing = false;
-        if (!state->writes_stopped.load())
-            state->deliverLocked(nullptr, 0, nullptr, state->write_error);
-    }
-}
-
-bool Socket::StartReading() {
-    const auto state = state_;
-    {
-        std::lock_guard lock(state->mutex);
-        // Resume must never restore a cleared context.
-        if (!state->callback) return false;
-        state->paused = false;
-        if (!stream_ || state->reading || state->channel_owned) return true;
-        state->reading = true;
-    }
-    try {
-        read_ = ReadStream(state, stream_);
-        return true;
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->reading = false;
-        return false;
+        int32_t status = 0;
+        if (state->write_status.compare_exchange_strong(status, error))
+            state->deliverLocked(nullptr, 0, nullptr, error);
     }
 }
 
@@ -458,7 +455,6 @@ void Socket::RegisterDatagram() {
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 winrt_socket_address source{};
                 if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
-                state->received.fetch_add(1, std::memory_order_relaxed);
                 state->deliver(buffer.data(), buffer.Length(),
                     unconnected ? &source : nullptr, 0);
             } catch (...) {

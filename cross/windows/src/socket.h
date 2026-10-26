@@ -58,7 +58,6 @@ private:
     static winrt::Windows::Foundation::IAsyncAction WriteQueued(std::shared_ptr<State> state,
         winrt::Windows::Networking::Sockets::DatagramSocket datagram,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
-    bool StartReading();
     void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.

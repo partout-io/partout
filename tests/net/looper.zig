@@ -205,12 +205,13 @@ const WindowsWriteProbe = struct {
     looper: *Looper,
     failures: usize = 0,
     code: ?c_int = null,
+    detach_on_failure: bool = true,
 
     fn failed(context: ?*anyopaque, failure: io.Failure) void {
         const self: *WindowsWriteProbe = @ptrCast(@alignCast(context.?));
         self.failures += 1;
         self.code = failure.io.code;
-        self.looper.detach(.link) catch unreachable;
+        if (self.detach_on_failure) self.looper.detach(.link) catch unreachable;
     }
 };
 
@@ -262,7 +263,7 @@ test "Windows native write failures return asynchronously through the looper" {
     })) orelse return error.SocketFailed;
     var transferred = false;
     defer if (!transferred) socket.destroy();
-    var probe = WindowsWriteProbe{ .looper = &looper };
+    var probe = WindowsWriteProbe{ .looper = &looper, .detach_on_failure = false };
     try looper.attach(.{
         .pair = .{ .link = socket },
         .on_failure = .{ .context = &probe, .callback = WindowsWriteProbe.failed },
@@ -283,6 +284,14 @@ test "Windows native write failures return asynchronously through the looper" {
     }
     try std.testing.expectEqual(@as(usize, 1), probe.failures);
     try std.testing.expect(probe.code.? != 0);
+    // A terminal failure remains visible to subsequent submissions, until stop
+    // replaces it with cancellation. Neither path restarts the native writer.
+    const failed = (try socket.write("after failure", destination)).?;
+    try std.testing.expectEqual(probe.code, failed.io.code);
+    socket.stopWrites();
+    const stopped = (try socket.write("after stop", destination)).?;
+    try std.testing.expectEqual(@as(?c_int, -2147467260), stopped.io.code); // E_ABORT
+    try looper.detach(.link);
     try std.testing.expect(!looper.isLinkAttached());
 }
 
