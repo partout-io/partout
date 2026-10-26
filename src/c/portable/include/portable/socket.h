@@ -27,6 +27,24 @@ typedef struct __pp_socket_struct *pp_socket;
 /* Close the owned socket and free the wrapper. */
 void pp_socket_free(pp_socket sock);
 
+/* Platform policy for transport sockets, including descriptors owned by a backend.
+ * POSIX uses native descriptors; WinRT uses wrapper pointers encoded as uintptr_t.
+ * The borrowed context must outlive calls through this configurator. */
+typedef struct {
+    void *_Nullable ctx;
+    bool (*configure)(void *_Nullable ctx,
+                      const pp_reachability *_Nullable reachability,
+                      const pp_socket_fd *fds, size_t count);
+} pp_socket_configurator;
+
+/* Build the platform policy using the host controller as its borrowed context. */
+pp_socket_configurator pp_socket_configurator_current(void *_Nullable ref);
+
+/* Configure existing descriptors without taking ownership. Empty batches succeed. */
+bool pp_socket_configure_descriptors(pp_socket_configurator configurator,
+                                     const pp_reachability *_Nullable reachability,
+                                     const pp_socket_fd *_Nullable fds, size_t count);
+
 /* Create a nonblocking connected socket, or bind unconnected UDP to a numeric local endpoint
  * Unconnected IPv6 is IPv6-only unless dual_stack is enabled; configuration runs before bind.
  * Dual-stack wildcard binds fall back to IPv4 when IPv6 is unsupported.

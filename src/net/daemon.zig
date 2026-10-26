@@ -1499,7 +1499,6 @@ fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
         error.IncompleteModule => .incompleteModule,
         error.MissingConnectionImplementation => .requiredImplementation,
         error.OutOfMemory => .outOfMemory,
-        error.SocketConfiguration => .socketConfiguration,
         error.TunNotAvailable => .tunNotAvailable,
         error.AlreadyStarted,
         error.Closed,

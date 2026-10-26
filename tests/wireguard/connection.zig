@@ -201,7 +201,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -235,7 +235,7 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -269,7 +269,7 @@ test "WireGuard takes ownership of link and TUN descriptors" {
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
 
         .options = .{ .min_data_count_interval = 2345 },
@@ -389,7 +389,7 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
 
         .options = .{ .min_data_count_interval = 1 },
@@ -455,7 +455,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
 
         .options = .{ .dns_timeout = 1234 },
@@ -634,7 +634,7 @@ test "WireGuard connection handles network monitor events" {
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -732,7 +732,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -796,7 +796,7 @@ test "WireGuard connection retries passive backend failure without terminal even
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -849,7 +849,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -1051,6 +1051,10 @@ const FakeController = struct {
     fail_configure_sockets: bool = false,
     clear_tunnel_settings_count: usize = 0,
 
+    fn factory(self: *FakeController) sandbox.SocketFactory {
+        return .{ .ptr = self, .vtable = &fake_socket_factory_vtable };
+    }
+
     fn controller(self: *FakeController) sandbox.TunnelController {
         return .{
             .ptr = self,
@@ -1059,9 +1063,14 @@ const FakeController = struct {
     }
 };
 
+const fake_socket_factory_vtable = blk: {
+    var table = mock.noopSocketFactory().vtable.*;
+    table.configure_sockets = fakeConfigureSockets;
+    break :blk table;
+};
+
 const fake_controller_vtable = sandbox.TunnelController.VTable{
     .set_tunnel_settings = fakeSetTunnelSettings,
-    .configure_sockets = fakeConfigureSockets,
     .report_snapshot = fakeReportSnapshot,
     .set_environment_value = fakeSetEnvironmentValue,
     .clear_tunnel_settings = fakeClearTunnelSettings,
@@ -1078,7 +1087,7 @@ fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sa
     return io.TunWrapper.create(std.testing.allocator, null);
 }
 
-fn fakeConfigureSockets(ptr: ?*anyopaque, descriptors: []const io.SocketDescriptor) sandbox.TunnelController.Error!void {
+fn fakeConfigureSockets(ptr: ?*anyopaque, descriptors: []const io.SocketDescriptor) sandbox.SocketFactory.Error!void {
     const self: *FakeController = @ptrCast(@alignCast(ptr.?));
     self.configure_sockets_count += 1;
     if (self.fail_configure_sockets) return error.SocketConfiguration;
@@ -1247,7 +1256,7 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     );
     defer configuration.deinit(allocator);
     const tun = try io.TunWrapper.create(allocator, null);
-    var sut = try adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, .none, controller.controller(), mock.noopDNSResolver(), mock.noopSocketFactory(), &profile, &configuration, 1000);
+    var sut = try adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, .none, mock.noopDNSResolver(), controller.factory(), &profile, &configuration, 1000);
     defer sut.deinit(allocator);
 
     sut.sendKeepalives(); // Safe before startup.
@@ -1316,7 +1325,7 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -1409,7 +1418,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
         .events = recorder.events(),
         .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = mock.noopSocketFactory(),
+        .factory = controller.factory(),
         .writer = environment.writer(),
     });
     var destroyed = false;

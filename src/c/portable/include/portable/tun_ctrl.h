@@ -21,12 +21,6 @@ typedef struct {
 typedef struct {
     void (*set_delegate)(void *_Nullable ref,
                          const pp_tun_ctrl_delegate *_Nullable delegate);
-    /* POSIX receives native descriptors. The WinRT platform receives wrapper
-     * pointers encoded as uintptr_t; those values are never Winsock SOCKETs. */
-    bool (*configure_sockets)(void *_Nullable ref,
-                              const pp_reachability *_Nullable info,
-                              const pp_socket_fd *_Nonnull fds,
-                              size_t fds_len);
     pp_tun _Nullable (*_Nonnull set_tunnel)(void *_Nullable ref,
                                             const char *uuid,
                                             const char *_Nullable info_json);

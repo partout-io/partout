@@ -38,13 +38,11 @@ pub const TunnelController = struct {
     vtable: *const VTable,
 
     pub const Error = std.mem.Allocator.Error || error{
-        SocketConfiguration,
         TunNotAvailable,
     };
 
     pub const VTable = struct {
         set_tunnel_settings: *const fn (?*anyopaque, api.TunnelRemoteInfoWrapper) Error!*TunWrapper,
-        configure_sockets: *const fn (?*anyopaque, []const io.SocketDescriptor) Error!void,
         report_snapshot: *const fn (?*anyopaque, api.TunnelSnapshot) void,
         set_environment_value: *const fn (?*anyopaque, []const u8, ?[]const u8) void,
         clear_tunnel_settings: *const fn (?*anyopaque, bool) void,
@@ -54,10 +52,6 @@ pub const TunnelController = struct {
 
     pub fn setTunnelSettings(self: TunnelController, info: api.TunnelRemoteInfoWrapper) Error!*TunWrapper {
         return self.vtable.set_tunnel_settings(self.ptr, info);
-    }
-
-    pub fn configureSockets(self: TunnelController, descriptors: []const io.SocketDescriptor) Error!void {
-        return self.vtable.configure_sockets(self.ptr, descriptors);
     }
 
     pub fn reportSnapshot(self: TunnelController, snapshot: api.TunnelSnapshot) void {
@@ -172,12 +166,14 @@ pub const DNSRecord = struct {
 pub const SocketFactory = struct {
     pub const Error = std.mem.Allocator.Error || error{
         LinkNotActive,
+        SocketConfiguration,
     };
 
     ptr: ?*anyopaque = null,
     vtable: *const VTable,
 
     pub const VTable = struct {
+        configure_sockets: *const fn (?*anyopaque, []const io.SocketDescriptor) Error!void,
         current_reachability: *const fn (?*anyopaque) ?io.ReachabilityInfo,
         create: *const fn (
             ptr: ?*anyopaque,
@@ -188,6 +184,13 @@ pub const SocketFactory = struct {
             timeout: c_int,
         ) Error!io.LinkDescriptor,
     };
+
+    /// Applies current platform policy to existing, borrowed descriptors.
+    /// Used by backends that create and refresh their own sockets.
+    pub fn configureSockets(self: SocketFactory, descriptors: []const io.SocketDescriptor) Error!void {
+        if (descriptors.len == 0) return;
+        return self.vtable.configure_sockets(self.ptr, descriptors);
+    }
 
     pub fn currentReachability(self: SocketFactory) ?io.ReachabilityInfo {
         return self.vtable.current_reachability(self.ptr);

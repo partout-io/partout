@@ -107,7 +107,6 @@ const WireGuardConnection = struct {
             module_id,
             backend,
             daemon_io,
-            sandbox.controller,
             sandbox.resolver,
             sandbox.factory,
             sandbox.profile,
