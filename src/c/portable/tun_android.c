@@ -134,8 +134,10 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-static bool configure_sockets(void *jni_ref, const pp_reachability *info,
-                                          const pp_socket_fd *fds, const size_t fds_len) {
+static bool configure_sockets(
+    void *jni_ref, const pp_reachability *info,
+    const pp_socket_fd *fds, const size_t fds_len
+) {
     assert(jni_ref);
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return false;

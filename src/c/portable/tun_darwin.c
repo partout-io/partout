@@ -287,8 +287,10 @@ static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *in
     return pp_tun_lookup();
 }
 
-static bool configure_sockets(void *ref, const pp_reachability *info,
-                                          const pp_socket_fd *fds, const size_t fds_len) {
+static bool configure_sockets(
+    void *ref, const pp_reachability *info,
+    const pp_socket_fd *fds, const size_t fds_len
+) {
     pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
     const pp_swift_tun_ctrl_configure_sockets_fn swift = pp_swift_tun_ctrl_configure_sockets();
     if (!swift) return true;

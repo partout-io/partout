@@ -103,8 +103,10 @@ static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *dele
     pp_clog_v(PPLogLevelDebug, "tun_linux: ctrl_set_delegate(%p, %p)", ref, delegate);
 }
 
-static bool configure_sockets(void *ref, const pp_reachability *info,
-                                          const pp_socket_fd *fds, const size_t fds_len) {
+static bool configure_sockets(
+    void *ref, const pp_reachability *info,
+    const pp_socket_fd *fds, const size_t fds_len
+) {
     (void)ref;
     (void)info;
     (void)fds;
