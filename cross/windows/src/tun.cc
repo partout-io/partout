@@ -175,7 +175,7 @@ winrt_tun TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
     auto tun = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
     if (!started_) {
-        const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
+        const auto settings = partout::windows::TunnelSettings::parse(info_json);
         if (!idle_transport_) {
             auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
                 const auto result = state->write(bytes, length, true);

@@ -54,8 +54,7 @@ int main() try {
 
     const auto automatic = R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":0}}]})";
     assert(TunnelSettings::parse(automatic).mtu == 1400);
-    assert(TunnelSettings::parse(automatic, 1420).mtu == 1420);
-    assert(TunnelSettings::parse(automatic, 1420).maxFrame() == 1520);
+    assert(TunnelSettings::parse(automatic).maxFrame() == 1500);
 
     for (const auto json : {
         R"({"modules":[]})",

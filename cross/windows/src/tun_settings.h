@@ -20,6 +20,6 @@ struct TunnelSettings {
     static constexpr uint32_t encapsulation_headroom = 100;
 
     uint32_t maxFrame() const;
-    static TunnelSettings parse(const char *text, uint32_t default_mtu = 1400);
+    static TunnelSettings parse(const char *text);
 };
 }

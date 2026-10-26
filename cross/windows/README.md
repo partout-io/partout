@@ -153,8 +153,7 @@ Transport association, socket I/O and the TUN packet bridge are implemented.
 Channel startup applies negotiated IP addresses, inclusion/exclusion routes,
 DNS resolution rules and MTU from the remote IP/DNS modules. The receive pool
 uses the negotiated MTU; the send pool adds 100 bytes for encapsulation.
-Absent or zero MTU uses 1400 for connected transports and 1420 for independent
-UDP, matching WireGuard passive I/O's default. Explicit MTUs are honored.
+Absent or zero MTU uses 1400 for all transports. Explicit MTUs are honored.
 Default inclusion routes are split into two `/1` routes to outrank physical
 default routes without relying on interface metrics. Absent IP families are
 passed to Windows as `nullptr`, not empty address lists.
