@@ -26,7 +26,6 @@ pub const Sandbox = struct {
     cache_dir: []const u8 = "",
     events: events_mod.ConnectionEvents,
     writer: ?ConnectionWriter = null,
-    controller: TunnelController,
     resolver: DNSResolver,
     factory: SocketFactory,
 };

@@ -1204,7 +1204,6 @@ const ConnectionDaemon = struct {
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
             .writer = ConnectionWriter.init(self.looper, &writer_vtable),
-            .controller = self.daemon.controller,
             .resolver = self.resolver,
             .factory = self.factory,
         });

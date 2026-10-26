@@ -184,7 +184,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
     var fake_backend = FakeBackend{ .fail_turn_on_number = 1 };
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -199,9 +199,8 @@ test "WireGuard connection erases backend activation errors at the generic bound
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -218,7 +217,7 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -233,9 +232,8 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -252,7 +250,7 @@ test "WireGuard takes ownership of link and TUN descriptors" {
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -267,9 +265,8 @@ test "WireGuard takes ownership of link and TUN descriptors" {
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
 
         .options = .{ .min_data_count_interval = 2345 },
@@ -332,7 +329,6 @@ test "WireGuard takes ownership of link and TUN descriptors" {
     try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
     try std.testing.expectEqual(@as(usize, 1), final_tun.cleanups);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
 }
 
 const OwnedDescriptor = struct {
@@ -372,7 +368,7 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -387,9 +383,8 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
 
         .options = .{ .min_data_count_interval = 1 },
@@ -414,9 +409,8 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
     try std.testing.expect(try loop_helpers.poll(&environment.looper, 5));
     try std.testing.expectEqual(stopped_reports, recorder.data_count_reports);
 
-    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+    try std.testing.expectEqual(@as(usize, 0), factory.configure_sockets_count);
+
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
@@ -432,7 +426,7 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var resolver = FakeResolver{
         .records = &.{
             .{ .address = "fd00::1", .is_ipv6 = true },
@@ -453,9 +447,8 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
 
         .options = .{ .dns_timeout = 1234 },
@@ -617,7 +610,7 @@ test "WireGuard connection handles network monitor events" {
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -632,9 +625,8 @@ test "WireGuard connection handles network monitor events" {
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -656,7 +648,7 @@ test "WireGuard connection handles network monitor events" {
         try std.testing.expect(std.mem.indexOf(u8, fake_backend.last_set_config.?, "endpoint=127.0.0.1:51820\n") != null);
     }
     try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 0), factory.configure_sockets_count);
     try std.testing.expectEqual(
         roaming_workarounds_before + @as(usize, if (builtin.os.tag == .macos) 0 else 1),
         fake_backend.disable_roaming_count,
@@ -675,7 +667,6 @@ test "WireGuard connection handles network monitor events" {
         created.networkChange(.{ .reachable = true });
         try std.testing.expectEqual(@as(usize, 0), fake_backend.bump_sockets_count);
         try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-        try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
 
         try std.testing.expectEqual(@as(usize, 5), recorder.rebind_count);
         try std.testing.expectEqual(@as(usize, 0), fake_backend.set_config_count);
@@ -694,7 +685,6 @@ test "WireGuard connection handles network monitor events" {
 
         created.networkChange(.{ .reachable = true });
         try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-        try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
 
         created.stop();
         try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
@@ -712,7 +702,7 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var resolver = FakeResolver{ .records = &.{
         .{ .address = "198.51.100.10", .is_ipv6 = false },
     } };
@@ -730,9 +720,8 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -759,8 +748,8 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 3), resolver.resolve_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.configure_sockets_count);
+
+    try std.testing.expectEqual(@as(usize, 0), factory.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 2), recorder.rebind_count);
@@ -779,7 +768,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     var fake_backend = FakeBackend{ .fail_turn_on_number = 2 };
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -794,9 +783,8 @@ test "WireGuard connection retries passive backend failure without terminal even
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -819,7 +807,7 @@ test "WireGuard connection retries passive backend failure without terminal even
     try waitForRetry(&environment, &fake_backend, 3);
 
     try std.testing.expect(!connection.testing.adapter(created).isStopped());
-    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
+
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.stopped_count);
@@ -832,7 +820,7 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
     const context = ConnectionContext.init(fake_backend.backend());
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var tagged = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -847,9 +835,8 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
         .profile = &tagged,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -866,14 +853,13 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
     try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
     try std.testing.expectEqual(api.PartoutErrorCode.outOfMemory, recorder.failure.?.err_pair.code);
     try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.cancel, recorder.failure.?.disposition);
-    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
 
     // Emulate the daemon finalizing the connection after receiving failure.
     created.stop();
     created.stop();
     try std.testing.expect(connection.testing.adapter(created).isStopped());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
+
     try std.testing.expectEqual(@as(usize, 1), recorder.stopped_count);
 }
 
@@ -1044,22 +1030,12 @@ fn fakeResolveAddress(
     return allocator.dupe(u8, self.mapped_address orelse address);
 }
 
-const FakeController = struct {
-    set_tunnel_settings_count: usize = 0,
-    fail_set_tunnel_settings_number: ?usize = null,
+const FakeSocketFactory = struct {
     configure_sockets_count: usize = 0,
     fail_configure_sockets: bool = false,
-    clear_tunnel_settings_count: usize = 0,
 
-    fn factory(self: *FakeController) sandbox.SocketFactory {
+    fn interface(self: *FakeSocketFactory) sandbox.SocketFactory {
         return .{ .ptr = self, .vtable = &fake_socket_factory_vtable };
-    }
-
-    fn controller(self: *FakeController) sandbox.TunnelController {
-        return .{
-            .ptr = self,
-            .vtable = &fake_controller_vtable,
-        };
     }
 };
 
@@ -1069,43 +1045,12 @@ const fake_socket_factory_vtable = blk: {
     break :blk table;
 };
 
-const fake_controller_vtable = sandbox.TunnelController.VTable{
-    .set_tunnel_settings = fakeSetTunnelSettings,
-    .report_snapshot = fakeReportSnapshot,
-    .set_environment_value = fakeSetEnvironmentValue,
-    .clear_tunnel_settings = fakeClearTunnelSettings,
-    .set_reasserting = fakeSetReasserting,
-    .cancel_tunnel_connection = fakeCancelTunnelConnection,
-};
-
-fn fakeSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) sandbox.TunnelController.Error!*io.TunWrapper {
-    const self: *FakeController = @ptrCast(@alignCast(ptr.?));
-    self.set_tunnel_settings_count += 1;
-    if (self.fail_set_tunnel_settings_number == self.set_tunnel_settings_count)
-        return error.TunNotAvailable;
-    if (info.original_module_id.len == 0) return error.InvalidProfile;
-    return io.TunWrapper.create(std.testing.allocator, null);
-}
-
 fn fakeConfigureSockets(ptr: ?*anyopaque, descriptors: []const io.SocketDescriptor) sandbox.SocketFactory.Error!void {
-    const self: *FakeController = @ptrCast(@alignCast(ptr.?));
+    const self: *FakeSocketFactory = @ptrCast(@alignCast(ptr.?));
     self.configure_sockets_count += 1;
     if (self.fail_configure_sockets) return error.SocketConfiguration;
     if (!std.mem.eql(io.SocketDescriptor, &.{ 3, 4 }, descriptors)) return error.SocketConfiguration;
 }
-
-fn fakeReportSnapshot(_: ?*anyopaque, _: api.TunnelSnapshot) void {}
-
-fn fakeSetEnvironmentValue(_: ?*anyopaque, _: []const u8, _: ?[]const u8) void {}
-
-fn fakeClearTunnelSettings(ptr: ?*anyopaque, _: bool) void {
-    const self: *FakeController = @ptrCast(@alignCast(ptr.?));
-    self.clear_tunnel_settings_count += 1;
-}
-
-fn fakeSetReasserting(_: ?*anyopaque, _: bool) void {}
-
-fn fakeCancelTunnelConnection(_: ?*anyopaque, _: ?api.PartoutErrorPair) void {}
 
 const EventRecorder = struct {
     established_count: usize = 0,
@@ -1246,7 +1191,7 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     defer fake_backend.deinit(allocator);
     var vtable = fake_backend_vtable;
     vtable.turn_on = Probe.turnOn;
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[],"activeModulesIds":[]}
     );
@@ -1256,7 +1201,7 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     );
     defer configuration.deinit(allocator);
     const tun = try io.TunWrapper.create(allocator, null);
-    var sut = try adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, .none, mock.noopDNSResolver(), controller.factory(), &profile, &configuration, 1000);
+    var sut = try adapter.WireGuardAdapter.init(profile.id, .{ .ptr = &fake_backend, .vtable = &vtable }, .none, mock.noopDNSResolver(), factory.interface(), &profile, &configuration, 1000);
     defer sut.deinit(allocator);
 
     sut.sendKeepalives(); // Safe before startup.
@@ -1264,7 +1209,7 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     defer initial_info.deinit(allocator);
     try sut.commit(allocator, .{ .fd = -1, .io = .{ .tun = tun } });
     try std.testing.expect(sut.isStarted());
-    try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 1), factory.configure_sockets_count);
     sut.sendKeepalives();
     try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
 
@@ -1272,7 +1217,7 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     _ = sut.didUpdateReachable(allocator, false);
     try std.testing.expect(sut.isStarted());
     try std.testing.expectEqual(@as(usize, 1), fake_backend.bump_sockets_count);
-    try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 2), factory.configure_sockets_count);
 
     adapter.testing.setNetworkChangeBehavior(&sut, .suspend_backend_when_offline);
     _ = sut.didUpdateReachable(allocator, false);
@@ -1289,11 +1234,10 @@ test "WireGuard adapter supports active startup and both reachability policies" 
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
     _ = sut.didUpdateReachable(allocator, true);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.bump_sockets_count);
-    try std.testing.expectEqual(@as(usize, 4), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 4), factory.configure_sockets_count);
 
     sut.stop(allocator);
     try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_off_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
 }
 
 test "WireGuard none mode resolves hostnames before establishment and resets uncommitted starts" {
@@ -1304,7 +1248,7 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
     var vtable = fake_backend_vtable;
     vtable.turn_on = fakeActiveTurnOn;
     vtable.complete_io = null;
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var resolver = FakeResolver{
         .records = &.{.{ .address = "198.51.100.10", .is_ipv6 = false }},
@@ -1323,9 +1267,8 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
     const created = try connection.createConnection(&context, allocator, conn.activeConnectionModule(&profile).?, .{
         .profile = &profile,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = resolver.resolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     defer created.destroy();
@@ -1401,7 +1344,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var vtable = fake_backend_vtable;
     vtable.turn_on = fakeActiveTurnOn;
     vtable.complete_io = null;
-    var controller = FakeController{};
+    var factory = FakeSocketFactory{};
     var recorder = EventRecorder{};
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -1416,9 +1359,8 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     const created = try connection.createConnection(&context, allocator, conn.activeConnectionModule(&profile).?, .{
         .profile = &profile,
         .events = recorder.events(),
-        .controller = controller.controller(),
         .resolver = mock.noopDNSResolver(),
-        .factory = controller.factory(),
+        .factory = factory.interface(),
         .writer = environment.writer(),
     });
     var destroyed = false;
@@ -1434,14 +1376,14 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     const tun = try io.TunWrapper.create(allocator, null);
     tun.test_descriptor = owned.descriptor();
     try created.commit(.{ .fd = -1, .io = .{ .tun = tun } });
-    try std.testing.expectEqual(@as(usize, 1), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 1), factory.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
     const sut = connection.testing.adapter(created);
     adapter.testing.setNetworkChangeBehavior(sut, .refresh_sockets);
     created.networkChange(.{ .reachable = true });
     created.betterPath();
     try std.testing.expectEqual(@as(usize, 1), fake_backend.bump_sockets_count);
-    try std.testing.expectEqual(@as(usize, 2), controller.configure_sockets_count);
+    try std.testing.expectEqual(@as(usize, 2), factory.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.rebind_count);
 
     adapter.testing.setNetworkChangeBehavior(sut, .suspend_backend_when_offline);
@@ -1458,11 +1400,11 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var failed_owned = OwnedDescriptor{};
     const failed_tun = try io.TunWrapper.create(allocator, null);
     failed_tun.test_descriptor = failed_owned.descriptor();
-    controller.fail_configure_sockets = true;
+    factory.fail_configure_sockets = true;
     try std.testing.expect(try created.rebind(.{}, .{ .fd = -1, .io = .{ .tun = failed_tun } }));
     try std.testing.expectEqual(@as(usize, 1), failed_owned.cleanups);
     try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
-    controller.fail_configure_sockets = false;
+    factory.fail_configure_sockets = false;
     try std.testing.expect(try loop_helpers.poll(&environment.looper, 20));
     try std.testing.expectEqual(@as(usize, 2), recorder.tun_request_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
@@ -1485,16 +1427,15 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var rejected = OwnedDescriptor{};
     const rejected_tun = try io.TunWrapper.create(allocator, null);
     rejected_tun.test_descriptor = rejected.descriptor();
-    controller.fail_configure_sockets = true;
+    factory.fail_configure_sockets = true;
     try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = -1, .io = .{ .tun = rejected_tun } }));
     try std.testing.expectEqual(@as(usize, 4), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), rejected.cleanups);
     created.stop();
     try std.testing.expectEqual(@as(usize, 1), rejected.cleanups);
     try std.testing.expectEqual(@as(usize, 2), recorder.stopped_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.set_tunnel_settings_count);
-    try std.testing.expectEqual(@as(usize, 0), controller.clear_tunnel_settings_count);
-    controller.fail_configure_sockets = false;
+
+    factory.fail_configure_sockets = false;
     try expectEstablished(try created.start(remote));
     var final_owned = OwnedDescriptor{};
     const final_tun = try io.TunWrapper.create(allocator, null);
