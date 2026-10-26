@@ -16,14 +16,14 @@ preserved.
 
 ## Windows passive I/O
 
-[The Windows passive adapter](../internal/passive_io_windows.zig) fills waiting
+[The passive adapter](../internal/passive_io.zig) fills waiting
 Go reads directly from native UDP and TUN callbacks under its receive lock.
 This avoids queue allocations and an intermediate payload copy. Packets arriving
 without a waiting reader use bounded owned queues. Read buffers are unregistered
 before completion; detach, shutdown and failure cancel pending registrations.
 Callbacks never complete Go requests themselves; the waiting Go worker completes
-after releasing the receive lock. POSIX passive I/O instead reads directly from
-descriptors with readiness waits; the production non-Windows path uses active mode.
+after releasing the receive lock. Passive I/O is supported only on Windows;
+non-Windows platforms use active mode.
 
 The adapter serializes writes against descriptor replacement. Passive write
 completion releases the Go buffer after the native backend copies it; it reports
