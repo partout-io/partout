@@ -139,7 +139,7 @@ pub const PosixLooper = struct {
     }
 
     /// Failed replacement preserves the old task. The token's address is not retained.
-    pub fn scheduleTimer(self: *PosixLooper, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    pub fn scheduleTimer(self: *PosixLooper, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         node.* = .{ .id = self.next_timer_id, .deadline_ns = deadlineAfter(delay_ms), .task = task };

@@ -7,8 +7,10 @@
 #include <cstdio>
 #include <vector>
 namespace { std::atomic<winrt_log_callback> logger{nullptr}; }
-extern "C" void winrt_set_logger(winrt_log_callback callback) { logger.store(callback); }
-extern "C" void winrt_log(winrt_log_level level, const char *format, ...) {
+extern "C" {
+
+void winrt_set_logger(winrt_log_callback callback) { logger.store(callback); }
+void winrt_log(winrt_log_level level, const char *format, ...) {
     va_list args;
     va_start(args, format);
     va_list copy;
@@ -24,4 +26,6 @@ extern "C" void winrt_log(winrt_log_level level, const char *format, ...) {
         }
     } catch (...) { /* Diagnostics must not throw across the C ABI. */ }
     va_end(args);
+}
+
 }

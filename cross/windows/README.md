@@ -10,9 +10,9 @@ portable ABI adapters. Dependencies run from Partout to the backend:
 
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
-                                              -> PartoutTunnelController
+                                              -> Partout::TunnelController
 Partout io_windows.zig       -> winrt/socket.h  -> src/socket.cc
-Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun_ctrl.cc
+Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 ```
 
 ## Where code belongs
@@ -20,15 +20,16 @@ Partout portable/tun_winrt.c -> winrt/tun.h     -> src/tun_ctrl.cc
 | Location | Responsibility |
 | --- | --- |
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/` | Backend-owned socket, tunnel controller and logging interfaces; no Partout headers. |
+| `include/winrt/` | Backend-owned C socket, tunnel controller and logging ABI; no Partout headers or C++ interfaces. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
-| `src/socket.cc` | Owns UDP/TCP transports, receive callbacks, TCP read loop, writes and callback lifetime. |
-| `src/tun_ctrl.h`, `src/tun_ctrl.cc` | Private `PartoutTunnelController`, transport association and channel startup/stop. |
+| `src/socket.h`, `src/socket.cc` | Internal `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime; implements the C socket ABI. |
+| `src/tun.h`, `src/tun.cc` | Internal `Partout::TunnelController`, transport association and channel startup/stop; implements the C tunnel ABI. |
+| `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
-| `../../src/net/looper_windows.zig` | Queued packet callbacks, attachment lifetime and timers; ignores the shared mux option. |
+| `../../src/net/looper_windows.zig` | Dispatches native packet callbacks and timers, waiting on the daemon's shared wake event. |
 | `../../src/wireguard/internal/passive_io_windows.zig` | Queues native receives for Go's passive read callbacks and forwards writes. |
-| `../../src/c/portable/tun_winrt.c` | Converts Partout's portable controller ABI into backend calls. |
+| `../../src/c/portable/tun_windows.c` | Converts Partout's portable controller ABI into backend calls, or supplies fallback stubs without WinRT. |
 
 `partout-winrt-backend` compiles sockets, the controller and logging with only
 the native include directory. `partout-winrt` adds `runtime.cc` and packages all
@@ -40,18 +41,29 @@ Create a socket, configure it through the tunnel controller, then open it.
 For connected sockets, association must happen before connect. The Partout adapter passes
 the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
 
-UDP uses the OS `MessageReceived` event. TCP runs an asynchronous read loop.
+UDP uses the OS `MessageReceived` event. TCP owns an `IAsyncAction` read loop;
+channel takeover cancels native I/O and joins that task directly.
 Both deliver buffers or errors to the registered callback and borrowed context.
 Clearing the callback drains delivery; callbacks only queue input and must not
-reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
-asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
+reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
+packet and destination; one coroutine drains the native queue in FIFO order using
+`co_await` for output-stream acquisition and writes. Success means accepted, with
+later failures routed through the same callback. Channel-buffer writes copy into
+VpnChannel's pool directly. See `include/winrt/socket.h` for the contract.
+Callers serialize writes with other writes, socket configuration, channel
+takeover, writer replacement and destruction. The daemon actor provides this
+serialization for OpenVPN; WireGuard's passive adapter holds its write lock.
+Stopping writes and clearing receive callbacks may overlap an admitted write;
+the owner keeps the socket alive until submission returns. Outstanding reads and
+writes retain shared I/O state and native transports, without retaining Socket.
 
 ### Connected transports (OpenVPN)
 
 The WindowsLooper queues owned input for both link and TUN attachments and
 dispatches their callbacks on its caller. The native socket owns the lifetime
 of its OS callbacks and pending reads. Before channel startup, direct socket
-reads are stopped (pending TCP reads are cancelled and drained).
+writes are drained, then reads are stopped (pending TCP reads are cancelled
+and drained), before transferring the transport to VpnChannel.
 
 After startup, `Encapsulate` queues plain IP packets on the TUN side and
 `Decapsulate` queues transport data on the link side. Neither waits for protocol
@@ -59,8 +71,11 @@ processing. TUN writes copy packets into channel receive buffers and call
 `AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`. Link writes use
 the socket during negotiation, then the channel send-buffer append/flush APIs
 after startup. This requires the channel append/flush APIs
-(Windows build 20348 or later). Detach drains input callbacks and rejects new
-writes, while retained attachments let already admitted writes finish.
+(Windows build 20348 or later). All WindowsLooper operations run on its owner
+thread, including writes, timers and detach. Its mutex protects only the receive
+queue and flags shared with native callbacks. Detach drains native delivery and
+discards pending writes and queued input; an in-progress protocol callback retains
+its attachment until it returns, so it may safely detach its own side.
 
 ### Unconnected UDP (WireGuard)
 
@@ -86,17 +101,25 @@ background suspension and resume still need validation. The physical adapter is
 retained across UDP bind replacement; automatic local-interface migration is not
 implemented.
 
+Passive write completion releases the Go buffer after the native backend copies
+it; it reports acceptance rather than network transmission. Later socket failures
+use the passive adapter's existing receive-error path.
+
 ### Timers
 
-Timers use one `RunAfter` alarm for the earliest pending deadline. The alarm
-only wakes the looper; `loopOnce()` invokes due tasks on its caller thread.
+`loopOnce()` waits on the existing daemon mailbox event with a timeout for the
+earliest timer deadline. Native receive callbacks signal that same event; no
+socket readiness polling or separate timer-alarm thread is needed. Due tasks
+and packet callbacks execute on the caller thread.
 Scheduling and cancellation are queue-confined, and timer tokens are copied by
 value. Replacement preserves the old task on allocation failure; cancellation
 and stop remove tasks before their borrowed contexts can be released. Tasks
 scheduled by a timer callback become eligible on the next iteration.
 
-The normal `loopOnce(null)` driver remains nonblocking so its caller can service
-the separate mailbox. Explicit bounded polls can wait for the timer alarm.
+The normal `loopOnce(null)` driver sleeps until packets, a mailbox wake, or a
+timer deadline require work. Bounded waits remain available for tests. The
+supplied mux is borrowed only for its wake event; a looper created without one
+owns a private wake source. The daemon's command loop remains unchanged.
 
 ## VPN channel runtime
 
@@ -137,7 +160,7 @@ cmake --build .cmake-winrt --target partout-winrt
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
 `-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
-builds without WinRT use `tun_windows_dummy.c`, an intentional fallback for
+builds without WinRT use the fallback branch in `tun_windows.c` for
 tests and builds that do not need native VPN support.
 
 Enable WireGuard with `-DPP_BUILD_USE_WIREGUARD=ON` when building the full

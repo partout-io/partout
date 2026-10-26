@@ -1144,6 +1144,7 @@ fn expectEstablished(result: conn.Connection.StartResult) !void {
 }
 
 test "WireGuard backend dispatches the passive startup payload separately" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
             const called: *bool = @ptrCast(@alignCast(raw.?));
@@ -1484,14 +1485,14 @@ const TimerEnvironment = struct {
     fn writer(self: *@This()) source.net.ConnectionWriter {
         return source.net.ConnectionWriter.init(&self.looper, &vtable);
     }
-    fn write(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    fn write(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (source.net.SubmissionError || error{MissingDestination})!void {
         const loop: *source.net_looper.Looper = @ptrCast(@alignCast(raw));
         loop.write(packets, side, destination) catch |err| switch (err) {
             error.SideNotAttached, error.InvalidBuffers => {},
             else => |failure| return failure,
         };
     }
-    fn schedule(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    fn schedule(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) source.net.SubmissionError!void {
         const loop: *source.net_looper.Looper = @ptrCast(@alignCast(raw));
         return loop.scheduleTimer(timer, delay_ms, task);
     }

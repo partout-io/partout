@@ -290,6 +290,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 }
 
 test "daemon preserves settings-only failure and hold behavior" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
         callbacks_on_caller: bool = true,

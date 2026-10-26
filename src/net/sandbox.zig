@@ -12,6 +12,7 @@ const std = @import("std");
 const core = @import("../core/exports.zig");
 const events_mod = @import("connection_events.zig");
 const io = @import("io.zig");
+const looper_helpers = @import("looper_helpers.zig");
 const api = core.api;
 
 const TunWrapper = io.TunWrapper;
@@ -287,8 +288,8 @@ pub const ConnectionWriter = struct {
     vtable: *const VTable,
 
     pub const VTable = struct {
-        write_packets: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void,
-        schedule_timer: *const fn (*anyopaque, *io.Timer, u64, io.TimedTask) io.SubmissionError!void,
+        write_packets: *const fn (*anyopaque, io.Packets, io.Side, ?io.SocketAddress) (looper_helpers.SubmissionError || error{MissingDestination})!void,
+        schedule_timer: *const fn (*anyopaque, *io.Timer, u64, io.TimedTask) looper_helpers.SubmissionError!void,
         cancel_timer: *const fn (*anyopaque, *io.Timer) void,
     };
 
@@ -301,11 +302,11 @@ pub const ConnectionWriter = struct {
     }
 
     /// The implementation consumes or copies packets before returning.
-    pub fn writePackets(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    pub fn writePackets(self: ConnectionWriter, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (looper_helpers.SubmissionError || error{MissingDestination})!void {
         return self.vtable.write_packets(self.ptr, packets, side, destination);
     }
 
-    pub fn scheduleTimer(self: ConnectionWriter, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    pub fn scheduleTimer(self: ConnectionWriter, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) looper_helpers.SubmissionError!void {
         return self.vtable.schedule_timer(self.ptr, timer, delay_ms, task);
     }
 

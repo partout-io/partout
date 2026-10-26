@@ -25,7 +25,7 @@ fn negotiatorOptions(
         .callback_context = null,
         .write_packets = ignoreWrite,
         .schedule_negotiation_check = struct {
-            fn call(_: ?*anyopaque, _: u64) io.SubmissionError!void {}
+            fn call(_: ?*anyopaque, _: u64) source.net.SubmissionError!void {}
         }.call,
     };
 }
@@ -77,4 +77,4 @@ test "cached session tokens replace OTP credentials" {
     try std.testing.expectEqualStrings("renewed-token", renewed.password.?.asSlice());
 }
 
-fn ignoreWrite(_: ?*anyopaque, _: []const []const u8, _: source.net.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {}
+fn ignoreWrite(_: ?*anyopaque, _: []const []const u8, _: source.net.SocketAddress) (source.net.SubmissionError || error{MissingDestination})!void {}

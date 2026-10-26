@@ -177,7 +177,7 @@ const writer_vtable: net.ConnectionWriter.VTable = .{
     .cancel_timer = cancelTimer,
 };
 
-fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (source.net.SubmissionError || error{MissingDestination})!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
     looper.write(packets, side, destination) catch |err| switch (err) {
         error.SideNotAttached, error.InvalidBuffers => {},
@@ -185,7 +185,7 @@ fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination
     };
 }
 
-fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) source.net.SubmissionError!void {
     const looper: *Looper = @ptrCast(@alignCast(raw));
     return looper.scheduleTimer(timer, delay_ms, task);
 }
