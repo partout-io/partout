@@ -124,15 +124,16 @@ bool Socket::Open(const char *hostname, uint16_t port,
         }
         Apartment apartment;
         const HostName host{to_hstring(hostname)};
-        const bool numeric = host.Type() == HostNameType::Ipv4 || host.Type() == HostNameType::Ipv6;
-        if ((unconnected_ && !numeric) ||
-            (options->dual_stack && host.Type() != HostNameType::Ipv6)) {
+        const bool is_v4 = host.Type() == HostNameType::Ipv4;
+        const bool is_v6 = host.Type() == HostNameType::Ipv6;
+        const bool numeric = is_v4 || is_v6;
+        if ((unconnected_ && !numeric) || (options->dual_stack && !is_v6)) {
             throw hresult_invalid_argument();
         }
         const auto service = to_hstring(port);
         if (unconnected_) {
-            accepts_ipv4_ = host.Type() == HostNameType::Ipv4 || options->dual_stack;
-            accepts_ipv6_ = host.Type() == HostNameType::Ipv6;
+            accepts_ipv4_ = is_v4 || options->dual_stack;
+            accepts_ipv6_ = is_v6;
         }
         if (datagram_) {
             RegisterDatagram();
