@@ -20,7 +20,6 @@ pub const ReadAction = common.ReadAction;
 pub const Failure = common.Failure;
 pub const TimedTask = common.TimedTask;
 pub const Timer = common.Timer;
-pub const SubmissionError = common.SubmissionError;
 
 pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;

@@ -956,7 +956,7 @@ const ConnectionDaemon = struct {
         .cancel_timer = cancelTimer,
     };
 
-    fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    fn writePackets(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (looper_mod.SubmissionError || error{MissingDestination})!void {
         const looper: *Looper = @ptrCast(@alignCast(raw));
         looper.write(packets, side, destination) catch |err| switch (err) {
             error.SideNotAttached, error.InvalidBuffers => {},
@@ -964,7 +964,7 @@ const ConnectionDaemon = struct {
         };
     }
 
-    fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    fn scheduleTimer(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) looper_mod.SubmissionError!void {
         const looper: *Looper = @ptrCast(@alignCast(raw));
         return looper.scheduleTimer(timer, delay_ms, task);
     }

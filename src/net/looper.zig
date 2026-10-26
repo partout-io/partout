@@ -16,6 +16,7 @@ const looper_posix = @import("looper_posix.zig");
 const looper_windows = @import("looper_windows.zig");
 
 pub const testing_helpers = if (builtin.is_test) helpers else void;
+pub const SubmissionError = helpers.SubmissionError;
 
 pub const Looper = struct {
     pub const Impl = if (builtin.os.tag == .windows)
@@ -84,7 +85,7 @@ pub const Looper = struct {
         timer: *io.Timer,
         delay_ms: u64,
         task: io.TimedTask,
-    ) io.SubmissionError!void {
+    ) SubmissionError!void {
         return self.impl.scheduleTimer(timer, delay_ms, task);
     }
 
@@ -113,7 +114,7 @@ pub const Looper = struct {
         return self.impl.isAttached(.tun);
     }
 
-    pub fn resumeReading(self: *Looper, side: io.Side) io.SubmissionError!void {
+    pub fn resumeReading(self: *Looper, side: io.Side) SubmissionError!void {
         return self.impl.resumeReading(side);
     }
 

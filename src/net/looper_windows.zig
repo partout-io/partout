@@ -143,7 +143,7 @@ pub const WindowsLooper = struct {
         timer: *io.Timer,
         delay_ms: u64,
         task: io.TimedTask,
-    ) io.SubmissionError!void {
+    ) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         errdefer self.allocator.destroy(node);
@@ -258,7 +258,7 @@ pub const WindowsLooper = struct {
         return self.sides[@intFromEnum(side)] != null;
     }
 
-    pub fn resumeReading(self: *WindowsLooper, side: io.Side) io.SubmissionError!void {
+    pub fn resumeReading(self: *WindowsLooper, side: io.Side) helpers.SubmissionError!void {
         const attachment = self.getSide(side) catch return error.LooperUnavailable;
         self.mutex.lock();
         attachment.reading = true;

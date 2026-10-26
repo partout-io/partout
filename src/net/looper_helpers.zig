@@ -62,7 +62,9 @@ pub const AttachArguments = struct {
 
 pub const InitError = std.mem.Allocator.Error || error{MuxFailure};
 
-pub const AttachError = io.SubmissionError || error{
+pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
+
+pub const AttachError = SubmissionError || error{
     InvalidBuffers,
     MuxFailure,
     SideAlreadyAttached,
@@ -73,7 +75,7 @@ pub const DetachError = error{ LooperUnavailable, ReentrantCall };
 
 pub const StopError = error{ LooperUnavailable, ReentrantCall };
 
-pub const WriteError = io.SubmissionError || error{
+pub const WriteError = SubmissionError || error{
     SideNotAttached,
     InvalidBuffers,
     MissingDestination,

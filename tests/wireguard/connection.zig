@@ -1485,14 +1485,14 @@ const TimerEnvironment = struct {
     fn writer(self: *@This()) source.net.ConnectionWriter {
         return source.net.ConnectionWriter.init(&self.looper, &vtable);
     }
-    fn write(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (io.SubmissionError || error{MissingDestination})!void {
+    fn write(raw: *anyopaque, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) (source.net.SubmissionError || error{MissingDestination})!void {
         const loop: *source.net_looper.Looper = @ptrCast(@alignCast(raw));
         loop.write(packets, side, destination) catch |err| switch (err) {
             error.SideNotAttached, error.InvalidBuffers => {},
             else => |failure| return failure,
         };
     }
-    fn schedule(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) io.SubmissionError!void {
+    fn schedule(raw: *anyopaque, timer: *io.Timer, delay_ms: u64, task: io.TimedTask) source.net.SubmissionError!void {
         const loop: *source.net_looper.Looper = @ptrCast(@alignCast(raw));
         return loop.scheduleTimer(timer, delay_ms, task);
     }
