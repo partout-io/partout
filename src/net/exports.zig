@@ -45,6 +45,7 @@ pub const LinkDescriptor = io.LinkDescriptor;
 pub const Looper = looper.Looper;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Packets = io.Packets;
+pub const PacketTransport = io.PacketTransport;
 pub const Platform = platform.Platform;
 pub const ReadAction = io.ReadAction;
 pub const ReachabilityInfo = io.ReachabilityInfo;

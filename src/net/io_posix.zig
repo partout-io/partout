@@ -448,3 +448,144 @@ pub fn mapWriteResult(_: io.Side, result: c_int, comptime maps_no_space: bool) !
     if (result < 0) return error.LibcFailure;
     return @intCast(result);
 }
+
+/// A readiness-driven thread supplies borrowed input; writes submit directly.
+/// No thread starts until a receiver is registered. Removal wakes and joins it.
+pub fn PacketTransport(comptime DescriptorType: type) type {
+    return struct {
+        const Self = @This();
+        pub const Descriptor = DescriptorType;
+        pub const OnReceive = io.PacketReceiveCallback;
+        pub const WriteResult = io.PacketWriteResult;
+
+        allocator: std.mem.Allocator,
+        descriptor: Descriptor,
+        io_lock: core.Mutex = .{},
+        readiness: io.Waiter,
+        receive_thread: ?std.Thread = null,
+        on_receive: OnReceive = null,
+        receive_context: ?*anyopaque = null,
+        stop_receiving: bool = false,
+        writes_stopped: bool = false,
+
+        /// Takes descriptor ownership on entry, including allocation failure.
+        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptor) std.mem.Allocator.Error!*Self {
+            errdefer releaseDescriptor(descriptor);
+            const self = try allocator.create(Self);
+            errdefer allocator.destroy(self);
+            self.* = .{
+                .allocator = allocator,
+                .descriptor = descriptor,
+                .readiness = io.Waiter.init() orelse return error.OutOfMemory,
+            };
+            return self;
+        }
+
+        pub fn cleanup(self: *Self) void {
+            self.stopWrites();
+            self.setOnReceive(null, null) catch unreachable;
+            self.readiness.deinit();
+            self.io_lock.deinit();
+            releaseDescriptor(self.descriptor);
+            self.allocator.destroy(self);
+        }
+
+        pub fn setOnReceive(self: *Self, callback: OnReceive, context: ?*anyopaque) error{ReceiveSetupFailed}!void {
+            if (callback == null) {
+                self.io_lock.lock();
+                self.stop_receiving = true;
+                self.readiness.wake();
+                self.io_lock.unlock();
+                if (self.receive_thread) |thread| thread.join();
+                self.receive_thread = null;
+                self.on_receive = null;
+                self.receive_context = null;
+                return;
+            }
+            if (self.receive_thread != null) return error.ReceiveSetupFailed;
+            self.on_receive = callback;
+            self.receive_context = context;
+            self.stop_receiving = false;
+            self.receive_thread = std.Thread.spawn(.{}, receivePackets, .{self}) catch {
+                self.on_receive = null;
+                self.receive_context = null;
+                return error.ReceiveSetupFailed;
+            };
+        }
+
+        pub fn stopWrites(self: *Self) void {
+            self.io_lock.lock();
+            self.writes_stopped = true;
+            self.io_lock.unlock();
+        }
+
+        pub fn write(self: *Self, bytes: []const u8, destination: ?io.SocketAddress) WriteResult {
+            self.io_lock.lock();
+            defer self.io_lock.unlock();
+            if (self.writes_stopped) return .failed;
+            const descriptor = switch (self.descriptor) {
+                inline else => |descriptor| descriptor,
+            };
+            const size = descriptor.io.writePacket(bytes, 0, destination) catch |err| return switch (err) {
+                error.WouldBlock, error.Backpressure => .again,
+                error.DatagramDropped => if (self.descriptor == .link) .dropped else .failed,
+                else => .failed,
+            };
+            return if (size == bytes.len) .ok else .failed;
+        }
+
+        fn receivePackets(self: *Self) void {
+            const descriptor = switch (self.descriptor) {
+                inline else => |descriptor| descriptor,
+            };
+            var buffer: [65535]u8 = undefined;
+            while (true) {
+                self.io_lock.lock();
+                if (self.stop_receiving) {
+                    self.io_lock.unlock();
+                    return;
+                }
+                var address = std.mem.zeroes(io.SocketAddress);
+                const size = descriptor.io.readPacket(&buffer, &address) catch |err| {
+                    if (err == error.DatagramDropped) {
+                        self.io_lock.unlock();
+                        continue;
+                    }
+                    if (err == error.WouldBlock) {
+                        _ = descriptor.io.waitForReadiness(false, &self.readiness, &self.io_lock) catch {
+                            self.io_lock.unlock();
+                            self.reportReceiveFailure();
+                            return;
+                        };
+                        self.io_lock.unlock();
+                        continue;
+                    }
+                    self.io_lock.unlock();
+                    self.reportReceiveFailure();
+                    return;
+                } orelse {
+                    self.io_lock.unlock();
+                    self.reportReceiveFailure();
+                    return;
+                };
+                if (self.descriptor == .link and descriptor.io == .socket and !descriptor.io.isUnconnected())
+                    address = descriptor.io.socket.remoteAddress() orelse address;
+                self.io_lock.unlock();
+                if (!self.on_receive.?(self.receive_context, &buffer, size, if (self.descriptor == .link) &address else null, 0)) return;
+            }
+        }
+
+        fn reportReceiveFailure(self: *Self) void {
+            self.io_lock.lock();
+            const stopping = self.stop_receiving;
+            self.io_lock.unlock();
+            if (!stopping) _ = self.on_receive.?(self.receive_context, null, 0, null, -1);
+        }
+
+        pub fn releaseDescriptor(descriptor: Descriptor) void {
+            switch (descriptor) {
+                inline else => |value| value.cleanup(),
+            }
+        }
+    };
+}

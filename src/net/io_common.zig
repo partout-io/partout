@@ -253,6 +253,11 @@ fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddres
     return result;
 }
 
+/// Packet callbacks borrow their payload and source until return. Clearing the
+/// receiver drains delivery before its context can be released.
+pub const PacketReceiveCallback = ?*const fn (?*anyopaque, [*c]const u8, usize, [*c]const SocketAddress, i32) callconv(.c) bool;
+pub const PacketWriteResult = enum { ok, again, dropped, failed };
+
 pub const testing = struct {
     pub fn reachable(value: bool) ReachabilityInfo {
         var result = std.mem.zeroes(ReachabilityInfo);

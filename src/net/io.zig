@@ -44,3 +44,6 @@ pub const DescriptorPair = union(Side) {
     link: LinkDescriptor,
     tun: TunDescriptor,
 };
+
+/// Owns callback delivery and packet submission using the selected backend.
+pub const PacketTransport = backend.PacketTransport(DescriptorPair);

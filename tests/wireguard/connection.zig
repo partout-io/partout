@@ -23,12 +23,6 @@ const uapi = wireguard_internal.uapi;
 const api = core.api;
 const AtomicBool = std.atomic.Value(bool);
 
-fn waitUntil(value: *const AtomicBool) void {
-    while (!value.load(.acquire)) {
-        std.Thread.yield() catch {};
-    }
-}
-
 const ConnectionContext = connection.ConnectionContext;
 test "WireGuard connection builds UAPI configuration" {
     const allocator = std.testing.allocator;
@@ -179,6 +173,7 @@ test "WireGuard connection parses runtime data count" {
 }
 
 test "WireGuard connection erases backend activation errors at the generic boundary" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 1 };
@@ -212,6 +207,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
@@ -243,94 +239,6 @@ test "WireGuard connection preserves allocator errors at the generic boundary" {
     try std.testing.expectEqual(@as(usize, 0), recorder.failure_count);
 }
 
-test "WireGuard takes ownership of link and TUN descriptors" {
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
-    const allocator = std.testing.allocator;
-
-    var fake_backend = FakeBackend{};
-    defer fake_backend.deinit(allocator);
-    const context = ConnectionContext.init(fake_backend.backend());
-    var factory = FakeSocketFactory{};
-    var recorder = EventRecorder{};
-    var tagged = try api.Profile.parse(allocator,
-        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
-        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
-        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
-    );
-    defer tagged.deinit(allocator);
-    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
-    var environment: TimerEnvironment = undefined;
-    try environment.init(allocator);
-    defer environment.deinit();
-    const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
-        .profile = &tagged,
-        .events = recorder.events(),
-        .resolver = mock.noopDNSResolver(),
-        .factory = factory.interface(),
-        .writer = environment.writer(),
-
-        .options = .{ .min_data_count_interval = 2345 },
-    });
-    var destroyed = false;
-    defer if (!destroyed) created.destroy();
-    try std.testing.expectEqual(.link, created.daemon_io);
-
-    var first_link = OwnedDescriptor{};
-    var first_tun = OwnedDescriptor{};
-    var second_link = OwnedDescriptor{};
-    var second_tun = OwnedDescriptor{};
-    try expectEstablished(try created.start(.{ .link = first_link.descriptor() }));
-    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
-    try created.commit(first_tun.descriptor());
-    try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
-    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
-
-    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }, null));
-    try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
-    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
-    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
-    try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
-    var third_link = OwnedDescriptor{};
-    try std.testing.expect(try created.rebind(.{ .link = third_link.descriptor() }, second_tun.descriptor()));
-    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
-
-    // Unexpected EOF from an owned descriptor reaches daemon recovery once.
-    const transport = fake_backend.transport.?;
-    const wg_c = wireguard_internal.passive_io.testing.abi;
-    var buffer: [32]u8 = undefined;
-    var packets = [_]wg_c.wg_read_packet{.{ .data = &buffer, .capacity = buffer.len }};
-    const worker = try std.Thread.spawn(.{}, struct {
-        fn run(tunnel: backend_mod.StartTunnelPassive, batch: [*c]wg_c.wg_read_packet) void {
-            std.testing.expectEqual(wg_c.WG_IO_OK, tunnel.tun.read.?(tunnel.context, batch, 1, 1)) catch unreachable;
-        }
-    }.run, .{ transport, &packets });
-    worker.join();
-    try std.testing.expectEqual(wg_c.WG_IO_CLOSED, transport.tun.read.?(transport.context, &packets, 1, 1));
-    // Worker delivery is immediate; the daemon sink is responsible for queuing recovery.
-    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
-    try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
-    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);
-
-    created.stop();
-    created.stop();
-    try std.testing.expectEqual(@as(usize, 1), third_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
-
-    var final_link = OwnedDescriptor{};
-    var final_tun = OwnedDescriptor{};
-    try expectEstablished(try created.start(.{ .link = final_link.descriptor() }));
-    try created.commit(final_tun.descriptor());
-    created.destroy();
-    destroyed = true;
-    try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
-    try std.testing.expectEqual(@as(usize, 1), final_tun.cleanups);
-    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
-}
-
 const OwnedDescriptor = struct {
     cleanups: usize = 0,
 
@@ -344,7 +252,7 @@ const OwnedDescriptor = struct {
     fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
     fn reset(_: *anyopaque) io.Error!void {}
     fn read(_: *anyopaque, _: []u8) io.Error!?usize {
-        return null;
+        return error.WouldBlock;
     }
     fn write(_: *anyopaque, bytes: []const u8, offset: usize) io.Error!usize {
         return bytes.len - offset;
@@ -363,6 +271,7 @@ const OwnedDescriptor = struct {
 };
 
 test "WireGuard data timer runs on its owner and cancels before stop" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -421,6 +330,7 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
 }
 
 test "WireGuard connection resolves hostname endpoints through sandbox resolver" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -605,6 +515,7 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 }
 
 test "WireGuard connection handles network monitor events" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -693,6 +604,85 @@ test "WireGuard connection handles network monitor events" {
     created.networkChange(.{ .reachable = true });
     created.betterPath();
     try std.testing.expectEqual(rebinds_before, recorder.rebind_count);
+}
+
+test "WireGuard takes ownership of link and TUN descriptors" {
+    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    const allocator = std.testing.allocator;
+
+    var fake_backend = FakeBackend{};
+    defer fake_backend.deinit(allocator);
+    const context = ConnectionContext.init(fake_backend.backend());
+    var factory = FakeSocketFactory{};
+    var recorder = EventRecorder{};
+    var tagged = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[{"publicKey":"BJgXqaX9zQbZwBcvWMaYpxzXhIAmKxT4P7d9gklYxhw=","endpoint":"127.0.0.1:51820","allowedIPs":["0.0.0.0/0"]}]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer tagged.deinit(allocator);
+    const module = conn.activeConnectionModule(&tagged) orelse return error.TestUnexpectedResult;
+    var environment: TimerEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    const created = try connection.testing.createConnection(allocator, context.backend, .link, module, .{
+        .profile = &tagged,
+        .events = recorder.events(),
+        .resolver = mock.noopDNSResolver(),
+        .factory = factory.interface(),
+        .writer = environment.writer(),
+
+        .options = .{ .min_data_count_interval = 2345 },
+    });
+    var destroyed = false;
+    defer if (!destroyed) created.destroy();
+    try std.testing.expectEqual(.link, created.daemon_io);
+
+    var first_link = OwnedDescriptor{};
+    var first_tun = OwnedDescriptor{};
+    var second_link = OwnedDescriptor{};
+    var second_tun = OwnedDescriptor{};
+    try expectEstablished(try created.start(.{ .link = first_link.descriptor() }));
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try created.commit(first_tun.descriptor());
+    try std.testing.expectEqual(@as(usize, 0), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), fake_backend.send_keepalives_count);
+
+    try std.testing.expect(try created.rebind(.{ .link = second_link.descriptor() }, null));
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.send_keepalives_count);
+    try std.testing.expectEqual(@as(usize, 0), recorder.established_count);
+    try std.testing.expectEqual(@as(usize, 1), fake_backend.turn_on_count);
+    try std.testing.expectEqual(@as(usize, 1), first_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 0), first_tun.cleanups);
+    var third_link = OwnedDescriptor{};
+    try std.testing.expect(try created.rebind(.{ .link = third_link.descriptor() }, second_tun.descriptor()));
+    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), first_tun.cleanups);
+
+    // Unexpected EOF from an owned descriptor reaches daemon recovery once.
+    const passive = &connection.testing.adapter(created).transport.passive.io;
+    try std.testing.expect(!wireguard_internal.passive_io.PassiveIO.testing.receive(passive, .tun, &.{}, null, -1));
+    // Worker delivery is immediate; the daemon sink is responsible for queuing recovery.
+    try std.testing.expectEqual(@as(usize, 1), recorder.failure_count);
+    try std.testing.expectEqual(@as(@TypeOf(recorder.failure.?.err_pair.code), .ioFailure), recorder.failure.?.err_pair.code);
+    try std.testing.expectEqual(conn.Connection.Events.FailureDisposition.reconnect, recorder.failure.?.disposition);
+
+    created.stop();
+    created.stop();
+    try std.testing.expectEqual(@as(usize, 1), third_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), second_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), second_tun.cleanups);
+
+    var final_link = OwnedDescriptor{};
+    var final_tun = OwnedDescriptor{};
+    try expectEstablished(try created.start(.{ .link = final_link.descriptor() }));
+    try created.commit(final_tun.descriptor());
+    created.destroy();
+    destroyed = true;
+    try std.testing.expectEqual(@as(usize, 1), final_link.cleanups);
+    try std.testing.expectEqual(@as(usize, 1), final_tun.cleanups);
+    try std.testing.expectEqual(@as(usize, 2), fake_backend.turn_on_count);
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
@@ -864,9 +854,6 @@ test "WireGuard connection cancels when a temporary shutdown retry cannot be sch
 }
 
 const FakeBackend = struct {
-    block_get_config: AtomicBool = AtomicBool.init(false),
-    get_config_entered: AtomicBool = AtomicBool.init(false),
-    release_get_config: AtomicBool = AtomicBool.init(false),
     turn_on_count: usize = 0,
     turn_off_count: usize = 0,
     set_config_count: usize = 0,
@@ -928,12 +915,7 @@ fn fakeTurnOff(ptr: ?*anyopaque, handle: i32) void {
     std.testing.expectEqual(@as(i32, 7), handle) catch unreachable;
 }
 
-fn fakeGetConfig(ptr: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
-    const self: *FakeBackend = @ptrCast(@alignCast(ptr.?));
-    if (self.block_get_config.load(.acquire)) {
-        self.get_config_entered.store(true, .release);
-        waitUntil(&self.release_get_config);
-    }
+fn fakeGetConfig(_: ?*anyopaque, allocator: std.mem.Allocator, _: i32) backend_mod.Error!?[]u8 {
     return try allocator.dupe(u8,
         \\rx_bytes=10
         \\tx_bytes=20

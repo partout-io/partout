@@ -155,7 +155,7 @@ pub const SocketWrapper = struct {
     }
 
     /// Register once on attach, clear on detach. Clearing drains native delivery
-    /// before releasing the borrowed context. The callback only queues input.
+    /// before releasing the borrowed context. The callback consumes borrowed input.
     pub fn setOnReceive(self: *SocketWrapper, callback: OnReceive, context: ?*anyopaque) error{ReceiveSetupFailed}!void {
         if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         try self.receiver.set(.link, self.socket, callback, context);
@@ -228,3 +228,58 @@ pub const TunWrapper = struct {
         return io_c.winrt_tun_write(self.tun, packet.ptr, packet.len);
     }
 };
+
+/// Native delivery and copied asynchronous writes are owned by WinRT.
+pub fn PacketTransport(comptime DescriptorType: type) type {
+    return struct {
+        const Self = @This();
+        pub const Descriptor = DescriptorType;
+        pub const OnReceive = io.PacketReceiveCallback;
+        pub const WriteResult = io.PacketWriteResult;
+
+        allocator: std.mem.Allocator,
+        descriptor: Descriptor,
+
+        /// Takes descriptor ownership on entry, including allocation failure.
+        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptor) std.mem.Allocator.Error!*Self {
+            errdefer releaseDescriptor(descriptor);
+            const self = try allocator.create(Self);
+            self.* = .{ .allocator = allocator, .descriptor = descriptor };
+            return self;
+        }
+
+        pub fn cleanup(self: *Self) void {
+            self.stopWrites();
+            self.setOnReceive(null, null) catch unreachable;
+            releaseDescriptor(self.descriptor);
+            self.allocator.destroy(self);
+        }
+
+        pub fn setOnReceive(self: *Self, callback: Self.OnReceive, context: ?*anyopaque) error{ReceiveSetupFailed}!void {
+            switch (self.descriptor) {
+                inline else => |descriptor| try descriptor.setOnReceive(callback, context),
+            }
+        }
+
+        pub fn stopWrites(self: *Self) void {
+            switch (self.descriptor) {
+                inline else => |descriptor| descriptor.stopWrites(),
+            }
+        }
+
+        /// Native acceptance releases the caller's bytes, before transmission.
+        pub fn write(self: *Self, bytes: []const u8, destination: ?io.SocketAddress) WriteResult {
+            const result = switch (self.descriptor) {
+                .link => |descriptor| descriptor.write(bytes, destination),
+                .tun => |descriptor| descriptor.write(bytes),
+            };
+            return if (result == 0) .ok else .failed;
+        }
+
+        pub fn releaseDescriptor(descriptor: Descriptor) void {
+            switch (descriptor) {
+                inline else => |value| value.cleanup(),
+            }
+        }
+    };
+}
