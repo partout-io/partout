@@ -121,6 +121,21 @@ timer deadline require work. Bounded waits remain available for tests. The
 supplied mux is borrowed only for its wake event; a looper created without one
 owns a private wake source. The daemon's command loop remains unchanged.
 
+### TUN lifetime and delivery
+
+`Partout::Tun` owns each TUN handle; its nested `State` retains the channel and
+packet counters for the controller and socket writer. One receive mutex protects
+the current borrowed TUN and serializes native packet delivery with callback
+registration, removal and handle destruction. Freeing an old handle cannot clear
+its replacement. Callbacks only enqueue input and must not reenter TUN or
+controller APIs.
+
+Writes copy packets into the channel synchronously. The daemon looper serializes
+writes, write shutdown and handle lifetime; teardown outside the looper follows
+daemon shutdown. No write mutex, asynchronous TUN writer or atomic stop flag is
+needed. Native receive counters use the receive mutex; write counters belong to
+the looper, which snapshots all counters under that mutex when stopping.
+
 ## VPN channel runtime
 
 C++ plugins include `partout_winrt.h` and construct `PartoutVpnChannelRuntime`

@@ -19,15 +19,20 @@ typedef struct {
 void winrt_tun_ctrl_set_delegate(void *controller, const winrt_tun_ctrl_delegate *delegate);
 bool winrt_tun_ctrl_configure_sockets(void *controller, const winrt_socket *sockets, size_t count);
 /* Starts the channel with negotiated settings and returns an owned TUN handle. */
-typedef struct WinrtTunHandle *winrt_tun;
+typedef struct __winrt_tun_struct *winrt_tun;
 typedef bool (*winrt_tun_on_receive)(void *context, const uint8_t *bytes, size_t length);
 winrt_tun winrt_tun_ctrl_set_tunnel(void *controller, const char *uuid, const char *info_json);
 void winrt_tun_free(winrt_tun tun);
-/* Clearing drains delivery. Callbacks only enqueue borrowed input. */
+/* Native receive callbacks are serialized and borrow input until return. Callbacks
+ * only enqueue input and must not reenter TUN/controller APIs. Clearing drains
+ * delivery before the borrowed context can be released. */
 bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context);
 void winrt_tun_stop_writes(winrt_tun tun);
-/* Copies one IP packet into the channel receive pool and appends/flushes it. */
+/* Lifecycle, writes and stop_writes are serialized by the looper; free follows
+ * all outstanding ABI calls. Writes synchronously copy one IP packet into the
+ * channel receive pool and append/flush it. Stopped writes return E_ABORT. */
 int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length);
+void winrt_tun_stop_writes(winrt_tun tun);
 void winrt_tun_ctrl_report_snapshot(void *controller, const char *snapshot_json);
 void winrt_tun_ctrl_set_environment_value(void *controller, const char *key, const char *value);
 void winrt_tun_ctrl_clear_tunnel(void *controller, bool kill_switch);
