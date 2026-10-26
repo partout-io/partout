@@ -130,8 +130,8 @@ bool TunnelController::Associate(Socket *socket) noexcept {
             socket_ = socket;
             return true;
         }
-        // The channel needs a transport, but it must not own WG's UDP bind.
-        // Keep the adapter across WG bind replacement, including after Open.
+        // UDP sockets with multiple destinations keep their binds independent of the channel.
+        // Keep the adapter across UDP bind replacement, including after Open.
         if (!udp_adapter_) {
             const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
             if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
@@ -144,7 +144,7 @@ bool TunnelController::Associate(Socket *socket) noexcept {
         try {
             channel.AssociateTransport(idle, nullptr);
             // UDP connect sends no application payload. This socket exists
-            // only to satisfy the framework; no WG peer is mapped onto it.
+            // only to satisfy the framework; application destinations use independent UDP sockets.
             // TEST-NET-1 avoids DNS and any dependency on a real server.
             const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
             if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
