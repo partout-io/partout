@@ -138,7 +138,7 @@ the looper, which snapshots all counters under that mutex when stopping.
 
 ## VPN channel runtime
 
-C++ plugins include `partout_winrt.h` and construct `PartoutVpnChannelRuntime`
+C++ plugins include `partout_winrt.h` and construct `Partout::VpnChannelRuntime`
 with a retained `VpnChannel`, profile JSON, logger settings and nonblocking
 daemon options (`is_daemon = false`). The runtime copies the profile and cache
 path. Serialize calls and forward the five `IVpnPlugIn` callbacks unchanged.
