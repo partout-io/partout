@@ -14,7 +14,7 @@ preserved.
 
 **Passive mode** uses Partout's custom callback ABI, declared in [wg_go.h](include/wg_go/wg_go.h) and [passive_io.h](include/wg_go/passive_io.h). Partout owns UDP and TUN I/O; `wgTurnOnWithPassiveIO` supplies Go with read/write callbacks instead of native descriptors. Go lends pinned packet buffers to the host, which completes each accepted request through `wgCompleteIO`. Common operations reuse the original ABI, while passive shutdown and endpoint updates use dedicated functions. The C shim serializes device calls and dispatches according to the selected mode. Active and passive backends must never run concurrently, and previous-mode calls must finish before switching. This is the default WireGuard mode on Windows (`daemon_io = .link`).
 
-## Windows passive I/O
+## Passive I/O
 
 [The passive adapter](../internal/passive_io.zig) fills waiting
 Go reads directly from native UDP and TUN callbacks under its receive lock.
@@ -22,13 +22,16 @@ This avoids queue allocations and an intermediate payload copy. Packets arriving
 without a waiting reader use bounded owned queues. Read buffers are unregistered
 before completion; detach, shutdown and failure cancel pending registrations.
 Callbacks never complete Go requests themselves; the waiting Go worker completes
-after releasing the receive lock. Passive I/O is supported only on Windows;
-non-Windows platforms use active mode.
+after releasing the receive lock. The shared callback I/O adapter uses native
+Windows delivery and a readiness-driven receive thread per POSIX descriptor.
+Both platforms use the same queues, pending reads and cancellation rules.
+Production defaults remain passive on Windows and active on non-Windows platforms.
 
 The adapter serializes writes against descriptor replacement. Passive write
-completion releases the Go buffer after the native backend copies it; it reports
-acceptance rather than network transmission. Later socket failures use the
-adapter's receive-error path.
+completion releases the Go buffer after submission: Windows copies it into native
+storage; POSIX submits directly and reports backpressure for retry. Completion
+reports acceptance rather than network transmission. Later receive and native
+asynchronous write failures use the adapter's receive-error path.
 
 WireGuard keeps its unconnected UDP socket outside VpnChannel transport takeover.
 `Encapsulate` supplies TUN input, and decrypted packets return through the channel

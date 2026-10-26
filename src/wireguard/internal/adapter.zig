@@ -57,11 +57,10 @@ pub const WireGuardAdapter = struct {
             /// Owned while started, temporarily shut down, or awaiting recommit.
             tunnel: net.TunDescriptor = undefined,
         },
-        // Passive I/O uses native receive callbacks, available only on Windows.
-        passive: if (builtin.os.tag == .windows) struct {
+        passive: struct {
             start: impl.StartTunnelPassive = undefined,
             io: PassiveIO,
-        } else noreturn,
+        },
     };
 
     /// Concrete failures produced while activating the WireGuard tunnel.
@@ -125,10 +124,7 @@ pub const WireGuardAdapter = struct {
             .network_change_behavior = .current(),
             .transport = switch (daemon_io) {
                 .none => .{ .active = .{ .factory = factory } },
-                .link => if (builtin.os.tag == .windows)
-                    .{ .passive = .{ .io = try PassiveIO.init(backend.vtable.complete_io orelse @panic("complete_io undefined in backend")) } }
-                else
-                    @panic("WireGuard passive I/O requires Windows"),
+                .link => .{ .passive = .{ .io = try PassiveIO.init(backend.vtable.complete_io orelse @panic("complete_io undefined in backend")) } },
                 .looper => @panic("WireGuard requires link or none daemon I/O"),
             },
         };

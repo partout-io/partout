@@ -48,8 +48,8 @@ const ClearingAllocator = struct {
     }
 };
 
-test "Windows passive UDP preserves multiple peer sources and reply destinations" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+test "WireGuard passive UDP preserves multiple peer sources and reply destinations" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var receiver = try bridge.PassiveIO.init(Completion.finish);
@@ -58,12 +58,12 @@ test "Windows passive UDP preserves multiple peer sources and reply destinations
     var peers: [2]bridge.PassiveIO = .{ try .init(Completion.finish), try .init(Completion.finish) };
     defer for (&peers) |*peer| peer.deinit();
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
-    receiver.replaceLink(socket);
+    receiver.replaceLink(socket.linkDescriptor());
     var endpoint = std.mem.zeroes(c.wg_endpoint);
     endpoint.family = 4;
     endpoint.address[0] = 127;
     endpoint.address[3] = 1;
-    endpoint.port = (try socket.localAddress()).port;
+    endpoint.port = (try socket.linkDescriptor().localAddress()).port;
     const transport = receiver.transport(endpoint.port, 1400);
     var previous_port: u16 = 0;
     // Repeat peer 0 from a new bind while the receiver remains attached.
@@ -72,13 +72,13 @@ test "Windows passive UDP preserves multiple peer sources and reply destinations
         const peer = &peers[index];
         peer.allocator = std.testing.allocator;
         const peer_socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })).?;
-        const new_port = (try peer_socket.localAddress()).port;
+        const new_port = (try peer_socket.linkDescriptor().localAddress()).port;
         if (index == 0) {
             try std.testing.expect(new_port != previous_port);
             previous_port = new_port;
         }
-        peer.replaceLink(peer_socket);
-        const port = (try peer_socket.localAddress()).port;
+        peer.replaceLink(peer_socket.linkDescriptor());
+        const port = (try peer_socket.linkDescriptor().localAddress()).port;
         const peer_transport = peer.transport(port, 1400);
         const data = [_]u8{ @intCast(index), 42 };
         var completion: Completion = .{};
@@ -141,7 +141,7 @@ const FailureRecorder = struct {
     }
 };
 
-fn waitForWindowsReads(passive: *bridge.PassiveIO, side: source.net.Side, count: usize) !void {
+fn waitForPendingReads(passive: *bridge.PassiveIO, side: source.net.Side, count: usize) !void {
     for (0..1000) |_| {
         if (bridge.PassiveIO.testing.pendingReads(passive, side) == count) return;
         source.core.sleepMs(1);
@@ -149,8 +149,8 @@ fn waitForWindowsReads(passive: *bridge.PassiveIO, side: source.net.Side, count:
     return error.TestUnexpectedResult;
 }
 
-test "Windows passive waiting reads receive without packet allocations" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+test "WireGuard passive waiting reads receive without packet allocations" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     for ([_]source.net.Side{ .link, .tun }) |side| {
         var passive = try bridge.PassiveIO.init(Completion.finish);
         defer passive.deinit();
@@ -170,7 +170,7 @@ test "Windows passive waiting reads receive without packet allocations" {
             packets[i] = .{ .data = &buffers[i], .capacity = buffers[i].len };
             requests[i] = .{ .passive = &passive, .side = side, .packets = &packets[i], .result = &results[i] };
             threads[i] = try std.Thread.spawn(.{}, ReadRequest.run, .{&requests[i]});
-            try waitForWindowsReads(&passive, side, i + 1);
+            try waitForPendingReads(&passive, side, i + 1);
         }
         var address = std.mem.zeroes(io.SocketAddress);
         address.family = 6;
@@ -201,8 +201,8 @@ test "Windows passive waiting reads receive without packet allocations" {
     }
 }
 
-test "Windows passive queued reads preserve batching and discard oversized packets" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+test "WireGuard passive queued reads preserve batching and discard oversized packets" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var passive = try bridge.PassiveIO.init(Completion.finish);
@@ -225,8 +225,8 @@ test "Windows passive queued reads preserve batching and discard oversized packe
     try std.testing.expectEqual(@as(usize, 6), clearing.frees);
 }
 
-test "Windows passive pending buffers are unregistered on timeout cancellation detach and failure" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+test "WireGuard passive pending buffers are unregistered on timeout cancellation detach and failure" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Scenario = enum { timeout, cancel, detach, failure, oversized };
     for (std.enums.values(Scenario)) |scenario| {
         var passive = try bridge.PassiveIO.init(Completion.finish);
@@ -244,7 +244,7 @@ test "Windows passive pending buffers are unregistered on timeout cancellation d
             passive.quiesce();
             value.join();
         };
-        try waitForWindowsReads(&passive, .link, 1);
+        try waitForPendingReads(&passive, .link, 1);
         var address = std.mem.zeroes(io.SocketAddress);
         address.family = 4;
         switch (scenario) {

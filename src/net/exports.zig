@@ -15,6 +15,7 @@
 //! keeps the tunnel settings aligned with the connection lifecycle.
 
 const conn = @import("connection.zig");
+const callback_io = @import("callback_io.zig");
 const daemon = @import("daemon.zig");
 const io = @import("io.zig");
 const looper = @import("looper.zig");
@@ -23,6 +24,7 @@ const resolver = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
 
 pub const Connection = conn.Connection;
+pub const CallbackIO = callback_io.CallbackIO;
 pub const ConnectionWriter = sandbox.ConnectionWriter;
 pub const ConnectionCreateError = conn.CreateError;
 pub const ConnectionImplementation = conn.ConnectionImplementation;

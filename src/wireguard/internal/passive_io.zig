@@ -8,7 +8,7 @@ const c = @import("wireguard_c");
 const backend = @import("backend.zig");
 const Endpoint = c.wg_endpoint;
 
-/// WinRT fills waiting Go reads directly, queuing owned packets otherwise.
+/// Native callbacks fill waiting Go reads directly, queuing owned packets otherwise.
 /// Lifecycle calls are owner-serialized. Writes exclude descriptor replacement,
 /// while callbacks use a separate lock so channel writes can trigger delivery.
 pub const PassiveIO = struct {
@@ -17,8 +17,8 @@ pub const PassiveIO = struct {
     writes: core.Mutex = .{},
     ready: core.Condition = .{},
     complete: *const fn (usize, u32, i32) callconv(.c) void,
-    link: ?net.LinkDescriptor = null,
-    tun: ?net.TunDescriptor = null,
+    link: ?*net.CallbackIO = null,
+    tun: ?*net.CallbackIO = null,
     closed: bool = true,
     sides: [2]Side = .{ .{}, .{} },
     failure: ?FailureReporter = null,
@@ -79,17 +79,22 @@ pub const PassiveIO = struct {
             descriptor.cleanup();
             return;
         }
+        const value = net.CallbackIO.create(self.allocator, if (tag == .link) .{ .link = descriptor } else .{ .tun = descriptor }) catch {
+            self.lock.unlock();
+            self.fail();
+            return;
+        };
         if (tag == .link) {
-            self.link = descriptor;
+            self.link = value;
             self.closed = false;
-        } else self.tun = descriptor;
+        } else self.tun = value;
         const side = &self.sides[@intFromEnum(tag)];
         side.owner = self;
         side.tag = tag;
         side.attached = true;
         self.ready.broadcast();
         self.lock.unlock();
-        descriptor.setOnReceive(onReceive, side) catch self.fail();
+        value.setOnReceive(onReceive, side) catch self.fail();
     }
 
     // Caller holds writes, but never the queue lock while draining callbacks.
@@ -104,8 +109,6 @@ pub const PassiveIO = struct {
         self.ready.broadcast();
         self.lock.unlock();
         if (descriptor) |value| {
-            value.stopWrites();
-            value.setOnReceive(null, null) catch unreachable;
             value.cleanup();
         }
     }
@@ -320,12 +323,14 @@ pub const PassiveIO = struct {
         self.lock.unlock();
         var completed: u32 = 0;
         var status: i32 = if (closed) c.WG_IO_CLOSED else c.WG_IO_AGAIN;
+        var dropped = false;
         if (!closed) if (descriptor) |value| {
             for (packets[0..count]) |packet| {
                 const data: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
-                const result = if (tag == .link) value.write(data, destination) else value.write(data);
-                if (result != 0) {
-                    status = c.WG_IO_INVALID;
+                const result = value.write(data, destination);
+                if (result != .ok) {
+                    dropped = result == .dropped;
+                    status = if (result == .again) c.WG_IO_AGAIN else c.WG_IO_INVALID;
                     break;
                 }
                 completed += 1;
@@ -335,15 +340,15 @@ pub const PassiveIO = struct {
         self.writes.unlock();
         if (status == c.WG_IO_AGAIN) {
             self.lock.lock();
-            if (!self.closed and tag == .tun and self.tun == null)
+            if (!self.closed and (descriptor != null or (tag == .tun and self.tun == null)))
                 self.ready.waitUntil(&self.lock, core.concurrency.deadlineAfterMs(core.monotonicNs(), 100));
-            status = if (self.closed) c.WG_IO_CLOSED else if (tag == .link) c.WG_IO_INVALID else c.WG_IO_AGAIN;
+            status = if (self.closed) c.WG_IO_CLOSED else if (tag == .link and descriptor == null) c.WG_IO_INVALID else c.WG_IO_AGAIN;
             self.lock.unlock();
             // A missing link during rebind is a dropped send, not a terminal error.
             self.complete(request, completed, status);
             return c.WG_IO_OK;
         }
-        if (status == c.WG_IO_INVALID) self.fail();
+        if (status == c.WG_IO_INVALID and !dropped) self.fail();
         self.complete(request, completed, status);
         return c.WG_IO_OK;
     }
