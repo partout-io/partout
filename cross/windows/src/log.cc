@@ -6,25 +6,51 @@
 #include <cstdarg>
 #include <cstdio>
 #include <vector>
-namespace { std::atomic<winrt_log_callback> logger{nullptr}; }
-extern "C" {
 
-void winrt_set_logger(winrt_log_callback callback) { logger.store(callback); }
-void winrt_log(winrt_log_level level, const char *format, ...) {
-    va_list args;
-    va_start(args, format);
+namespace Partout {
+namespace {
+
+std::atomic<winrt_log_callback> logger{nullptr};
+
+void SetLogger(winrt_log_callback callback) noexcept {
+    logger.store(callback);
+}
+
+void Log(winrt_log_level level, const char *format, va_list args) noexcept {
+    if (!format) return;
     va_list copy;
     va_copy(copy, args);
     const int size = std::vsnprintf(nullptr, 0, format, copy);
     va_end(copy);
+    if (size < 0) return;
+
     try {
-        if (size >= 0) {
-            std::vector<char> message(static_cast<size_t>(size) + 1);
-            std::vsnprintf(message.data(), message.size(), format, args);
-            if (const auto sink = logger.load()) sink(level, message.data());
-            else OutputDebugStringA(message.data());
+        std::vector<char> message(static_cast<size_t>(size) + 1);
+        if (std::vsnprintf(message.data(), message.size(), format, args) != size) return;
+        const auto sink = logger.load();
+        if (!sink) {
+            OutputDebugStringA(message.data());
+            return;
         }
-    } catch (...) { /* Diagnostics must not throw across the C ABI. */ }
+        sink(level, message.data());
+    } catch (...) {
+        // Diagnostics must not throw across the C ABI.
+    }
+}
+
+} // namespace
+} // namespace Partout
+
+extern "C" {
+
+void winrt_set_logger(winrt_log_callback callback) {
+    Partout::SetLogger(callback);
+}
+
+void winrt_log(winrt_log_level level, const char *format, ...) {
+    va_list args;
+    va_start(args, format);
+    Partout::Log(level, format, args);
     va_end(args);
 }
 
