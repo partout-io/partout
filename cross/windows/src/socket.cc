@@ -448,13 +448,7 @@ void Socket::StopWrites() {
     state_->write_status.store(E_ABORT);
 }
 
-std::function<void(const uint8_t *, size_t)> Socket::ChannelReceiver() const {
-    return [state = state_](const uint8_t *bytes, size_t length) {
-        state->deliver(bytes, length, nullptr, 0);
-    };
-}
-
-void Socket::TakeOver() {
+Socket::Receiver Socket::TakeOver(Writer writer) {
     const auto state = state_;
     // Negotiation packets must reach the transport before VpnChannel owns it.
     if (write_) write_.get();
@@ -466,11 +460,11 @@ void Socket::TakeOver() {
     receive_registration_.revoke();
     if (stream_) stream_.CancelIOAsync().get();
     if (read_) read_.get();
-}
 
-void Socket::SetChannelWriter(
-    std::function<int32_t(const uint8_t *, size_t)> writer) {
     channel_write_ = std::move(writer);
+    return [state](const uint8_t *bytes, size_t length) {
+        state->deliver(bytes, length, nullptr, 0);
+    };
 }
 
 } // namespace Partout

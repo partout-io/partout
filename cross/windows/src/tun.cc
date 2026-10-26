@@ -103,8 +103,6 @@ bool TunnelController::Associate(Socket *socket) noexcept {
             channel_.AssociateTransport(transport, nullptr);
             transport_ = transport;
             socket_ = socket;
-            std::lock_guard lock(input_mutex_);
-            link_receive_ = socket->ChannelReceiver();
             return true;
         }
         // The channel needs a transport, but it must not own WG's UDP bind.
@@ -146,7 +144,15 @@ bool TunnelController::Start(const char *info_json) noexcept {
         if (!channel_ || !transport_) return false;
         if (started_) return true;
         const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
-        if (!idle_transport_) socket_->TakeOver();
+        if (!idle_transport_) {
+            auto receive = socket_->TakeOver([channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
+                const auto result = write_channel(channel, bytes, length, true);
+                (result == 0 ? counters->link_send : counters->link_send_failed).fetch_add(1, std::memory_order_relaxed);
+                return result;
+            });
+            std::lock_guard lock(input_mutex_);
+            link_receive_ = std::move(receive);
+        }
         // Windows requires null for an absent address family, not an empty view.
         channel_.StartWithMainTransport(
             settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
@@ -154,11 +160,6 @@ bool TunnelController::Start(const char *info_json) noexcept {
             VpnInterfaceId{nullptr}, settings.routes, settings.domains,
             settings.mtu, settings.maxFrame(), false, transport_);
         started_ = true;
-        if (!idle_transport_) socket_->SetChannelWriter([channel = channel_, counters = counters_](const uint8_t *bytes, size_t length) {
-            const auto result = write_channel(channel, bytes, length, true);
-            (result == 0 ? counters->link_send : counters->link_send_failed).fetch_add(1, std::memory_order_relaxed);
-            return result;
-        });
         winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
             settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
         return true;

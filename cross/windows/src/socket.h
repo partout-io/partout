@@ -13,10 +13,13 @@
 namespace Partout {
 
 // Callers serialize writes with other writes, open/configuration, channel
-// takeover, writer replacement, and destruction. Keep the socket alive until
+// takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
 public:
+    using Receiver = std::function<void(const uint8_t *, size_t)>;
+    using Writer = std::function<int32_t(const uint8_t *, size_t)>;
+
     Socket(winrt_socket_proto proto, bool unconnected);
     ~Socket() noexcept;
     Socket(const Socket &) = delete;
@@ -38,14 +41,9 @@ public:
     int32_t Write(const uint8_t *bytes, size_t length, const winrt_socket_address *destination);
     void StopWrites();
 
-    // Retains callback state, not the socket wrapper. Safe after link detach.
-    std::function<void(const uint8_t *, size_t)> ChannelReceiver() const;
-
-    // Drain direct writes, then stop reads before channel transport takeover.
-    void TakeOver();
-
-    // After channel startup, send encapsulated packets through its send-buffer pool.
-    void SetChannelWriter(std::function<int32_t(const uint8_t *, size_t)> writer);
+    // Drain direct I/O and install the channel writer. Store the returned receiver
+    // before starting the channel; it retains state and is safe after link detach.
+    Receiver TakeOver(Writer writer);
 
 private:
     struct State;
@@ -67,7 +65,7 @@ private:
     winrt::Windows::Foundation::IAsyncAction read_{nullptr};
     winrt::Windows::Foundation::IAsyncAction write_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
-    std::function<int32_t(const uint8_t *, size_t)> channel_write_;
+    Writer channel_write_;
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};
     winrt::Windows::Networking::HostName bound_host_{nullptr};
