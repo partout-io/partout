@@ -7,6 +7,7 @@
 #include "portable/conditionals.h"
 #include "portable/tun.h"
 #include "portable/tun_ctrl.h"
+#include "portable/socket.h"
 
 #if PARTOUT_WINDOWS
 
@@ -27,7 +28,7 @@ static void pp_tun_ctrl_set_delegate(void *ref, const pp_tun_ctrl_delegate *dele
     (void)delegate;
 }
 
-static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
+static bool configure_sockets(void *ref, const pp_reachability *info,
                                          const pp_socket_fd *fds, size_t fds_len) {
     (void)ref;
     (void)info;
@@ -64,10 +65,13 @@ static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
     (void)error_message;
 }
 
+pp_socket_configurator pp_socket_configurator_current(void *ref) {
+    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
+}
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .configure_sockets = pp_tun_ctrl_configure_sockets,
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,

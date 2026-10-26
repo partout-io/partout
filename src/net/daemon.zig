@@ -1204,7 +1204,6 @@ const ConnectionDaemon = struct {
             .cache_dir = self.daemon.options.cache_dir,
             .events = self.events(),
             .writer = ConnectionWriter.init(self.looper, &writer_vtable),
-            .controller = self.daemon.controller,
             .resolver = self.resolver,
             .factory = self.factory,
         });
@@ -1499,7 +1498,6 @@ fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
         error.IncompleteModule => .incompleteModule,
         error.MissingConnectionImplementation => .requiredImplementation,
         error.OutOfMemory => .outOfMemory,
-        error.SocketConfiguration => .socketConfiguration,
         error.TunNotAvailable => .tunNotAvailable,
         error.AlreadyStarted,
         error.Closed,

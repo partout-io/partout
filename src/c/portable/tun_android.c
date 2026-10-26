@@ -7,6 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 #include "portable/tun_ctrl.h"
+#include "portable/socket.h"
 
 #if PARTOUT_ANDROID
 
@@ -133,8 +134,10 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-static bool pp_tun_ctrl_configure_sockets(void *jni_ref, const pp_reachability *info,
-                                          const pp_socket_fd *fds, const size_t fds_len) {
+static bool configure_sockets(
+    void *jni_ref, const pp_reachability *info,
+    const pp_socket_fd *fds, const size_t fds_len
+) {
     assert(jni_ref);
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
     if (!fds || fds_len == 0) return false;
@@ -397,10 +400,13 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
+pp_socket_configurator pp_socket_configurator_current(void *ref) {
+    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
+}
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .configure_sockets = pp_tun_ctrl_configure_sockets,
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,

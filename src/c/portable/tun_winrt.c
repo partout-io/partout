@@ -3,6 +3,7 @@
 
 /* Partout owns this adapter. The WinRT backend imports no portable ABI headers. */
 #include "portable/tun_ctrl.h"
+#include "portable/socket.h"
 #include "winrt/tun.h"
 #include "winrt/log.h"
 
@@ -33,10 +34,10 @@ static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     };
     winrt_tun_ctrl_set_delegate(ref, &native);
 }
-static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t count) {
+static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t fds_len) {
     (void)info;
-    if (count && !fds) return false;
-    for (size_t i = 0; i < count; ++i) {
+    if (fds_len && !fds) return false;
+    for (size_t i = 0; i < fds_len; ++i) {
         const winrt_socket socket = (winrt_socket)(uintptr_t)fds[i];
         if (!winrt_tun_ctrl_configure_sockets(ref, &socket, 1)) return false;
     }
@@ -46,11 +47,14 @@ static pp_tun set_tunnel(void *ref, const char *uuid, const char *info_json) {
     return (pp_tun)winrt_tun_ctrl_set_tunnel(ref, uuid, info_json);
 }
 
+pp_socket_configurator pp_socket_configurator_current(void *ref) {
+    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
+}
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     winrt_set_logger(bridge_log);
     const pp_tun_ctrl_fnt functions = {
         .set_delegate = set_delegate,
-        .configure_sockets = configure_sockets,
         .set_tunnel = set_tunnel,
         .report_snapshot = winrt_tun_ctrl_report_snapshot,
         .set_environment_value = winrt_tun_ctrl_set_environment_value,

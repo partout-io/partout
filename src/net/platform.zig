@@ -46,6 +46,9 @@ pub const Platform = struct {
         /// The tunnel controller implementation.
         fnt: ?FunctionTable = null,
 
+        /// Platform socket policy, independent of the tunnel function table.
+        socket_configurator: ?io_c.pp_socket_configurator = null,
+
         /// The socket buffer size.
         socket_buf_size: c_int = 1024 * 1024,
     };
@@ -55,6 +58,7 @@ pub const Platform = struct {
     ref: ?*anyopaque,
     fnt: FunctionTable,
     dns: PlatformDNS,
+    socket_configurator: io_c.pp_socket_configurator,
     socket_buf_size: c_int,
 
     //#endregion
@@ -91,6 +95,7 @@ pub const Platform = struct {
             .ref = ref_copy,
             .fnt = functions,
             .dns = .{},
+            .socket_configurator = options.socket_configurator orelse io_c.pp_socket_configurator_current(ref_copy),
             .socket_buf_size = options.socket_buf_size,
             .callbacks_mutex = .{},
             .monitor_drainer = .{},
@@ -279,15 +284,13 @@ pub const Platform = struct {
         self: *const Platform,
         descriptors: []const SocketDescriptor,
         reachability: ?ReachabilityInfo,
-    ) TunnelController.Error!void {
+    ) SocketFactory.Error!void {
         if (descriptors.len == 0) return;
 
         var reachability_copy = reachability;
         const reachability_ptr = if (reachability_copy) |*value| value else null;
-        log.writef(.debug, "Configure tunnel sockets: count={}", .{descriptors.len});
-        const configure_sockets = self.fnt.configure_sockets orelse
-            @panic("Platform function table has no configure_sockets callback");
-        if (!configure_sockets(self.ref, reachability_ptr, descriptors.ptr, descriptors.len)) {
+        log.writef(.debug, "Configure sockets: count={}", .{descriptors.len});
+        if (!io_c.pp_socket_configure_descriptors(self.socket_configurator, reachability_ptr, descriptors.ptr, descriptors.len)) {
             return error.SocketConfiguration;
         }
     }
@@ -297,7 +300,6 @@ pub const Platform = struct {
 
 const platform_tunnel_controller_vtable = TunnelController.VTable{
     .set_tunnel_settings = ctrlSetTunnelSettings,
-    .configure_sockets = ctrlConfigureSockets,
     .report_snapshot = ctrlReportSnapshot,
     .set_environment_value = ctrlSetEnvironmentValue,
     .clear_tunnel_settings = ctrlClearTunnelSettings,
@@ -324,11 +326,6 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     };
     errdefer io_c.pp_tun_free(tun);
     return TunWrapper.create(allocator, tun);
-}
-
-fn ctrlConfigureSockets(ptr: ?*anyopaque, descriptors: []const SocketDescriptor) TunnelController.Error!void {
-    const self: *Platform = @ptrCast(@alignCast(ptr.?));
-    return self.configureSocketsWithError(descriptors, self.currentReachability());
 }
 
 fn ctrlReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {
@@ -403,9 +400,15 @@ fn ctrlCancelTunnelConnection(ptr: ?*anyopaque, err_pair: ?api.PartoutErrorPair)
 //#region Socket factory
 
 const platform_socket_factory_vtable = SocketFactory.VTable{
+    .configure_sockets = socketFactoryConfigureSockets,
     .current_reachability = socketFactoryCurrentReachability,
     .create = socketFactoryCreateWithFallback,
 };
+
+fn socketFactoryConfigureSockets(ptr: ?*anyopaque, descriptors: []const SocketDescriptor) SocketFactory.Error!void {
+    const self: *Platform = @ptrCast(@alignCast(ptr.?));
+    return self.configureSocketsWithError(descriptors, self.currentReachability());
+}
 
 fn socketFactoryCurrentReachability(ptr: ?*anyopaque) ?ReachabilityInfo {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));

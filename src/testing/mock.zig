@@ -53,6 +53,7 @@ pub fn noopSocketFactory() net.SocketFactory {
 }
 
 const noop_socket_factory_vtable = net.SocketFactory.VTable{
+    .configure_sockets = noopConfigureSockets,
     .current_reachability = noopSocketFactoryCurrentReachability,
     .create = noopSocketFactoryCreate,
 };
@@ -74,7 +75,6 @@ fn noopSocketFactoryCreate(
 
 const noop_controller_vtable = net.TunnelController.VTable{
     .set_tunnel_settings = noopSetTunnelSettings,
-    .configure_sockets = noopConfigureSockets,
     .report_snapshot = noopReportSnapshot,
     .set_environment_value = noopSetEnvironmentValue,
     .clear_tunnel_settings = noopClearTunnelSettings,
@@ -86,7 +86,7 @@ fn noopSetTunnelSettings(_: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) net.Tun
     return error.TunNotAvailable;
 }
 
-fn noopConfigureSockets(_: ?*anyopaque, _: []const net.SocketDescriptor) net.TunnelController.Error!void {}
+fn noopConfigureSockets(_: ?*anyopaque, _: []const net.SocketDescriptor) net.SocketFactory.Error!void {}
 
 fn noopReportSnapshot(_: ?*anyopaque, _: api.TunnelSnapshot) void {}
 
@@ -215,7 +215,6 @@ pub const MockTunnelController = struct {
     set_tunnel_settings_count: usize = 0,
     set_tunnel_settings_error: ?net.TunnelController.Error = null,
     clear_tunnel_settings_count: usize = 0,
-    configure_sockets_count: usize = 0,
     report_snapshot_count: usize = 0,
     set_environment_value_count: usize = 0,
     remove_environment_value_count: usize = 0,
@@ -238,7 +237,6 @@ pub const MockTunnelController = struct {
 
 const mock_controller_vtable = net.TunnelController.VTable{
     .set_tunnel_settings = mockSetTunnelSettings,
-    .configure_sockets = mockConfigureSockets,
     .report_snapshot = mockReportSnapshot,
     .set_environment_value = mockSetEnvironmentValue,
     .clear_tunnel_settings = mockClearTunnelSettings,
@@ -253,12 +251,6 @@ fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) ne
     self.last_settings = snapshotTunnelSettings(info);
     if (self.set_tunnel_settings_error) |err| return err;
     return net.TunWrapper.create(std.testing.allocator, null);
-}
-
-fn mockConfigureSockets(ptr: ?*anyopaque, descriptors: []const net.SocketDescriptor) net.TunnelController.Error!void {
-    const self: *MockTunnelController = @ptrCast(@alignCast(ptr.?));
-    self.configure_sockets_count += 1;
-    _ = descriptors;
 }
 
 fn mockReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {

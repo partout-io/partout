@@ -101,7 +101,6 @@ test "empty connection registry reports absent implementation" {
                     @panic("Missing implementation must not emit events");
                 }
             }.unexpected },
-            .controller = mock.noopTunnelController(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
         }),
