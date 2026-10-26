@@ -235,10 +235,13 @@ pub const TunWrapper = struct {
     pub fn write(self: *TunWrapper, packet: io.Packet) !?io.Failure {
         if (!build_options.winrt) @panic("WinRT TUN C ABI is not linked");
         const code = io_c.winrt_tun_write(@ptrCast(self.tun), packet.ptr, packet.len);
-        return if (code == 0) null else .{ .io = .{
-            .side = .tun,
-            .cause = error.LibcFailure,
-            .code = code,
-        } };
+        if (code != 0) {
+            return .{ .io = .{
+                .side = .tun,
+                .cause = error.LibcFailure,
+                .code = code,
+            } };
+        }
+        return null;
     }
 };
