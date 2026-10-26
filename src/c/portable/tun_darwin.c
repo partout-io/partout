@@ -7,6 +7,7 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 #include "portable/tun_ctrl.h"
+#include "portable/socket.h"
 
 #if PARTOUT_APPLE
 
@@ -286,8 +287,10 @@ static pp_tun pp_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *in
     return pp_tun_lookup();
 }
 
-static bool pp_tun_ctrl_configure_sockets(void *ref, const pp_reachability *info,
-                                          const pp_socket_fd *fds, const size_t fds_len) {
+static bool configure_sockets(
+    void *ref, const pp_reachability *info,
+    const pp_socket_fd *fds, const size_t fds_len
+) {
     pp_clog_v(PPLogLevelInfo, "tun_darwin: ctrl_configure_sockets(%p)", ref);
     const pp_swift_tun_ctrl_configure_sockets_fn swift = pp_swift_tun_ctrl_configure_sockets();
     if (!swift) return true;
@@ -320,10 +323,13 @@ static void pp_tun_ctrl_cancel_tunnel(void *ref, const char *error_code) {
     swift(ref, error_code);
 }
 
+pp_socket_configurator pp_socket_configurator_current(void *ref) {
+    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
+}
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
     pp_tun_ctrl_fnt fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
-        .configure_sockets = pp_tun_ctrl_configure_sockets,
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,

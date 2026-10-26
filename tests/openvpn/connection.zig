@@ -124,7 +124,6 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
         .active_modules_ids = &.{module_id},
     };
     var context = connection.ConnectionContext{ .session_options = .{ .backend = .mock } };
-    var controller = mock.MockTunnelController{};
     var request = Request{ .created = undefined, .reason = undefined };
     const created = try connection.createConnection(
         &context,
@@ -133,12 +132,11 @@ test "OpenVPN preserves authentication for reconnect and rebind shutdown" {
         .{
             .profile = &profile,
             .events = .{ .ctx = &request, .event = Request.recordEvent },
-            .controller = controller.interface(),
             .resolver = mock.noopDNSResolver(),
             .factory = mock.noopSocketFactory(),
 
             .cache_dir = "/tmp",
-            .writer = net.ConnectionWriter.init(&controller, &Request.writer_vtable),
+            .writer = net.ConnectionWriter.init(&request, &Request.writer_vtable),
         },
     );
     defer created.destroy();

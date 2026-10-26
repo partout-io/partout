@@ -4,6 +4,7 @@
 #include "portable/conditionals.h"
 #include "portable/tun.h"
 #include "portable/tun_ctrl.h"
+#include "portable/socket.h"
 
 #if PARTOUT_WINDOWS
 #if PARTOUT_WINRT
@@ -133,13 +134,16 @@ static void cancel_tunnel(void *ref, const char *error_message) {
 
 #endif // PARTOUT_WINRT
 
+pp_socket_configurator pp_socket_configurator_current(void *ref) {
+    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
+}
+
 pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
 #if PARTOUT_WINRT
     winrt_set_logger(bridge_log);
 #endif
     const pp_tun_ctrl_fnt functions = {
         .set_delegate = set_delegate,
-        .configure_sockets = configure_sockets,
         .set_tunnel = set_tunnel,
         .report_snapshot = report_snapshot,
         .set_environment_value = set_environment_value,

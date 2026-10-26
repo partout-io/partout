@@ -172,6 +172,56 @@ test "platform configure socket allows missing context" {
     try std.testing.expect(platformConfigureSocket(null, @as(SocketDescriptor, 42), null));
 }
 
+test "socket creation and existing descriptors share independent platform policy" {
+    const Policy = struct {
+        calls: usize = 0,
+        last_fds_len: usize = 0,
+        last_descriptor: SocketDescriptor = 0,
+        last_reachable: bool = false,
+        allow: bool = true,
+
+        fn configure(raw: ?*anyopaque, info: [*c]const ReachabilityInfo, fds: [*c]const SocketDescriptor, fds_len: usize) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.calls += 1;
+            self.last_fds_len = fds_len;
+            self.last_descriptor = fds[fds_len - 1];
+            self.last_reachable = info != null and info[0].reachable;
+            return self.allow;
+        }
+    };
+    var policy = Policy{};
+    var platform = try Platform.init(.{
+        .socket_configurator = .{ .ctx = &policy, .configure = Policy.configure },
+    });
+    defer platform.deinit();
+    const factory = platform.socketFactory();
+
+    // Opening uses the supplied reachability snapshot before bind/connect.
+    var opening_path = reachable(true);
+    const options = socketOptions(&platform, opening_path, 1000);
+    try std.testing.expect(options.configure.?(options.configure_ctx, 42, &opening_path));
+    try std.testing.expectEqual(@as(usize, 1), policy.calls);
+    try std.testing.expectEqual(@as(usize, 1), policy.last_fds_len);
+    try std.testing.expect(policy.last_reachable);
+
+    // Backend-owned descriptors use the latest platform path as one batch.
+    platform_source.testing.notifyReachability(&platform, reachable(false));
+    try factory.configureSockets(&.{ 3, 4 });
+    try std.testing.expectEqual(@as(usize, 2), policy.calls);
+    try std.testing.expectEqual(@as(usize, 2), policy.last_fds_len);
+    try std.testing.expectEqual(@as(SocketDescriptor, 4), policy.last_descriptor);
+    try std.testing.expect(!policy.last_reachable);
+
+    policy.allow = false;
+    try std.testing.expectError(error.SocketConfiguration, factory.configureSockets(&.{ 3, 4 }));
+    try std.testing.expect(!options.configure.?(options.configure_ctx, 42, &opening_path));
+    try factory.configureSockets(&.{});
+    try std.testing.expectEqual(@as(usize, 4), policy.calls);
+    try std.testing.expect(io_c.pp_socket_configure_descriptors(platform.socket_configurator, null, null, 0));
+    try std.testing.expect(!io_c.pp_socket_configure_descriptors(platform.socket_configurator, null, null, 1));
+    try std.testing.expectEqual(@as(usize, 4), policy.calls);
+}
+
 test "Windows configuration callback receives the WinRT pointer and can reject open" {
     if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
@@ -180,9 +230,9 @@ test "Windows configuration callback receives the WinRT pointer and can reject o
         reachable: bool = false,
         allow: bool = true,
 
-        fn configure(context: ?*anyopaque, info: [*c]const ReachabilityInfo, descriptors: [*c]const SocketDescriptor, count: usize) callconv(.c) bool {
+        fn configure(context: ?*anyopaque, info: [*c]const ReachabilityInfo, descriptors: [*c]const SocketDescriptor, fds_len: usize) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(context.?));
-            std.debug.assert(count == 1);
+            std.debug.assert(fds_len == 1);
             self.calls += 1;
             self.descriptor = descriptors[0];
             self.reachable = info != null and info[0].reachable;
@@ -190,9 +240,7 @@ test "Windows configuration callback receives the WinRT pointer and can reject o
         }
     };
     var probe = Probe{};
-    var functions = io_c.pp_tun_ctrl_fnt_current();
-    functions.configure_sockets = Probe.configure;
-    var platform = try Platform.init(.{ .ref = &probe, .fnt = functions });
+    var platform = try Platform.init(.{ .socket_configurator = .{ .ctx = &probe, .configure = Probe.configure } });
     defer platform.deinit();
     const endpoint: api.ExtendedEndpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, 1194) };
     const options = socketOptions(&platform, reachable(true), 1000);
@@ -355,9 +403,9 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
         ipv4_calls: usize = 0,
         allow_ipv4: bool = true,
 
-        fn configure(raw: ?*anyopaque, info: [*c]const io_c.pp_reachability, fds: [*c]const SocketDescriptor, count: usize) callconv(.c) bool {
+        fn configure(raw: ?*anyopaque, info: [*c]const io_c.pp_reachability, fds: [*c]const SocketDescriptor, fds_len: usize) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
-            std.debug.assert(count == 1 and info != null and info[0].reachable);
+            std.debug.assert(fds_len == 1 and info != null and info[0].reachable);
             self.calls += 1;
             var address: std.c.sockaddr.storage = undefined;
             var len: std.c.socklen_t = @sizeOf(@TypeOf(address));
@@ -368,9 +416,7 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
         }
     };
     var policy = Policy{};
-    var functions = io_c.pp_tun_ctrl_fnt_current();
-    functions.configure_sockets = Policy.configure;
-    var platform = try Platform.init(.{ .ref = &policy, .fnt = functions });
+    var platform = try Platform.init(.{ .socket_configurator = .{ .ctx = &policy, .configure = Policy.configure } });
     defer platform.deinit();
     const reservation = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })).?;
     const port = (try reservation.linkDescriptor().localAddress()).port;

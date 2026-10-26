@@ -53,7 +53,7 @@ pub const WireGuardAdapter = struct {
     /// Owns mode-specific resources; State tracks their lifecycle.
     const Transport = union(enum) {
         active: struct {
-            controller: net.TunnelController,
+            factory: net.SocketFactory,
             /// Owned while started, temporarily shut down, or awaiting recommit.
             tunnel: net.TunDescriptor = undefined,
         },
@@ -75,7 +75,7 @@ pub const WireGuardAdapter = struct {
     };
 
     const BuildConfigurationError = resolver.ResolutionError || uapi.BuildConfigurationError;
-    const StartBackendError = impl.Error || net.TunnelController.Error || error{CouldNotStartBackend};
+    const StartBackendError = impl.Error || net.SocketFactory.Error || error{CouldNotStartBackend};
 
     const State = union(enum) {
         /// No backend or temporary-restart work is active.
@@ -104,7 +104,6 @@ pub const WireGuardAdapter = struct {
         module_id: api.UUID,
         backend: impl.Backend,
         daemon_io: net.Connection.DaemonIO,
-        controller: net.TunnelController,
         dns_resolver: net.DNSResolver,
         factory: net.SocketFactory,
         profile: *const api.Profile,
@@ -124,7 +123,7 @@ pub const WireGuardAdapter = struct {
             ),
             .network_change_behavior = .current(),
             .transport = switch (daemon_io) {
-                .none => .{ .active = .{ .controller = controller } },
+                .none => .{ .active = .{ .factory = factory } },
                 .link => .{ .passive = .{ .io = try PassiveIO.init(backend.vtable.complete_io orelse @panic("complete_io undefined in backend")) } },
                 .looper => @panic("WireGuard requires link or none daemon I/O"),
             },
@@ -408,7 +407,7 @@ pub const WireGuardAdapter = struct {
         if (self.transport != .active) return;
         const descriptors = try self.backend.socketDescriptors(allocator, handle);
         defer allocator.free(descriptors);
-        if (descriptors.len > 0) try self.transport.active.controller.configureSockets(descriptors);
+        if (descriptors.len > 0) try self.transport.active.factory.configureSockets(descriptors);
     }
 
     fn updatePeerEndpoints(self: *WireGuardAdapter, allocator: std.mem.Allocator, handle: i32) void {
