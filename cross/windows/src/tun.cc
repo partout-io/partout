@@ -3,6 +3,7 @@
 #include "tun_settings.h"
 #include <windows.h>
 #include "tun.h"
+#include "loop.h"
 #include "socket.h"
 #include "winrt/log.h"
 #include <winrt/Windows.Foundation.Collections.h>
@@ -94,7 +95,7 @@ Tun::~Tun() noexcept {
     if (state_->tun == this) state_->tun = nullptr;
 }
 
-bool Tun::SetOnReceive(winrt_tun_on_receive callback, void *context) {
+bool Tun::SetOnReceive(TunOnReceive callback, void *context) {
     std::lock_guard lock(state_->receive_mutex);
     if (callback && callback_) return false;
     callback_ = callback;
@@ -120,7 +121,17 @@ void Tun::StopWrites() {
 TunnelController::TunnelController(VpnChannel const &channel)
     : state_(std::make_shared<Tun::State>(channel)) {}
 
-TunnelController::~TunnelController() { Close(); }
+TunnelController::~TunnelController() {
+    Close();
+    if (runtime_) winrt_loop_free(runtime_);
+}
+
+void TunnelController::BindRuntime(winrt_loop runtime) {
+    if (runtime_ == runtime) return;
+    RetainLoop(runtime);
+    if (runtime_) winrt_loop_free(runtime_);
+    runtime_ = runtime;
+}
 
 bool TunnelController::Associate(Socket &socket) noexcept {
     try {
@@ -171,9 +182,9 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
     winrt_log(WinrtLogDebug, "Partout::TunnelController: idle UDP transport ready");
 }
 
-winrt_tun TunnelController::Open(const char *info_json) {
+std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
-    auto tun = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
+    auto tun = std::make_unique<Tun>(state_);
     if (!started_) {
         const TunSettings settings{info_json};
         if (!idle_transport_) {
@@ -201,11 +212,15 @@ winrt_tun TunnelController::Open(const char *info_json) {
             settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
     std::lock_guard lock(state_->receive_mutex);
-    state_->tun = &tun->handle;
-    return tun.release();
+    state_->tun = tun.get();
+    return tun;
 }
 
 void TunnelController::Close() noexcept {
+    if (runtime_ && !Loop(runtime_).IsWorker()) {
+        try { Loop(runtime_).Invoke([this] { Close(); }); } catch (...) {}
+        return;
+    }
     {
         std::lock_guard lock(state_->receive_mutex);
         if (auto tun = std::exchange(state_->tun, nullptr)) {
@@ -269,90 +284,3 @@ void TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
 }
 
 } // namespace Partout
-
-// ref is a retained channel context owned by the daemon bindings.
-static Partout::TunnelController *get_controller(void *ref) {
-    return static_cast<Partout::TunnelController *>(ref);
-}
-
-extern "C" {
-
-void winrt_tun_free(winrt_tun tun) {
-    delete tun;
-}
-
-bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context) {
-    if (!tun) return false;
-    return tun->handle.SetOnReceive(callback, context);
-}
-
-int32_t winrt_tun_write(winrt_tun tun, const uint8_t *bytes, size_t length) {
-    if (!tun) return E_INVALIDARG;
-    return tun->handle.Write(bytes, length);
-}
-
-void winrt_tun_stop_writes(winrt_tun tun) {
-    if (!tun) return;
-    tun->handle.StopWrites();
-}
-
-// FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
-void winrt_tun_ctrl_set_delegate(void *ref, const winrt_tun_ctrl_delegate *delegate) {
-    winrt_log(delegate ? WinrtLogNotice : WinrtLogDebug,
-        "Partout::TunnelController: delegate notifications not implemented: controller=%p, registered=%s",
-        ref, delegate ? "true" : "false");
-}
-
-bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, size_t count) {
-    if (count && !sockets) return false;
-    const auto controller = get_controller(ref);
-    for (size_t i = 0; i < count; ++i) {
-        if (!sockets[i]) return false;
-        if (controller && !controller->Associate(sockets[i]->handle)) return false;
-    }
-    return true;
-}
-
-winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *info_json) {
-    (void)uuid;
-    const auto controller = get_controller(ref);
-    if (!controller) return nullptr;
-    try { return controller->Open(info_json); }
-    catch (hresult_error const &error) {
-        winrt_log(WinrtLogError, "Partout::TunnelController: open failed: HRESULT=0x%08x (%ls)",
-            static_cast<unsigned int>(error.code().value), error.message().c_str());
-        return nullptr;
-    } catch (...) {
-        winrt_log(WinrtLogError, "Partout::TunnelController: open failed: HRESULT=0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
-        return nullptr;
-    }
-}
-
-// FIXME: ###, Windows, Publish tunnel snapshots to the host.
-void winrt_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
-    winrt_log(WinrtLogDebug, "Partout::TunnelController: snapshot publication not implemented: controller=%p, snapshot=%p", ref, snapshot_json);
-}
-
-// FIXME: ###, Windows, Publish environment updates to the host.
-void winrt_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
-    winrt_log(WinrtLogDebug, "Partout::TunnelController: environment publication not implemented: controller=%p, key=%p, value=%p", ref, key, value);
-}
-
-// FIXME: ###, Windows, Honor kill_switch when clearing tunnel settings.
-void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
-    winrt_log(WinrtLogDebug, "Partout::TunnelController: clear requested: controller=%p, kill_switch=%s",
-        ref, kill_switch ? "true" : "false");
-    const auto controller = get_controller(ref);
-    if (!controller) return;
-    if (kill_switch)
-        winrt_log(WinrtLogNotice, "Partout::TunnelController: kill switch not implemented; clearing tunnel settings");
-    controller->Close();
-}
-
-// FIXME: ###, Windows, Cancel the VPN channel and report error_message.
-void winrt_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
-    winrt_log(WinrtLogError, "Partout::TunnelController: cancellation not implemented: controller=%p, error_message=%p", ref, error_message);
-}
-
-}

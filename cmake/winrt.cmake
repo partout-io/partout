@@ -10,8 +10,10 @@ if(PP_BUILD_WINRT)
     endif()
     enable_language(CXX)
     # The native backend cannot include Partout headers. Keep it independently
-    # compilable; runtime.cc is the only integration layer with Partout's API.
+    # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
     add_library(partout-winrt-backend OBJECT
+        cross/windows/src/loop.cc
+        cross/windows/src/transport.cc
         cross/windows/src/socket.cc
         cross/windows/src/tun.cc
         cross/windows/src/tun_settings.cc
@@ -21,8 +23,8 @@ if(PP_BUILD_WINRT)
     target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32)
 
     # Preserve a single archive for Zig and existing consumers.
-    add_library(partout-winrt STATIC cross/windows/src/runtime.cc)
-    target_include_directories(partout-winrt PRIVATE src)
+    add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
+    target_include_directories(partout-winrt PRIVATE src src/c/portable/include)
     target_compile_definitions(partout-winrt PRIVATE PARTOUT_WINRT_EXPORTS)
     target_link_libraries(partout-winrt PRIVATE partout-winrt-backend)
 

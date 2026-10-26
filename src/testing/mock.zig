@@ -3,6 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
+const ffi = @import("../c/exports.zig");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
@@ -250,7 +252,39 @@ fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) ne
     self.last_settings_info = info;
     self.last_settings = snapshotTunnelSettings(info);
     if (self.set_tunnel_settings_error) |err| return err;
-    return net.TunWrapper.create(std.testing.allocator, null);
+    return createTun(std.testing.allocator);
+}
+
+/// Settings-only tests use an explicit inert native capability on Windows.
+pub fn createTun(allocator: std.mem.Allocator) std.mem.Allocator.Error!*net.TunWrapper {
+    if (builtin.os.tag != .windows) return net.TunWrapper.create(allocator, null);
+    const Native = struct {
+        fn release(_: ?*anyopaque) callconv(.c) void {}
+        fn subscribe(_: ?*anyopaque, _: ffi.io.winrt_receive, _: ?*anyopaque) callconv(.c) bool {
+            return true;
+        }
+        fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
+            return true;
+        }
+        fn stop(_: ?*anyopaque) callconv(.c) void {}
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const ffi.io.winrt_address) callconv(.c) i32 {
+            return 0;
+        }
+        fn address(_: ?*anyopaque, _: [*c]ffi.io.winrt_address) callconv(.c) bool {
+            return false;
+        }
+        var capability: ffi.io.winrt_transport = .{
+            .context = null,
+            .release = release,
+            .subscribe = subscribe,
+            .@"resume" = resumeReads,
+            .stop = stop,
+            .write = write,
+            .local_address = address,
+            .unconnected = false,
+        };
+    };
+    return net.TunWrapper.create(allocator, @ptrCast(&Native.capability));
 }
 
 fn mockReportSnapshot(ptr: ?*anyopaque, snapshot: api.TunnelSnapshot) void {

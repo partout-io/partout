@@ -56,7 +56,7 @@ struct Socket::State {
     // The front slot stays queued until completion, including while suspended.
     // A nonempty queue therefore already has a writer.
     std::deque<WriteRequest> writes;
-    winrt_socket_on_receive callback = nullptr;
+    SocketOnReceive callback = nullptr;
     void *context = nullptr;
     bool reading = false;
     bool paused = false;
@@ -74,16 +74,16 @@ struct Socket::State {
     }
 
     void deliver(const uint8_t *bytes, size_t size,
-                 const winrt_socket_address *source, int32_t error) {
+                 const SocketAddress *source, int32_t error) {
         std::lock_guard lock(mutex);
         if (!error) ++received;
         deliverLocked(bytes, size, source, error);
     }
 
     void deliverLocked(const uint8_t *bytes, size_t size,
-                       const winrt_socket_address *source, int32_t error) {
+                       const SocketAddress *source, int32_t error) {
         if (!callback || (paused && !error)) return;
-        if (error == WinrtSocketEOF) {
+        if (error == SocketEOF) {
             winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
             winrt_log(WinrtLogError, "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
@@ -93,14 +93,14 @@ struct Socket::State {
     }
 };
 
-Socket::Socket(winrt_socket_proto proto, bool unconnected) {
-    if (proto != WinrtSocketProtoUDP && proto != WinrtSocketProtoTCP)
+Socket::Socket(SocketProto proto, bool unconnected) {
+    if (proto != SocketProtoUDP && proto != SocketProtoTCP)
         throw hresult_invalid_argument();
-    if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
+    if (unconnected && proto != SocketProtoUDP) throw hresult_invalid_argument();
     Apartment apartment;
     unconnected_ = unconnected;
     state_ = std::make_shared<State>();
-    if (proto == WinrtSocketProtoUDP) datagram_ = DatagramSocket{};
+    if (proto == SocketProtoUDP) datagram_ = DatagramSocket{};
     else stream_ = StreamSocket{};
 }
 
@@ -133,7 +133,7 @@ void Socket::SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter
 }
 
 bool Socket::Open(const char *hostname, uint16_t port,
-    const winrt_socket_open_options *options) {
+    const SocketOpenOptions *options) {
     try {
         if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
             (options->dual_stack && !unconnected_)) {
@@ -213,7 +213,7 @@ void Socket::RegisterForDatagrams() {
                     (family == HostNameType::Ipv6 && !ipv6)) return;
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
-                winrt_socket_address source{};
+                SocketAddress source{};
                 if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
                 state->deliver(buffer.data(), buffer.Length(),
                     unconnected ? &source : nullptr, 0);
@@ -231,7 +231,7 @@ void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
     action.GetResults();
 }
 
-bool Socket::GetAddress(winrt_socket_address *address) {
+bool Socket::GetAddress(SocketAddress *address) {
     if (!address) return false;
     try {
         Apartment apartment;
@@ -256,10 +256,10 @@ bool Socket::GetAddress(winrt_socket_address *address) {
     return true;
 }
 
-winrt_socket_address Socket::ParseAddress(HostName const &host, hstring const &port) {
+SocketAddress Socket::ParseAddress(HostName const &host, hstring const &port) {
     if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
         throw hresult_invalid_argument();
-    winrt_socket_address result{};
+    SocketAddress result{};
     auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
     if (zone != std::wstring::npos) {
@@ -276,7 +276,7 @@ winrt_socket_address Socket::ParseAddress(HostName const &host, hstring const &p
     return result;
 }
 
-bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
+bool Socket::SetOnReceive(SocketOnReceive callback, void *context) {
     const auto state = state_;
     {
         std::lock_guard lock(state->mutex);
@@ -342,7 +342,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->finishReadLocked(WinrtSocketEOF);
+                state->finishReadLocked(SocketEOF);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
@@ -354,7 +354,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
 }
 
 int32_t Socket::Write(const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
+    const SocketAddress *destination) {
     try {
         if ((!bytes && length) || length > UINT32_MAX)
             throw hresult_invalid_argument();
@@ -378,7 +378,7 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
 }
 
 void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
+    const SocketAddress *destination) {
     const auto state = state_;
     State::WriteRequest request;
     if (unconnected_) {
@@ -486,54 +486,3 @@ Socket::Receiver Socket::TakeOver(Writer writer) {
 }
 
 } // namespace Partout
-
-extern "C" {
-
-void winrt_socket_free(winrt_socket socket) {
-    delete socket;
-}
-
-winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
-    try {
-        return new __winrt_socket_struct{{proto, unconnected}};
-    } catch (...) {
-        winrt_log(WinrtLogError, "Partout::Socket: create failed: HRESULT=0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
-        return nullptr;
-    }
-}
-
-bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
-    const winrt_socket_open_options *options) {
-    if (!socket) return false;
-    return socket->handle.Open(hostname, port, options);
-}
-
-bool winrt_socket_set_on_receive(winrt_socket socket,
-    winrt_socket_on_receive callback, void *context) {
-    if (!socket) return false;
-    return socket->handle.SetOnReceive(callback, context);
-}
-
-bool winrt_socket_resume_reading(winrt_socket socket) {
-    if (!socket) return false;
-    return socket->handle.ResumeReading();
-}
-
-int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
-    if (!socket) return E_INVALIDARG;
-    return socket->handle.Write(bytes, length, destination);
-}
-
-void winrt_socket_stop_writes(winrt_socket socket) {
-    if (!socket) return;
-    socket->handle.StopWrites();
-}
-
-bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
-    if (!socket) return false;
-    return socket->handle.GetAddress(address);
-}
-
-}

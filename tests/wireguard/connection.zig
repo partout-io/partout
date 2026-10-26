@@ -1149,7 +1149,7 @@ test "WireGuard backend dispatches the passive startup payload separately" {
     try std.testing.expect(called);
     try std.testing.expect(backend_mod.goBackend().vtable.complete_io != null);
 
-    const tun = try io.TunWrapper.create(std.testing.allocator, null);
+    const tun = try mock.createTun(std.testing.allocator);
     defer tun.destroy();
     try std.testing.expectError(error.TransportFailure, backend.turnOn(std.testing.allocator, "legacy", .{
         .tun = tun,

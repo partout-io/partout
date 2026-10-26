@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "winrt/tun.h"
+#include "io_types.h"
 #include "socket.h"
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Vpn.h>
@@ -12,7 +12,7 @@
 
 namespace Partout {
 
-// Lifecycle, writes and StopWrites run on the looper (or during quiescent teardown).
+// Lifecycle, writes and StopWrites run on the native command worker.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
     class State;
@@ -24,19 +24,19 @@ public:
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
-    bool SetOnReceive(winrt_tun_on_receive callback, void *context);
+    bool SetOnReceive(TunOnReceive callback, void *context);
     int32_t Write(const uint8_t *bytes, size_t length);
     void StopWrites();
 
 private:
     std::shared_ptr<State> state_;
-    winrt_tun_on_receive callback_ = nullptr;
+    TunOnReceive callback_ = nullptr;
     void *context_ = nullptr;
     bool writes_stopped_ = false;
 };
 
-// Association may run on the setup worker before Open. Open and Close run on the
-// looper; destruction follows daemon shutdown. Native receives share Tun's gate.
+// Association, Open and Close run on the same native worker. Destruction follows
+// daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
     explicit TunnelController(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
@@ -45,13 +45,16 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    winrt_tun Open(const char *info_json);
+    void BindRuntime(winrt_loop);
+    winrt_loop Runtime() const { return runtime_; }
+    std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
     void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);
+    winrt_loop runtime_ = nullptr;
 
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
@@ -62,8 +65,3 @@ private:
 };
 
 } // namespace Partout
-
-// Owned C handle; the TUN stays private to the native implementation.
-struct __winrt_tun_struct {
-    Partout::Tun handle;
-};

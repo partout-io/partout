@@ -222,7 +222,7 @@ test "socket creation and existing descriptors share independent platform policy
     try std.testing.expectEqual(@as(usize, 4), policy.calls);
 }
 
-test "Windows configuration callback receives the WinRT pointer and can reject open" {
+test "Windows configuration callback receives a native policy token and can reject open" {
     if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
@@ -245,7 +245,7 @@ test "Windows configuration callback receives the WinRT pointer and can reject o
     const endpoint: api.ExtendedEndpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, 1194) };
     const options = socketOptions(&platform, reachable(true), 1000);
     const wrapper = (try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) orelse return error.SocketFailed;
-    try std.testing.expectEqual(@intFromPtr(wrapper.socket.?), probe.descriptor);
+    try std.testing.expectEqual(@intFromPtr(wrapper.native.context), probe.descriptor);
     try std.testing.expectEqual(@as(usize, 1), probe.calls);
     try std.testing.expect(probe.reachable);
     wrapper.destroy();

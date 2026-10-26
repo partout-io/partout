@@ -24,6 +24,11 @@ const TimerProbe = struct {
 };
 
 test "looper runs and cancels timers on its caller" {
+    // Windows dispatch is supplied by the optional native runtime archive.
+    if (builtin.os.tag == .windows and !source.winrt_enabled) {
+        try std.testing.expectError(error.MuxFailure, Looper.init(std.testing.allocator, .{ .mux = null }));
+        return;
+    }
     const wake: ?test_helpers.Mux = if (builtin.os.tag == .windows) null else try test_helpers.Mux.init();
     defer if (wake) |value| value.deinit();
     var looper = try Looper.init(std.testing.allocator, .{
@@ -57,7 +62,7 @@ test "looper runs and cancels timers on its caller" {
 }
 
 test "Windows timer callback can cancel a due task and rearm for the next iteration" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         looper: *Looper,
         first: io.Timer = .{},
@@ -92,7 +97,7 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
 }
 
 test "Windows dispatcher waits for the earlier timer deadline" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
     var later = io.Timer{};
@@ -112,7 +117,7 @@ test "Windows dispatcher waits for the earlier timer deadline" {
 }
 
 test "Windows dispatcher shares the daemon wake event without spinning or losing a wake" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const mux = c.pp_mux_create(1) orelse return error.MuxCreationFailed;
     defer c.pp_mux_free(mux);
@@ -160,7 +165,7 @@ test "Windows dispatcher shares the daemon wake event without spinning or losing
 }
 
 test "Windows timer replacement failure preserves the old task and token" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     var looper = try Looper.init(failing.allocator(), .{ .mux = null });
     defer looper.deinit();
@@ -180,7 +185,7 @@ test "Windows timer replacement failure preserves the old task and token" {
 }
 
 test "Windows timer expiry cannot invoke a context after cancellation or stop" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
@@ -437,6 +442,11 @@ const WindowsAdmissionProbe = struct {
 
     fn read(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
         const self: *WindowsAdmissionProbe = @ptrCast(@alignCast(raw.?));
+        if (self.reads == 0) {
+            try std.testing.expectEqualStrings("pause", packets[0]);
+            self.reads += 1;
+            return .pause;
+        }
         try std.testing.expectEqualStrings("resumed", packets[0]);
         self.reads += 1;
         return .keep;
@@ -453,34 +463,74 @@ test "Windows paused TUN drops new input but admits failures and resumes deliver
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
     var probe: WindowsAdmissionProbe = .{};
-    // Exercise admission/dispatch without a VPN host. This unattached side has
-    // no native handle to drain or destroy; queued nodes retain it during dispatch.
-    var side: Looper.Impl.testing.Side = .{
-        .owner = looper.impl,
-        .arguments = .{
-            .pair = .{ .tun = undefined },
-            .on_read = .{ .context = &probe, .callback = WindowsAdmissionProbe.read },
-            .on_failure = .{ .context = &probe, .callback = WindowsAdmissionProbe.failed },
-        },
-        .reading = false,
+    // A fake producer exercises the C++ queue through the public transport
+    // boundary, without relying on Zig queue internals or a VPN host.
+    const c = source.ffi.io;
+    const Producer = struct {
+        callback: c.winrt_receive = null,
+        context: ?*anyopaque = null,
+        released: bool = false,
+
+        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.callback = callback;
+            self.context = context;
+            return true;
+        }
+        fn release(raw: ?*anyopaque) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.released = true;
+        }
+        fn @"resume"(_: ?*anyopaque) callconv(.c) bool {
+            return true;
+        }
+        fn stop(_: ?*anyopaque) callconv(.c) void {}
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+            return 0;
+        }
+        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+            return false;
+        }
+        fn send(self: *@This(), bytes: []const u8, code: i32) bool {
+            return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
+        }
     };
-    for (0..10000) |_| {
-        try std.testing.expect(!Looper.Impl.testing.receive(&side, "paused", 6, null, 0));
-    }
-    try std.testing.expectEqual(@as(u64, 10000), side.dropped);
-    try std.testing.expectEqual(@as(u64, 0), side.queued);
-    try std.testing.expect(looper.impl.callbacks.head == null);
-
-    const native_failure: i32 = -2147467260; // E_ABORT
-    try std.testing.expect(!Looper.Impl.testing.receive(&side, null, 0, null, native_failure));
+    var producer: Producer = .{};
+    var capability: c.winrt_transport = .{
+        .context = &producer,
+        .release = Producer.release,
+        .subscribe = Producer.subscribe,
+        .@"resume" = Producer.@"resume",
+        .stop = Producer.stop,
+        .write = Producer.write,
+        .local_address = Producer.address,
+        .unconnected = false,
+    };
+    const tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(&capability));
+    try looper.attach(.{
+        .pair = .{ .tun = tun },
+        .on_read = .{ .context = &probe, .callback = WindowsAdmissionProbe.read },
+        .on_failure = .{ .context = &probe, .callback = WindowsAdmissionProbe.failed },
+    });
+    try std.testing.expect(producer.send("pause", 0));
     try std.testing.expect(try test_helpers.poll(&looper, 0));
-    try std.testing.expectEqual(@as(usize, 1), probe.failures);
-    try std.testing.expectEqual(@as(usize, 0), probe.reads);
-
-    side.reading = true;
-    try std.testing.expect(Looper.Impl.testing.receive(&side, "resumed", 7, null, 0));
+    for (0..10000) |_| {
+        try std.testing.expect(!producer.send("paused", 0));
+    }
     try std.testing.expect(try test_helpers.poll(&looper, 0));
     try std.testing.expectEqual(@as(usize, 1), probe.reads);
-    try std.testing.expectEqual(@as(usize, 1), side.references);
-    try std.testing.expect(looper.impl.callbacks.head == null);
+
+    const native_failure: i32 = -2147467260; // E_ABORT
+    try std.testing.expect(!producer.send("", native_failure));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 1), probe.failures);
+    try std.testing.expectEqual(@as(usize, 1), probe.reads);
+
+    try looper.resumeReading(.tun);
+    try std.testing.expect(producer.send("resumed", 0));
+    try std.testing.expect(try test_helpers.poll(&looper, 0));
+    try std.testing.expectEqual(@as(usize, 2), probe.reads);
+    try looper.detach(.tun);
+    try std.testing.expect(producer.callback == null);
+    try std.testing.expect(producer.released);
 }

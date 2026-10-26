@@ -21,6 +21,7 @@ const test_core_util = @import("core/util.zig");
 const test_core_uuid = @import("core/uuid.zig");
 const test_net_connection = @import("net/connection.zig");
 const test_net_daemon = @import("net/daemon.zig");
+const test_net_runtime_worker = @import("net/runtime_worker.zig");
 const test_net_io = @import("net/io.zig");
 const test_net_io_common = @import("net/io_common.zig");
 const test_net_io_posix = @import("net/io_posix.zig");
@@ -86,6 +87,7 @@ comptime {
     _ = test_core_uuid;
     _ = test_net_connection;
     _ = test_net_daemon;
+    _ = test_net_runtime_worker;
     _ = test_net_io;
     _ = test_net_io_common;
     if (builtin.os.tag != .windows) {

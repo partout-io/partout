@@ -5,14 +5,16 @@ VPN-host testing; this is not yet production or full platform-parity
 validation. The transport paths below are the default implementation, with no
 separate experiment flag.
 
-The native backend owns WinRT objects and asynchronous I/O. Partout owns the
-portable ABI adapters. Dependencies run from Partout to the backend:
+The native backend owns WinRT objects and a single command worker for setup,
+writes and handover. Received packets and failures use the existing Zig looper callback boundary.
+Zig owns protocol processing, backpressure and timers; the daemon is unchanged:
 
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
-Partout io_windows.zig       -> winrt/socket.h  -> src/socket.cc
-Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
+Partout io_windows.zig       -> winrt/runtime.h -> src/transport.cc
+Partout looper_windows.zig   -> winrt/runtime.h -> src/loop.cc
+Partout portable controller  -> src/platform.cc -> src/tun.cc
 ```
 
 ## Where code belongs
@@ -20,18 +22,22 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 | Location | Responsibility |
 | --- | --- |
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/` | Backend-owned C socket, tunnel controller and logging ABI; no Partout headers or C++ interfaces. |
+| `include/winrt/runtime.h` | Runtime transport capabilities, native loop and link setup boundary; no socket or TUN object ABI. |
+| `include/winrt/log.h` | Native logging boundary. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
-| `src/socket.h`, `src/socket.cc` | Internal `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime; implements the C socket ABI. |
-| `src/tun.h`, `src/tun.cc` | Internal `Partout::TunnelController`, transport association and channel startup/stop; implements the C tunnel ABI. |
+| `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
+| `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
+| `src/transport.h`, `src/transport.cc` | Owned native capabilities shared by daemon and passive I/O. |
+| `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
+| `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
-| `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
-| `../../src/net/looper_windows.zig` | Dispatches native packet callbacks and timers, waiting on the daemon's shared wake event. |
-| `../../src/c/portable/tun_windows.c` | Converts Partout's portable controller ABI into backend calls, or supplies fallback stubs without WinRT. |
+| `../../src/net/io_windows.zig` | Native setup completions and transport capabilities, including passive subscriptions. |
+| `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
+| `../../src/c/portable/tun_windows.c` | Fallback controller stubs for builds without WinRT. |
 
 `partout-winrt-backend` compiles sockets, the controller and logging with only
-the native include directory. `partout-winrt` adds `runtime.cc` and packages all
+the native include directory. `partout-winrt` adds `runtime.cc`, `platform.cc` and packages all
 objects into one archive for Zig. The backend has no portable ABI dependency.
 
 ## Logging
@@ -50,9 +56,10 @@ once per destination, including its HRESULT.
 
 ## Socket lifecycle
 
-Create a socket, configure it through the tunnel controller, then open it.
-For connected sockets, association must happen before connect. The Partout adapter passes
-the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
+Link setup creates, configures and opens a transport in one native operation.
+For connected sockets, association happens before connect. The configuration
+callback receives a temporary native policy token through `pp_socket_fd`.
+It must not retain or dereference that token; it is not a Winsock handle.
 
 UDP uses the OS `MessageReceived` event. TCP owns an `IAsyncAction` read loop;
 channel takeover cancels native I/O and joins that task directly.
@@ -62,7 +69,7 @@ reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
 packet and destination; one coroutine drains the native queue in FIFO order using
 `co_await` for output-stream acquisition and writes. Success means accepted, with
 later failures routed through the same callback. Channel-buffer writes copy into
-VpnChannel's pool directly. See `include/winrt/socket.h` for the contract.
+VpnChannel's pool directly. See `include/winrt/runtime.h` for the boundary contract.
 Callers serialize writes with other writes, socket configuration, channel
 takeover, writer replacement and destruction. The caller supplies this serialization.
 Stopping writes and clearing receive callbacks may overlap an admitted write;
@@ -71,8 +78,10 @@ writes retain shared I/O state and native transports, without retaining Socket.
 
 ### Connected transports
 
-The WindowsLooper queues owned input for both link and TUN attachments and
-dispatches their callbacks on its caller. The native socket owns the lifetime
+Native producer callbacks copy input into the Zig looper's receive mailbox.
+The existing daemon I/O callbacks invoke `Connection.submitPackets()`.
+There is no intermediate C++ output queue or per-packet synchronous worker call.
+The native socket owns the lifetime
 of its OS callbacks and pending reads. Before channel startup, direct socket
 writes are drained, then reads are stopped (pending TCP reads are cancelled
 and drained), before transferring the transport to VpnChannel.
@@ -83,11 +92,11 @@ processing. TUN writes copy packets into channel receive buffers and call
 `AppendVpnReceivePacketBuffer` / `FlushVpnReceivePacketBuffers`. Link writes use
 the socket during negotiation, then the channel send-buffer append/flush APIs
 after startup. This requires the channel append/flush APIs
-(Windows build 20348 or later). All WindowsLooper operations run on its owner
-thread, including writes, timers and detach. Its mutex protects only the receive
-queue and flags shared with native callbacks. Detach drains native delivery and
-discards pending writes and queued input; an in-progress protocol callback retains
-its attachment until it returns, so it may safely detach its own side.
+(Windows build 20348 or later). Native setup, socket writes, channel startup and
+teardown serialize on the same C++ worker. Writes and resumes post commands;
+setup and lifecycle operations may use synchronous barriers. Protocol callbacks
+remain on the daemon actor and can detach their own side. A generation token
+rejects already-queued input after detach or replacement.
 
 ### Unconnected UDP
 
@@ -107,10 +116,10 @@ Unconnected UDP bypasses `Decapsulate` and the channel send-buffer path.
 
 ### Timers
 
-`loopOnce()` waits on the existing daemon mailbox event with a timeout for the
-earliest timer deadline. Native receive callbacks signal that same event; no
-socket readiness polling or separate timer-alarm thread is needed. Due tasks
-and packet callbacks execute on the caller thread.
+Zig owns timer nodes, deadlines, replacement and cancellation. `loopOnce()` waits
+on the existing daemon mailbox event with a timeout for the earliest timer.
+Native callbacks wake that same event through the existing looper interface. Due tasks
+and packet callbacks execute on the daemon thread; C++ has no timer scheduler.
 Scheduling and cancellation are queue-confined, and timer tokens are copied by
 value. Replacement preserves the old task on allocation failure; cancellation
 and stop remove tasks before their borrowed contexts can be released. Tasks
@@ -119,7 +128,8 @@ scheduled by a timer callback become eligible on the next iteration.
 The normal `loopOnce(null)` driver sleeps until packets, a mailbox wake, or a
 timer deadline require work. Bounded waits remain available for tests. The
 supplied mux is borrowed only for its wake event; a looper created without one
-owns a private wake source. The daemon's command loop remains unchanged.
+owns a private wake source. The existing looper owns its receive mailbox; there
+is no C++ output queue. Paused input stays queued without spinning until resume.
 
 ### TUN lifetime and delivery
 
@@ -130,22 +140,35 @@ registration, removal and handle destruction. Freeing an old handle cannot clear
 its replacement. Callbacks consume or copy input and must not reenter TUN or
 controller APIs.
 
-The Zig wrappers share callback registration and draining logic, retain native
-handle types, and return native write status codes. WindowsLooper converts a
-write failure into the same queue used for asynchronous receive/write failures.
-Detach drains native callbacks before purging that side's queued input. Dispatch
-retains the side separately so a protocol callback can detach itself safely.
+The Zig adapters hold generic owned capabilities, without native socket or TUN
+types. The native runtime converts a write failure into the same queue used for
+asynchronous receive/write failures.
+Detach drains native callbacks. Already-enqueued packets carry generation
+tokens and are discarded by the looper after detach or replacement.
 
 Pausing TUN reads preserves already queued packets but drops new packet input
 before allocation until reads resume. Errors remain eligible while paused.
 Socket input retains in-flight TCP bytes until resume; native socket callbacks
-provide backpressure. Detach summaries include the paused TUN drop count.
+provide backpressure.
 
-Writes copy packets into the channel synchronously. The daemon looper serializes
-writes, write shutdown and handle lifetime; teardown outside the looper follows
-daemon shutdown. No write mutex, asynchronous TUN writer or atomic stop flag is
-needed. Native receive counters use the receive mutex; write counters belong to
-the looper, which snapshots all counters under that mutex when stopping.
+WireGuard's passive I/O subscribes directly to a transport capability. Its
+thread-safe Go read bridge consumes native producer callbacks independently of
+the daemon loop, preserving per-peer source addresses, destination-aware writes,
+quiesce/reactivation and callback draining during replacement. The protocol's
+bounded queue for pending Go reads stays separate from daemon dispatch.
+
+Writes copy the submission before posting it to the native worker. Channel
+buffer operations then run on that worker, serialized with handover and stop.
+Final release drains accepted commands and native receive callbacks before
+releasing the transport and joining an unreferenced worker.
+
+On Windows, the daemon selects `RuntimeLoopWorker` with the same request,
+completion and factory contracts as `ConnectionWorker`. Shared endpoint
+preparation runs on the C++ RuntimeLoop thread; the socket factory reuses that
+loop for creation, association and open. No Zig preparation thread is started.
+Returned transports retain the loop for writes, handover and teardown. Other
+platforms keep `ConnectionWorker` and its Zig actor. The daemon's mailbox,
+protocol processing and timers are unchanged.
 
 ## VPN channel runtime
 
@@ -187,6 +210,8 @@ With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
 builds without WinRT use the fallback branch in `tun_windows.c` for
 tests and builds that do not need native VPN support.
+The Windows looper also requires the native archive; without it, creation
+reports `MuxFailure`. Native dispatch tests run when WinRT is enabled.
 
 Independent UDP is automatic for unconnected sockets; no additional
 transport option is needed. The native archive alone does not register a VPN
