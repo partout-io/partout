@@ -35,7 +35,7 @@ private:
     bool writes_stopped_ = false;
 };
 
-// Association may run on the setup worker before Open. Open and Stop run on the
+// Association may run on the setup worker before Open. Open and Close run on the
 // looper; destruction follows daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
@@ -46,13 +46,12 @@ public:
 
     bool Associate(Socket *socket) noexcept;
     winrt_tun Open(const char *info_json);
-    void Stop() noexcept;
+    void Close() noexcept;
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
     void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);
-    void Start(const char *info_json);
 
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};

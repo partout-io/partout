@@ -120,7 +120,7 @@ void Tun::StopWrites() {
 TunnelController::TunnelController(VpnChannel const &channel)
     : state_(std::make_shared<Tun::State>(channel)) {}
 
-TunnelController::~TunnelController() { Stop(); }
+TunnelController::~TunnelController() { Close(); }
 
 bool TunnelController::Associate(Socket *socket) noexcept {
     if (!socket) return false;
@@ -175,41 +175,38 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
 winrt_tun TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
     auto tun = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
-    Start(info_json);
+    if (!started_) {
+        const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
+        if (!idle_transport_) {
+            auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
+                const auto result = state->write(bytes, length, true);
+                if (result) {
+                    ++state->counters.link_send_failed;
+                    return result;
+                }
+                ++state->counters.link_send;
+                return int32_t{0};
+            });
+            std::lock_guard lock(state_->receive_mutex);
+            state_->link_receive = std::move(receive);
+        }
+        // Windows requires null for an absent address family, not an empty view.
+        state_->channel.StartWithMainTransport(
+            settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
+            settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
+            VpnInterfaceId{nullptr}, settings.routes, settings.domains,
+            settings.mtu, settings.maxFrame(), false, transport_);
+        started_ = true;
+        socket_ = nullptr; // TakeOver's receiver retains the socket state.
+        winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
+            settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
+    }
     std::lock_guard lock(state_->receive_mutex);
     state_->tun = &tun->handle;
     return tun.release();
 }
 
-void TunnelController::Start(const char *info_json) {
-    if (started_) return;
-    const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
-    if (!idle_transport_) {
-        auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
-            const auto result = state->write(bytes, length, true);
-            if (result) {
-                ++state->counters.link_send_failed;
-                return result;
-            }
-            ++state->counters.link_send;
-            return int32_t{0};
-        });
-        std::lock_guard lock(state_->receive_mutex);
-        state_->link_receive = std::move(receive);
-    }
-    // Windows requires null for an absent address family, not an empty view.
-    state_->channel.StartWithMainTransport(
-        settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
-        settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
-        VpnInterfaceId{nullptr}, settings.routes, settings.domains,
-        settings.mtu, settings.maxFrame(), false, transport_);
-    started_ = true;
-    socket_ = nullptr; // TakeOver's receiver retains the socket state.
-    winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
-        settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
-}
-
-void TunnelController::Stop() noexcept {
+void TunnelController::Close() noexcept {
     {
         std::lock_guard lock(state_->receive_mutex);
         if (auto tun = std::exchange(state_->tun, nullptr)) {
@@ -224,7 +221,7 @@ void TunnelController::Stop() noexcept {
             state_->channel.Stop();
             started_ = false;
         } catch (...) {
-            winrt_log(WinrtLogError, "Partout::TunnelController.Stop failed: HRESULT 0x%08x",
+            winrt_log(WinrtLogError, "Partout::TunnelController.Close failed: HRESULT 0x%08x",
                 static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
@@ -346,7 +343,7 @@ void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
     winrt_log(WinrtLogDebug, "tun: ctrl_clear_tunnel(%p, %d)", ref, kill_switch);
     const auto controller = get_controller(ref);
     if (!controller) return;
-    controller->Stop();
+    controller->Close();
 }
 
 // FIXME: ###, Windows, Cancel the VPN channel and report error_message.
