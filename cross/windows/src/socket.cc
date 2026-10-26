@@ -150,7 +150,7 @@ bool Socket::Open(const char *hostname, uint16_t port,
             accepts_ipv6_ = is_v6;
         }
         if (datagram_) {
-            RegisterDatagram();
+            RegisterForDatagrams();
         }
         if (unconnected_) {
             // WinRT rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
@@ -196,7 +196,7 @@ bool Socket::Open(const char *hostname, uint16_t port,
     return true;
 }
 
-void Socket::RegisterDatagram() {
+void Socket::RegisterForDatagrams() {
     const auto state = state_;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
@@ -293,14 +293,21 @@ bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
 
 bool Socket::ResumeReading() {
     const auto state = state_;
-    bool start_read;
+    bool start_read = false;
     {
         std::lock_guard lock(state->mutex);
         // Resume must never restore a cleared context.
         if (!state->callback) return false;
-        state->paused = false;
-        start_read = stream_ && !state->reading && !state->channel_owned;
-        if (start_read) state->reading = true;
+        if (datagram_) {
+            // UDP delivery resumes through the registered MessageReceived handler.
+            state->paused = false;
+        } else {
+            // TCP also needs a read coroutine unless one is already active or
+            // the channel has taken over the transport.
+            state->paused = false;
+            start_read = !state->reading && !state->channel_owned;
+            if (start_read) state->reading = true;
+        }
     }
     if (start_read) {
         try {

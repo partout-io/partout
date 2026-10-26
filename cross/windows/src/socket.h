@@ -48,7 +48,7 @@ public:
 private:
     struct State;
 
-    void RegisterDatagram();
+    void RegisterForDatagrams();
     static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
     static winrt_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host,
         winrt::hstring const &port);
