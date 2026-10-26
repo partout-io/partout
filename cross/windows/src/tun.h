@@ -4,10 +4,10 @@
 #pragma once
 
 #include "winrt/tun.h"
+#include "socket.h"
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Vpn.h>
 #include <winrt/Windows.Networking.Sockets.h>
-#include <functional>
 #include <memory>
 #include <mutex>
 
@@ -15,8 +15,6 @@ struct WinrtTun;
 struct WinrtPacketCounters;
 
 namespace Partout {
-
-class Socket;
 
 // Internal platform ref. Daemon bindings retain the channel until callbacks drain.
 class TunnelController {
@@ -42,7 +40,7 @@ private:
     Socket *socket_ = nullptr; // Borrowed until Start; the link owns it.
     std::shared_ptr<WinrtTun> tun_;
     std::shared_ptr<WinrtPacketCounters> counters_;
-    std::function<void(const uint8_t *, size_t)> link_receive_;
+    Socket::Receiver link_receive_;
     std::mutex input_mutex_; // Protects snapshots used by plugin callbacks.
 };
 } // namespace Partout
