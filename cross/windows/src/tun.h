@@ -51,6 +51,9 @@ public:
     void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
+    void AssociateUnconnected(Socket &socket);
+    void Start(const char *info_json);
+
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket idle_transport_{nullptr};

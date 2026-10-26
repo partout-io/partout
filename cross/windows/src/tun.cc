@@ -66,20 +66,21 @@ int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
         packet = nullptr; // Ownership returned to the channel.
         stage = "flush";
         flush();
-        return 0;
     } catch (...) {
         const auto error = to_hresult().value;
         winrt_log(WinrtLogError, "WinRT %s write failed during %s: HRESULT 0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
-        if (!packet) return error;
-        try {
-            packet.Buffer().Length(0);
-            append(packet);
-            flush();
-        } catch (...) {}
+        if (packet) {
+            try {
+                packet.Buffer().Length(0);
+                append(packet);
+                flush();
+            } catch (...) {}
+        }
         return error;
     }
+    return 0;
 }
 
 Tun::Tun(std::shared_ptr<State> state) : state_(std::move(state)) {}
@@ -104,8 +105,12 @@ bool Tun::SetOnReceive(winrt_tun_on_receive callback, void *context) {
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
     if (writes_stopped_) return E_ABORT;
     const auto result = state_->write(bytes, length, false);
-    ++(result == 0 ? state_->counters.tun_write : state_->counters.tun_write_failed);
-    return result;
+    if (result) {
+        ++state_->counters.tun_write_failed;
+        return result;
+    }
+    ++state_->counters.tun_write;
+    return 0;
 }
 
 void Tun::StopWrites() {
@@ -118,81 +123,90 @@ TunnelController::TunnelController(VpnChannel const &channel)
 TunnelController::~TunnelController() { Stop(); }
 
 bool TunnelController::Associate(Socket *socket) noexcept {
+    if (!socket) return false;
     try {
-        if (!socket) return false;
         const auto transport = socket->Transport();
         const auto &channel = state_->channel;
         if (!channel || !transport) return false;
-        if (!socket->IsUnconnected()) {
-            if (transport_ == transport) return true;
+        if (socket->IsUnconnected()) {
+            AssociateUnconnected(*socket);
+        } else if (transport_ != transport) {
             channel.AssociateTransport(transport, nullptr);
             transport_ = transport;
             socket_ = socket;
-            return true;
         }
-        // UDP sockets with multiple destinations keep their binds independent of the channel.
-        // Keep the adapter across UDP bind replacement, including after Open.
-        if (!udp_adapter_) {
-            const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
-            if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
-            udp_adapter_ = profile.NetworkAdapter();
-        }
-        socket->SetAdapter(udp_adapter_);
-        if (idle_transport_) return true;
-        if (transport_) throw hresult_illegal_method_call();
-        Sockets::DatagramSocket idle;
-        try {
-            channel.AssociateTransport(idle, nullptr);
-            // UDP connect sends no application payload. This socket exists
-            // only to satisfy the framework; application destinations use independent UDP sockets.
-            // TEST-NET-1 avoids DNS and any dependency on a real server.
-            const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
-            if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
-                connect.Cancel();
-                throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
-            }
-            connect.GetResults();
-        } catch (...) { idle.Close(); throw; }
-        idle_transport_ = idle;
-        transport_ = idle;
-        winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
-        return true;
     } catch (...) {
         winrt_log(WinrtLogError, "Partout::TunnelController.Associate failed: HRESULT 0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return false;
     }
+    return true;
+}
+
+void TunnelController::AssociateUnconnected(Socket &socket) {
+    // UDP sockets with multiple destinations keep their binds independent of the channel.
+    // Keep the adapter across UDP bind replacement, including after Open.
+    if (!udp_adapter_) {
+        const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
+        if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
+        udp_adapter_ = profile.NetworkAdapter();
+    }
+    socket.SetAdapter(udp_adapter_);
+    if (idle_transport_) return;
+    if (transport_) throw hresult_illegal_method_call();
+    Sockets::DatagramSocket idle;
+    try {
+        state_->channel.AssociateTransport(idle, nullptr);
+        // UDP connect sends no application payload. This socket exists
+        // only to satisfy the framework; application destinations use independent UDP sockets.
+        // TEST-NET-1 avoids DNS and any dependency on a real server.
+        const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
+        if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
+            connect.Cancel();
+            throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
+        }
+        connect.GetResults();
+    } catch (...) { idle.Close(); throw; }
+    idle_transport_ = idle;
+    transport_ = idle;
+    winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
 }
 
 winrt_tun TunnelController::Open(const char *info_json) {
-    const auto &channel = state_->channel;
-    if (!channel || !transport_) return nullptr;
+    if (!state_->channel || !transport_) return nullptr;
     auto handle = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
-    if (!started_) {
-        const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
-        if (!idle_transport_) {
-            auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
-                const auto result = state->write(bytes, length, true);
-                ++(result == 0 ? state->counters.link_send : state->counters.link_send_failed);
-                return result;
-            });
-            std::lock_guard lock(state_->receive_mutex);
-            state_->link_receive = std::move(receive);
-        }
-        // Windows requires null for an absent address family, not an empty view.
-        channel.StartWithMainTransport(
-            settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
-            settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
-            VpnInterfaceId{nullptr}, settings.routes, settings.domains,
-            settings.mtu, settings.maxFrame(), false, transport_);
-        started_ = true;
-        socket_ = nullptr; // TakeOver's receiver retains the socket state.
-        winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
-            settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
-    }
+    Start(info_json);
     std::lock_guard lock(state_->receive_mutex);
     state_->tun = &handle->handle;
     return handle.release();
+}
+
+void TunnelController::Start(const char *info_json) {
+    if (started_) return;
+    const auto settings = partout::windows::TunnelSettings::parse(info_json, idle_transport_ ? 1420 : 1400);
+    if (!idle_transport_) {
+        auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
+            const auto result = state->write(bytes, length, true);
+            if (result) {
+                ++state->counters.link_send_failed;
+                return result;
+            }
+            ++state->counters.link_send;
+            return int32_t{0};
+        });
+        std::lock_guard lock(state_->receive_mutex);
+        state_->link_receive = std::move(receive);
+    }
+    // Windows requires null for an absent address family, not an empty view.
+    state_->channel.StartWithMainTransport(
+        settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
+        settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
+        VpnInterfaceId{nullptr}, settings.routes, settings.domains,
+        settings.mtu, settings.maxFrame(), false, transport_);
+    started_ = true;
+    socket_ = nullptr; // TakeOver's receiver retains the socket state.
+    winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
+        settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
 }
 
 void TunnelController::Stop() noexcept {
