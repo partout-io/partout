@@ -44,7 +44,7 @@ public:
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
-    bool Associate(Socket *socket) noexcept;
+    bool Associate(Socket &socket) noexcept;
     winrt_tun Open(const char *info_json);
     void Close() noexcept;
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);

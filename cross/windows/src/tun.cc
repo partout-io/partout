@@ -122,18 +122,17 @@ TunnelController::TunnelController(VpnChannel const &channel)
 
 TunnelController::~TunnelController() { Close(); }
 
-bool TunnelController::Associate(Socket *socket) noexcept {
-    if (!socket) return false;
+bool TunnelController::Associate(Socket &socket) noexcept {
     try {
-        const auto transport = socket->Transport();
         const auto &channel = state_->channel;
+        const auto transport = socket.Transport();
         if (!channel || !transport) return false;
-        if (socket->IsUnconnected()) {
-            AssociateUnconnected(*socket);
+        if (socket.IsUnconnected()) {
+            AssociateUnconnected(socket);
         } else if (transport_ != transport) {
             channel.AssociateTransport(transport, nullptr);
             transport_ = transport;
-            socket_ = socket;
+            socket_ = &socket;
         }
     } catch (...) {
         winrt_log(WinrtLogError, "Partout::TunnelController.Associate failed: HRESULT 0x%08x",
@@ -307,7 +306,7 @@ bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, si
     const auto controller = get_controller(ref);
     for (size_t i = 0; i < count; ++i) {
         if (!sockets[i]) return false;
-        if (controller && !controller->Associate(&sockets[i]->handle)) return false;
+        if (controller && !controller->Associate(sockets[i]->handle)) return false;
     }
     return true;
 }
