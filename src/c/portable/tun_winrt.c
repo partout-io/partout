@@ -34,10 +34,10 @@ static void set_delegate(void *ref, const pp_tun_ctrl_delegate *delegate) {
     };
     winrt_tun_ctrl_set_delegate(ref, &native);
 }
-static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t count) {
+static bool configure_sockets(void *ref, const pp_reachability *info, const pp_socket_fd *fds, size_t fds_len) {
     (void)info;
-    if (count && !fds) return false;
-    for (size_t i = 0; i < count; ++i) {
+    if (fds_len && !fds) return false;
+    for (size_t i = 0; i < fds_len; ++i) {
         const winrt_socket socket = (winrt_socket)(uintptr_t)fds[i];
         if (!winrt_tun_ctrl_configure_sockets(ref, &socket, 1)) return false;
     }

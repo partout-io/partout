@@ -34,7 +34,7 @@ typedef struct {
     void *_Nullable ctx;
     bool (*configure)(void *_Nullable ctx,
                       const pp_reachability *_Nullable reachability,
-                      const pp_socket_fd *fds, size_t count);
+                      const pp_socket_fd *fds, size_t fds_len);
 } pp_socket_configurator;
 
 /* Build the platform policy using the host controller as its borrowed context. */
@@ -43,7 +43,7 @@ pp_socket_configurator pp_socket_configurator_current(void *_Nullable ref);
 /* Configure existing descriptors without taking ownership. Empty batches succeed. */
 bool pp_socket_configure_descriptors(pp_socket_configurator configurator,
                                      const pp_reachability *_Nullable reachability,
-                                     const pp_socket_fd *_Nullable fds, size_t count);
+                                     const pp_socket_fd *_Nullable fds, size_t fds_len);
 
 /* Create a nonblocking connected socket, or bind unconnected UDP to a numeric local endpoint
  * Unconnected IPv6 is IPv6-only unless dual_stack is enabled; configuration runs before bind.

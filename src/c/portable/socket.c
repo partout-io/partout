@@ -24,10 +24,10 @@
 
 bool pp_socket_configure_descriptors(pp_socket_configurator configurator,
                                      const pp_reachability *reachability,
-                                     const pp_socket_fd *fds, size_t count) {
-    if (count == 0) return true;
+                                     const pp_socket_fd *fds, size_t fds_len) {
+    if (fds_len == 0) return true;
     if (!fds || !configurator.configure) return false;
-    return configurator.configure(configurator.ctx, reachability, fds, count);
+    return configurator.configure(configurator.ctx, reachability, fds, fds_len);
 }
 
 static pp_socket_fd local_invalid_fd(void);
