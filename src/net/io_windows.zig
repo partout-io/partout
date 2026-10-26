@@ -230,18 +230,18 @@ pub const TunWrapper = struct {
 };
 
 /// Native delivery and copied asynchronous writes are owned by WinRT.
-pub fn PacketTransport(comptime Descriptors: type) type {
+pub fn PacketTransport(comptime DescriptorType: type) type {
     return struct {
         const Self = @This();
-        pub const Descriptor = Descriptors;
+        pub const Descriptor = DescriptorType;
         pub const OnReceive = io.PacketReceiveCallback;
         pub const WriteResult = io.PacketWriteResult;
 
         allocator: std.mem.Allocator,
-        descriptor: Descriptors,
+        descriptor: Descriptor,
 
         /// Takes descriptor ownership on entry, including allocation failure.
-        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptors) std.mem.Allocator.Error!*Self {
+        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptor) std.mem.Allocator.Error!*Self {
             errdefer releaseDescriptor(descriptor);
             const self = try allocator.create(Self);
             self.* = .{ .allocator = allocator, .descriptor = descriptor };
@@ -276,7 +276,7 @@ pub fn PacketTransport(comptime Descriptors: type) type {
             return if (result == 0) .ok else .failed;
         }
 
-        pub fn releaseDescriptor(descriptor: Descriptors) void {
+        pub fn releaseDescriptor(descriptor: Descriptor) void {
             switch (descriptor) {
                 inline else => |value| value.cleanup(),
             }

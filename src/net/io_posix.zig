@@ -451,15 +451,15 @@ pub fn mapWriteResult(_: io.Side, result: c_int, comptime maps_no_space: bool) !
 
 /// A readiness-driven thread supplies borrowed input; writes submit directly.
 /// No thread starts until a receiver is registered. Removal wakes and joins it.
-pub fn PacketTransport(comptime Descriptors: type) type {
+pub fn PacketTransport(comptime DescriptorType: type) type {
     return struct {
         const Self = @This();
-        pub const Descriptor = Descriptors;
+        pub const Descriptor = DescriptorType;
         pub const OnReceive = io.PacketReceiveCallback;
         pub const WriteResult = io.PacketWriteResult;
 
         allocator: std.mem.Allocator,
-        descriptor: Descriptors,
+        descriptor: Descriptor,
         io_lock: core.Mutex = .{},
         readiness: io.Waiter,
         receive_thread: ?std.Thread = null,
@@ -469,7 +469,7 @@ pub fn PacketTransport(comptime Descriptors: type) type {
         writes_stopped: bool = false,
 
         /// Takes descriptor ownership on entry, including allocation failure.
-        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptors) std.mem.Allocator.Error!*Self {
+        pub fn create(allocator: std.mem.Allocator, descriptor: Descriptor) std.mem.Allocator.Error!*Self {
             errdefer releaseDescriptor(descriptor);
             const self = try allocator.create(Self);
             errdefer allocator.destroy(self);
@@ -582,7 +582,7 @@ pub fn PacketTransport(comptime Descriptors: type) type {
             if (!stopping) _ = self.on_receive.?(self.receive_context, null, 0, null, -1);
         }
 
-        pub fn releaseDescriptor(descriptor: Descriptors) void {
+        pub fn releaseDescriptor(descriptor: Descriptor) void {
             switch (descriptor) {
                 inline else => |value| value.cleanup(),
             }
