@@ -35,6 +35,20 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 the native include directory. `partout-winrt` adds `runtime.cc` and packages all
 objects into one archive for Zig. The backend has no portable ABI dependency.
 
+## Logging
+
+Native messages use `Partout::<Class>: action` prefixes and lowercase action
+wording. Failures include `HRESULT=0x...` when available; packet sizes and
+counters use named fields. Debug covers setup details and callback traces;
+info covers channel/connection lifecycle, TCP EOF and packet totals; notice
+covers unsupported requested features; error covers failed operations. Routine
+snapshot and environment publication stubs remain debug traces to avoid repeated
+notices. Fault is reserved for unrecoverable internal failures.
+
+Runtime messages go to both channel diagnostics and the configured host logger;
+the host logger receives the original level. A connection failure is reported
+once per destination, including its HRESULT.
+
 ## Socket lifecycle
 
 Create a socket, configure it through the tunnel controller, then open it.

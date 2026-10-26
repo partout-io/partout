@@ -82,7 +82,7 @@ void TunSettings::ApplyDNS(const JsonObject &settings) {
     if (Has(settings, L"domainName"))
         domains.Append(VpnDomainNameInfo{settings.GetNamedString(L"domainName"), VpnDomainNameType::Suffix, servers, proxies});
     if (names.Size() && policy != L"match")
-        winrt_log(WinrtLogNotice, "VPN channel cannot configure DNS search suffixes; DNS resolution rules are applied");
+        winrt_log(WinrtLogNotice, "Partout::TunSettings: DNS search suffixes unsupported; DNS resolution rules applied");
 }
 
 void TunSettings::ApplyMTU(double mtu) {

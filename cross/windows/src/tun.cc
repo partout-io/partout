@@ -68,7 +68,7 @@ int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
         flush();
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(WinrtLogError, "WinRT %s write failed during %s: HRESULT 0x%08x, length=%zu, capacity=%u",
+        winrt_log(WinrtLogError, "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
         if (packet) {
@@ -135,7 +135,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
             socket_ = &socket;
         }
     } catch (...) {
-        winrt_log(WinrtLogError, "Partout::TunnelController.Associate failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return false;
     }
@@ -168,7 +168,7 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
     } catch (...) { idle.Close(); throw; }
     idle_transport_ = idle;
     transport_ = idle;
-    winrt_log(WinrtLogNotice, "WinRT independent UDP: idle channel transport ready");
+    winrt_log(WinrtLogDebug, "Partout::TunnelController: idle UDP transport ready");
 }
 
 winrt_tun TunnelController::Open(const char *info_json) {
@@ -197,7 +197,7 @@ winrt_tun TunnelController::Open(const char *info_json) {
             settings.MTU(), settings.MaxFrame(), false, transport_);
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
-        winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
+        winrt_log(WinrtLogInfo, "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
             settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
     std::lock_guard lock(state_->receive_mutex);
@@ -220,13 +220,13 @@ void TunnelController::Close() noexcept {
             state_->channel.Stop();
             started_ = false;
         } catch (...) {
-            winrt_log(WinrtLogError, "Partout::TunnelController.Close failed: HRESULT 0x%08x",
+            winrt_log(WinrtLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
                 static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
         { std::lock_guard lock(state_->receive_mutex); counters = state_->counters; }
-        winrt_log(WinrtLogNotice,
-            "VPN packets (controller totals): TUN read=%llu, TUN dropped=%llu, link send=%llu, link send failed=%llu, link read=%llu, TUN write=%llu, TUN write failed=%llu",
+        winrt_log(WinrtLogInfo,
+            "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, tun_write_failed=%llu",
             counters.tun_read, counters.tun_dropped, counters.link_send,
             counters.link_send_failed, counters.link_read, counters.tun_write, counters.tun_write_failed);
     }
@@ -298,7 +298,9 @@ void winrt_tun_stop_writes(winrt_tun tun) {
 
 // FIXME: ###, Windows, Retain and notify the tunnel controller delegate.
 void winrt_tun_ctrl_set_delegate(void *ref, const winrt_tun_ctrl_delegate *delegate) {
-    winrt_log(WinrtLogDebug, "tun: ctrl_set_delegate(%p, %p)", ref, delegate);
+    winrt_log(delegate ? WinrtLogNotice : WinrtLogDebug,
+        "Partout::TunnelController: delegate notifications not implemented: controller=%p, registered=%s",
+        ref, delegate ? "true" : "false");
 }
 
 bool winrt_tun_ctrl_configure_sockets(void *ref, const winrt_socket *sockets, size_t count) {
@@ -317,11 +319,11 @@ winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *inf
     if (!controller) return nullptr;
     try { return controller->Open(info_json); }
     catch (hresult_error const &error) {
-        winrt_log(WinrtLogError, "Partout::TunnelController.Open failed: HRESULT 0x%08x (%ls)",
+        winrt_log(WinrtLogError, "Partout::TunnelController: open failed: HRESULT=0x%08x (%ls)",
             static_cast<unsigned int>(error.code().value), error.message().c_str());
         return nullptr;
     } catch (...) {
-        winrt_log(WinrtLogError, "Partout::TunnelController.Open failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::TunnelController: open failed: HRESULT=0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return nullptr;
     }
@@ -329,25 +331,28 @@ winrt_tun winrt_tun_ctrl_set_tunnel(void *ref, const char *uuid, const char *inf
 
 // FIXME: ###, Windows, Publish tunnel snapshots to the host.
 void winrt_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
-    winrt_log(WinrtLogDebug, "tun: ctrl_report_snapshot(%p, %p)", ref, snapshot_json);
+    winrt_log(WinrtLogDebug, "Partout::TunnelController: snapshot publication not implemented: controller=%p, snapshot=%p", ref, snapshot_json);
 }
 
 // FIXME: ###, Windows, Publish environment updates to the host.
 void winrt_tun_ctrl_set_environment_value(void *ref, const char *key, const char *value) {
-    winrt_log(WinrtLogDebug, "tun: ctrl_set_environment_value(%p, %p, %p)", ref, key, value);
+    winrt_log(WinrtLogDebug, "Partout::TunnelController: environment publication not implemented: controller=%p, key=%p, value=%p", ref, key, value);
 }
 
 // FIXME: ###, Windows, Honor kill_switch when clearing tunnel settings.
 void winrt_tun_ctrl_clear_tunnel(void *ref, bool kill_switch) {
-    winrt_log(WinrtLogDebug, "tun: ctrl_clear_tunnel(%p, %d)", ref, kill_switch);
+    winrt_log(WinrtLogDebug, "Partout::TunnelController: clear requested: controller=%p, kill_switch=%s",
+        ref, kill_switch ? "true" : "false");
     const auto controller = get_controller(ref);
     if (!controller) return;
+    if (kill_switch)
+        winrt_log(WinrtLogNotice, "Partout::TunnelController: kill switch not implemented; clearing tunnel settings");
     controller->Close();
 }
 
 // FIXME: ###, Windows, Cancel the VPN channel and report error_message.
 void winrt_tun_ctrl_cancel_tunnel(void *ref, const char *error_message) {
-    winrt_log(WinrtLogDebug, "tun: ctrl_cancel_tunnel(%p, %p)", ref, error_message);
+    winrt_log(WinrtLogError, "Partout::TunnelController: cancellation not implemented: controller=%p, error_message=%p", ref, error_message);
 }
 
 }

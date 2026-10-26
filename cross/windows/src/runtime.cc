@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <chrono>
 #include <condition_variable>
+#include <cwchar>
 #include <memory>
 #include <atomic>
 #include <mutex>
@@ -20,7 +21,6 @@
 
 #include "partout_winrt.h"
 #include "tun.h"
-#include "winrt/log.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -103,13 +103,12 @@ struct VpnChannelRuntime::Impl {
         if (!value || value != channel) throw hresult_invalid_argument();
     }
 
-    // FIXME: ###, Windows, Retain log level
-    void Log(std::wstring_view message) const noexcept {
+    void Log(partout_log_level level, std::wstring_view message) const noexcept {
         try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
-                init_args.logger_fn(init_args.logger_ctx, PartoutLogLevelDebug, text.c_str());
+                init_args.logger_fn(init_args.logger_ctx, level, text.c_str());
             }
         } catch (...) {}
     }
@@ -130,7 +129,7 @@ struct VpnChannelRuntime::Impl {
             std::scoped_lock lock(startup_mutex);
             startup_status = StartupStatus::waiting;
         }
-        Log(L"Partout::VpnChannelRuntime.Connect entered");
+        Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
             partout_daemon_start_args args{};
@@ -156,15 +155,16 @@ struct VpnChannelRuntime::Impl {
                 throw hresult_error(E_FAIL, L"Unable to start Partout daemon");
             }
             daemon_started = true;
-            Log(L"Partout::VpnChannelRuntime: Waiting for connection status");
+            Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: waiting for connection");
             WaitForConnection();
-            Log(L"Partout::VpnChannelRuntime: Connection established");
+            Log(PartoutLogLevelInfo, L"Partout::VpnChannelRuntime: connected");
         } catch (...) {
             const auto failure = to_hresult();
-            winrt_log(WinrtLogError, "Partout::VpnChannelRuntime.Connect failed: HRESULT 0x%08x",
+            wchar_t message[128]{};
+            std::swprintf(message, 128, L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
                 static_cast<unsigned int>(failure.value));
+            Log(PartoutLogLevelError, message);
             Stop();
-            Log(L"Partout::VpnChannelRuntime.Connect failed");
             try { channel.SetErrorMessage(L"Unable to start Partout VPN channel"); } catch (...) {}
             throw;
         }
@@ -188,8 +188,9 @@ void VpnChannelRuntime::Connect(VpnChannel const &channel) {
 
 void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
     impl_->CheckChannel(channel);
-    impl_->Log(L"Partout::VpnChannelRuntime.Disconnect entered");
+    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: disconnect requested");
     impl_->Stop();
+    impl_->Log(PartoutLogLevelInfo, L"Partout::VpnChannelRuntime: disconnected");
 }
 
 // FIXME: ###, Windows, Supply the protocol keepalive payload when required.
@@ -199,7 +200,7 @@ void VpnChannelRuntime::GetKeepAlivePayload(
 ) {
     impl_->CheckChannel(channel);
     keep_alive_packet = nullptr;
-    impl_->Log(L"Partout::VpnChannelRuntime.GetKeepAlivePayload entered (no payload)");
+    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
 }
 
 void VpnChannelRuntime::Encapsulate(
