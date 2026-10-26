@@ -83,7 +83,7 @@ struct Socket::State {
     void deliverLocked(const uint8_t *bytes, size_t size,
                        const winrt_socket_address *source, int32_t error) {
         if (!callback || (paused && !error)) return;
-        if (error == 1) {
+        if (error == WinrtSocketEOF) {
             winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
             winrt_log(WinrtLogError, "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
@@ -342,7 +342,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->finishReadLocked(1);
+                state->finishReadLocked(WinrtSocketEOF);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);

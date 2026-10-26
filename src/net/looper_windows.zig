@@ -379,8 +379,8 @@ pub const WindowsLooper = struct {
         if (code != 0) {
             if (on_failure) |callback| callback.call(.{ .io = .{
                 .side = std.meta.activeTag(arguments.pair),
-                .cause = if (code == 1) error.EndOfStream else error.LibcFailure,
-                .code = if (code == 1) null else code,
+                .cause = if (code == io_c.WinrtSocketEOF) error.EndOfStream else error.LibcFailure,
+                .code = if (code == io_c.WinrtSocketEOF) null else code,
             } });
             return false;
         }
