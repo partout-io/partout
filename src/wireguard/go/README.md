@@ -14,6 +14,34 @@ preserved.
 
 **Passive mode** uses Partout's custom callback ABI, declared in [wg_go.h](include/wg_go/wg_go.h) and [passive_io.h](include/wg_go/passive_io.h). Partout owns UDP and TUN I/O; `wgTurnOnWithPassiveIO` supplies Go with read/write callbacks instead of native descriptors. Go lends pinned packet buffers to the host, which completes each accepted request through `wgCompleteIO`. Common operations reuse the original ABI, while passive shutdown and endpoint updates use dedicated functions. The C shim serializes device calls and dispatches according to the selected mode. Active and passive backends must never run concurrently, and previous-mode calls must finish before switching. This is the default WireGuard mode on Windows (`daemon_io = .link`).
 
+## Windows passive I/O
+
+[The Windows passive adapter](../internal/passive_io_windows.zig) fills waiting
+Go reads directly from native UDP and TUN callbacks under its receive lock.
+This avoids queue allocations and an intermediate payload copy. Packets arriving
+without a waiting reader use bounded owned queues. Read buffers are unregistered
+before completion; detach, shutdown and failure cancel pending registrations.
+Callbacks never complete Go requests themselves; the waiting Go worker completes
+after releasing the receive lock. POSIX passive I/O instead reads directly from
+descriptors with readiness waits; the production non-Windows path uses active mode.
+
+The adapter serializes writes against descriptor replacement. Passive write
+completion releases the Go buffer after the native backend copies it; it reports
+acceptance rather than network transmission. Later socket failures use the
+adapter's receive-error path.
+
+WireGuard keeps its unconnected UDP socket outside VpnChannel transport takeover.
+`Encapsulate` supplies TUN input, and decrypted packets return through the channel
+receive-buffer append/flush APIs. WireGuard does not use `Decapsulate` or the
+channel send-buffer path for UDP traffic. See the [Windows backend guide](../../../cross/windows/README.md#unconnected-udp)
+for native transport setup.
+
+Local tests cover allocation-free delivery to waiting readers, queued batches,
+cancellation and buffer lifetimes, multiple UDP sources and replies after a
+source-port change. Live multi-peer/peer-roaming, background suspension and resume
+still need validation. The physical adapter is retained across UDP bind
+replacement; automatic local-interface migration is not implemented.
+
 ## Build and test
 
 CMake builds the Go bridge through the `partout-wg-go` target and passes its
@@ -26,7 +54,3 @@ cmake --build .cmake --target partout-wg-go
 cmake --build .cmake
 go -C src/wireguard/go test -race ./...
 ```
-
-Windows passive I/O uses native receive queues and channel TUN writes; POSIX
-uses descriptors and readiness waits. See the [Windows backend guide](../../../cross/windows/README.md)
-for transport ownership and current limitations.

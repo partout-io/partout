@@ -1,7 +1,7 @@
 # Windows WinRT backend
 
-Windows support is experimental. OpenVPN and WireGuard have carried traffic in
-manual VPN-host testing; this is not yet production or full platform-parity
+Windows support is experimental. The backend has carried traffic in manual
+VPN-host testing; this is not yet production or full platform-parity
 validation. The transport paths below are the default implementation, with no
 separate experiment flag.
 
@@ -28,7 +28,6 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Partout socket and TUN wrappers. |
 | `../../src/net/looper_windows.zig` | Dispatches native packet callbacks and timers, waiting on the daemon's shared wake event. |
-| `../../src/wireguard/internal/passive_io_windows.zig` | Queues native receives for Go's passive read callbacks and forwards writes. |
 | `../../src/c/portable/tun_windows.c` | Converts Partout's portable controller ABI into backend calls, or supplies fallback stubs without WinRT. |
 
 `partout-winrt-backend` compiles sockets, the controller and logging with only
@@ -58,20 +57,19 @@ the opaque socket pointer through `pp_socket_fd`; it is not a Winsock handle.
 UDP uses the OS `MessageReceived` event. TCP owns an `IAsyncAction` read loop;
 channel takeover cancels native I/O and joins that task directly.
 Both deliver buffers or errors to the registered callback and borrowed context.
-Clearing the callback drains delivery; callbacks only queue input and must not
+Clearing the callback drains delivery; callbacks consume or copy input and must not
 reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
 packet and destination; one coroutine drains the native queue in FIFO order using
 `co_await` for output-stream acquisition and writes. Success means accepted, with
 later failures routed through the same callback. Channel-buffer writes copy into
 VpnChannel's pool directly. See `include/winrt/socket.h` for the contract.
 Callers serialize writes with other writes, socket configuration, channel
-takeover, writer replacement and destruction. The daemon actor provides this
-serialization for OpenVPN; WireGuard's passive adapter holds its write lock.
+takeover, writer replacement and destruction. The caller supplies this serialization.
 Stopping writes and clearing receive callbacks may overlap an admitted write;
 the owner keeps the socket alive until submission returns. Outstanding reads and
 writes retain shared I/O state and native transports, without retaining Socket.
 
-### Connected transports (OpenVPN)
+### Connected transports
 
 The WindowsLooper queues owned input for both link and TUN attachments and
 dispatches their callbacks on its caller. The native socket owns the lifetime
@@ -91,9 +89,9 @@ queue and flags shared with native callbacks. Detach drains native delivery and
 discards pending writes and queued input; an in-progress protocol callback retains
 its attachment until it returns, so it may safely detach its own side.
 
-### Unconnected UDP (WireGuard)
+### Unconnected UDP
 
-WireGuard uses an application-owned UDP socket bound to the network adapter
+Unconnected UDP uses an application-owned socket bound to the network adapter
 selected before channel startup. It keeps receiving source addresses through
 `MessageReceived` and sends to each supplied destination with
 `GetOutputStreamAsync`; VpnChannel never takes over this socket.
@@ -101,23 +99,11 @@ selected before channel startup. It keeps receiving source addresses through
 The controller associates a separate idle UDP socket with VpnChannel because
 channel startup requires a transport. Its numeric destination is `192.0.2.1:9`
 (TEST-NET-1), with no DNS lookup or application payload writes. This transport
-does not represent a WireGuard peer and is closed when the controller stops.
+does not represent a protocol peer and is closed when the controller stops.
 
-`Encapsulate` forwards IP packets into the passive TUN queue. Go workers read
-the UDP and TUN queues through the passive ABI; decrypted packets return through
-the channel receive-buffer append/flush APIs. WireGuard does not use
-`Decapsulate` or the channel send-buffer path for its UDP traffic.
-
-The passive implementation is split into POSIX and Windows backends, with shared
-argument validation and endpoint conversion. Local tests cover multiple UDP
-sources and replying after a source-port change. Live multi-peer/peer-roaming,
-background suspension and resume still need validation. The physical adapter is
-retained across UDP bind replacement; automatic local-interface migration is not
-implemented.
-
-Passive write completion releases the Go buffer after the native backend copies
-it; it reports acceptance rather than network transmission. Later socket failures
-use the passive adapter's existing receive-error path.
+`Encapsulate` forwards borrowed IP packets to the registered TUN receiver.
+TUN writes return packets through the channel receive-buffer append/flush APIs.
+Unconnected UDP bypasses `Decapsulate` and the channel send-buffer path.
 
 ### Timers
 
@@ -141,7 +127,7 @@ owns a private wake source. The daemon's command loop remains unchanged.
 packet counters for the controller and socket writer. One receive mutex protects
 the current borrowed TUN and serializes native packet delivery with callback
 registration, removal and handle destruction. Freeing an old handle cannot clear
-its replacement. Callbacks only enqueue input and must not reenter TUN or
+its replacement. Callbacks consume or copy input and must not reenter TUN or
 controller APIs.
 
 The Zig wrappers share callback registration and draining logic, retain native
@@ -202,8 +188,7 @@ With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 builds without WinRT use the fallback branch in `tun_windows.c` for
 tests and builds that do not need native VPN support.
 
-Enable WireGuard with `-DPP_BUILD_USE_WIREGUARD=ON` when building the full
-library. Independent UDP is automatic for unconnected sockets; no additional
+Independent UDP is automatic for unconnected sockets; no additional
 transport option is needed. The native archive alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
