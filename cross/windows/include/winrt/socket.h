@@ -30,9 +30,12 @@ typedef struct {
     uint8_t family;
 } winrt_socket_address;
 
+/* Callback sentinel for an orderly TCP shutdown; other errors are HRESULTs. */
+enum { WinrtSocketEOF = 1 };
+
 /* Worker-thread callbacks are serialized per socket. Buffers and source are
  * borrowed until return; only unconnected UDP supplies source. Error is zero
- * for data, 1 for TCP EOF, otherwise a receive/write HRESULT. False pauses data
+ * for data, WinrtSocketEOF for TCP EOF, otherwise a receive/write HRESULT. False pauses data
  * delivery; asynchronous write failures are still delivered while paused.
  * Register on attach, clear on detach; replacing a callback is rejected.
  * Clearing drains callbacks. Callbacks must not reenter socket APIs. Keep context

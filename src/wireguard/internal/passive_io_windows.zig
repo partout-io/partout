@@ -259,11 +259,7 @@ pub const PassiveIO = struct {
             for (packets[0..count]) |packet| {
                 const data: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
                 const result = if (tag == .link) value.write(data, destination) else value.write(data);
-                const failure = result catch {
-                    status = c.WG_IO_INVALID;
-                    break;
-                };
-                if (failure != null) {
+                if (result != 0) {
                     status = c.WG_IO_INVALID;
                     break;
                 }

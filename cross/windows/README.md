@@ -35,6 +35,20 @@ Partout portable/tun_windows.c -> winrt/tun.h  -> src/tun.cc
 the native include directory. `partout-winrt` adds `runtime.cc` and packages all
 objects into one archive for Zig. The backend has no portable ABI dependency.
 
+## Logging
+
+Native messages use `Partout::<Class>: action` prefixes and lowercase action
+wording. Failures include `HRESULT=0x...` when available; packet sizes and
+counters use named fields. Debug covers setup details and callback traces;
+info covers channel/connection lifecycle, TCP EOF and packet totals; notice
+covers unsupported requested features; error covers failed operations. Routine
+snapshot and environment publication stubs remain debug traces to avoid repeated
+notices. Fault is reserved for unrecoverable internal failures.
+
+Runtime messages go to both channel diagnostics and the configured host logger;
+the host logger receives the original level. A connection failure is reported
+once per destination, including its HRESULT.
+
 ## Socket lifecycle
 
 Create a socket, configure it through the tunnel controller, then open it.
@@ -121,9 +135,35 @@ timer deadline require work. Bounded waits remain available for tests. The
 supplied mux is borrowed only for its wake event; a looper created without one
 owns a private wake source. The daemon's command loop remains unchanged.
 
+### TUN lifetime and delivery
+
+`Partout::Tun` owns each TUN handle; its nested `State` retains the channel and
+packet counters for the controller and socket writer. One receive mutex protects
+the current borrowed TUN and serializes native packet delivery with callback
+registration, removal and handle destruction. Freeing an old handle cannot clear
+its replacement. Callbacks only enqueue input and must not reenter TUN or
+controller APIs.
+
+The Zig wrappers share callback registration and draining logic, retain native
+handle types, and return native write status codes. WindowsLooper converts a
+write failure into the same queue used for asynchronous receive/write failures.
+Detach drains native callbacks before purging that side's queued input. Dispatch
+retains the side separately so a protocol callback can detach itself safely.
+
+Pausing TUN reads preserves already queued packets but drops new packet input
+before allocation until reads resume. Errors remain eligible while paused.
+Socket input retains in-flight TCP bytes until resume; native socket callbacks
+provide backpressure. Detach summaries include the paused TUN drop count.
+
+Writes copy packets into the channel synchronously. The daemon looper serializes
+writes, write shutdown and handle lifetime; teardown outside the looper follows
+daemon shutdown. No write mutex, asynchronous TUN writer or atomic stop flag is
+needed. Native receive counters use the receive mutex; write counters belong to
+the looper, which snapshots all counters under that mutex when stopping.
+
 ## VPN channel runtime
 
-C++ plugins include `partout_winrt.h` and construct `PartoutVpnChannelRuntime`
+C++ plugins include `partout_winrt.h` and construct `Partout::VpnChannelRuntime`
 with a retained `VpnChannel`, profile JSON, logger settings and nonblocking
 daemon options (`is_daemon = false`). The runtime copies the profile and cache
 path. Serialize calls and forward the five `IVpnPlugIn` callbacks unchanged.
@@ -138,8 +178,7 @@ Transport association, socket I/O and the TUN packet bridge are implemented.
 Channel startup applies negotiated IP addresses, inclusion/exclusion routes,
 DNS resolution rules and MTU from the remote IP/DNS modules. The receive pool
 uses the negotiated MTU; the send pool adds 100 bytes for encapsulation.
-Absent or zero MTU uses 1400 for connected transports and 1420 for independent
-UDP, matching WireGuard passive I/O's default. Explicit MTUs are honored.
+Absent or zero MTU uses 1400 for all transports. Explicit MTUs are honored.
 Default inclusion routes are split into two `/1` routes to outrank physical
 default routes without relying on interface metrics. Absent IP families are
 passed to Windows as `nullptr`, not empty address lists.

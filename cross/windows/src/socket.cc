@@ -83,9 +83,12 @@ struct Socket::State {
     void deliverLocked(const uint8_t *bytes, size_t size,
                        const winrt_socket_address *source, int32_t error) {
         if (!callback || (paused && !error)) return;
-        if (error) winrt_log(WinrtLogError,
-            "WinRT socket I/O failed: code=0x%08x (1=TCP EOF), channel_owned=%s",
-            static_cast<unsigned int>(error), channel_owned ? "true" : "false");
+        if (error == WinrtSocketEOF) {
+            winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
+        } else if (error) {
+            winrt_log(WinrtLogError, "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
+                static_cast<unsigned int>(error), channel_owned ? "true" : "false");
+        }
         paused = !callback(context, bytes, size, source, error);
     }
 };
@@ -106,7 +109,7 @@ Socket::~Socket() noexcept {
     SetOnReceive(nullptr, nullptr);
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
-        winrt_log(WinrtLogNotice, "WinRT independent UDP totals: received=%llu, sent=%llu",
+        winrt_log(WinrtLogInfo, "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
             state_->received, state_->sent);
     }
     receive_registration_.revoke();
@@ -162,7 +165,7 @@ bool Socket::Open(const char *hostname, uint16_t port,
             if (adapter_) {
                 if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
                 datagram_.BindServiceNameAsync(local_service, adapter_).get();
-                winrt_log(WinrtLogNotice, "WinRT independent UDP: bound port %ls on adapter %ls",
+                winrt_log(WinrtLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
                     datagram_.Information().LocalPort().c_str(),
                     to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
@@ -177,20 +180,21 @@ bool Socket::Open(const char *hostname, uint16_t port,
             WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
                 options->timeout_ms);
         }
-        winrt_log(WinrtLogDebug, "WinRT socket: Opened %s %s:%u, mode=%s, dual_stack=%s",
+        winrt_log(WinrtLogDebug, "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
             datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-            unconnected_ ? "unconnected (bound)" : "connected",
+            unconnected_ ? "unconnected" : "connected",
             options->dual_stack ? "true" : "false");
     } catch (hresult_error const &error) {
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
             const auto message = to_string(error.message());
-            winrt_log(WinrtLogError, "winrt_socket_open failed: HRESULT 0x%08x (%s)",
+            winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
                 static_cast<unsigned int>(error.code().value), message.c_str());
         } catch (...) {}
         return false;
     } catch (...) {
-        winrt_log(WinrtLogError, "winrt_socket_open failed: unexpected exception");
+        winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
+            static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -338,7 +342,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->finishReadLocked(1);
+                state->finishReadLocked(WinrtSocketEOF);
                 co_return;
             }
             state->deliver(received.data(), received.Length(), nullptr, 0);
@@ -366,7 +370,7 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         }
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(WinrtLogError, "WinRT socket write failed: HRESULT 0x%08x, length=%zu",
+        winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
             static_cast<unsigned int>(error), length);
         return error;
     }
@@ -493,7 +497,7 @@ winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
     try {
         return new __winrt_socket_struct{{proto, unconnected}};
     } catch (...) {
-        winrt_log(WinrtLogError, "winrt_socket_create failed: HRESULT 0x%08x",
+        winrt_log(WinrtLogError, "Partout::Socket: create failed: HRESULT=0x%08x",
             static_cast<unsigned int>(to_hresult().value));
         return nullptr;
     }

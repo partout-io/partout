@@ -15,19 +15,21 @@
 #define PARTOUT_WINRT_API __declspec(dllimport)
 #endif
 
+namespace Partout {
+
 // One runtime per channel. Callbacks must be serialized by the consumer.
 // Profile and cache_dir are copied; logger_ctx must outlive the runtime and
 // remain valid while registered with Partout's process-wide logger.
-class PartoutVpnChannelRuntime {
+class VpnChannelRuntime {
 public:
-    PARTOUT_WINRT_API PartoutVpnChannelRuntime(
+    PARTOUT_WINRT_API VpnChannelRuntime(
         winrt::Windows::Networking::Vpn::VpnChannel const &channel,
         const char *profile,
         const partout_init_args &init_args,
         const partout_daemon_options &options);
-    PARTOUT_WINRT_API ~PartoutVpnChannelRuntime();
-    PartoutVpnChannelRuntime(const PartoutVpnChannelRuntime &) = delete;
-    PartoutVpnChannelRuntime &operator=(const PartoutVpnChannelRuntime &) = delete;
+    PARTOUT_WINRT_API ~VpnChannelRuntime();
+    VpnChannelRuntime(const VpnChannelRuntime &) = delete;
+    VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
 
     PARTOUT_WINRT_API void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     PARTOUT_WINRT_API void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
@@ -48,5 +50,8 @@ private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };
+
+} // namespace Partout
+
 #undef PARTOUT_WINRT_API
 #endif

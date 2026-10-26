@@ -21,11 +21,11 @@ jobs:
       matrix:
         include:
           - job_name: Run Zig tests
-            runner: macos-26
+            runner: xcode-27
             suite: zig
             timeout_minutes: 10
           - job_name: Run Apple tests
-            runner: macos-26
+            runner: xcode-27
             suite: apple
             timeout_minutes: 10
           - job_name: Run Android tests

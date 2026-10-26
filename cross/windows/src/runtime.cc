@@ -5,6 +5,7 @@
 #include <windows.h>
 #include <chrono>
 #include <condition_variable>
+#include <cwchar>
 #include <memory>
 #include <atomic>
 #include <mutex>
@@ -20,7 +21,6 @@
 
 #include "partout_winrt.h"
 #include "tun.h"
-#include "winrt/log.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -34,14 +34,16 @@ extern "C" void pp_winrt_runtime_link() {}
 using namespace winrt;
 using namespace winrt::Windows::Networking::Vpn;
 
-struct PartoutVpnChannelRuntime::Impl {
+namespace Partout {
+
+struct VpnChannelRuntime::Impl {
     VpnChannel channel;
     std::string profile;
     std::string cache_dir;
     partout_init_args init_args;
     partout_daemon_options options;
     bool daemon_started = false;
-    std::atomic<std::shared_ptr<Partout::TunnelController>> controller;
+    std::atomic<std::shared_ptr<TunnelController>> controller;
     enum class StartupStatus { waiting, connecting, connected, failed };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
@@ -101,13 +103,12 @@ struct PartoutVpnChannelRuntime::Impl {
         if (!value || value != channel) throw hresult_invalid_argument();
     }
 
-    // FIXME: ###, Windows, Retain log level
-    void Log(std::wstring_view message) const noexcept {
+    void Log(partout_log_level level, std::wstring_view message) const noexcept {
         try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
-                init_args.logger_fn(init_args.logger_ctx, PartoutLogLevelDebug, text.c_str());
+                init_args.logger_fn(init_args.logger_ctx, level, text.c_str());
             }
         } catch (...) {}
     }
@@ -128,14 +129,14 @@ struct PartoutVpnChannelRuntime::Impl {
             std::scoped_lock lock(startup_mutex);
             startup_status = StartupStatus::waiting;
         }
-        Log(L"PartoutVpnChannelRuntime.Connect entered");
+        Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
             partout_daemon_start_args args{};
             args.profile = profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
-            const auto active_controller = std::make_shared<Partout::TunnelController>(channel);
+            const auto active_controller = std::make_shared<TunnelController>(channel);
             controller.store(active_controller);
             bindings.controller = active_controller.get();
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
@@ -154,22 +155,23 @@ struct PartoutVpnChannelRuntime::Impl {
                 throw hresult_error(E_FAIL, L"Unable to start Partout daemon");
             }
             daemon_started = true;
-            Log(L"PartoutVpnChannelRuntime: Waiting for connection status");
+            Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: waiting for connection");
             WaitForConnection();
-            Log(L"PartoutVpnChannelRuntime: Connection established");
+            Log(PartoutLogLevelInfo, L"Partout::VpnChannelRuntime: connected");
         } catch (...) {
             const auto failure = to_hresult();
-            winrt_log(WinrtLogError, "PartoutVpnChannelRuntime.Connect failed: HRESULT 0x%08x",
+            wchar_t message[128]{};
+            std::swprintf(message, 128, L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
                 static_cast<unsigned int>(failure.value));
+            Log(PartoutLogLevelError, message);
             Stop();
-            Log(L"PartoutVpnChannelRuntime.Connect failed");
             try { channel.SetErrorMessage(L"Unable to start Partout VPN channel"); } catch (...) {}
             throw;
         }
     }
 };
 
-PartoutVpnChannelRuntime::PartoutVpnChannelRuntime(
+VpnChannelRuntime::VpnChannelRuntime(
     VpnChannel const &channel,
     const char *profile,
     const partout_init_args &init_args,
@@ -177,30 +179,31 @@ PartoutVpnChannelRuntime::PartoutVpnChannelRuntime(
 ) : impl_(std::make_unique<Impl>(channel, profile, init_args, options)) {
 }
 
-PartoutVpnChannelRuntime::~PartoutVpnChannelRuntime() = default;
+VpnChannelRuntime::~VpnChannelRuntime() = default;
 
-void PartoutVpnChannelRuntime::Connect(VpnChannel const &channel) {
+void VpnChannelRuntime::Connect(VpnChannel const &channel) {
     impl_->CheckChannel(channel);
     impl_->Connect();
 }
 
-void PartoutVpnChannelRuntime::Disconnect(VpnChannel const &channel) {
+void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
     impl_->CheckChannel(channel);
-    impl_->Log(L"PartoutVpnChannelRuntime.Disconnect entered");
+    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: disconnect requested");
     impl_->Stop();
+    impl_->Log(PartoutLogLevelInfo, L"Partout::VpnChannelRuntime: disconnected");
 }
 
 // FIXME: ###, Windows, Supply the protocol keepalive payload when required.
-void PartoutVpnChannelRuntime::GetKeepAlivePayload(
+void VpnChannelRuntime::GetKeepAlivePayload(
     VpnChannel const &channel,
     VpnPacketBuffer &keep_alive_packet
 ) {
     impl_->CheckChannel(channel);
     keep_alive_packet = nullptr;
-    impl_->Log(L"PartoutVpnChannelRuntime.GetKeepAlivePayload entered (no payload)");
+    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
 }
 
-void PartoutVpnChannelRuntime::Encapsulate(
+void VpnChannelRuntime::Encapsulate(
     VpnChannel const &channel, VpnPacketBufferList const &packets,
     VpnPacketBufferList const &encapsulated_packets
 ) {
@@ -209,7 +212,7 @@ void PartoutVpnChannelRuntime::Encapsulate(
     if (const auto controller = impl_->controller.load()) controller->Encapsulate(packets);
 }
 
-void PartoutVpnChannelRuntime::Decapsulate(
+void VpnChannelRuntime::Decapsulate(
     VpnChannel const &channel,
     VpnPacketBuffer const &packet,
     VpnPacketBufferList const &decapsulated_packets,
@@ -220,3 +223,5 @@ void PartoutVpnChannelRuntime::Decapsulate(
     (void)control_packets;
     if (const auto controller = impl_->controller.load()) controller->Decapsulate(packet);
 }
+
+} // namespace Partout
