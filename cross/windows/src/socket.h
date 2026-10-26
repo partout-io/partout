@@ -54,6 +54,7 @@ private:
         winrt::hstring const &port);
     static winrt::Windows::Foundation::IAsyncAction ReadStream(std::shared_ptr<State> state,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
+    void EnqueueWrite(const uint8_t *bytes, size_t length, const winrt_socket_address *destination);
     static winrt::Windows::Foundation::IAsyncAction WriteQueued(std::shared_ptr<State> state,
         winrt::Windows::Networking::Sockets::DatagramSocket datagram,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
@@ -65,7 +66,7 @@ private:
     winrt::Windows::Foundation::IAsyncAction read_{nullptr};
     winrt::Windows::Foundation::IAsyncAction write_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
-    Writer channel_write_;
+    Writer channel_write_; // Installed by TakeOver; empty during direct socket I/O.
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};
     winrt::Windows::Networking::HostName bound_host_{nullptr};

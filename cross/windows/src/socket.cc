@@ -359,42 +359,10 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         const auto status = state->write_status.load();
         if (status) return status;
         if (channel_write_) {
+            // After takeover, VpnChannel owns transport writes.
             check_hresult(channel_write_(bytes, length));
         } else {
-            State::WriteRequest request;
-            if (unconnected_) {
-                if (!destination || (destination->family != 4 && destination->family != 6) ||
-                    (destination->family == 4 && !accepts_ipv4_) ||
-                    (destination->family == 6 && !accepts_ipv6_))
-                    throw hresult_invalid_argument();
-                wchar_t address[INET6_ADDRSTRLEN]{};
-                if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
-                    const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
-                    throw hresult_invalid_argument();
-                std::wstring host{address};
-                if (destination->family == 6 && destination->scope_id)
-                    host += L"%" + std::to_wstring(destination->scope_id);
-                request.host = HostName{host};
-                request.service = to_hstring(destination->port);
-            }
-            request.buffer = Buffer{static_cast<uint32_t>(length)};
-            request.buffer.Length(static_cast<uint32_t>(length));
-            if (length) memcpy(request.buffer.data(), bytes, length);
-            bool start;
-            {
-                std::lock_guard lock(state->mutex);
-                start = state->writes.empty();
-                state->writes.push_back(std::move(request));
-            }
-            if (start) {
-                try {
-                    write_ = WriteQueued(state, datagram_, stream_);
-                } catch (...) {
-                    std::lock_guard lock(state->mutex);
-                    state->writes.clear();
-                    throw;
-                }
-            }
+            EnqueueWrite(bytes, length, destination);
         }
     } catch (...) {
         const auto error = to_hresult().value;
@@ -403,6 +371,45 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         return error;
     }
     return 0;
+}
+
+void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
+    const winrt_socket_address *destination) {
+    const auto state = state_;
+    State::WriteRequest request;
+    if (unconnected_) {
+        if (!destination || (destination->family != 4 && destination->family != 6) ||
+            (destination->family == 4 && !accepts_ipv4_) ||
+            (destination->family == 6 && !accepts_ipv6_))
+            throw hresult_invalid_argument();
+        wchar_t address[INET6_ADDRSTRLEN]{};
+        if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
+            const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
+            throw hresult_invalid_argument();
+        std::wstring host{address};
+        if (destination->family == 6 && destination->scope_id)
+            host += L"%" + std::to_wstring(destination->scope_id);
+        request.host = HostName{host};
+        request.service = to_hstring(destination->port);
+    }
+    request.buffer = Buffer{static_cast<uint32_t>(length)};
+    request.buffer.Length(static_cast<uint32_t>(length));
+    if (length) memcpy(request.buffer.data(), bytes, length);
+    bool start;
+    {
+        std::lock_guard lock(state->mutex);
+        start = state->writes.empty();
+        state->writes.push_back(std::move(request));
+    }
+    if (start) {
+        try {
+            write_ = WriteQueued(state, datagram_, stream_);
+        } catch (...) {
+            std::lock_guard lock(state->mutex);
+            state->writes.clear();
+            throw;
+        }
+    }
 }
 
 IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
