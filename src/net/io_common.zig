@@ -55,8 +55,6 @@ pub const Timer = struct {
     id: ?u64 = null,
 };
 
-pub const SubmissionError = std.mem.Allocator.Error || error{LooperUnavailable};
-
 pub const Datagram = struct { payload: []const u8, address: SocketAddress };
 pub const IPAddressError = error{ InvalidEndpoint, NoSpaceLeft };
 pub const ReachabilityInfo = io_c.pp_reachability;
