@@ -1190,6 +1190,7 @@ fn expectEstablished(result: conn.Connection.StartResult) !void {
 }
 
 test "WireGuard backend dispatches the passive startup payload separately" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
             const called: *bool = @ptrCast(@alignCast(raw.?));
