@@ -118,7 +118,7 @@ pub const Looper = struct {
     }
 
     /// POSIX copies the batch and writes it in FIFO order during loopOnce().
-    /// Windows completes socket writes synchronously before returning.
+    /// Windows copies packets into its native asynchronous write queue.
     /// The destination is stored by value. Empty batches are no-ops.
     /// Unconnected UDP requires a destination. Side failures use on_failure;
     /// rejected datagrams are dropped without detaching the socket.

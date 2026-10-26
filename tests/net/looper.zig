@@ -215,7 +215,7 @@ const WindowsWriteProbe = struct {
 };
 
 test "Windows looper owns sides and routes socket write failure" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{
@@ -250,6 +250,40 @@ test "Windows looper owns sides and routes socket write failure" {
     try std.testing.expect(probe.code != null);
     try std.testing.expect(!looper.isLinkAttached());
     try std.testing.expect((try looper.flushWrites(.link)) == null);
+}
+
+test "Windows native write failures return asynchronously through the looper" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    defer looper.deinit();
+    const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{
+        .ipv4 = true,
+        .ipv6 = false,
+    })) orelse return error.SocketFailed;
+    var transferred = false;
+    defer if (!transferred) socket.destroy();
+    var probe = WindowsWriteProbe{ .looper = &looper };
+    try looper.attach(.{
+        .pair = .{ .link = socket },
+        .on_failure = .{ .context = &probe, .callback = WindowsWriteProbe.failed },
+    });
+    transferred = true;
+    var destination = std.mem.zeroes(io.SocketAddress);
+    destination.family = 4;
+    destination.address[0] = 127;
+    destination.address[3] = 1;
+    destination.port = 1194;
+    // Too large for UDP: submission owns the bytes, native completion fails.
+    const payload = [_]u8{0} ** 65536;
+    try std.testing.expect((try socket.write(&payload, destination)) == null);
+    try std.testing.expectEqual(@as(usize, 0), probe.failures);
+    for (0..5000) |_| {
+        if (probe.failures != 0) break;
+        try std.testing.expect(try test_helpers.poll(&looper, 1));
+    }
+    try std.testing.expectEqual(@as(usize, 1), probe.failures);
+    try std.testing.expect(probe.code.? != 0);
+    try std.testing.expect(!looper.isLinkAttached());
 }
 
 const WindowsSockets = struct {
@@ -289,7 +323,7 @@ const WindowsDetachProbe = struct {
 };
 
 test "Windows TCP receive resumes and detaches its side on the looper thread" {
-    if (builtin.os.tag != .windows) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const ws = WindowsSockets;
     // Initialize Winsock using the native backend, then make a local TCP peer.
@@ -326,6 +360,24 @@ test "Windows TCP receive resumes and detaches its side on the looper thread" {
         .on_failure = .{ .context = &probe, .callback = WindowsDetachProbe.failed },
     });
     transferred = true;
+    // Queue a burst before the peer reads, reusing the caller's buffer each time.
+    // Native completion must preserve both byte ownership and submission order.
+    var outgoing: [16 * 1024]u8 = undefined;
+    for (0..32) |index| {
+        @memset(&outgoing, @intCast(index));
+        try looper.write(&.{&outgoing}, .link, null);
+    }
+    @memset(&outgoing, 255);
+    var incoming: [16 * 1024]u8 = undefined;
+    var received: usize = 0;
+    while (received < outgoing.len * 32) {
+        const count = ws.recv(peer, &incoming, incoming.len, 0);
+        try std.testing.expect(count > 0);
+        for (incoming[0..@intCast(count)]) |byte| {
+            try std.testing.expectEqual(@as(u8, @intCast(received / outgoing.len)), byte);
+            received += 1;
+        }
+    }
     try std.testing.expectEqual(@as(c_int, 1), ws.send(peer, "x", 1, 0));
     for (0..5000) |_| {
         if (probe.reads == 1) break;

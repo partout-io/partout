@@ -150,8 +150,8 @@ pub const SocketWrapper = struct {
         io_c.winrt_socket_stop_writes(self.socket);
     }
 
-    /// Completes a whole packet write; UDP requires a destination when unconnected.
-    /// Native failures are returned by value for the looper's on_failure callback.
+    /// Copies and submits a packet; UDP requires a destination when unconnected.
+    /// Immediate failures return by value; async failures use the receive callback.
     pub fn write(
         self: *SocketWrapper,
         packet: io.Packet,

@@ -119,7 +119,8 @@ pub const PassiveIO = struct {
         self.closed = true;
         self.ready.broadcast();
         self.lock.unlock();
-        // No admitted write may still borrow a Go buffer when this returns.
+        // No submission may still borrow a Go buffer when this returns.
+        // Pending native writes own copies and are discarded on detach.
         self.writes.lock();
         self.writes.unlock();
     }

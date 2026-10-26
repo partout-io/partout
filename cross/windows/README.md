@@ -45,21 +45,25 @@ UDP uses the OS `MessageReceived` event. TCP owns an `IAsyncAction` read loop;
 channel takeover cancels native I/O and joins that task directly.
 Both deliver buffers or errors to the registered callback and borrowed context.
 Clearing the callback drains delivery; callbacks only queue input and must not
-reenter socket APIs. Buffer contents are borrowed until return. Writes wait for WinRT's
-asynchronous operation to complete. See `include/winrt/socket.h` for the contract.
+reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
+packet and destination; one coroutine drains the native queue in FIFO order using
+`co_await` for output-stream acquisition and writes. Success means accepted, with
+later failures routed through the same callback. Channel-buffer writes copy into
+VpnChannel's pool directly. See `include/winrt/socket.h` for the contract.
 Callers serialize writes with other writes, socket configuration, channel
 takeover, writer replacement and destruction. The daemon actor provides this
 serialization for OpenVPN; WireGuard's passive adapter holds its write lock.
 Stopping writes and clearing receive callbacks may overlap an admitted write;
-the owner keeps the socket alive until that write returns. Receive delivery
-retains its own synchronization and state for outstanding native operations.
+the owner keeps the socket alive until submission returns. Outstanding reads and
+writes retain shared I/O state and native transports, without retaining Socket.
 
 ### Connected transports (OpenVPN)
 
 The WindowsLooper queues owned input for both link and TUN attachments and
 dispatches their callbacks on its caller. The native socket owns the lifetime
 of its OS callbacks and pending reads. Before channel startup, direct socket
-reads are stopped (pending TCP reads are cancelled and drained).
+writes are drained, then reads are stopped (pending TCP reads are cancelled
+and drained), before transferring the transport to VpnChannel.
 
 After startup, `Encapsulate` queues plain IP packets on the TUN side and
 `Decapsulate` queues transport data on the link side. Neither waits for protocol
@@ -70,8 +74,8 @@ after startup. This requires the channel append/flush APIs
 (Windows build 20348 or later). All WindowsLooper operations run on its owner
 thread, including writes, timers and detach. Its mutex protects only the receive
 queue and flags shared with native callbacks. Detach drains native delivery and
-discards queued input; an in-progress protocol callback retains its attachment
-until it returns, so it may safely detach its own side.
+discards pending writes and queued input; an in-progress protocol callback retains
+its attachment until it returns, so it may safely detach its own side.
 
 ### Unconnected UDP (WireGuard)
 
@@ -96,6 +100,10 @@ sources and replying after a source-port change. Live multi-peer/peer-roaming,
 background suspension and resume still need validation. The physical adapter is
 retained across UDP bind replacement; automatic local-interface migration is not
 implemented.
+
+Passive write completion releases the Go buffer after the native backend copies
+it; it reports acceptance rather than network transmission. Later socket failures
+use the passive adapter's existing receive-error path.
 
 ### Timers
 

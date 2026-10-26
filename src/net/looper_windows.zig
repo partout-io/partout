@@ -201,7 +201,7 @@ pub const WindowsLooper = struct {
         }
     }
 
-    /// Writes complete before returning, so there is no separate flush queue.
+    /// Native sockets own copied packets and serialize async writes.
     pub fn write(
         self: *WindowsLooper,
         packets: io.Packets,
@@ -225,7 +225,7 @@ pub const WindowsLooper = struct {
         }
     }
 
-    /// Socket writes are submitted and completed by write().
+    /// Native writes start at submission; nothing needs a readiness-driven flush.
     pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?io.Failure {
         return null;
     }

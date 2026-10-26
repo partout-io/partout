@@ -7,7 +7,6 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Sockets.h>
-#include <atomic>
 #include <functional>
 #include <memory>
 
@@ -42,32 +41,34 @@ public:
     // Retains callback state, not the socket wrapper. Safe after link detach.
     std::function<void(const uint8_t *, size_t)> ChannelReceiver() const;
 
-    // Stop/drain direct reads before StartWithMainTransport takes receive ownership.
+    // Drain direct writes, then stop reads before channel transport takeover.
     void TakeOver();
 
     // After channel startup, send encapsulated packets through its send-buffer pool.
     void SetChannelWriter(std::function<int32_t(const uint8_t *, size_t)> writer);
 
 private:
-    struct ReceiveState;
+    struct State;
 
     static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
     static winrt_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host,
         winrt::hstring const &port);
-    static winrt::Windows::Foundation::IAsyncAction ReadStream(std::shared_ptr<ReceiveState> state,
+    static winrt::Windows::Foundation::IAsyncAction ReadStream(std::shared_ptr<State> state,
+        winrt::Windows::Networking::Sockets::StreamSocket stream);
+    static winrt::Windows::Foundation::IAsyncAction WriteQueued(std::shared_ptr<State> state,
+        winrt::Windows::Networking::Sockets::DatagramSocket datagram,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
     bool StartReading();
     void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
-    std::shared_ptr<ReceiveState> receive_state_;
+    std::shared_ptr<State> state_;
     winrt::Windows::Networking::Sockets::DatagramSocket datagram_{nullptr};
     winrt::Windows::Networking::Sockets::StreamSocket stream_{nullptr};
     winrt::Windows::Foundation::IAsyncAction read_{nullptr};
+    winrt::Windows::Foundation::IAsyncAction write_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
     std::function<int32_t(const uint8_t *, size_t)> channel_write_;
-    std::atomic<bool> writes_stopped_{false};
-    uint64_t sent_ = 0;
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};
     winrt::Windows::Networking::HostName bound_host_{nullptr};

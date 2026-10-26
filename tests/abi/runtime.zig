@@ -147,6 +147,7 @@ test "daemon runtime owns options during lifecycle" {
 }
 
 test "starts DNS-only profile through tunnel controller" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
