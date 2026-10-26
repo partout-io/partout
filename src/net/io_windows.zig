@@ -155,7 +155,7 @@ pub const SocketWrapper = struct {
     }
 
     /// Register once on attach, clear on detach. Clearing drains native delivery
-    /// before releasing the borrowed context. The callback only queues input.
+    /// before releasing the borrowed context. The callback consumes borrowed input.
     pub fn setOnReceive(self: *SocketWrapper, callback: OnReceive, context: ?*anyopaque) error{ReceiveSetupFailed}!void {
         if (!build_options.winrt) @panic("WinRT socket C ABI is not linked");
         try self.receiver.set(.link, self.socket, callback, context);

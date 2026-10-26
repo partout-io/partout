@@ -8,7 +8,7 @@ const c = @import("wireguard_c");
 const backend = @import("backend.zig");
 const common = @import("passive_io_common.zig");
 
-/// WinRT pushes owned packets into queues; Go workers drain them on read.
+/// WinRT fills waiting Go reads directly, queuing owned packets otherwise.
 /// Lifecycle calls are owner-serialized. Writes exclude descriptor replacement,
 /// while callbacks use a separate lock so channel writes can trigger delivery.
 pub const PassiveIO = struct {
@@ -29,12 +29,25 @@ pub const PassiveIO = struct {
         source: net.SocketAddress,
         next: ?*Packet = null,
     };
+    // Stack-owned by a Go read call. All buffer access and list operations use
+    // lock; the reader unlinks itself before unlocking and completing the call.
+    const PendingRead = struct {
+        packets: []c.wg_read_packet,
+        completed: u32 = 0,
+        interrupted: bool = false,
+        next: ?*PendingRead = null,
+    };
     const Side = struct {
         owner: *PassiveIO = undefined,
         tag: net.Side = .link,
         attached: bool = false,
         packets: core.Fifo(Packet) = .{},
         count: usize = 0,
+        readers: core.Fifo(PendingRead) = .{},
+
+        fn cancelReads(self: *Side) void {
+            while (self.readers.take()) |reader| reader.interrupted = true;
+        }
     };
 
     pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {
@@ -84,6 +97,7 @@ pub const PassiveIO = struct {
         self.lock.lock();
         const side = &self.sides[@intFromEnum(tag)];
         side.attached = false;
+        side.cancelReads();
         const descriptor = if (tag == .link) self.link else self.tun;
         if (tag == .link) self.link = null else self.tun = null;
         self.clear(side);
@@ -117,6 +131,7 @@ pub const PassiveIO = struct {
     pub fn quiesce(self: *PassiveIO) void {
         self.lock.lock();
         self.closed = true;
+        for (&self.sides) |*side| side.cancelReads();
         self.ready.broadcast();
         self.lock.unlock();
         // No submission may still borrow a Go buffer when this returns.
@@ -145,6 +160,7 @@ pub const PassiveIO = struct {
         self.lock.lock();
         const reporter = if (self.closed) null else self.failure;
         self.closed = true;
+        for (&self.sides) |*side| side.cancelReads();
         self.ready.broadcast();
         self.lock.unlock();
         if (reporter) |value| value.report(value.ctx);
@@ -163,12 +179,31 @@ pub const PassiveIO = struct {
             self.fail();
             return false;
         }
+        const address = if (source == null) std.mem.zeroes(net.SocketAddress) else source[0];
+        if (side.readers.head) |reader| {
+            const output = &reader.packets[reader.completed];
+            // Consume an oversized datagram without delivering truncated input.
+            // Finish this wait just as the queued read path does on a drop.
+            if (length > output.capacity) {
+                _ = side.readers.take();
+                reader.interrupted = true;
+            } else {
+                @memcpy(output.data[0..length], bytes[0..length]);
+                output.size = @intCast(length);
+                output.source = common.toEndpoint(address);
+                reader.completed += 1;
+                if (reader.completed == reader.packets.len) _ = side.readers.take();
+            }
+            self.ready.broadcast();
+            self.lock.unlock();
+            return true;
+        }
         // Bound memory without pausing UDP delivery indefinitely. Drop newest.
         if (side.count >= 1024) {
             self.lock.unlock();
             return true;
         }
-        self.enqueue(side, bytes[0..length], if (source == null) std.mem.zeroes(net.SocketAddress) else source[0]) catch {
+        self.enqueue(side, bytes[0..length], address) catch {
             self.lock.unlock();
             self.fail();
             return false;
@@ -208,13 +243,18 @@ pub const PassiveIO = struct {
         if (!common.validRead(packets, count, request)) return c.WG_IO_INVALID;
         self.lock.lock();
         const side = &self.sides[@intFromEnum(tag)];
-        // Go also cancels reads during bind replacement. Bound the wait so it
-        // can observe cancellation even without a host descriptor change.
-        const deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), 100);
-        while (!self.closed and side.count == 0 and core.monotonicNs() < deadline)
-            self.ready.waitUntil(&self.lock, deadline);
         var completed: u32 = 0;
-        if (!self.closed) for (packets[0..count]) |*output| {
+        if (!self.closed and side.count == 0) {
+            var reader = PendingRead{ .packets = packets[0..count] };
+            side.readers.append(&reader);
+            // Go also cancels reads during bind replacement. Bound the wait so
+            // it can observe cancellation without a host descriptor change.
+            const deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), 100);
+            while (!self.closed and !reader.interrupted and reader.completed == 0 and core.monotonicNs() < deadline)
+                self.ready.waitUntil(&self.lock, deadline);
+            _ = side.readers.remove(&reader);
+            completed = if (self.closed) 0 else reader.completed;
+        } else if (!self.closed) for (packets[0..count]) |*output| {
             const packet = side.packets.take() orelse break;
             side.count -= 1;
             defer {
@@ -233,6 +273,31 @@ pub const PassiveIO = struct {
         self.complete(request, completed, status);
         return c.WG_IO_OK;
     }
+
+    pub const testing = struct {
+        pub fn attach(self: *PassiveIO, tag: net.Side) void {
+            self.lock.lock();
+            defer self.lock.unlock();
+            const side = &self.sides[@intFromEnum(tag)];
+            side.owner = self;
+            side.tag = tag;
+            side.attached = true;
+            self.closed = false;
+        }
+
+        pub fn receive(self: *PassiveIO, tag: net.Side, bytes: []const u8, source: ?*const net.SocketAddress, code: i32) bool {
+            return onReceive(&self.sides[@intFromEnum(tag)], bytes.ptr, bytes.len, source, code);
+        }
+
+        pub fn pendingReads(self: *PassiveIO, tag: net.Side) usize {
+            self.lock.lock();
+            defer self.lock.unlock();
+            var count: usize = 0;
+            var current = self.sides[@intFromEnum(tag)].readers.head;
+            while (current) |reader| : (current = reader.next) count += 1;
+            return count;
+        }
+    };
 
     fn writeLink(raw: ?*anyopaque, packets: [*c]const c.wg_packet, count: u32, destination: [*c]const c.wg_endpoint, request: usize) callconv(.c) i32 {
         const self: *PassiveIO = @ptrCast(@alignCast(raw orelse return c.WG_IO_INVALID));

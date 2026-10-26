@@ -24,7 +24,7 @@ typedef bool (*winrt_tun_on_receive)(void *context, const uint8_t *bytes, size_t
 winrt_tun winrt_tun_ctrl_set_tunnel(void *controller, const char *uuid, const char *info_json);
 void winrt_tun_free(winrt_tun tun);
 /* Native receive callbacks are serialized and borrow input until return. Callbacks
- * only enqueue input and must not reenter TUN/controller APIs. Clearing drains
+ * consume or copy input and must not reenter TUN/controller APIs. Clearing drains
  * delivery before the borrowed context can be released. */
 bool winrt_tun_set_on_receive(winrt_tun tun, winrt_tun_on_receive callback, void *context);
 void winrt_tun_stop_writes(winrt_tun tun);

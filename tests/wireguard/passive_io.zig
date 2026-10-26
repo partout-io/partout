@@ -110,8 +110,8 @@ test "Windows passive UDP preserves multiple peer sources and reply destinations
         try std.testing.expectEqual(endpoint.port, incoming[0].source.port);
         try std.testing.expectEqualSlices(u8, &data, bytes[0..incoming[0].size]);
     }
-    // Three received packets: each payload must be freed before its node.
-    try std.testing.expectEqual(@as(usize, 6), clearing.frees);
+    // Waiting reads bypass allocation; queued packets free a payload and node.
+    try std.testing.expect(clearing.frees <= 6 and clearing.frees % 2 == 0);
     receiver.quiesce();
     var completion: Completion = .{};
     var bytes: [32]u8 = undefined;
@@ -344,6 +344,134 @@ const FailureRecorder = struct {
 
 fn failedWait(_: c_int, _: bool, _: c_int) callconv(.c) c_int {
     return -1;
+}
+
+fn waitForWindowsReads(passive: *bridge.PassiveIO, side: source.net.Side, count: usize) !void {
+    for (0..1000) |_| {
+        if (bridge.PassiveIO.testing.pendingReads(passive, side) == count) return;
+        source.core.sleepMs(1);
+    }
+    return error.TestUnexpectedResult;
+}
+
+test "Windows passive waiting reads receive without packet allocations" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    for ([_]source.net.Side{ .link, .tun }) |side| {
+        var passive = try bridge.PassiveIO.init(Completion.finish);
+        defer passive.deinit();
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+        passive.allocator = failing.allocator();
+        bridge.PassiveIO.testing.attach(&passive, side);
+        var buffers: [2][32]u8 = undefined;
+        var packets: [2]c.wg_read_packet = undefined;
+        var results: [2]Completion = .{ .{}, .{} };
+        var requests: [2]ReadRequest = undefined;
+        var threads: [2]?std.Thread = .{ null, null };
+        defer {
+            passive.quiesce();
+            for (threads) |thread| if (thread) |value| value.join();
+        }
+        for (0..2) |i| {
+            packets[i] = .{ .data = &buffers[i], .capacity = buffers[i].len };
+            requests[i] = .{ .passive = &passive, .side = side, .packets = &packets[i], .result = &results[i] };
+            threads[i] = try std.Thread.spawn(.{}, ReadRequest.run, .{&requests[i]});
+            try waitForWindowsReads(&passive, side, i + 1);
+        }
+        var address = std.mem.zeroes(io.SocketAddress);
+        address.family = 6;
+        address.address[15] = 1;
+        address.scope_id = 7;
+        address.port = 51820;
+        // Each callback must fill the oldest pending read, including empty UDP.
+        try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, side, "direct", if (side == .link) &address else null, 0));
+        try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, side, "", if (side == .link) &address else null, 0));
+        for (&threads) |*thread| {
+            thread.*.?.join();
+            thread.* = null;
+        }
+        for (results) |result| {
+            try std.testing.expectEqual(@as(usize, 1), result.calls);
+            try std.testing.expectEqual(@as(u32, 1), result.count);
+            try std.testing.expectEqual(c.WG_IO_OK, result.status);
+        }
+        try std.testing.expectEqualStrings("direct", buffers[0][0..packets[0].size]);
+        try std.testing.expectEqual(@as(u32, 0), packets[1].size);
+        if (side == .link) {
+            try std.testing.expectEqual(address.port, packets[0].source.port);
+            try std.testing.expectEqual(address.scope_id, packets[0].source.scope_id);
+            try std.testing.expectEqualSlices(u8, &address.address, &packets[0].source.address);
+        }
+        try std.testing.expectEqual(@as(usize, 0), bridge.PassiveIO.testing.pendingReads(&passive, side));
+        try std.testing.expect(!failing.has_induced_failure);
+    }
+}
+
+test "Windows passive queued reads preserve batching and discard oversized packets" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
+    defer clearing.arena.deinit();
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    passive.allocator = clearing.allocator();
+    defer passive.deinit();
+    bridge.PassiveIO.testing.attach(&passive, .tun);
+    for ([_][]const u8{ "one", "two", "oversized" }) |bytes|
+        try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, .tun, bytes, null, 0));
+    var buffers: [3][4]u8 = undefined;
+    var packets: [3]c.wg_read_packet = undefined;
+    for (&packets, &buffers) |*packet, *buffer| packet.* = .{ .data = buffer, .capacity = buffer.len };
+    var result = Completion{};
+    const transport = passive.transport(51820, 1400);
+    try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, packets.len, result.token()));
+    try std.testing.expectEqual(c.WG_IO_OK, result.status);
+    try std.testing.expectEqual(@as(u32, 2), result.count);
+    try std.testing.expectEqualStrings("one", buffers[0][0..packets[0].size]);
+    try std.testing.expectEqualStrings("two", buffers[1][0..packets[1].size]);
+    // Payloads must be freed before their nodes, including the discarded packet.
+    try std.testing.expectEqual(@as(usize, 6), clearing.frees);
+}
+
+test "Windows passive pending buffers are unregistered on timeout cancellation detach and failure" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const Scenario = enum { timeout, cancel, detach, failure, oversized };
+    for (std.enums.values(Scenario)) |scenario| {
+        var passive = try bridge.PassiveIO.init(Completion.finish);
+        passive.allocator = std.testing.allocator;
+        defer passive.deinit();
+        var failure = FailureRecorder{};
+        passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
+        bridge.PassiveIO.testing.attach(&passive, .link);
+        var bytes = [_]u8{42} ** 4;
+        var packet = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
+        var result = Completion{};
+        var request = ReadRequest{ .passive = &passive, .side = .link, .packets = &packet, .result = &result };
+        var thread: ?std.Thread = try std.Thread.spawn(.{}, ReadRequest.run, .{&request});
+        defer if (thread) |value| {
+            passive.quiesce();
+            value.join();
+        };
+        try waitForWindowsReads(&passive, .link, 1);
+        var address = std.mem.zeroes(io.SocketAddress);
+        address.family = 4;
+        switch (scenario) {
+            .timeout => {},
+            .cancel => passive.quiesce(),
+            .detach => passive.releaseLink(),
+            .failure => try std.testing.expect(!bridge.PassiveIO.testing.receive(&passive, .link, "", null, -1)),
+            .oversized => try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, .link, "too large", &address, 0)),
+        }
+        thread.?.join();
+        thread = null;
+        try std.testing.expectEqual(@as(usize, 1), result.calls);
+        try std.testing.expectEqual(@as(u32, 0), result.count);
+        try std.testing.expectEqual(if (scenario == .cancel or scenario == .failure) c.WG_IO_CLOSED else c.WG_IO_AGAIN, result.status);
+        try std.testing.expectEqual(@as(usize, if (scenario == .failure) 1 else 0), failure.calls);
+        try std.testing.expectEqual(@as(usize, 0), bridge.PassiveIO.testing.pendingReads(&passive, .link));
+        // A callback after completion must queue instead of touching old storage.
+        bridge.PassiveIO.testing.attach(&passive, .link);
+        try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, .link, "late", &address, 0));
+        try std.testing.expectEqualSlices(u8, &([_]u8{42} ** 4), &bytes);
+        try std.testing.expectEqual(@as(usize, 1), passive.sides[0].count);
+    }
 }
 
 test "WireGuard passive terminal I/O failures report once and cancellation stays silent" {
