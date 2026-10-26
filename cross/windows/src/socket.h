@@ -22,13 +22,6 @@ public:
     Socket(const Socket &) = delete;
     Socket &operator=(const Socket &) = delete;
 
-    bool Open(const char *hostname, uint16_t port, const winrt_socket_open_options *options);
-    bool SetOnReceive(winrt_socket_on_receive callback, void *context);
-    bool ResumeReading();
-    int32_t Write(const uint8_t *bytes, size_t length, const winrt_socket_address *destination);
-    void StopWrites();
-    bool GetAddress(winrt_socket_address *address);
-
     // Borrow the transport for VPN channel association; no socket internals escape.
     winrt::Windows::Foundation::IInspectable Transport() const;
 
@@ -37,6 +30,13 @@ public:
 
     // Before open: constrain independent UDP to the selected physical adapter.
     void SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter);
+
+    bool Open(const char *hostname, uint16_t port, const winrt_socket_open_options *options);
+    bool GetAddress(winrt_socket_address *address);
+    bool SetOnReceive(winrt_socket_on_receive callback, void *context);
+    bool ResumeReading();
+    int32_t Write(const uint8_t *bytes, size_t length, const winrt_socket_address *destination);
+    void StopWrites();
 
     // Retains callback state, not the socket wrapper. Safe after link detach.
     std::function<void(const uint8_t *, size_t)> ChannelReceiver() const;
@@ -50,6 +50,7 @@ public:
 private:
     struct State;
 
+    void RegisterDatagram();
     static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
     static winrt_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host,
         winrt::hstring const &port);
@@ -58,7 +59,6 @@ private:
     static winrt::Windows::Foundation::IAsyncAction WriteQueued(std::shared_ptr<State> state,
         winrt::Windows::Networking::Sockets::DatagramSocket datagram,
         winrt::Windows::Networking::Sockets::StreamSocket stream);
-    void RegisterDatagram();
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
     std::shared_ptr<State> state_;
