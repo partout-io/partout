@@ -167,7 +167,6 @@ bool Socket::Open(const char *hostname, uint16_t port,
             datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
             unconnected_ ? "unconnected (bound)" : "connected",
             options->dual_stack ? "true" : "false");
-        return true;
     } catch (hresult_error const &error) {
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
@@ -175,43 +174,54 @@ bool Socket::Open(const char *hostname, uint16_t port,
             winrt_log(WinrtLogError, "winrt_socket_open failed: HRESULT 0x%08x (%s)",
                 static_cast<unsigned int>(error.code().value), message.c_str());
         } catch (...) {}
+        return false;
     } catch (...) {
         winrt_log(WinrtLogError, "winrt_socket_open failed: unexpected exception");
+        return false;
     }
-    return false;
+    return true;
 }
 
 bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
     const auto state = state_;
     {
         std::lock_guard lock(state->mutex);
+        // Ignore if a callback was already registered.
         if (callback && state->callback) return false;
         state->callback = callback;
         state->context = context;
     }
-    if (!callback || ResumeReading()) return true;
-    SetOnReceive(nullptr, nullptr);
-    return false;
+    if (callback && !ResumeReading()) {
+        // Roll back registration if starting native reads failed.
+        std::lock_guard lock(state->mutex);
+        state->callback = nullptr;
+        state->context = nullptr;
+        return false;
+    }
+    return true;
 }
 
 bool Socket::ResumeReading() {
     const auto state = state_;
+    bool start_read;
     {
         std::lock_guard lock(state->mutex);
         // Resume must never restore a cleared context.
         if (!state->callback) return false;
         state->paused = false;
-        if (!stream_ || state->reading || state->channel_owned) return true;
-        state->reading = true;
+        start_read = stream_ && !state->reading && !state->channel_owned;
+        if (start_read) state->reading = true;
     }
-    try {
-        read_ = ReadStream(state, stream_);
-        return true;
-    } catch (...) {
-        std::lock_guard lock(state->mutex);
-        state->reading = false;
-        return false;
+    if (start_read) {
+        try {
+            read_ = ReadStream(state, stream_);
+        } catch (...) {
+            std::lock_guard lock(state->mutex);
+            state->reading = false;
+            return false;
+        }
     }
+    return true;
 }
 
 int32_t Socket::Write(const uint8_t *bytes, size_t length,
@@ -225,49 +235,49 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
         if (status) return status;
         if (channel_write_) {
             check_hresult(channel_write_(bytes, length));
-            return 0;
-        }
-        State::WriteRequest request;
-        if (unconnected_) {
-            if (!destination || (destination->family != 4 && destination->family != 6) ||
-                (destination->family == 4 && !accepts_ipv4_) ||
-                (destination->family == 6 && !accepts_ipv6_))
-                throw hresult_invalid_argument();
-            wchar_t address[INET6_ADDRSTRLEN]{};
-            if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
-                const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
-                throw hresult_invalid_argument();
-            std::wstring host{address};
-            if (destination->family == 6 && destination->scope_id)
-                host += L"%" + std::to_wstring(destination->scope_id);
-            request.host = HostName{host};
-            request.service = to_hstring(destination->port);
-        }
-        request.buffer = Buffer{static_cast<uint32_t>(length)};
-        request.buffer.Length(static_cast<uint32_t>(length));
-        if (length) memcpy(request.buffer.data(), bytes, length);
-        bool start;
-        {
-            std::lock_guard lock(state->mutex);
-            start = state->writes.empty();
-            state->writes.push_back(std::move(request));
-        }
-        if (start) {
-            try {
-                write_ = WriteQueued(state, datagram_, stream_);
-            } catch (...) {
+        } else {
+            State::WriteRequest request;
+            if (unconnected_) {
+                if (!destination || (destination->family != 4 && destination->family != 6) ||
+                    (destination->family == 4 && !accepts_ipv4_) ||
+                    (destination->family == 6 && !accepts_ipv6_))
+                    throw hresult_invalid_argument();
+                wchar_t address[INET6_ADDRSTRLEN]{};
+                if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
+                    const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
+                    throw hresult_invalid_argument();
+                std::wstring host{address};
+                if (destination->family == 6 && destination->scope_id)
+                    host += L"%" + std::to_wstring(destination->scope_id);
+                request.host = HostName{host};
+                request.service = to_hstring(destination->port);
+            }
+            request.buffer = Buffer{static_cast<uint32_t>(length)};
+            request.buffer.Length(static_cast<uint32_t>(length));
+            if (length) memcpy(request.buffer.data(), bytes, length);
+            bool start;
+            {
                 std::lock_guard lock(state->mutex);
-                state->writes.clear();
-                throw;
+                start = state->writes.empty();
+                state->writes.push_back(std::move(request));
+            }
+            if (start) {
+                try {
+                    write_ = WriteQueued(state, datagram_, stream_);
+                } catch (...) {
+                    std::lock_guard lock(state->mutex);
+                    state->writes.clear();
+                    throw;
+                }
             }
         }
-        return 0;
     } catch (...) {
         const auto error = to_hresult().value;
         winrt_log(WinrtLogError, "WinRT socket write failed: HRESULT 0x%08x, length=%zu",
             static_cast<unsigned int>(error), length);
         return error;
     }
+    return 0;
 }
 
 void Socket::StopWrites() {
@@ -293,10 +303,10 @@ bool Socket::GetAddress(winrt_socket_address *address) {
             port = info.LocalPort();
         }
         *address = ParseAddress(host, port);
-        return true;
     } catch (...) {
         return false;
     }
+    return true;
 }
 
 IInspectable Socket::Transport() const {
