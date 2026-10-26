@@ -175,7 +175,7 @@ winrt_tun TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
     auto tun = std::unique_ptr<__winrt_tun_struct>(new __winrt_tun_struct{Tun{state_}});
     if (!started_) {
-        const auto settings = TunSettings::parse(info_json);
+        const TunSettings settings{info_json};
         if (!idle_transport_) {
             auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
                 const auto result = state->write(bytes, length, true);
@@ -191,14 +191,14 @@ winrt_tun TunnelController::Open(const char *info_json) {
         }
         // Windows requires null for an absent address family, not an empty view.
         state_->channel.StartWithMainTransport(
-            settings.ipv4.Size() ? settings.ipv4.GetView() : nullptr,
-            settings.ipv6.Size() ? settings.ipv6.GetView() : nullptr,
-            VpnInterfaceId{nullptr}, settings.routes, settings.domains,
-            settings.mtu, settings.maxFrame(), false, transport_);
+            settings.IPv4().Size() ? settings.IPv4().GetView() : nullptr,
+            settings.IPv6().Size() ? settings.IPv6().GetView() : nullptr,
+            VpnInterfaceId{nullptr}, settings.Routes(), settings.Domains(),
+            settings.MTU(), settings.MaxFrame(), false, transport_);
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
         winrt_log(WinrtLogDebug, "Partout::TunnelController: Started (IPv4=%u, IPv6=%u, MTU=%u)",
-            settings.ipv4.Size(), settings.ipv6.Size(), settings.mtu);
+            settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
     std::lock_guard lock(state_->receive_mutex);
     state_->tun = &tun->handle;
