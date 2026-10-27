@@ -617,26 +617,23 @@ const ConnectionDaemon = struct {
         };
     }
 
+    /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
     fn onPacketsReceived(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
         if (builtin.os.tag != .windows) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
         const input = attachment.input(bytes, length, source, code) orelse return false;
-        self.receivePackets(input) catch return false;
-        return attachment.keepReading(input);
-    }
-
-    /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
-    fn receivePackets(self: *ConnectionDaemon, input: Looper.PacketReceipt) error{ Closed, OutOfMemory }!void {
-        errdefer |err| {
-            if (err == error.OutOfMemory) {
-                self.onReceivePacketsFailed();
-            }
-        }
         var owned = input;
-        owned.bytes = try self.daemon.allocator.dupe(u8, input.bytes);
-        errdefer self.daemon.allocator.free(owned.bytes);
-        try self.schedule(.{ .onPacketsReceived = owned });
+        owned.bytes = self.daemon.allocator.dupe(u8, input.bytes) catch {
+            self.onReceivePacketsFailed();
+            return false;
+        };
+        self.schedule(.{ .onPacketsReceived = owned }) catch |err| {
+            self.daemon.allocator.free(owned.bytes);
+            if (err == error.OutOfMemory) self.onReceivePacketsFailed();
+            return false;
+        };
+        return attachment.keepReading(input);
     }
 
     fn onReceivePacketsFailed(self: *ConnectionDaemon) void {
@@ -1597,7 +1594,7 @@ pub const testing = struct {
     };
     pub const perform = ConnectionDaemon.perform;
     pub const schedule = ConnectionDaemon.schedule;
-    pub const receivePackets = ConnectionDaemon.receivePackets;
+    pub const onReceivePacketsFailed = ConnectionDaemon.onReceivePacketsFailed;
     pub const isCurrentThread = ConnectionDaemon.isCurrentThread;
     pub const codeForDaemonStartError = partoutCodeForDaemonStartError;
     pub const codeForLooperFailure = partoutCodeForLooperFailure;

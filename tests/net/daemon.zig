@@ -1705,7 +1705,6 @@ test "stop waits for terminal submission failure before immediate destruction" {
         }
     };
     for ([_]bool{ false, true }) |stop_already_queued| {
-        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
         var connection: FailingStartConnection = .{};
         var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
         defer registry.deinit(std.testing.allocator);
@@ -1713,7 +1712,7 @@ test "stop waits for terminal submission failure before immediate destruction" {
         defer profile.deinit(std.testing.allocator);
         var controller: mock_mod.MockTunnelController = .{};
         var monitor: mock_mod.MockNetworkMonitor = .{ .reachable = false };
-        const sut = try Daemon.create(failing.allocator(), &profile, .{
+        const sut = try Daemon.create(std.testing.allocator, &profile, .{
             .objects = .{
                 .registry = &registry,
                 .controller = controller.interface(),
@@ -1758,8 +1757,7 @@ test "stop waits for terminal submission failure before immediate destruction" {
                 core.sleepMs(1);
             }
         }
-        failing.fail_index = failing.alloc_index;
-        try std.testing.expectError(error.OutOfMemory, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = 0, .bytes = "oom" }));
+        daemon.testing.onReceivePacketsFailed(owner);
         if (!stop_already_queued) stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
         while (!probe.stop_entered.load(.acquire)) {
             if (core.monotonicNs() >= deadline) return error.Timeout;
@@ -2360,11 +2358,19 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             owner.looper.resumeReading(.tun) catch return error.LooperFailure;
         }
 
+        // Simulate receipts already admitted before a pause or replacement.
+        fn queue(owner: anytype, receipt: Looper.PacketReceipt) daemon.Error!void {
+            var owned = receipt;
+            owned.bytes = try owner.daemon.allocator.dupe(u8, receipt.bytes);
+            errdefer owner.daemon.allocator.free(owned.bytes);
+            try daemon.testing.schedule(owner, .{ .onPacketsReceived = owned });
+        }
+
         fn burst(owner: anytype, self: *@This()) daemon.Error!void {
             self.pause_next = true;
             const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
             for ([_][]const u8{ "first", "second", "third" }) |bytes| {
-                try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
+                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
             }
         }
 
@@ -2377,7 +2383,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             self.measure_timer = true;
             const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
             for (0..owner.looper.impl.max_read_count + 1) |_| {
-                try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
+                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
             }
         }
     };
@@ -2427,7 +2433,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
 
         // Queue one in-flight packet while paused, then run a control past it.
         const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-        try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
+        try Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
         try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
@@ -2454,7 +2460,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try std.testing.expect(probe.reads_at_timer.? < all_reads);
 
         try daemon.testing.onLoop(owner, &probe, Probe.attach);
-        try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
+        try Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(usize, 0), probe.failures);
         try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
@@ -2479,13 +2485,13 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             try std.testing.expectEqual(@as(usize, 0), connection.start_count);
             failing.fail_index = std.math.maxInt(usize);
             try std.testing.expectError(error.Closed, sut.start());
-            try std.testing.expectError(error.Closed, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
+            try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
         } else {
             // Paused owned input must also be reclaimed when the mailbox closes.
             const final_generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-            try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
+            try Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
             daemon.testing.shutdown(owner);
-            try std.testing.expectError(error.Closed, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
+            try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
             try waitForExit(owner);
         }
         try std.testing.expect(probe.on_actor);
