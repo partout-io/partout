@@ -51,8 +51,8 @@ pub const WindowsLooper = struct {
             return .{
                 .side = attachment.side,
                 .generation = attachment.generation,
-                .bytes = if (length == 0) &.{} else bytes[0..length],
-                .source = if (source == null) null else @as(*const io.SocketAddress, @ptrCast(source)).*,
+                .bytes = if (length > 0) bytes[0..length] else &.{},
+                .source = if (source != null) source[0] else null,
                 .code = code,
             };
         }
