@@ -12,8 +12,8 @@ Zig owns protocol processing, backpressure and timers; the daemon is unchanged:
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
-Partout io_windows.zig       -> winrt/runtime.h -> src/loop.cc
-Partout looper_windows.zig   -> winrt/runtime.h -> src/loop.cc
+Partout io_windows.zig       -> winrt/io.h -> src/loop.cc
+Partout looper_windows.zig   -> winrt/io.h -> src/loop.cc
 Partout portable controller  -> src/platform.cc -> src/tun.cc
 ```
 
@@ -22,7 +22,7 @@ Partout portable controller  -> src/platform.cc -> src/tun.cc
 | Location | Responsibility |
 | --- | --- |
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/runtime.h` | Runtime transport capabilities, native loop and link setup boundary; no socket or TUN object ABI. |
+| `include/winrt/io.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
 | `include/winrt/log.h` | Native logging boundary. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
@@ -69,7 +69,7 @@ reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
 packet and destination; one coroutine drains the native queue in FIFO order using
 `co_await` for output-stream acquisition and writes. Success means accepted, with
 later failures routed through the same callback. Channel-buffer writes copy into
-VpnChannel's pool directly. See `include/winrt/runtime.h` for the boundary contract.
+VpnChannel's pool directly. See `include/winrt/io.h` for the boundary contract.
 Callers serialize writes with other writes, socket configuration, channel
 takeover, writer replacement and destruction. The caller supplies this serialization.
 Stopping writes and clearing receive callbacks may overlap an admitted write;

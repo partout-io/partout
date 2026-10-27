@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "transport.h"
-#include "winrt/runtime.h"
+#include "winrt/io.h"
 #include "winrt/log.h"
 
 // Partout integration belongs here; the native backend has no portable headers.

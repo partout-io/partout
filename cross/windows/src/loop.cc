@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #include "loop.h"
 #include "transport.h"
-#include "winrt/runtime.h"
+#include "winrt/io.h"
 #include "winrt/log.h"
 #include <winrt/base.h>
 #include <string>

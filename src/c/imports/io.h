@@ -8,5 +8,5 @@
 #include <portable/tun.h>
 #include <portable/tun_ctrl.h>
 #if PARTOUT_WINDOWS
-#include <winrt/runtime.h>
+#include <winrt/io.h>
 #endif
