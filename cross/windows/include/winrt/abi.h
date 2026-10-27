@@ -9,6 +9,7 @@
 namespace Partout {
 class RuntimeLoop;
 }
+
 typedef Partout::RuntimeLoop *winrt_loop;
 extern "C" {
 #else
@@ -24,7 +25,9 @@ typedef struct {
     uint8_t family;
 } winrt_address;
 
-enum { WinrtEOF = 1 };
+enum {
+    WinrtEOF = 1
+};
 
 typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_address *, int32_t);
 

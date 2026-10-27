@@ -17,19 +17,16 @@ void SetLogger(winrt_log_callback callback) noexcept {
 }
 
 void Log(winrt_log_level level, const char *format, va_list args) noexcept {
-    if (!format)
-        return;
+    if (!format) return;
     va_list copy;
     va_copy(copy, args);
     const int size = std::vsnprintf(nullptr, 0, format, copy);
     va_end(copy);
-    if (size < 0)
-        return;
+    if (size < 0) return;
 
     try {
         std::vector<char> message(static_cast<size_t>(size) + 1);
-        if (std::vsnprintf(message.data(), message.size(), format, args) != size)
-            return;
+        if (std::vsnprintf(message.data(), message.size(), format, args) != size) return;
         const auto sink = logger.load();
         if (!sink) {
             OutputDebugStringA(message.data());

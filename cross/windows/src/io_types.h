@@ -6,7 +6,10 @@
 #include <functional>
 
 namespace Partout {
-enum SocketProto { SocketProtoTCP, SocketProtoUDP };
+enum SocketProto {
+    SocketProtoTCP,
+    SocketProtoUDP
+};
 
 struct SocketOpenOptions {
     bool dual_stack;
@@ -20,7 +23,8 @@ struct SocketAddress {
     uint8_t family;
 };
 
-using SocketOnReceive = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
+using SocketOnReceive =
+    std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
 constexpr int SocketEOF = 1;
 using TunOnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
 } // namespace Partout

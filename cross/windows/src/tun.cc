@@ -44,8 +44,7 @@ public:
 };
 
 int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
-    if (!bytes || !length || length > UINT32_MAX)
-        return E_INVALIDARG;
+    if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
     const auto append = [&](VpnPacketBuffer const &packet) {
         if (send)
             channel.AppendVpnSendPacketBuffer(packet);
@@ -66,8 +65,7 @@ int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
         const auto buffer = packet.Buffer();
         capacity = buffer.Capacity();
         stage = "copy packet";
-        if (length > capacity)
-            throw hresult_invalid_argument();
+        if (length > capacity) throw hresult_invalid_argument();
         memcpy(buffer.data(), bytes, length);
         buffer.Length(static_cast<uint32_t>(length));
         stage = "append";
@@ -87,8 +85,7 @@ int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
                 packet.Buffer().Length(0);
                 append(packet);
                 flush();
-            } catch (...) {
-            }
+            } catch (...) {}
         }
         return error;
     }
@@ -102,14 +99,12 @@ Tun::~Tun() noexcept {
     std::lock_guard lock(state_.receive_mutex);
     callback_ = nullptr;
     // An older handle may be freed after Open publishes its replacement.
-    if (state_.tun == this)
-        state_.tun = nullptr;
+    if (state_.tun == this) state_.tun = nullptr;
 }
 
 bool Tun::SetOnReceive(TunOnReceive callback) {
     std::lock_guard lock(state_.receive_mutex);
-    if (callback && callback_)
-        return false;
+    if (callback && callback_) return false;
     callback_ = std::move(callback);
     return true;
 }
@@ -118,13 +113,11 @@ void Tun::ReportError(int32_t error) {
     int32_t expected = 0;
     write_status_.compare_exchange_strong(expected, error);
     std::lock_guard lock(state_.receive_mutex);
-    if (callback_)
-        callback_(nullptr, 0, error);
+    if (callback_) callback_(nullptr, 0, error);
 }
 
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
-    if (auto status = WriteStatus())
-        return status;
+    if (auto status = WriteStatus()) return status;
     const auto result = state_.write(bytes, length, false);
     if (result) {
         ++state_.counters.tun_write_failed;
@@ -152,8 +145,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
     try {
         const auto &channel = state_->channel;
         const auto transport = socket.Transport();
-        if (!channel || !transport)
-            return false;
+        if (!channel || !transport) return false;
         if (socket.IsUnconnected()) {
             AssociateUnconnected(socket);
         } else if (transport_ != transport) {
@@ -174,15 +166,12 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
     // Keep the adapter across UDP bind replacement, including after Open.
     if (!udp_adapter_) {
         const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
-        if (!profile)
-            throw hresult_error(E_FAIL, L"No physical network profile");
+        if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
         udp_adapter_ = profile.NetworkAdapter();
     }
     socket.SetAdapter(udp_adapter_);
-    if (idle_transport_)
-        return;
-    if (transport_)
-        throw hresult_illegal_method_call();
+    if (idle_transport_) return;
+    if (transport_) throw hresult_illegal_method_call();
     Sockets::DatagramSocket idle;
     try {
         state_->channel.AssociateTransport(idle, nullptr);
@@ -205,21 +194,21 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
 }
 
 std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
-    if (!state_->channel || !transport_)
-        return nullptr;
+    if (!state_->channel || !transport_) return nullptr;
     auto tun = std::make_unique<Tun>(*state_);
     if (!started_) {
         const TunSettings settings{info_json};
         if (!idle_transport_) {
-            auto receive = socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
-                const auto result = state->write(bytes, length, true);
-                if (result) {
-                    ++state->counters.link_send_failed;
-                    return result;
-                }
-                ++state->counters.link_send;
-                return int32_t{0};
-            });
+            auto receive =
+                socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
+                    const auto result = state->write(bytes, length, true);
+                    if (result) {
+                        ++state->counters.link_send_failed;
+                        return result;
+                    }
+                    ++state->counters.link_send;
+                    return int32_t{0};
+                });
             std::lock_guard lock(state_->receive_mutex);
             state_->link_receive = std::move(receive);
         }
@@ -247,8 +236,7 @@ void TunnelController::Close() noexcept {
             loop_.Post([this] {
                 Close();
             });
-        } catch (...) {
-        }
+        } catch (...) {}
         return;
     }
     {
@@ -282,10 +270,8 @@ void TunnelController::Close() noexcept {
     }
     // Release setup resources even if channel startup failed.
     try {
-        if (idle_transport_)
-            idle_transport_.Close();
-    } catch (...) {
-    }
+        if (idle_transport_) idle_transport_.Close();
+    } catch (...) {}
     idle_transport_ = nullptr;
     transport_ = nullptr;
     udp_adapter_ = nullptr;
@@ -309,16 +295,14 @@ void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
         const auto packet = packets.RemoveAtBegin();
         packets.Append(packet);
         const auto buffer = packet.Buffer();
-        if (!tun->callback_(buffer.data(), buffer.Length(), 0))
-            ++counters.tun_dropped;
+        if (!tun->callback_(buffer.data(), buffer.Length(), 0)) ++counters.tun_dropped;
     }
 }
 
 void TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     std::lock_guard lock(state_->receive_mutex);
     ++state_->counters.link_read;
-    if (!state_->link_receive)
-        return;
+    if (!state_->link_receive) return;
     const auto buffer = packet.Buffer();
     state_->link_receive(buffer.data(), buffer.Length());
 }

@@ -48,7 +48,12 @@ struct VpnChannelRuntime::Impl {
     // Stop waits for those borrows before destroying native state.
     std::mutex controller_mutex;
     std::unique_ptr<TunnelController> controller;
-    enum class StartupStatus { waiting, connecting, connected, failed };
+    enum class StartupStatus {
+        waiting,
+        connecting,
+        connected,
+        failed
+    };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
     StartupStatus startup_status = StartupStatus::waiting;
@@ -61,11 +66,9 @@ struct VpnChannelRuntime::Impl {
     // Called by the daemon, including during partout_daemon_start(). Only
     // publish state here: stopping the daemon from its callback would deadlock.
     void OnConnectionStatus(const char *status) noexcept {
-        if (!status)
-            return;
+        if (!status) return;
         std::scoped_lock lock(startup_mutex);
-        if (StartupCompleteLocked())
-            return;
+        if (StartupCompleteLocked()) return;
         const std::string_view value{status};
         if (value == "connecting") {
             startup_status = StartupStatus::connecting;
@@ -107,22 +110,19 @@ struct VpnChannelRuntime::Impl {
     }
 
     void CheckChannel(VpnChannel const &value) const {
-        if (!value || value != channel)
-            throw hresult_invalid_argument();
+        if (!value || value != channel) throw hresult_invalid_argument();
     }
 
     void Log(partout_log_level level, std::wstring_view message) const noexcept {
         try {
             channel.LogDiagnosticMessage(hstring{message});
-        } catch (...) {
-        }
+        } catch (...) {}
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
                 init_args.logger_fn(init_args.logger_ctx, level, text.c_str());
             }
-        } catch (...) {
-        }
+        } catch (...) {}
     }
 
     void Stop() noexcept {
@@ -197,8 +197,7 @@ struct VpnChannelRuntime::Impl {
             Stop();
             try {
                 channel.SetErrorMessage(L"Unable to start Partout VPN channel");
-            } catch (...) {
-            }
+            } catch (...) {}
             throw;
         }
     }
@@ -237,8 +236,7 @@ void VpnChannelRuntime::Encapsulate(VpnChannel const &channel, VpnPacketBufferLi
     impl_->CheckChannel(channel);
     (void)encapsulated_packets;
     std::lock_guard lock(impl_->controller_mutex);
-    if (impl_->controller)
-        impl_->controller->Encapsulate(packets);
+    if (impl_->controller) impl_->controller->Encapsulate(packets);
 }
 
 void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer const &packet,
@@ -248,8 +246,7 @@ void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer c
     (void)decapsulated_packets;
     (void)control_packets;
     std::lock_guard lock(impl_->controller_mutex);
-    if (impl_->controller)
-        impl_->controller->Decapsulate(packet);
+    if (impl_->controller) impl_->controller->Decapsulate(packet);
 }
 
 } // namespace Partout

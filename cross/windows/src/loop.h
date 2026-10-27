@@ -29,8 +29,7 @@ public:
 
     // Setup and lifecycle barriers only. Packet writes and resumes use Post.
     template <typename Task> auto Invoke(Task &&task) -> decltype(task()) {
-        if (IsWorker())
-            return task();
+        if (IsWorker()) return task();
         using Result = decltype(task());
         // std::function requires a copyable callback; packaged_task is move-only.
         auto command = std::make_shared<std::packaged_task<Result()>>(std::forward<Task>(task));

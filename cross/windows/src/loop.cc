@@ -10,7 +10,7 @@ namespace Partout {
 namespace {
 std::atomic<RuntimeLoop *> current_loop = nullptr;
 std::mutex runtime_mutex;
-}
+} // namespace
 
 RuntimeLoop *RuntimeLoop::Current() {
     return current_loop.load();
@@ -18,8 +18,7 @@ RuntimeLoop *RuntimeLoop::Current() {
 
 RuntimeLoop::RuntimeLoop() {
     std::lock_guard runtime_lock(runtime_mutex);
-    if (current_loop.load())
-        throw std::runtime_error("A RuntimeLoop is already active");
+    if (current_loop.load()) throw std::runtime_error("A RuntimeLoop is already active");
     // Publish only after apartment initialization succeeds below. Creation and
     // destruction are serialized by the runtime owner, before/after its users.
     auto started = started_.get_future();
@@ -30,8 +29,7 @@ RuntimeLoop::RuntimeLoop() {
         started.get();
         current_loop = this;
     } catch (...) {
-        if (worker_.joinable())
-            worker_.join();
+        if (worker_.joinable()) worker_.join();
         throw;
     }
 }
@@ -58,8 +56,7 @@ void RuntimeLoop::Drain() {
 void RuntimeLoop::Post(std::function<void()> command) {
     {
         std::lock_guard lock(mutex_);
-        if (quitting_)
-            throw std::runtime_error("RuntimeLoop is closed");
+        if (quitting_) throw std::runtime_error("RuntimeLoop is closed");
         commands_.push_back(std::move(command));
     }
     changed_.notify_one();
@@ -81,8 +78,7 @@ void RuntimeLoop::Run() {
             changed_.wait(lock, [&] {
                 return quitting_ || !commands_.empty();
             });
-            if (commands_.empty())
-                break;
+            if (commands_.empty()) break;
             command = std::move(commands_.front());
             commands_.pop_front();
         }

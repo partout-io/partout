@@ -24,15 +24,19 @@ int main() try {
     assert(settings.MTU() == 1500 && settings.MaxFrame() == 1600);
     const auto routes = settings.Routes().Ipv4InclusionRoutes();
     assert(routes.Size() == 3);
-    assert(routes.GetAt(0).PrefixSize() == 1 && routes.GetAt(0).Address().CanonicalName() == L"0.0.0.0");
-    assert(routes.GetAt(1).PrefixSize() == 1 && routes.GetAt(1).Address().CanonicalName() == L"128.0.0.0");
+    assert(routes.GetAt(0).PrefixSize() == 1 &&
+           routes.GetAt(0).Address().CanonicalName() == L"0.0.0.0");
+    assert(routes.GetAt(1).PrefixSize() == 1 &&
+           routes.GetAt(1).Address().CanonicalName() == L"128.0.0.0");
     assert(routes.GetAt(2).Address().CanonicalName() == L"192.168.1.0");
     assert(routes.GetAt(2).PrefixSize() == 24);
     assert(settings.Routes().Ipv4ExclusionRoutes().GetAt(0).PrefixSize() == 32);
     const auto v6routes = settings.Routes().Ipv6InclusionRoutes();
     assert(v6routes.Size() == 2);
-    assert(v6routes.GetAt(0).PrefixSize() == 1 && v6routes.GetAt(0).Address().CanonicalName() == L"::");
-    assert(v6routes.GetAt(1).PrefixSize() == 1 && v6routes.GetAt(1).Address().CanonicalName() == L"8000::");
+    assert(v6routes.GetAt(0).PrefixSize() == 1 &&
+           v6routes.GetAt(0).Address().CanonicalName() == L"::");
+    assert(v6routes.GetAt(1).PrefixSize() == 1 &&
+           v6routes.GetAt(1).Address().CanonicalName() == L"8000::");
     assert(settings.Routes().Ipv6ExclusionRoutes().GetAt(0).Address().CanonicalName() == L"fd01::");
     const auto domains = settings.Domains().DomainNameList();
     assert(domains.Size() == 1 && domains.GetAt(0).DomainName().CanonicalName() == L"example.org");
@@ -52,7 +56,8 @@ int main() try {
     assert(v6.IPv4().Size() == 0 && v6.IPv6().Size() == 1);
     assert(v6.MTU() == 1400 && v6.MaxFrame() == 1500);
 
-    const auto automatic = R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":0}}]})";
+    const auto automatic =
+        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":0}}]})";
     assert(TunSettings(automatic).MTU() == 1400);
     assert(TunSettings(automatic).MaxFrame() == 1500);
 
@@ -84,24 +89,26 @@ int main() try {
     ]})"};
     assert(clearedDNS.Domains().DomainNameList().Size() == 0);
 
-    for (const auto json : {
-        static_cast<const char *>(nullptr),
-        R"({"modules":[]})",
-        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":-1}}]})",
-        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["fd00::2/64"]}}}]})",
-        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2/33"]}}}]})",
-        R"({"modules":[{"type":"IP","value":{"ipv6":{"subnets":["fd00::2"]},"mtu":1200}}]})",
-        R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":1300.5}}]})",
-        R"({"modules":[{"type":"DNS","value":{"protocolType":{"type":"https"}}}]})"
-    }) {
+    for (const auto json :
+         {static_cast<const char *>(nullptr), R"({"modules":[]})",
+          R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":-1}}]})",
+          R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["fd00::2/64"]}}}]})",
+          R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2/33"]}}}]})",
+          R"({"modules":[{"type":"IP","value":{"ipv6":{"subnets":["fd00::2"]},"mtu":1200}}]})",
+          R"({"modules":[{"type":"IP","value":{"ipv4":{"subnets":["10.8.0.2"]},"mtu":1300.5}}]})",
+          R"({"modules":[{"type":"DNS","value":{"protocolType":{"type":"https"}}}]})"}) {
         bool rejected = false;
-        try { const TunSettings rejected_settings{json}; }
-        catch (winrt::hresult_error const &) { rejected = true; }
+        try {
+            const TunSettings rejected_settings{json};
+        } catch (winrt::hresult_error const &) {
+            rejected = true;
+        }
         assert(rejected);
     }
     puts("Tunnel settings tests passed");
 } catch (winrt::hresult_error const &error) {
+
     fprintf(stderr, "HRESULT 0x%08x: %s\n", static_cast<unsigned>(error.code().value),
-        winrt::to_string(error.message()).c_str());
+            winrt::to_string(error.message()).c_str());
     return 1;
 }

@@ -49,7 +49,8 @@ public:
     void ReportError(int32_t error);
     int32_t WriteStatus() const;
     bool ResumeReading();
-    int32_t Write(winrt::Windows::Storage::Streams::Buffer buffer, const SocketAddress *destination);
+    int32_t Write(winrt::Windows::Storage::Streams::Buffer buffer,
+                  const SocketAddress *destination);
     void StopWrites();
 
     // Drain direct I/O and install the channel writer. Store the returned receiver
@@ -63,7 +64,8 @@ private:
     static winrt::Windows::Foundation::IAsyncAction
     ReadStream(std::shared_ptr<State> state,
                winrt::Windows::Networking::Sockets::StreamSocket stream);
-    void EnqueueWrite(winrt::Windows::Storage::Streams::Buffer buffer, const SocketAddress *destination);
+    void EnqueueWrite(winrt::Windows::Storage::Streams::Buffer buffer,
+                      const SocketAddress *destination);
     static winrt::Windows::Foundation::IAsyncAction
     WriteQueued(std::shared_ptr<State> state,
                 winrt::Windows::Networking::Sockets::DatagramSocket datagram,

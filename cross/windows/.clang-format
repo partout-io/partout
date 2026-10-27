@@ -5,10 +5,11 @@ ContinuationIndentWidth: 4
 ColumnLimit: 100
 SortIncludes: Never
 BreakBeforeBraces: Attach
-AllowShortBlocksOnASingleLine: Never
+AllowShortBlocksOnASingleLine: Empty
 AllowShortFunctionsOnASingleLine: Empty
-AllowShortIfStatementsOnASingleLine: Never
-AllowShortLambdasOnASingleLine: None
+AllowShortEnumsOnASingleLine: false
+AllowShortIfStatementsOnASingleLine: WithoutElse
+AllowShortLambdasOnASingleLine: Empty
 AllowShortLoopsOnASingleLine: false
 SeparateDefinitionBlocks: Always
 LineEnding: LF

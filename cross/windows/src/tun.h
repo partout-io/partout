@@ -29,9 +29,11 @@ public:
     // Removing the callback waits for in-flight delivery under the receive mutex.
     bool SetOnReceive(TunOnReceive callback);
     void ReportError(int32_t error);
+
     int32_t WriteStatus() const {
         return write_status_.load();
     }
+
     int32_t Write(const uint8_t *bytes, size_t length);
     void StopWrites();
 
@@ -51,6 +53,7 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
+
     RuntimeLoop &Loop() const {
         return loop_;
     }
