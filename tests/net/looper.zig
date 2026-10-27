@@ -458,57 +458,65 @@ const WindowsAdmissionProbe = struct {
     }
 };
 
+// Exercises native producer admission without requiring a VPN channel host.
+const WindowsProducer = struct {
+    const c = source.ffi.io;
+    callback: c.winrt_receive = null,
+    context: ?*anyopaque = null,
+    released: bool = false,
+
+    fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.callback = callback;
+        self.context = context;
+        return true;
+    }
+    fn release(raw: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.released = true;
+    }
+    fn @"resume"(_: ?*anyopaque) callconv(.c) bool {
+        return true;
+    }
+    fn stop(_: ?*anyopaque) callconv(.c) void {}
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+        return 0;
+    }
+    fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+        return false;
+    }
+    fn send(self: *@This(), bytes: []const u8, code: i32) bool {
+        return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
+    }
+    fn capability(self: *@This()) c.winrt_transport {
+        return .{
+            .context = self,
+            .release = release,
+            .subscribe = subscribe,
+            .@"resume" = @"resume",
+            .stop = stop,
+            .write = write,
+            .local_address = address,
+            .unconnected = false,
+        };
+    }
+    fn pair(native: *c.winrt_transport, side: io.Side) !io.DescriptorPair {
+        return switch (side) {
+            .link => .{ .link = try io.SocketWrapper.wrap(std.testing.allocator, native) },
+            .tun => .{ .tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(native)) },
+        };
+    }
+};
+
 test "Windows paused TUN drops new input but admits failures and resumes delivery" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
     var probe: WindowsAdmissionProbe = .{};
-    // A fake producer exercises the C++ queue through the public transport
-    // boundary, without relying on Zig queue internals or a VPN host.
-    const c = source.ffi.io;
-    const Producer = struct {
-        callback: c.winrt_receive = null,
-        context: ?*anyopaque = null,
-        released: bool = false,
-
-        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.callback = callback;
-            self.context = context;
-            return true;
-        }
-        fn release(raw: ?*anyopaque) callconv(.c) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.released = true;
-        }
-        fn @"resume"(_: ?*anyopaque) callconv(.c) bool {
-            return true;
-        }
-        fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
-            return 0;
-        }
-        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
-            return false;
-        }
-        fn send(self: *@This(), bytes: []const u8, code: i32) bool {
-            return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
-        }
-    };
-    var producer: Producer = .{};
-    var capability: c.winrt_transport = .{
-        .context = &producer,
-        .release = Producer.release,
-        .subscribe = Producer.subscribe,
-        .@"resume" = Producer.@"resume",
-        .stop = Producer.stop,
-        .write = Producer.write,
-        .local_address = Producer.address,
-        .unconnected = false,
-    };
-    const tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(&capability));
+    var producer: WindowsProducer = .{};
+    var capability = producer.capability();
     try looper.attach(.{
-        .pair = .{ .tun = tun },
+        .pair = try WindowsProducer.pair(&capability, .tun),
         .on_read = .{ .context = &probe, .callback = WindowsAdmissionProbe.read },
         .on_failure = .{ .context = &probe, .callback = WindowsAdmissionProbe.failed },
     });
@@ -533,4 +541,122 @@ test "Windows paused TUN drops new input but admits failures and resumes deliver
     try looper.detach(.tun);
     try std.testing.expect(producer.callback == null);
     try std.testing.expect(producer.released);
+}
+
+const WindowsAllocationProbe = struct {
+    failures: usize = 0,
+    reads: usize = 0,
+    failure: ?io.Failure = null,
+    caller_thread: std.Thread.Id,
+    ran_on_caller: bool = false,
+    loop: *Looper,
+    detach_on_failure: bool = false,
+
+    fn failed(raw: ?*anyopaque, failure: io.Failure) void {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.failures += 1;
+        self.failure = failure;
+        self.ran_on_caller = std.Thread.getCurrentId() == self.caller_thread;
+        if (self.detach_on_failure) self.loop.detach(failure.io.side) catch unreachable;
+    }
+    fn read(raw: ?*anyopaque, _: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.reads += 1;
+        return .keep;
+    }
+};
+
+test "Windows receive OOM wakes the looper and reports one failure without allocating" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const Sender = struct {
+        looper: *Looper,
+        producer: *WindowsProducer,
+        rejected: bool = false,
+        fn run(self: *@This()) void {
+            const deadline = source.core.monotonicNs() + 2 * std.time.ns_per_s;
+            while (source.core.monotonicNs() < deadline) {
+                self.looper.impl.mutex.lock();
+                const waiting = self.looper.impl.waiting;
+                self.looper.impl.mutex.unlock();
+                if (waiting) {
+                    self.rejected = !self.producer.send("packet", 0);
+                    return;
+                }
+                source.core.sleepMs(1);
+            }
+        }
+    };
+    for ([_]io.Side{ .link, .tun }) |side| {
+        // Fail either the node allocation or the following packet copy.
+        for (0..2) |offset| {
+            var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+            var looper = try Looper.init(failing.allocator(), .{ .mux = null });
+            defer looper.deinit();
+            var probe: WindowsAllocationProbe = .{ .loop = &looper, .caller_thread = std.Thread.getCurrentId() };
+            var producer: WindowsProducer = .{};
+            var capability = producer.capability();
+            try looper.attach(.{
+                .pair = try WindowsProducer.pair(&capability, side),
+                .on_read = .{ .context = &probe, .callback = WindowsAllocationProbe.read },
+                .on_failure = .{ .context = &probe, .callback = WindowsAllocationProbe.failed },
+            });
+            failing.fail_index = failing.alloc_index + offset;
+            var sender: Sender = .{ .looper = &looper, .producer = &producer };
+            const thread = try std.Thread.spawn(.{}, Sender.run, .{&sender});
+            const alive = test_helpers.poll(&looper, 2000);
+            thread.join();
+            try std.testing.expect(try alive);
+            try std.testing.expect(sender.rejected);
+            try std.testing.expect(failing.has_induced_failure);
+            try std.testing.expectEqual(@as(usize, 1), probe.failures);
+            try std.testing.expectEqual(side, probe.failure.?.io.side);
+            try std.testing.expectEqual(@as(?i32, -2147024882), probe.failure.?.io.code);
+            try std.testing.expect(probe.failure.?.io.cause == error.LibcFailure);
+            try std.testing.expect(probe.ran_on_caller);
+            try std.testing.expectEqual(@as(usize, 0), probe.reads);
+            try std.testing.expect(!producer.send("later", 0));
+            try std.testing.expect(try test_helpers.poll(&looper, 0));
+            try std.testing.expectEqual(@as(usize, 1), probe.failures);
+            try std.testing.expectError(error.LooperUnavailable, looper.resumeReading(side));
+            try looper.detach(side);
+            try std.testing.expect(producer.released);
+        }
+    }
+}
+
+test "Windows receive OOM respects detach and attachment replacement" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    for ([_]io.Side{ .link, .tun }) |side| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+        var looper = try Looper.init(failing.allocator(), .{ .mux = null });
+        defer looper.deinit();
+        var probe: WindowsAllocationProbe = .{ .loop = &looper, .caller_thread = std.Thread.getCurrentId() };
+        var producer: WindowsProducer = .{};
+        var capability = producer.capability();
+        try looper.attach(.{
+            .pair = try WindowsProducer.pair(&capability, side),
+            .on_read = .{ .context = &probe, .callback = WindowsAllocationProbe.read },
+            .on_failure = .{ .context = &probe, .callback = WindowsAllocationProbe.failed },
+        });
+        failing.fail_index = failing.alloc_index;
+        try std.testing.expect(!producer.send("lost", 0));
+        try looper.detach(side);
+        failing.fail_index = std.math.maxInt(usize);
+        try looper.attach(.{
+            .pair = try WindowsProducer.pair(&capability, side),
+            .on_read = .{ .context = &probe, .callback = WindowsAllocationProbe.read },
+            .on_failure = .{ .context = &probe, .callback = WindowsAllocationProbe.failed },
+        });
+        try std.testing.expect(producer.send("replacement", 0));
+        try std.testing.expect(try test_helpers.poll(&looper, 0));
+        try std.testing.expectEqual(@as(usize, 0), probe.failures);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        // A failure callback may synchronously release its own attachment.
+        probe.detach_on_failure = true;
+        failing.fail_index = failing.alloc_index;
+        try std.testing.expect(!producer.send("lost again", 0));
+        try std.testing.expect(try test_helpers.poll(&looper, 0));
+        try std.testing.expectEqual(@as(usize, 1), probe.failures);
+        try std.testing.expect(producer.callback == null);
+    }
 }
