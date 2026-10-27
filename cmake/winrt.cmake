@@ -14,6 +14,7 @@ if(PP_BUILD_WINRT)
     add_library(partout-winrt-backend OBJECT
         cross/windows/src/abi.cc
         cross/windows/src/loop.cc
+        cross/windows/src/network.cc
         cross/windows/src/socket.cc
         cross/windows/src/tun.cc
         cross/windows/src/tun_settings.cc

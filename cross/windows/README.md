@@ -230,7 +230,16 @@ default routes without relying on interface metrics. Absent IP families are
 passed to Windows as `nullptr`, not empty address lists.
 Route gateways and DNS search suffix lists have no corresponding
 channel setting. Encrypted DNS is rejected rather than silently downgraded.
-Controller notifications remain unimplemented.
+The controller subscribes to `NetworkInformation.NetworkStatusChanged` while
+the daemon delegate is attached. It publishes initial physical-network
+reachability and detects changes in adapter identity, including handoffs that
+remain reachable throughout. Duplicate notifications for the same path are
+ignored. Physical profile selection excludes VPN interfaces and covers Ethernet,
+Wi-Fi and WWAN. Reachability feeds the daemon connection gate; path changes
+request OpenVPN reconnection or WireGuard link refresh. Replacement independent
+UDP sockets select the current adapter even when the channel stays open.
+Unsubscription drains delegate delivery before releasing its borrowed context.
+Snapshot and environment publication remain unimplemented.
 
 ## Build
 

@@ -135,6 +135,7 @@ TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
     : loop_(loop), state_(std::make_unique<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
+    monitor_.Stop();
     // Destruction must complete close, rather than queue a borrowed this pointer.
     loop_.Perform([this] {
         Close();
@@ -163,12 +164,10 @@ bool TunnelController::Associate(Socket &socket) noexcept {
 
 void TunnelController::AssociateUnconnected(Socket &socket) {
     // UDP sockets with multiple destinations keep their binds independent of the channel.
-    // Keep the adapter across UDP bind replacement, including after Open.
-    if (!udp_adapter_) {
-        const auto profile = Connectivity::NetworkInformation::GetInternetConnectionProfile();
-        if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
-        udp_adapter_ = profile.NetworkAdapter();
-    }
+    // Link refresh may preserve the channel while replacing its independent socket.
+    const auto profile = PhysicalProfile();
+    if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
+    udp_adapter_ = profile.NetworkAdapter();
     socket.SetAdapter(udp_adapter_);
     if (idle_transport_) return;
     if (transport_) throw hresult_illegal_method_call();
