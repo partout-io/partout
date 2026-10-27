@@ -15,7 +15,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
@@ -33,10 +32,7 @@ const Connection = conn_mod.Connection;
 const ConnectionEvent = Connection.Event;
 const ConnectionGate = helpers.ConnectionGate;
 const ConnectionRegistry = conn_mod.ConnectionRegistry;
-const ConnectionWorker = if (builtin.os.tag == .windows and build_options.winrt)
-    worker_mod.RuntimeLoopWorker
-else
-    worker_mod.ConnectionWorker;
+const ConnectionWorker = worker_mod.ConnectionWorker;
 const ConnectionWriter = sandbox.ConnectionWriter;
 const Looper = looper_mod.Looper;
 const RemoteDescriptor = conn_mod.RemoteDescriptor;

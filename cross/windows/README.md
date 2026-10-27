@@ -162,8 +162,9 @@ buffer operations then run on that worker, serialized with handover and stop.
 Final release drains accepted commands and native receive callbacks before
 releasing the transport and joining an unreferenced worker.
 
-On Windows, the daemon selects `RuntimeLoopWorker` with the same request,
-completion and factory contracts as `ConnectionWorker`. Shared endpoint
+`ConnectionWorker` selects its executor internally: RuntimeLoop on Windows
+with WinRT enabled, or a Zig actor otherwise. Its request, completion and
+factory contracts are shared across platforms. Shared endpoint
 preparation runs on the C++ RuntimeLoop thread; the socket factory reuses that
 loop for creation, association and open. No Zig preparation thread is started.
 Returned transports retain the loop for writes, handover and teardown. Other

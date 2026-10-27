@@ -8,7 +8,7 @@ const io = source.net_io;
 const net = source.net;
 const core = source.core;
 const api = core.api;
-const Worker = source.net_connection_worker.RuntimeLoopWorker;
+const Worker = source.net_connection_worker.ConnectionWorker;
 const mock = source.mock;
 const c = source.ffi.io;
 
