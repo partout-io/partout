@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #include "../../../cross/windows/src/network.h"
 #include <cassert>
+#include <array>
 
 int main() {
     using namespace Partout;
@@ -12,12 +13,19 @@ int main() {
     // Both adapters remain connected with InternetAccess. Enumeration must not
     // keep Wi-Fi selected once Ethernet has a lower combined default-route cost.
     const NetworkPreference wifi_preference{3, 50}, ethernet_preference{3, 10};
+    const std::array adapters{wifi, ethernet};
+    const std::array preferences{wifi_preference, ethernet_preference};
+    const auto preference = [&](size_t i) { return std::optional{preferences[i]}; };
     NetworkPath handoff;
-    assert(handoff.Update(wifi, true));
-    assert(ethernet_preference.IsBetterThan(wifi_preference));
-    assert(!wifi_preference.IsBetterThan(ethernet_preference));
-    assert(handoff.Update(ethernet, true));
-    assert(!handoff.Update(ethernet, true));
+    const auto initial = SelectPhysicalNetwork(1, preference);
+    assert(initial && adapters[*initial] == wifi);
+    assert(handoff.Update(adapters[*initial], true));
+    const auto selected = SelectPhysicalNetwork(adapters.size(), preference);
+    assert(selected && adapters[*selected] == ethernet);
+    assert(handoff.Update(adapters[*selected], true));
+    assert(!handoff.Update(adapters[*selected], true));
+    assert(!SelectPhysicalNetwork(0, preference));
+    assert(!SelectPhysicalNetwork(2, [](size_t) { return std::nullopt; }));
     assert((NetworkPreference{3, 5}.IsBetterThan(ethernet_preference)));
     assert((ethernet_preference.IsBetterThan(NetworkPreference{3, std::nullopt})));
     assert((NetworkPreference{3, std::nullopt}.IsBetterThan(NetworkPreference{1, std::nullopt})));

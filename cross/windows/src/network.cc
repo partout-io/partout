@@ -17,6 +17,21 @@ bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
     return metric && (!other.metric || *metric < *other.metric);
 }
 
+std::optional<size_t> SelectPhysicalNetwork(size_t count,
+    const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
+    std::optional<size_t> selected;
+    NetworkPreference best{};
+    for (size_t i = 0; i < count; ++i) {
+        const auto candidate = preference(i);
+        if (!candidate) continue;
+        if (!selected || candidate->IsBetterThan(best)) {
+            selected = i;
+            best = *candidate;
+        }
+    }
+    return selected;
+}
+
 namespace {
 std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter, const MIB_IPFORWARD_TABLE2 *routes) {
     if (!routes) return std::nullopt;
@@ -67,19 +82,15 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile() {
     const auto result = GetIpForwardTable2(AF_UNSPEC, &raw_routes);
     const std::unique_ptr<MIB_IPFORWARD_TABLE2, decltype(&FreeMibTable)> routes(raw_routes, FreeMibTable);
     if (result != NO_ERROR) throw winrt::hresult_error(HRESULT_FROM_WIN32(result));
-    ConnectionProfile selected{nullptr};
-    NetworkPreference best{};
-    for (auto const &profile : NetworkInformation::GetConnectionProfiles()) {
-        if (!usable(profile)) continue;
-        const NetworkPreference preference{
+    const auto profiles = NetworkInformation::GetConnectionProfiles();
+    const auto selected = SelectPhysicalNetwork(profiles.Size(), [&](size_t i) -> std::optional<NetworkPreference> {
+        const auto profile = profiles.GetAt(static_cast<uint32_t>(i));
+        if (!usable(profile)) return std::nullopt;
+        return NetworkPreference{
             static_cast<uint32_t>(profile.GetNetworkConnectivityLevel()),
             DefaultRouteMetric(profile.NetworkAdapter().NetworkAdapterId(), routes.get())};
-        if (!selected || preference.IsBetterThan(best)) {
-            selected = profile;
-            best = preference;
-        }
-    }
-    return selected;
+    });
+    return selected ? profiles.GetAt(static_cast<uint32_t>(*selected)) : ConnectionProfile{nullptr};
 }
 
 struct NetworkMonitor::State {
