@@ -133,7 +133,8 @@ supplied mux is borrowed only for its wake event; a looper created without one
 owns a private wake source. WindowsLooper has no receive FIFO: owned packets and
 failures use the daemon's existing mailbox. Paused packets remain there without
 blocking control messages or spinning; packet batches are bounded so timers run.
-OOM notification uses a reserved mailbox job without allocating.
+Packet submission allocation failure sets a terminal flag and wakes the daemon
+actor to finalize and cancel; ordinary I/O failures retain protocol reconnect behavior.
 
 ### TUN lifetime and delivery
 

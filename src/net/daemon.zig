@@ -386,8 +386,7 @@ const ConnectionDaemon = struct {
     jobs: core.Fifo(Job),
     jobs_mutex: core.Mutex,
     jobs_condition: core.concurrency.Condition = .{},
-    submit_packets_failure_job: Job = .{ .message = .submitPacketsFailed },
-    submit_packets_failure_queued: bool = false,
+    packet_submission_failed: bool = false,
     is_running: bool,
 
     // Internal state
@@ -613,7 +612,7 @@ const ConnectionDaemon = struct {
     /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
     fn submitPackets(self: *ConnectionDaemon, input: Looper.PacketSubmission) error{ Closed, OutOfMemory }!void {
         errdefer |err| {
-            if (err == error.OutOfMemory and self.looper.failAllocation(input)) {
+            if (err == error.OutOfMemory) {
                 self.onSubmitPacketsFailed();
             }
         }
@@ -635,9 +634,8 @@ const ConnectionDaemon = struct {
     fn onSubmitPacketsFailed(self: *ConnectionDaemon) void {
         self.jobs_mutex.lock();
         defer self.jobs_mutex.unlock();
-        if (!self.is_running or self.submit_packets_failure_queued) return;
-        self.submit_packets_failure_queued = true;
-        self.jobs.append(&self.submit_packets_failure_job);
+        if (!self.is_running) return;
+        self.packet_submission_failed = true;
         _ = io_c.pp_mux_wake(self.mux);
     }
 
@@ -962,10 +960,6 @@ const ConnectionDaemon = struct {
         self.looper.deliver(submission);
     }
 
-    fn handleSubmitPacketsFailed(self: *ConnectionDaemon) void {
-        self.looper.dispatchFailures();
-    }
-
     // The event loop invokes looper callbacks on the actor thread. They may run
     // protocol work directly; lifecycle events are queued until loopOnce returns.
 
@@ -1050,7 +1044,6 @@ const ConnectionDaemon = struct {
         onReachability: io.ReachabilityInfo,
         onBetterPath,
         submitPackets: Looper.PacketSubmission,
-        submitPacketsFailed,
 
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
@@ -1085,7 +1078,7 @@ const ConnectionDaemon = struct {
         while (running) {
             // Fetch pending jobs if any.
             self.jobs_mutex.lock();
-            running = self.is_running;
+            running = self.is_running and !self.packet_submission_failed;
             _ = io_c.pp_mux_reset_wake(self.mux);
             const last = self.jobs.tail;
             self.jobs_mutex.unlock();
@@ -1095,7 +1088,8 @@ const ConnectionDaemon = struct {
             var remaining = self.looper.mailboxJobLimit();
             while (running and remaining > 0) : (remaining -= 1) {
                 self.jobs_mutex.lock();
-                const next = self.jobs.removeWhere(self, Job.eligible);
+                running = self.is_running and !self.packet_submission_failed;
+                const next = if (running) self.jobs.removeWhere(self, Job.eligible) else null;
                 self.jobs_mutex.unlock();
                 const job = next orelse break;
                 const was_last = job == last;
@@ -1131,7 +1125,8 @@ const ConnectionDaemon = struct {
 
         // Signal finalization to close job submissions.
         self.jobs_mutex.lock();
-        const unexpected_exit = loop_terminated and self.is_running;
+        const unexpected_exit = (loop_terminated or self.packet_submission_failed) and self.is_running;
+        if (self.packet_submission_failed) loop_failure = .{ .system = error.OutOfMemory };
         self.is_running = false;
         var pending = self.jobs.takeAll();
         self.jobs_mutex.unlock();
@@ -1160,11 +1155,6 @@ const ConnectionDaemon = struct {
     }
 
     fn executeJob(self: *ConnectionDaemon, job: *const Job) Error!void {
-        if (job == &self.submit_packets_failure_job) {
-            self.jobs_mutex.lock();
-            self.submit_packets_failure_queued = false;
-            self.jobs_mutex.unlock();
-        }
         if (builtin.is_test) {
             if (job.test_task) |task| return task.callback(self, task.context);
         }
@@ -1179,8 +1169,8 @@ const ConnectionDaemon = struct {
         }
         const owned = job.owned;
         self.jobs_mutex.lock();
-        const still_running = self.is_running;
-        if (!owned and job != &self.submit_packets_failure_job) {
+        const still_running = self.is_running and !self.packet_submission_failed;
+        if (!owned) {
             job.result = result;
             job.done = true;
             self.jobs_condition.broadcast();
@@ -1206,7 +1196,7 @@ const ConnectionDaemon = struct {
     fn enqueue(self: *ConnectionDaemon, job: *Job) error{Closed}!void {
         self.jobs_mutex.lock();
         defer self.jobs_mutex.unlock();
-        if (!self.is_running) return error.Closed;
+        if (!self.is_running or self.packet_submission_failed) return error.Closed;
 
         self.jobs.append(job);
         _ = io_c.pp_mux_wake(self.mux);
@@ -1214,7 +1204,7 @@ const ConnectionDaemon = struct {
 
     fn perform(self: *ConnectionDaemon, message: Message) Error!void {
         self.jobs_mutex.lock();
-        if (!self.is_running) {
+        if (!self.is_running or self.packet_submission_failed) {
             self.jobs_mutex.unlock();
             return error.Closed;
         }
@@ -1253,7 +1243,6 @@ const ConnectionDaemon = struct {
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
             .submitPackets => |submission| self.handleSubmitPackets(submission),
-            .submitPacketsFailed => self.handleSubmitPacketsFailed(),
         }
     }
 

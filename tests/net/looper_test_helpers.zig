@@ -14,9 +14,7 @@ pub const Mailbox = struct {
     looper: *source.net_looper.Looper,
     mutex: source.core.Mutex = .{},
     inputs: source.core.Fifo(Node) = .{},
-    failure_pending: bool = false,
     closed: bool = false,
-    waiting: std.atomic.Value(bool) = .init(false),
 
     const Node = struct {
         input: source.net_looper.Looper.PacketSubmission,
@@ -61,20 +59,8 @@ pub const Mailbox = struct {
         const attachment: *source.net_looper.Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const input = attachment.input(bytes, length, address, code) orelse return false;
         const self: *Mailbox = @ptrCast(@alignCast(attachment.owner.receive_context.?));
-        post(self, input) catch |err| {
-            if (err == error.OutOfMemory and attachment.owner.failAllocation(input)) failed(self);
-            return false;
-        };
+        post(self, input) catch return false;
         return attachment.keepReading(input);
-    }
-
-    fn failed(raw: *anyopaque) void {
-        const self: *Mailbox = @ptrCast(@alignCast(raw));
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        if (self.closed) return;
-        self.failure_pending = true;
-        _ = io_c.pp_mux_wake(self.looper.impl.mux);
     }
 
     fn free(self: *Mailbox, node: *Node) void {
@@ -84,21 +70,14 @@ pub const Mailbox = struct {
 
     fn poll(self: *Mailbox, max_wait_ms: ?u32) !bool {
         self.mutex.lock();
-        var queued = self.failure_pending;
+        var queued = false;
         var pending = self.inputs.head;
         while (pending) |node| : (pending = node.next) queued = queued or self.looper.impl.inputReady(node.input);
         self.mutex.unlock();
         var failure: ?source.net_io.Failure = null;
-        self.waiting.store(true, .release);
         const alive = self.looper.impl.loopOnce(if (queued) 0 else max_wait_ms, &failure);
-        self.waiting.store(false, .release);
         try std.testing.expect(failure == null);
         if (!alive) return false;
-        self.mutex.lock();
-        const dispatch_failure = self.failure_pending;
-        self.failure_pending = false;
-        self.mutex.unlock();
-        if (dispatch_failure) self.looper.impl.dispatchFailures();
         for (0..self.looper.impl.max_read_count) |_| {
             self.mutex.lock();
             const node = self.inputs.removeWhere(self, Node.ready);

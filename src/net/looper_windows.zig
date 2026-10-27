@@ -31,13 +31,12 @@ pub const WindowsLooper = struct {
         arguments: ?helpers.AttachArguments = null,
         generation: u64 = 0,
         reading: bool = true,
-        allocation_failure: enum { none, pending, delivered } = .none,
 
         pub fn input(side: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketSubmission {
             const self = side.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
-            if (side.arguments == null or side.allocation_failure != .none or (code == 0 and !side.reading and side.tag == .tun)) {
+            if (side.arguments == null or (code == 0 and !side.reading and side.tag == .tun)) {
                 return null;
             }
             return .{
@@ -88,20 +87,6 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn failAllocation(self: *WindowsLooper, event: helpers.PacketSubmission) bool {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        const side = &self.sides[@intFromEnum(event.side)];
-        if (side.arguments == null or side.generation != event.generation or side.allocation_failure != .none) {
-            return false;
-        }
-        // Reserve terminal failure delivery in the attachment itself: this
-        // path must work even when neither a node nor packet can be allocated.
-        side.allocation_failure = .pending;
-        side.reading = false;
-        return true;
-    }
-
     pub fn inputReady(self: *WindowsLooper, event: helpers.PacketSubmission) bool {
         self.mutex.lock();
         defer self.mutex.unlock();
@@ -138,21 +123,6 @@ pub const WindowsLooper = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
         if (side.arguments != null and side.generation == generation) side.reading = keep;
-    }
-
-    pub fn dispatchFailures(self: *WindowsLooper) void {
-        for (&self.sides) |*side| {
-            self.mutex.lock();
-            const event: ?helpers.PacketSubmission = if (side.arguments != null and side.allocation_failure == .pending) .{
-                .side = side.tag,
-                .generation = side.generation,
-                .code = -2147024882, // E_OUTOFMEMORY
-            } else null;
-            if (event != null) side.allocation_failure = .delivered;
-            self.mutex.unlock();
-            if (event) |value| self.deliver(value);
-            if (self.stopped) return;
-        }
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
@@ -227,7 +197,6 @@ pub const WindowsLooper = struct {
         side.generation +%= 1;
         side.arguments = arguments;
         side.reading = true;
-        side.allocation_failure = .none;
         self.mutex.unlock();
         switch (arguments.pair) {
             inline else => |value| value.setOnReceive(self.on_receive, side) catch {
@@ -264,10 +233,6 @@ pub const WindowsLooper = struct {
         const side = &self.sides[@intFromEnum(tag)];
         const arguments = side.arguments orelse return error.LooperUnavailable;
         self.mutex.lock();
-        if (side.allocation_failure != .none) {
-            self.mutex.unlock();
-            return error.LooperUnavailable;
-        }
         side.reading = true;
         self.mutex.unlock();
         switch (arguments.pair) {

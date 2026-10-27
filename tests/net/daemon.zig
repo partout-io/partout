@@ -2094,7 +2094,7 @@ test "connection worker rolls back endpoint and thread allocations" {
     try std.testing.checkAllAllocationFailures(std.testing.allocator, Fixture.run, .{});
 }
 
-test "Windows native input shares the daemon mailbox and preserves pause, ownership and OOM delivery" {
+test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const Probe = struct {
@@ -2196,96 +2196,113 @@ test "Windows native input shares the daemon mailbox and preserves pause, owners
             }
         }
     };
-    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    const allocator = failing.allocator();
-    var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
-    defer profile.deinit(std.testing.allocator);
-    var connection = FailingStartConnection{};
-    var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
-    defer registry.deinit(std.testing.allocator);
-    var controller = mock_mod.MockTunnelController{};
-    var monitor = mock_mod.MockNetworkMonitor{};
-    var probe = Probe{};
-    probe.capability = .{
-        .context = &probe,
-        .release = Probe.release,
-        .subscribe = Probe.subscribe,
-        .@"resume" = Probe.resumeReads,
-        .stop = Probe.stop,
-        .write = Probe.write,
-        .local_address = Probe.address,
-        .unconnected = false,
-    };
-    const sut = try Daemon.create(allocator, &profile, .{
-        .objects = .{
-            .registry = &registry,
-            .controller = controller.interface(),
-            .resolver = mock_mod.noopDNSResolver(),
-            .factory = mock_mod.noopSocketFactory(),
-            .monitor = monitor.interface(),
-        },
-        .options = .{ .starts_immediately = false },
-    });
-    defer sut.destroy();
-    const owner = sut.implementation.connection;
-    try daemon.testing.onLoop(owner, &probe, Probe.attach);
-    var packet = "original".*;
-    try std.testing.expect(probe.callback.?(probe.callback_context, &packet, packet.len, null, 0));
-    @memset(&packet, 'x');
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqualStrings("original", probe.bytes[0..probe.length]);
-    try std.testing.expectEqual(@as(usize, 1), probe.reads);
-
-    // Queue one in-flight packet while paused, then run a control past it.
-    const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-    try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 1), probe.reads);
-    try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 2), probe.reads);
-    try std.testing.expectEqualStrings("pending", probe.bytes[0..probe.length]);
-
-    // A pause also applies to packets fetched in the same mailbox batch.
-    try daemon.testing.onLoop(owner, &probe, Probe.burst);
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 3), probe.reads);
-    try std.testing.expectEqualStrings("first", probe.bytes[0..probe.length]);
-    try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 5), probe.reads);
-    try std.testing.expectEqualStrings("third", probe.bytes[0..probe.length]);
-
-    // A ready timer must run between mailbox packet batches, before all input drains.
-    const all_reads = probe.reads + owner.looper.impl.max_read_count + 1;
-    try daemon.testing.onLoop(owner, &probe, Probe.flood);
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(all_reads, probe.reads);
-    try std.testing.expect(probe.reads_at_timer.? < all_reads);
-
-    try daemon.testing.onLoop(owner, &probe, Probe.attach);
-    try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(usize, 0), probe.failures);
-    try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
-    try daemon.testing.onLoop(owner, {}, Probe.barrier);
-    try std.testing.expectEqual(@as(?i32, -123), probe.code);
-
-    for (0..2) |offset| {
+    for ([_]?usize{ null, 0, 1 }) |oom_offset| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+        const allocator = failing.allocator();
+        var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(std.testing.allocator);
+        var connection = FailingStartConnection{};
+        var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
+        defer registry.deinit(std.testing.allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+        var probe = Probe{};
+        probe.capability = .{
+            .context = &probe,
+            .release = Probe.release,
+            .subscribe = Probe.subscribe,
+            .@"resume" = Probe.resumeReads,
+            .stop = Probe.stop,
+            .write = Probe.write,
+            .local_address = Probe.address,
+            .unconnected = false,
+        };
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = false, .cancels_unrecoverable = false },
+        });
+        defer sut.destroy();
+        const owner = sut.implementation.connection;
+        try sut.start();
+        defer sut.stop();
+        try cancelGateTimer(owner);
         try daemon.testing.onLoop(owner, &probe, Probe.attach);
-        failing.fail_index = failing.alloc_index + offset;
-        try std.testing.expect(!probe.callback.?(probe.callback_context, "oom", 3, null, 0));
-        // The mailbox failure notification and its callback allocate nothing.
+        var packet = "original".*;
+        try std.testing.expect(probe.callback.?(probe.callback_context, &packet, packet.len, null, 0));
+        @memset(&packet, 'x');
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
-        try std.testing.expectEqual(offset + 2, probe.failures);
-        try std.testing.expectEqual(@as(?i32, -2147024882), probe.code);
-        failing.fail_index = std.math.maxInt(usize);
+        try std.testing.expectEqualStrings("original", probe.bytes[0..probe.length]);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+
+        // Queue one in-flight packet while paused, then run a control past it.
+        const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+        try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 2), probe.reads);
+        try std.testing.expectEqualStrings("pending", probe.bytes[0..probe.length]);
+
+        // A pause also applies to packets fetched in the same mailbox batch.
+        try daemon.testing.onLoop(owner, &probe, Probe.burst);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 3), probe.reads);
+        try std.testing.expectEqualStrings("first", probe.bytes[0..probe.length]);
+        try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 5), probe.reads);
+        try std.testing.expectEqualStrings("third", probe.bytes[0..probe.length]);
+
+        // A ready timer must run between mailbox packet batches, before all input drains.
+        const all_reads = probe.reads + owner.looper.impl.max_read_count + 1;
+        try daemon.testing.onLoop(owner, &probe, Probe.flood);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(all_reads, probe.reads);
+        try std.testing.expect(probe.reads_at_timer.? < all_reads);
+
+        try daemon.testing.onLoop(owner, &probe, Probe.attach);
+        try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 0), probe.failures);
+        try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(?i32, -123), probe.code);
+
+        if (oom_offset) |offset| {
+            try daemon.testing.onLoop(owner, &probe, Probe.attach);
+            failing.fail_index = failing.alloc_index + offset;
+            try std.testing.expect(!probe.callback.?(probe.callback_context, "oom", 3, null, 0));
+            // Actor finalization and cancellation must work while allocation fails.
+            try waitForExit(owner);
+            try std.testing.expect(failing.has_induced_failure);
+            try std.testing.expect(owner.packet_submission_failed);
+            try std.testing.expect(!owner.is_running);
+            try std.testing.expect(sut.state == .stopped);
+            try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+            try std.testing.expectEqual(@as(?api.PartoutErrorCode, .ioFailure), controller.last_cancel_code);
+            try std.testing.expect(probe.callback == null);
+            try std.testing.expect(!owner.looper.isTunAttached());
+            try std.testing.expectEqual(@as(usize, 1), probe.failures);
+            try std.testing.expectEqual(@as(usize, 0), connection.start_count);
+            failing.fail_index = std.math.maxInt(usize);
+            try std.testing.expectError(error.Closed, sut.start());
+            try std.testing.expectError(error.Closed, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
+        } else {
+            // Paused owned input must also be reclaimed when the mailbox closes.
+            const final_generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+            try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
+            daemon.testing.shutdown(owner);
+            try std.testing.expectError(error.Closed, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
+            try waitForExit(owner);
+        }
+        try std.testing.expect(probe.on_actor);
     }
-    try std.testing.expect(probe.on_actor);
-    // Paused owned input must also be reclaimed when the mailbox closes.
-    const final_generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-    try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
-    daemon.testing.shutdown(owner);
-    try std.testing.expectError(error.Closed, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
 }

@@ -67,11 +67,6 @@ pub const Looper = struct {
         return self.impl.loopOnce(null, failure);
     }
 
-    pub fn failAllocation(self: *Looper, submission: PacketSubmission) bool {
-        if (builtin.os.tag == .windows) return self.impl.failAllocation(submission);
-        return false;
-    }
-
     pub fn inputReady(self: *Looper, submission: PacketSubmission) bool {
         if (builtin.os.tag == .windows) return self.impl.inputReady(submission);
         return true;
@@ -79,10 +74,6 @@ pub const Looper = struct {
 
     pub fn deliver(self: *Looper, submission: PacketSubmission) void {
         if (builtin.os.tag == .windows) self.impl.deliver(submission);
-    }
-
-    pub fn dispatchFailures(self: *Looper) void {
-        if (builtin.os.tag == .windows) self.impl.dispatchFailures();
     }
 
     /// Bound native mailbox work so protocol timers get a turn. POSIX receives
