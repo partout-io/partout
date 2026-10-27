@@ -477,8 +477,11 @@ const ConnectionDaemon = struct {
 
     fn stop(self: *ConnectionDaemon) void {
         self.perform(.stop) catch {
+            // A closed mailbox may mean terminal cleanup is still running.
+            // Keep stop synchronous so the caller can immediately destroy us.
             self.jobs_mutex.lock();
             defer self.jobs_mutex.unlock();
+            // Reentrant actor callbacks cannot wait for their own finalization.
             if (self.isCurrentThread()) return;
             while (self.actor_id != null) self.jobs_condition.wait(&self.jobs_mutex);
         };
