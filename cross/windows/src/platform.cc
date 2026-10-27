@@ -54,7 +54,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
     });
     pp_tun_ctrl_fnt functions{};
     functions.set_delegate = [](void *, const pp_tun_ctrl_delegate *) {
-        // Reachability notifications remain unimplemented.
+        // FIXME: ###, Implement reachability notifications.
     };
     functions.set_tunnel = [](void *raw, const char *, const char *json) -> pp_tun {
         auto controller = static_cast<Partout::TunnelController *>(raw);
@@ -76,16 +76,20 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         }
     };
     functions.report_snapshot = [](void *, const char *) {
+        // FIXME: ###, Report tunnel snapshots.
     };
     functions.set_environment_value = [](void *, const char *, const char *) {
+        // FIXME: ###, Apply environment values.
     };
     functions.clear_tunnel = [](void *raw, bool kill_switch) {
+        // FIXME: ###, Implement kill switch support.
         if (kill_switch)
             winrt_log(WinrtLogNotice, "Partout: kill switch not implemented");
         if (auto controller = static_cast<Partout::TunnelController *>(raw))
             controller->Close();
     };
     functions.cancel_tunnel = [](void *, const char *) {
+        // FIXME: ###, Cancel the tunnel connection.
     };
     return functions;
 }
