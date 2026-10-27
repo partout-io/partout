@@ -23,6 +23,82 @@ const request: Worker.Request = .{
     .link_activity_timeout = 1000,
 };
 
+test "backend thread hooks bracket owned threads and foreign writers retain buffer ownership" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const Probe = struct {
+        socket: io.LinkDescriptor,
+        destination: io.SocketAddress,
+        before: [2]i32 = .{ -1, -1 },
+        during: [2]i32 = .{ -1, -1 },
+        after: [2]i32 = .{ -1, -1 },
+        entered: bool = false,
+        writes: [3]i32 = .{ -1, -1, -1 },
+        received: std.atomic.Value(u8) = .init(0),
+
+        extern "ole32" fn CoGetApartmentType(*i32, *i32) callconv(.winapi) i32;
+
+        fn apartment() [2]i32 {
+            var result: [2]i32 = .{ -1, -1 };
+            if (CoGetApartmentType(&result[0], &result[1]) < 0) return .{ -1, -1 };
+            return result;
+        }
+
+        fn run(self: *@This()) void {
+            self.before = apartment();
+            var payload = [_]u8{'a'};
+            // No entry hook: this models a foreign Go writer using the runtime's MTA.
+            self.writes[0] = self.socket.write(&payload, self.destination);
+            io.threadEnter() catch return;
+            self.entered = true;
+            self.during = apartment();
+            payload[0] = 'b';
+            self.writes[1] = self.socket.write(&payload, self.destination);
+            io.threadExit();
+            self.after = apartment();
+            payload[0] = 'c';
+            self.writes[2] = self.socket.write(&payload, self.destination);
+            payload[0] = 'x'; // Each submitted Buffer must already own its payload.
+        }
+
+        fn receive(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, _: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            const bit: u8 = if (code != 0 or length != 1) 8 else switch (bytes[0]) {
+                'a' => 1,
+                'b' => 2,
+                'c' => 4,
+                else => 8,
+            };
+            _ = self.received.fetchOr(bit, .release);
+            return true;
+        }
+    };
+    const receiver = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+    defer receiver.destroy();
+    const sender = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+    defer sender.destroy();
+    var probe = Probe{
+        .socket = sender,
+        .destination = try io.testing.socketAddress(.{ .address = "127.0.0.1", .proto = .init(.udp, (try receiver.localAddress()).port) }),
+    };
+    try receiver.setOnReceive(Probe.receive, &probe);
+    defer receiver.setOnReceive(null, null) catch unreachable;
+    const thread = try std.Thread.spawn(.{}, Probe.run, .{&probe});
+    thread.join();
+    try std.testing.expect(probe.entered);
+    try std.testing.expectEqual([3]i32{ 0, 0, 0 }, probe.writes);
+    // APTTYPE_MTA=1; qualifier is IMPLICIT_MTA=1 before/after, NONE=0 while entered.
+    try std.testing.expectEqual([2]i32{ 1, 1 }, probe.before);
+    try std.testing.expectEqual([2]i32{ 1, 0 }, probe.during);
+    try std.testing.expectEqual(probe.before, probe.after);
+    const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+    while (probe.received.load(.acquire) != 7) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+}
+
 test "native receive removal drains the ABI callback before replacing its context" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const native_runtime = try NativeRuntime.init();
