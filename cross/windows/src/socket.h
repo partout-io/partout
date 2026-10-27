@@ -17,7 +17,7 @@ namespace Partout {
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
-public:
+  public:
     using Receiver = std::function<void(const uint8_t *, size_t)>;
     using Writer = std::function<int32_t(const uint8_t *, size_t)>;
 
@@ -31,10 +31,10 @@ public:
 
     // Whether the socket uses application-owned, unconnected UDP.
     bool IsUnconnected() const;
+
     bool Accepts(const SocketAddress *destination) const {
-        return !unconnected_ || (destination &&
-            ((destination->family == 4 && accepts_ipv4_) ||
-             (destination->family == 6 && accepts_ipv6_)));
+        return !unconnected_ || (destination && ((destination->family == 4 && accepts_ipv4_) ||
+                                                 (destination->family == 6 && accepts_ipv6_)));
     }
 
     // Before open: constrain independent UDP to the selected physical adapter.
@@ -42,8 +42,12 @@ public:
 
     bool Open(const char *hostname, uint16_t port, const SocketOpenOptions *options);
     bool GetAddress(SocketAddress *address);
+
     static SocketAddress Address(winrt::Windows::Networking::HostName const &host,
-        winrt::hstring const &port) { return ParseAddress(host, port); }
+                                 winrt::hstring const &port) {
+        return ParseAddress(host, port);
+    }
+
     bool SetOnReceive(SocketOnReceive callback, void *context);
     bool ResumeReading();
     int32_t Write(const uint8_t *bytes, size_t length, const SocketAddress *destination);
@@ -53,19 +57,22 @@ public:
     // before starting the channel; it retains state and is safe after link detach.
     Receiver TakeOver(Writer writer);
 
-private:
+  private:
     struct State;
 
     void RegisterForDatagrams();
-    static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms);
+    static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action,
+                               int timeout_ms);
     static SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host,
-        winrt::hstring const &port);
-    static winrt::Windows::Foundation::IAsyncAction ReadStream(std::shared_ptr<State> state,
-        winrt::Windows::Networking::Sockets::StreamSocket stream);
+                                      winrt::hstring const &port);
+    static winrt::Windows::Foundation::IAsyncAction
+    ReadStream(std::shared_ptr<State> state,
+               winrt::Windows::Networking::Sockets::StreamSocket stream);
     void EnqueueWrite(const uint8_t *bytes, size_t length, const SocketAddress *destination);
-    static winrt::Windows::Foundation::IAsyncAction WriteQueued(std::shared_ptr<State> state,
-        winrt::Windows::Networking::Sockets::DatagramSocket datagram,
-        winrt::Windows::Networking::Sockets::StreamSocket stream);
+    static winrt::Windows::Foundation::IAsyncAction
+    WriteQueued(std::shared_ptr<State> state,
+                winrt::Windows::Networking::Sockets::DatagramSocket datagram,
+                winrt::Windows::Networking::Sockets::StreamSocket stream);
 
     // Keep the MTA alive until transports and outstanding callbacks are released.
     std::shared_ptr<State> state_;
@@ -73,7 +80,8 @@ private:
     winrt::Windows::Networking::Sockets::StreamSocket stream_{nullptr};
     winrt::Windows::Foundation::IAsyncAction read_{nullptr};
     winrt::Windows::Foundation::IAsyncAction write_{nullptr};
-    winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker receive_registration_;
+    winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker
+        receive_registration_;
     Writer channel_write_; // Installed by TakeOver; empty during direct socket I/O.
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};

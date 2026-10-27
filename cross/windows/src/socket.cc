@@ -52,7 +52,10 @@ struct Socket::State {
     bool paused = false;
     bool channel_owned = false;
 
-    State() { check_hresult(CoIncrementMTAUsage(&apartment)); }
+    State() {
+        check_hresult(CoIncrementMTAUsage(&apartment));
+    }
+
     ~State() {
         writes.clear();
         CoDecrementMTAUsage(apartment);
@@ -60,24 +63,27 @@ struct Socket::State {
 
     void finishReadLocked(int32_t error = 0) {
         reading = false;
-        if (error && !channel_owned) deliverLocked(nullptr, 0, nullptr, error);
+        if (error && !channel_owned)
+            deliverLocked(nullptr, 0, nullptr, error);
     }
 
-    void deliver(const uint8_t *bytes, size_t size,
-                 const SocketAddress *source, int32_t error) {
+    void deliver(const uint8_t *bytes, size_t size, const SocketAddress *source, int32_t error) {
         std::lock_guard lock(mutex);
-        if (!error) ++received;
+        if (!error)
+            ++received;
         deliverLocked(bytes, size, source, error);
     }
 
-    void deliverLocked(const uint8_t *bytes, size_t size,
-                       const SocketAddress *source, int32_t error) {
-        if (!callback || (paused && !error)) return;
+    void deliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
+                       int32_t error) {
+        if (!callback || (paused && !error))
+            return;
         if (error == SocketEOF) {
             winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
-            winrt_log(WinrtLogError, "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
-                static_cast<unsigned int>(error), channel_owned ? "true" : "false");
+            winrt_log(WinrtLogError,
+                      "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
+                      static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         }
         paused = !callback(context, bytes, size, source, error);
     }
@@ -86,11 +92,14 @@ struct Socket::State {
 Socket::Socket(SocketProto proto, bool unconnected) {
     if (proto != SocketProtoUDP && proto != SocketProtoTCP)
         throw hresult_invalid_argument();
-    if (unconnected && proto != SocketProtoUDP) throw hresult_invalid_argument();
+    if (unconnected && proto != SocketProtoUDP)
+        throw hresult_invalid_argument();
     unconnected_ = unconnected;
     state_ = std::make_shared<State>();
-    if (proto == SocketProtoUDP) datagram_ = DatagramSocket{};
-    else stream_ = StreamSocket{};
+    if (proto == SocketProtoUDP)
+        datagram_ = DatagramSocket{};
+    else
+        stream_ = StreamSocket{};
 }
 
 Socket::~Socket() noexcept {
@@ -99,16 +108,25 @@ Socket::~Socket() noexcept {
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
         winrt_log(WinrtLogInfo, "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
-            state_->received, state_->sent);
+                  state_->received, state_->sent);
     }
     receive_registration_.revoke();
     // Close each transport independently.
-    try { if (datagram_) datagram_.Close(); } catch (...) {}
-    try { if (stream_) stream_.Close(); } catch (...) {}
+    try {
+        if (datagram_)
+            datagram_.Close();
+    } catch (...) {
+    }
+    try {
+        if (stream_)
+            stream_.Close();
+    } catch (...) {
+    }
 }
 
 IInspectable Socket::Transport() const {
-    if (datagram_) return datagram_;
+    if (datagram_)
+        return datagram_;
     return stream_;
 }
 
@@ -117,12 +135,12 @@ bool Socket::IsUnconnected() const {
 }
 
 void Socket::SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter) {
-    if (!IsUnconnected() || !adapter) throw hresult_invalid_argument();
+    if (!IsUnconnected() || !adapter)
+        throw hresult_invalid_argument();
     adapter_ = adapter;
 }
 
-bool Socket::Open(const char *hostname, uint16_t port,
-    const SocketOpenOptions *options) {
+bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *options) {
     try {
         if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
             (options->dual_stack && !unconnected_)) {
@@ -151,11 +169,12 @@ bool Socket::Open(const char *hostname, uint16_t port,
             const bool ipv6_wildcard = host.CanonicalName() == L"::";
             const auto local_service = port == 0 ? hstring{} : service;
             if (adapter_) {
-                if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
+                if (!ipv4_wildcard && !ipv6_wildcard)
+                    throw hresult_invalid_argument();
                 datagram_.BindServiceNameAsync(local_service, adapter_).get();
                 winrt_log(WinrtLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
-                    datagram_.Information().LocalPort().c_str(),
-                    to_hstring(adapter_.NetworkAdapterId()).c_str());
+                          datagram_.Information().LocalPort().c_str(),
+                          to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
                 datagram_.BindServiceNameAsync(local_service).get();
             } else {
@@ -166,23 +185,25 @@ bool Socket::Open(const char *hostname, uint16_t port,
             WaitForConnect(datagram_.ConnectAsync(host, service), options->timeout_ms);
         } else {
             WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
-                options->timeout_ms);
+                           options->timeout_ms);
         }
-        winrt_log(WinrtLogDebug, "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
-            datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-            unconnected_ ? "unconnected" : "connected",
-            options->dual_stack ? "true" : "false");
+        winrt_log(WinrtLogDebug,
+                  "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
+                  datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
+                  unconnected_ ? "unconnected" : "connected",
+                  options->dual_stack ? "true" : "false");
     } catch (hresult_error const &error) {
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
             const auto message = to_string(error.message());
             winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
-                static_cast<unsigned int>(error.code().value), message.c_str());
-        } catch (...) {}
+                      static_cast<unsigned int>(error.code().value), message.c_str());
+        } catch (...) {
+        }
         return false;
     } catch (...) {
         winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
+                  static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -192,19 +213,21 @@ void Socket::RegisterForDatagrams() {
     const auto state = state_;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
-    receive_registration_ = datagram_.MessageReceived(auto_revoke,
+    receive_registration_ = datagram_.MessageReceived(
+        auto_revoke,
         [state, unconnected = unconnected_, ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_](
             DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
             try {
                 const auto family = args.RemoteAddress().Type();
                 if ((family == HostNameType::Ipv4 && !ipv4) ||
-                    (family == HostNameType::Ipv6 && !ipv6)) return;
+                    (family == HostNameType::Ipv6 && !ipv6))
+                    return;
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 SocketAddress source{};
-                if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
-                state->deliver(buffer.data(), buffer.Length(),
-                    unconnected ? &source : nullptr, 0);
+                if (unconnected)
+                    source = ParseAddress(args.RemoteAddress(), args.RemotePort());
+                state->deliver(buffer.data(), buffer.Length(), unconnected ? &source : nullptr, 0);
             } catch (...) {
                 state->deliver(nullptr, 0, nullptr, to_hresult().value);
             }
@@ -220,7 +243,8 @@ void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
 }
 
 bool Socket::GetAddress(SocketAddress *address) {
-    if (!address) return false;
+    if (!address)
+        return false;
     try {
         HostName host{nullptr};
         hstring port;
@@ -230,7 +254,8 @@ bool Socket::GetAddress(SocketAddress *address) {
             port = info.LocalPort();
             // Service binds may report :: even for our IPv4-only policy.
             // Preserve the requested binding while using the OS-assigned port.
-            if (bound_host_) host = bound_host_;
+            if (bound_host_)
+                host = bound_host_;
         } else {
             const auto info = stream_.Information();
             host = info.LocalAddress();
@@ -258,7 +283,8 @@ SocketAddress Socket::ParseAddress(HostName const &host, hstring const &port) {
     if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
         throw hresult_invalid_argument();
     const auto number = std::stoul(std::wstring(port));
-    if (number > UINT16_MAX) throw hresult_invalid_argument();
+    if (number > UINT16_MAX)
+        throw hresult_invalid_argument();
     result.port = static_cast<uint16_t>(number);
     return result;
 }
@@ -268,7 +294,8 @@ bool Socket::SetOnReceive(SocketOnReceive callback, void *context) {
     {
         std::lock_guard lock(state->mutex);
         // Ignore if a callback was already registered.
-        if (callback && state->callback) return false;
+        if (callback && state->callback)
+            return false;
         state->callback = callback;
         state->context = context;
     }
@@ -288,7 +315,8 @@ bool Socket::ResumeReading() {
     {
         std::lock_guard lock(state->mutex);
         // Resume must never restore a cleared context.
-        if (!state->callback) return false;
+        if (!state->callback)
+            return false;
         if (datagram_) {
             // UDP delivery resumes through the registered MessageReceived handler.
             state->paused = false;
@@ -297,7 +325,8 @@ bool Socket::ResumeReading() {
             // the channel has taken over the transport.
             state->paused = false;
             start_read = !state->reading && !state->channel_owned;
-            if (start_read) state->reading = true;
+            if (start_read)
+                state->reading = true;
         }
     }
     if (start_read) {
@@ -324,7 +353,8 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
                     state->finishReadLocked();
                     co_return;
                 }
-                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
+                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(),
+                                                      InputStreamOptions::Partial);
             }
             auto received = co_await read;
             if (received.Length() == 0) {
@@ -340,14 +370,14 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
     }
 }
 
-int32_t Socket::Write(const uint8_t *bytes, size_t length,
-    const SocketAddress *destination) {
+int32_t Socket::Write(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
     try {
         if ((!bytes && length) || length > UINT32_MAX)
             throw hresult_invalid_argument();
         const auto state = state_;
         const auto status = state->write_status.load();
-        if (status) return status;
+        if (status)
+            return status;
         if (channel_write_) {
             // After takeover, VpnChannel owns transport writes.
             check_hresult(channel_write_(bytes, length));
@@ -357,14 +387,13 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
     } catch (...) {
         const auto error = to_hresult().value;
         winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
-            static_cast<unsigned int>(error), length);
+                  static_cast<unsigned int>(error), length);
         return error;
     }
     return 0;
 }
 
-void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
-    const SocketAddress *destination) {
+void Socket::EnqueueWrite(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
     const auto state = state_;
     State::WriteRequest request;
     if (unconnected_) {
@@ -374,7 +403,7 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
             throw hresult_invalid_argument();
         wchar_t address[INET6_ADDRSTRLEN]{};
         if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
-            const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
+                       const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
             throw hresult_invalid_argument();
         std::wstring host{address};
         if (destination->family == 6 && destination->scope_id)
@@ -384,7 +413,8 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
     }
     request.buffer = Buffer{static_cast<uint32_t>(length)};
     request.buffer.Length(static_cast<uint32_t>(length));
-    if (length) memcpy(request.buffer.data(), bytes, length);
+    if (length)
+        memcpy(request.buffer.data(), bytes, length);
     bool start;
     {
         std::lock_guard lock(state->mutex);
@@ -402,8 +432,8 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
     }
 }
 
-IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
-    DatagramSocket datagram, StreamSocket stream) {
+IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state, DatagramSocket datagram,
+                                 StreamSocket stream) {
     try {
         for (;;) {
             State::WriteRequest request;
@@ -425,7 +455,8 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
             auto &buffer = request.buffer;
             for (;;) {
                 const auto written = co_await output.WriteAsync(buffer);
-                if (written == buffer.Length()) break;
+                if (written == buffer.Length())
+                    break;
                 if (datagram || !written || written > buffer.Length())
                     throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));
                 Buffer remaining{buffer.Length() - written};
@@ -436,7 +467,8 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
             std::lock_guard lock(state->mutex);
             ++state->sent;
             state->writes.pop_front();
-            if (state->writes.empty()) co_return;
+            if (state->writes.empty())
+                co_return;
         }
     } catch (...) {
         std::lock_guard lock(state->mutex);
@@ -455,15 +487,18 @@ void Socket::StopWrites() {
 Socket::Receiver Socket::TakeOver(Writer writer) {
     const auto state = state_;
     // Negotiation packets must reach the transport before VpnChannel owns it.
-    if (write_) write_.get();
+    if (write_)
+        write_.get();
     check_hresult(state->write_status.load());
     {
         std::lock_guard lock(state->mutex);
         state->channel_owned = true;
     }
     receive_registration_.revoke();
-    if (stream_) stream_.CancelIOAsync().get();
-    if (read_) read_.get();
+    if (stream_)
+        stream_.CancelIOAsync().get();
+    if (read_)
+        read_.get();
 
     channel_write_ = std::move(writer);
     return [state](const uint8_t *bytes, size_t length) {

@@ -14,7 +14,7 @@
 // MSVC does not support Clang's nullability annotations.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)
-#pragma warning(disable: 4068)
+#pragma warning(disable : 4068)
 #define _Nullable
 #define _Nonnull
 #endif
@@ -51,22 +51,23 @@ struct VpnChannelRuntime::Impl {
 
     bool StartupCompleteLocked() const {
         return startup_status == StartupStatus::connected ||
-            startup_status == StartupStatus::failed;
+               startup_status == StartupStatus::failed;
     }
 
     // Called by the daemon, including during partout_daemon_start(). Only
     // publish state here: stopping the daemon from its callback would deadlock.
     void OnConnectionStatus(const char *status) noexcept {
-        if (!status) return;
+        if (!status)
+            return;
         std::scoped_lock lock(startup_mutex);
-        if (StartupCompleteLocked()) return;
+        if (StartupCompleteLocked())
+            return;
         const std::string_view value{status};
         if (value == "connecting") {
             startup_status = StartupStatus::connecting;
         } else if (value == "connected") {
             startup_status = StartupStatus::connected;
-        } else if (value == "disconnected" &&
-                   startup_status == StartupStatus::connecting) {
+        } else if (value == "disconnected" && startup_status == StartupStatus::connecting) {
             startup_status = StartupStatus::failed;
         }
         // The daemon emits an initial disconnected status before connecting.
@@ -86,8 +87,8 @@ struct VpnChannelRuntime::Impl {
         }
     }
 
-    Impl(VpnChannel const &value, const char *profile_json,
-         const partout_init_args &initialization, const partout_daemon_options &daemon_options)
+    Impl(VpnChannel const &value, const char *profile_json, const partout_init_args &initialization,
+         const partout_daemon_options &daemon_options)
         : channel(value), profile(profile_json ? profile_json : ""),
           cache_dir(daemon_options.cache_dir ? daemon_options.cache_dir : ""),
           init_args(initialization), options(daemon_options) {
@@ -97,20 +98,27 @@ struct VpnChannelRuntime::Impl {
         options.cache_dir = daemon_options.cache_dir ? cache_dir.c_str() : nullptr;
     }
 
-    ~Impl() { Stop(); }
+    ~Impl() {
+        Stop();
+    }
 
     void CheckChannel(VpnChannel const &value) const {
-        if (!value || value != channel) throw hresult_invalid_argument();
+        if (!value || value != channel)
+            throw hresult_invalid_argument();
     }
 
     void Log(partout_log_level level, std::wstring_view message) const noexcept {
-        try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
+        try {
+            channel.LogDiagnosticMessage(hstring{message});
+        } catch (...) {
+        }
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
                 init_args.logger_fn(init_args.logger_ctx, level, text.c_str());
             }
-        } catch (...) {}
+        } catch (...) {
+        }
     }
 
     void Stop() noexcept {
@@ -161,23 +169,24 @@ struct VpnChannelRuntime::Impl {
         } catch (...) {
             const auto failure = to_hresult();
             wchar_t message[128]{};
-            std::swprintf(message, 128, L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
-                static_cast<unsigned int>(failure.value));
+            std::swprintf(message, 128,
+                          L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
+                          static_cast<unsigned int>(failure.value));
             Log(PartoutLogLevelError, message);
             Stop();
-            try { channel.SetErrorMessage(L"Unable to start Partout VPN channel"); } catch (...) {}
+            try {
+                channel.SetErrorMessage(L"Unable to start Partout VPN channel");
+            } catch (...) {
+            }
             throw;
         }
     }
 };
 
-VpnChannelRuntime::VpnChannelRuntime(
-    VpnChannel const &channel,
-    const char *profile,
-    const partout_init_args &init_args,
-    const partout_daemon_options &options
-) : impl_(std::make_unique<Impl>(channel, profile, init_args, options)) {
-}
+VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel, const char *profile,
+                                     const partout_init_args &init_args,
+                                     const partout_daemon_options &options)
+    : impl_(std::make_unique<Impl>(channel, profile, init_args, options)) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
 
@@ -194,34 +203,30 @@ void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
 }
 
 // FIXME: ###, Windows, Supply the protocol keepalive payload when required.
-void VpnChannelRuntime::GetKeepAlivePayload(
-    VpnChannel const &channel,
-    VpnPacketBuffer &keep_alive_packet
-) {
+void VpnChannelRuntime::GetKeepAlivePayload(VpnChannel const &channel,
+                                            VpnPacketBuffer &keep_alive_packet) {
     impl_->CheckChannel(channel);
     keep_alive_packet = nullptr;
-    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
+    impl_->Log(PartoutLogLevelDebug,
+               L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
 }
 
-void VpnChannelRuntime::Encapsulate(
-    VpnChannel const &channel, VpnPacketBufferList const &packets,
-    VpnPacketBufferList const &encapsulated_packets
-) {
+void VpnChannelRuntime::Encapsulate(VpnChannel const &channel, VpnPacketBufferList const &packets,
+                                    VpnPacketBufferList const &encapsulated_packets) {
     impl_->CheckChannel(channel);
     (void)encapsulated_packets;
-    if (const auto controller = impl_->controller.load()) controller->Encapsulate(packets);
+    if (const auto controller = impl_->controller.load())
+        controller->Encapsulate(packets);
 }
 
-void VpnChannelRuntime::Decapsulate(
-    VpnChannel const &channel,
-    VpnPacketBuffer const &packet,
-    VpnPacketBufferList const &decapsulated_packets,
-    VpnPacketBufferList const &control_packets
-) {
+void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer const &packet,
+                                    VpnPacketBufferList const &decapsulated_packets,
+                                    VpnPacketBufferList const &control_packets) {
     impl_->CheckChannel(channel);
     (void)decapsulated_packets;
     (void)control_packets;
-    if (const auto controller = impl_->controller.load()) controller->Decapsulate(packet);
+    if (const auto controller = impl_->controller.load())
+        controller->Decapsulate(packet);
 }
 
 } // namespace Partout

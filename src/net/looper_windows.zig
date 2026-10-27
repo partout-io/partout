@@ -72,6 +72,7 @@ pub const WindowsLooper = struct {
         fn hasId(self: *const Scheduled, id: u64) bool {
             return self.id == id;
         }
+
         fn isReady(self: *const Scheduled, _: void) bool {
             return self.ready;
         }
@@ -86,6 +87,7 @@ pub const WindowsLooper = struct {
         self.* = .{ .allocator = allocator, .mux = mux, .owns_mux = options.mux == null, .max_read_count = options.max_read_count };
         return self;
     }
+
     pub fn destroy(self: *WindowsLooper) void {
         self.stop() catch unreachable;
         self.mutex.deinit();
@@ -111,6 +113,7 @@ pub const WindowsLooper = struct {
         if (self.waiting) _ = c.pp_mux_wake(self.mux);
         return true;
     }
+
     fn failAllocation(self: *WindowsLooper, event: Pending) void {
         self.mutex.lock();
         defer self.mutex.unlock();
@@ -122,10 +125,12 @@ pub const WindowsLooper = struct {
         side.reading = false;
         if (self.waiting) _ = c.pp_mux_wake(self.mux);
     }
+
     fn readyLocked(self: *const WindowsLooper, event: Pending) bool {
         const side = &self.sides[@intFromEnum(event.side)];
         return side.arguments == null or side.generation != event.generation or event.code != 0 or side.reading;
     }
+
     fn deliver(self: *WindowsLooper, event: Pending) void {
         const side = &self.sides[@intFromEnum(event.side)];
         if (side.arguments == null or side.generation != event.generation) return;
@@ -150,11 +155,13 @@ pub const WindowsLooper = struct {
         };
         self.pause(side, event.generation, action == .keep);
     }
+
     fn pause(self: *WindowsLooper, side: *Attachment, generation: u64, keep: bool) void {
         self.mutex.lock();
         defer self.mutex.unlock();
         if (side.arguments != null and side.generation == generation) side.reading = keep;
     }
+
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
         if (self.stopped) return false;
@@ -230,6 +237,7 @@ pub const WindowsLooper = struct {
         }
         return true;
     }
+
     pub fn scheduleTimer(self: *WindowsLooper, token: *io.Timer, delay_ms: u64, task: io.TimedTask) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
@@ -240,11 +248,13 @@ pub const WindowsLooper = struct {
         self.timers.append(node);
         token.id = node.id;
     }
+
     pub fn cancelTimer(self: *WindowsLooper, token: *io.Timer) void {
         const id = token.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         token.id = null;
     }
+
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {
         self.stopped = true;
         while (self.timers.take()) |node| self.allocator.destroy(node);
@@ -255,6 +265,7 @@ pub const WindowsLooper = struct {
             self.allocator.destroy(node);
         }
     }
+
     pub fn attach(self: *WindowsLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.max_read_count == 0) return error.InvalidBuffers;
         if (self.stopped) return error.LooperUnavailable;
@@ -281,6 +292,7 @@ pub const WindowsLooper = struct {
             },
         }
     }
+
     pub fn detach(self: *WindowsLooper, tag: io.Side) helpers.DetachError!void {
         const side = &self.sides[@intFromEnum(tag)];
         self.mutex.lock();
@@ -296,9 +308,11 @@ pub const WindowsLooper = struct {
         }
         _ = c.pp_mux_wake(self.mux);
     }
+
     pub fn isAttached(self: *const WindowsLooper, tag: io.Side) bool {
         return self.sides[@intFromEnum(tag)].arguments != null;
     }
+
     pub fn resumeReading(self: *WindowsLooper, tag: io.Side) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const side = &self.sides[@intFromEnum(tag)];
@@ -315,6 +329,7 @@ pub const WindowsLooper = struct {
         }
         _ = c.pp_mux_wake(self.mux);
     }
+
     pub fn write(self: *WindowsLooper, packets: io.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
@@ -331,6 +346,7 @@ pub const WindowsLooper = struct {
             }
         }
     }
+
     pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?io.Failure {
         return null;
     }

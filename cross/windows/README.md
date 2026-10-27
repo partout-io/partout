@@ -6,8 +6,8 @@ validation. The transport paths below are the default implementation, with no
 separate experiment flag.
 
 The native backend owns WinRT objects and a single command worker for setup,
-writes and handover. Received packets and failures use the existing Zig looper callback boundary.
-Zig owns protocol processing, backpressure and timers; the daemon is unchanged:
+writes and handover. Received packets and failures enter the existing daemon mailbox.
+Zig owns protocol processing, backpressure and timers:
 
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
@@ -79,8 +79,8 @@ writes retain shared I/O state and native transports, without retaining Socket.
 
 ### Connected transports
 
-Native producer callbacks copy input into the Zig looper's receive mailbox.
-The existing daemon I/O callbacks invoke `Connection.submitPackets()`.
+Native producer callbacks copy input directly into the existing daemon mailbox.
+The actor dispatches through the existing I/O callbacks to `Connection.submitPackets()`.
 There is no intermediate C++ output queue or per-packet synchronous worker call.
 The native socket owns the lifetime
 of its OS callbacks and pending reads. Before channel startup, direct socket
@@ -129,8 +129,10 @@ scheduled by a timer callback become eligible on the next iteration.
 The normal `loopOnce(null)` driver sleeps until packets, a mailbox wake, or a
 timer deadline require work. Bounded waits remain available for tests. The
 supplied mux is borrowed only for its wake event; a looper created without one
-owns a private wake source. The existing looper owns its receive mailbox; there
-is no C++ output queue. Paused input stays queued without spinning until resume.
+owns a private wake source. WindowsLooper has no receive FIFO: owned packets and
+failures use the daemon's existing mailbox. Paused packets remain there without
+blocking control messages or spinning; packet batches are bounded so timers run.
+OOM notification uses a reserved mailbox job without allocating.
 
 ### TUN lifetime and delivery
 
@@ -147,7 +149,7 @@ handles, C callback tables and address conversions stay in the ABI adapters.
 The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
 Detach drains native callbacks. Already-enqueued packets carry generation
-tokens and are discarded by the looper after detach or replacement.
+tokens and are discarded during mailbox dispatch after detach or replacement.
 
 Pausing TUN reads preserves already queued packets but drops new packet input
 before allocation until reads resume. Errors remain eligible while paused.
@@ -173,8 +175,8 @@ factory contracts are shared across platforms. Shared endpoint
 preparation runs on the C++ RuntimeLoop thread; the socket factory reuses that
 loop for creation, association and open. No Zig preparation thread is started.
 Returned transports retain the loop for writes, handover and teardown. Other
-platforms keep `ConnectionWorker` and its Zig actor. The daemon's mailbox,
-protocol processing and timers are unchanged.
+platforms keep `ConnectionWorker` and its Zig actor. Native input shares the
+daemon's existing mailbox; protocol processing and timers remain in Zig.
 
 ## VPN channel runtime
 

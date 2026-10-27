@@ -16,40 +16,68 @@ std::shared_ptr<RuntimeLoop> RuntimeLoop::Current() {
 
 RuntimeLoop::RuntimeLoop() {
     auto started = started_.get_future();
-    worker_ = std::thread([this] { Run(); });
-    try { started.get(); }
-    catch (...) { worker_.join(); throw; }
+    worker_ = std::thread([this] {
+        Run();
+    });
+    try {
+        started.get();
+    } catch (...) {
+        worker_.join();
+        throw;
+    }
 }
+
 RuntimeLoop::~RuntimeLoop() {
-    { std::lock_guard lock(mutex_); quitting_ = true; }
+    {
+        std::lock_guard lock(mutex_);
+        quitting_ = true;
+    }
     changed_.notify_one();
     worker_.join();
 }
-bool RuntimeLoop::IsWorker() const { return std::this_thread::get_id() == worker_id_; }
+
+bool RuntimeLoop::IsWorker() const {
+    return std::this_thread::get_id() == worker_id_;
+}
+
 void RuntimeLoop::Post(std::function<void()> command) {
-    { std::lock_guard lock(mutex_);
-      if (quitting_) throw std::runtime_error("RuntimeLoop is closed");
-      commands_.push_back(std::move(command)); }
+    {
+        std::lock_guard lock(mutex_);
+        if (quitting_)
+            throw std::runtime_error("RuntimeLoop is closed");
+        commands_.push_back(std::move(command));
+    }
     changed_.notify_one();
 }
+
 void RuntimeLoop::Run() {
     worker_id_ = std::this_thread::get_id();
-    try { winrt::init_apartment(winrt::apartment_type::multi_threaded); }
-    catch (...) { started_.set_exception(std::current_exception()); return; }
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+    } catch (...) {
+        started_.set_exception(std::current_exception());
+        return;
+    }
     current_loop = this;
     started_.set_value();
     for (;;) {
         std::function<void()> command;
         {
             std::unique_lock lock(mutex_);
-            changed_.wait(lock, [&] { return quitting_ || !commands_.empty(); });
-            if (commands_.empty()) break;
+            changed_.wait(lock, [&] {
+                return quitting_ || !commands_.empty();
+            });
+            if (commands_.empty())
+                break;
             command = std::move(commands_.front());
             commands_.pop_front();
         }
-        try { command(); }
-        catch (...) { winrt_log(WinrtLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
-            static_cast<unsigned>(winrt::to_hresult().value)); }
+        try {
+            command();
+        } catch (...) {
+            winrt_log(WinrtLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
+                      static_cast<unsigned>(winrt::to_hresult().value));
+        }
     }
     current_loop = nullptr;
     // Cached activation factories must not survive the apartment that supplied
@@ -57,4 +85,4 @@ void RuntimeLoop::Run() {
     winrt::clear_factory_cache();
     winrt::uninit_apartment();
 }
-}
+} // namespace Partout
