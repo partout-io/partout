@@ -5,12 +5,15 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 
 const io = @import("source").net_io;
 
 const reachabilityNone = io.testing.reachabilityNone;
 
 test "WinRT local address reports wildcard family and assigned UDP port" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const cases = [_]struct { ipv4: bool, ipv6: bool, family: u8 }{
         .{ .ipv4 = true, .ipv6 = false, .family = 4 },
@@ -33,6 +36,8 @@ test "WinRT local address reports wildcard family and assigned UDP port" {
 }
 
 test "WinRT local address reports connected UDP loopback endpoint" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const socket = (try io.SocketWrapper.create(std.testing.allocator, .{
         .address = "127.0.0.1",

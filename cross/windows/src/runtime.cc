@@ -21,6 +21,7 @@
 
 #include "partout_winrt.h"
 #include "tun.h"
+#include "loop.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -43,7 +44,11 @@ struct VpnChannelRuntime::Impl {
     partout_init_args init_args;
     partout_daemon_options options;
     bool daemon_started = false;
-    std::atomic<std::shared_ptr<TunnelController>> controller;
+    std::unique_ptr<RuntimeLoop> loop;
+    // Packet callbacks borrow the controller only while holding this gate.
+    // Stop waits for those borrows before destroying native state.
+    std::mutex controller_mutex;
+    std::unique_ptr<TunnelController> controller;
     enum class StartupStatus { waiting, connecting, connected, failed };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
@@ -122,13 +127,22 @@ struct VpnChannelRuntime::Impl {
     }
 
     void Stop() noexcept {
-        // Stop drains callbacks and releases their internal controller before
-        // the runtime releases its channel or transport.
+        // Destroying the daemon joins its actor and drains accepted preparation,
+        // detaches native receive callbacks, and releases its transports.
         if (daemon_started) {
             partout_daemon_stop();
             daemon_started = false;
         }
-        controller.store(nullptr);
+        if (loop) {
+            std::lock_guard lock(controller_mutex);
+            // Wait for plugin callbacks, then serialize controller destruction
+            // after all accepted native commands (including transport release).
+            loop->Invoke([this] {
+                controller.reset();
+            });
+            loop->Drain();
+            loop.reset(); // Drains remaining commands, joins, then uninitializes MTA.
+        }
     }
 
     void Connect() {
@@ -140,21 +154,23 @@ struct VpnChannelRuntime::Impl {
         Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
+            loop = std::make_unique<RuntimeLoop>();
             partout_daemon_start_args args{};
             args.profile = profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
-            const auto active_controller = std::make_shared<TunnelController>(channel);
-            controller.store(active_controller);
-            bindings.controller = active_controller.get();
+            {
+                std::lock_guard lock(controller_mutex);
+                controller = std::make_unique<TunnelController>(*loop, channel);
+                bindings.controller = controller.get();
+            }
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
             bindings.events.ctx = this;
             bindings.events.set_connection_status = [](void *ctx, const char *status) noexcept {
                 static_cast<Impl *>(ctx)->OnConnectionStatus(status);
             };
             bindings.release = [](partout_daemon_bindings *owned) noexcept {
-                // Runtime retains the controller through stop; packet callbacks
-                // take a shared reference while forwarding their borrowed input.
+                // Runtime owns the controller and loop through daemon destruction.
                 owned->controller = nullptr;
             };
             args.bindings = &bindings;
@@ -215,8 +231,9 @@ void VpnChannelRuntime::Encapsulate(VpnChannel const &channel, VpnPacketBufferLi
                                     VpnPacketBufferList const &encapsulated_packets) {
     impl_->CheckChannel(channel);
     (void)encapsulated_packets;
-    if (const auto controller = impl_->controller.load())
-        controller->Encapsulate(packets);
+    std::lock_guard lock(impl_->controller_mutex);
+    if (impl_->controller)
+        impl_->controller->Encapsulate(packets);
 }
 
 void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer const &packet,
@@ -225,8 +242,9 @@ void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer c
     impl_->CheckChannel(channel);
     (void)decapsulated_packets;
     (void)control_packets;
-    if (const auto controller = impl_->controller.load())
-        controller->Decapsulate(packet);
+    std::lock_guard lock(impl_->controller_mutex);
+    if (impl_->controller)
+        impl_->controller->Decapsulate(packet);
 }
 
 } // namespace Partout

@@ -6,6 +6,7 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const test_helpers = @import("looper_test_helpers.zig");
 
 const io = source.net_io;
@@ -247,6 +248,8 @@ const WindowsWriteProbe = struct {
 };
 
 test "Windows looper owns sides and routes socket write failure" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
@@ -300,6 +303,8 @@ const WindowsRejectedReceiver = struct {
 };
 
 test "Windows native write failures return asynchronously through the looper" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
@@ -387,6 +392,8 @@ const WindowsDetachProbe = struct {
 };
 
 test "Windows TCP receive resumes and detaches its side on the looper thread" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const ws = WindowsSockets;

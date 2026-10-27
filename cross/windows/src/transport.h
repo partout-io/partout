@@ -13,15 +13,11 @@ namespace Partout {
 // Native implementation details never appear in the C runtime interface.
 class Transport {
 public:
-    Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Socket> value);
-    Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Tun> value);
+    Transport(RuntimeLoop &, std::unique_ptr<Socket> value);
+    Transport(RuntimeLoop &, std::unique_ptr<Tun> value);
 
-    std::shared_ptr<RuntimeLoop> Loop() const {
+    RuntimeLoop &Loop() const {
         return loop_;
-    }
-
-    std::shared_ptr<RuntimeLoop> TakeLoop() {
-        return std::move(loop_);
     }
 
     using Receiver = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
@@ -40,7 +36,7 @@ public:
 
 private:
     bool Deliver(const uint8_t *, size_t, const SocketAddress *, int32_t);
-    std::shared_ptr<RuntimeLoop> loop_;
+    RuntimeLoop &loop_; // Borrowed from the runtime, including queued destruction.
     std::atomic<int32_t> status_{0};
     std::mutex receive_mutex_;
     Receiver receive_;

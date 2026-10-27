@@ -8,11 +8,11 @@
 #include <winrt/Windows.Networking.Sockets.h>
 
 namespace Partout {
-Transport::Transport(std::shared_ptr<RuntimeLoop> loop, std::unique_ptr<Socket> value)
-    : socket(std::move(value)), loop_(std::move(loop)) {}
+Transport::Transport(RuntimeLoop &loop, std::unique_ptr<Socket> value)
+    : socket(std::move(value)), loop_(loop) {}
 
-Transport::Transport(std::shared_ptr<RuntimeLoop> loop, std::unique_ptr<Tun> value)
-    : tun(std::move(value)), loop_(std::move(loop)) {}
+Transport::Transport(RuntimeLoop &loop, std::unique_ptr<Tun> value)
+    : tun(std::move(value)), loop_(loop) {}
 
 bool Transport::Subscribe(Receiver receive) {
     if (!receive) {
@@ -61,7 +61,7 @@ bool Transport::Deliver(const uint8_t *bytes, size_t size, const SocketAddress *
 
 bool Transport::ResumeReading() {
     try {
-        loop_->Post([this] {
+        loop_.Post([this] {
             if (socket && !socket->ResumeReading())
                 Deliver(nullptr, 0, nullptr, E_FAIL);
         });
@@ -72,7 +72,7 @@ bool Transport::ResumeReading() {
 }
 
 bool Transport::GetAddress(SocketAddress *address) {
-    return loop_->Invoke([this, address] {
+    return loop_.Invoke([this, address] {
         return socket && socket->GetAddress(address);
     });
 }
@@ -99,7 +99,7 @@ int32_t Transport::Write(const uint8_t *bytes, size_t size, const SocketAddress 
         std::optional<SocketAddress> address;
         if (destination)
             address = *destination;
-        loop_->Post([this, copy = std::move(copy), address] {
+        loop_.Post([this, copy = std::move(copy), address] {
             if (status_)
                 return;
             auto result =

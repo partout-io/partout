@@ -39,18 +39,16 @@ private:
 
 // Association, Open and Close run on the same native worker. Destruction follows
 // daemon shutdown. Native receives share Tun's gate.
-class TunnelController : public std::enable_shared_from_this<TunnelController> {
+class TunnelController {
 public:
-    explicit TunnelController(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    void BindLoop(std::shared_ptr<RuntimeLoop>);
-
-    std::shared_ptr<RuntimeLoop> Loop() const {
-        return loop_.load();
+    RuntimeLoop &Loop() const {
+        return loop_;
     }
 
     std::unique_ptr<Tun> Open(const char *info_json);
@@ -60,7 +58,7 @@ public:
 
 private:
     void AssociateUnconnected(Socket &socket);
-    std::atomic<std::shared_ptr<RuntimeLoop>> loop_;
+    RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
 
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};

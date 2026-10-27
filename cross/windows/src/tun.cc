@@ -132,15 +132,11 @@ void Tun::StopWrites() {
     writes_stopped_ = true;
 }
 
-TunnelController::TunnelController(VpnChannel const &channel)
-    : state_(std::make_shared<Tun::State>(channel)) {}
+TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
+    : loop_(loop), state_(std::make_shared<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
     Close();
-}
-
-void TunnelController::BindLoop(std::shared_ptr<RuntimeLoop> loop) {
-    loop_.store(std::move(loop));
 }
 
 bool TunnelController::Associate(Socket &socket) noexcept {
@@ -236,20 +232,12 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
 }
 
 void TunnelController::Close() noexcept {
-    const auto loop = Loop();
-    // Association only starts after loop publication; nothing to close before it.
-    if (!loop)
-        return;
-    if (!loop->IsWorker()) {
+    if (!loop_.IsWorker()) {
         try {
-            if (auto self = weak_from_this().lock())
-                loop->Post([self] {
-                    self->Close();
-                });
-            else
-                loop->Invoke([this] {
-                    Close();
-                }); // Final destruction follows worker drainage.
+            // The runtime retains this controller until queued close completes.
+            loop_.Post([this] {
+                Close();
+            });
         } catch (...) {
         }
         return;

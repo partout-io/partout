@@ -4,6 +4,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const test_helpers = @import("looper_test_helpers.zig");
 const io = source.net_io;
 const Looper = source.net_looper.Looper;
@@ -512,6 +513,8 @@ test "reads without an observer drain data and still report failures" {
 }
 
 test "UDP packet errors discard only the bad packet and retain the link" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();

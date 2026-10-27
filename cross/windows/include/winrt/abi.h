@@ -56,16 +56,23 @@ typedef struct {
 
 /* Creates, configures and opens a link in one operation. configure receives a
  * temporary native policy token; it must not retain or dereference that token.
- * Reuses the current native worker, or creates a standalone loop when called
- * outside a worker. The returned transport retains its loop. */
+ * Borrows the active runtime's loop; fails if no runtime is active. The owner
+ * must outlive all transports and drain their queued destruction. */
 winrt_transport *winrt_connect(const char *host, uint16_t port,
                                const winrt_connect_options *options);
 
+/* Explicit owner API for standalone native consumers and tests. Only one loop
+ * may be active. VpnChannelRuntime owns its loop directly in C++.
+ * Before free: stop producers, drain preparation, release every transport and
+ * drain teardown. Never free a borrowed handle or free on the worker itself. */
 winrt_loop winrt_loop_create(void);
-/* Accepted work executes once on the persistent worker. Its socket factory
- * reuses that same loop; free drains accepted work before releasing it. */
-bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
 void winrt_loop_free(winrt_loop);
+/* Borrowed lookup: the runtime owner must outlive every user of this handle. */
+winrt_loop winrt_loop_current(void);
+/* Accepted work executes once on the runtime worker. Drain is a barrier for
+ * previously submitted commands; callers must first quiesce their producers. */
+bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
+void winrt_loop_drain(winrt_loop);
 #ifdef __cplusplus
 }
 #endif

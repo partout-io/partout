@@ -146,7 +146,7 @@ its replacement. Callbacks consume or copy input and must not reenter TUN or
 controller APIs.
 
 The Zig adapters hold generic owned capabilities, without native socket or TUN
-types. Native classes use C++ types and shared `RuntimeLoop` ownership; opaque
+types. Native classes use C++ types and borrow the runtime-owned `RuntimeLoop`; opaque
 handles, C callback tables and address conversions stay in the ABI adapters.
 The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
@@ -168,7 +168,7 @@ Writes copy the submission before posting it to the native worker. Channel
 buffer operations then run on that worker, serialized with handover and stop.
 Stop and callback removal do not wait behind link preparation. Final release
 drains native receive callbacks immediately and queues destruction after accepted
-commands. Channel close is queued with retained controller ownership. Worker
+commands. Channel close is queued while the runtime retains the controller. Worker
 drainage stays on the destroying caller, outside the daemon actor.
 
 `ConnectionWorker` selects its executor internally: RuntimeLoop on Windows
@@ -176,7 +176,8 @@ with WinRT enabled, or a Zig actor otherwise. Its request, completion and
 factory contracts are shared across platforms. Shared endpoint
 preparation runs on the C++ RuntimeLoop thread; the socket factory reuses that
 loop for creation, association and open. No Zig preparation thread is started.
-Returned transports retain the loop for writes, handover and teardown. Other
+Workers, transports and the controller borrow the same loop for preparation,
+writes, handover and teardown. Other
 platforms keep `ConnectionWorker` and its Zig actor. Native input shares the
 daemon's existing mailbox; protocol processing and timers remain in Zig.
 
@@ -187,6 +188,15 @@ with a retained `VpnChannel`, profile JSON, logger settings and nonblocking
 daemon options (`is_daemon = false`). The runtime copies the profile and cache
 path. Serialize calls and forward the five `IVpnPlugIn` callbacks unchanged.
 The runtime stops Partout before releasing the controller and transport.
+`VpnChannelRuntime` exclusively owns the active loop. Stop joins the daemon actor
+and drains accepted preparation, waits for plugin packet callbacks, destroys the
+controller on the native worker after queued transport teardown, and drains and
+joins that worker before releasing its WinRT apartment. Socket destruction also
+waits for canceled read/write coroutines. Connect creates a fresh loop after Stop.
+The process-wide loop lookup is borrowed and never extends this lifetime.
+Standalone native consumers and tests must explicitly create a loop, release all
+workers and transports, drain teardown, and free it; socket creation no longer
+creates an implicit loop. Only one loop may be active, matching the daemon API.
 
 CMake builds Partout as a shared library and installs `partout.h` and
 `partout_winrt.h`. Plugins link Partout's import library with a compatible MSVC

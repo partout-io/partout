@@ -4,30 +4,41 @@
 #include "winrt/log.h"
 #include <winrt/base.h>
 #include <stdexcept>
+#include <atomic>
 
 namespace Partout {
 namespace {
-thread_local RuntimeLoop *current_loop = nullptr;
+std::atomic<RuntimeLoop *> current_loop = nullptr;
+std::mutex runtime_mutex;
 }
 
-std::shared_ptr<RuntimeLoop> RuntimeLoop::Current() {
-    return current_loop ? current_loop->shared_from_this() : nullptr;
+RuntimeLoop *RuntimeLoop::Current() {
+    return current_loop.load();
 }
 
 RuntimeLoop::RuntimeLoop() {
+    std::lock_guard runtime_lock(runtime_mutex);
+    if (current_loop.load())
+        throw std::runtime_error("A RuntimeLoop is already active");
+    // Publish only after apartment initialization succeeds below. Creation and
+    // destruction are serialized by the runtime owner, before/after its users.
     auto started = started_.get_future();
-    worker_ = std::thread([this] {
-        Run();
-    });
     try {
+        worker_ = std::thread([this] {
+            Run();
+        });
         started.get();
+        current_loop = this;
     } catch (...) {
-        worker_.join();
+        if (worker_.joinable())
+            worker_.join();
         throw;
     }
 }
 
 RuntimeLoop::~RuntimeLoop() {
+    std::lock_guard runtime_lock(runtime_mutex);
+    current_loop = nullptr;
     {
         std::lock_guard lock(mutex_);
         quitting_ = true;
@@ -38,6 +49,10 @@ RuntimeLoop::~RuntimeLoop() {
 
 bool RuntimeLoop::IsWorker() const {
     return std::this_thread::get_id() == worker_id_;
+}
+
+void RuntimeLoop::Drain() {
+    Invoke([] {});
 }
 
 void RuntimeLoop::Post(std::function<void()> command) {
@@ -58,7 +73,6 @@ void RuntimeLoop::Run() {
         started_.set_exception(std::current_exception());
         return;
     }
-    current_loop = this;
     started_.set_value();
     for (;;) {
         std::function<void()> command;
@@ -79,7 +93,6 @@ void RuntimeLoop::Run() {
                       static_cast<unsigned>(winrt::to_hresult().value));
         }
     }
-    current_loop = nullptr;
     // Cached activation factories must not survive the apartment that supplied
     // them when the last native worker is released and a later one is created.
     winrt::clear_factory_cache();

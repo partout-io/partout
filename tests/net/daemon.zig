@@ -5,6 +5,7 @@
 const std = @import("std");
 
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const builtin = @import("builtin");
 const io = source.net_io;
 
@@ -22,6 +23,8 @@ const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
 test "daemon terminates and cancels after terminal looper failure" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     // Windows I/O polling is not implemented yet.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
@@ -121,6 +124,8 @@ test "daemon terminates and cancels after terminal looper failure" {
 }
 
 test "daemon dispatches controls to actor and owns queued establishment metadata" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -290,6 +295,8 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 }
 
 test "daemon preserves settings-only failure and hold behavior" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
@@ -365,6 +372,8 @@ test "daemon preserves settings-only failure and hold behavior" {
 }
 
 test "settings daemon creation rolls back allocation failures" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const Fixture = struct {
         fn create(allocator: std.mem.Allocator, profile: *const api.Profile, registry: *const net.ConnectionRegistry) !void {
             var controller = mock_mod.MockTunnelController{};
@@ -392,6 +401,8 @@ test "settings daemon creation rolls back allocation failures" {
 }
 
 test "daemon owns the profile and rolls back connection startup allocations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         create_count: usize = 0,
@@ -550,6 +561,8 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 }
 
 test "daemon defers reporting with owned payloads and permits reentrant stop" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: net.Connection.Events = undefined,
@@ -688,6 +701,8 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
 }
 
 test "I/O modes control socket creation, attachment, and descriptor handoff" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
@@ -1013,6 +1028,8 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
 }
 
 test "looper owns TUN across startup and optional rebind replacement" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -1152,6 +1169,8 @@ test "looper owns TUN across startup and optional rebind replacement" {
 }
 
 test "needs_rebind restarts sessions without reporting a failure" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -1250,6 +1269,8 @@ test "needs_rebind restarts sessions without reporting a failure" {
 }
 
 test "daemon-created link is released on failed start or rebind" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
@@ -1370,6 +1391,8 @@ test "daemon-created link is released on failed start or rebind" {
 }
 
 test "event loop flushes graceful shutdown and finalizes terminal failure on its thread" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Atomic = std.atomic.Value(usize);
     const Probe = struct {
@@ -1660,6 +1683,8 @@ fn waitForExit(owner: anytype) !void {
 }
 
 test "stop waits for terminal submission failure before immediate destruction" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         entered: std.atomic.Value(bool) = .init(false),
@@ -1770,6 +1795,8 @@ test "stop waits for terminal submission failure before immediate destruction" {
 }
 
 test "event loop completes pending performs and releases discarded payloads on shutdown" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var connection = FailingStartConnection{};
@@ -1872,6 +1899,8 @@ test "event loop completes pending performs and releases discarded payloads on s
 }
 
 test "terminal protocol failure pauses retries and honors cancellation policy" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     for ([_]bool{ false, true }) |cancels| {
@@ -1916,6 +1945,8 @@ test "terminal protocol failure pauses retries and honors cancellation policy" {
 }
 
 test "worker preserves loop progress and rejects stale preparation results" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Stage = enum { dns, socket };
     const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop, preparation_failed, network_changed, better_path };
@@ -2155,6 +2186,8 @@ test "worker preserves loop progress and rejects stale preparation results" {
 }
 
 test "connection worker rolls back endpoint and thread allocations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const Fixture = struct {
         const endpoints = [_]api.ExtendedEndpoint{
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
@@ -2189,6 +2222,8 @@ test "connection worker rolls back endpoint and thread allocations" {
 }
 
 test "daemon yields to timers between mailbox batches on every platform" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         connection: FailingStartConnection = .{},
@@ -2262,6 +2297,8 @@ test "daemon yields to timers between mailbox batches on every platform" {
 }
 
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const Probe = struct {

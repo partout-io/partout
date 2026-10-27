@@ -3,6 +3,7 @@
 
 //! Windows executor for the shared connection worker's link preparation.
 //! This adapter owns no Zig thread and adds no completion or packet queue.
+//! The enclosing native runtime owns the borrowed command loop through destroy.
 const std = @import("std");
 const ffi = @import("../c/exports.zig");
 const c = ffi.io;
@@ -29,7 +30,7 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         pub fn create(allocator: std.mem.Allocator, context: *Context) error{OutOfMemory}!*Self {
             const self = try allocator.create(Self);
             errdefer allocator.destroy(self);
-            const loop = c.winrt_loop_create() orelse return error.OutOfMemory;
+            const loop = c.winrt_loop_current() orelse return error.OutOfMemory;
             self.* = .{ .allocator = allocator, .context = context, .loop = loop };
             return self;
         }
@@ -42,9 +43,9 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         }
 
         pub fn destroy(self: *Self) void {
-            // Free drains accepted preparation tasks. Transports retain the
-            // native worker for ongoing I/O and handover after setup completes.
-            c.winrt_loop_free(self.loop);
+            // Drain accepted preparation before freeing its Zig context. The
+            // native loop is borrowed and remains owned by VpnChannelRuntime.
+            c.winrt_loop_drain(self.loop);
             self.allocator.destroy(self);
         }
     };

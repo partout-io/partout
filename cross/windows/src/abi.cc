@@ -27,14 +27,13 @@ struct TransportHandle {
                   self->handle->StopWrites();
                   self->handle->Subscribe({});
                   // Drain callbacks now; destroy on the worker after accepted commands.
-                  // Move the loop reference to the caller so deletion cannot self-join.
-                  auto loop = self->handle->TakeLoop();
+                  auto &loop = self->handle->Loop();
                   try {
-                      loop->Post([self] {
+                      loop.Post([self] {
                           delete self;
                       });
                   } catch (...) {
-                      loop->Invoke([self] {
+                      loop.Invoke([self] {
                           delete self;
                       });
                   }
@@ -53,7 +52,7 @@ struct TransportHandle {
                               return receive(context, bytes, size, source ? &address : nullptr,
                                              error);
                           };
-                      return self->handle->Loop()->Invoke([&] {
+                      return self->handle->Loop().Invoke([&] {
                           return self->handle->Subscribe(std::move(receiver));
                       });
                   } catch (...) {
@@ -93,22 +92,24 @@ winrt_transport *Wrap(std::unique_ptr<Transport> transport) {
 }
 } // namespace Partout::ABI
 
-struct __winrt_loop_struct {
-    std::shared_ptr<Partout::RuntimeLoop> handle = std::make_shared<Partout::RuntimeLoop>();
-};
-
 extern "C" {
 winrt_loop winrt_loop_create(void) {
     try {
-        return new __winrt_loop_struct{};
+        return reinterpret_cast<winrt_loop>(new Partout::RuntimeLoop);
     } catch (...) {
         return nullptr;
     }
 }
 
+winrt_loop winrt_loop_current(void) {
+    return reinterpret_cast<winrt_loop>(Partout::RuntimeLoop::Current());
+}
+
 bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) {
     try {
-        loop->handle->Post([=] {
+        if (!loop)
+            return false;
+        reinterpret_cast<Partout::RuntimeLoop *>(loop)->Post([=] {
             execute(context);
         });
         return true;
@@ -117,14 +118,14 @@ bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) 
     }
 }
 
-void winrt_loop_free(winrt_loop loop) {
+void winrt_loop_drain(winrt_loop loop) {
     if (!loop)
         return;
-    // Setup may publish a retained transport while the owner closes.
-    if (!loop->handle->IsWorker())
-        loop->handle->Invoke([] {
-        });
-    delete loop;
+    reinterpret_cast<Partout::RuntimeLoop *>(loop)->Drain();
+}
+
+void winrt_loop_free(winrt_loop loop) {
+    delete reinterpret_cast<Partout::RuntimeLoop *>(loop);
 }
 
 winrt_transport *winrt_connect(const char *host, uint16_t port,
@@ -132,12 +133,11 @@ winrt_transport *winrt_connect(const char *host, uint16_t port,
     try {
         auto loop = Partout::RuntimeLoop::Current();
         if (!loop)
-            loop = std::make_shared<Partout::RuntimeLoop>();
-        // The caller retains the loop until Invoke returns; commands borrow it.
-        return loop->Invoke([&loop, host = std::string{host}, port,
+            return nullptr;
+        return loop->Invoke([loop, host = std::string{host}, port,
                              settings = *options]() -> winrt_transport * {
             auto transport = std::make_unique<Partout::Transport>(
-                loop, std::make_unique<Partout::Socket>(settings.tcp ? Partout::SocketProtoTCP
+                *loop, std::make_unique<Partout::Socket>(settings.tcp ? Partout::SocketProtoTCP
                                                                      : Partout::SocketProtoUDP,
                                                         settings.unconnected));
             if (settings.configure &&

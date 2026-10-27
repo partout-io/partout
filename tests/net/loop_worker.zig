@@ -4,6 +4,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const io = source.net_io;
 const net = source.net;
 const core = source.core;
@@ -22,7 +23,9 @@ const request: Worker.Request = .{
     .link_activity_timeout = 1000,
 };
 
-test "RuntimeLoop prepares and opens on one native thread and retains the transport" {
+test "runtime-owned loop outlives preparation worker and serves borrowed transports" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         factory_thread: std.Thread.Id = 0,
@@ -76,7 +79,7 @@ test "RuntimeLoop prepares and opens on one native thread and retains the transp
     try std.testing.expectEqual(probe.factory_thread, probe.completion_thread);
     worker.destroy();
     destroyed = true;
-    // The returned capability retains the same worker for ongoing I/O.
+    // Destroying the preparation worker leaves the runtime's loop available.
     const address = try remote.link.?.localAddress();
     try std.testing.expectEqual(remote.local_port, address.port);
     try std.testing.expect(address.port != 0);
@@ -84,6 +87,8 @@ test "RuntimeLoop prepares and opens on one native thread and retains the transp
 }
 
 test "RuntimeLoop close drains each accepted completion and rejects new requests" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         started: std.atomic.Value(bool) = .init(false),
@@ -135,6 +140,8 @@ test "RuntimeLoop close drains each accepted completion and rejects new requests
 }
 
 test "RuntimeLoop transport teardown does not wait for a blocked rebind" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,

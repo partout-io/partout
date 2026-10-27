@@ -13,16 +13,19 @@
 namespace Partout {
 // One native command worker. Completions go directly to the consumer's mailbox
 // (or WireGuard's passive adapter); this class never dispatches protocol code.
-class RuntimeLoop : public std::enable_shared_from_this<RuntimeLoop> {
+class RuntimeLoop {
 public:
     RuntimeLoop();
     ~RuntimeLoop();
     RuntimeLoop(const RuntimeLoop &) = delete;
     RuntimeLoop &operator=(const RuntimeLoop &) = delete;
 
-    static std::shared_ptr<RuntimeLoop> Current();
+    // Borrowed process runtime. Its owner must quiesce all users before destruction.
+    // Only one runtime may be active, matching the daemon's process-wide lifetime.
+    static RuntimeLoop *Current();
     bool IsWorker() const;
     void Post(std::function<void()> command);
+    void Drain();
 
     // Setup and lifecycle barriers only. Packet writes and resumes use Post.
     template <typename Task> auto Invoke(Task &&task) -> decltype(task()) {

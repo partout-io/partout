@@ -122,6 +122,18 @@ Socket::~Socket() noexcept {
             stream_.Close();
     } catch (...) {
     }
+    // Closing cancels native I/O. Join coroutine completion before runtime
+    // shutdown tears down the worker's apartment and activation factory cache.
+    try {
+        if (read_)
+            read_.get();
+    } catch (...) {
+    }
+    try {
+        if (write_)
+            write_.get();
+    } catch (...) {
+    }
 }
 
 IInspectable Socket::Transport() const {

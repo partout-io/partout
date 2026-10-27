@@ -41,7 +41,8 @@ pp_socket_configurator pp_socket_configurator_current(void *ref) {
                     if (!transport || !transport->socket)
                         return false;
                     if (controller) {
-                        controller->BindLoop(transport->Loop());
+                        if (&controller->Loop() != &transport->Loop())
+                            return false;
                         if (!controller->Associate(*transport->socket))
                             return false;
                     }
@@ -66,11 +67,9 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         if (!controller)
             return nullptr;
         try {
-            auto loop = controller->Loop();
-            if (!loop)
-                return nullptr;
+            auto &loop = controller->Loop();
             // TUN commit and StartWithMainTransport serialize with all socket I/O.
-            return loop->Invoke([controller, json, &loop]() -> pp_tun {
+            return loop.Invoke([controller, json, &loop]() -> pp_tun {
                 auto tun = controller->Open(json);
                 if (!tun)
                     return nullptr;
