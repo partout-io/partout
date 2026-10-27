@@ -105,8 +105,8 @@ pub const WindowsLooper = struct {
 
     pub fn receivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) void {
         const side = &self.sides[@intFromEnum(event.side)];
-        if (side.arguments == null or side.generation != event.generation) return;
-        const arguments = side.arguments.?;
+        if (side.generation != event.generation) return;
+        const arguments = side.arguments orelse return;
         if (event.code != 0) {
             if (arguments.on_failure) |callback| callback.call(.{ .io = .{
                 .side = event.side,
@@ -116,10 +116,10 @@ pub const WindowsLooper = struct {
             self.setReading(side, event.generation, false);
             return;
         }
-        const callback = arguments.on_read orelse return;
-        const address: ?[1]io.SocketAddress = if (event.source) |value| .{value} else null;
-        const action = callback.call(&.{event.bytes}, if (address) |*value| value else null) catch |err| {
-            if (side.arguments != null and side.generation == event.generation) {
+        const on_read = arguments.on_read orelse return;
+        const addresses: ?[]const io.SocketAddress = if (event.source) |value| &.{value} else null;
+        const action = on_read.call(&.{event.bytes}, addresses) catch |err| {
+            if (side.generation == event.generation) {
                 if (arguments.on_failure) |failure| failure.call(.{ .user = err });
                 self.setReading(side, event.generation, false);
             }
