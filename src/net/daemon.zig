@@ -622,18 +622,18 @@ const ConnectionDaemon = struct {
         if (builtin.os.tag != .windows) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
-        const input = attachment.receipt(bytes, length, source, code) orelse return false;
-        var owned = input;
-        owned.bytes = self.daemon.allocator.dupe(u8, input.bytes) catch {
+        const receipt = attachment.receipt(bytes, length, source, code) orelse return false;
+        var receipt_copy = receipt;
+        receipt_copy.bytes = self.daemon.allocator.dupe(u8, receipt.bytes) catch {
             self.onReceivePacketsFailed();
             return false;
         };
-        self.schedule(.{ .onPacketsReceived = owned }) catch |err| {
-            self.daemon.allocator.free(owned.bytes);
+        self.schedule(.{ .onPacketsReceived = receipt_copy }) catch |err| {
+            self.daemon.allocator.free(receipt_copy.bytes);
             if (err == error.OutOfMemory) self.onReceivePacketsFailed();
             return false;
         };
-        return attachment.keepReading(input);
+        return attachment.keepReading(receipt);
     }
 
     fn onReceivePacketsFailed(self: *ConnectionDaemon) void {
