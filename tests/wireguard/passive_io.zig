@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const builtin = @import("builtin");
 const source = @import("source");
 const bridge = source.wireguard_internal.passive_io;
@@ -49,6 +50,8 @@ const ClearingAllocator = struct {
 };
 
 test "WireGuard passive UDP preserves multiple peer sources and reply destinations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
@@ -142,6 +145,8 @@ const FailureRecorder = struct {
 };
 
 test "WireGuard passive initial transport allocation failure stays closed and reports once" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();

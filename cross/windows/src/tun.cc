@@ -136,7 +136,10 @@ TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
     : loop_(loop), state_(std::make_shared<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
-    Close();
+    // Destruction must complete close, rather than queue a borrowed this pointer.
+    loop_.Invoke([this] {
+        Close();
+    });
 }
 
 bool TunnelController::Associate(Socket &socket) noexcept {

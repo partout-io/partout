@@ -415,7 +415,7 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length, const SocketAddre
             throw hresult_invalid_argument();
         wchar_t address[INET6_ADDRSTRLEN]{};
         if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
-                       const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
+                      destination->address, address, INET6_ADDRSTRLEN))
             throw hresult_invalid_argument();
         std::wstring host{address};
         if (destination->family == 6 && destination->scope_id)

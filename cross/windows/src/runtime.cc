@@ -7,7 +7,6 @@
 #include <condition_variable>
 #include <cwchar>
 #include <memory>
-#include <atomic>
 #include <mutex>
 #include <string>
 #include <string_view>
@@ -134,11 +133,16 @@ struct VpnChannelRuntime::Impl {
             daemon_started = false;
         }
         if (loop) {
-            std::lock_guard lock(controller_mutex);
-            // Wait for plugin callbacks, then serialize controller destruction
-            // after all accepted native commands (including transport release).
-            loop->Invoke([this] {
-                controller.reset();
+            std::unique_ptr<TunnelController> closing;
+            {
+                // Wait for current plugin callbacks and reject later ones.
+                std::lock_guard lock(controller_mutex);
+                closing = std::move(controller);
+            }
+            // Do not hold the callback gate while calling VpnChannel.Stop.
+            // Destroy after all accepted commands, including transport release.
+            loop->Invoke([&closing] {
+                closing.reset();
             });
             loop->Drain();
             loop.reset(); // Drains remaining commands, joins, then uninitializes MTA.

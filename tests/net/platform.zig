@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
 const winrt_enabled = @import("source").winrt_enabled;
 
@@ -223,6 +224,8 @@ test "socket creation and existing descriptors share independent platform policy
 }
 
 test "Windows configuration callback receives a native policy token and can reject open" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,

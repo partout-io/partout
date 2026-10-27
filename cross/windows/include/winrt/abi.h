@@ -6,10 +6,14 @@
 #include <stdint.h>
 
 #ifdef __cplusplus
+namespace Partout {
+class RuntimeLoop;
+}
+typedef Partout::RuntimeLoop *winrt_loop;
 extern "C" {
-#endif
-
+#else
 typedef struct __winrt_loop_struct *winrt_loop;
+#endif
 
 /* Native I/O C ABI. No WinRT socket or TUN objects cross this interface.
  * Addresses have the same layout as pp_socket_address. */

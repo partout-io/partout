@@ -23,6 +23,39 @@ const request: Worker.Request = .{
     .link_activity_timeout = 1000,
 };
 
+test "native setup requires an owner and runtime shutdown permits recreation" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    try std.testing.expect(c.winrt_loop_current() == null);
+    try std.testing.expect(c.winrt_connect("127.0.0.1", 9, &.{ .unconnected = false, .timeout_ms = 1000 }) == null);
+    const Probe = struct {
+        done: bool = false,
+        fn run(raw: ?*anyopaque) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.done = true;
+        }
+    };
+    for (0..3) |_| {
+        var probe = Probe{};
+        {
+            const native_runtime = try NativeRuntime.init();
+            defer native_runtime.deinit();
+            const loop = c.winrt_loop_current().?;
+            // A failed second owner must leave the active runtime untouched.
+            try std.testing.expect(c.winrt_loop_create() == null);
+            try std.testing.expectEqual(loop, c.winrt_loop_current().?);
+            {
+                const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+                defer socket.cleanup(); // Destruction is queued on the borrowed loop.
+                try std.testing.expectEqual(@as(i32, 0), socket.write("queued", try io.testing.socketAddress(.{ .address = "127.0.0.1", .proto = .init(.udp, 9) })));
+            }
+            try std.testing.expect(c.winrt_loop_submit(loop, Probe.run, &probe));
+        }
+        // Owner shutdown joins queued commands and leaves no active loop.
+        try std.testing.expect(probe.done);
+        try std.testing.expect(c.winrt_loop_current() == null);
+    }
+}
+
 test "runtime-owned loop outlives preparation worker and serves borrowed transports" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();

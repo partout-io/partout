@@ -95,21 +95,21 @@ winrt_transport *Wrap(std::unique_ptr<Transport> transport) {
 extern "C" {
 winrt_loop winrt_loop_create(void) {
     try {
-        return reinterpret_cast<winrt_loop>(new Partout::RuntimeLoop);
+        return new Partout::RuntimeLoop;
     } catch (...) {
         return nullptr;
     }
 }
 
 winrt_loop winrt_loop_current(void) {
-    return reinterpret_cast<winrt_loop>(Partout::RuntimeLoop::Current());
+    return Partout::RuntimeLoop::Current();
 }
 
 bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) {
     try {
         if (!loop)
             return false;
-        reinterpret_cast<Partout::RuntimeLoop *>(loop)->Post([=] {
+        loop->Post([=] {
             execute(context);
         });
         return true;
@@ -121,11 +121,11 @@ bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) 
 void winrt_loop_drain(winrt_loop loop) {
     if (!loop)
         return;
-    reinterpret_cast<Partout::RuntimeLoop *>(loop)->Drain();
+    loop->Drain();
 }
 
 void winrt_loop_free(winrt_loop loop) {
-    delete reinterpret_cast<Partout::RuntimeLoop *>(loop);
+    delete loop;
 }
 
 winrt_transport *winrt_connect(const char *host, uint16_t port,
