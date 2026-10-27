@@ -115,8 +115,8 @@ struct TransportHandle {
     }
 
     winrt_transport api{
-        this,
-        [](void *raw) {
+        .context = this,
+        .release = [](void *raw) {
             auto self = static_cast<TransportHandle *>(raw);
             self->StopWrites();
             self->Subscribe(nullptr, nullptr);
@@ -131,33 +131,33 @@ struct TransportHandle {
                 });
             }
         },
-        [](void *raw, winrt_receive receive, void *context) {
+        .subscribe = [](void *raw, winrt_receive receive, void *receive_context) {
             auto self = static_cast<TransportHandle *>(raw);
             try {
-                return self->Subscribe(receive, context);
+                return self->Subscribe(receive, receive_context);
             } catch (...) {
                 return false;
             }
         },
-        [](void *raw) {
+        .resume = [](void *raw) {
             return static_cast<TransportHandle *>(raw)->ResumeReading();
         },
-        [](void *raw) {
+        .stop = [](void *raw) {
             static_cast<TransportHandle *>(raw)->StopWrites();
         },
-        [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *destination) {
+        .write = [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *destination) {
             Partout::SocketAddress address{};
             if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
             return static_cast<TransportHandle *>(raw)->Write(bytes, size,
                                                               destination ? &address : nullptr);
         },
-        [](void *raw, winrt_address *result) {
+        .local_address = [](void *raw, winrt_address *result) {
             Partout::SocketAddress address{};
             if (!static_cast<TransportHandle *>(raw)->GetAddress(&address)) return false;
             *result = ConvertAddress<winrt_address>(address);
             return true;
         },
-        socket && socket->IsUnconnected()};
+        .unconnected = socket && socket->IsUnconnected()};
 };
 } // namespace
 
