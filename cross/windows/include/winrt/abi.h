@@ -10,7 +10,7 @@ extern "C" {
 #endif
 
 typedef struct __winrt_loop_struct *winrt_loop;
-/* Native I/O boundary. No WinRT socket or TUN objects cross this interface.
+/* Native I/O C ABI. No WinRT socket or TUN objects cross this interface.
  * Addresses have the same layout as pp_socket_address. */
 typedef struct {
     uint8_t address[16];

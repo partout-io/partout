@@ -12,8 +12,8 @@ Zig owns protocol processing, backpressure and timers; the daemon is unchanged:
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
-Partout io_windows.zig       -> winrt/io.h -> src/loop.cc
-Partout looper_windows.zig   -> winrt/io.h -> src/loop.cc
+Partout io_windows.zig       -> winrt/abi.h -> src/abi.cc
+Partout looper_windows.zig   -> winrt/abi.h -> src/abi.cc
 Partout portable controller  -> src/platform.cc -> src/tun.cc
 ```
 
@@ -22,13 +22,14 @@ Partout portable controller  -> src/platform.cc -> src/tun.cc
 | Location | Responsibility |
 | --- | --- |
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/io.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
+| `include/winrt/abi.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
 | `include/winrt/log.h` | Native logging boundary. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
 | `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
 | `src/transport.h`, `src/transport.cc` | C++ transports shared by daemon and passive I/O. |
-| `src/loop.h`, `src/loop.cc` | Persistent native command worker and C ABI adapters; no output queue or timer scheduler. |
+| `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
+| `src/abi.cc` | C ABI loop handles, transport adapters, address conversions and link setup entry point. |
 | `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
@@ -69,7 +70,7 @@ reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
 packet and destination; one coroutine drains the native queue in FIFO order using
 `co_await` for output-stream acquisition and writes. Success means accepted, with
 later failures routed through the same callback. Channel-buffer writes copy into
-VpnChannel's pool directly. See `include/winrt/io.h` for the boundary contract.
+VpnChannel's pool directly. See `include/winrt/abi.h` for the boundary contract.
 Callers serialize writes with other writes, socket configuration, channel
 takeover, writer replacement and destruction. The caller supplies this serialization.
 Stopping writes and clearing receive callbacks may overlap an admitted write;

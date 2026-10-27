@@ -473,6 +473,8 @@ const WindowsProducer = struct {
     }
     fn release(raw: ?*anyopaque) callconv(.c) void {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.callback = null;
+        self.context = null;
         self.released = true;
     }
     fn @"resume"(_: ?*anyopaque) callconv(.c) bool {

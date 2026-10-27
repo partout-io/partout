@@ -134,12 +134,6 @@ pub fn PacketTransport(comptime DescriptorType: type) type {
         }
 
         pub fn cleanup(self: *Self) void {
-            switch (self.descriptor) {
-                inline else => |value| {
-                    value.stopWrites();
-                    value.setOnReceive(null, null) catch unreachable;
-                },
-            }
             releaseDescriptor(self.descriptor);
             self.allocator.destroy(self);
         }

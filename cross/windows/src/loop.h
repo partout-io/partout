@@ -20,6 +20,7 @@ public:
     RuntimeLoop(const RuntimeLoop &) = delete;
     RuntimeLoop &operator=(const RuntimeLoop &) = delete;
 
+    static std::shared_ptr<RuntimeLoop> Current();
     bool IsWorker() const;
     void Post(std::function<void()> command);
     // Setup and lifecycle barriers only. Packet writes and resumes use Post.

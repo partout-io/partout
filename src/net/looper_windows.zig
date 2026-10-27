@@ -292,11 +292,7 @@ pub const WindowsLooper = struct {
         side.generation +%= 1;
         self.mutex.unlock();
         switch (arguments.pair) {
-            inline else => |value| {
-                value.stopWrites();
-                value.setOnReceive(null, null) catch unreachable;
-                value.cleanup();
-            },
+            inline else => |value| value.cleanup(),
         }
         _ = c.pp_mux_wake(self.mux);
     }
