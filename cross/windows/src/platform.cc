@@ -62,7 +62,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
                       reachable ? "true" : "false", changed ? "true" : "false");
             const pp_reachability info{reachable};
             if (callbacks.on_reachability) callbacks.on_reachability(callbacks.ctx, &info);
-            // OpenVPN reconnects on this signal; WireGuard refreshes its UDP link.
+            // Notify the daemon that the available physical path has changed.
             if (changed && reachable && callbacks.on_better_path) callbacks.on_better_path(callbacks.ctx);
         });
     };

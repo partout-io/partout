@@ -236,7 +236,7 @@ reachability and detects changes in adapter identity, including handoffs that
 remain reachable throughout. Duplicate notifications for the same path are
 ignored. Physical profile selection excludes VPN interfaces and covers Ethernet,
 Wi-Fi and WWAN. Reachability feeds the daemon connection gate; path changes
-request OpenVPN reconnection or WireGuard link refresh. Replacement independent
+notify the daemon that the available physical path has changed. Replacement independent
 UDP sockets select the current adapter even when the channel stays open.
 Unsubscription drains delegate delivery before releasing its borrowed context.
 Snapshot and environment publication remain unimplemented.
