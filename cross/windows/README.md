@@ -27,9 +27,8 @@ Partout portable controller  -> src/platform.cc -> src/tun.cc
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
 | `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
-| `src/transport.h`, `src/transport.cc` | C++ transports shared by daemon and passive I/O. |
 | `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
-| `src/abi.cc` | C ABI loop handles, transport adapters, address conversions and link setup entry point. |
+| `src/abi.h`, `src/abi.cc` | C ABI loop handles, endpoint ownership and scheduling, address conversions, native socket policy tokens and link setup. |
 | `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
@@ -151,11 +150,16 @@ The Zig adapters hold generic owned capabilities, without native socket or TUN
 types. Native classes use C++ types and borrow the runtime-owned `RuntimeLoop`; opaque
 handles, C callback tables and address conversions stay in the ABI adapters.
 Socket and TUN endpoints invoke the ABI receive adapter directly under their
-delivery mutex. Callback removal drains that same gate; Transport adds no
+delivery mutex. Callback removal drains that same gate; the ABI handle adds no
 receive callback storage or second mutex. Each endpoint latches terminal errors
 for subsequent writes, while TCP EOF remains a receive-only notification.
 The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
+Each ABI `TransportHandle` owns its socket or TUN directly and borrows the runtime
+loop. It copies writes before posting them, schedules read resumes, and queues its
+own destruction after immediately stopping writes and draining callbacks. There
+is no intermediate C++ Transport object. Native socket policy tokens are opaque
+ABI handle references, validated by the ABI adapter before channel association.
 Detach drains native callbacks. Already-enqueued packets carry generation
 tokens and are discarded during mailbox dispatch after detach or replacement.
 

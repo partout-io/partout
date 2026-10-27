@@ -1,7 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "transport.h"
-#include "winrt/abi.h"
+#include "abi.h"
+#include "loop.h"
+#include "tun.h"
 #include "winrt/log.h"
 
 // Partout integration belongs here; the native backend has no portable headers.
@@ -37,15 +38,8 @@ pp_socket_configurator pp_socket_configurator_current(void *ref) {
                     return false;
                 auto controller = static_cast<Partout::TunnelController *>(raw);
                 for (size_t i = 0; i < count; ++i) {
-                    auto transport = reinterpret_cast<Partout::Transport *>(tokens[i]);
-                    if (!transport || !transport->socket)
+                    if (!Partout::ABI::ConfigureSocket(controller, tokens[i]))
                         return false;
-                    if (controller) {
-                        if (&controller->Loop() != &transport->Loop())
-                            return false;
-                        if (!controller->Associate(*transport->socket))
-                            return false;
-                    }
                 }
                 return true;
             }};
@@ -73,8 +67,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
                 auto tun = controller->Open(json);
                 if (!tun)
                     return nullptr;
-                auto transport = std::make_unique<Partout::Transport>(loop, std::move(tun));
-                return reinterpret_cast<pp_tun>(Partout::ABI::Wrap(std::move(transport)));
+                return reinterpret_cast<pp_tun>(Partout::ABI::Wrap(loop, std::move(tun)));
             });
         } catch (...) {
             winrt_log(WinrtLogError, "Partout: channel open failed: HRESULT=0x%08x",
