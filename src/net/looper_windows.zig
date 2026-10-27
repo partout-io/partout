@@ -31,6 +31,16 @@ pub const WindowsLooper = struct {
         reading: bool,
         arguments: ?helpers.AttachArguments,
 
+        fn init(owner: *WindowsLooper, side: io.Side) Attachment {
+            return .{
+                .owner = owner,
+                .side = side,
+                .generation = 0,
+                .reading = true,
+                .arguments = null,
+            };
+        }
+
         pub fn receipt(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
             const self = attachment.owner;
             self.mutex.lock();
@@ -77,8 +87,8 @@ pub const WindowsLooper = struct {
             .allocator = allocator,
             .mux = mux,
             .sides = .{
-                .{ .owner = self, .side = .link, .generation = 0, .reading = true, .arguments = null },
-                .{ .owner = self, .side = .tun, .generation = 0, .reading = true, .arguments = null },
+                Attachment.init(self, .link),
+                Attachment.init(self, .tun),
             },
             .mutex = .{},
             .max_read_count = options.max_read_count,
