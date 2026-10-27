@@ -11,7 +11,11 @@ pub const NativeRuntime = struct {
 
     pub fn init() !NativeRuntime {
         if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return .{};
-        return .{ .loop = c.winrt_loop_create() orelse return error.NativeRuntimeUnavailable };
+        if (c.winrt_thread_init() != 0) return error.NativeApartmentUnavailable;
+        errdefer c.winrt_thread_uninit();
+        return .{
+            .loop = c.winrt_loop_create() orelse return error.NativeRuntimeUnavailable,
+        };
     }
 
     pub fn deinit(self: NativeRuntime) void {
@@ -20,5 +24,6 @@ pub const NativeRuntime = struct {
             c.winrt_loop_drain(@ptrCast(loop));
             c.winrt_loop_free(@ptrCast(loop));
         }
+        c.winrt_thread_uninit();
     }
 };

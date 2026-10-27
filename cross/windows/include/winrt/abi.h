@@ -28,8 +28,15 @@ enum { WinrtEOF = 1 };
 
 typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_address *, int32_t);
 
+/* Initialize the calling thread's MTA before submitting writes. Returns zero
+ * on success or an HRESULT on failure. Each successful init must be matched
+ * with uninit on the same thread, after that thread's final native operation. */
+int32_t winrt_thread_init(void);
+void winrt_thread_uninit(void);
+
 /* Owned transport capability, shared by daemon and passive consumers.
- * subscribe(NULL) drains borrowed callback contexts. Writes copy before return.
+ * subscribe(NULL) drains borrowed callback contexts. Writes copy into a WinRT
+ * Buffer before return; the submitting thread must have a WinRT apartment.
  * release drains callbacks immediately; native destruction may be deferred.
  * Lifecycle and writes are owner-serialized; receive callbacks must not reenter.
  * Callbacks run on native producers and only enqueue daemon messages or feed the passive adapter.

@@ -5,10 +5,11 @@
 #include "loop.h"
 #include "socket.h"
 #include "tun.h"
+#include "winrt/log.h"
 #include <algorithm>
+#include <cstring>
 #include <optional>
 #include <string>
-#include <vector>
 
 namespace {
 template <typename To, typename From> To ConvertAddress(const From &value) {
@@ -76,18 +77,19 @@ struct TransportHandle {
         if (socket && !socket->Accepts(destination))
             return E_INVALIDARG;
         try {
-            std::vector<uint8_t> copy;
+            winrt::Windows::Storage::Streams::Buffer buffer{static_cast<uint32_t>(size)};
+            buffer.Length(static_cast<uint32_t>(size));
             if (size)
-                copy.assign(bytes, bytes + size);
+                memcpy(buffer.data(), bytes, size);
             std::optional<Partout::SocketAddress> address;
             if (destination)
                 address = *destination;
-            loop.Post([this, copy = std::move(copy), address] {
+            loop.Post([this, buffer = std::move(buffer), address]() mutable {
                 if (WriteStatus())
                     return;
                 const auto result =
-                    socket ? socket->Write(copy.data(), copy.size(), address ? &*address : nullptr)
-                           : tun->Write(copy.data(), copy.size());
+                    socket ? socket->Write(std::move(buffer), address ? &*address : nullptr)
+                           : tun->Write(buffer.data(), buffer.Length());
                 if (result)
                     ReportError(result);
             });
@@ -190,6 +192,22 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
 } // namespace Partout::ABI
 
 extern "C" {
+int32_t winrt_thread_init(void) {
+    try {
+        winrt::init_apartment(winrt::apartment_type::multi_threaded);
+        return 0;
+    } catch (...) {
+        const auto error = winrt::to_hresult().value;
+        winrt_log(WinrtLogError, "Partout: thread apartment initialization failed: HRESULT=0x%08x",
+                  static_cast<unsigned>(error));
+        return error;
+    }
+}
+
+void winrt_thread_uninit(void) {
+    winrt::uninit_apartment();
+}
+
 winrt_loop winrt_loop_create(void) {
     try {
         return new Partout::RuntimeLoop;

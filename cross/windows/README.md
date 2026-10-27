@@ -174,8 +174,13 @@ the daemon loop, preserving per-peer source addresses, destination-aware writes,
 quiesce/reactivation and callback draining during replacement. The protocol's
 bounded queue for pending Go reads stays separate from daemon dispatch.
 
-Writes copy the submission before posting it to the native worker. Channel
-buffer operations then run on that worker, serialized with handover and stop.
+Writes copy the submission into a WinRT `Buffer` before posting it to the native
+worker. Direct socket writes move that buffer into the socket queue without a
+second payload copy. The Zig event-loop thread initializes its apartment on entry
+and uninitializes it on exit; passive Go callers initialize around each write
+batch. Channel writes still copy into channel-owned packet buffers on the native
+worker, serialized with handover and stop. TCP partial-write retries retain the
+existing suffix-copy behavior.
 Stop and callback removal do not wait behind link preparation. Final release
 drains native receive callbacks immediately and queues destruction after accepted
 commands. Channel close is queued while the runtime retains the controller. Worker

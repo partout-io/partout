@@ -393,30 +393,32 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
     }
 }
 
-int32_t Socket::Write(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
+int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
+    uint32_t length = 0;
     try {
-        if ((!bytes && length) || length > UINT32_MAX)
+        if (!buffer)
             throw hresult_invalid_argument();
+        length = buffer.Length();
         const auto state = state_;
         const auto status = state->write_status.load();
         if (status)
             return status;
         if (channel_write_) {
             // After takeover, VpnChannel owns transport writes.
-            check_hresult(channel_write_(bytes, length));
+            check_hresult(channel_write_(buffer.data(), length));
         } else {
-            EnqueueWrite(bytes, length, destination);
+            EnqueueWrite(std::move(buffer), destination);
         }
     } catch (...) {
         const auto error = to_hresult().value;
         winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
-                  static_cast<unsigned int>(error), length);
+                  static_cast<unsigned int>(error), static_cast<size_t>(length));
         return error;
     }
     return 0;
 }
 
-void Socket::EnqueueWrite(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
+void Socket::EnqueueWrite(Buffer buffer, const SocketAddress *destination) {
     const auto state = state_;
     State::WriteRequest request;
     if (unconnected_) {
@@ -434,10 +436,7 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length, const SocketAddre
         request.host = HostName{host};
         request.service = to_hstring(destination->port);
     }
-    request.buffer = Buffer{static_cast<uint32_t>(length)};
-    request.buffer.Length(static_cast<uint32_t>(length));
-    if (length)
-        memcpy(request.buffer.data(), bytes, length);
+    request.buffer = std::move(buffer);
     bool start;
     {
         std::lock_guard lock(state->mutex);
