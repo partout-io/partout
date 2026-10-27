@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
-#include "winrt/runtime.h"
 #include <functional>
 #include <future>
 #include <memory>
@@ -10,7 +9,7 @@
 namespace Partout {
 // One native command worker. Completions go directly to the consumer's mailbox
 // (or WireGuard's passive adapter); this class never dispatches protocol code.
-class RuntimeLoop {
+class RuntimeLoop : public std::enable_shared_from_this<RuntimeLoop> {
 public:
     RuntimeLoop();
     ~RuntimeLoop();
@@ -33,7 +32,4 @@ private:
     std::unique_ptr<State> state_;
     void Run();
 };
-RuntimeLoop &Loop(winrt_loop);
-void RetainLoop(winrt_loop);
-winrt_loop CurrentLoop();
 }

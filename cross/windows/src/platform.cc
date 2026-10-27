@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "transport.h"
+#include "winrt/runtime.h"
 #include "winrt/log.h"
 
 // Partout integration belongs here; the native backend has no portable headers.
@@ -38,7 +39,7 @@ pp_socket_configurator pp_socket_configurator_current(void *ref) {
             auto transport = reinterpret_cast<Partout::Transport *>(tokens[i]);
             if (!transport || !transport->socket) return false;
             if (controller) {
-                controller->BindRuntime(transport->Runtime());
+                controller->BindLoop(transport->Loop());
                 if (!controller->Associate(*transport->socket)) return false;
             }
         }
@@ -61,17 +62,14 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         auto controller = static_cast<Partout::TunnelController *>(raw);
         if (!controller) return nullptr;
         try {
-            auto runtime = controller->Runtime();
-            if (!runtime) return nullptr;
+            auto loop = controller->Loop();
+            if (!loop) return nullptr;
             // TUN commit and StartWithMainTransport serialize with all socket I/O.
-            return Partout::Loop(runtime).Invoke([=]() -> pp_tun {
+            return loop->Invoke([controller, json, &loop]() -> pp_tun {
                 auto tun = controller->Open(json);
                 if (!tun) return nullptr;
-                auto transport = std::make_unique<Partout::Transport>(runtime, std::move(tun));
-                Partout::RetainLoop(runtime);
-                auto result = reinterpret_cast<pp_tun>(&transport->api);
-                transport.release();
-                return result;
+                auto transport = std::make_unique<Partout::Transport>(loop, std::move(tun));
+                return reinterpret_cast<pp_tun>(Partout::ABI::Wrap(std::move(transport)));
             });
         } catch (...) {
             winrt_log(WinrtLogError, "Partout: channel open failed: HRESULT=0x%08x",

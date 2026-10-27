@@ -123,14 +123,10 @@ TunnelController::TunnelController(VpnChannel const &channel)
 
 TunnelController::~TunnelController() {
     Close();
-    if (runtime_) winrt_loop_free(runtime_);
 }
 
-void TunnelController::BindRuntime(winrt_loop runtime) {
-    if (runtime_ == runtime) return;
-    RetainLoop(runtime);
-    if (runtime_) winrt_loop_free(runtime_);
-    runtime_ = runtime;
+void TunnelController::BindLoop(std::shared_ptr<RuntimeLoop> loop) {
+    loop_ = std::move(loop);
 }
 
 bool TunnelController::Associate(Socket &socket) noexcept {
@@ -217,8 +213,8 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
 }
 
 void TunnelController::Close() noexcept {
-    if (runtime_ && !Loop(runtime_).IsWorker()) {
-        try { Loop(runtime_).Invoke([this] { Close(); }); } catch (...) {}
+    if (loop_ && !loop_->IsWorker()) {
+        try { loop_->Invoke([this] { Close(); }); } catch (...) {}
         return;
     }
     {

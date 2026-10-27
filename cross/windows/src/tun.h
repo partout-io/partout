@@ -11,6 +11,7 @@
 #include <memory>
 
 namespace Partout {
+class RuntimeLoop;
 
 // Lifecycle, writes and StopWrites run on the native command worker.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
@@ -45,8 +46,8 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    void BindRuntime(winrt_loop);
-    winrt_loop Runtime() const { return runtime_; }
+    void BindLoop(std::shared_ptr<RuntimeLoop>);
+    std::shared_ptr<RuntimeLoop> Loop() const { return loop_; }
     std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
@@ -54,7 +55,7 @@ public:
 
 private:
     void AssociateUnconnected(Socket &socket);
-    winrt_loop runtime_ = nullptr;
+    std::shared_ptr<RuntimeLoop> loop_;
 
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};

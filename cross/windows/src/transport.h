@@ -7,26 +7,33 @@
 #include <atomic>
 #include <mutex>
 
+struct winrt_transport;
+
 namespace Partout {
 // Native implementation details never appear in the C runtime interface.
 class Transport {
 public:
-    Transport(winrt_loop, std::unique_ptr<Socket> value);
-    Transport(winrt_loop, std::unique_ptr<Tun> value);
-    winrt_loop Runtime() const { return runtime_; }
-    winrt_transport api{};
+    Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Socket> value);
+    Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Tun> value);
+    std::shared_ptr<RuntimeLoop> Loop() const { return loop_; }
+    using Receiver = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
+    bool IsUnconnected() const { return socket && socket->IsUnconnected(); }
+    bool Subscribe(Receiver);
+    bool ResumeReading();
+    void StopWrites();
+    int32_t Write(const uint8_t *, size_t, const SocketAddress *);
+    bool GetAddress(SocketAddress *);
     std::unique_ptr<Socket> socket;
     std::unique_ptr<Tun> tun;
 private:
-    void Initialize(bool unconnected);
-    bool Subscribe(winrt_receive, void *);
-    bool Deliver(const uint8_t *, size_t, const winrt_address *, int32_t);
-    void StopWrites();
-    int32_t Write(const uint8_t *, size_t, const winrt_address *);
-    winrt_loop runtime_;
+    bool Deliver(const uint8_t *, size_t, const SocketAddress *, int32_t);
+    std::shared_ptr<RuntimeLoop> loop_;
     std::atomic<int32_t> status_{0};
     std::mutex receive_mutex_;
-    winrt_receive receive_ = nullptr;
-    void *context_ = nullptr;
+    Receiver receive_;
 };
+// C ABI conversion only; native consumers own Transport directly.
+namespace ABI {
+winrt_transport *Wrap(std::unique_ptr<Transport>);
+}
 }

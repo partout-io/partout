@@ -12,7 +12,7 @@ Zig owns protocol processing, backpressure and timers; the daemon is unchanged:
 ```text
 VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
-Partout io_windows.zig       -> winrt/runtime.h -> src/transport.cc
+Partout io_windows.zig       -> winrt/runtime.h -> src/loop.cc
 Partout looper_windows.zig   -> winrt/runtime.h -> src/loop.cc
 Partout portable controller  -> src/platform.cc -> src/tun.cc
 ```
@@ -27,8 +27,8 @@ Partout portable controller  -> src/platform.cc -> src/tun.cc
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
 | `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
-| `src/transport.h`, `src/transport.cc` | Owned native capabilities shared by daemon and passive I/O. |
-| `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
+| `src/transport.h`, `src/transport.cc` | C++ transports shared by daemon and passive I/O. |
+| `src/loop.h`, `src/loop.cc` | Persistent native command worker and C ABI adapters; no output queue or timer scheduler. |
 | `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
@@ -141,7 +141,9 @@ its replacement. Callbacks consume or copy input and must not reenter TUN or
 controller APIs.
 
 The Zig adapters hold generic owned capabilities, without native socket or TUN
-types. The native runtime converts a write failure into the same queue used for
+types. Native classes use C++ types and shared `RuntimeLoop` ownership; opaque
+handles, C callback tables and address conversions stay in the ABI adapters.
+The native runtime converts a write failure into the same queue used for
 asynchronous receive/write failures.
 Detach drains native callbacks. Already-enqueued packets carry generation
 tokens and are discarded by the looper after detach or replacement.
