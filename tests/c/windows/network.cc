@@ -8,6 +8,19 @@ int main() {
     const winrt::guid wifi{1, 0, 0, {}}, ethernet{2, 0, 0, {}}, mobile{3, 0, 0, {}};
     NetworkPath path;
     assert(path.Update(wifi, true));
+
+    // Both adapters remain connected with InternetAccess. Enumeration must not
+    // keep Wi-Fi selected once Ethernet has a lower combined default-route cost.
+    const NetworkPreference wifi_preference{3, 50}, ethernet_preference{3, 10};
+    NetworkPath handoff;
+    assert(handoff.Update(wifi, true));
+    assert(ethernet_preference.IsBetterThan(wifi_preference));
+    assert(!wifi_preference.IsBetterThan(ethernet_preference));
+    assert(handoff.Update(ethernet, true));
+    assert(!handoff.Update(ethernet, true));
+    assert((NetworkPreference{3, 5}.IsBetterThan(ethernet_preference)));
+    assert((ethernet_preference.IsBetterThan(NetworkPreference{3, std::nullopt})));
+    assert((NetworkPreference{3, std::nullopt}.IsBetterThan(NetworkPreference{1, std::nullopt})));
     assert(!path.Update(wifi, true));
     assert(path.Update(ethernet, true));
     assert(!path.Update(ethernet, true));

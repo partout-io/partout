@@ -1,13 +1,44 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
+#include <winsock2.h>
+#include <ws2ipdef.h>
 #include "network.h"
 #include <windows.h>
 #include <ipifcons.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <mutex>
 #include <utility>
 
 namespace Partout {
+bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
+    if (metric == other.metric) return connectivity > other.connectivity;
+    return metric && (!other.metric || *metric < *other.metric);
+}
+
+namespace {
+std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter, const MIB_IPFORWARD_TABLE2 *routes) {
+    if (!routes) return std::nullopt;
+    std::optional<uint64_t> best;
+    for (ULONG i = 0; i < routes->NumEntries; ++i) {
+        const auto &route = routes->Table[i];
+        // Ignore more-specific routes, including the VPN's split default /1s.
+        if (route.DestinationPrefix.PrefixLength != 0 || route.ValidLifetime == 0) continue;
+        GUID id{};
+        if (ConvertInterfaceLuidToGuid(&route.InterfaceLuid, &id) != NO_ERROR || winrt::guid{id} != adapter) continue;
+        MIB_IPINTERFACE_ROW ip_interface{};
+        InitializeIpInterfaceEntry(&ip_interface);
+        ip_interface.Family = route.DestinationPrefix.Prefix.si_family;
+        ip_interface.InterfaceLuid = route.InterfaceLuid;
+        if (GetIpInterfaceEntry(&ip_interface) != NO_ERROR || !ip_interface.Connected) continue;
+        const uint64_t metric = uint64_t{route.Metric} + ip_interface.Metric;
+        if (!best || metric < *best) best = metric;
+    }
+    return best;
+}
+}
+
 bool NetworkPath::Update(winrt::guid id, bool available) {
     if (initialized && available == reachable && id == adapter) return false;
     initialized = true;
@@ -28,15 +59,24 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile() {
         return (type == IF_TYPE_ETHERNET_CSMACD || profile.IsWlanConnectionProfile() || profile.IsWwanConnectionProfile()) &&
             profile.GetNetworkConnectivityLevel() != NetworkConnectivityLevel::None;
     };
-    auto selected = NetworkInformation::GetInternetConnectionProfile();
-    if (usable(selected)) return selected;
-    // The preferred profile may belong to the VPN. Fall back to a connected
-    // physical profile, favoring the highest reported connectivity level.
-    selected = nullptr;
+    const auto preferred = NetworkInformation::GetInternetConnectionProfile();
+    if (usable(preferred)) return preferred;
+    // The VPN may mask the preferred physical profile. Compare physical default
+    // route costs rather than enumeration order when several remain connected.
+    MIB_IPFORWARD_TABLE2 *raw_routes = nullptr;
+    const auto result = GetIpForwardTable2(AF_UNSPEC, &raw_routes);
+    const std::unique_ptr<MIB_IPFORWARD_TABLE2, decltype(&FreeMibTable)> routes(raw_routes, FreeMibTable);
+    if (result != NO_ERROR) throw winrt::hresult_error(HRESULT_FROM_WIN32(result));
+    ConnectionProfile selected{nullptr};
+    NetworkPreference best{};
     for (auto const &profile : NetworkInformation::GetConnectionProfiles()) {
         if (!usable(profile)) continue;
-        if (!selected || profile.GetNetworkConnectivityLevel() > selected.GetNetworkConnectivityLevel()) {
+        const NetworkPreference preference{
+            static_cast<uint32_t>(profile.GetNetworkConnectivityLevel()),
+            DefaultRouteMetric(profile.NetworkAdapter().NetworkAdapterId(), routes.get())};
+        if (!selected || preference.IsBetterThan(best)) {
             selected = profile;
+            best = preference;
         }
     }
     return selected;

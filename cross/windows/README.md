@@ -235,7 +235,10 @@ the daemon delegate is attached. It publishes initial physical-network
 reachability and detects changes in adapter identity, including handoffs that
 remain reachable throughout. Duplicate notifications for the same path are
 ignored. Physical profile selection excludes VPN interfaces and covers Ethernet,
-Wi-Fi and WWAN. Reachability feeds the daemon connection gate; path changes
+Wi-Fi and WWAN. When the preferred profile belongs to the VPN, physical default
+routes are ranked by the sum of route and interface metrics, so a cheaper adapter
+can replace one that remains connected. Profiles without default routes remain
+available as a fallback for local networks. Reachability feeds the daemon connection gate; path changes
 notify the daemon that the available physical path has changed. Replacement independent
 UDP sockets select the current adapter even when the channel stays open.
 Unsubscription drains delegate delivery before releasing its borrowed context.
@@ -269,4 +272,12 @@ a VPN host. From the same developer shell (adjust the archive path for your buil
 ```powershell
 cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
 & .cmake-winrt/tun-settings-test.exe
+```
+
+The network selection regression test covers simultaneous Wi-Fi and Ethernet
+connectivity, route-cost preference, offline recovery and monitor lifecycle:
+
+```powershell
+cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
+& .cmake-winrt/network-test.exe
 ```
