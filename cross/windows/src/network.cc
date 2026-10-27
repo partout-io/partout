@@ -1,15 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "network.h"
+#include <windows.h>
+#include <ipifcons.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <mutex>
 #include <utility>
 
 namespace Partout {
-namespace {
-constexpr uint32_t kEthernetInterfaceType = 6; // IANA ethernetCsmacd.
-}
-
 bool NetworkPath::Update(winrt::guid id, bool available) {
     if (initialized && available == reachable && id == adapter) return false;
     initialized = true;
@@ -27,7 +25,7 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile() {
         // WLAN and WWAN have dedicated profile flags; accept these three
         // physical network kinds.
         // Local access is sufficient: the remote endpoint may be on the LAN.
-        return (type == kEthernetInterfaceType || profile.IsWlanConnectionProfile() || profile.IsWwanConnectionProfile()) &&
+        return (type == IF_TYPE_ETHERNET_CSMACD || profile.IsWlanConnectionProfile() || profile.IsWwanConnectionProfile()) &&
             profile.GetNetworkConnectivityLevel() != NetworkConnectivityLevel::None;
     };
     auto selected = NetworkInformation::GetInternetConnectionProfile();
