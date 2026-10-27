@@ -24,6 +24,7 @@ typedef bool (*winrt_receive)(void *, const uint8_t *, size_t,
 
 /* Owned transport capability, shared by daemon and passive consumers.
  * subscribe(NULL) drains borrowed callback contexts. Writes copy before return.
+ * release drains callbacks immediately; native destruction may be deferred.
  * Lifecycle and writes are owner-serialized; receive callbacks must not reenter.
  * Callbacks run on native producers and only enqueue daemon messages or feed the passive adapter. */
 typedef struct winrt_transport winrt_transport;

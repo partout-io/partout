@@ -161,8 +161,10 @@ bounded queue for pending Go reads stays separate from daemon dispatch.
 
 Writes copy the submission before posting it to the native worker. Channel
 buffer operations then run on that worker, serialized with handover and stop.
-Final release drains accepted commands and native receive callbacks before
-releasing the transport and joining an unreferenced worker.
+Stop and callback removal do not wait behind link preparation. Final release
+drains native receive callbacks immediately and queues destruction after accepted
+commands. Channel close is queued with retained controller ownership. Worker
+drainage stays on the destroying caller, outside the daemon actor.
 
 `ConnectionWorker` selects its executor internally: RuntimeLoop on Windows
 with WinRT enabled, or a Zig actor otherwise. Its request, completion and

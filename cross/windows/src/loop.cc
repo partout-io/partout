@@ -77,19 +77,19 @@ struct TransportHandle {
         this,
         [](void *raw) {
             auto self = static_cast<TransportHandle *>(raw);
-            // Retain on the caller so final destruction never joins its own worker.
-            auto loop = self->handle->Loop();
-            loop->Invoke([self] {
-                self->handle->StopWrites();
-                self->handle->Subscribe({});
-                delete self;
-            });
+            self->handle->StopWrites();
+            self->handle->Subscribe({});
+            // Drain callbacks now; destroy on the worker after accepted commands.
+            // Move the loop reference to the caller so deletion cannot self-join.
+            auto loop = self->handle->TakeLoop();
+            try { loop->Post([self] { delete self; }); }
+            catch (...) { loop->Invoke([self] { delete self; }); }
         },
         [](void *raw, winrt_receive receive, void *context) {
             auto self = static_cast<TransportHandle *>(raw);
             try {
-                Partout::Transport::Receiver receiver;
-                if (receive) receiver = [=](const uint8_t *bytes, size_t size, const Partout::SocketAddress *source, int32_t error) {
+                if (!receive) return self->handle->Subscribe({});
+                Partout::Transport::Receiver receiver = [=](const uint8_t *bytes, size_t size, const Partout::SocketAddress *source, int32_t error) {
                     winrt_address address{};
                     if (source) address = ConvertAddress<winrt_address>(*source);
                     return receive(context, bytes, size, source ? &address : nullptr, error);

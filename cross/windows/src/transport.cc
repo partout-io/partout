@@ -56,9 +56,7 @@ bool Transport::GetAddress(SocketAddress *address) {
 }
 void Transport::StopWrites() {
     status_ = E_ABORT;
-    loop_->Invoke([this] {
-        if (socket) socket->StopWrites(); else tun->StopWrites();
-    });
+    if (socket) socket->StopWrites(); else tun->StopWrites();
 }
 int32_t Transport::Write(const uint8_t *bytes, size_t size, const SocketAddress *destination) {
     if (auto status = status_.load()) return status;

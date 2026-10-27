@@ -9,11 +9,12 @@
 #include <winrt/Windows.Networking.Vpn.h>
 #include <winrt/Windows.Networking.Sockets.h>
 #include <memory>
+#include <atomic>
 
 namespace Partout {
 class RuntimeLoop;
 
-// Lifecycle, writes and StopWrites run on the native command worker.
+// Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
     class State;
@@ -33,12 +34,12 @@ private:
     std::shared_ptr<State> state_;
     TunOnReceive callback_ = nullptr;
     void *context_ = nullptr;
-    bool writes_stopped_ = false;
+    std::atomic<bool> writes_stopped_{false};
 };
 
 // Association, Open and Close run on the same native worker. Destruction follows
 // daemon shutdown. Native receives share Tun's gate.
-class TunnelController {
+class TunnelController : public std::enable_shared_from_this<TunnelController> {
 public:
     explicit TunnelController(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     ~TunnelController();

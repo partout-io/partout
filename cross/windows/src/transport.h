@@ -16,6 +16,7 @@ public:
     Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Socket> value);
     Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Tun> value);
     std::shared_ptr<RuntimeLoop> Loop() const { return loop_; }
+    std::shared_ptr<RuntimeLoop> TakeLoop() { return std::move(loop_); }
     using Receiver = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
     bool IsUnconnected() const { return socket && socket->IsUnconnected(); }
     bool Subscribe(Receiver);
