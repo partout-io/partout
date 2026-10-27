@@ -37,7 +37,7 @@ struct SocketHandle {
 
     bool ResumeReading() {
         try {
-            loop.Post([this] {
+            loop.Schedule([this] {
                 if (!socket->ResumeReading()) socket->ReportError(E_FAIL);
             });
             return true;
@@ -47,7 +47,7 @@ struct SocketHandle {
     }
 
     bool GetAddress(Partout::SocketAddress *address) {
-        return loop.Invoke([this, address] {
+        return loop.Perform([this, address] {
             return socket->GetAddress(address);
         });
     }
@@ -60,7 +60,7 @@ struct SocketHandle {
             auto buffer = CopyBuffer(bytes, size);
             std::optional<Partout::SocketAddress> address;
             if (destination) address = *destination;
-            loop.Post([this, buffer = std::move(buffer), address]() mutable {
+            loop.Schedule([this, buffer = std::move(buffer), address]() mutable {
                 if (socket->WriteStatus()) return;
                 const auto result = socket->Write(std::move(buffer), address ? &*address : nullptr);
                 if (result) socket->ReportError(result);
@@ -75,7 +75,7 @@ struct SocketHandle {
     // return. No callback storage or second delivery gate is needed here.
     bool Subscribe(winrt_receive receive, void *context) {
         if (!receive) return socket->SetOnReceive({});
-        return loop.Invoke([this, receive, context] {
+        return loop.Perform([this, receive, context] {
             return socket->SetOnReceive([receive, context](const uint8_t *bytes, size_t size,
                                                            const Partout::SocketAddress *source,
                                                            int32_t error) {
@@ -94,11 +94,11 @@ struct SocketHandle {
             self->Subscribe(nullptr, nullptr);
             // Drain callbacks now; destroy on the worker after accepted commands.
             try {
-                self->loop.Post([self] {
+                self->loop.Schedule([self] {
                     delete self;
                 });
             } catch (...) {
-                self->loop.Invoke([self] {
+                self->loop.Perform([self] {
                     delete self;
                 });
             }
@@ -143,7 +143,7 @@ struct TunHandle {
         if (auto status = tun->WriteStatus()) return status;
         try {
             auto buffer = CopyBuffer(bytes, size);
-            loop.Post([this, buffer = std::move(buffer)] {
+            loop.Schedule([this, buffer = std::move(buffer)] {
                 if (tun->WriteStatus()) return;
                 const auto result = tun->Write(buffer.data(), buffer.Length());
                 if (result) tun->ReportError(result);
@@ -157,7 +157,7 @@ struct TunHandle {
     bool Subscribe(winrt_receive receive, void *context) {
         // Removing the endpoint callback drains active delivery immediately.
         if (!receive) return tun->SetOnReceive({});
-        return loop.Invoke([this, receive, context] {
+        return loop.Perform([this, receive, context] {
             return tun->SetOnReceive(
                 [receive, context](const uint8_t *bytes, size_t size, int32_t error) {
                     return receive(context, bytes, size, nullptr, error);
@@ -173,11 +173,11 @@ struct TunHandle {
             self->Subscribe(nullptr, nullptr);
             // The controller outlives this handle and its queued writes/destruction.
             try {
-                self->loop.Post([self] {
+                self->loop.Schedule([self] {
                     delete self;
                 });
             } catch (...) {
-                self->loop.Invoke([self] {
+                self->loop.Perform([self] {
                     delete self;
                 });
             }
@@ -240,7 +240,7 @@ winrt_loop winrt_loop_current(void) {
 bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) {
     try {
         if (!loop) return false;
-        loop->Post([=] {
+        loop->Schedule([=] {
             execute(context);
         });
         return true;
@@ -263,7 +263,7 @@ winrt_transport *winrt_connect(const char *host, uint16_t port,
     try {
         auto loop = Partout::RuntimeLoop::Current();
         if (!loop) return nullptr;
-        return loop->Invoke([
+        return loop->Perform([
             loop, host = std::string{host}, port,
             settings = *options
         ]() -> winrt_transport * {

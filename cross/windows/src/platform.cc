@@ -59,7 +59,7 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         try {
             auto &loop = controller->Loop();
             // TUN commit and StartWithMainTransport serialize with all socket I/O.
-            return loop.Invoke([controller, json, &loop]() -> pp_tun {
+            return loop.Perform([controller, json, &loop]() -> pp_tun {
                 auto tun = controller->Open(json);
                 if (!tun) return nullptr;
                 return reinterpret_cast<pp_tun>(Partout::ABI::WrapTun(loop, std::move(tun)));

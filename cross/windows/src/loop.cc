@@ -50,10 +50,10 @@ bool RuntimeLoop::IsWorker() const {
 }
 
 void RuntimeLoop::Drain() {
-    Invoke([] {});
+    Perform([] {});
 }
 
-void RuntimeLoop::Post(std::function<void()> command) {
+void RuntimeLoop::Schedule(std::function<void()> command) {
     {
         std::lock_guard lock(mutex_);
         if (quitting_) throw std::runtime_error("RuntimeLoop is closed");

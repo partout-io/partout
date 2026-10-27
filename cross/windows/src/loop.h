@@ -24,17 +24,17 @@ public:
     // Only one runtime may be active, matching the daemon's process-wide lifetime.
     static RuntimeLoop *Current();
     bool IsWorker() const;
-    void Post(std::function<void()> command);
+    void Schedule(std::function<void()> command);
     void Drain();
 
-    // Setup and lifecycle barriers only. Packet writes and resumes use Post.
-    template <typename Task> auto Invoke(Task &&task) -> decltype(task()) {
+    // Setup and lifecycle barriers only. Packet writes and resumes use Schedule.
+    template <typename Task> auto Perform(Task &&task) -> decltype(task()) {
         if (IsWorker()) return task();
         using Result = decltype(task());
         // std::function requires a copyable callback; packaged_task is move-only.
         auto command = std::make_shared<std::packaged_task<Result()>>(std::forward<Task>(task));
         auto result = command->get_future();
-        Post([command] {
+        Schedule([command] {
             (*command)();
         });
         return result.get();

@@ -136,7 +136,7 @@ TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
 
 TunnelController::~TunnelController() {
     // Destruction must complete close, rather than queue a borrowed this pointer.
-    loop_.Invoke([this] {
+    loop_.Perform([this] {
         Close();
     });
 }
@@ -233,7 +233,7 @@ void TunnelController::Close() noexcept {
     if (!loop_.IsWorker()) {
         try {
             // The runtime retains this controller until queued close completes.
-            loop_.Post([this] {
+            loop_.Schedule([this] {
                 Close();
             });
         } catch (...) {}
