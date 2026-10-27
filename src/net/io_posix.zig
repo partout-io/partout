@@ -65,8 +65,6 @@ pub const POSIXInterface = union(enum) {
         vtable: *const VTable,
 
         pub const VTable = struct {
-            set_event_mask: *const fn (*anyopaque, bool, bool) Error!void,
-            reset_events: *const fn (*anyopaque) Error!void,
             read: *const fn (*anyopaque, []u8) Error!?usize,
             write: *const fn (*anyopaque, []const u8, usize) Error!usize,
             cleanup: *const fn (*anyopaque) void,
@@ -111,20 +109,6 @@ pub const POSIXInterface = union(enum) {
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
         };
         return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
-    }
-
-    pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
-        return switch (self) {
-            .mock => |mock| if (builtin.is_test) mock.vtable.set_event_mask(mock.ptr, readable, writable) else unreachable,
-            inline else => |wrapper| wrapper.setEventMask(readable, writable),
-        };
-    }
-
-    pub fn resetEvents(self: POSIXInterface) Error!void {
-        return switch (self) {
-            .mock => |mock| if (builtin.is_test) mock.vtable.reset_events(mock.ptr) else unreachable,
-            inline else => |wrapper| wrapper.resetEvents(),
-        };
     }
 
     pub fn read(self: POSIXInterface, buf: []u8) Error!?usize {
@@ -255,14 +239,6 @@ pub const SocketWrapper = struct {
         return self.remote_endpoint == null;
     }
 
-    fn setEventMask(self: *const SocketWrapper, readable: bool, writable: bool) !void {
-        if (!io_c.pp_socket_set_event_mask(self.socket, readable, writable)) return error.LibcFailure;
-    }
-
-    fn resetEvents(self: *const SocketWrapper) !void {
-        if (!io_c.pp_socket_reset_events(self.socket)) return error.LibcFailure;
-    }
-
     fn read(self: *const SocketWrapper, buf: []u8) !?usize {
         if (self.isUnconnected()) return error.InvalidSocketMode;
         const read_count = io_c.pp_socket_read(self.socket, buf.ptr, buf.len, null);
@@ -358,17 +334,6 @@ pub const TunWrapper = struct {
         self.allocator.destroy(self);
     }
 
-    fn open(
-        allocator: std.mem.Allocator,
-        uuid: []const u8,
-    ) !?io_c.pp_tun {
-        if (!@hasDecl(io_c, "pp_tun_open")) return null;
-        var c_uuid: util.TemporaryCString = .{};
-        try c_uuid.init(allocator, uuid);
-        defer c_uuid.deinit();
-        return io_c.pp_tun_open(c_uuid.ptr());
-    }
-
     fn free(self: *TunWrapper) void {
         if (self.is_closed) return;
         self.is_closed = true;
@@ -382,10 +347,6 @@ pub const TunWrapper = struct {
     fn nativeIO(self: *TunWrapper) POSIXInterface {
         return .{ .tun = self };
     }
-
-    fn setEventMask(_: *TunWrapper, _: bool, _: bool) !void {}
-
-    fn resetEvents(_: *TunWrapper) !void {}
 
     fn read(self: *const TunWrapper, buf: []u8) !?usize {
         if (builtin.is_test) if (self.test_descriptor) |descriptor| return descriptor.io.read(buf);

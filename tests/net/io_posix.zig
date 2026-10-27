@@ -63,8 +63,6 @@ test "POSIX interface dispatches to owned sockets and tunnels" {
     try std.testing.expect(native_socket.socket == socket);
     try std.testing.expect(native_socket == .socket);
     try std.testing.expect(native_tun == .tun);
-    try native_tun.setEventMask(true, true);
-    try native_tun.resetEvents();
     // Invalid offsets are rejected before reaching the native handles.
     for ([_]io_posix.POSIXInterface{ native_socket, native_tun }) |native| {
         try std.testing.expectError(error.InvalidOffset, native.write("", 1));
@@ -137,8 +135,6 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
     const Probe = struct {
         closed: usize = 0,
 
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
             return error.WouldBlock;
         }
@@ -153,8 +149,6 @@ test "looper owns heap TUN wrapper and closes transferred handle exactly once" {
             return 0;
         }
         const vtable = io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,

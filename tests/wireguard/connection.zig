@@ -249,8 +249,6 @@ const OwnedDescriptor = struct {
         const self: *@This() = @ptrCast(@alignCast(raw));
         self.cleanups += 1;
     }
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(_: *anyopaque, _: []u8) io.Error!?usize {
         return error.WouldBlock;
     }
@@ -261,8 +259,6 @@ const OwnedDescriptor = struct {
         return 0;
     }
     const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-        .set_event_mask = mask,
-        .reset_events = reset,
         .read = read,
         .write = write,
         .cleanup = cleanup,

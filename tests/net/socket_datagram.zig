@@ -94,8 +94,6 @@ const Echo = struct {
 const TunProbe = struct {
     payload: ?[]const u8 = null,
     cleaned: Atomic = .init(0),
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(raw: *anyopaque, buf: []u8) io.Error!?usize {
         const self: *TunProbe = @ptrCast(@alignCast(raw));
         const payload = self.payload orelse return error.WouldBlock;
@@ -114,8 +112,6 @@ const TunProbe = struct {
         return 0;
     }
     const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-        .set_event_mask = mask,
-        .reset_events = reset,
         .read = read,
         .write = write,
         .cleanup = cleanup,

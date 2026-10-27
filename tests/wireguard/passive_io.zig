@@ -207,8 +207,6 @@ const PosixPacketIO = struct {
         const self: *PosixPacketIO = @ptrCast(@alignCast(raw));
         self.cleanups += 1;
     }
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn lastError(_: *anyopaque) c_int {
         return 0;
     }
@@ -217,8 +215,6 @@ const PosixPacketIO = struct {
             .read = read,
             .write = write,
             .cleanup = cleanup,
-            .set_event_mask = mask,
-            .reset_events = reset,
             .last_error_code = lastError,
         } } } };
     }

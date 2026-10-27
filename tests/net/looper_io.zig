@@ -81,8 +81,6 @@ const Mock = struct {
     writes: usize = 0,
     cleaned: usize = 0,
 
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
         const self: *Mock = @ptrCast(@alignCast(raw));
         if (self.fail_read) return error.LibcFailure;
@@ -122,8 +120,6 @@ const Mock = struct {
         return 0;
     }
     const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-        .set_event_mask = mask,
-        .reset_events = reset,
         .read = read,
         .write = write,
         .cleanup = cleanup,

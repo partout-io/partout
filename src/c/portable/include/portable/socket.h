@@ -101,10 +101,6 @@ pp_fd pp_socket_get_watch_fd(pp_socket sock);
 /* Configure nonblocking I/O for the native socket. */
 int pp_socket_set_nonblocking(pp_socket_fd fd);
 
-/* Configure and reset the socket events associated with the watch fd. */
-bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write);
-bool pp_socket_reset_events(pp_socket sock);
-
 int pp_socket_last_error_binding(void);
 
 #pragma clang assume_nonnull end

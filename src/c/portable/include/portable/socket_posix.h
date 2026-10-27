@@ -113,20 +113,3 @@ int pp_socket_set_nonblocking(pp_socket_fd fd) {
     return ret;
 }
 
-bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
-    if (!local_is_valid_socket(sock)) {
-        local_set_not_socket_error();
-        return false;
-    }
-    (void)read;
-    (void)write;
-    return true;
-}
-
-bool pp_socket_reset_events(pp_socket sock) {
-    if (!local_is_valid_socket(sock)) {
-        local_set_not_socket_error();
-        return false;
-    }
-    return true;
-}

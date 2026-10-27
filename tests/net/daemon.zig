@@ -827,8 +827,6 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
             return error.WouldBlock;
         }
@@ -843,8 +841,6 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             return 0;
         }
         const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -1072,8 +1068,6 @@ test "looper owns TUN across startup and optional rebind replacement" {
             tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
             return error.WouldBlock;
         }
@@ -1088,8 +1082,6 @@ test "looper owns TUN across startup and optional rebind replacement" {
             return 0;
         }
         const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -1471,8 +1463,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
@@ -1505,8 +1495,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             }
         }
         const io_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -2025,14 +2013,10 @@ test "worker preserves loop progress and rejects stale preparation results" {
         fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
             return data.len - offset;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn code(_: *anyopaque) c_int {
             return 0;
         }
         const tun_io = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = noCleanup,
