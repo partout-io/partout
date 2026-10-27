@@ -140,7 +140,7 @@ TunnelController::~TunnelController() {
 }
 
 void TunnelController::BindLoop(std::shared_ptr<RuntimeLoop> loop) {
-    loop_ = std::move(loop);
+    loop_.store(std::move(loop));
 }
 
 bool TunnelController::Associate(Socket &socket) noexcept {
@@ -236,14 +236,18 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
 }
 
 void TunnelController::Close() noexcept {
-    if (loop_ && !loop_->IsWorker()) {
+    const auto loop = Loop();
+    // Association only starts after loop publication; nothing to close before it.
+    if (!loop)
+        return;
+    if (!loop->IsWorker()) {
         try {
             if (auto self = weak_from_this().lock())
-                loop_->Post([self] {
+                loop->Post([self] {
                     self->Close();
                 });
             else
-                loop_->Invoke([this] {
+                loop->Invoke([this] {
                     Close();
                 }); // Final destruction follows worker drainage.
         } catch (...) {

@@ -50,7 +50,7 @@ class TunnelController : public std::enable_shared_from_this<TunnelController> {
     void BindLoop(std::shared_ptr<RuntimeLoop>);
 
     std::shared_ptr<RuntimeLoop> Loop() const {
-        return loop_;
+        return loop_.load();
     }
 
     std::unique_ptr<Tun> Open(const char *info_json);
@@ -60,7 +60,7 @@ class TunnelController : public std::enable_shared_from_this<TunnelController> {
 
   private:
     void AssociateUnconnected(Socket &socket);
-    std::shared_ptr<RuntimeLoop> loop_;
+    std::atomic<std::shared_ptr<RuntimeLoop>> loop_;
 
     std::shared_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
