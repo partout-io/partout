@@ -80,7 +80,7 @@ struct VpnChannelRuntime::Impl {
 
     void WaitForConnection() {
         std::unique_lock lock(startup_mutex);
-        const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(60), [this] {
+        const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(30), [this] {
             return StartupCompleteLocked();
         });
         if (!completed) {
