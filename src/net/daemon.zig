@@ -476,7 +476,12 @@ const ConnectionDaemon = struct {
     }
 
     fn stop(self: *ConnectionDaemon) void {
-        self.perform(.stop) catch return;
+        self.perform(.stop) catch {
+            self.jobs_mutex.lock();
+            defer self.jobs_mutex.unlock();
+            if (self.isCurrentThread()) return;
+            while (self.actor_id != null) self.jobs_condition.wait(&self.jobs_mutex);
+        };
     }
 
     //#endregion
@@ -1145,6 +1150,7 @@ const ConnectionDaemon = struct {
 
         self.jobs_mutex.lock();
         self.actor_id = null;
+        self.jobs_condition.broadcast();
         self.jobs_mutex.unlock();
         log.write(.debug, "Connection event loop stopped");
     }

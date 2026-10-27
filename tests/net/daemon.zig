@@ -1671,6 +1671,118 @@ fn waitForExit(owner: anytype) !void {
     return error.Timeout;
 }
 
+test "stop waits for terminal submission failure before immediate destruction" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    const Probe = struct {
+        entered: std.atomic.Value(bool) = .init(false),
+        released: std.atomic.Value(bool) = .init(false),
+        stop_entered: std.atomic.Value(bool) = .init(false),
+        stop_done: std.atomic.Value(bool) = .init(false),
+        returned_before_exit: bool = false,
+        reentrant_stop_returned: bool = false,
+
+        fn block(owner: anytype, self: *@This()) daemon.Error!void {
+            self.entered.store(true, .release);
+            const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+            while (!self.released.load(.acquire) and core.monotonicNs() < deadline) core.sleepMs(1);
+            // A stop invoked by the dying actor must never wait for itself.
+            owner.daemon.stop();
+            self.reentrant_stop_returned = true;
+        }
+
+        fn blocker(owner: anytype, self: *@This()) void {
+            daemon.testing.onLoop(owner, self, block) catch unreachable;
+        }
+
+        fn stopper(sut: *Daemon, self: *@This()) void {
+            self.stop_entered.store(true, .release);
+            sut.stop();
+            const owner = sut.implementation.connection;
+            owner.jobs_mutex.lock();
+            self.returned_before_exit = owner.actor_id != null;
+            owner.jobs_mutex.unlock();
+            self.stop_done.store(true, .release);
+        }
+    };
+    for ([_]bool{ false, true }) |stop_already_queued| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+        var connection: FailingStartConnection = .{};
+        var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
+        defer registry.deinit(std.testing.allocator);
+        var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(std.testing.allocator);
+        var controller: mock_mod.MockTunnelController = .{};
+        var monitor: mock_mod.MockNetworkMonitor = .{ .reachable = false };
+        const sut = try Daemon.create(failing.allocator(), &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = false, .cancels_unrecoverable = false },
+        });
+        const owner = sut.implementation.connection;
+        var destroyed = false;
+        defer if (!destroyed) {
+            // Also clean up safely when running this test against the regression.
+            sut.stop();
+            daemon.testing.shutdown(owner);
+            waitForExit(owner) catch unreachable;
+            sut.destroy();
+        };
+        try sut.start();
+        try cancelGateTimer(owner);
+        var probe: Probe = .{};
+        const blocker = try std.Thread.spawn(.{}, Probe.blocker, .{ owner, &probe });
+        var blocker_joined = false;
+        defer if (!blocker_joined) blocker.join();
+        defer probe.released.store(true, .release);
+        const deadline = core.monotonicNs() + std.time.ns_per_s;
+        while (!probe.entered.load(.acquire)) {
+            if (core.monotonicNs() >= deadline) return error.Timeout;
+            core.sleepMs(1);
+        }
+        var stopper: ?std.Thread = null;
+        defer if (stopper) |thread| thread.join();
+        defer probe.released.store(true, .release);
+        if (stop_already_queued) {
+            stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
+            while (true) {
+                owner.jobs_mutex.lock();
+                const queued = if (owner.jobs.tail) |job| job.message == .stop else false;
+                owner.jobs_mutex.unlock();
+                if (queued) break;
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+        }
+        failing.fail_index = failing.alloc_index;
+        try std.testing.expectError(error.OutOfMemory, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = 0, .bytes = "oom" }));
+        if (!stop_already_queued) stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
+        while (!probe.stop_entered.load(.acquire)) {
+            if (core.monotonicNs() >= deadline) return error.Timeout;
+            core.sleepMs(1);
+        }
+        // Hold the actor so an immediate Closed return can be observed.
+        const stop_deadline = core.monotonicNs() + 50 * std.time.ns_per_ms;
+        while (!probe.stop_done.load(.acquire) and core.monotonicNs() < stop_deadline) core.sleepMs(1);
+        probe.released.store(true, .release);
+        stopper.?.join();
+        stopper = null;
+        blocker.join();
+        blocker_joined = true;
+        try std.testing.expect(!probe.returned_before_exit);
+        try std.testing.expect(probe.reentrant_stop_returned);
+        try std.testing.expect(sut.state == .stopped);
+        try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+        // Match partout_daemon_stop(): destroy immediately, without waitForExit.
+        sut.destroy();
+        destroyed = true;
+    }
+}
+
 test "event loop completes pending performs and releases discarded payloads on shutdown" {
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
