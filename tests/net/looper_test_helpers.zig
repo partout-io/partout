@@ -17,7 +17,7 @@ pub const Mailbox = struct {
     closed: bool = false,
 
     const Node = struct {
-        input: source.net_looper.Looper.PacketSubmission,
+        input: source.net_looper.Looper.PacketReceipt,
         next: ?*Node = null,
 
         fn ready(self: *const Node, mailbox: *Mailbox) bool {
@@ -41,7 +41,7 @@ pub const Mailbox = struct {
         self.mutex.deinit();
     }
 
-    fn post(raw: *anyopaque, input: source.net_looper.Looper.PacketSubmission) error{ Closed, OutOfMemory }!void {
+    fn post(raw: *anyopaque, input: source.net_looper.Looper.PacketReceipt) error{ Closed, OutOfMemory }!void {
         const self: *Mailbox = @ptrCast(@alignCast(raw));
         const node = try self.looper.allocator.create(Node);
         errdefer self.looper.allocator.destroy(node);

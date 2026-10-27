@@ -29,7 +29,7 @@ pub const Looper = struct {
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const WriteError = helpers.WriteError;
-    pub const PacketSubmission = helpers.PacketSubmission;
+    pub const PacketReceipt = helpers.PacketReceipt;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
@@ -69,13 +69,13 @@ pub const Looper = struct {
         return self.impl.loopOnce(null, failure);
     }
 
-    pub fn canReceivePackets(self: *Looper, submission: PacketSubmission) bool {
-        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(submission);
+    pub fn canReceivePackets(self: *Looper, receipt: PacketReceipt) bool {
+        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(receipt);
         return true;
     }
 
-    pub fn receivePackets(self: *Looper, submission: PacketSubmission) void {
-        if (builtin.os.tag == .windows) self.impl.receivePackets(submission);
+    pub fn receivePackets(self: *Looper, receipt: PacketReceipt) void {
+        if (builtin.os.tag == .windows) self.impl.receivePackets(receipt);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

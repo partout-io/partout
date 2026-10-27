@@ -32,7 +32,7 @@ pub const WindowsLooper = struct {
         generation: u64 = 0,
         reading: bool = true,
 
-        pub fn input(side: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketSubmission {
+        pub fn input(side: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
             const self = side.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
@@ -48,7 +48,7 @@ pub const WindowsLooper = struct {
             };
         }
 
-        pub fn keepReading(side: *Attachment, event: helpers.PacketSubmission) bool {
+        pub fn keepReading(side: *Attachment, event: helpers.PacketReceipt) bool {
             const self = side.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
@@ -94,7 +94,7 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn canReceivePackets(self: *WindowsLooper, event: helpers.PacketSubmission) bool {
+    pub fn canReceivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) bool {
         self.mutex.lock();
         defer self.mutex.unlock();
         const side = &self.sides[@intFromEnum(event.side)];
@@ -103,7 +103,7 @@ pub const WindowsLooper = struct {
             event.code != 0 or side.reading;
     }
 
-    pub fn receivePackets(self: *WindowsLooper, event: helpers.PacketSubmission) void {
+    pub fn receivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) void {
         const side = &self.sides[@intFromEnum(event.side)];
         if (side.arguments == null or side.generation != event.generation) return;
         const arguments = side.arguments.?;

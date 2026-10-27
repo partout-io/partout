@@ -27,7 +27,7 @@ pub const Options = struct {
 
 /// A borrowed view of native input; constructing this does not copy the payload.
 /// Mailbox submission copies bytes once, and the actor consumes that owned copy.
-pub const PacketSubmission = struct {
+pub const PacketReceipt = struct {
     side: io.Side,
     generation: u64,
     bytes: []const u8 = &.{},

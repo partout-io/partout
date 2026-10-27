@@ -617,8 +617,17 @@ const ConnectionDaemon = struct {
         };
     }
 
+    fn onPacketsReceived(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
+        if (builtin.os.tag != .windows) return false;
+        const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
+        const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
+        const input = attachment.input(bytes, length, source, code) orelse return false;
+        self.receivePackets(input) catch return false;
+        return attachment.keepReading(input);
+    }
+
     /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
-    fn receivePackets(self: *ConnectionDaemon, input: Looper.PacketSubmission) error{ Closed, OutOfMemory }!void {
+    fn receivePackets(self: *ConnectionDaemon, input: Looper.PacketReceipt) error{ Closed, OutOfMemory }!void {
         errdefer |err| {
             if (err == error.OutOfMemory) {
                 self.onReceivePacketsFailed();
@@ -628,15 +637,6 @@ const ConnectionDaemon = struct {
         owned.bytes = try self.daemon.allocator.dupe(u8, input.bytes);
         errdefer self.daemon.allocator.free(owned.bytes);
         try self.schedule(.{ .onPacketsReceived = owned });
-    }
-
-    fn onPacketsReceived(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
-        if (builtin.os.tag != .windows) return false;
-        const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
-        const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
-        const input = attachment.input(bytes, length, source, code) orelse return false;
-        self.receivePackets(input) catch return false;
-        return attachment.keepReading(input);
     }
 
     fn onReceivePacketsFailed(self: *ConnectionDaemon) void {
@@ -964,8 +964,8 @@ const ConnectionDaemon = struct {
 
     //#region Actor thread - I/O callbacks
 
-    fn handlePacketsReceived(self: *ConnectionDaemon, submission: Looper.PacketSubmission) void {
-        self.looper.receivePackets(submission);
+    fn handlePacketsReceived(self: *ConnectionDaemon, receipt: Looper.PacketReceipt) void {
+        self.looper.receivePackets(receipt);
     }
 
     // The event loop invokes looper callbacks on the actor thread. They may run
@@ -1051,7 +1051,7 @@ const ConnectionDaemon = struct {
         resumeGate,
         onReachability: io.ReachabilityInfo,
         onBetterPath,
-        onPacketsReceived: Looper.PacketSubmission,
+        onPacketsReceived: Looper.PacketReceipt,
 
         // Accepted deferred messages own their payload until job completion.
         fn deinit(self: Message, allocator: std.mem.Allocator) void {
@@ -1260,7 +1260,7 @@ const ConnectionDaemon = struct {
             .resumeGate => self.handleResumeGate(),
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
-            .onPacketsReceived => |submission| self.handlePacketsReceived(submission),
+            .onPacketsReceived => |receipt| self.handlePacketsReceived(receipt),
         }
     }
 
