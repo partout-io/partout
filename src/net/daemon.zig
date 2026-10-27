@@ -957,7 +957,7 @@ const ConnectionDaemon = struct {
     //#region Actor thread - I/O callbacks
 
     fn handleSubmitPackets(self: *ConnectionDaemon, submission: Looper.PacketSubmission) void {
-        self.looper.deliver(submission);
+        self.looper.deliverPackets(submission);
     }
 
     // The event loop invokes looper callbacks on the actor thread. They may run
@@ -1028,7 +1028,7 @@ const ConnectionDaemon = struct {
 
         fn eligible(job: *const Job, owner: *ConnectionDaemon) bool {
             if (job.owned and job.message == .submitPackets) {
-                return owner.looper.inputReady(job.message.submitPackets);
+                return owner.looper.canDeliverPackets(job.message.submitPackets);
             }
             return true;
         }

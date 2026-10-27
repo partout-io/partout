@@ -21,7 +21,7 @@ pub const Mailbox = struct {
         next: ?*Node = null,
 
         fn ready(self: *const Node, mailbox: *Mailbox) bool {
-            return mailbox.looper.impl.inputReady(self.input);
+            return mailbox.looper.impl.canDeliverPackets(self.input);
         }
     };
 
@@ -72,7 +72,7 @@ pub const Mailbox = struct {
         self.mutex.lock();
         var queued = false;
         var pending = self.inputs.head;
-        while (pending) |node| : (pending = node.next) queued = queued or self.looper.impl.inputReady(node.input);
+        while (pending) |node| : (pending = node.next) queued = queued or self.looper.impl.canDeliverPackets(node.input);
         self.mutex.unlock();
         var failure: ?source.net_io.Failure = null;
         const alive = self.looper.impl.loopOnce(if (queued) 0 else max_wait_ms, &failure);
@@ -83,7 +83,7 @@ pub const Mailbox = struct {
             const node = self.inputs.removeWhere(self, Node.ready);
             self.mutex.unlock();
             const input = node orelse break;
-            self.looper.impl.deliver(input.input);
+            self.looper.impl.deliverPackets(input.input);
             self.free(input);
         }
         return !self.looper.impl.stopped;

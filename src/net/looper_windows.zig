@@ -87,14 +87,14 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn inputReady(self: *WindowsLooper, event: helpers.PacketSubmission) bool {
+    pub fn canDeliverPackets(self: *WindowsLooper, event: helpers.PacketSubmission) bool {
         self.mutex.lock();
         defer self.mutex.unlock();
         const side = &self.sides[@intFromEnum(event.side)];
         return side.arguments == null or side.generation != event.generation or event.code != 0 or side.reading;
     }
 
-    pub fn deliver(self: *WindowsLooper, event: helpers.PacketSubmission) void {
+    pub fn deliverPackets(self: *WindowsLooper, event: helpers.PacketSubmission) void {
         const side = &self.sides[@intFromEnum(event.side)];
         if (side.arguments == null or side.generation != event.generation) return;
         const arguments = side.arguments.?;
