@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
-const build_options = @import("build_options");
-const ffi = @import("../../c/exports.zig");
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const c = @import("wireguard_c");
@@ -354,16 +351,6 @@ pub const PassiveIO = struct {
 
     fn write(self: *PassiveIO, tag: net.Side, packets: [*c]const c.wg_packet, count: u32, destination: ?net.SocketAddress, request: usize) i32 {
         if (!validWrite(tag, packets, count, request)) return c.WG_IO_INVALID;
-        const uses_winrt = builtin.os.tag == .windows and build_options.winrt;
-        if (comptime uses_winrt) {
-            if (ffi.io.winrt_thread_init() != 0) {
-                self.fail();
-                return self.completeRequest(request, .{ .status = c.WG_IO_INVALID });
-            }
-        }
-        defer {
-            if (comptime uses_winrt) ffi.io.winrt_thread_uninit();
-        }
         self.writes.lock();
         self.lock.lock();
         if (self.closed) {

@@ -15,7 +15,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
@@ -1071,22 +1070,20 @@ const ConnectionDaemon = struct {
     };
 
     fn run(self: *ConnectionDaemon) void {
-        const uses_winrt = builtin.os.tag == .windows and build_options.winrt;
-        const apartment_error = if (comptime uses_winrt) io_c.winrt_thread_init() else 0;
-        defer {
-            if (comptime uses_winrt) {
-                if (apartment_error == 0) io_c.winrt_thread_uninit();
-            }
-        }
+        var thread_error: ?io.Error = null;
+        io.threadEnter() catch |err| {
+            thread_error = err;
+        };
+        defer if (thread_error == null) io.threadExit();
         self.jobs_mutex.lock();
-        var running = self.is_running and apartment_error == 0;
+        var running = self.is_running and thread_error == null;
         self.actor_id = std.Thread.getCurrentId();
         self.jobs_mutex.unlock();
         log.write(.debug, "Connection event loop started");
 
         // Record event loop terminations caused by the looper.
-        var loop_terminated = apartment_error != 0;
-        var loop_failure: ?io.Failure = if (apartment_error != 0) .{ .system = error.LibcFailure } else null;
+        var loop_terminated = thread_error != null;
+        var loop_failure: ?io.Failure = if (thread_error) |err| .{ .system = err } else null;
 
         while (running) {
             // Fetch pending jobs if any.

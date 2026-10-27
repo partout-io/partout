@@ -13,6 +13,10 @@ const backend = if (builtin.os.tag == .windows) windows else posix;
 
 pub const testing = common.testing;
 
+/// Bracket an owned I/O thread's work; exit must run on the same thread.
+pub const threadEnter = backend.threadEnter;
+pub const threadExit = backend.threadExit;
+
 pub const Packet = common.Packet;
 pub const Packets = common.Packets;
 pub const ReadAction = common.ReadAction;

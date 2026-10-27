@@ -11,8 +11,8 @@ pub const NativeRuntime = struct {
 
     pub fn init() !NativeRuntime {
         if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return .{};
-        if (c.winrt_thread_init() != 0) return error.NativeApartmentUnavailable;
-        errdefer c.winrt_thread_uninit();
+        try source.net_io.threadEnter();
+        errdefer source.net_io.threadExit();
         return .{
             .loop = c.winrt_loop_create() orelse return error.NativeRuntimeUnavailable,
         };
@@ -24,6 +24,6 @@ pub const NativeRuntime = struct {
             c.winrt_loop_drain(@ptrCast(loop));
             c.winrt_loop_free(@ptrCast(loop));
         }
-        c.winrt_thread_uninit();
+        source.net_io.threadExit();
     }
 };

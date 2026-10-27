@@ -180,19 +180,18 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
 } // namespace Partout::ABI
 
 extern "C" {
-int32_t winrt_thread_init(void) {
+bool winrt_thread_enter(void) {
     try {
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
-        return 0;
+        return true;
     } catch (...) {
-        const auto error = winrt::to_hresult().value;
-        winrt_log(WinrtLogError, "Partout: thread apartment initialization failed: HRESULT=0x%08x",
-                  static_cast<unsigned>(error));
-        return error;
+        winrt_log(WinrtLogError, "Partout: thread initialization failed: HRESULT=0x%08x",
+                  static_cast<unsigned>(winrt::to_hresult().value));
+        return false;
     }
 }
 
-void winrt_thread_uninit(void) {
+void winrt_thread_exit(void) {
     winrt::uninit_apartment();
 }
 

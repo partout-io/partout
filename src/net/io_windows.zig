@@ -13,6 +13,14 @@ const c = ffi.io;
 pub const LinkDescriptor = *SocketWrapper;
 pub const TunDescriptor = *TunWrapper;
 
+pub fn threadEnter() error{LibcFailure}!void {
+    if (build_options.winrt and !c.winrt_thread_enter()) return error.LibcFailure;
+}
+
+pub fn threadExit() void {
+    if (build_options.winrt) c.winrt_thread_exit();
+}
+
 fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
