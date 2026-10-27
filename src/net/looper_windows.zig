@@ -15,21 +15,21 @@ const c = ffi.io;
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     mux: c.pp_mux,
-    sides: [2]Attachment = .{ .{}, .{} },
-    mutex: core.Mutex = .{},
-    on_receive: io_common.PacketReceiveCallback = null,
-    receive_context: ?*anyopaque = null,
-    timers: core.Fifo(Scheduled) = .{},
-    next_timer: u64 = 1,
+    sides: [2]Attachment,
+    mutex: core.Mutex,
+    on_receive: io_common.PacketReceiveCallback,
+    receive_context: ?*anyopaque,
+    timers: core.Fifo(Scheduled),
+    next_timer: u64,
     max_read_count: usize,
-    stopped: bool = false,
+    stopped: bool,
 
     pub const Attachment = struct {
-        owner: *WindowsLooper = undefined,
-        side: io.Side = .link,
-        arguments: ?helpers.AttachArguments = null,
-        generation: u64 = 0,
-        reading: bool = true,
+        owner: *WindowsLooper,
+        side: io.Side,
+        generation: u64,
+        reading: bool,
+        arguments: ?helpers.AttachArguments,
 
         pub fn receipt(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
             const self = attachment.owner;
@@ -58,8 +58,8 @@ pub const WindowsLooper = struct {
         id: u64,
         deadline: u64,
         task: io.TimedTask,
-        ready: bool = false,
-        next: ?*Scheduled = null,
+        ready: bool,
+        next: ?*Scheduled,
         fn hasId(self: *const Scheduled, id: u64) bool {
             return self.id == id;
         }
@@ -76,9 +76,17 @@ pub const WindowsLooper = struct {
         self.* = .{
             .allocator = allocator,
             .mux = mux,
+            .sides = .{
+                .{ .owner = self, .side = .link, .generation = 0, .reading = true, .arguments = null },
+                .{ .owner = self, .side = .tun, .generation = 0, .reading = true, .arguments = null },
+            },
+            .mutex = .{},
             .max_read_count = options.max_read_count,
             .on_receive = options.on_receive,
             .receive_context = options.receive_context,
+            .timers = .{},
+            .next_timer = 1,
+            .stopped = false,
         };
         return self;
     }
@@ -168,6 +176,8 @@ pub const WindowsLooper = struct {
             .id = self.next_timer,
             .deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), delay_ms),
             .task = task,
+            .ready = false,
+            .next = null,
         };
         self.next_timer +%= 1;
         if (self.next_timer == 0) self.next_timer = 1;
@@ -200,8 +210,6 @@ pub const WindowsLooper = struct {
             self.mutex.unlock();
             return error.SideAlreadyAttached;
         }
-        attachment.owner = self;
-        attachment.side = tag;
         attachment.generation +%= 1;
         attachment.arguments = arguments;
         attachment.reading = true;
