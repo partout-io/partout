@@ -54,8 +54,9 @@ generate_kotlin_models() {
 }
 
 generate_cpp_models() {
-    # TODO
-    :
+    local openapi=$1
+
+    scripts/gen-models.sh "$openapi" cpp cross/windows/src/models Partout.Models
 }
 
 generate_models() {

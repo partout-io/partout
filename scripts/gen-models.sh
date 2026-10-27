@@ -108,8 +108,33 @@ case $language in
             "${kotlin_extra_imports_opts[@]}"
         ;;
     cpp)
-        echo "cpp language is not implemented yet; exiting."
-        exit 0
+        tmp_dir="$(mktemp -d)"
+        cleanup() {
+            rm -rf "$tmp_dir"
+        }
+        trap cleanup EXIT
+
+        # Pistache's models use nlohmann/json without the HTTP server. As in
+        # Swift, map tagged envelopes to a manual JSON type.
+        openapi-generator generate \
+            -i "$infile" \
+            -o "$tmp_dir" \
+            -g cpp-pistache-server \
+            --global-property=models,supportingFiles=Helpers.h:Helpers.cpp,modelDocs=false,modelTests=false \
+            --schema-mappings TaggedModule=JSONValue,DNSModule.ProtocolType=JSONValue,ModuleImportContext=JSONValue,OpenVPN.ObfuscationMethod=JSONValue \
+            --type-mappings TaggedModule=JSONValue,DNSModule.ProtocolType=JSONValue,DNSModule_ProtocolType=JSONValue,ModuleImportContext=JSONValue,OpenVPN.ObfuscationMethod=JSONValue,OpenVPN_ObfuscationMethod=JSONValue,set=std::vector \
+            --import-mappings 'JSONValue=#include "../json.h",TaggedModule=#include "../json.h",DNSModule.ProtocolType=#include "../json.h",DNSModule_ProtocolType=#include "../json.h",ModuleImportContext=#include "../json.h",OpenVPN.ObfuscationMethod=#include "../json.h",OpenVPN_ObfuscationMethod=#include "../json.h"' \
+            --model-name-mappings Profile=TaggedProfile \
+            --name-mappings interface=interface_ \
+            --additional-properties="modelPackage=$package_name,helpersPackage=Partout.Helpers,useStructModel=true,variableNameFirstCharacterUppercase=false,sortModelPropertiesByRequiredFlag=false"
+
+        rm -rf "$models_dir"
+        mkdir -p "$models_dir"
+        cp "$tmp_dir/model/"*.h "$tmp_dir/model/"*.cpp "$models_dir/"
+        # Match the C++ method naming convention; retain nlohmann's ADL free
+        # functions named to_json/from_json.
+        perl -0pi -e 's/\bvalidate\(/Validate(/g; s/\bto_json\(\)/ToJson()/g; s/\bfrom_json\(const nlohmann::json& j\)/FromJson(const nlohmann::json\& j)/g' "$models_dir/"*.h "$models_dir/"*.cpp
+        perl -0pi -e 's/[ \t]+$//mg; s/\n{3,}/\n\n/g' "$models_dir/"*.h "$models_dir/"*.cpp
         ;;
     *)
         echo "unknown language '$language'; expected 'swift', 'kotlin', or 'cpp'"

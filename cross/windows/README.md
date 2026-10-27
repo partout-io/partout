@@ -246,13 +246,52 @@ Snapshot and environment publication remain unimplemented.
 
 ## Build
 
-Requires CMake 4.0+, Visual Studio 2022 C++ tools and the Windows SDK. From the
-Partout root in a developer shell matching the target architecture:
+Requires CMake 4.0+, Visual Studio 2022 C++ tools, the Windows SDK, and the
+`nlohmann_json` CMake package (for example, from vcpkg's `nlohmann-json` port).
+Pass the package's toolchain file or prefix to CMake as needed. From the Partout
+root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-winrt -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINRT=ON -DPP_BUILD_LIBRARY=OFF
 cmake --build .cmake-winrt --target partout-winrt
 ```
+
+### OpenAPI models
+
+Regenerate the entities in `cross/windows/src/models` with:
+
+```sh
+scripts/build.sh -gen-models cpp
+```
+
+This uses `openapi-generator` and Java, just like Swift and Kotlin. The stock
+`cpp-pistache-server` generator emits C++17 structs in `Partout::Models` and
+nlohmann/json conversions; only models and their helpers are retained, so
+Pistache is not a build dependency. There are no custom templates. The script
+renames generated methods to `ToJson`, `FromJson`, and `Validate`.
+
+Discriminator envelopes use the handwritten `JSONValue` in `src/json.h` to keep
+the complete payload, including unknown tags. Concrete types such as
+`TaggedModule_IP` are also generated. Decode an envelope's `value` into a
+concrete type when needed. Sets use vectors with generated uniqueness validation.
+
+```cpp
+const auto profile = Partout::Models::TaggedProfile::FromJson(json);
+const auto ip = profile.modules.at(0).value.get<Partout::Models::TaggedModule_IP>();
+const auto encoded = ip.ToJson();
+```
+
+The models are compiled into `partout-winrt`. A standalone serialization test
+can also be built without the Windows SDK, using a C++17 compiler and
+nlohmann/json on the include path:
+
+```sh
+c++ -std=c++17 -I/path/to/nlohmann/include -Icross/windows/src/models \
+    tests/c/windows/models.cc cross/windows/src/models/*.cpp -o /tmp/partout-models-test
+/tmp/partout-models-test
+```
+
+### Native integration
 
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
