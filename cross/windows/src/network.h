@@ -23,6 +23,8 @@ public:
     NetworkMonitor();
     ~NetworkMonitor();
 
+    // Callback arguments are (reachable, path_changed). The initial snapshot
+    // reports path_changed=false; duplicate snapshots do not invoke the callback.
     void Start(std::function<void(bool, bool)> notify);
     void Stop();
 
