@@ -14,8 +14,8 @@ const log = core.logging;
 // FIXME: ###, Abuse of anyerror in callbacks
 
 pub const Options = struct {
-    /// POSIX requires a borrowed mux. Windows uses its wake event only, or owns
-    /// a private wake source if null. Supplied muxes must outlive the looper.
+    /// Borrows the caller's mux, which must outlive the looper.
+    /// Windows uses only its wake event.
     mux: io_c.pp_mux,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,

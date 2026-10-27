@@ -24,15 +24,15 @@ const TimerProbe = struct {
 };
 
 test "looper runs and cancels timers on its caller" {
+    try std.testing.expectError(error.MuxFailure, Looper.init(std.testing.allocator, .{ .mux = null }));
     // Windows dispatch is supplied by the optional native runtime archive.
     if (builtin.os.tag == .windows and !source.winrt_enabled) {
-        try std.testing.expectError(error.MuxFailure, Looper.init(std.testing.allocator, .{ .mux = null }));
         return;
     }
-    const wake: ?test_helpers.Mux = if (builtin.os.tag == .windows) null else try test_helpers.Mux.init();
-    defer if (wake) |value| value.deinit();
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{
-        .mux = if (wake) |value| value.handle else null,
+        .mux = mux,
     });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
@@ -87,7 +87,9 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
             self.other_calls += 1;
         }
     };
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -104,7 +106,9 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
 
 test "Windows dispatcher waits for the earlier timer deadline" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -179,7 +183,9 @@ test "Windows dispatcher shares the daemon wake event without spinning or losing
 test "Windows timer replacement failure preserves the old task and token" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
-    var looper = try Looper.init(failing.allocator(), .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(failing.allocator(), .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -201,7 +207,9 @@ test "Windows timer replacement failure preserves the old task and token" {
 
 test "Windows timer expiry cannot invoke a context after cancellation or stop" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -240,7 +248,9 @@ const WindowsWriteProbe = struct {
 
 test "Windows looper owns sides and routes socket write failure" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -291,7 +301,9 @@ const WindowsRejectedReceiver = struct {
 
 test "Windows native write failures return asynchronously through the looper" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -403,7 +415,9 @@ test "Windows TCP receive resumes and detaches its side on the looper thread" {
     defer _ = ws.closesocket(peer);
     const timeout: u32 = 5000;
     try std.testing.expect(ws.setsockopt(peer, 65535, 0x1006, &timeout, @sizeOf(u32)) == 0);
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();
@@ -539,7 +553,9 @@ const WindowsProducer = struct {
 
 test "Windows paused TUN drops new input but admits failures and resumes delivery" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
+    const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
+    defer source.ffi.io.pp_mux_free(mux);
+    var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
     var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
     mailbox.bind();

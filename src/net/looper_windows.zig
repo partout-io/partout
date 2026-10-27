@@ -15,7 +15,6 @@ const c = ffi.io;
 pub const WindowsLooper = struct {
     allocator: std.mem.Allocator,
     mux: c.pp_mux,
-    owns_mux: bool,
     sides: [2]Attachment = .{ .{}, .{} },
     mutex: core.Mutex = .{},
     on_receive: io_common.PacketReceiveCallback = null,
@@ -72,14 +71,11 @@ pub const WindowsLooper = struct {
 
     pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
         if (!build_options.winrt) return error.MuxFailure;
+        const mux = options.mux orelse return error.MuxFailure;
         const self = try allocator.create(WindowsLooper);
-        errdefer allocator.destroy(self);
-        const mux = options.mux orelse c.pp_mux_create(1) orelse return error.MuxFailure;
-        errdefer if (options.mux == null) c.pp_mux_free(mux);
         self.* = .{
             .allocator = allocator,
             .mux = mux,
-            .owns_mux = options.mux == null,
             .max_read_count = options.max_read_count,
             .on_receive = options.on_receive,
             .receive_context = options.receive_context,
@@ -90,7 +86,6 @@ pub const WindowsLooper = struct {
     pub fn destroy(self: *WindowsLooper) void {
         self.stop() catch unreachable;
         self.mutex.deinit();
-        if (self.owns_mux) c.pp_mux_free(self.mux);
         self.allocator.destroy(self);
     }
 
