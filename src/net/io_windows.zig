@@ -13,7 +13,7 @@ const c = ffi.io;
 pub const LinkDescriptor = *SocketWrapper;
 pub const TunDescriptor = *TunWrapper;
 
-fn OwnedTransport(comptime side: io.Side) type {
+fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
@@ -107,15 +107,16 @@ fn OwnedTransport(comptime side: io.Side) type {
     };
 }
 
-pub const SocketWrapper = OwnedTransport(.link);
-pub const TunWrapper = OwnedTransport(.tun);
+pub const SocketWrapper = NativeTransport(.link);
+pub const TunWrapper = NativeTransport(.tun);
 
-pub fn PacketTransport(comptime DescriptorType: type) type {
+pub fn CallbackTransport(comptime DescriptorType: type) type {
     return struct {
         const Self = @This();
         pub const Descriptor = DescriptorType;
         pub const OnReceive = io.PacketReceiveCallback;
         pub const WriteResult = io.PacketWriteResult;
+
         allocator: std.mem.Allocator,
         descriptor: Descriptor,
 

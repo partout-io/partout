@@ -405,7 +405,7 @@ pub fn mapWriteResult(_: io.Side, result: c_int, comptime maps_no_space: bool) !
 
 /// A readiness-driven thread supplies borrowed input; writes submit directly.
 /// No thread starts until a receiver is registered. Removal wakes and joins it.
-pub fn PacketTransport(comptime DescriptorType: type) type {
+pub fn CallbackTransport(comptime DescriptorType: type) type {
     return struct {
         const Self = @This();
         pub const Descriptor = DescriptorType;

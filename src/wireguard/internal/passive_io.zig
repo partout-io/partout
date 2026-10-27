@@ -40,7 +40,7 @@ pub const PassiveIO = struct {
     const Side = struct {
         owner: *PassiveIO = undefined,
         tag: net.Side,
-        transport: ?*net.PacketTransport = null,
+        transport: ?*net.CallbackTransport = null,
         attached: bool = false,
         packets: core.Fifo(Packet) = .{},
         count: usize = 0,
@@ -111,7 +111,7 @@ pub const PassiveIO = struct {
         self.replace(.{ .tun = descriptor });
     }
 
-    fn replace(self: *PassiveIO, descriptor: net.PacketTransport.Descriptor) void {
+    fn replace(self: *PassiveIO, descriptor: net.CallbackTransport.Descriptor) void {
         const tag = std.meta.activeTag(descriptor);
         const side = self.sideFor(tag);
         self.writes.lock();
@@ -120,24 +120,24 @@ pub const PassiveIO = struct {
         self.lock.lock();
         if (tag == .tun and self.closed) {
             self.lock.unlock();
-            net.PacketTransport.releaseDescriptor(descriptor);
+            net.CallbackTransport.releaseDescriptor(descriptor);
             return;
         }
         if (tag == .link) {
             self.closed = false;
             self.failed = false;
         }
-        const packet_transport = net.PacketTransport.create(self.allocator, descriptor) catch {
+        const callback_transport = net.CallbackTransport.create(self.allocator, descriptor) catch {
             self.lock.unlock();
             self.fail();
             return;
         };
-        side.transport = packet_transport;
+        side.transport = callback_transport;
         side.owner = self;
         side.attached = true;
         self.ready.broadcast();
         self.lock.unlock();
-        packet_transport.setOnReceive(onReceive, side) catch self.fail();
+        callback_transport.setOnReceive(onReceive, side) catch self.fail();
     }
 
     // Caller holds writes, but never the queue lock while draining callbacks.
@@ -148,12 +148,12 @@ pub const PassiveIO = struct {
         // Replacing an attached descriptor cancels that descriptor's readers.
         if (side.attached) side.cancelReads();
         side.attached = false;
-        const packet_transport = side.transport;
+        const callback_transport = side.transport;
         side.transport = null;
         side.clear(self.allocator);
         self.ready.broadcast();
         self.lock.unlock();
-        if (packet_transport) |value| value.cleanup();
+        if (callback_transport) |value| value.cleanup();
     }
 
     pub fn releaseLink(self: *PassiveIO) void {
@@ -358,11 +358,11 @@ pub const PassiveIO = struct {
             self.writes.unlock();
             return self.completeRequest(request, .{ .status = c.WG_IO_CLOSED });
         }
-        const packet_transport = self.sideFor(tag).transport;
+        const callback_transport = self.sideFor(tag).transport;
         self.lock.unlock();
         // A missing link is a dropped send during rebind. A missing TUN waits
         // for initial commit. Neither is a terminal transport failure.
-        var result = if (packet_transport) |value|
+        var result = if (callback_transport) |value|
             writePackets(value, packets[0..count], destination)
         else
             BatchResult{ .status = switch (tag) {
@@ -375,11 +375,11 @@ pub const PassiveIO = struct {
         return self.completeRequest(request, result);
     }
 
-    fn writePackets(packet_transport: *net.PacketTransport, packets: []const c.wg_packet, destination: ?net.SocketAddress) BatchResult {
+    fn writePackets(callback_transport: *net.CallbackTransport, packets: []const c.wg_packet, destination: ?net.SocketAddress) BatchResult {
         var result = BatchResult{ .status = c.WG_IO_OK };
         for (packets) |packet| {
             const bytes: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];
-            switch (packet_transport.write(bytes, destination)) {
+            switch (callback_transport.write(bytes, destination)) {
                 .ok => result.count += 1,
                 .again => {
                     result.status = c.WG_IO_AGAIN;

@@ -256,7 +256,7 @@ test "POSIX callback adapter releases an incoming descriptor on allocation failu
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
     var tun = PosixPacketIO{};
-    try std.testing.expectError(error.OutOfMemory, source.net.PacketTransport.create(failing.allocator(), .{ .tun = tun.descriptor() }));
+    try std.testing.expectError(error.OutOfMemory, source.net.CallbackTransport.create(failing.allocator(), .{ .tun = tun.descriptor() }));
     try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
 }
 
