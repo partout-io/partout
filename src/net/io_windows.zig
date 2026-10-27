@@ -12,18 +12,16 @@ const c = ffi.io;
 
 pub const LinkDescriptor = *SocketWrapper;
 pub const TunDescriptor = *TunWrapper;
-pub const OnReceive = io.PacketReceiveCallback;
 
 fn OwnedTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
         native: *c.winrt_transport,
-        unconnected: bool,
 
         pub fn wrap(allocator: std.mem.Allocator, native: *c.winrt_transport) std.mem.Allocator.Error!*Self {
             const self = try allocator.create(Self);
-            self.* = .{ .allocator = allocator, .native = native, .unconnected = native.unconnected };
+            self.* = .{ .allocator = allocator, .native = native };
             return self;
         }
 
@@ -32,9 +30,7 @@ fn OwnedTransport(comptime side: io.Side) type {
             self.allocator.destroy(self);
         }
 
-        pub fn cleanup(self: *Self) void {
-            self.destroy();
-        }
+        pub const cleanup = destroy;
 
         pub fn localAddress(self: *const Self) !io.SocketAddress {
             var address: io.SocketAddress = undefined;
@@ -60,10 +56,6 @@ fn OwnedTransport(comptime side: io.Side) type {
 
         pub fn tunDescriptor(self: *Self) !TunDescriptor {
             return self;
-        }
-
-        pub fn socketWrapper(self: *Self) ?*SocketWrapper {
-            return if (side == .link) self else null;
         }
 
         pub fn tunWrapper(self: *Self) ?*TunWrapper {

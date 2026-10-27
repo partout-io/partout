@@ -33,6 +33,7 @@ pub const Looper = struct {
 
     allocator: std.mem.Allocator,
     impl: *Impl,
+    mailbox_job_limit: usize,
 
     /// Allocates a looper. A supplied mux is borrowed through destroy().
     pub fn create(
@@ -56,6 +57,7 @@ pub const Looper = struct {
         return .{
             .allocator = allocator,
             .impl = try Impl.create(allocator, options),
+            .mailbox_job_limit = if (builtin.os.tag == .windows) options.max_read_count else std.math.maxInt(usize),
         };
     }
 
@@ -74,13 +76,6 @@ pub const Looper = struct {
 
     pub fn deliver(self: *Looper, submission: PacketSubmission) void {
         if (builtin.os.tag == .windows) self.impl.deliver(submission);
-    }
-
-    /// Bound native mailbox work so protocol timers get a turn. POSIX receives
-    /// packets in loopOnce(), outside the mailbox, and needs no job limit.
-    pub fn mailboxJobLimit(self: *Looper) usize {
-        if (builtin.os.tag == .windows) return self.impl.max_read_count;
-        return std.math.maxInt(usize);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

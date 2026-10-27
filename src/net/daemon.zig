@@ -1085,7 +1085,7 @@ const ConnectionDaemon = struct {
 
             // Paused input stays queued; controls can pass it without requeueing.
             // Bound each turn so packet traffic cannot starve protocol timers.
-            var remaining = self.looper.mailboxJobLimit();
+            var remaining = self.looper.mailbox_job_limit;
             while (running and remaining > 0) : (remaining -= 1) {
                 self.jobs_mutex.lock();
                 running = self.is_running and !self.packet_submission_failed;

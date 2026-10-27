@@ -246,7 +246,7 @@ pub const WindowsLooper = struct {
         if (self.stopped) return error.LooperUnavailable;
         const side = &self.sides[@intFromEnum(tag)];
         const arguments = side.arguments orelse return error.SideNotAttached;
-        if (arguments.pair == .link and arguments.pair.link.unconnected and destination == null) return error.MissingDestination;
+        if (arguments.pair == .link and arguments.pair.link.native.unconnected and destination == null) return error.MissingDestination;
         for (packets) |packet| {
             const result = switch (arguments.pair) {
                 inline else => |value| value.write(packet, destination),
