@@ -74,7 +74,7 @@ fn OwnedTransport(comptime side: io.Side) type {
             return self.native.write.?(self.native.context, packet.ptr, packet.len, if (destination) |*address| @ptrCast(address) else null);
         }
 
-        // Compatibility with the platform factory. Native setup is one runtime
+        // Compatibility with the platform factory. Native setup is one loop
         // operation; Zig never creates or configures a native socket object.
         pub const create = if (side == .link) createLink else createTun;
 

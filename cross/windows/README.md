@@ -143,7 +143,7 @@ controller APIs.
 The Zig adapters hold generic owned capabilities, without native socket or TUN
 types. Native classes use C++ types and shared `RuntimeLoop` ownership; opaque
 handles, C callback tables and address conversions stay in the ABI adapters.
-The native runtime converts a write failure into the same queue used for
+The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
 Detach drains native callbacks. Already-enqueued packets carry generation
 tokens and are discarded by the looper after detach or replacement.

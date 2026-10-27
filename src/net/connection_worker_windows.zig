@@ -12,7 +12,7 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         const Self = @This();
         allocator: std.mem.Allocator,
         context: *Context,
-        runtime: c.winrt_loop,
+        loop: c.winrt_loop,
 
         const Task = struct {
             owner: *Self,
@@ -29,8 +29,8 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         pub fn create(allocator: std.mem.Allocator, context: *Context) error{OutOfMemory}!*Self {
             const self = try allocator.create(Self);
             errdefer allocator.destroy(self);
-            const runtime = c.winrt_loop_create() orelse return error.OutOfMemory;
-            self.* = .{ .allocator = allocator, .context = context, .runtime = runtime };
+            const loop = c.winrt_loop_create() orelse return error.OutOfMemory;
+            self.* = .{ .allocator = allocator, .context = context, .loop = loop };
             return self;
         }
 
@@ -38,13 +38,13 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
             const task = try self.allocator.create(Task);
             errdefer self.allocator.destroy(task);
             task.* = .{ .owner = self, .message = message };
-            if (!c.winrt_loop_submit(self.runtime, Task.run, task)) return error.OutOfMemory;
+            if (!c.winrt_loop_submit(self.loop, Task.run, task)) return error.OutOfMemory;
         }
 
         pub fn destroy(self: *Self) void {
             // Free drains accepted preparation tasks. Transports retain the
             // native worker for ongoing I/O and handover after setup completes.
-            c.winrt_loop_free(self.runtime);
+            c.winrt_loop_free(self.loop);
             self.allocator.destroy(self);
         }
     };

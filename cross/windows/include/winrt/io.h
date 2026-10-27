@@ -56,7 +56,7 @@ winrt_transport *winrt_connect(winrt_loop, const char *host, uint16_t port,
 
 winrt_loop winrt_loop_create(void);
 /* Accepted work executes once on the persistent worker. Its socket factory
- * reuses that same runtime; free drains accepted work before releasing it. */
+ * reuses that same loop; free drains accepted work before releasing it. */
 bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
 void winrt_loop_free(winrt_loop);
 #ifdef __cplusplus
