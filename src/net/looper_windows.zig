@@ -27,32 +27,32 @@ pub const WindowsLooper = struct {
 
     pub const Attachment = struct {
         owner: *WindowsLooper = undefined,
-        tag: io.Side = .link,
+        side: io.Side = .link,
         arguments: ?helpers.AttachArguments = null,
         generation: u64 = 0,
         reading: bool = true,
 
-        pub fn input(side: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
-            const self = side.owner;
+        pub fn input(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
+            const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
-            if (side.arguments == null or (code == 0 and !side.reading and side.tag == .tun)) {
+            if (attachment.arguments == null or (code == 0 and !attachment.reading and attachment.side == .tun)) {
                 return null;
             }
             return .{
-                .side = side.tag,
-                .generation = side.generation,
+                .side = attachment.side,
+                .generation = attachment.generation,
                 .bytes = if (length == 0) &.{} else bytes[0..length],
                 .source = if (source == null) null else @as(*const io.SocketAddress, @ptrCast(source)).*,
                 .code = code,
             };
         }
 
-        pub fn keepReading(side: *Attachment, event: helpers.PacketReceipt) bool {
-            const self = side.owner;
+        pub fn keepReading(attachment: *Attachment, event: helpers.PacketReceipt) bool {
+            const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
-            return side.arguments != null and side.generation == event.generation and side.reading and event.code == 0;
+            return attachment.arguments != null and attachment.generation == event.generation and attachment.reading and event.code == 0;
         }
     };
     const Scheduled = struct {
@@ -199,22 +199,22 @@ pub const WindowsLooper = struct {
         if (self.on_receive == null) return error.LooperUnavailable;
         if (self.stopped) return error.LooperUnavailable;
         const tag = std.meta.activeTag(arguments.pair);
-        const side = &self.sides[@intFromEnum(tag)];
+        const attachment = &self.sides[@intFromEnum(tag)];
         self.mutex.lock();
-        if (side.arguments != null) {
+        if (attachment.arguments != null) {
             self.mutex.unlock();
             return error.SideAlreadyAttached;
         }
-        side.owner = self;
-        side.tag = tag;
-        side.generation +%= 1;
-        side.arguments = arguments;
-        side.reading = true;
+        attachment.owner = self;
+        attachment.side = tag;
+        attachment.generation +%= 1;
+        attachment.arguments = arguments;
+        attachment.reading = true;
         self.mutex.unlock();
         switch (arguments.pair) {
-            inline else => |value| value.setOnReceive(self.on_receive, side) catch {
+            inline else => |value| value.setOnReceive(self.on_receive, attachment) catch {
                 self.mutex.lock();
-                side.arguments = null;
+                attachment.arguments = null;
                 self.mutex.unlock();
                 return error.LooperUnavailable;
             },
