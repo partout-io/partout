@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "../../../cross/windows/src/network.h"
+#include "../../../cross/windows/src/network_internal.h"
 #include <cassert>
 #include <array>
 

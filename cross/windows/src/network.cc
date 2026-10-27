@@ -3,6 +3,7 @@
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include "network.h"
+#include "network_internal.h"
 #include <windows.h>
 #include <ipifcons.h>
 #include <iphlpapi.h>
@@ -17,6 +18,7 @@ bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
     return metric && (!other.metric || *metric < *other.metric);
 }
 
+// A missing preference excludes an unusable profile from selection.
 std::optional<size_t> SelectPhysicalNetwork(size_t count,
     const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
     std::optional<size_t> selected;
@@ -52,7 +54,7 @@ std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter, const MIB_IPFORW
     }
     return best;
 }
-}
+} // namespace
 
 bool NetworkPath::Update(winrt::guid id, bool available) {
     if (initialized && available == reachable && id == adapter) return false;
