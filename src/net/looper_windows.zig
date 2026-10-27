@@ -92,6 +92,7 @@ pub const WindowsLooper = struct {
         task: io.TimedTask,
         ready: bool,
         next: ?*Scheduled,
+
         fn hasId(self: *const Scheduled, id: u64) bool {
             return self.id == id;
         }
@@ -134,28 +135,28 @@ pub const WindowsLooper = struct {
     }
 
     pub fn receivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) void {
-        const side = &self.sides[@intFromEnum(receipt.side)];
-        if (side.generation != receipt.generation) return;
-        const arguments = side.arguments orelse return;
+        const attachment = &self.sides[@intFromEnum(receipt.side)];
+        if (attachment.generation != receipt.generation) return;
+        const arguments = attachment.arguments orelse return;
         if (receipt.code != 0) {
             if (arguments.on_failure) |callback| callback.call(.{ .io = .{
                 .side = receipt.side,
                 .cause = if (receipt.code == c.WinrtEOF) error.EndOfStream else error.LibcFailure,
                 .code = if (receipt.code == c.WinrtEOF) null else receipt.code,
             } });
-            side.setReading(receipt.generation, false);
+            attachment.setReading(receipt.generation, false);
             return;
         }
         const on_read = arguments.on_read orelse return;
         const addresses: ?[]const io.SocketAddress = if (receipt.source) |value| &.{value} else null;
         const action = on_read.call(&.{receipt.bytes}, addresses) catch |err| {
-            if (side.generation == receipt.generation) {
+            if (attachment.generation == receipt.generation) {
                 if (arguments.on_failure) |failure| failure.call(.{ .user = err });
-                side.setReading(receipt.generation, false);
+                attachment.setReading(receipt.generation, false);
             }
             return;
         };
-        side.setReading(receipt.generation, action == .keep);
+        attachment.setReading(receipt.generation, action == .keep);
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
@@ -169,7 +170,7 @@ pub const WindowsLooper = struct {
                 failure.* = .{ .wait = if (code == 0) result else code };
                 return false;
             }
-            if (result > 0 or deadline == null or core.monotonicNs() >= deadline.?) break;
+            if (waitCompleted(result, deadline)) break;
         }
         return self.dispatchExpiredTimers();
     }
@@ -187,6 +188,12 @@ pub const WindowsLooper = struct {
         // Round up to avoid waking before the deadline; clamp to the mux limit.
         const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
         return @intCast(@min(ms, std.math.maxInt(c_int)));
+    }
+
+    fn waitCompleted(result: c_int, deadline: ?u64) bool {
+        if (result > 0) return true;
+        const until = deadline orelse return true;
+        return core.monotonicNs() >= until;
     }
 
     fn dispatchExpiredTimers(self: *WindowsLooper) bool {
@@ -236,8 +243,8 @@ pub const WindowsLooper = struct {
         if (self.max_read_count == 0) return error.InvalidBuffers;
         if (self.on_receive == null) return error.LooperUnavailable;
         if (self.stopped) return error.LooperUnavailable;
-        const tag = std.meta.activeTag(arguments.pair);
-        const attachment = &self.sides[@intFromEnum(tag)];
+        const side = std.meta.activeTag(arguments.pair);
+        const attachment = &self.sides[@intFromEnum(side)];
         self.mutex.lock();
         if (attachment.arguments != null) {
             self.mutex.unlock();
@@ -257,15 +264,15 @@ pub const WindowsLooper = struct {
         }
     }
 
-    pub fn detach(self: *WindowsLooper, tag: io.Side) helpers.DetachError!void {
-        const side = &self.sides[@intFromEnum(tag)];
+    pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
+        const attachment = &self.sides[@intFromEnum(side)];
         self.mutex.lock();
-        const arguments = side.arguments orelse {
+        const arguments = attachment.arguments orelse {
             self.mutex.unlock();
             return;
         };
-        side.arguments = null;
-        side.generation +%= 1;
+        attachment.arguments = null;
+        attachment.generation +%= 1;
         self.mutex.unlock();
         switch (arguments.pair) {
             inline else => |value| value.cleanup(),
@@ -273,16 +280,16 @@ pub const WindowsLooper = struct {
         _ = c.pp_mux_wake(self.mux);
     }
 
-    pub fn isAttached(self: *const WindowsLooper, tag: io.Side) bool {
-        return self.sides[@intFromEnum(tag)].arguments != null;
+    pub fn isAttached(self: *const WindowsLooper, side: io.Side) bool {
+        return self.sides[@intFromEnum(side)].arguments != null;
     }
 
-    pub fn resumeReading(self: *WindowsLooper, tag: io.Side) helpers.SubmissionError!void {
+    pub fn resumeReading(self: *WindowsLooper, side: io.Side) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
-        const side = &self.sides[@intFromEnum(tag)];
-        const arguments = side.arguments orelse return error.LooperUnavailable;
+        const attachment = &self.sides[@intFromEnum(side)];
+        const arguments = attachment.arguments orelse return error.LooperUnavailable;
         self.mutex.lock();
-        side.reading = true;
+        attachment.reading = true;
         self.mutex.unlock();
         switch (arguments.pair) {
             inline else => |value| value.resumeReading() catch return error.LooperUnavailable,
@@ -290,18 +297,18 @@ pub const WindowsLooper = struct {
         _ = c.pp_mux_wake(self.mux);
     }
 
-    pub fn write(self: *WindowsLooper, packets: io.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
+    pub fn write(self: *WindowsLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
-        const side = &self.sides[@intFromEnum(tag)];
-        const arguments = side.arguments orelse return error.SideNotAttached;
+        const attachment = &self.sides[@intFromEnum(side)];
+        const arguments = attachment.arguments orelse return error.SideNotAttached;
         if (arguments.pair == .link and arguments.pair.link.native.unconnected and destination == null) return error.MissingDestination;
         for (packets) |packet| {
             const result = switch (arguments.pair) {
                 inline else => |value| value.write(packet, destination),
             };
             if (result != 0) {
-                if (self.on_receive) |callback| _ = callback(side, null, 0, null, result);
+                if (self.on_receive) |callback| _ = callback(attachment, null, 0, null, result);
                 return;
             }
         }
