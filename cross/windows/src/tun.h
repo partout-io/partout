@@ -20,7 +20,7 @@ class Tun {
     class State;
     friend class TunnelController;
 
-  public:
+public:
     explicit Tun(std::shared_ptr<State> state);
     ~Tun() noexcept;
     Tun(const Tun &) = delete;
@@ -30,7 +30,7 @@ class Tun {
     int32_t Write(const uint8_t *bytes, size_t length);
     void StopWrites();
 
-  private:
+private:
     std::shared_ptr<State> state_;
     TunOnReceive callback_ = nullptr;
     void *context_ = nullptr;
@@ -40,7 +40,7 @@ class Tun {
 // Association, Open and Close run on the same native worker. Destruction follows
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController : public std::enable_shared_from_this<TunnelController> {
-  public:
+public:
     explicit TunnelController(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     ~TunnelController();
     TunnelController(const TunnelController &) = delete;
@@ -58,7 +58,7 @@ class TunnelController : public std::enable_shared_from_this<TunnelController> {
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
     void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
-  private:
+private:
     void AssociateUnconnected(Socket &socket);
     std::atomic<std::shared_ptr<RuntimeLoop>> loop_;
 

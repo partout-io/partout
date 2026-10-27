@@ -81,14 +81,18 @@ fn NativeTransport(comptime side: io.Side) type {
             try host.init(allocator, peer.address);
             defer host.deinit();
             const options_ctx = @constCast(&options);
-            const native: *c.winrt_transport = c.winrt_connect(host.ptr(), peer.proto.port, &.{
-                .tcp = peer.plainSocketType() == .tcp,
-                .unconnected = endpoint == null,
-                .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
-                .timeout_ms = options.timeout_ms,
-                .configure = configure,
-                .context = options_ctx,
-            }) orelse return null;
+            const native: *c.winrt_transport = c.winrt_connect(
+                host.ptr(),
+                peer.proto.port,
+                &.{
+                    .tcp = peer.plainSocketType() == .tcp,
+                    .unconnected = endpoint == null,
+                    .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
+                    .timeout_ms = options.timeout_ms,
+                    .configure = configure,
+                    .context = options_ctx,
+                },
+            ) orelse return null;
             // Release the native transport if allocating its Zig wrapper fails.
             errdefer native.release.?(native.context);
             return try wrap(allocator, native);

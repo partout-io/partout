@@ -21,7 +21,7 @@ namespace Partout {
 // Profile and cache_dir are copied; logger_ctx must outlive the runtime and
 // remain valid while registered with Partout's process-wide logger.
 class VpnChannelRuntime {
-  public:
+public:
     PARTOUT_WINRT_API VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                                         const char *profile, const partout_init_args &init_args,
                                         const partout_daemon_options &options);
@@ -44,7 +44,7 @@ class VpnChannelRuntime {
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &decapsulated_packets,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &control_packets);
 
-  private:
+private:
     struct Impl;
     std::unique_ptr<Impl> impl_;
 };

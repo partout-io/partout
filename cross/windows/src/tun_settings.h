@@ -11,7 +11,7 @@ namespace Partout {
 
 // Validated channel settings from negotiated IP/DNS modules.
 class TunSettings {
-  public:
+public:
     explicit TunSettings(const char *json);
 
     const auto &IPv4() const {
@@ -36,7 +36,7 @@ class TunSettings {
 
     uint32_t MaxFrame() const;
 
-  private:
+private:
     using JsonObject = winrt::Windows::Data::Json::JsonObject;
     using JsonArray = winrt::Windows::Data::Json::JsonArray;
     using HostName = winrt::Windows::Networking::HostName;

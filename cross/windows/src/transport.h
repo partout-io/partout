@@ -12,7 +12,7 @@ struct winrt_transport;
 namespace Partout {
 // Native implementation details never appear in the C runtime interface.
 class Transport {
-  public:
+public:
     Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Socket> value);
     Transport(std::shared_ptr<RuntimeLoop>, std::unique_ptr<Tun> value);
 
@@ -38,7 +38,7 @@ class Transport {
     std::unique_ptr<Socket> socket;
     std::unique_ptr<Tun> tun;
 
-  private:
+private:
     bool Deliver(const uint8_t *, size_t, const SocketAddress *, int32_t);
     std::shared_ptr<RuntimeLoop> loop_;
     std::atomic<int32_t> status_{0};

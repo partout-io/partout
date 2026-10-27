@@ -17,7 +17,7 @@ namespace Partout {
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
-  public:
+public:
     using Receiver = std::function<void(const uint8_t *, size_t)>;
     using Writer = std::function<int32_t(const uint8_t *, size_t)>;
 
@@ -57,7 +57,7 @@ class Socket {
     // before starting the channel; it retains state and is safe after link detach.
     Receiver TakeOver(Writer writer);
 
-  private:
+private:
     struct State;
 
     void RegisterForDatagrams();

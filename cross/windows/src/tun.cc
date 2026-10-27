@@ -23,7 +23,7 @@ namespace Partout {
 
 // Retained by the controller, TUN handles and socket writer, without cycles.
 class Tun::State {
-  public:
+public:
     VpnChannel channel;
     // Held throughout native delivery and callback removal. The current Tun is
     // borrowed under this gate; its destructor unpublishes it before returning.
