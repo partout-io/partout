@@ -76,7 +76,14 @@ pub const WindowsLooper = struct {
         errdefer allocator.destroy(self);
         const mux = options.mux orelse c.pp_mux_create(1) orelse return error.MuxFailure;
         errdefer if (options.mux == null) c.pp_mux_free(mux);
-        self.* = .{ .allocator = allocator, .mux = mux, .owns_mux = options.mux == null, .max_read_count = options.max_read_count, .on_receive = options.on_receive, .receive_context = options.receive_context };
+        self.* = .{
+            .allocator = allocator,
+            .mux = mux,
+            .owns_mux = options.mux == null,
+            .max_read_count = options.max_read_count,
+            .on_receive = options.on_receive,
+            .receive_context = options.receive_context,
+        };
         return self;
     }
 
@@ -91,7 +98,9 @@ pub const WindowsLooper = struct {
         self.mutex.lock();
         defer self.mutex.unlock();
         const side = &self.sides[@intFromEnum(event.side)];
-        return side.arguments == null or side.generation != event.generation or event.code != 0 or side.reading;
+        return side.arguments == null or
+            side.generation != event.generation or
+            event.code != 0 or side.reading;
     }
 
     pub fn deliverPackets(self: *WindowsLooper, event: helpers.PacketSubmission) void {
@@ -160,7 +169,11 @@ pub const WindowsLooper = struct {
     pub fn scheduleTimer(self: *WindowsLooper, token: *io.Timer, delay_ms: u64, task: io.TimedTask) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
-        node.* = .{ .id = self.next_timer, .deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), delay_ms), .task = task };
+        node.* = .{
+            .id = self.next_timer,
+            .deadline = core.concurrency.deadlineAfterMs(core.monotonicNs(), delay_ms),
+            .task = task,
+        };
         self.next_timer +%= 1;
         if (self.next_timer == 0) self.next_timer = 1;
         self.cancelTimer(token);
