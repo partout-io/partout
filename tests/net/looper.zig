@@ -247,7 +247,7 @@ const WindowsWriteProbe = struct {
     }
 };
 
-test "Windows looper owns sides and routes socket write failure" {
+test "Windows looper owns attachments and routes socket write failure" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;

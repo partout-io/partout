@@ -2389,7 +2389,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
 
         fn burst(owner: anytype, self: *@This()) daemon.Error!void {
             self.pause_next = true;
-            const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
             for ([_][]const u8{ "first", "second", "third" }) |bytes| {
                 try queue(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
             }
@@ -2402,7 +2402,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
 
         fn flood(owner: anytype, self: *@This()) daemon.Error!void {
             self.measure_timer = true;
-            const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
             for (0..owner.looper.impl.max_read_count + 1) |_| {
                 try queue(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
             }
@@ -2453,7 +2453,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
 
         // Queue one in-flight packet while paused, then run a control past it.
-        const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+        const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
         try Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
@@ -2509,7 +2509,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
         } else {
             // Paused owned input must also be reclaimed when the mailbox closes.
-            const final_generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
+            const final_generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
             try Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
             daemon.testing.shutdown(owner);
             try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
