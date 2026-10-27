@@ -45,9 +45,7 @@ pub const WindowsLooper = struct {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
-            if (attachment.arguments == null or (code == 0 and !attachment.reading and attachment.side == .tun)) {
-                return null;
-            }
+            if (!attachment.acceptsReceipt(code)) return null;
             return .{
                 .side = attachment.side,
                 .generation = attachment.generation,
@@ -57,13 +55,37 @@ pub const WindowsLooper = struct {
             };
         }
 
+        // Called while holding the owner's mutex. Paused TUN input is dropped;
+        // link input stays queued in the mailbox, and failures remain eligible.
+        fn acceptsReceipt(attachment: *const Attachment, code: i32) bool {
+            return attachment.arguments != null and
+                (code != 0 or attachment.reading or attachment.side == .link);
+        }
+
         pub fn keepReading(attachment: *Attachment, event: helpers.PacketReceipt) bool {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
             return attachment.arguments != null and attachment.generation == event.generation and attachment.reading and event.code == 0;
         }
+
+        fn canReceivePackets(attachment: *Attachment, event: helpers.PacketReceipt) bool {
+            const self = attachment.owner;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            return attachment.arguments == null or
+                attachment.generation != event.generation or
+                event.code != 0 or attachment.reading;
+        }
+
+        fn setReading(attachment: *Attachment, generation: u64, reading: bool) void {
+            const self = attachment.owner;
+            self.mutex.lock();
+            defer self.mutex.unlock();
+            if (attachment.arguments != null and attachment.generation == generation) attachment.reading = reading;
+        }
     };
+
     const Scheduled = struct {
         id: u64,
         deadline: u64,
@@ -108,12 +130,7 @@ pub const WindowsLooper = struct {
     }
 
     pub fn canReceivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) bool {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        const side = &self.sides[@intFromEnum(event.side)];
-        return side.arguments == null or
-            side.generation != event.generation or
-            event.code != 0 or side.reading;
+        return self.sides[@intFromEnum(event.side)].canReceivePackets(event);
     }
 
     pub fn receivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) void {
@@ -126,7 +143,7 @@ pub const WindowsLooper = struct {
                 .cause = if (event.code == c.WinrtEOF) error.EndOfStream else error.LibcFailure,
                 .code = if (event.code == c.WinrtEOF) null else event.code,
             } });
-            self.setReading(side, event.generation, false);
+            side.setReading(event.generation, false);
             return;
         }
         const on_read = arguments.on_read orelse return;
@@ -134,17 +151,11 @@ pub const WindowsLooper = struct {
         const action = on_read.call(&.{event.bytes}, addresses) catch |err| {
             if (side.generation == event.generation) {
                 if (arguments.on_failure) |failure| failure.call(.{ .user = err });
-                self.setReading(side, event.generation, false);
+                side.setReading(event.generation, false);
             }
             return;
         };
-        self.setReading(side, event.generation, action == .keep);
-    }
-
-    fn setReading(self: *WindowsLooper, side: *Attachment, generation: u64, reading: bool) void {
-        self.mutex.lock();
-        defer self.mutex.unlock();
-        if (side.arguments != null and side.generation == generation) side.reading = reading;
+        side.setReading(event.generation, action == .keep);
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
