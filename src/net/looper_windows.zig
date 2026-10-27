@@ -41,7 +41,7 @@ pub const WindowsLooper = struct {
             };
         }
 
-        pub fn receipt(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
+        pub fn makeReceipt(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
@@ -62,20 +62,20 @@ pub const WindowsLooper = struct {
                 (code != 0 or attachment.reading or attachment.side == .link);
         }
 
-        pub fn keepReading(attachment: *Attachment, event: helpers.PacketReceipt) bool {
+        pub fn keepReading(attachment: *Attachment, receipt: helpers.PacketReceipt) bool {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
-            return attachment.arguments != null and attachment.generation == event.generation and attachment.reading and event.code == 0;
+            return attachment.arguments != null and attachment.generation == receipt.generation and attachment.reading and receipt.code == 0;
         }
 
-        fn canReceivePackets(attachment: *Attachment, event: helpers.PacketReceipt) bool {
+        fn canReceivePackets(attachment: *Attachment, receipt: helpers.PacketReceipt) bool {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();
             return attachment.arguments == null or
-                attachment.generation != event.generation or
-                event.code != 0 or attachment.reading;
+                attachment.generation != receipt.generation or
+                receipt.code != 0 or attachment.reading;
         }
 
         fn setReading(attachment: *Attachment, generation: u64, reading: bool) void {
@@ -129,57 +129,69 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    pub fn canReceivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) bool {
-        return self.sides[@intFromEnum(event.side)].canReceivePackets(event);
+    pub fn canReceivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) bool {
+        return self.sides[@intFromEnum(receipt.side)].canReceivePackets(receipt);
     }
 
-    pub fn receivePackets(self: *WindowsLooper, event: helpers.PacketReceipt) void {
-        const side = &self.sides[@intFromEnum(event.side)];
-        if (side.generation != event.generation) return;
+    pub fn receivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) void {
+        const side = &self.sides[@intFromEnum(receipt.side)];
+        if (side.generation != receipt.generation) return;
         const arguments = side.arguments orelse return;
-        if (event.code != 0) {
+        if (receipt.code != 0) {
             if (arguments.on_failure) |callback| callback.call(.{ .io = .{
-                .side = event.side,
-                .cause = if (event.code == c.WinrtEOF) error.EndOfStream else error.LibcFailure,
-                .code = if (event.code == c.WinrtEOF) null else event.code,
+                .side = receipt.side,
+                .cause = if (receipt.code == c.WinrtEOF) error.EndOfStream else error.LibcFailure,
+                .code = if (receipt.code == c.WinrtEOF) null else receipt.code,
             } });
-            side.setReading(event.generation, false);
+            side.setReading(receipt.generation, false);
             return;
         }
         const on_read = arguments.on_read orelse return;
-        const addresses: ?[]const io.SocketAddress = if (event.source) |value| &.{value} else null;
-        const action = on_read.call(&.{event.bytes}, addresses) catch |err| {
-            if (side.generation == event.generation) {
+        const addresses: ?[]const io.SocketAddress = if (receipt.source) |value| &.{value} else null;
+        const action = on_read.call(&.{receipt.bytes}, addresses) catch |err| {
+            if (side.generation == receipt.generation) {
                 if (arguments.on_failure) |failure| failure.call(.{ .user = err });
-                side.setReading(event.generation, false);
+                side.setReading(receipt.generation, false);
             }
             return;
         };
-        side.setReading(event.generation, action == .keep);
+        side.setReading(receipt.generation, action == .keep);
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
         if (self.stopped) return false;
-        var deadline: ?u64 = if (max_wait_ms) |ms| core.concurrency.deadlineAfterMs(core.monotonicNs(), ms) else null;
-        var timer = self.timers.head;
-        while (timer) |node| : (timer = node.next) deadline = @min(deadline orelse node.deadline, node.deadline);
+        const deadline = self.nextWaitDeadline(max_wait_ms);
         while (true) {
-            const timeout: c_int = if (deadline) |until| blk: {
-                const remaining = until -| core.monotonicNs();
-                const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
-                break :blk @intCast(@min(ms, std.math.maxInt(c_int)));
-            } else -1;
             var code: c_int = 0;
-            const result = c.pp_mux_wait(self.mux, timeout, &code);
+            const result = c.pp_mux_wait(self.mux, remainingWaitMs(deadline), &code);
             if (result < 0) {
                 failure.* = .{ .wait = if (code == 0) result else code };
                 return false;
             }
             if (result > 0 or deadline == null or core.monotonicNs() >= deadline.?) break;
         }
+        return self.dispatchExpiredTimers();
+    }
+
+    fn nextWaitDeadline(self: *const WindowsLooper, max_wait_ms: ?u32) ?u64 {
+        var deadline: ?u64 = if (max_wait_ms) |ms| core.concurrency.deadlineAfterMs(core.monotonicNs(), ms) else null;
+        var timer = self.timers.head;
+        while (timer) |node| : (timer = node.next) deadline = @min(deadline orelse node.deadline, node.deadline);
+        return deadline;
+    }
+
+    fn remainingWaitMs(deadline: ?u64) c_int {
+        const until = deadline orelse return -1;
+        const remaining = until -| core.monotonicNs();
+        // Round up to avoid waking before the deadline; clamp to the mux limit.
+        const ms = remaining / std.time.ns_per_ms + @intFromBool(remaining % std.time.ns_per_ms != 0);
+        return @intCast(@min(ms, std.math.maxInt(c_int)));
+    }
+
+    fn dispatchExpiredTimers(self: *WindowsLooper) bool {
         const now = core.monotonicNs();
-        timer = self.timers.head;
+        var timer = self.timers.head;
         while (timer) |node| : (timer = node.next) node.ready = node.deadline <= now;
         while (self.timers.removeWhere({}, Scheduled.isReady)) |node| {
             const task = node.task;
