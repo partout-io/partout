@@ -32,13 +32,6 @@ pub const POSIXDescriptor = struct {
         self.io.cleanup();
     }
 
-    pub fn socketWrapper(self: POSIXDescriptor) ?*SocketWrapper {
-        return switch (self.io) {
-            .socket => |socket| socket,
-            else => null,
-        };
-    }
-
     pub fn tunWrapper(self: POSIXDescriptor) ?*TunWrapper {
         return switch (self.io) {
             .tun => |tun| tun,
