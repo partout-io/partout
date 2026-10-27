@@ -70,10 +70,6 @@ fn OwnedTransport(comptime side: io.Side) type {
         // operation; Zig never creates or configures a native socket object.
         pub const create = if (side == .link) createLink else createTun;
 
-        fn createTun(allocator: std.mem.Allocator, tun: c.pp_tun) std.mem.Allocator.Error!*Self {
-            return wrap(allocator, @ptrCast(@alignCast(tun)));
-        }
-
         fn createLink(allocator: std.mem.Allocator, endpoint: ?core.api.ExtendedEndpoint, options: io.SocketOptions) std.mem.Allocator.Error!?*Self {
             if (!build_options.winrt) return null;
             if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
@@ -95,6 +91,10 @@ fn OwnedTransport(comptime side: io.Side) type {
             }) orelse return null;
             errdefer native.*.release.?(native.*.context);
             return try wrap(allocator, native);
+        }
+
+        fn createTun(allocator: std.mem.Allocator, tun: c.pp_tun) std.mem.Allocator.Error!*Self {
+            return wrap(allocator, @ptrCast(@alignCast(tun)));
         }
 
         fn configure(raw: ?*anyopaque, token: usize) callconv(.c) bool {
