@@ -106,21 +106,21 @@ pub const PosixLooper = struct {
         }
 
         // Drain outgoing batches before accepting more input. Read TUN first.
-        for ([_]io.Side{ .link, .tun }) |tag| {
-            const attachment = self.attachments[@intFromEnum(tag)] orelse continue;
+        for ([_]io.Side{ .link, .tun }) |side| {
+            const attachment = self.attachments[@intFromEnum(side)] orelse continue;
             if (attachment.write_ready and attachment.write_retry == null) {
                 if (self.processWrite(attachment)) |internal_failure| {
-                    self.removeSide(tag, internal_failure);
+                    self.removeAttachment(side, internal_failure);
                     failure.* = internal_failure;
                     return true;
                 }
             }
         }
-        for ([_]io.Side{ .tun, .link }) |tag| {
-            const attachment = self.attachments[@intFromEnum(tag)] orelse continue;
+        for ([_]io.Side{ .tun, .link }) |side| {
+            const attachment = self.attachments[@intFromEnum(side)] orelse continue;
             if (attachment.read_ready and attachment.reading and attachment.read_retry == null) {
                 if (self.processRead(attachment)) |internal_failure| {
-                    self.removeSide(tag, internal_failure);
+                    self.removeAttachment(side, internal_failure);
                     failure.* = internal_failure;
                     return true;
                 }
@@ -160,52 +160,52 @@ pub const PosixLooper = struct {
     pub fn attach(self: *PosixLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
-        const tag = std.meta.activeTag(arguments.pair);
-        const buffer_size = switch (tag) {
+        const side = std.meta.activeTag(arguments.pair);
+        const buffer_size = switch (side) {
             .link => self.options.link_buf_size,
             .tun => self.options.tun_buf_size,
         };
         if (buffer_size == 0 or self.options.max_read_count == 0 or self.options.max_read_size == 0) return error.InvalidBuffers;
-        const slot = &self.attachments[@intFromEnum(tag)];
+        const slot = &self.attachments[@intFromEnum(side)];
         if (slot.* != null) return error.SideAlreadyAttached;
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
         if (descriptor.fd < 0 or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
-            (descriptor.io.isUnconnected() and tag != .link)) return error.MuxFailure;
+            (descriptor.io.isUnconnected() and side != .link)) return error.MuxFailure;
         for (self.attachments) |other| {
             if (other) |attachment| if (attachment.fd == descriptor.fd) return error.MuxFailure;
         }
         if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) return error.MuxFailure;
         errdefer _ = io_c.pp_mux_delete(self.options.mux, descriptor.fd);
-        slot.* = try Attachment.create(self.allocator, tag, descriptor, arguments, self.options.max_read_count, buffer_size);
+        slot.* = try Attachment.create(self.allocator, side, descriptor, arguments, self.options.max_read_count, buffer_size);
     }
 
-    pub fn detach(self: *PosixLooper, tag: io.Side) helpers.DetachError!void {
+    pub fn detach(self: *PosixLooper, side: io.Side) helpers.DetachError!void {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
         self.busy = true;
         defer self.busy = false;
-        self.removeSide(tag, null);
+        self.removeAttachment(side, null);
     }
 
-    pub fn isAttached(self: *const PosixLooper, tag: io.Side) bool {
-        return self.attachments[@intFromEnum(tag)] != null;
+    pub fn isAttached(self: *const PosixLooper, side: io.Side) bool {
+        return self.attachments[@intFromEnum(side)] != null;
     }
 
-    pub fn resumeReading(self: *PosixLooper, tag: io.Side) error{LooperUnavailable}!void {
+    pub fn resumeReading(self: *PosixLooper, side: io.Side) error{LooperUnavailable}!void {
         if (self.stopped) return error.LooperUnavailable;
-        if (self.attachments[@intFromEnum(tag)]) |attachment| {
+        if (self.attachments[@intFromEnum(side)]) |attachment| {
             attachment.reading = true;
             attachment.read_retry = null;
         }
     }
 
     /// Copies the complete batch, or leaves the queue unchanged on allocation failure.
-    pub fn write(self: *PosixLooper, packets: io.Packets, tag: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
+    pub fn write(self: *PosixLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
-        const attachment = self.attachments[@intFromEnum(tag)] orelse return error.SideNotAttached;
+        const attachment = self.attachments[@intFromEnum(side)] orelse return error.SideNotAttached;
         if (attachment.native_io.isUnconnected() and destination == null) return error.MissingDestination;
         try attachment.write_queue.append(packets, destination);
         if (attachment.write_retry == null) attachment.write_ready = true;
@@ -213,12 +213,12 @@ pub const PosixLooper = struct {
 
     /// Makes one nonblocking drain attempt without invoking read, timer or failure callbacks.
     /// The caller may detach afterwards even if writes fail or remain blocked.
-    pub fn flushWrites(self: *PosixLooper, tag: io.Side) helpers.DetachError!?io.Failure {
+    pub fn flushWrites(self: *PosixLooper, side: io.Side) helpers.DetachError!?io.Failure {
         if (self.busy) return error.ReentrantCall;
         if (self.stopped) return error.LooperUnavailable;
         self.busy = true;
         defer self.busy = false;
-        const attachment = self.attachments[@intFromEnum(tag)] orelse return null;
+        const attachment = self.attachments[@intFromEnum(side)] orelse return null;
         return self.processWrite(attachment);
     }
 
@@ -313,8 +313,8 @@ pub const PosixLooper = struct {
     }
 
     // All callers hold the reentrancy guard, including while cancelling writes.
-    fn removeSide(self: *PosixLooper, tag: io.Side, failure: ?io.Failure) void {
-        const slot = &self.attachments[@intFromEnum(tag)];
+    fn removeAttachment(self: *PosixLooper, side: io.Side, failure: ?io.Failure) void {
+        const slot = &self.attachments[@intFromEnum(side)];
         const attachment = slot.* orelse return;
         slot.* = null;
         _ = io_c.pp_mux_delete(self.options.mux, attachment.fd);
@@ -330,8 +330,8 @@ pub const PosixLooper = struct {
     fn clear(self: *PosixLooper) void {
         self.stopped = true;
         while (self.timers.take()) |node| self.allocator.destroy(node);
-        self.removeSide(.link, null);
-        self.removeSide(.tun, null);
+        self.removeAttachment(.link, null);
+        self.removeAttachment(.tun, null);
     }
 
     const Attachment = struct {
