@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
-//! caller's mux. Both platforms run callbacks inline in loopOnce(); Windows
-//! queues WinRT receives and waits on the mux's mailbox wake event. Read packet views
+//! caller's mux. Windows posts WinRT receives to the caller's mailbox and waits
+//! on its wake event. POSIX runs read callbacks in loopOnce(). Read packet views
 //! expire when the callback returns.
 
 const std = @import("std");
@@ -29,6 +29,7 @@ pub const Looper = struct {
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const WriteError = helpers.WriteError;
+    pub const PacketSubmission = helpers.PacketSubmission;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
@@ -64,6 +65,31 @@ pub const Looper = struct {
 
     pub fn loopOnce(self: *Looper, failure: *?io.Failure) bool {
         return self.impl.loopOnce(null, failure);
+    }
+
+    pub fn failAllocation(self: *Looper, submission: PacketSubmission) bool {
+        if (builtin.os.tag == .windows) return self.impl.failAllocation(submission);
+        return false;
+    }
+
+    pub fn inputReady(self: *Looper, submission: PacketSubmission) bool {
+        if (builtin.os.tag == .windows) return self.impl.inputReady(submission);
+        return true;
+    }
+
+    pub fn deliver(self: *Looper, submission: PacketSubmission) void {
+        if (builtin.os.tag == .windows) self.impl.deliver(submission);
+    }
+
+    pub fn dispatchFailures(self: *Looper) void {
+        if (builtin.os.tag == .windows) self.impl.dispatchFailures();
+    }
+
+    /// Bound native mailbox work so protocol timers get a turn. POSIX receives
+    /// packets in loopOnce(), outside the mailbox, and needs no job limit.
+    pub fn mailboxJobLimit(self: *Looper) usize {
+        if (builtin.os.tag == .windows) return self.impl.max_read_count;
+        return std.math.maxInt(usize);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

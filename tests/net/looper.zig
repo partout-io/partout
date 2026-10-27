@@ -35,6 +35,9 @@ test "looper runs and cancels timers on its caller" {
         .mux = if (wake) |value| value.handle else null,
     });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var timer = io.Timer{};
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
     const task: io.TimedTask = .{ .context = &probe, .callback = TimerProbe.run };
@@ -86,6 +89,9 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
     };
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var probe = Probe{ .looper = &looper };
     try looper.scheduleTimer(&probe.first, 0, .{ .context = &probe, .callback = Probe.run });
     try looper.scheduleTimer(&probe.other, 0, .{ .context = &probe, .callback = Probe.otherRun });
@@ -100,6 +106,9 @@ test "Windows dispatcher waits for the earlier timer deadline" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var later = io.Timer{};
     var earlier = io.Timer{};
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
@@ -123,6 +132,9 @@ test "Windows dispatcher shares the daemon wake event without spinning or losing
     defer c.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
 
     // Commands already queued before entering the wait must remain observable.
     try std.testing.expect(c.pp_mux_wake(mux));
@@ -169,6 +181,9 @@ test "Windows timer replacement failure preserves the old task and token" {
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     var looper = try Looper.init(failing.allocator(), .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var timer = io.Timer{};
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
     try looper.scheduleTimer(&timer, 0, .{ .context = &probe, .callback = TimerProbe.run });
@@ -188,6 +203,9 @@ test "Windows timer expiry cannot invoke a context after cancellation or stop" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var probe = TimerProbe{ .caller_thread = std.Thread.getCurrentId() };
     // The scheduler stores the token value, not this temporary's address.
     var copied: io.Timer = timer: {
@@ -224,6 +242,9 @@ test "Windows looper owns sides and routes socket write failure" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{
         .ipv4 = true,
         .ipv6 = false,
@@ -272,6 +293,9 @@ test "Windows native write failures return asynchronously through the looper" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{
         .ipv4 = true,
         .ipv6 = false,
@@ -381,6 +405,9 @@ test "Windows TCP receive resumes and detaches its side on the looper thread" {
     try std.testing.expect(ws.setsockopt(peer, 65535, 0x1006, &timeout, @sizeOf(u32)) == 0);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var probe = WindowsDetachProbe{ .looper = &looper, .caller_thread = std.Thread.getCurrentId() };
     try looper.attach(.{
         .pair = .{ .link = socket },
@@ -514,6 +541,9 @@ test "Windows paused TUN drops new input but admits failures and resumes deliver
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     var looper = try Looper.init(std.testing.allocator, .{ .mux = null });
     defer looper.deinit();
+    var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+    mailbox.bind();
+    defer mailbox.deinit();
     var probe: WindowsAdmissionProbe = .{};
     var producer: WindowsProducer = .{};
     var capability = producer.capability();
@@ -571,15 +601,13 @@ const WindowsAllocationProbe = struct {
 test "Windows receive OOM wakes the looper and reports one failure without allocating" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const Sender = struct {
-        looper: *Looper,
+        mailbox: *test_helpers.Mailbox,
         producer: *WindowsProducer,
         rejected: bool = false,
         fn run(self: *@This()) void {
             const deadline = source.core.monotonicNs() + 2 * std.time.ns_per_s;
             while (source.core.monotonicNs() < deadline) {
-                self.looper.impl.mutex.lock();
-                const waiting = self.looper.impl.waiting;
-                self.looper.impl.mutex.unlock();
+                const waiting = self.mailbox.waiting.load(.acquire);
                 if (waiting) {
                     self.rejected = !self.producer.send("packet", 0);
                     return;
@@ -594,6 +622,9 @@ test "Windows receive OOM wakes the looper and reports one failure without alloc
             var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
             var looper = try Looper.init(failing.allocator(), .{ .mux = null });
             defer looper.deinit();
+            var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+            mailbox.bind();
+            defer mailbox.deinit();
             var probe: WindowsAllocationProbe = .{ .loop = &looper, .caller_thread = std.Thread.getCurrentId() };
             var producer: WindowsProducer = .{};
             var capability = producer.capability();
@@ -603,7 +634,7 @@ test "Windows receive OOM wakes the looper and reports one failure without alloc
                 .on_failure = .{ .context = &probe, .callback = WindowsAllocationProbe.failed },
             });
             failing.fail_index = failing.alloc_index + offset;
-            var sender: Sender = .{ .looper = &looper, .producer = &producer };
+            var sender: Sender = .{ .mailbox = &mailbox, .producer = &producer };
             const thread = try std.Thread.spawn(.{}, Sender.run, .{&sender});
             const alive = test_helpers.poll(&looper, 2000);
             thread.join();
@@ -632,6 +663,9 @@ test "Windows receive OOM respects detach and attachment replacement" {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
         var looper = try Looper.init(failing.allocator(), .{ .mux = null });
         defer looper.deinit();
+        var mailbox: test_helpers.Mailbox = .{ .looper = &looper };
+        mailbox.bind();
+        defer mailbox.deinit();
         var probe: WindowsAllocationProbe = .{ .loop = &looper, .caller_thread = std.Thread.getCurrentId() };
         var producer: WindowsProducer = .{};
         var capability = producer.capability();

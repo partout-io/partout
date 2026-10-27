@@ -79,7 +79,8 @@ writes retain shared I/O state and native transports, without retaining Socket.
 
 ### Connected transports
 
-Native producer callbacks copy input directly into the existing daemon mailbox.
+The native transport invokes the daemon's receive callback directly. It calls
+`ConnectionDaemon.submitPackets()` to copy borrowed input into the existing daemon mailbox.
 The actor dispatches through the existing I/O callbacks to `Connection.submitPackets()`.
 There is no intermediate C++ output queue or per-packet synchronous worker call.
 The native socket owns the lifetime
