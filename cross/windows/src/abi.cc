@@ -217,14 +217,17 @@ winrt_transport *winrt_connect(const char *host, uint16_t port,
     try {
         auto loop = Partout::RuntimeLoop::Current();
         if (!loop) return nullptr;
-        return loop->Invoke([loop, host = std::string{host}, port,
-                             settings = *options]() -> winrt_transport * {
-            auto transport = std::make_unique<TransportHandle>(
-                *loop, std::make_unique<Partout::Socket>(settings.tcp ? Partout::SocketProtoTCP
-                                                                      : Partout::SocketProtoUDP,
-                                                         settings.unconnected));
-            if (settings.configure &&
-                !settings.configure(settings.context, reinterpret_cast<uintptr_t>(transport.get())))
+        return loop->Invoke([
+            loop, host = std::string{host}, port,
+            settings = *options
+        ]() -> winrt_transport * {
+            std::unique_ptr<Partout::Socket> socket = std::make_unique<Partout::Socket>(
+                settings.tcp ? Partout::SocketProtoTCP : Partout::SocketProtoUDP,
+                settings.unconnected
+            );
+            auto transport = std::make_unique<TransportHandle>(*loop, std::move(socket));
+            const uintptr_t transport_ptr = reinterpret_cast<uintptr_t>(transport.get());
+            if (settings.configure && !settings.configure(settings.context, transport_ptr))
                 return nullptr;
             Partout::SocketOpenOptions options{settings.dual_stack, settings.timeout_ms};
             if (!transport->socket->Open(host.c_str(), port, &options)) return nullptr;
