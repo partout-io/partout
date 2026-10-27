@@ -16,7 +16,10 @@ const windows = @import("connection_worker_windows.zig");
 const api = core.api;
 const log = core.logging;
 
-const contract = struct {
+/// Serial link preparation, independent of Connection and its event loop.
+/// Owns endpoint storage and DNS state until destroy() drains preparation.
+pub const ConnectionWorker = struct {
+    const Self = @This();
     pub const Action = enum { start, rebind };
     pub const Request = struct {
         request_id: u64,
@@ -48,16 +51,6 @@ const contract = struct {
         // Ownership of the result and the accepted work's context transfers here.
         call: *const fn (*anyopaque, *anyopaque, Completion) void,
     };
-};
-
-/// Serial link preparation, independent of Connection and its event loop.
-/// Owns endpoint storage and DNS state until destroy() drains preparation.
-pub const ConnectionWorker = struct {
-    const Self = @This();
-    pub const Action = contract.Action;
-    pub const Request = contract.Request;
-    pub const Completion = contract.Completion;
-    pub const Callback = contract.Callback;
     const Work = struct {
         request: Request,
         completion_context: *anyopaque,
