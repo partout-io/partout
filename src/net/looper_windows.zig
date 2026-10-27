@@ -113,7 +113,7 @@ pub const WindowsLooper = struct {
                 .cause = if (event.code == c.WinrtEOF) error.EndOfStream else error.LibcFailure,
                 .code = if (event.code == c.WinrtEOF) null else event.code,
             } });
-            self.pause(side, event.generation, false);
+            self.setReading(side, event.generation, false);
             return;
         }
         const callback = arguments.on_read orelse return;
@@ -121,17 +121,17 @@ pub const WindowsLooper = struct {
         const action = callback.call(&.{event.bytes}, if (address) |*value| value else null) catch |err| {
             if (side.arguments != null and side.generation == event.generation) {
                 if (arguments.on_failure) |failure| failure.call(.{ .user = err });
-                self.pause(side, event.generation, false);
+                self.setReading(side, event.generation, false);
             }
             return;
         };
-        self.pause(side, event.generation, action == .keep);
+        self.setReading(side, event.generation, action == .keep);
     }
 
-    fn pause(self: *WindowsLooper, side: *Attachment, generation: u64, keep: bool) void {
+    fn setReading(self: *WindowsLooper, side: *Attachment, generation: u64, reading: bool) void {
         self.mutex.lock();
         defer self.mutex.unlock();
-        if (side.arguments != null and side.generation == generation) side.reading = keep;
+        if (side.arguments != null and side.generation == generation) side.reading = reading;
     }
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
