@@ -1,4 +1,5 @@
 {
+  "C_Cpp.default.cppStandard": "c++20",
   "vim.ignorecase": false,
   "vim.smartcase": false,
   "zig.path": "zig",

@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
 const winrt_enabled = @import("source").winrt_enabled;
 
@@ -222,7 +223,9 @@ test "socket creation and existing descriptors share independent platform policy
     try std.testing.expectEqual(@as(usize, 4), policy.calls);
 }
 
-test "Windows configuration callback receives the WinRT pointer and can reject open" {
+test "Windows configuration callback receives a native policy token and can reject open" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
@@ -244,11 +247,13 @@ test "Windows configuration callback receives the WinRT pointer and can reject o
     defer platform.deinit();
     const endpoint: api.ExtendedEndpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, 1194) };
     const options = socketOptions(&platform, reachable(true), 1000);
-    const wrapper = (try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) orelse return error.SocketFailed;
-    try std.testing.expectEqual(@intFromPtr(wrapper.socket.?), probe.descriptor);
-    try std.testing.expectEqual(@as(usize, 1), probe.calls);
-    try std.testing.expect(probe.reachable);
-    wrapper.destroy();
+    {
+        const wrapper = (try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) orelse return error.SocketFailed;
+        defer wrapper.destroy();
+        try std.testing.expect(probe.descriptor != 0);
+        try std.testing.expectEqual(@as(usize, 1), probe.calls);
+        try std.testing.expect(probe.reachable);
+    }
     probe.allow = false;
     try std.testing.expect((try io.SocketWrapper.create(std.testing.allocator, endpoint, options)) == null);
     try std.testing.expectEqual(@as(usize, 2), probe.calls);

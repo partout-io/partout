@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const builtin = @import("builtin");
 const source = @import("source");
 const bridge = source.wireguard_internal.passive_io;
@@ -49,6 +50,8 @@ const ClearingAllocator = struct {
 };
 
 test "WireGuard passive UDP preserves multiple peer sources and reply destinations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
@@ -142,6 +145,8 @@ const FailureRecorder = struct {
 };
 
 test "WireGuard passive initial transport allocation failure stays closed and reports once" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
@@ -207,8 +212,6 @@ const PosixPacketIO = struct {
         const self: *PosixPacketIO = @ptrCast(@alignCast(raw));
         self.cleanups += 1;
     }
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn lastError(_: *anyopaque) c_int {
         return 0;
     }
@@ -217,8 +220,6 @@ const PosixPacketIO = struct {
             .read = read,
             .write = write,
             .cleanup = cleanup,
-            .set_event_mask = mask,
-            .reset_events = reset,
             .last_error_code = lastError,
         } } } };
     }
@@ -260,7 +261,7 @@ test "POSIX callback adapter releases an incoming descriptor on allocation failu
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
     var tun = PosixPacketIO{};
-    try std.testing.expectError(error.OutOfMemory, source.net.PacketTransport.create(failing.allocator(), .{ .tun = tun.descriptor() }));
+    try std.testing.expectError(error.OutOfMemory, source.net.CallbackTransport.create(failing.allocator(), .{ .tun = tun.descriptor() }));
     try std.testing.expectEqual(@as(usize, 1), tun.cleanups);
 }
 

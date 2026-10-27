@@ -5,6 +5,7 @@
 const std = @import("std");
 
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const builtin = @import("builtin");
 const io = source.net_io;
 
@@ -22,6 +23,8 @@ const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
 test "daemon terminates and cancels after terminal looper failure" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     // Windows I/O polling is not implemented yet.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
@@ -121,6 +124,8 @@ test "daemon terminates and cancels after terminal looper failure" {
 }
 
 test "daemon dispatches controls to actor and owns queued establishment metadata" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -290,6 +295,8 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 }
 
 test "daemon preserves settings-only failure and hold behavior" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
@@ -365,6 +372,8 @@ test "daemon preserves settings-only failure and hold behavior" {
 }
 
 test "settings daemon creation rolls back allocation failures" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const Fixture = struct {
         fn create(allocator: std.mem.Allocator, profile: *const api.Profile, registry: *const net.ConnectionRegistry) !void {
             var controller = mock_mod.MockTunnelController{};
@@ -392,6 +401,8 @@ test "settings daemon creation rolls back allocation failures" {
 }
 
 test "daemon owns the profile and rolls back connection startup allocations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         create_count: usize = 0,
@@ -550,6 +561,8 @@ fn mockIsReachable(ptr: ?*const anyopaque) bool {
 }
 
 test "daemon defers reporting with owned payloads and permits reentrant stop" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Factory = struct {
         events: net.Connection.Events = undefined,
@@ -688,6 +701,8 @@ test "daemon defers reporting with owned payloads and permits reentrant stop" {
 }
 
 test "I/O modes control socket creation, attachment, and descriptor handoff" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         endpoint: api.ExtendedEndpoint,
@@ -827,8 +842,6 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
             return error.WouldBlock;
         }
@@ -843,8 +856,6 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
             return 0;
         }
         const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -1017,6 +1028,8 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
 }
 
 test "looper owns TUN across startup and optional rebind replacement" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -1072,8 +1085,6 @@ test "looper owns TUN across startup and optional rebind replacement" {
             tun.test_descriptor = .{ .fd = self.tun_fd, .io = .{ .mock = .{ .ptr = self, .vtable = &tun_vtable } } };
             return tun;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(_: *anyopaque, _: []u8) io.Error!?usize {
             return error.WouldBlock;
         }
@@ -1088,8 +1099,6 @@ test "looper owns TUN across startup and optional rebind replacement" {
             return 0;
         }
         const tun_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -1160,6 +1169,8 @@ test "looper owns TUN across startup and optional rebind replacement" {
 }
 
 test "needs_rebind restarts sessions without reporting a failure" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Probe = struct {
         events: net.Connection.Events = undefined,
@@ -1258,6 +1269,8 @@ test "needs_rebind restarts sessions without reporting a failure" {
 }
 
 test "daemon-created link is released on failed start or rebind" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Scenario = enum { start_false, start_error, rebind_false, rebind_error };
     const Probe = struct {
@@ -1378,6 +1391,8 @@ test "daemon-created link is released on failed start or rebind" {
 }
 
 test "event loop flushes graceful shutdown and finalizes terminal failure on its thread" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Atomic = std.atomic.Value(usize);
     const Probe = struct {
@@ -1471,8 +1486,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             std.debug.assert(!daemon.testing.isCurrentThread(self.daemon.implementation.connection));
             return .{ .fd = self.fd, .io = .{ .mock = .{ .ptr = self, .vtable = &io_vtable } } };
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
             const self: *@This() = @ptrCast(@alignCast(raw));
             self.onActor();
@@ -1505,8 +1518,6 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
             }
         }
         const io_vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,
@@ -1671,7 +1682,121 @@ fn waitForExit(owner: anytype) !void {
     return error.Timeout;
 }
 
+test "stop waits for terminal submission failure before immediate destruction" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    const Probe = struct {
+        entered: std.atomic.Value(bool) = .init(false),
+        released: std.atomic.Value(bool) = .init(false),
+        stop_entered: std.atomic.Value(bool) = .init(false),
+        stop_done: std.atomic.Value(bool) = .init(false),
+        returned_before_exit: bool = false,
+        reentrant_stop_returned: bool = false,
+
+        fn block(owner: anytype, self: *@This()) daemon.Error!void {
+            self.entered.store(true, .release);
+            const deadline = core.monotonicNs() + 2 * std.time.ns_per_s;
+            while (!self.released.load(.acquire) and core.monotonicNs() < deadline) core.sleepMs(1);
+            // A stop invoked by the dying actor must never wait for itself.
+            owner.daemon.stop();
+            self.reentrant_stop_returned = true;
+        }
+
+        fn blocker(owner: anytype, self: *@This()) void {
+            daemon.testing.onLoop(owner, self, block) catch unreachable;
+        }
+
+        fn stopper(sut: *Daemon, self: *@This()) void {
+            self.stop_entered.store(true, .release);
+            sut.stop();
+            const owner = sut.implementation.connection;
+            owner.jobs_mutex.lock();
+            self.returned_before_exit = owner.actor_id != null;
+            owner.jobs_mutex.unlock();
+            self.stop_done.store(true, .release);
+        }
+    };
+    for ([_]bool{ false, true }) |stop_already_queued| {
+        var connection: FailingStartConnection = .{};
+        var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
+        defer registry.deinit(std.testing.allocator);
+        var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(std.testing.allocator);
+        var controller: mock_mod.MockTunnelController = .{};
+        var monitor: mock_mod.MockNetworkMonitor = .{ .reachable = false };
+        const sut = try Daemon.create(std.testing.allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = false, .cancels_unrecoverable = false },
+        });
+        const owner = sut.implementation.connection;
+        var destroyed = false;
+        defer if (!destroyed) {
+            // Also clean up safely when running this test against the regression.
+            sut.stop();
+            daemon.testing.shutdown(owner);
+            waitForExit(owner) catch unreachable;
+            sut.destroy();
+        };
+        try sut.start();
+        try cancelGateTimer(owner);
+        var probe: Probe = .{};
+        const blocker = try std.Thread.spawn(.{}, Probe.blocker, .{ owner, &probe });
+        var blocker_joined = false;
+        defer if (!blocker_joined) blocker.join();
+        defer probe.released.store(true, .release);
+        const deadline = core.monotonicNs() + std.time.ns_per_s;
+        while (!probe.entered.load(.acquire)) {
+            if (core.monotonicNs() >= deadline) return error.Timeout;
+            core.sleepMs(1);
+        }
+        var stopper: ?std.Thread = null;
+        defer if (stopper) |thread| thread.join();
+        defer probe.released.store(true, .release);
+        if (stop_already_queued) {
+            stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
+            while (true) {
+                owner.jobs_mutex.lock();
+                const queued = if (owner.jobs.tail) |job| job.message == .stop else false;
+                owner.jobs_mutex.unlock();
+                if (queued) break;
+                if (core.monotonicNs() >= deadline) return error.Timeout;
+                core.sleepMs(1);
+            }
+        }
+        daemon.testing.onReceivePacketsFailed(owner);
+        if (!stop_already_queued) stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
+        while (!probe.stop_entered.load(.acquire)) {
+            if (core.monotonicNs() >= deadline) return error.Timeout;
+            core.sleepMs(1);
+        }
+        // Hold the actor so an immediate Closed return can be observed.
+        const stop_deadline = core.monotonicNs() + 50 * std.time.ns_per_ms;
+        while (!probe.stop_done.load(.acquire) and core.monotonicNs() < stop_deadline) core.sleepMs(1);
+        probe.released.store(true, .release);
+        stopper.?.join();
+        stopper = null;
+        blocker.join();
+        blocker_joined = true;
+        try std.testing.expect(!probe.returned_before_exit);
+        try std.testing.expect(probe.reentrant_stop_returned);
+        try std.testing.expect(sut.state == .stopped);
+        try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+        // Match partout_daemon_stop(): destroy immediately, without waitForExit.
+        sut.destroy();
+        destroyed = true;
+    }
+}
+
 test "event loop completes pending performs and releases discarded payloads on shutdown" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var connection = FailingStartConnection{};
@@ -1774,6 +1899,8 @@ test "event loop completes pending performs and releases discarded payloads on s
 }
 
 test "terminal protocol failure pauses retries and honors cancellation policy" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     for ([_]bool{ false, true }) |cancels| {
@@ -1818,6 +1945,8 @@ test "terminal protocol failure pauses retries and honors cancellation policy" {
 }
 
 test "worker preserves loop progress and rejects stale preparation results" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Stage = enum { dns, socket };
     const Ending = enum { stop, shutdown, replace, replace_failed, queued_stop, preparation_failed, network_changed, better_path };
@@ -1915,14 +2044,10 @@ test "worker preserves loop progress and rejects stale preparation results" {
         fn write(_: *anyopaque, data: []const u8, offset: usize) io.Error!usize {
             return data.len - offset;
         }
-        fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-        fn reset(_: *anyopaque) io.Error!void {}
         fn code(_: *anyopaque) c_int {
             return 0;
         }
         const tun_io = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = noCleanup,
@@ -2061,6 +2186,8 @@ test "worker preserves loop progress and rejects stale preparation results" {
 }
 
 test "connection worker rolls back endpoint and thread allocations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const Fixture = struct {
         const endpoints = [_]api.ExtendedEndpoint{
             api.ExtendedEndpoint.init("192.0.2.1", .init(.udp, 1194)).?,
@@ -2092,4 +2219,302 @@ test "connection worker rolls back endpoint and thread allocations" {
         }
     };
     try std.testing.checkAllAllocationFailures(std.testing.allocator, Fixture.run, .{});
+}
+
+test "daemon yields to timers between mailbox batches on every platform" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    const Probe = struct {
+        connection: FailingStartConnection = .{},
+        writer: net.ConnectionWriter = undefined,
+        timer: io.Timer = .{},
+        calls: usize = 0,
+        calls_at_timer: ?usize = null,
+
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.writer = sb.writer.?;
+            return .{ .ptr = &self.connection, .vtable = &vtable, .daemon_io = .none };
+        }
+
+        fn betterPath(raw: *anyopaque) void {
+            const connection: *FailingStartConnection = @ptrCast(@alignCast(raw));
+            const self: *@This() = @fieldParentPtr("connection", connection);
+            self.calls += 1;
+            if (self.calls == 1) self.writer.scheduleTimer(&self.timer, 0, .{ .context = self, .callback = tick }) catch unreachable;
+        }
+
+        fn tick(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.calls_at_timer = self.calls;
+        }
+
+        fn flood(owner: anytype, _: void) daemon.Error!void {
+            for (0..owner.looper.mailbox_job_limit + 1) |_| try daemon.testing.schedule(owner, .onBetterPath);
+        }
+
+        fn barrier(_: anytype, _: void) daemon.Error!void {}
+
+        const vtable = blk: {
+            var value = FailingStartConnection.vtable;
+            value.better_path = betterPath;
+            break :blk value;
+        };
+        const implementation_vtable: net.ConnectionImplementation.VTable = .{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    var probe: Probe = .{};
+    var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation_vtable }});
+    defer registry.deinit(std.testing.allocator);
+    var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(std.testing.allocator);
+    var controller: mock_mod.MockTunnelController = .{};
+    var monitor: mock_mod.MockNetworkMonitor = .{ .reachable = false };
+    const sut = try Daemon.create(std.testing.allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .starts_immediately = false },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try cancelGateTimer(owner);
+    try daemon.testing.onLoop(owner, {}, Probe.flood);
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try std.testing.expectEqual(owner.looper.mailbox_job_limit + 1, probe.calls);
+    try std.testing.expect(probe.calls_at_timer.? > 0);
+    try std.testing.expect(probe.calls_at_timer.? < probe.calls);
+}
+
+test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const c = source.ffi.io;
+    const Probe = struct {
+        callback: c.winrt_receive = null,
+        callback_context: ?*anyopaque = null,
+        capability: c.winrt_transport = undefined,
+        actor: std.Thread.Id = 0,
+        reads: usize = 0,
+        failures: usize = 0,
+        code: ?i32 = null,
+        bytes: [16]u8 = undefined,
+        length: usize = 0,
+        on_actor: bool = true,
+        pause_next: bool = false,
+        looper: *Looper = undefined,
+        measure_timer: bool = false,
+        reads_at_timer: ?usize = null,
+
+        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.callback = callback;
+            self.callback_context = context;
+            return true;
+        }
+        fn release(raw: ?*anyopaque) callconv(.c) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.callback = null;
+            self.callback_context = null;
+        }
+        fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
+            return true;
+        }
+        fn stop(_: ?*anyopaque) callconv(.c) void {}
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+            return 0;
+        }
+        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+            return false;
+        }
+
+        fn read(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.on_actor = self.on_actor and std.Thread.getCurrentId() == self.actor;
+            self.length = packets[0].len;
+            @memcpy(self.bytes[0..self.length], packets[0]);
+            self.reads += 1;
+            if (self.measure_timer) {
+                self.measure_timer = false;
+                var timer: io.Timer = .{};
+                try self.looper.scheduleTimer(&timer, 0, .{ .context = self, .callback = timerFired });
+            }
+            if (self.pause_next) {
+                self.pause_next = false;
+                return .pause;
+            }
+            return if (self.reads == 1) .pause else .keep;
+        }
+        fn failed(raw: ?*anyopaque, failure: io.Failure) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.on_actor = self.on_actor and std.Thread.getCurrentId() == self.actor;
+            self.failures += 1;
+            self.code = failure.io.code;
+        }
+        fn attach(owner: anytype, self: *@This()) daemon.Error!void {
+            self.actor = std.Thread.getCurrentId();
+            self.looper = owner.looper;
+            if (owner.looper.isTunAttached()) owner.looper.detach(.tun) catch return error.LooperFailure;
+            const wrapper = try io.TunWrapper.create(std.testing.allocator, @ptrCast(&self.capability));
+            errdefer wrapper.destroy();
+            owner.looper.attach(.{
+                .pair = .{ .tun = wrapper },
+                .on_read = .{ .context = self, .callback = read },
+                .on_failure = .{ .context = self, .callback = failed },
+            }) catch return error.LooperFailure;
+        }
+        fn barrier(_: anytype, _: void) daemon.Error!void {}
+        fn resumeInput(owner: anytype, _: void) daemon.Error!void {
+            owner.looper.resumeReading(.tun) catch return error.LooperFailure;
+        }
+
+        // Simulate receipts already admitted before a pause or replacement.
+        fn queue(owner: anytype, receipt: Looper.PacketReceipt) daemon.Error!void {
+            var owned = receipt;
+            owned.bytes = try owner.daemon.allocator.dupe(u8, receipt.bytes);
+            errdefer owner.daemon.allocator.free(owned.bytes);
+            try daemon.testing.schedule(owner, .{ .onPacketsReceived = owned });
+        }
+
+        fn burst(owner: anytype, self: *@This()) daemon.Error!void {
+            self.pause_next = true;
+            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+            for ([_][]const u8{ "first", "second", "third" }) |bytes| {
+                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
+            }
+        }
+
+        fn timerFired(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.reads_at_timer = self.reads;
+        }
+
+        fn flood(owner: anytype, self: *@This()) daemon.Error!void {
+            self.measure_timer = true;
+            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+            for (0..owner.looper.impl.max_read_count + 1) |_| {
+                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
+            }
+        }
+    };
+    for ([_]?usize{ null, 0, 1 }) |oom_offset| {
+        var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+        const allocator = failing.allocator();
+        var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+        defer profile.deinit(std.testing.allocator);
+        var connection = FailingStartConnection{};
+        var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
+        defer registry.deinit(std.testing.allocator);
+        var controller = mock_mod.MockTunnelController{};
+        var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+        var probe = Probe{};
+        probe.capability = .{
+            .context = &probe,
+            .release = Probe.release,
+            .subscribe = Probe.subscribe,
+            .@"resume" = Probe.resumeReads,
+            .stop = Probe.stop,
+            .write = Probe.write,
+            .local_address = Probe.address,
+            .unconnected = false,
+        };
+        const sut = try Daemon.create(allocator, &profile, .{
+            .objects = .{
+                .registry = &registry,
+                .controller = controller.interface(),
+                .resolver = mock_mod.noopDNSResolver(),
+                .factory = mock_mod.noopSocketFactory(),
+                .monitor = monitor.interface(),
+            },
+            .options = .{ .starts_immediately = false, .cancels_unrecoverable = false },
+        });
+        defer sut.destroy();
+        const owner = sut.implementation.connection;
+        try sut.start();
+        defer sut.stop();
+        try cancelGateTimer(owner);
+        try daemon.testing.onLoop(owner, &probe, Probe.attach);
+        var packet = "original".*;
+        try std.testing.expect(probe.callback.?(probe.callback_context, &packet, packet.len, null, 0));
+        @memset(&packet, 'x');
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqualStrings("original", probe.bytes[0..probe.length]);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+
+        // Queue one in-flight packet while paused, then run a control past it.
+        const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+        try Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 2), probe.reads);
+        try std.testing.expectEqualStrings("pending", probe.bytes[0..probe.length]);
+
+        // A pause also applies to packets fetched in the same mailbox batch.
+        try daemon.testing.onLoop(owner, &probe, Probe.burst);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 3), probe.reads);
+        try std.testing.expectEqualStrings("first", probe.bytes[0..probe.length]);
+        try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 5), probe.reads);
+        try std.testing.expectEqualStrings("third", probe.bytes[0..probe.length]);
+
+        // A ready timer must run between mailbox packet batches, before all input drains.
+        const all_reads = probe.reads + owner.looper.impl.max_read_count + 1;
+        try daemon.testing.onLoop(owner, &probe, Probe.flood);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(all_reads, probe.reads);
+        try std.testing.expect(probe.reads_at_timer.? < all_reads);
+
+        try daemon.testing.onLoop(owner, &probe, Probe.attach);
+        try Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(usize, 0), probe.failures);
+        try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
+        try daemon.testing.onLoop(owner, {}, Probe.barrier);
+        try std.testing.expectEqual(@as(?i32, -123), probe.code);
+
+        if (oom_offset) |offset| {
+            try daemon.testing.onLoop(owner, &probe, Probe.attach);
+            failing.fail_index = failing.alloc_index + offset;
+            try std.testing.expect(!probe.callback.?(probe.callback_context, "oom", 3, null, 0));
+            // Actor finalization and cancellation must work while allocation fails.
+            try waitForExit(owner);
+            try std.testing.expect(failing.has_induced_failure);
+            try std.testing.expect(owner.packet_receive_failed);
+            try std.testing.expect(!owner.is_running);
+            try std.testing.expect(sut.state == .stopped);
+            try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
+            try std.testing.expectEqual(@as(?api.PartoutErrorCode, .ioFailure), controller.last_cancel_code);
+            try std.testing.expect(probe.callback == null);
+            try std.testing.expect(!owner.looper.isTunAttached());
+            try std.testing.expectEqual(@as(usize, 1), probe.failures);
+            try std.testing.expectEqual(@as(usize, 0), connection.start_count);
+            failing.fail_index = std.math.maxInt(usize);
+            try std.testing.expectError(error.Closed, sut.start());
+            try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
+        } else {
+            // Paused owned input must also be reclaimed when the mailbox closes.
+            const final_generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+            try Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
+            daemon.testing.shutdown(owner);
+            try std.testing.expectError(error.Closed, Probe.queue(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
+            try waitForExit(owner);
+        }
+        try std.testing.expect(probe.on_actor);
+    }
 }

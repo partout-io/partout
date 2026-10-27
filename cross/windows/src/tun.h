@@ -3,57 +3,72 @@
 
 #pragma once
 
-#include "winrt/tun.h"
+#include "io_types.h"
 #include "socket.h"
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Vpn.h>
 #include <winrt/Windows.Networking.Sockets.h>
 #include <memory>
+#include <atomic>
 
 namespace Partout {
+class RuntimeLoop;
 
-// Lifecycle, writes and StopWrites run on the looper (or during quiescent teardown).
+// Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
     class State;
     friend class TunnelController;
 
 public:
-    explicit Tun(std::shared_ptr<State> state);
+    explicit Tun(State &state);
     ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
-    bool SetOnReceive(winrt_tun_on_receive callback, void *context);
+    // Removing the callback waits for in-flight delivery under the receive mutex.
+    bool SetOnReceive(TunOnReceive callback);
+    void ReportError(int32_t error);
+
+    int32_t WriteStatus() const {
+        return write_status_.load();
+    }
+
     int32_t Write(const uint8_t *bytes, size_t length);
     void StopWrites();
 
 private:
-    std::shared_ptr<State> state_;
-    winrt_tun_on_receive callback_ = nullptr;
-    void *context_ = nullptr;
-    bool writes_stopped_ = false;
+    State &state_; // Borrowed; the controller outlives every TUN handle.
+    TunOnReceive callback_ = nullptr;
+    std::atomic<int32_t> write_status_{0};
 };
 
-// Association may run on the setup worker before Open. Open and Close run on the
-// looper; destruction follows daemon shutdown. Native receives share Tun's gate.
+// Association, Open and Close run on the same native worker. Destruction follows
+// daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
-    explicit TunnelController(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    winrt_tun Open(const char *info_json);
+
+    RuntimeLoop &Loop() const {
+        return loop_;
+    }
+
+    std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;
     void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
     void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);
+    RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
 
-    std::shared_ptr<Tun::State> state_;
+    // Handles and socket writers are drained before controller destruction.
+    std::unique_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket idle_transport_{nullptr};
     winrt::Windows::Networking::Connectivity::NetworkAdapter udp_adapter_{nullptr};
@@ -62,8 +77,3 @@ private:
 };
 
 } // namespace Partout
-
-// Owned C handle; the TUN stays private to the native implementation.
-struct __winrt_tun_struct {
-    Partout::Tun handle;
-};

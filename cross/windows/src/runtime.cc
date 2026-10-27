@@ -7,20 +7,20 @@
 #include <condition_variable>
 #include <cwchar>
 #include <memory>
-#include <atomic>
 #include <mutex>
 #include <string>
 #include <string_view>
 // MSVC does not support Clang's nullability annotations.
 #if defined(_MSC_VER) && !defined(__clang__)
 #pragma warning(push)
-#pragma warning(disable: 4068)
+#pragma warning(disable : 4068)
 #define _Nullable
 #define _Nonnull
 #endif
 
 #include "partout_winrt.h"
 #include "tun.h"
+#include "loop.h"
 
 #if defined(_MSC_VER) && !defined(__clang__)
 #undef _Nonnull
@@ -43,15 +43,24 @@ struct VpnChannelRuntime::Impl {
     partout_init_args init_args;
     partout_daemon_options options;
     bool daemon_started = false;
-    std::atomic<std::shared_ptr<TunnelController>> controller;
-    enum class StartupStatus { waiting, connecting, connected, failed };
+    std::unique_ptr<RuntimeLoop> loop;
+    // Packet callbacks borrow the controller only while holding this gate.
+    // Stop waits for those borrows before destroying native state.
+    std::mutex controller_mutex;
+    std::unique_ptr<TunnelController> controller;
+    enum class StartupStatus {
+        waiting,
+        connecting,
+        connected,
+        failed
+    };
     std::mutex startup_mutex;
     std::condition_variable startup_changed;
     StartupStatus startup_status = StartupStatus::waiting;
 
     bool StartupCompleteLocked() const {
         return startup_status == StartupStatus::connected ||
-            startup_status == StartupStatus::failed;
+               startup_status == StartupStatus::failed;
     }
 
     // Called by the daemon, including during partout_daemon_start(). Only
@@ -65,8 +74,7 @@ struct VpnChannelRuntime::Impl {
             startup_status = StartupStatus::connecting;
         } else if (value == "connected") {
             startup_status = StartupStatus::connected;
-        } else if (value == "disconnected" &&
-                   startup_status == StartupStatus::connecting) {
+        } else if (value == "disconnected" && startup_status == StartupStatus::connecting) {
             startup_status = StartupStatus::failed;
         }
         // The daemon emits an initial disconnected status before connecting.
@@ -75,7 +83,7 @@ struct VpnChannelRuntime::Impl {
 
     void WaitForConnection() {
         std::unique_lock lock(startup_mutex);
-        const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(60), [this] {
+        const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(30), [this] {
             return StartupCompleteLocked();
         });
         if (!completed) {
@@ -86,8 +94,8 @@ struct VpnChannelRuntime::Impl {
         }
     }
 
-    Impl(VpnChannel const &value, const char *profile_json,
-         const partout_init_args &initialization, const partout_daemon_options &daemon_options)
+    Impl(VpnChannel const &value, const char *profile_json, const partout_init_args &initialization,
+         const partout_daemon_options &daemon_options)
         : channel(value), profile(profile_json ? profile_json : ""),
           cache_dir(daemon_options.cache_dir ? daemon_options.cache_dir : ""),
           init_args(initialization), options(daemon_options) {
@@ -97,14 +105,18 @@ struct VpnChannelRuntime::Impl {
         options.cache_dir = daemon_options.cache_dir ? cache_dir.c_str() : nullptr;
     }
 
-    ~Impl() { Stop(); }
+    ~Impl() {
+        Stop();
+    }
 
     void CheckChannel(VpnChannel const &value) const {
         if (!value || value != channel) throw hresult_invalid_argument();
     }
 
     void Log(partout_log_level level, std::wstring_view message) const noexcept {
-        try { channel.LogDiagnosticMessage(hstring{message}); } catch (...) {}
+        try {
+            channel.LogDiagnosticMessage(hstring{message});
+        } catch (...) {}
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
@@ -114,13 +126,28 @@ struct VpnChannelRuntime::Impl {
     }
 
     void Stop() noexcept {
-        // Stop drains callbacks and releases their internal controller before
-        // the runtime releases its channel or transport.
+        // Destroying the daemon joins its actor and drains accepted preparation,
+        // detaches native receive callbacks, and releases its transports.
         if (daemon_started) {
             partout_daemon_stop();
             daemon_started = false;
         }
-        controller.store(nullptr);
+        if (loop) {
+            std::unique_ptr<TunnelController> closing;
+            {
+                // Wait for current plugin callbacks and reject later ones.
+                std::lock_guard lock(controller_mutex);
+                closing = std::move(controller);
+            }
+            // Do not hold the callback gate while calling VpnChannel.Stop.
+            // Destroy after all accepted commands, including transport release:
+            // TUN handles and socket writers borrow the controller's TUN state.
+            loop->Perform([&closing] {
+                closing.reset();
+            });
+            loop->Drain();
+            loop.reset(); // Drains remaining commands, joins, then uninitializes MTA.
+        }
     }
 
     void Connect() {
@@ -132,21 +159,23 @@ struct VpnChannelRuntime::Impl {
         Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
+            loop = std::make_unique<RuntimeLoop>();
             partout_daemon_start_args args{};
             args.profile = profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
-            const auto active_controller = std::make_shared<TunnelController>(channel);
-            controller.store(active_controller);
-            bindings.controller = active_controller.get();
+            {
+                std::lock_guard lock(controller_mutex);
+                controller = std::make_unique<TunnelController>(*loop, channel);
+                bindings.controller = controller.get();
+            }
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
             bindings.events.ctx = this;
             bindings.events.set_connection_status = [](void *ctx, const char *status) noexcept {
                 static_cast<Impl *>(ctx)->OnConnectionStatus(status);
             };
             bindings.release = [](partout_daemon_bindings *owned) noexcept {
-                // Runtime retains the controller through stop; packet callbacks
-                // take a shared reference while forwarding their borrowed input.
+                // Runtime owns the controller and loop through daemon destruction.
                 owned->controller = nullptr;
             };
             args.bindings = &bindings;
@@ -161,23 +190,23 @@ struct VpnChannelRuntime::Impl {
         } catch (...) {
             const auto failure = to_hresult();
             wchar_t message[128]{};
-            std::swprintf(message, 128, L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
-                static_cast<unsigned int>(failure.value));
+            std::swprintf(message, 128,
+                          L"Partout::VpnChannelRuntime: connect failed: HRESULT=0x%08x",
+                          static_cast<unsigned int>(failure.value));
             Log(PartoutLogLevelError, message);
             Stop();
-            try { channel.SetErrorMessage(L"Unable to start Partout VPN channel"); } catch (...) {}
+            try {
+                channel.SetErrorMessage(L"Unable to start Partout VPN channel");
+            } catch (...) {}
             throw;
         }
     }
 };
 
-VpnChannelRuntime::VpnChannelRuntime(
-    VpnChannel const &channel,
-    const char *profile,
-    const partout_init_args &init_args,
-    const partout_daemon_options &options
-) : impl_(std::make_unique<Impl>(channel, profile, init_args, options)) {
-}
+VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel, const char *profile,
+                                     const partout_init_args &init_args,
+                                     const partout_daemon_options &options)
+    : impl_(std::make_unique<Impl>(channel, profile, init_args, options)) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
 
@@ -194,34 +223,30 @@ void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
 }
 
 // FIXME: ###, Windows, Supply the protocol keepalive payload when required.
-void VpnChannelRuntime::GetKeepAlivePayload(
-    VpnChannel const &channel,
-    VpnPacketBuffer &keep_alive_packet
-) {
+void VpnChannelRuntime::GetKeepAlivePayload(VpnChannel const &channel,
+                                            VpnPacketBuffer &keep_alive_packet) {
     impl_->CheckChannel(channel);
     keep_alive_packet = nullptr;
-    impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
+    impl_->Log(PartoutLogLevelDebug,
+               L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
 }
 
-void VpnChannelRuntime::Encapsulate(
-    VpnChannel const &channel, VpnPacketBufferList const &packets,
-    VpnPacketBufferList const &encapsulated_packets
-) {
+void VpnChannelRuntime::Encapsulate(VpnChannel const &channel, VpnPacketBufferList const &packets,
+                                    VpnPacketBufferList const &encapsulated_packets) {
     impl_->CheckChannel(channel);
     (void)encapsulated_packets;
-    if (const auto controller = impl_->controller.load()) controller->Encapsulate(packets);
+    std::lock_guard lock(impl_->controller_mutex);
+    if (impl_->controller) impl_->controller->Encapsulate(packets);
 }
 
-void VpnChannelRuntime::Decapsulate(
-    VpnChannel const &channel,
-    VpnPacketBuffer const &packet,
-    VpnPacketBufferList const &decapsulated_packets,
-    VpnPacketBufferList const &control_packets
-) {
+void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer const &packet,
+                                    VpnPacketBufferList const &decapsulated_packets,
+                                    VpnPacketBufferList const &control_packets) {
     impl_->CheckChannel(channel);
     (void)decapsulated_packets;
     (void)control_packets;
-    if (const auto controller = impl_->controller.load()) controller->Decapsulate(packet);
+    std::lock_guard lock(impl_->controller_mutex);
+    if (impl_->controller) impl_->controller->Decapsulate(packet);
 }
 
 } // namespace Partout

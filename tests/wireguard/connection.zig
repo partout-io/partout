@@ -6,6 +6,7 @@ const std = @import("std");
 const loop_helpers = @import("../net/looper_test_helpers.zig");
 
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const mock = source.mock;
 const builtin = @import("builtin");
 
@@ -25,6 +26,8 @@ const AtomicBool = std.atomic.Value(bool);
 
 const ConnectionContext = connection.ConnectionContext;
 test "WireGuard connection builds UAPI configuration" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var configuration = try api.WireGuardConfiguration.parse(allocator,
         \\{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"],"listenPort":51820},
@@ -49,6 +52,8 @@ test "WireGuard connection builds UAPI configuration" {
 }
 
 test "WireGuard connection builds tunnel info with IP and DNS modules" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -114,6 +119,8 @@ test "WireGuard connection builds tunnel info with IP and DNS modules" {
 }
 
 test "WireGuard connection folds active IP and VPN DNS routes into every peer" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var profile = try api.Profile.parse(allocator,
         \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
@@ -163,6 +170,8 @@ test "WireGuard connection folds active IP and VPN DNS routes into every peer" {
 }
 
 test "WireGuard connection parses runtime data count" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const data_count = uapi.parseRuntimeDataCount(
         \\public_key=abc
         \\rx_bytes=1234
@@ -173,6 +182,8 @@ test "WireGuard connection parses runtime data count" {
 }
 
 test "WireGuard connection erases backend activation errors at the generic boundary" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -207,6 +218,8 @@ test "WireGuard connection erases backend activation errors at the generic bound
 }
 
 test "WireGuard connection preserves allocator errors at the generic boundary" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -249,8 +262,6 @@ const OwnedDescriptor = struct {
         const self: *@This() = @ptrCast(@alignCast(raw));
         self.cleanups += 1;
     }
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(_: *anyopaque, _: []u8) io.Error!?usize {
         return error.WouldBlock;
     }
@@ -261,8 +272,6 @@ const OwnedDescriptor = struct {
         return 0;
     }
     const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-        .set_event_mask = mask,
-        .reset_events = reset,
         .read = read,
         .write = write,
         .cleanup = cleanup,
@@ -271,6 +280,8 @@ const OwnedDescriptor = struct {
 };
 
 test "WireGuard data timer runs on its owner and cancels before stop" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -330,6 +341,8 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
 }
 
 test "WireGuard connection resolves hostname endpoints through sandbox resolver" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -383,6 +396,8 @@ test "WireGuard connection resolves hostname endpoints through sandbox resolver"
 }
 
 test "WireGuard DNS resolution stably prioritizes IPv4" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{
         .{ .address = "fd00::1", .is_ipv6 = true },
@@ -411,6 +426,8 @@ test "WireGuard DNS resolution stably prioritizes IPv4" {
 }
 
 test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{
         .{ .address = "64:ff9b::c000:201", .is_ipv6 = true },
@@ -436,6 +453,8 @@ test "WireGuard DNS resolution bypasses the resolver for numeric endpoints" {
 }
 
 test "WireGuard DNS resolution accepts peers without endpoints" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{} };
     var configuration = try api.WireGuardConfiguration.parse(allocator,
@@ -459,6 +478,8 @@ test "WireGuard DNS resolution accepts peers without endpoints" {
 }
 
 test "WireGuard resolves every peer hostname" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{ .records = &.{
         .{ .address = "198.51.100.10", .is_ipv6 = false },
@@ -486,6 +507,8 @@ test "WireGuard resolves every peer hostname" {
 }
 
 test "WireGuard delegates current-network address mapping to DNSResolver" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var resolver = FakeResolver{
         .records = &.{},
@@ -515,6 +538,8 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 }
 
 test "WireGuard connection handles network monitor events" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -607,6 +632,8 @@ test "WireGuard connection handles network monitor events" {
 }
 
 test "WireGuard takes ownership of link and TUN descriptors" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -686,6 +713,8 @@ test "WireGuard takes ownership of link and TUN descriptors" {
 }
 
 test "WireGuard connection retries temporary shutdown resume and re-resolves peers" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -752,6 +781,8 @@ test "WireGuard connection retries temporary shutdown resume and re-resolves pee
 }
 
 test "WireGuard connection retries passive backend failure without terminal events" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -804,6 +835,8 @@ test "WireGuard connection retries passive backend failure without terminal even
 }
 
 test "WireGuard connection cancels when a temporary shutdown retry cannot be scheduled" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
@@ -1126,6 +1159,8 @@ fn expectEstablished(result: conn.Connection.StartResult) !void {
 }
 
 test "WireGuard backend dispatches the passive startup payload separately" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
@@ -1149,7 +1184,7 @@ test "WireGuard backend dispatches the passive startup payload separately" {
     try std.testing.expect(called);
     try std.testing.expect(backend_mod.goBackend().vtable.complete_io != null);
 
-    const tun = try io.TunWrapper.create(std.testing.allocator, null);
+    const tun = try mock.createTun(std.testing.allocator);
     defer tun.destroy();
     try std.testing.expectError(error.TransportFailure, backend.turnOn(std.testing.allocator, "legacy", .{
         .tun = tun,
@@ -1158,6 +1193,8 @@ test "WireGuard backend dispatches the passive startup payload separately" {
 }
 
 test "WireGuard adapter supports active startup and both reachability policies" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     const Probe = struct {
@@ -1224,6 +1261,8 @@ test "WireGuard adapter supports active startup and both reachability policies" 
 }
 
 test "WireGuard none mode resolves hostnames before establishment and resets uncommitted starts" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var fake_backend = FakeBackend{};
@@ -1320,6 +1359,8 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
 }
 
 test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var fake_backend = FakeBackend{};

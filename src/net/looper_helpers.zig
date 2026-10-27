@@ -7,19 +7,32 @@ const std = @import("std");
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io.zig");
+const io_common = @import("io_common.zig");
 const io_c = ffi.io;
 const log = core.logging;
 
 // FIXME: ###, Abuse of anyerror in callbacks
 
 pub const Options = struct {
-    /// POSIX requires a borrowed mux. Windows uses its wake event only, or owns
-    /// a private wake source if null. Supplied muxes must outlive the looper.
+    /// Borrows the caller's mux, which must outlive the looper.
+    /// Windows uses only its wake event.
     mux: io_c.pp_mux,
     link_buf_size: usize = 64 * 1024,
     tun_buf_size: usize = 64 * 1024,
     max_read_size: usize = 256 * 1024,
     max_read_count: usize = 128,
+    on_receive: io_common.PacketReceiveCallback = null,
+    receive_context: ?*anyopaque = null,
+};
+
+/// A borrowed view of native input; constructing this does not copy the payload.
+/// Mailbox submission copies bytes once, and the actor consumes that owned copy.
+pub const PacketReceipt = struct {
+    side: io.Side,
+    generation: u64,
+    bytes: []const u8 = &.{},
+    source: ?io.SocketAddress = null,
+    code: i32 = 0,
 };
 
 /// Invoked on read events from either looper side. Payloads and addresses are

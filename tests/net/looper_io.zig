@@ -4,6 +4,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const test_helpers = @import("looper_test_helpers.zig");
 const io = source.net_io;
 const Looper = source.net_looper.Looper;
@@ -81,8 +82,6 @@ const Mock = struct {
     writes: usize = 0,
     cleaned: usize = 0,
 
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
         const self: *Mock = @ptrCast(@alignCast(raw));
         if (self.fail_read) return error.LibcFailure;
@@ -122,8 +121,6 @@ const Mock = struct {
         return 0;
     }
     const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-        .set_event_mask = mask,
-        .reset_events = reset,
         .read = read,
         .write = write,
         .cleanup = cleanup,
@@ -516,6 +513,8 @@ test "reads without an observer drain data and still report failures" {
 }
 
 test "UDP packet errors discard only the bad packet and retain the link" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const wake = try test_helpers.Mux.init();
     defer wake.deinit();

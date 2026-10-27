@@ -3,19 +3,23 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 const core = @import("../core/exports.zig");
 const connection = @import("connection.zig");
 const io = @import("io.zig");
 const resolver_mod = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
+const windows = @import("connection_worker_windows.zig");
 
 const api = core.api;
 const log = core.logging;
 
 /// Serial link preparation, independent of Connection and its event loop.
-/// Owns endpoint storage and DNS state until destroy() joins the worker.
+/// Owns endpoint storage and DNS state until destroy() drains preparation.
 pub const ConnectionWorker = struct {
+    const Self = @This();
     pub const Action = enum { start, rebind };
     pub const Request = struct {
         request_id: u64,
@@ -51,14 +55,17 @@ pub const ConnectionWorker = struct {
         request: Request,
         completion_context: *anyopaque,
     };
-    const Actor = core.actor.Actor(ConnectionWorker, null, Work, error{}, execute);
+    const Executor = if (builtin.os.tag == .windows and build_options.winrt)
+        windows.Executor(Self, Work, execute)
+    else
+        core.actor.Actor(Self, null, Work, error{}, execute);
 
     allocator: std.mem.Allocator,
     resolver: sandbox.DNSResolver,
     factory: sandbox.SocketFactory,
     endpoint_resolver: ?resolver_mod.EndpointResolver,
     callback: Callback,
-    actor: *Actor,
+    executor: *Executor,
     closed: std.atomic.Value(bool) = .init(false),
 
     pub fn create(
@@ -67,8 +74,8 @@ pub const ConnectionWorker = struct {
         factory: sandbox.SocketFactory,
         endpoints: ?[]const api.ExtendedEndpoint,
         callback: Callback,
-    ) error{OutOfMemory}!*ConnectionWorker {
-        const self = try allocator.create(ConnectionWorker);
+    ) error{OutOfMemory}!*Self {
+        const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
             .allocator = allocator,
@@ -76,7 +83,7 @@ pub const ConnectionWorker = struct {
             .factory = factory,
             .endpoint_resolver = null,
             .callback = callback,
-            .actor = undefined,
+            .executor = undefined,
         };
         // Connection may be released while preparation is still blocked.
         if (endpoints) |source| {
@@ -93,37 +100,37 @@ pub const ConnectionWorker = struct {
             self.endpoint_resolver = resolver_mod.EndpointResolver.init(allocator, owned);
         }
         errdefer self.deinitEndpoints();
-        self.actor = Actor.create(allocator, self) catch return error.OutOfMemory;
+        self.executor = Executor.create(allocator, self) catch return error.OutOfMemory;
         return self;
     }
 
     /// Accepted requests always deliver exactly one completion, including on close.
-    pub fn submit(self: *ConnectionWorker, request: Request, completion_context: *anyopaque) error{ Closed, OutOfMemory }!void {
+    pub fn submit(self: *Self, request: Request, completion_context: *anyopaque) error{ Closed, OutOfMemory }!void {
         if (self.closed.load(.acquire)) return error.Closed;
-        try self.actor.schedule(.{ .request = request, .completion_context = completion_context });
+        try self.executor.schedule(.{ .request = request, .completion_context = completion_context });
     }
 
     /// Rejects new work without waiting for a running DNS/socket call.
-    pub fn close(self: *ConnectionWorker) void {
+    pub fn close(self: *Self) void {
         self.closed.store(true, .release);
     }
 
     /// Call outside the event loop, while the callback and dependencies remain valid.
-    pub fn destroy(self: *ConnectionWorker) void {
+    pub fn destroy(self: *Self) void {
         self.close();
-        self.actor.destroy();
+        self.executor.destroy();
         self.deinitEndpoints();
         self.allocator.destroy(self);
     }
 
-    fn deinitEndpoints(self: *ConnectionWorker) void {
+    fn deinitEndpoints(self: *Self) void {
         if (self.endpoint_resolver) |*resolver| {
             resolver.deinit();
             core.util.freeSlice(api.ExtendedEndpoint, self.allocator, resolver.endpoints);
         }
     }
 
-    fn execute(self: *ConnectionWorker, comptime Result: type, work: Work) error{}!Result {
+    fn execute(self: *Self, comptime Result: type, work: Work) error{}!Result {
         const remote = if (self.closed.load(.acquire)) error.Closed else self.prepareLink(work.request);
         self.callback.call(self.callback.context, work.completion_context, .{
             .request_id = work.request.request_id,
@@ -133,7 +140,7 @@ pub const ConnectionWorker = struct {
         });
     }
 
-    fn prepareLink(self: *ConnectionWorker, request: Request) !connection.RemoteDescriptor {
+    fn prepareLink(self: *Self, request: Request) !connection.RemoteDescriptor {
         var remote = connection.RemoteDescriptor{};
         log.write(.notice, "Create new link");
         var endpoint: ?api.ExtendedEndpoint = null;

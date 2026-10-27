@@ -5,6 +5,7 @@
 const std = @import("std");
 const builtin = @import("builtin");
 const source = @import("source");
+const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 
 const core = source.core;
 const portable_c = source.ffi.portable;
@@ -45,6 +46,8 @@ fn daemonStartArgs(profile: ?[*:0]const u8) partout_c.partout_daemon_start_args 
 }
 
 test "daemon options parse DNS-only profile" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var options = try abi_runtime.DaemonOptions.init(
         allocator,
@@ -64,6 +67,8 @@ test "daemon options parse DNS-only profile" {
 }
 
 test "daemon options reject invalid args" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
 
     try std.testing.expectError(
@@ -73,6 +78,8 @@ test "daemon options reject invalid args" {
 }
 
 test "daemon options default cache directory" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
     args.options.cache_dir = null;
@@ -90,6 +97,8 @@ test "daemon options default cache directory" {
 }
 
 test "daemon options reject missing connection implementation" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     if (source.openvpn_enabled) {
         var options = try abi_runtime.DaemonOptions.init(
@@ -111,6 +120,8 @@ test "daemon options reject missing connection implementation" {
 }
 
 test "daemon runtime owns options during lifecycle" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
@@ -147,6 +158,8 @@ test "daemon runtime owns options during lifecycle" {
 }
 
 test "starts DNS-only profile through tunnel controller" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
@@ -176,6 +189,8 @@ test "starts DNS-only profile through tunnel controller" {
 }
 
 test "starts profile without active modules without tunnel settings" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -199,6 +214,8 @@ test "starts profile without active modules without tunnel settings" {
 }
 
 test "requires a connection implementation for active connection profiles" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
@@ -214,6 +231,8 @@ fn emptyConnectionRegistry(allocator: std.mem.Allocator) error{OutOfMemory}!conn
 }
 
 test "daemon options decode experimental feature flags" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     const allocator = std.testing.allocator;
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
     args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon |
@@ -228,6 +247,8 @@ test "daemon options decode experimental feature flags" {
 }
 
 test "daemon options reject unknown feature bits" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
     args.options.feature_flags = @as(u64, 1) << 63;
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonOptions.init(std.testing.allocator, args, null));
@@ -236,6 +257,8 @@ test "daemon options reject unknown feature bits" {
 }
 
 test "legacy feature flags preserve the current implementations" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Case = struct { json: [:0]const u8, enabled: bool };
     const cases = [_]Case{

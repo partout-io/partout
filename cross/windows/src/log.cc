@@ -53,5 +53,4 @@ void winrt_log(winrt_log_level level, const char *format, ...) {
     Partout::Log(level, format, args);
     va_end(args);
 }
-
 }

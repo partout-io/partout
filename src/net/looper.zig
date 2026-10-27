@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
-//! caller's mux. Both platforms run callbacks inline in loopOnce(); Windows
-//! queues WinRT receives and waits on the mux's mailbox wake event. Read packet views
+//! caller's mux. Windows posts WinRT receives to the caller's mailbox and waits
+//! on its wake event. POSIX runs read callbacks in loopOnce(). Read packet views
 //! expire when the callback returns.
 
 const std = @import("std");
@@ -29,9 +29,11 @@ pub const Looper = struct {
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;
     pub const WriteError = helpers.WriteError;
+    pub const PacketReceipt = helpers.PacketReceipt;
 
     allocator: std.mem.Allocator,
     impl: *Impl,
+    mailbox_job_limit: usize,
 
     /// Allocates a looper. A supplied mux is borrowed through destroy().
     pub fn create(
@@ -55,6 +57,7 @@ pub const Looper = struct {
         return .{
             .allocator = allocator,
             .impl = try Impl.create(allocator, options),
+            .mailbox_job_limit = options.max_read_count,
         };
     }
 
@@ -64,6 +67,15 @@ pub const Looper = struct {
 
     pub fn loopOnce(self: *Looper, failure: *?io.Failure) bool {
         return self.impl.loopOnce(null, failure);
+    }
+
+    pub fn canReceivePackets(self: *Looper, receipt: PacketReceipt) bool {
+        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(receipt);
+        return true;
+    }
+
+    pub fn receivePackets(self: *Looper, receipt: PacketReceipt) void {
+        if (builtin.os.tag == .windows) self.impl.receivePackets(receipt);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

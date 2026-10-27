@@ -64,8 +64,6 @@ const Mock = struct {
     backpressure: bool = false,
     block: bool = false,
     writes: usize = 0,
-    fn mask(_: *anyopaque, _: bool, _: bool) io.Error!void {}
-    fn reset(_: *anyopaque) io.Error!void {}
     fn read(raw: *anyopaque, data: []u8) io.Error!?usize {
         const self: *Mock = @ptrCast(@alignCast(raw));
         if (self.has_read) return error.WouldBlock;
@@ -102,8 +100,6 @@ const Mock = struct {
     }
     fn descriptor(self: *Mock) source.net_io_posix.POSIXDescriptor {
         const vtable = source.net_io_posix.POSIXInterface.Mock.VTable{
-            .set_event_mask = mask,
-            .reset_events = reset,
             .read = read,
             .write = write,
             .cleanup = cleanup,

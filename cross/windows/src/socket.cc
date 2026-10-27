@@ -25,17 +25,36 @@ using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Sockets;
 using namespace winrt::Windows::Storage::Streams;
 
-namespace {
-
-// Open runs on the daemon's worker, which need not already have a COM apartment.
-struct Apartment {
-    Apartment() { init_apartment(apartment_type::multi_threaded); }
-    ~Apartment() { uninit_apartment(); }
-};
-
-} // namespace
-
 namespace Partout {
+namespace {
+void WaitForConnect(IAsyncAction const &action, int timeout_ms) {
+    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
+        action.Cancel();
+        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
+    }
+    action.GetResults();
+}
+
+SocketAddress ParseAddress(HostName const &host, hstring const &port) {
+    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
+        throw hresult_invalid_argument();
+    SocketAddress result{};
+    auto text = std::wstring(host.CanonicalName());
+    const auto zone = text.find(L'%');
+    if (zone != std::wstring::npos) {
+        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
+        text.resize(zone);
+    }
+    const bool ipv4 = host.Type() == HostNameType::Ipv4;
+    result.family = ipv4 ? 4 : 6;
+    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
+        throw hresult_invalid_argument();
+    const auto number = std::stoul(std::wstring(port));
+    if (number > UINT16_MAX) throw hresult_invalid_argument();
+    result.port = static_cast<uint16_t>(number);
+    return result;
+}
+} // namespace
 
 // Outstanding reads and writes retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
@@ -56,66 +75,84 @@ struct Socket::State {
     // The front slot stays queued until completion, including while suspended.
     // A nonempty queue therefore already has a writer.
     std::deque<WriteRequest> writes;
-    winrt_socket_on_receive callback = nullptr;
-    void *context = nullptr;
+    SocketOnReceive callback = nullptr;
     bool reading = false;
     bool paused = false;
     bool channel_owned = false;
 
-    State() { check_hresult(CoIncrementMTAUsage(&apartment)); }
+    State() {
+        check_hresult(CoIncrementMTAUsage(&apartment));
+    }
+
     ~State() {
         writes.clear();
         CoDecrementMTAUsage(apartment);
     }
 
-    void finishReadLocked(int32_t error = 0) {
+    void FinishReadLocked(int32_t error = 0) {
         reading = false;
-        if (error && !channel_owned) deliverLocked(nullptr, 0, nullptr, error);
+        if (error && !channel_owned) DeliverLocked(nullptr, 0, nullptr, error);
     }
 
-    void deliver(const uint8_t *bytes, size_t size,
-                 const winrt_socket_address *source, int32_t error) {
+    void Deliver(const uint8_t *bytes, size_t size, const SocketAddress *source, int32_t error) {
         std::lock_guard lock(mutex);
         if (!error) ++received;
-        deliverLocked(bytes, size, source, error);
+        DeliverLocked(bytes, size, source, error);
     }
 
-    void deliverLocked(const uint8_t *bytes, size_t size,
-                       const winrt_socket_address *source, int32_t error) {
+    void DeliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
+                       int32_t error) {
+        if (error && error != SocketEOF) {
+            int32_t expected = 0;
+            write_status.compare_exchange_strong(expected, error);
+        }
         if (!callback || (paused && !error)) return;
-        if (error == WinrtSocketEOF) {
+        if (error == SocketEOF) {
             winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
-            winrt_log(WinrtLogError, "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
-                static_cast<unsigned int>(error), channel_owned ? "true" : "false");
+            winrt_log(WinrtLogError,
+                      "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
+                      static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         }
-        paused = !callback(context, bytes, size, source, error);
+        paused = !callback(bytes, size, source, error);
     }
 };
 
-Socket::Socket(winrt_socket_proto proto, bool unconnected) {
-    if (proto != WinrtSocketProtoUDP && proto != WinrtSocketProtoTCP)
-        throw hresult_invalid_argument();
-    if (unconnected && proto != WinrtSocketProtoUDP) throw hresult_invalid_argument();
-    Apartment apartment;
+Socket::Socket(SocketProto proto, bool unconnected) {
+    if (proto != SocketProtoUDP && proto != SocketProtoTCP) throw hresult_invalid_argument();
+    if (unconnected && proto != SocketProtoUDP) throw hresult_invalid_argument();
     unconnected_ = unconnected;
     state_ = std::make_shared<State>();
-    if (proto == WinrtSocketProtoUDP) datagram_ = DatagramSocket{};
-    else stream_ = StreamSocket{};
+    if (proto == SocketProtoUDP)
+        datagram_ = DatagramSocket{};
+    else
+        stream_ = StreamSocket{};
 }
 
 Socket::~Socket() noexcept {
     StopWrites();
-    SetOnReceive(nullptr, nullptr);
+    SetOnReceive({});
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
         winrt_log(WinrtLogInfo, "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
-            state_->received, state_->sent);
+                  state_->received, state_->sent);
     }
     receive_registration_.revoke();
     // Close each transport independently.
-    try { if (datagram_) datagram_.Close(); } catch (...) {}
-    try { if (stream_) stream_.Close(); } catch (...) {}
+    try {
+        if (datagram_) datagram_.Close();
+    } catch (...) {}
+    try {
+        if (stream_) stream_.Close();
+    } catch (...) {}
+    // Closing cancels native I/O. Join coroutine completion before runtime
+    // shutdown tears down the worker's apartment and activation factory cache.
+    try {
+        if (read_) read_.get();
+    } catch (...) {}
+    try {
+        if (write_) write_.get();
+    } catch (...) {}
 }
 
 IInspectable Socket::Transport() const {
@@ -132,14 +169,12 @@ void Socket::SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter
     adapter_ = adapter;
 }
 
-bool Socket::Open(const char *hostname, uint16_t port,
-    const winrt_socket_open_options *options) {
+bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *options) {
     try {
         if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
             (options->dual_stack && !unconnected_)) {
             throw hresult_invalid_argument();
         }
-        Apartment apartment;
         const HostName host{to_hstring(hostname)};
         const bool is_v4 = host.Type() == HostNameType::Ipv4;
         const bool is_v6 = host.Type() == HostNameType::Ipv6;
@@ -166,8 +201,8 @@ bool Socket::Open(const char *hostname, uint16_t port,
                 if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
                 datagram_.BindServiceNameAsync(local_service, adapter_).get();
                 winrt_log(WinrtLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
-                    datagram_.Information().LocalPort().c_str(),
-                    to_hstring(adapter_.NetworkAdapterId()).c_str());
+                          datagram_.Information().LocalPort().c_str(),
+                          to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
                 datagram_.BindServiceNameAsync(local_service).get();
             } else {
@@ -178,23 +213,24 @@ bool Socket::Open(const char *hostname, uint16_t port,
             WaitForConnect(datagram_.ConnectAsync(host, service), options->timeout_ms);
         } else {
             WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
-                options->timeout_ms);
+                           options->timeout_ms);
         }
-        winrt_log(WinrtLogDebug, "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
-            datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-            unconnected_ ? "unconnected" : "connected",
-            options->dual_stack ? "true" : "false");
+        winrt_log(WinrtLogDebug,
+                  "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
+                  datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
+                  unconnected_ ? "unconnected" : "connected",
+                  options->dual_stack ? "true" : "false");
     } catch (hresult_error const &error) {
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
             const auto message = to_string(error.message());
             winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
-                static_cast<unsigned int>(error.code().value), message.c_str());
+                      static_cast<unsigned int>(error.code().value), message.c_str());
         } catch (...) {}
         return false;
     } catch (...) {
         winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
+                  static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -204,37 +240,29 @@ void Socket::RegisterForDatagrams() {
     const auto state = state_;
     // WinRT requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
-    receive_registration_ = datagram_.MessageReceived(auto_revoke,
+    receive_registration_ = datagram_.MessageReceived(
+        auto_revoke,
         [state, unconnected = unconnected_, ipv4 = accepts_ipv4_, ipv6 = accepts_ipv6_](
             DatagramSocket const &, DatagramSocketMessageReceivedEventArgs const &args) {
             try {
                 const auto family = args.RemoteAddress().Type();
                 if ((family == HostNameType::Ipv4 && !ipv4) ||
-                    (family == HostNameType::Ipv6 && !ipv6)) return;
+                    (family == HostNameType::Ipv6 && !ipv6))
+                    return;
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
-                winrt_socket_address source{};
+                SocketAddress source{};
                 if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
-                state->deliver(buffer.data(), buffer.Length(),
-                    unconnected ? &source : nullptr, 0);
+                state->Deliver(buffer.data(), buffer.Length(), unconnected ? &source : nullptr, 0);
             } catch (...) {
-                state->deliver(nullptr, 0, nullptr, to_hresult().value);
+                state->Deliver(nullptr, 0, nullptr, to_hresult().value);
             }
         });
 }
 
-void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
-    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
-        action.Cancel();
-        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
-    }
-    action.GetResults();
-}
-
-bool Socket::GetAddress(winrt_socket_address *address) {
+bool Socket::GetAddress(SocketAddress *address) {
     if (!address) return false;
     try {
-        Apartment apartment;
         HostName host{nullptr};
         hstring port;
         if (datagram_) {
@@ -256,43 +284,30 @@ bool Socket::GetAddress(winrt_socket_address *address) {
     return true;
 }
 
-winrt_socket_address Socket::ParseAddress(HostName const &host, hstring const &port) {
-    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
-        throw hresult_invalid_argument();
-    winrt_socket_address result{};
-    auto text = std::wstring(host.CanonicalName());
-    const auto zone = text.find(L'%');
-    if (zone != std::wstring::npos) {
-        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
-        text.resize(zone);
-    }
-    const bool ipv4 = host.Type() == HostNameType::Ipv4;
-    result.family = ipv4 ? 4 : 6;
-    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
-        throw hresult_invalid_argument();
-    const auto number = std::stoul(std::wstring(port));
-    if (number > UINT16_MAX) throw hresult_invalid_argument();
-    result.port = static_cast<uint16_t>(number);
-    return result;
-}
-
-bool Socket::SetOnReceive(winrt_socket_on_receive callback, void *context) {
+bool Socket::SetOnReceive(SocketOnReceive callback) {
     const auto state = state_;
+    const bool registering = static_cast<bool>(callback);
     {
         std::lock_guard lock(state->mutex);
         // Ignore if a callback was already registered.
         if (callback && state->callback) return false;
-        state->callback = callback;
-        state->context = context;
+        state->callback = std::move(callback);
     }
-    if (callback && !ResumeReading()) {
+    if (registering && !ResumeReading()) {
         // Roll back registration if starting native reads failed.
         std::lock_guard lock(state->mutex);
         state->callback = nullptr;
-        state->context = nullptr;
         return false;
     }
     return true;
+}
+
+void Socket::ReportError(int32_t error) {
+    state_->Deliver(nullptr, 0, nullptr, error);
+}
+
+int32_t Socket::WriteStatus() const {
+    return state_->write_status.load();
 }
 
 bool Socket::ResumeReading() {
@@ -334,51 +349,50 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             {
                 std::lock_guard lock(state->mutex);
                 if (!state->callback || state->paused || state->channel_owned) {
-                    state->finishReadLocked();
+                    state->FinishReadLocked();
                     co_return;
                 }
-                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::Partial);
+                read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(),
+                                                      InputStreamOptions::Partial);
             }
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->finishReadLocked(WinrtSocketEOF);
+                state->FinishReadLocked(SocketEOF);
                 co_return;
             }
-            state->deliver(received.data(), received.Length(), nullptr, 0);
+            state->Deliver(received.data(), received.Length(), nullptr, 0);
         }
     } catch (...) {
         std::lock_guard lock(state->mutex);
-        state->finishReadLocked(to_hresult().value);
+        state->FinishReadLocked(to_hresult().value);
     }
 }
 
-int32_t Socket::Write(const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
+int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
+    uint32_t length = 0;
     try {
-        if ((!bytes && length) || length > UINT32_MAX)
-            throw hresult_invalid_argument();
-        Apartment apartment;
+        if (!buffer) throw hresult_invalid_argument();
+        length = buffer.Length();
         const auto state = state_;
         const auto status = state->write_status.load();
         if (status) return status;
         if (channel_write_) {
             // After takeover, VpnChannel owns transport writes.
-            check_hresult(channel_write_(bytes, length));
+            check_hresult(channel_write_(buffer.data(), length));
         } else {
-            EnqueueWrite(bytes, length, destination);
+            EnqueueWrite(std::move(buffer), destination);
         }
     } catch (...) {
         const auto error = to_hresult().value;
         winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
-            static_cast<unsigned int>(error), length);
+                  static_cast<unsigned int>(error), static_cast<size_t>(length));
         return error;
     }
     return 0;
 }
 
-void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
+void Socket::EnqueueWrite(Buffer buffer, const SocketAddress *destination) {
     const auto state = state_;
     State::WriteRequest request;
     if (unconnected_) {
@@ -387,8 +401,8 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
             (destination->family == 6 && !accepts_ipv6_))
             throw hresult_invalid_argument();
         wchar_t address[INET6_ADDRSTRLEN]{};
-        if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6,
-            const_cast<uint8_t *>(destination->address), address, INET6_ADDRSTRLEN))
+        if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6, destination->address, address,
+                       INET6_ADDRSTRLEN))
             throw hresult_invalid_argument();
         std::wstring host{address};
         if (destination->family == 6 && destination->scope_id)
@@ -396,9 +410,7 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
         request.host = HostName{host};
         request.service = to_hstring(destination->port);
     }
-    request.buffer = Buffer{static_cast<uint32_t>(length)};
-    request.buffer.Length(static_cast<uint32_t>(length));
-    if (length) memcpy(request.buffer.data(), bytes, length);
+    request.buffer = std::move(buffer);
     bool start;
     {
         std::lock_guard lock(state->mutex);
@@ -416,8 +428,8 @@ void Socket::EnqueueWrite(const uint8_t *bytes, size_t length,
     }
 }
 
-IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
-    DatagramSocket datagram, StreamSocket stream) {
+IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state, DatagramSocket datagram,
+                                 StreamSocket stream) {
     try {
         for (;;) {
             State::WriteRequest request;
@@ -458,7 +470,7 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state,
         state->writes.clear();
         int32_t status = 0;
         if (state->write_status.compare_exchange_strong(status, error))
-            state->deliverLocked(nullptr, 0, nullptr, error);
+            state->DeliverLocked(nullptr, 0, nullptr, error);
     }
 }
 
@@ -481,59 +493,8 @@ Socket::Receiver Socket::TakeOver(Writer writer) {
 
     channel_write_ = std::move(writer);
     return [state](const uint8_t *bytes, size_t length) {
-        state->deliver(bytes, length, nullptr, 0);
+        state->Deliver(bytes, length, nullptr, 0);
     };
 }
 
 } // namespace Partout
-
-extern "C" {
-
-void winrt_socket_free(winrt_socket socket) {
-    delete socket;
-}
-
-winrt_socket winrt_socket_create(winrt_socket_proto proto, bool unconnected) {
-    try {
-        return new __winrt_socket_struct{{proto, unconnected}};
-    } catch (...) {
-        winrt_log(WinrtLogError, "Partout::Socket: create failed: HRESULT=0x%08x",
-            static_cast<unsigned int>(to_hresult().value));
-        return nullptr;
-    }
-}
-
-bool winrt_socket_open(winrt_socket socket, const char *hostname, uint16_t port,
-    const winrt_socket_open_options *options) {
-    if (!socket) return false;
-    return socket->handle.Open(hostname, port, options);
-}
-
-bool winrt_socket_set_on_receive(winrt_socket socket,
-    winrt_socket_on_receive callback, void *context) {
-    if (!socket) return false;
-    return socket->handle.SetOnReceive(callback, context);
-}
-
-bool winrt_socket_resume_reading(winrt_socket socket) {
-    if (!socket) return false;
-    return socket->handle.ResumeReading();
-}
-
-int32_t winrt_socket_write(winrt_socket socket, const uint8_t *bytes, size_t length,
-    const winrt_socket_address *destination) {
-    if (!socket) return E_INVALIDARG;
-    return socket->handle.Write(bytes, length, destination);
-}
-
-void winrt_socket_stop_writes(winrt_socket socket) {
-    if (!socket) return;
-    socket->handle.StopWrites();
-}
-
-bool winrt_socket_get_address(winrt_socket socket, winrt_socket_address *address) {
-    if (!socket) return false;
-    return socket->handle.GetAddress(address);
-}
-
-}

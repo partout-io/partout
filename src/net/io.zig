@@ -46,4 +46,4 @@ pub const DescriptorPair = union(Side) {
 };
 
 /// Owns callback delivery and packet submission using the selected backend.
-pub const PacketTransport = backend.PacketTransport(DescriptorPair);
+pub const CallbackTransport = backend.CallbackTransport(DescriptorPair);

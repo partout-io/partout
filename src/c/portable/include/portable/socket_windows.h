@@ -139,30 +139,3 @@ int pp_socket_set_nonblocking(pp_socket_fd fd) {
     return 0;
 }
 
-bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
-    if (!local_is_valid_socket(sock)) {
-        local_set_not_socket_error();
-        return false;
-    }
-    long events = FD_CLOSE;
-    if (read) events |= FD_READ;
-    if (write) events |= FD_WRITE;
-    if (WSAEventSelect(sock->fd, sock->handle, events) == SOCKET_ERROR) {
-        local_print_error("WSAEventSelect()");
-        return false;
-    }
-    return true;
-}
-
-bool pp_socket_reset_events(pp_socket sock) {
-    if (!local_is_valid_socket(sock)) {
-        local_set_not_socket_error();
-        return false;
-    }
-    WSANETWORKEVENTS events;
-    if (WSAEnumNetworkEvents(sock->fd, sock->handle, &events) == SOCKET_ERROR) {
-        local_print_error("WSAEnumNetworkEvents()");
-        return false;
-    }
-    return true;
-}
