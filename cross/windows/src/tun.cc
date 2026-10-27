@@ -101,24 +101,30 @@ Tun::~Tun() noexcept {
     StopWrites();
     std::lock_guard lock(state_.receive_mutex);
     callback_ = nullptr;
-    context_ = nullptr;
     // An older handle may be freed after Open publishes its replacement.
     if (state_.tun == this)
         state_.tun = nullptr;
 }
 
-bool Tun::SetOnReceive(TunOnReceive callback, void *context) {
+bool Tun::SetOnReceive(TunOnReceive callback) {
     std::lock_guard lock(state_.receive_mutex);
     if (callback && callback_)
         return false;
-    callback_ = callback;
-    context_ = context;
+    callback_ = std::move(callback);
     return true;
 }
 
+void Tun::ReportError(int32_t error) {
+    int32_t expected = 0;
+    write_status_.compare_exchange_strong(expected, error);
+    std::lock_guard lock(state_.receive_mutex);
+    if (callback_)
+        callback_(nullptr, 0, error);
+}
+
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
-    if (writes_stopped_)
-        return E_ABORT;
+    if (auto status = WriteStatus())
+        return status;
     const auto result = state_.write(bytes, length, false);
     if (result) {
         ++state_.counters.tun_write_failed;
@@ -129,7 +135,7 @@ int32_t Tun::Write(const uint8_t *bytes, size_t length) {
 }
 
 void Tun::StopWrites() {
-    writes_stopped_ = true;
+    write_status_ = E_ABORT;
 }
 
 TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
@@ -250,7 +256,6 @@ void TunnelController::Close() noexcept {
         if (auto tun = std::exchange(state_->tun, nullptr)) {
             tun->StopWrites();
             tun->callback_ = nullptr;
-            tun->context_ = nullptr;
         }
         state_->link_receive = nullptr;
     }
@@ -304,7 +309,7 @@ void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
         const auto packet = packets.RemoveAtBegin();
         packets.Append(packet);
         const auto buffer = packet.Buffer();
-        if (!tun->callback_(tun->context_, buffer.data(), buffer.Length()))
+        if (!tun->callback_(buffer.data(), buffer.Length(), 0))
             ++counters.tun_dropped;
     }
 }

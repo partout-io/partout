@@ -4,8 +4,6 @@
 #include "socket.h"
 #include "tun.h"
 #include "loop.h"
-#include <atomic>
-#include <mutex>
 
 struct winrt_transport;
 
@@ -20,13 +18,10 @@ public:
         return loop_;
     }
 
-    using Receiver = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
-
     bool IsUnconnected() const {
         return socket && socket->IsUnconnected();
     }
 
-    bool Subscribe(Receiver);
     bool ResumeReading();
     void StopWrites();
     int32_t Write(const uint8_t *, size_t, const SocketAddress *);
@@ -35,11 +30,9 @@ public:
     std::unique_ptr<Tun> tun;
 
 private:
-    bool Deliver(const uint8_t *, size_t, const SocketAddress *, int32_t);
+    int32_t WriteStatus() const;
+    void ReportError(int32_t);
     RuntimeLoop &loop_; // Borrowed from the runtime, including queued destruction.
-    std::atomic<int32_t> status_{0};
-    std::mutex receive_mutex_;
-    Receiver receive_;
 };
 
 // C ABI conversion only; native consumers own Transport directly.

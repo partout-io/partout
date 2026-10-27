@@ -19,13 +19,38 @@ struct TransportHandle {
     std::unique_ptr<Partout::Transport> handle;
     winrt_transport api;
 
+    // Endpoint callback removal holds its delivery mutex until active calls
+    // return. No callback storage or second delivery gate is needed here.
+    bool Subscribe(winrt_receive receive, void *context) {
+        if (!receive) {
+            return handle->socket ? handle->socket->SetOnReceive({})
+                                  : handle->tun->SetOnReceive({});
+        }
+        return handle->Loop().Invoke([this, receive, context] {
+            if (handle->socket) {
+                return handle->socket->SetOnReceive(
+                    [receive, context](const uint8_t *bytes, size_t size,
+                                       const Partout::SocketAddress *source, int32_t error) {
+                        winrt_address address{};
+                        if (source)
+                            address = ConvertAddress<winrt_address>(*source);
+                        return receive(context, bytes, size, source ? &address : nullptr, error);
+                    });
+            }
+            return handle->tun->SetOnReceive(
+                [receive, context](const uint8_t *bytes, size_t size, int32_t error) {
+                    return receive(context, bytes, size, nullptr, error);
+                });
+        });
+    }
+
     explicit TransportHandle(std::unique_ptr<Partout::Transport> value)
         : handle(std::move(value)),
           api{this,
               [](void *raw) {
                   auto self = static_cast<TransportHandle *>(raw);
                   self->handle->StopWrites();
-                  self->handle->Subscribe({});
+                  self->Subscribe(nullptr, nullptr);
                   // Drain callbacks now; destroy on the worker after accepted commands.
                   auto &loop = self->handle->Loop();
                   try {
@@ -41,20 +66,7 @@ struct TransportHandle {
               [](void *raw, winrt_receive receive, void *context) {
                   auto self = static_cast<TransportHandle *>(raw);
                   try {
-                      if (!receive)
-                          return self->handle->Subscribe({});
-                      Partout::Transport::Receiver receiver =
-                          [=](const uint8_t *bytes, size_t size,
-                              const Partout::SocketAddress *source, int32_t error) {
-                              winrt_address address{};
-                              if (source)
-                                  address = ConvertAddress<winrt_address>(*source);
-                              return receive(context, bytes, size, source ? &address : nullptr,
-                                             error);
-                          };
-                      return self->handle->Loop().Invoke([&] {
-                          return self->handle->Subscribe(std::move(receiver));
-                      });
+                      return self->Subscribe(receive, context);
                   } catch (...) {
                       return false;
                   }

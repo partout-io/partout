@@ -14,56 +14,22 @@ Transport::Transport(RuntimeLoop &loop, std::unique_ptr<Socket> value)
 Transport::Transport(RuntimeLoop &loop, std::unique_ptr<Tun> value)
     : tun(std::move(value)), loop_(loop) {}
 
-bool Transport::Subscribe(Receiver receive) {
-    if (!receive) {
-        if (socket)
-            socket->SetOnReceive(nullptr, nullptr);
-        else
-            tun->SetOnReceive(nullptr, nullptr);
-        std::lock_guard lock(receive_mutex_);
-        receive_ = {};
-        return true;
-    }
-    {
-        std::lock_guard lock(receive_mutex_);
-        if (receive_)
-            return false;
-        receive_ = std::move(receive);
-    }
-    bool registered =
-        socket ? socket->SetOnReceive(
-                     [](void *raw, const uint8_t *bytes, size_t size, const SocketAddress *address,
-                        int32_t error) {
-                         return static_cast<Transport *>(raw)->Deliver(bytes, size, address, error);
-                     },
-                     this)
-               : tun->SetOnReceive(
-                     [](void *raw, const uint8_t *bytes, size_t size) {
-                         return static_cast<Transport *>(raw)->Deliver(bytes, size, nullptr, 0);
-                     },
-                     this);
-    if (!registered) {
-        std::lock_guard lock(receive_mutex_);
-        receive_ = {};
-    }
-    return registered;
+int32_t Transport::WriteStatus() const {
+    return socket ? socket->WriteStatus() : tun->WriteStatus();
 }
 
-bool Transport::Deliver(const uint8_t *bytes, size_t size, const SocketAddress *address,
-                        int32_t error) {
-    if (error && error != SocketEOF) {
-        int32_t expected = 0;
-        status_.compare_exchange_strong(expected, error);
-    }
-    std::lock_guard lock(receive_mutex_);
-    return receive_ && receive_(bytes, size, address, error);
+void Transport::ReportError(int32_t error) {
+    if (socket)
+        socket->ReportError(error);
+    else
+        tun->ReportError(error);
 }
 
 bool Transport::ResumeReading() {
     try {
         loop_.Post([this] {
             if (socket && !socket->ResumeReading())
-                Deliver(nullptr, 0, nullptr, E_FAIL);
+                ReportError(E_FAIL);
         });
         return true;
     } catch (...) {
@@ -78,7 +44,6 @@ bool Transport::GetAddress(SocketAddress *address) {
 }
 
 void Transport::StopWrites() {
-    status_ = E_ABORT;
     if (socket)
         socket->StopWrites();
     else
@@ -86,7 +51,7 @@ void Transport::StopWrites() {
 }
 
 int32_t Transport::Write(const uint8_t *bytes, size_t size, const SocketAddress *destination) {
-    if (auto status = status_.load())
+    if (auto status = WriteStatus())
         return status;
     if ((!bytes && size) || size > UINT32_MAX || (IsUnconnected() && !destination))
         return E_INVALIDARG;
@@ -100,13 +65,13 @@ int32_t Transport::Write(const uint8_t *bytes, size_t size, const SocketAddress 
         if (destination)
             address = *destination;
         loop_.Post([this, copy = std::move(copy), address] {
-            if (status_)
+            if (WriteStatus())
                 return;
             auto result =
                 socket ? socket->Write(copy.data(), copy.size(), address ? &*address : nullptr)
                        : tun->Write(copy.data(), copy.size());
             if (result)
-                Deliver(nullptr, 0, nullptr, result);
+                ReportError(result);
         });
         return 0;
     } catch (...) {

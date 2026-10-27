@@ -43,7 +43,10 @@ public:
     bool Open(const char *hostname, uint16_t port, const SocketOpenOptions *options);
     bool GetAddress(SocketAddress *address);
 
-    bool SetOnReceive(SocketOnReceive callback, void *context);
+    // Removing the callback waits for in-flight delivery under the state mutex.
+    bool SetOnReceive(SocketOnReceive callback);
+    void ReportError(int32_t error);
+    int32_t WriteStatus() const;
     bool ResumeReading();
     int32_t Write(const uint8_t *bytes, size_t length, const SocketAddress *destination);
     void StopWrites();

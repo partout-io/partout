@@ -3,6 +3,7 @@
 #pragma once
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 
 namespace Partout {
 enum SocketProto { SocketProtoTCP, SocketProtoUDP };
@@ -19,7 +20,7 @@ struct SocketAddress {
     uint8_t family;
 };
 
-using SocketOnReceive = bool (*)(void *, const uint8_t *, size_t, const SocketAddress *, int32_t);
+using SocketOnReceive = std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
 constexpr int SocketEOF = 1;
-using TunOnReceive = bool (*)(void *, const uint8_t *, size_t);
+using TunOnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
 } // namespace Partout

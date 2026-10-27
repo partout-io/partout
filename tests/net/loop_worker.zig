@@ -23,6 +23,79 @@ const request: Worker.Request = .{
     .link_activity_timeout = 1000,
 };
 
+test "native receive removal drains the ABI callback before replacing its context" {
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const Probe = struct {
+        calls: std.atomic.Value(usize) = .init(0),
+        entered: std.atomic.Value(bool) = .init(false),
+        released: std.atomic.Value(bool) = .init(false),
+
+        fn receive(raw: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const io.SocketAddress, _: i32) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            _ = self.calls.fetchAdd(1, .monotonic);
+            self.entered.store(true, .release);
+            while (!self.released.load(.acquire)) core.sleepMs(1);
+            return true;
+        }
+    };
+    const Remove = struct {
+        socket: io.LinkDescriptor,
+        started: std.atomic.Value(bool) = .init(false),
+        done: std.atomic.Value(bool) = .init(false),
+
+        fn run(self: *@This()) void {
+            self.started.store(true, .release);
+            self.socket.setOnReceive(null, null) catch unreachable;
+            self.done.store(true, .release);
+        }
+    };
+    const receiver = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+    defer receiver.destroy();
+    const sender = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
+    defer sender.destroy();
+    var probe = Probe{};
+    defer probe.released.store(true, .release);
+    try receiver.setOnReceive(Probe.receive, &probe);
+    const destination = try io.testing.socketAddress(.{ .address = "127.0.0.1", .proto = .init(.udp, (try receiver.localAddress()).port) });
+    try std.testing.expectEqual(@as(i32, 0), sender.write("first", destination));
+    const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
+    while (!probe.entered.load(.acquire)) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    var removal = Remove{ .socket = receiver };
+    const thread = try std.Thread.spawn(.{}, Remove.run, .{&removal});
+    defer {
+        probe.released.store(true, .release);
+        thread.join();
+    }
+    while (!removal.started.load(.acquire)) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    // Removal must wait for the native callback, independently of RuntimeLoop.
+    core.sleepMs(20);
+    try std.testing.expect(!removal.done.load(.acquire));
+    probe.released.store(true, .release);
+    while (!removal.done.load(.acquire)) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    var replacement = Probe{};
+    replacement.released.store(true, .release);
+    try receiver.setOnReceive(Probe.receive, &replacement);
+    defer receiver.setOnReceive(null, null) catch unreachable;
+    try std.testing.expectEqual(@as(i32, 0), sender.write("replacement", destination));
+    while (!replacement.entered.load(.acquire)) {
+        if (core.monotonicNs() >= deadline) return error.Timeout;
+        core.sleepMs(1);
+    }
+    try std.testing.expectEqual(@as(usize, 1), probe.calls.load(.acquire));
+    try std.testing.expectEqual(@as(usize, 1), replacement.calls.load(.acquire));
+}
+
 test "native setup requires an owner and runtime shutdown permits recreation" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     try std.testing.expect(c.winrt_loop_current() == null);

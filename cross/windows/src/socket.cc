@@ -77,7 +77,6 @@ struct Socket::State {
     // A nonempty queue therefore already has a writer.
     std::deque<WriteRequest> writes;
     SocketOnReceive callback = nullptr;
-    void *context = nullptr;
     bool reading = false;
     bool paused = false;
     bool channel_owned = false;
@@ -106,6 +105,10 @@ struct Socket::State {
 
     void deliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
                        int32_t error) {
+        if (error && error != SocketEOF) {
+            int32_t expected = 0;
+            write_status.compare_exchange_strong(expected, error);
+        }
         if (!callback || (paused && !error))
             return;
         if (error == SocketEOF) {
@@ -115,7 +118,7 @@ struct Socket::State {
                       "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
                       static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         }
-        paused = !callback(context, bytes, size, source, error);
+        paused = !callback(bytes, size, source, error);
     }
 };
 
@@ -134,7 +137,7 @@ Socket::Socket(SocketProto proto, bool unconnected) {
 
 Socket::~Socket() noexcept {
     StopWrites();
-    SetOnReceive(nullptr, nullptr);
+    SetOnReceive({});
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
         winrt_log(WinrtLogInfo, "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
@@ -302,24 +305,31 @@ bool Socket::GetAddress(SocketAddress *address) {
     return true;
 }
 
-bool Socket::SetOnReceive(SocketOnReceive callback, void *context) {
+bool Socket::SetOnReceive(SocketOnReceive callback) {
     const auto state = state_;
+    const bool registering = static_cast<bool>(callback);
     {
         std::lock_guard lock(state->mutex);
         // Ignore if a callback was already registered.
         if (callback && state->callback)
             return false;
-        state->callback = callback;
-        state->context = context;
+        state->callback = std::move(callback);
     }
-    if (callback && !ResumeReading()) {
+    if (registering && !ResumeReading()) {
         // Roll back registration if starting native reads failed.
         std::lock_guard lock(state->mutex);
         state->callback = nullptr;
-        state->context = nullptr;
         return false;
     }
     return true;
+}
+
+void Socket::ReportError(int32_t error) {
+    state_->deliver(nullptr, 0, nullptr, error);
+}
+
+int32_t Socket::WriteStatus() const {
+    return state_->write_status.load();
 }
 
 bool Socket::ResumeReading() {

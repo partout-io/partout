@@ -26,15 +26,19 @@ public:
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
-    bool SetOnReceive(TunOnReceive callback, void *context);
+    // Removing the callback waits for in-flight delivery under the receive mutex.
+    bool SetOnReceive(TunOnReceive callback);
+    void ReportError(int32_t error);
+    int32_t WriteStatus() const {
+        return write_status_.load();
+    }
     int32_t Write(const uint8_t *bytes, size_t length);
     void StopWrites();
 
 private:
     State &state_; // Borrowed; the controller outlives every TUN handle.
     TunOnReceive callback_ = nullptr;
-    void *context_ = nullptr;
-    std::atomic<bool> writes_stopped_{false};
+    std::atomic<int32_t> write_status_{0};
 };
 
 // Association, Open and Close run on the same native worker. Destruction follows

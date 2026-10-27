@@ -150,6 +150,10 @@ controller APIs.
 The Zig adapters hold generic owned capabilities, without native socket or TUN
 types. Native classes use C++ types and borrow the runtime-owned `RuntimeLoop`; opaque
 handles, C callback tables and address conversions stay in the ABI adapters.
+Socket and TUN endpoints invoke the ABI receive adapter directly under their
+delivery mutex. Callback removal drains that same gate; Transport adds no
+receive callback storage or second mutex. Each endpoint latches terminal errors
+for subsequent writes, while TCP EOF remains a receive-only notification.
 The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
 Detach drains native callbacks. Already-enqueued packets carry generation
