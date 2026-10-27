@@ -26,6 +26,36 @@ using namespace winrt::Windows::Networking::Sockets;
 using namespace winrt::Windows::Storage::Streams;
 
 namespace Partout {
+namespace {
+void WaitForConnect(IAsyncAction const &action, int timeout_ms) {
+    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
+        action.Cancel();
+        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
+    }
+    action.GetResults();
+}
+
+SocketAddress ParseAddress(HostName const &host, hstring const &port) {
+    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
+        throw hresult_invalid_argument();
+    SocketAddress result{};
+    auto text = std::wstring(host.CanonicalName());
+    const auto zone = text.find(L'%');
+    if (zone != std::wstring::npos) {
+        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
+        text.resize(zone);
+    }
+    const bool ipv4 = host.Type() == HostNameType::Ipv4;
+    result.family = ipv4 ? 4 : 6;
+    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
+        throw hresult_invalid_argument();
+    const auto number = std::stoul(std::wstring(port));
+    if (number > UINT16_MAX)
+        throw hresult_invalid_argument();
+    result.port = static_cast<uint16_t>(number);
+    return result;
+}
+} // namespace
 
 // Outstanding reads and writes retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
@@ -246,14 +276,6 @@ void Socket::RegisterForDatagrams() {
         });
 }
 
-void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
-    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
-        action.Cancel();
-        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
-    }
-    action.GetResults();
-}
-
 bool Socket::GetAddress(SocketAddress *address) {
     if (!address)
         return false;
@@ -278,27 +300,6 @@ bool Socket::GetAddress(SocketAddress *address) {
         return false;
     }
     return true;
-}
-
-SocketAddress Socket::ParseAddress(HostName const &host, hstring const &port) {
-    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
-        throw hresult_invalid_argument();
-    SocketAddress result{};
-    auto text = std::wstring(host.CanonicalName());
-    const auto zone = text.find(L'%');
-    if (zone != std::wstring::npos) {
-        result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
-        text.resize(zone);
-    }
-    const bool ipv4 = host.Type() == HostNameType::Ipv4;
-    result.family = ipv4 ? 4 : 6;
-    if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
-        throw hresult_invalid_argument();
-    const auto number = std::stoul(std::wstring(port));
-    if (number > UINT16_MAX)
-        throw hresult_invalid_argument();
-    result.port = static_cast<uint16_t>(number);
-    return result;
 }
 
 bool Socket::SetOnReceive(SocketOnReceive callback, void *context) {

@@ -43,11 +43,6 @@ public:
     bool Open(const char *hostname, uint16_t port, const SocketOpenOptions *options);
     bool GetAddress(SocketAddress *address);
 
-    static SocketAddress Address(winrt::Windows::Networking::HostName const &host,
-                                 winrt::hstring const &port) {
-        return ParseAddress(host, port);
-    }
-
     bool SetOnReceive(SocketOnReceive callback, void *context);
     bool ResumeReading();
     int32_t Write(const uint8_t *bytes, size_t length, const SocketAddress *destination);
@@ -61,10 +56,6 @@ private:
     struct State;
 
     void RegisterForDatagrams();
-    static void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action,
-                               int timeout_ms);
-    static SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host,
-                                      winrt::hstring const &port);
     static winrt::Windows::Foundation::IAsyncAction
     ReadStream(std::shared_ptr<State> state,
                winrt::Windows::Networking::Sockets::StreamSocket stream);
