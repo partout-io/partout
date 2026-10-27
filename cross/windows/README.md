@@ -138,8 +138,10 @@ actor to finalize and cancel; ordinary I/O failures retain protocol reconnect be
 
 ### TUN lifetime and delivery
 
-`Partout::Tun` owns each TUN handle; its nested `State` retains the channel and
-packet counters for the controller and socket writer. One receive mutex protects
+`TunnelController` exclusively owns the TUN `State`, including the channel and
+packet counters. TUN handles and the socket writer borrow it; runtime shutdown
+drains and destroys those transports before destroying the controller.
+One receive mutex protects
 the current borrowed TUN and serializes native packet delivery with callback
 registration, removal and handle destruction. Freeing an old handle cannot clear
 its replacement. Callbacks consume or copy input and must not reenter TUN or

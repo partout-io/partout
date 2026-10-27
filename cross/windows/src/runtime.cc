@@ -140,7 +140,8 @@ struct VpnChannelRuntime::Impl {
                 closing = std::move(controller);
             }
             // Do not hold the callback gate while calling VpnChannel.Stop.
-            // Destroy after all accepted commands, including transport release.
+            // Destroy after all accepted commands, including transport release:
+            // TUN handles and socket writers borrow the controller's TUN state.
             loop->Invoke([&closing] {
                 closing.reset();
             });

@@ -21,7 +21,7 @@ class Tun {
     friend class TunnelController;
 
 public:
-    explicit Tun(std::shared_ptr<State> state);
+    explicit Tun(State &state);
     ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
@@ -31,7 +31,7 @@ public:
     void StopWrites();
 
 private:
-    std::shared_ptr<State> state_;
+    State &state_; // Borrowed; the controller outlives every TUN handle.
     TunOnReceive callback_ = nullptr;
     void *context_ = nullptr;
     std::atomic<bool> writes_stopped_{false};
@@ -60,7 +60,8 @@ private:
     void AssociateUnconnected(Socket &socket);
     RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
 
-    std::shared_ptr<Tun::State> state_;
+    // Handles and socket writers are drained before controller destruction.
+    std::unique_ptr<Tun::State> state_;
     winrt::Windows::Foundation::IInspectable transport_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket idle_transport_{nullptr};
     winrt::Windows::Networking::Connectivity::NetworkAdapter udp_adapter_{nullptr};

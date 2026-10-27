@@ -21,7 +21,7 @@ using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
 
-// Retained by the controller, TUN handles and socket writer, without cycles.
+// Owned by the controller; TUN handles and the socket writer borrow it.
 class Tun::State {
 public:
     VpnChannel channel;
@@ -95,20 +95,20 @@ int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
     return 0;
 }
 
-Tun::Tun(std::shared_ptr<State> state) : state_(std::move(state)) {}
+Tun::Tun(State &state) : state_(state) {}
 
 Tun::~Tun() noexcept {
     StopWrites();
-    std::lock_guard lock(state_->receive_mutex);
+    std::lock_guard lock(state_.receive_mutex);
     callback_ = nullptr;
     context_ = nullptr;
     // An older handle may be freed after Open publishes its replacement.
-    if (state_->tun == this)
-        state_->tun = nullptr;
+    if (state_.tun == this)
+        state_.tun = nullptr;
 }
 
 bool Tun::SetOnReceive(TunOnReceive callback, void *context) {
-    std::lock_guard lock(state_->receive_mutex);
+    std::lock_guard lock(state_.receive_mutex);
     if (callback && callback_)
         return false;
     callback_ = callback;
@@ -119,12 +119,12 @@ bool Tun::SetOnReceive(TunOnReceive callback, void *context) {
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
     if (writes_stopped_)
         return E_ABORT;
-    const auto result = state_->write(bytes, length, false);
+    const auto result = state_.write(bytes, length, false);
     if (result) {
-        ++state_->counters.tun_write_failed;
+        ++state_.counters.tun_write_failed;
         return result;
     }
-    ++state_->counters.tun_write;
+    ++state_.counters.tun_write;
     return 0;
 }
 
@@ -133,7 +133,7 @@ void Tun::StopWrites() {
 }
 
 TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
-    : loop_(loop), state_(std::make_shared<Tun::State>(channel)) {}
+    : loop_(loop), state_(std::make_unique<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
     // Destruction must complete close, rather than queue a borrowed this pointer.
@@ -201,11 +201,11 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
 std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_)
         return nullptr;
-    auto tun = std::make_unique<Tun>(state_);
+    auto tun = std::make_unique<Tun>(*state_);
     if (!started_) {
         const TunSettings settings{info_json};
         if (!idle_transport_) {
-            auto receive = socket_->TakeOver([state = state_](const uint8_t *bytes, size_t length) {
+            auto receive = socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
                 const auto result = state->write(bytes, length, true);
                 if (result) {
                     ++state->counters.link_send_failed;
