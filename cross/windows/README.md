@@ -155,10 +155,11 @@ receive callback storage or second mutex. Each endpoint latches terminal errors
 for subsequent writes, while TCP EOF remains a receive-only notification.
 The native loop converts a write failure into the same queue used for
 asynchronous receive/write failures.
-Each ABI `TransportHandle` owns its socket or TUN directly and borrows the runtime
-loop. It copies writes before posting them, schedules read resumes, and queues its
-own destruction after immediately stopping writes and draining callbacks. There
-is no intermediate C++ Transport object. Native socket policy tokens are opaque
+The ABI uses separate `SocketHandle` and `TunHandle` owners. Each owns one endpoint
+and borrows the runtime loop. Socket handling includes addresses, destination
+validation and native read resumes; TUN handling includes only channel packet I/O.
+Both copy writes before posting them and queue their own destruction after
+immediately stopping writes and draining callbacks. Native socket policy tokens are opaque
 ABI handle references, validated by the ABI adapter before channel association.
 Detach drains native callbacks. Already-enqueued packets carry generation
 tokens and are discarded during mailbox dispatch after detach or replacement.

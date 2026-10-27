@@ -20,32 +20,25 @@ template <typename To, typename From> To ConvertAddress(const From &value) {
     return result;
 }
 
-struct TransportHandle {
+winrt::Windows::Storage::Streams::Buffer CopyBuffer(const uint8_t *bytes, size_t size) {
+    if ((!bytes && size) || size > UINT32_MAX) throw winrt::hresult_invalid_argument();
+    winrt::Windows::Storage::Streams::Buffer buffer{static_cast<uint32_t>(size)};
+    buffer.Length(static_cast<uint32_t>(size));
+    if (size) memcpy(buffer.data(), bytes, size);
+    return buffer;
+}
+
+struct SocketHandle {
     Partout::RuntimeLoop &loop; // Runtime outlives endpoints and their queued destruction.
     std::unique_ptr<Partout::Socket> socket;
-    std::unique_ptr<Partout::Tun> tun;
 
-    TransportHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Socket> value)
+    SocketHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Socket> value)
         : loop(owner), socket(std::move(value)) {}
-
-    TransportHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Tun> value)
-        : loop(owner), tun(std::move(value)) {}
-
-    int32_t WriteStatus() const {
-        return socket ? socket->WriteStatus() : tun->WriteStatus();
-    }
-
-    void ReportError(int32_t error) {
-        if (socket)
-            socket->ReportError(error);
-        else
-            tun->ReportError(error);
-    }
 
     bool ResumeReading() {
         try {
             loop.Post([this] {
-                if (socket && !socket->ResumeReading()) ReportError(E_FAIL);
+                if (!socket->ResumeReading()) socket->ReportError(E_FAIL);
             });
             return true;
         } catch (...) {
@@ -55,35 +48,22 @@ struct TransportHandle {
 
     bool GetAddress(Partout::SocketAddress *address) {
         return loop.Invoke([this, address] {
-            return socket && socket->GetAddress(address);
+            return socket->GetAddress(address);
         });
     }
 
-    void StopWrites() {
-        if (socket)
-            socket->StopWrites();
-        else
-            tun->StopWrites();
-    }
-
     int32_t Write(const uint8_t *bytes, size_t size, const Partout::SocketAddress *destination) {
-        if (auto status = WriteStatus()) return status;
-        if ((!bytes && size) || size > UINT32_MAX ||
-            (socket && socket->IsUnconnected() && !destination))
-            return E_INVALIDARG;
-        if (socket && !socket->Accepts(destination)) return E_INVALIDARG;
+        if (auto status = socket->WriteStatus()) return status;
+        if (socket->IsUnconnected() && !destination) return E_INVALIDARG;
+        if (!socket->Accepts(destination)) return E_INVALIDARG;
         try {
-            winrt::Windows::Storage::Streams::Buffer buffer{static_cast<uint32_t>(size)};
-            buffer.Length(static_cast<uint32_t>(size));
-            if (size) memcpy(buffer.data(), bytes, size);
+            auto buffer = CopyBuffer(bytes, size);
             std::optional<Partout::SocketAddress> address;
             if (destination) address = *destination;
             loop.Post([this, buffer = std::move(buffer), address]() mutable {
-                if (WriteStatus()) return;
-                const auto result =
-                    socket ? socket->Write(std::move(buffer), address ? &*address : nullptr)
-                           : tun->Write(buffer.data(), buffer.Length());
-                if (result) ReportError(result);
+                if (socket->WriteStatus()) return;
+                const auto result = socket->Write(std::move(buffer), address ? &*address : nullptr);
+                if (result) socket->ReportError(result);
             });
             return 0;
         } catch (...) {
@@ -94,31 +74,23 @@ struct TransportHandle {
     // Endpoint callback removal holds its delivery mutex until active calls
     // return. No callback storage or second delivery gate is needed here.
     bool Subscribe(winrt_receive receive, void *context) {
-        if (!receive) {
-            return socket ? socket->SetOnReceive({}) : tun->SetOnReceive({});
-        }
+        if (!receive) return socket->SetOnReceive({});
         return loop.Invoke([this, receive, context] {
-            if (socket) {
-                return socket->SetOnReceive([receive, context](const uint8_t *bytes, size_t size,
-                                                               const Partout::SocketAddress *source,
-                                                               int32_t error) {
-                    winrt_address address{};
-                    if (source) address = ConvertAddress<winrt_address>(*source);
-                    return receive(context, bytes, size, source ? &address : nullptr, error);
-                });
-            }
-            return tun->SetOnReceive(
-                [receive, context](const uint8_t *bytes, size_t size, int32_t error) {
-                    return receive(context, bytes, size, nullptr, error);
-                });
+            return socket->SetOnReceive([receive, context](const uint8_t *bytes, size_t size,
+                                                           const Partout::SocketAddress *source,
+                                                           int32_t error) {
+                winrt_address address{};
+                if (source) address = ConvertAddress<winrt_address>(*source);
+                return receive(context, bytes, size, source ? &address : nullptr, error);
+            });
         });
     }
 
     winrt_transport api{
         .context = this,
         .release = [](void *raw) {
-            auto self = static_cast<TransportHandle *>(raw);
-            self->StopWrites();
+            auto self = static_cast<SocketHandle *>(raw);
+            self->socket->StopWrites();
             self->Subscribe(nullptr, nullptr);
             // Drain callbacks now; destroy on the worker after accepted commands.
             try {
@@ -132,7 +104,7 @@ struct TransportHandle {
             }
         },
         .subscribe = [](void *raw, winrt_receive receive, void *receive_context) {
-            auto self = static_cast<TransportHandle *>(raw);
+            auto self = static_cast<SocketHandle *>(raw);
             try {
                 return self->Subscribe(receive, receive_context);
             } catch (...) {
@@ -140,41 +112,115 @@ struct TransportHandle {
             }
         },
         .resume = [](void *raw) {
-            return static_cast<TransportHandle *>(raw)->ResumeReading();
+            return static_cast<SocketHandle *>(raw)->ResumeReading();
         },
         .stop = [](void *raw) {
-            static_cast<TransportHandle *>(raw)->StopWrites();
+            static_cast<SocketHandle *>(raw)->socket->StopWrites();
         },
         .write = [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *destination) {
             Partout::SocketAddress address{};
             if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
-            return static_cast<TransportHandle *>(raw)->Write(bytes, size,
-                                                              destination ? &address : nullptr);
+            return static_cast<SocketHandle *>(raw)->Write(bytes, size,
+                                                           destination ? &address : nullptr);
         },
         .local_address = [](void *raw, winrt_address *result) {
             Partout::SocketAddress address{};
-            if (!static_cast<TransportHandle *>(raw)->GetAddress(&address)) return false;
+            if (!static_cast<SocketHandle *>(raw)->GetAddress(&address)) return false;
             *result = ConvertAddress<winrt_address>(address);
             return true;
         },
-        .unconnected = socket && socket->IsUnconnected()};
+        .unconnected = socket->IsUnconnected()};
+};
+
+struct TunHandle {
+    Partout::RuntimeLoop &loop;
+    std::unique_ptr<Partout::Tun> tun;
+
+    TunHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Tun> value)
+        : loop(owner), tun(std::move(value)) {}
+
+    int32_t Write(const uint8_t *bytes, size_t size) {
+        if (auto status = tun->WriteStatus()) return status;
+        try {
+            auto buffer = CopyBuffer(bytes, size);
+            loop.Post([this, buffer = std::move(buffer)] {
+                if (tun->WriteStatus()) return;
+                const auto result = tun->Write(buffer.data(), buffer.Length());
+                if (result) tun->ReportError(result);
+            });
+            return 0;
+        } catch (...) {
+            return winrt::to_hresult().value;
+        }
+    }
+
+    bool Subscribe(winrt_receive receive, void *context) {
+        // Removing the endpoint callback drains active delivery immediately.
+        if (!receive) return tun->SetOnReceive({});
+        return loop.Invoke([this, receive, context] {
+            return tun->SetOnReceive(
+                [receive, context](const uint8_t *bytes, size_t size, int32_t error) {
+                    return receive(context, bytes, size, nullptr, error);
+                });
+        });
+    }
+
+    winrt_transport api{
+        .context = this,
+        .release = [](void *raw) {
+            auto self = static_cast<TunHandle *>(raw);
+            self->tun->StopWrites();
+            self->Subscribe(nullptr, nullptr);
+            // The controller outlives this handle and its queued writes/destruction.
+            try {
+                self->loop.Post([self] {
+                    delete self;
+                });
+            } catch (...) {
+                self->loop.Invoke([self] {
+                    delete self;
+                });
+            }
+        },
+        .subscribe = [](void *raw, winrt_receive receive, void *receive_context) {
+            try {
+                return static_cast<TunHandle *>(raw)->Subscribe(receive, receive_context);
+            } catch (...) {
+                return false;
+            }
+        },
+        // TUN admission is controlled by the consumer; there is no native read loop.
+        .resume = [](void *) {
+            return true;
+        },
+        .stop = [](void *raw) {
+            static_cast<TunHandle *>(raw)->tun->StopWrites();
+        },
+        .write = [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *) {
+            return static_cast<TunHandle *>(raw)->Write(bytes, size);
+        },
+        // A channel TUN has no bound socket address.
+        .local_address = [](void *, winrt_address *) {
+            return false;
+        },
+        .unconnected = false};
 };
 } // namespace
 
 namespace Partout::ABI {
-winrt_transport *Wrap(RuntimeLoop &loop, std::unique_ptr<Tun> tun) {
-    auto wrapper = std::make_unique<TransportHandle>(loop, std::move(tun));
+winrt_transport *WrapTun(RuntimeLoop &loop, std::unique_ptr<Tun> tun) {
+    auto wrapper = std::make_unique<TunHandle>(loop, std::move(tun));
     auto api = &wrapper->api;
     wrapper.release();
     return api;
 }
 
 bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
-    const auto transport = reinterpret_cast<TransportHandle *>(token);
-    if (!transport || !transport->socket) return false;
+    const auto handle = reinterpret_cast<SocketHandle *>(token);
+    if (!handle || !handle->socket) return false;
     if (!controller) return true;
-    if (&controller->Loop() != &transport->loop) return false;
-    return controller->Associate(*transport->socket);
+    if (&controller->Loop() != &handle->loop) return false;
+    return controller->Associate(*handle->socket);
 }
 } // namespace Partout::ABI
 
@@ -225,14 +271,14 @@ winrt_transport *winrt_connect(const char *host, uint16_t port,
                 settings.tcp ? Partout::SocketProtoTCP : Partout::SocketProtoUDP,
                 settings.unconnected
             );
-            auto transport = std::make_unique<TransportHandle>(*loop, std::move(socket));
-            const uintptr_t transport_ptr = reinterpret_cast<uintptr_t>(transport.get());
-            if (settings.configure && !settings.configure(settings.context, transport_ptr))
+            auto handle = std::make_unique<SocketHandle>(*loop, std::move(socket));
+            const uintptr_t socket_token = reinterpret_cast<uintptr_t>(handle.get());
+            if (settings.configure && !settings.configure(settings.context, socket_token))
                 return nullptr;
             Partout::SocketOpenOptions options{settings.dual_stack, settings.timeout_ms};
-            if (!transport->socket->Open(host.c_str(), port, &options)) return nullptr;
-            auto api = &transport->api;
-            transport.release();
+            if (!handle->socket->Open(host.c_str(), port, &options)) return nullptr;
+            auto api = &handle->api;
+            handle.release();
             return api;
         });
     } catch (...) {
