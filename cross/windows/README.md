@@ -176,10 +176,9 @@ bounded queue for pending Go reads stays separate from daemon dispatch.
 
 Writes copy the submission into a WinRT `Buffer` before posting it to the native
 worker. Direct socket writes move that buffer into the socket queue without a
-second payload copy. Owned I/O threads call generic backend entry/exit hooks once
-around their work. Only the Windows backend initializes and uninitializes an
-apartment. Foreign Go writer threads use the implicit MTA held alive by the
-native worker and socket state; writes perform no per-packet apartment setup.
+second payload copy. Zig and Go writer threads use the implicit MTA held alive
+by the native worker and socket state. No thread hooks or per-packet apartment
+setup are needed; runtime shutdown drains all I/O users before releasing the MTA.
 Channel writes still copy into channel-owned packet buffers on the native
 worker, serialized with handover and stop. TCP partial-write retries retain the
 existing suffix-copy behavior.

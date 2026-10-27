@@ -23,7 +23,7 @@ const request: Worker.Request = .{
     .link_activity_timeout = 1000,
 };
 
-test "backend thread hooks bracket owned threads and foreign writers retain buffer ownership" {
+test "runtime MTA supports uninitialized writer threads and preserves buffer ownership" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
@@ -31,9 +31,7 @@ test "backend thread hooks bracket owned threads and foreign writers retain buff
         socket: io.LinkDescriptor,
         destination: io.SocketAddress,
         before: [2]i32 = .{ -1, -1 },
-        during: [2]i32 = .{ -1, -1 },
         after: [2]i32 = .{ -1, -1 },
-        entered: bool = false,
         writes: [3]i32 = .{ -1, -1, -1 },
         received: std.atomic.Value(u8) = .init(0),
 
@@ -48,17 +46,12 @@ test "backend thread hooks bracket owned threads and foreign writers retain buff
         fn run(self: *@This()) void {
             self.before = apartment();
             var payload = [_]u8{'a'};
-            // No entry hook: this models a foreign Go writer using the runtime's MTA.
-            self.writes[0] = self.socket.write(&payload, self.destination);
-            io.threadEnter() catch return;
-            self.entered = true;
-            self.during = apartment();
-            payload[0] = 'b';
-            self.writes[1] = self.socket.write(&payload, self.destination);
-            io.threadExit();
+            // No thread initialization: the native runtime keeps the MTA alive.
+            for ("abc", 0..) |byte, index| {
+                payload[0] = byte;
+                self.writes[index] = self.socket.write(&payload, self.destination);
+            }
             self.after = apartment();
-            payload[0] = 'c';
-            self.writes[2] = self.socket.write(&payload, self.destination);
             payload[0] = 'x'; // Each submitted Buffer must already own its payload.
         }
 
@@ -86,11 +79,9 @@ test "backend thread hooks bracket owned threads and foreign writers retain buff
     defer receiver.setOnReceive(null, null) catch unreachable;
     const thread = try std.Thread.spawn(.{}, Probe.run, .{&probe});
     thread.join();
-    try std.testing.expect(probe.entered);
     try std.testing.expectEqual([3]i32{ 0, 0, 0 }, probe.writes);
-    // APTTYPE_MTA=1; qualifier is IMPLICIT_MTA=1 before/after, NONE=0 while entered.
+    // APTTYPE_MTA=1, APTTYPEQUALIFIER_IMPLICIT_MTA=1 throughout submission.
     try std.testing.expectEqual([2]i32{ 1, 1 }, probe.before);
-    try std.testing.expectEqual([2]i32{ 1, 0 }, probe.during);
     try std.testing.expectEqual(probe.before, probe.after);
     const deadline = core.monotonicNs() + 5 * std.time.ns_per_s;
     while (probe.received.load(.acquire) != 7) {

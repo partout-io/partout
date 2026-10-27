@@ -5,7 +5,6 @@
 #include "loop.h"
 #include "socket.h"
 #include "tun.h"
-#include "winrt/log.h"
 #include <algorithm>
 #include <cstring>
 #include <optional>
@@ -180,21 +179,6 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
 } // namespace Partout::ABI
 
 extern "C" {
-bool winrt_thread_enter(void) {
-    try {
-        winrt::init_apartment(winrt::apartment_type::multi_threaded);
-        return true;
-    } catch (...) {
-        winrt_log(WinrtLogError, "Partout: thread initialization failed: HRESULT=0x%08x",
-                  static_cast<unsigned>(winrt::to_hresult().value));
-        return false;
-    }
-}
-
-void winrt_thread_exit(void) {
-    winrt::uninit_apartment();
-}
-
 winrt_loop winrt_loop_create(void) {
     try {
         return new Partout::RuntimeLoop;

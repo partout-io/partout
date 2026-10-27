@@ -21,10 +21,6 @@ pub const FileDescriptor = io_c.pp_fd;
 pub const SocketDescriptor = io_c.pp_socket_fd;
 const reachabilityNone = io.reachabilityNone;
 
-pub fn threadEnter() error{LibcFailure}!void {}
-
-pub fn threadExit() void {}
-
 /// A descriptor includes:
 /// - The `fd` to watch for I/O events.
 /// - The `io` interface to perform reads and writes.

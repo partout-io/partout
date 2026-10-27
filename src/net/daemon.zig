@@ -1070,20 +1070,15 @@ const ConnectionDaemon = struct {
     };
 
     fn run(self: *ConnectionDaemon) void {
-        var thread_error: ?io.Error = null;
-        io.threadEnter() catch |err| {
-            thread_error = err;
-        };
-        defer if (thread_error == null) io.threadExit();
         self.jobs_mutex.lock();
-        var running = self.is_running and thread_error == null;
+        var running = self.is_running;
         self.actor_id = std.Thread.getCurrentId();
         self.jobs_mutex.unlock();
         log.write(.debug, "Connection event loop started");
 
         // Record event loop terminations caused by the looper.
-        var loop_terminated = thread_error != null;
-        var loop_failure: ?io.Failure = if (thread_error) |err| .{ .system = err } else null;
+        var loop_terminated = false;
+        var loop_failure: ?io.Failure = null;
 
         while (running) {
             // Fetch pending jobs if any.

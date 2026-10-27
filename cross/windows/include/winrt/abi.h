@@ -31,11 +31,6 @@ enum {
 
 typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_address *, int32_t);
 
-/* Owned I/O threads enter once before native work and exit on the same thread.
- * Foreign writer threads use the MTA kept alive by the active native runtime. */
-bool winrt_thread_enter(void);
-void winrt_thread_exit(void);
-
 /* Owned transport capability, shared by daemon and passive consumers.
  * subscribe(NULL) drains borrowed callback contexts. Writes copy into a WinRT
  * Buffer before return; writes perform no per-packet apartment initialization.
