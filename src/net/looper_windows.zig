@@ -32,7 +32,7 @@ pub const WindowsLooper = struct {
         generation: u64 = 0,
         reading: bool = true,
 
-        pub fn input(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
+        pub fn receipt(attachment: *Attachment, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) ?helpers.PacketReceipt {
             const self = attachment.owner;
             self.mutex.lock();
             defer self.mutex.unlock();

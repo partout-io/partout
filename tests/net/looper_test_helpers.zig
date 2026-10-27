@@ -57,7 +57,7 @@ pub const Mailbox = struct {
 
     fn receive(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, address: [*c]const source.net_io.SocketAddress, code: i32) callconv(.c) bool {
         const attachment: *source.net_looper.Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
-        const input = attachment.input(bytes, length, address, code) orelse return false;
+        const input = attachment.receipt(bytes, length, address, code) orelse return false;
         const self: *Mailbox = @ptrCast(@alignCast(attachment.owner.receive_context.?));
         post(self, input) catch return false;
         return attachment.keepReading(input);

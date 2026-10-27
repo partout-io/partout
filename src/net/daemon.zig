@@ -622,7 +622,7 @@ const ConnectionDaemon = struct {
         if (builtin.os.tag != .windows) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
-        const input = attachment.input(bytes, length, source, code) orelse return false;
+        const input = attachment.receipt(bytes, length, source, code) orelse return false;
         var owned = input;
         owned.bytes = self.daemon.allocator.dupe(u8, input.bytes) catch {
             self.onReceivePacketsFailed();
