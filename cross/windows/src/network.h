@@ -23,8 +23,8 @@ public:
     NetworkMonitor();
     ~NetworkMonitor();
 
-    void Stop();
     void Start(std::function<void(bool, bool)> notify);
+    void Stop();
 
 private:
     struct State;

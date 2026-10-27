@@ -63,15 +63,6 @@ NetworkMonitor::~NetworkMonitor() {
     Stop();
 }
 
-void NetworkMonitor::Stop() {
-    {
-        std::lock_guard lock(state_->mutex);
-        state_->notify = nullptr;
-        state_->path = {};
-    }
-    registration_.revoke();
-}
-
 void NetworkMonitor::Start(std::function<void(bool, bool)> notify) {
     Stop();
     {
@@ -85,5 +76,13 @@ void NetworkMonitor::Start(std::function<void(bool, bool)> notify) {
         });
     state_->Refresh();
 }
-} // namespace Partout
 
+void NetworkMonitor::Stop() {
+    {
+        std::lock_guard lock(state_->mutex);
+        state_->notify = nullptr;
+        state_->path = {};
+    }
+    registration_.revoke();
+}
+} // namespace Partout
