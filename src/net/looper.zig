@@ -57,7 +57,7 @@ pub const Looper = struct {
         return .{
             .allocator = allocator,
             .impl = try Impl.create(allocator, options),
-            .mailbox_job_limit = if (builtin.os.tag == .windows) options.max_read_count else std.math.maxInt(usize),
+            .mailbox_job_limit = options.max_read_count,
         };
     }
 

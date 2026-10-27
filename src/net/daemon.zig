@@ -1083,15 +1083,11 @@ const ConnectionDaemon = struct {
             const last = self.jobs.tail;
             self.jobs_mutex.unlock();
 
-            // Paused input stays queued; controls can pass it without requeueing.
-            // Bound each turn so packet traffic cannot starve protocol timers.
+            // Drain eligible jobs, leaving paused packets queued. Yield for timers
+            // after the mailbox limit, even if more jobs are waiting.
             var remaining = self.looper.mailbox_job_limit;
-            while (running and remaining > 0) : (remaining -= 1) {
-                self.jobs_mutex.lock();
-                running = self.is_running and !self.packet_submission_failed;
-                const next = if (running) self.jobs.removeWhere(self, Job.eligible) else null;
-                self.jobs_mutex.unlock();
-                const job = next orelse break;
+            var pending = self.takeJob(&running, &remaining);
+            while (pending) |job| {
                 const was_last = job == last;
 
                 // Run jobs if thread is still running.
@@ -1104,9 +1100,8 @@ const ConnectionDaemon = struct {
                     }
                 };
                 running = self.completeJob(job, result);
-                if (was_last) break;
+                pending = if (running and !was_last) self.takeJob(&running, &remaining) else null;
             }
-            if (remaining == 0) _ = io_c.pp_mux_wake(self.mux);
             if (!running) break;
 
             // Wait for new jobs or I/O.
@@ -1152,6 +1147,20 @@ const ConnectionDaemon = struct {
         self.actor_id = null;
         self.jobs_mutex.unlock();
         log.write(.debug, "Connection event loop stopped");
+    }
+
+    fn takeJob(self: *ConnectionDaemon, running: *bool, remaining: *usize) ?*Job {
+        self.jobs_mutex.lock();
+        defer self.jobs_mutex.unlock();
+        running.* = self.is_running and !self.packet_submission_failed;
+        if (!running.*) return null;
+        if (remaining.* == 0) {
+            _ = io_c.pp_mux_wake(self.mux);
+            return null;
+        }
+        const job = self.jobs.removeWhere(self, Job.eligible) orelse return null;
+        remaining.* -= 1;
+        return job;
     }
 
     fn executeJob(self: *ConnectionDaemon, job: *const Job) Error!void {

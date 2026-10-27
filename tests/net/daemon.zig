@@ -2094,6 +2094,79 @@ test "connection worker rolls back endpoint and thread allocations" {
     try std.testing.checkAllAllocationFailures(std.testing.allocator, Fixture.run, .{});
 }
 
+test "daemon yields to timers between mailbox batches on every platform" {
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    const Probe = struct {
+        connection: FailingStartConnection = .{},
+        writer: net.ConnectionWriter = undefined,
+        timer: io.Timer = .{},
+        calls: usize = 0,
+        calls_at_timer: ?usize = null,
+
+        fn create(raw: ?*anyopaque, _: std.mem.Allocator, _: net.ConnectionModule, sb: net.Sandbox) net.ConnectionCreateError!net.Connection {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.writer = sb.writer.?;
+            return .{ .ptr = &self.connection, .vtable = &vtable, .daemon_io = .none };
+        }
+
+        fn betterPath(raw: *anyopaque) void {
+            const connection: *FailingStartConnection = @ptrCast(@alignCast(raw));
+            const self: *@This() = @fieldParentPtr("connection", connection);
+            self.calls += 1;
+            if (self.calls == 1) self.writer.scheduleTimer(&self.timer, 0, .{ .context = self, .callback = tick }) catch unreachable;
+        }
+
+        fn tick(raw: ?*anyopaque) void {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.calls_at_timer = self.calls;
+        }
+
+        fn flood(owner: anytype, _: void) daemon.Error!void {
+            for (0..owner.looper.mailbox_job_limit + 1) |_| try daemon.testing.schedule(owner, .onBetterPath);
+        }
+
+        fn barrier(_: anytype, _: void) daemon.Error!void {}
+
+        const vtable = blk: {
+            var value = FailingStartConnection.vtable;
+            value.better_path = betterPath;
+            break :blk value;
+        };
+        const implementation_vtable: net.ConnectionImplementation.VTable = .{
+            .module_type = FailingStartConnection.moduleType,
+            .create_connection = create,
+        };
+    };
+    var probe: Probe = .{};
+    var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{.{ .ptr = &probe, .vtable = &Probe.implementation_vtable }});
+    defer registry.deinit(std.testing.allocator);
+    var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(std.testing.allocator);
+    var controller: mock_mod.MockTunnelController = .{};
+    var monitor: mock_mod.MockNetworkMonitor = .{ .reachable = false };
+    const sut = try Daemon.create(std.testing.allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .starts_immediately = false },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try cancelGateTimer(owner);
+    try daemon.testing.onLoop(owner, {}, Probe.flood);
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try std.testing.expectEqual(owner.looper.mailbox_job_limit + 1, probe.calls);
+    try std.testing.expect(probe.calls_at_timer.? > 0);
+    try std.testing.expect(probe.calls_at_timer.? < probe.calls);
+}
+
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
