@@ -69,13 +69,13 @@ pub const Looper = struct {
         return self.impl.loopOnce(null, failure);
     }
 
-    pub fn canDeliverPackets(self: *Looper, submission: PacketSubmission) bool {
-        if (builtin.os.tag == .windows) return self.impl.canDeliverPackets(submission);
+    pub fn canReceivePackets(self: *Looper, submission: PacketSubmission) bool {
+        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(submission);
         return true;
     }
 
-    pub fn deliverPackets(self: *Looper, submission: PacketSubmission) void {
-        if (builtin.os.tag == .windows) self.impl.deliverPackets(submission);
+    pub fn receivePackets(self: *Looper, submission: PacketSubmission) void {
+        if (builtin.os.tag == .windows) self.impl.receivePackets(submission);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

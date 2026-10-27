@@ -1759,7 +1759,7 @@ test "stop waits for terminal submission failure before immediate destruction" {
             }
         }
         failing.fail_index = failing.alloc_index;
-        try std.testing.expectError(error.OutOfMemory, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = 0, .bytes = "oom" }));
+        try std.testing.expectError(error.OutOfMemory, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = 0, .bytes = "oom" }));
         if (!stop_already_queued) stopper = try std.Thread.spawn(.{}, Probe.stopper, .{ sut, &probe });
         while (!probe.stop_entered.load(.acquire)) {
             if (core.monotonicNs() >= deadline) return error.Timeout;
@@ -2364,7 +2364,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             self.pause_next = true;
             const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
             for ([_][]const u8{ "first", "second", "third" }) |bytes| {
-                try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
+                try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
             }
         }
 
@@ -2377,7 +2377,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             self.measure_timer = true;
             const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
             for (0..owner.looper.impl.max_read_count + 1) |_| {
-                try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
+                try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
             }
         }
     };
@@ -2427,7 +2427,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
 
         // Queue one in-flight packet while paused, then run a control past it.
         const generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-        try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
+        try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "pending" });
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
         try daemon.testing.onLoop(owner, {}, Probe.resumeInput);
@@ -2454,7 +2454,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try std.testing.expect(probe.reads_at_timer.? < all_reads);
 
         try daemon.testing.onLoop(owner, &probe, Probe.attach);
-        try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
+        try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "stale", .code = -1 });
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(usize, 0), probe.failures);
         try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
@@ -2468,7 +2468,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             // Actor finalization and cancellation must work while allocation fails.
             try waitForExit(owner);
             try std.testing.expect(failing.has_induced_failure);
-            try std.testing.expect(owner.packet_submission_failed);
+            try std.testing.expect(owner.packet_receive_failed);
             try std.testing.expect(!owner.is_running);
             try std.testing.expect(sut.state == .stopped);
             try std.testing.expectEqual(@as(usize, 1), controller.cancel_count);
@@ -2479,13 +2479,13 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             try std.testing.expectEqual(@as(usize, 0), connection.start_count);
             failing.fail_index = std.math.maxInt(usize);
             try std.testing.expectError(error.Closed, sut.start());
-            try std.testing.expectError(error.Closed, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
+            try std.testing.expectError(error.Closed, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = generation, .bytes = "rejected" }));
         } else {
             // Paused owned input must also be reclaimed when the mailbox closes.
             const final_generation = owner.looper.impl.sides[@intFromEnum(io.Side.tun)].generation;
-            try daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
+            try daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "shutdown" });
             daemon.testing.shutdown(owner);
-            try std.testing.expectError(error.Closed, daemon.testing.submitPackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
+            try std.testing.expectError(error.Closed, daemon.testing.receivePackets(owner, .{ .side = .tun, .generation = final_generation, .bytes = "rejected" }));
             try waitForExit(owner);
         }
         try std.testing.expect(probe.on_actor);
