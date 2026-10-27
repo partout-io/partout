@@ -50,8 +50,21 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         if (static_cast<unsigned>(level) < std::size(levels)) pp_clog(levels[level], message);
     });
     pp_tun_ctrl_fnt functions{};
-    functions.set_delegate = [](void *, const pp_tun_ctrl_delegate *) {
-        // FIXME: ###, Implement reachability notifications.
+    functions.set_delegate = [](void *raw, const pp_tun_ctrl_delegate *delegate) {
+        auto controller = static_cast<Partout::TunnelController *>(raw);
+        if (!controller) return;
+        if (!delegate) {
+            controller->Monitor().Stop();
+            return;
+        }
+        controller->Monitor().Start([callbacks = *delegate](bool reachable, bool changed) {
+            winrt_log(WinrtLogInfo, "Partout: physical network changed: reachable=%s, refresh=%s",
+                      reachable ? "true" : "false", changed ? "true" : "false");
+            const pp_reachability info{reachable};
+            if (callbacks.on_reachability) callbacks.on_reachability(callbacks.ctx, &info);
+            // Notify the daemon that the available physical path has changed.
+            if (changed && reachable && callbacks.on_better_path) callbacks.on_better_path(callbacks.ctx);
+        });
     };
     functions.set_tunnel = [](void *raw, const char *, const char *json) -> pp_tun {
         auto controller = static_cast<Partout::TunnelController *>(raw);

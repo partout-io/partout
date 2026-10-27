@@ -14,13 +14,14 @@ if(PP_BUILD_WINRT)
     add_library(partout-winrt-backend OBJECT
         cross/windows/src/abi.cc
         cross/windows/src/loop.cc
+        cross/windows/src/network.cc
         cross/windows/src/socket.cc
         cross/windows/src/tun.cc
         cross/windows/src/tun_settings.cc
         cross/windows/src/log.cc
     )
     target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
-    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32)
+    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi)
 
     # Preserve a single archive for Zig and existing consumers.
     add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)

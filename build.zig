@@ -445,6 +445,7 @@ fn createPartoutModule(
                 module.addObjectFile(library);
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
+                module.linkSystemLibrary("iphlpapi", .{});
             }
         }
         addCSources(module, config.openvpn, config.wireguard);

@@ -5,6 +5,7 @@
 
 #include "io_types.h"
 #include "socket.h"
+#include "network.h"
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Vpn.h>
 #include <winrt/Windows.Networking.Sockets.h>
@@ -53,10 +54,8 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-
-    RuntimeLoop &Loop() const {
-        return loop_;
-    }
+    RuntimeLoop &Loop() const { return loop_; }
+    NetworkMonitor &Monitor() { return monitor_; }
 
     std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;
@@ -66,6 +65,7 @@ public:
 private:
     void AssociateUnconnected(Socket &socket);
     RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
+    NetworkMonitor monitor_;
 
     // Handles and socket writers are drained before controller destruction.
     std::unique_ptr<Tun::State> state_;
