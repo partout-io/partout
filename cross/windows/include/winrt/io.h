@@ -49,9 +49,9 @@ typedef struct {
 } winrt_connect_options;
 /* Creates, configures and opens a link in one operation. configure receives a
  * temporary native policy token; it must not retain or dereference that token.
- * A null loop reuses the current submitted worker, or creates a standalone loop
- * when called outside submitted work. The returned transport retains its loop. */
-winrt_transport *winrt_connect(winrt_loop, const char *host, uint16_t port,
+ * Reuses the current native worker, or creates a standalone loop when called
+ * outside a worker. The returned transport retains its loop. */
+winrt_transport *winrt_connect(const char *host, uint16_t port,
     const winrt_connect_options *options);
 
 winrt_loop winrt_loop_create(void);

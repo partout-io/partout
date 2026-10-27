@@ -24,12 +24,13 @@ pub const WindowsLooper = struct {
     max_read_count: usize,
     stopped: bool = false,
 
-    const Event = struct {
+    const Pending = struct {
         side: io.Side,
         generation: u64,
         bytes: []const u8 = &.{},
         source: ?io.SocketAddress = null,
         code: i32 = 0,
+        next: ?*Pending = null,
     };
 
     const Attachment = struct {
@@ -47,7 +48,7 @@ pub const WindowsLooper = struct {
                 self.mutex.unlock();
                 return false;
             }
-            const event: Event = .{
+            const event: Pending = .{
                 .side = side.tag,
                 .generation = side.generation,
                 .bytes = if (length == 0) &.{} else bytes[0..length],
@@ -60,10 +61,6 @@ pub const WindowsLooper = struct {
             defer self.mutex.unlock();
             return accepted and side.arguments != null and side.generation == event.generation and side.reading and code == 0;
         }
-    };
-    const Pending = struct {
-        event: Event,
-        next: ?*Pending = null,
     };
     const Scheduled = struct {
         id: u64,
@@ -95,25 +92,25 @@ pub const WindowsLooper = struct {
         self.allocator.destroy(self);
     }
 
-    fn submit(self: *WindowsLooper, event: Event) bool {
+    fn submit(self: *WindowsLooper, event: Pending) bool {
         const pending = self.allocator.create(Pending) catch return false;
         const bytes = self.allocator.dupe(u8, event.bytes) catch {
             self.allocator.destroy(pending);
             return false;
         };
-        pending.* = .{ .event = event };
-        pending.event.bytes = bytes;
+        pending.* = event;
+        pending.bytes = bytes;
         self.mutex.lock();
         defer self.mutex.unlock();
         self.mailbox.append(pending);
         if (self.waiting) _ = c.pp_mux_wake(self.mux);
         return true;
     }
-    fn readyLocked(self: *const WindowsLooper, event: Event) bool {
+    fn readyLocked(self: *const WindowsLooper, event: Pending) bool {
         const side = &self.sides[@intFromEnum(event.side)];
         return side.arguments == null or side.generation != event.generation or event.code != 0 or side.reading;
     }
-    fn deliver(self: *WindowsLooper, event: Event) void {
+    fn deliver(self: *WindowsLooper, event: Pending) void {
         const side = &self.sides[@intFromEnum(event.side)];
         if (side.arguments == null or side.generation != event.generation) return;
         const arguments = side.arguments.?;
@@ -153,7 +150,7 @@ pub const WindowsLooper = struct {
             var pending = self.mailbox.head;
             var ready = false;
             while (pending) |node| : (pending = node.next) {
-                if (self.readyLocked(node.event)) {
+                if (self.readyLocked(node.*)) {
                     ready = true;
                     break;
                 }
@@ -181,13 +178,13 @@ pub const WindowsLooper = struct {
             self.mutex.lock();
             const pending = self.mailbox.removeWhere(self, struct {
                 fn ready(node: *const Pending, owner: *WindowsLooper) bool {
-                    return owner.readyLocked(node.event);
+                    return owner.readyLocked(node.*);
                 }
             }.ready);
             self.mutex.unlock();
             const node = pending orelse break;
-            self.deliver(node.event);
-            self.allocator.free(node.event.bytes);
+            self.deliver(node.*);
+            self.allocator.free(node.bytes);
             self.allocator.destroy(node);
             if (self.stopped) return false;
         }
@@ -223,7 +220,7 @@ pub const WindowsLooper = struct {
         try self.detach(.link);
         try self.detach(.tun);
         while (self.mailbox.take()) |node| {
-            self.allocator.free(node.event.bytes);
+            self.allocator.free(node.bytes);
             self.allocator.destroy(node);
         }
     }

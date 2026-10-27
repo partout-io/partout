@@ -6,69 +6,52 @@
 #include "winrt/log.h"
 #include <winrt/base.h>
 #include <string>
-#include <condition_variable>
-#include <deque>
-#include <mutex>
 #include <stdexcept>
-#include <thread>
 #include <algorithm>
 
 namespace Partout {
 namespace {
 thread_local RuntimeLoop *current_loop = nullptr;
-struct SubmissionScope {
-    RuntimeLoop *previous = current_loop;
-    explicit SubmissionScope(RuntimeLoop *loop) { current_loop = loop; }
-    ~SubmissionScope() { current_loop = previous; }
-};
 }
 
-struct RuntimeLoop::State {
-    std::mutex mutex;
-    std::condition_variable changed;
-    std::deque<std::function<void()>> commands;
-    bool quitting = false;
-    std::thread worker;
-    std::thread::id worker_id;
-    std::promise<void> started;
-};
-RuntimeLoop::RuntimeLoop() : state_(std::make_unique<State>()) {
-    auto started = state_->started.get_future();
-    state_->worker = std::thread([this] { Run(); });
+RuntimeLoop::RuntimeLoop() {
+    auto started = started_.get_future();
+    worker_ = std::thread([this] { Run(); });
     try { started.get(); }
-    catch (...) { state_->worker.join(); throw; }
+    catch (...) { worker_.join(); throw; }
 }
 RuntimeLoop::~RuntimeLoop() {
-    { std::lock_guard lock(state_->mutex); state_->quitting = true; }
-    state_->changed.notify_one();
-    state_->worker.join();
+    { std::lock_guard lock(mutex_); quitting_ = true; }
+    changed_.notify_one();
+    worker_.join();
 }
-bool RuntimeLoop::IsWorker() const { return std::this_thread::get_id() == state_->worker_id; }
+bool RuntimeLoop::IsWorker() const { return std::this_thread::get_id() == worker_id_; }
 void RuntimeLoop::Post(std::function<void()> command) {
-    { std::lock_guard lock(state_->mutex);
-      if (state_->quitting) throw std::runtime_error("RuntimeLoop is closed");
-      state_->commands.push_back(std::move(command)); }
-    state_->changed.notify_one();
+    { std::lock_guard lock(mutex_);
+      if (quitting_) throw std::runtime_error("RuntimeLoop is closed");
+      commands_.push_back(std::move(command)); }
+    changed_.notify_one();
 }
 void RuntimeLoop::Run() {
-    auto &self = *state_;
-    self.worker_id = std::this_thread::get_id();
+    worker_id_ = std::this_thread::get_id();
     try { winrt::init_apartment(winrt::apartment_type::multi_threaded); }
-    catch (...) { self.started.set_exception(std::current_exception()); return; }
-    self.started.set_value();
+    catch (...) { started_.set_exception(std::current_exception()); return; }
+    current_loop = this;
+    started_.set_value();
     for (;;) {
         std::function<void()> command;
         {
-            std::unique_lock lock(self.mutex);
-            self.changed.wait(lock, [&] { return self.quitting || !self.commands.empty(); });
-            if (self.commands.empty()) break;
-            command = std::move(self.commands.front());
-            self.commands.pop_front();
+            std::unique_lock lock(mutex_);
+            changed_.wait(lock, [&] { return quitting_ || !commands_.empty(); });
+            if (commands_.empty()) break;
+            command = std::move(commands_.front());
+            commands_.pop_front();
         }
         try { command(); }
         catch (...) { winrt_log(WinrtLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
             static_cast<unsigned>(winrt::to_hresult().value)); }
     }
+    current_loop = nullptr;
     // Cached activation factories must not survive the apartment that supplied
     // them when the last native worker is released and a later one is created.
     winrt::clear_factory_cache();
@@ -150,10 +133,7 @@ winrt_loop winrt_loop_create(void) {
 }
 bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) {
     try {
-        loop->handle->Post([loop = loop->handle.get(), execute, context] {
-            Partout::SubmissionScope scope{loop};
-            execute(context);
-        });
+        loop->handle->Post([=] { execute(context); });
         return true;
     } catch (...) { return false; }
 }
@@ -164,11 +144,10 @@ void winrt_loop_free(winrt_loop loop) {
     delete loop;
 }
 
-winrt_transport *winrt_connect(winrt_loop requested_loop, const char *host, uint16_t port,
+winrt_transport *winrt_connect(const char *host, uint16_t port,
     const winrt_connect_options *options) {
     try {
-        auto loop = requested_loop ? requested_loop->handle :
-            Partout::current_loop ? Partout::current_loop->shared_from_this() : std::make_shared<Partout::RuntimeLoop>();
+        auto loop = Partout::current_loop ? Partout::current_loop->shared_from_this() : std::make_shared<Partout::RuntimeLoop>();
         // The caller retains the loop until Invoke returns; commands borrow it.
         return loop->Invoke([&loop, host = std::string{host}, port, settings = *options]() -> winrt_transport * {
             auto transport = std::make_unique<Partout::Transport>(loop,

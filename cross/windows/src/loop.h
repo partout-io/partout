@@ -5,6 +5,10 @@
 #include <future>
 #include <memory>
 #include <utility>
+#include <condition_variable>
+#include <deque>
+#include <mutex>
+#include <thread>
 
 namespace Partout {
 // One native command worker. Completions go directly to the consumer's mailbox
@@ -28,8 +32,13 @@ public:
         return result.get();
     }
 private:
-    struct State;
-    std::unique_ptr<State> state_;
+    std::mutex mutex_;
+    std::condition_variable changed_;
+    std::deque<std::function<void()>> commands_;
+    bool quitting_ = false;
+    std::thread worker_;
+    std::thread::id worker_id_;
+    std::promise<void> started_;
     void Run();
 };
 }

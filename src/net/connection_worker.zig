@@ -55,7 +55,7 @@ pub const ConnectionWorker = struct {
         request: Request,
         completion_context: *anyopaque,
     };
-    const Actor = if (builtin.os.tag == .windows and build_options.winrt)
+    const Executor = if (builtin.os.tag == .windows and build_options.winrt)
         windows.Executor(Self, Work, execute)
     else
         core.actor.Actor(Self, null, Work, error{}, execute);
@@ -65,7 +65,7 @@ pub const ConnectionWorker = struct {
     factory: sandbox.SocketFactory,
     endpoint_resolver: ?resolver_mod.EndpointResolver,
     callback: Callback,
-    actor: *Actor,
+    executor: *Executor,
     closed: std.atomic.Value(bool) = .init(false),
 
     pub fn create(
@@ -83,7 +83,7 @@ pub const ConnectionWorker = struct {
             .factory = factory,
             .endpoint_resolver = null,
             .callback = callback,
-            .actor = undefined,
+            .executor = undefined,
         };
         // Connection may be released while preparation is still blocked.
         if (endpoints) |source| {
@@ -100,14 +100,14 @@ pub const ConnectionWorker = struct {
             self.endpoint_resolver = resolver_mod.EndpointResolver.init(allocator, owned);
         }
         errdefer self.deinitEndpoints();
-        self.actor = Actor.create(allocator, self) catch return error.OutOfMemory;
+        self.executor = Executor.create(allocator, self) catch return error.OutOfMemory;
         return self;
     }
 
     /// Accepted requests always deliver exactly one completion, including on close.
     pub fn submit(self: *Self, request: Request, completion_context: *anyopaque) error{ Closed, OutOfMemory }!void {
         if (self.closed.load(.acquire)) return error.Closed;
-        try self.actor.schedule(.{ .request = request, .completion_context = completion_context });
+        try self.executor.schedule(.{ .request = request, .completion_context = completion_context });
     }
 
     /// Rejects new work without waiting for a running DNS/socket call.
@@ -118,7 +118,7 @@ pub const ConnectionWorker = struct {
     /// Call outside the event loop, while the callback and dependencies remain valid.
     pub fn destroy(self: *Self) void {
         self.close();
-        self.actor.destroy();
+        self.executor.destroy();
         self.deinitEndpoints();
         self.allocator.destroy(self);
     }

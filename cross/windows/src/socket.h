@@ -12,6 +12,7 @@
 
 namespace Partout {
 
+// Setup and I/O calls run on RuntimeLoop's MTA worker.
 // Callers serialize writes with other writes, open/configuration, channel
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.

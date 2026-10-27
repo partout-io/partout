@@ -93,7 +93,7 @@ fn OwnedTransport(comptime side: io.Side) type {
             try host.init(allocator, peer.address);
             defer host.deinit();
             var policy = options;
-            const native = c.winrt_connect(null, host.ptr(), peer.proto.port, &.{
+            const native = c.winrt_connect(host.ptr(), peer.proto.port, &.{
                 .tcp = peer.plainSocketType() == .tcp,
                 .unconnected = endpoint == null,
                 .dual_stack = endpoint == null and options.ipv4 and options.ipv6,

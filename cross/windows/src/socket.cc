@@ -25,16 +25,6 @@ using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Sockets;
 using namespace winrt::Windows::Storage::Streams;
 
-namespace {
-
-// Open runs on the daemon's worker, which need not already have a COM apartment.
-struct Apartment {
-    Apartment() { init_apartment(apartment_type::multi_threaded); }
-    ~Apartment() { uninit_apartment(); }
-};
-
-} // namespace
-
 namespace Partout {
 
 // Outstanding reads and writes retain this state rather than the socket wrapper.
@@ -97,7 +87,6 @@ Socket::Socket(SocketProto proto, bool unconnected) {
     if (proto != SocketProtoUDP && proto != SocketProtoTCP)
         throw hresult_invalid_argument();
     if (unconnected && proto != SocketProtoUDP) throw hresult_invalid_argument();
-    Apartment apartment;
     unconnected_ = unconnected;
     state_ = std::make_shared<State>();
     if (proto == SocketProtoUDP) datagram_ = DatagramSocket{};
@@ -139,7 +128,6 @@ bool Socket::Open(const char *hostname, uint16_t port,
             (options->dual_stack && !unconnected_)) {
             throw hresult_invalid_argument();
         }
-        Apartment apartment;
         const HostName host{to_hstring(hostname)};
         const bool is_v4 = host.Type() == HostNameType::Ipv4;
         const bool is_v6 = host.Type() == HostNameType::Ipv6;
@@ -234,7 +222,6 @@ void Socket::WaitForConnect(IAsyncAction const &action, int timeout_ms) {
 bool Socket::GetAddress(SocketAddress *address) {
     if (!address) return false;
     try {
-        Apartment apartment;
         HostName host{nullptr};
         hstring port;
         if (datagram_) {
@@ -358,7 +345,6 @@ int32_t Socket::Write(const uint8_t *bytes, size_t length,
     try {
         if ((!bytes && length) || length > UINT32_MAX)
             throw hresult_invalid_argument();
-        Apartment apartment;
         const auto state = state_;
         const auto status = state->write_status.load();
         if (status) return status;
