@@ -89,18 +89,18 @@ struct Socket::State {
         CoDecrementMTAUsage(apartment);
     }
 
-    void finishReadLocked(int32_t error = 0) {
+    void FinishReadLocked(int32_t error = 0) {
         reading = false;
-        if (error && !channel_owned) deliverLocked(nullptr, 0, nullptr, error);
+        if (error && !channel_owned) DeliverLocked(nullptr, 0, nullptr, error);
     }
 
-    void deliver(const uint8_t *bytes, size_t size, const SocketAddress *source, int32_t error) {
+    void Deliver(const uint8_t *bytes, size_t size, const SocketAddress *source, int32_t error) {
         std::lock_guard lock(mutex);
         if (!error) ++received;
-        deliverLocked(bytes, size, source, error);
+        DeliverLocked(bytes, size, source, error);
     }
 
-    void deliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
+    void DeliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
                        int32_t error) {
         if (error && error != SocketEOF) {
             int32_t expected = 0;
@@ -253,9 +253,9 @@ void Socket::RegisterForDatagrams() {
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
                 SocketAddress source{};
                 if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
-                state->deliver(buffer.data(), buffer.Length(), unconnected ? &source : nullptr, 0);
+                state->Deliver(buffer.data(), buffer.Length(), unconnected ? &source : nullptr, 0);
             } catch (...) {
-                state->deliver(nullptr, 0, nullptr, to_hresult().value);
+                state->Deliver(nullptr, 0, nullptr, to_hresult().value);
             }
         });
 }
@@ -303,7 +303,7 @@ bool Socket::SetOnReceive(SocketOnReceive callback) {
 }
 
 void Socket::ReportError(int32_t error) {
-    state_->deliver(nullptr, 0, nullptr, error);
+    state_->Deliver(nullptr, 0, nullptr, error);
 }
 
 int32_t Socket::WriteStatus() const {
@@ -349,7 +349,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             {
                 std::lock_guard lock(state->mutex);
                 if (!state->callback || state->paused || state->channel_owned) {
-                    state->finishReadLocked();
+                    state->FinishReadLocked();
                     co_return;
                 }
                 read = stream.InputStream().ReadAsync(buffer, buffer.Capacity(),
@@ -358,14 +358,14 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->finishReadLocked(SocketEOF);
+                state->FinishReadLocked(SocketEOF);
                 co_return;
             }
-            state->deliver(received.data(), received.Length(), nullptr, 0);
+            state->Deliver(received.data(), received.Length(), nullptr, 0);
         }
     } catch (...) {
         std::lock_guard lock(state->mutex);
-        state->finishReadLocked(to_hresult().value);
+        state->FinishReadLocked(to_hresult().value);
     }
 }
 
@@ -470,7 +470,7 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state, DatagramSocket da
         state->writes.clear();
         int32_t status = 0;
         if (state->write_status.compare_exchange_strong(status, error))
-            state->deliverLocked(nullptr, 0, nullptr, error);
+            state->DeliverLocked(nullptr, 0, nullptr, error);
     }
 }
 
@@ -493,7 +493,7 @@ Socket::Receiver Socket::TakeOver(Writer writer) {
 
     channel_write_ = std::move(writer);
     return [state](const uint8_t *bytes, size_t length) {
-        state->deliver(bytes, length, nullptr, 0);
+        state->Deliver(bytes, length, nullptr, 0);
     };
 }
 

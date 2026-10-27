@@ -24,10 +24,12 @@ public:
     // Only one runtime may be active, matching the daemon's process-wide lifetime.
     static RuntimeLoop *Current();
     bool IsWorker() const;
+    // Queue a command without waiting for its completion.
     void Schedule(std::function<void()> command);
     void Drain();
 
-    // Setup and lifecycle barriers only. Packet writes and resumes use Schedule.
+    // Run inline on the worker, otherwise wait for the result. Setup and lifecycle
+    // barriers only; packet writes and resumes use Schedule.
     template <typename Task> auto Perform(Task &&task) -> decltype(task()) {
         if (IsWorker()) return task();
         using Result = decltype(task());

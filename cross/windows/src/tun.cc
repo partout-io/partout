@@ -40,10 +40,10 @@ public:
 
     explicit State(VpnChannel const &value) : channel(value) {}
 
-    int32_t write(const uint8_t *bytes, size_t length, bool send);
+    int32_t Write(const uint8_t *bytes, size_t length, bool send);
 };
 
-int32_t Tun::State::write(const uint8_t *bytes, size_t length, bool send) {
+int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
     if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
     const auto append = [&](VpnPacketBuffer const &packet) {
         if (send)
@@ -118,7 +118,7 @@ void Tun::ReportError(int32_t error) {
 
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
     if (auto status = WriteStatus()) return status;
-    const auto result = state_.write(bytes, length, false);
+    const auto result = state_.Write(bytes, length, false);
     if (result) {
         ++state_.counters.tun_write_failed;
         return result;
@@ -201,7 +201,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
-                    const auto result = state->write(bytes, length, true);
+                    const auto result = state->Write(bytes, length, true);
                     if (result) {
                         ++state->counters.link_send_failed;
                         return result;

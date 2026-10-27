@@ -12,5 +12,6 @@
 
 ## C++
 
+- Use PascalCase for all methods, public and private.
 - Do not compress blocks, as in no text after curly braces or multiple semicolon-separated lines. However, one-liner like `if (condition) return;` are acceptable as long as they are not too long.
 - Empty blocks in curly braces are fine (`{}`).
