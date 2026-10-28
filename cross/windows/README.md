@@ -246,13 +246,67 @@ Snapshot and environment publication remain unimplemented.
 
 ## Build
 
-Requires CMake 4.0+, Visual Studio 2022 C++ tools and the Windows SDK. From the
-Partout root in a developer shell matching the target architecture:
+Requires CMake 4.0+, Visual Studio 2022 C++ tools, the Windows SDK, and the
+`nlohmann_json` CMake package (for example, from vcpkg's `nlohmann-json` port).
+Pass the package's toolchain file or prefix to CMake as needed. From the Partout
+root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-winrt -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINRT=ON -DPP_BUILD_LIBRARY=OFF
 cmake --build .cmake-winrt --target partout-winrt
 ```
+
+### OpenAPI models
+
+Regenerate the entities in `cross/windows/src/models` with OpenAPI Generator
+7.20.0 or newer, a Java 11+ JDK, and Python 3 (standard library only):
+
+```sh
+scripts/build.sh -gen-models cpp
+```
+
+If the installed CLI is older or its launcher does not expose
+the JAR path, set `OPENAPI_GENERATOR_JAR` to a supported CLI jar.
+The YAML reader reuses the parser bundled in that same JAR;
+common launchers such as Homebrew's are detected automatically. There are no
+Python package dependencies. The checked-in models need no generator at build
+time.
+
+Both generators use their stock templates: `cpp-pistache-server` produces value
+structs with optional fields, and `cpp-httplib-server` produces discriminator
+unions and their JSON decoders. Only model files and validation helpers are
+retained; neither HTTP server library is a dependency. Runtime dependencies are
+C++17 and nlohmann/json. Boost is not required.
+
+`prepare-cpp-schema.py` projects inheritance-based discriminators into explicit
+`oneOf` unions and normalizes identifiers consistently for both generators. It
+leaves the shared schema and wire tags unchanged. `finish-cpp-models.py` applies
+method naming, schema constant defaults/checks, optional null/reset handling,
+and generic integer/validation
+helpers from `src/json.h`. It does not generate discriminator dispatch or use
+custom templates. Unknown discriminator tags are rejected by generated decoders.
+
+```cpp
+const auto profile = json.get<Partout::Models::TaggedProfile>();
+const auto &ip = std::get<Partout::Models::TaggedModuleIp>(profile.modules.at(0));
+const auto encoded = nlohmann::json(ip);
+```
+
+`TunSettings` consumes these typed variants and models, including DNS protocol
+variants. Integer conversion rejects fractional or overflowing MTUs before
+platform validation. Typed optional fields treat explicit null as absent;
+arbitrary JSON payloads retain null as a JSON value. Sets use vectors with
+generated uniqueness validation.
+
+The portable model regression tests compile without the Windows SDK:
+
+```sh
+cmake -S tests/c/windows -B .cmake-models -G Ninja
+cmake --build .cmake-models
+ctest --test-dir .cmake-models --output-on-failure
+```
+
+### Native integration
 
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
@@ -267,10 +321,11 @@ transport option is needed. The native archive alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
 The standalone settings mapping test uses real WinRT settings objects, without
-a VPN host. From the same developer shell (adjust the archive path for your build):
+a VPN host. From the same developer shell (adjust the archive and nlohmann/json
+include paths for your build):
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
 & .cmake-winrt/tun-settings-test.exe
 ```
 

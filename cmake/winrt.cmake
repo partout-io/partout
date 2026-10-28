@@ -9,6 +9,7 @@ if(PP_BUILD_WINRT)
         message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
     endif()
     enable_language(CXX)
+    find_package(nlohmann_json CONFIG REQUIRED)
     # The native backend cannot include Partout headers. Keep it independently
     # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
     add_library(partout-winrt-backend OBJECT
@@ -21,13 +22,17 @@ if(PP_BUILD_WINRT)
         cross/windows/src/log.cc
     )
     target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
-    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi)
+    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
+        PRIVATE nlohmann_json::nlohmann_json)
 
     # Preserve a single archive for Zig and existing consumers.
     add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
+    file(GLOB partout_model_sources CONFIGURE_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp")
+    target_sources(partout-winrt PRIVATE ${partout_model_sources})
     target_include_directories(partout-winrt PRIVATE src src/c/portable/include)
     target_compile_definitions(partout-winrt PRIVATE PARTOUT_WINRT_EXPORTS)
-    target_link_libraries(partout-winrt PRIVATE partout-winrt-backend)
+    target_link_libraries(partout-winrt PRIVATE partout-winrt-backend nlohmann_json::nlohmann_json)
 
     foreach(target IN ITEMS partout-winrt-backend partout-winrt)
         target_compile_features(${target} PRIVATE cxx_std_20)

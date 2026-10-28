@@ -108,8 +108,58 @@ case $language in
             "${kotlin_extra_imports_opts[@]}"
         ;;
     cpp)
-        echo "cpp language is not implemented yet; exiting."
-        exit 0
+        tmp_dir="$(mktemp -d)"
+        cleanup() {
+            rm -rf "$tmp_dir"
+        }
+        trap cleanup EXIT
+
+        cpp_generator=(openapi-generator)
+        if [[ -n "$OPENAPI_GENERATOR_JAR" ]]; then
+            cpp_generator=(java -jar "$OPENAPI_GENERATOR_JAR")
+        fi
+        cpp_version=$("${cpp_generator[@]}" version)
+        if [[ ! "$cpp_version" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]] ||
+            (( 10#${BASH_REMATCH[1]} < 7 ||
+                (10#${BASH_REMATCH[1]} == 7 && 10#${BASH_REMATCH[2]} < 20) )); then
+            echo "C++ models require OpenAPI Generator 7.20.0 or newer (found $cpp_version)."
+            echo "Install a supported version or set OPENAPI_GENERATOR_JAR to its CLI jar."
+            exit 1
+        fi
+
+        python3 "$(dirname "$0")/prepare-cpp-schema.py" \
+            "$infile" "$tmp_dir/openapi.json" "$tmp_dir/unions.txt"
+        union_models=$(cat "$tmp_dir/unions.txt")
+        IFS=':' read -ra union_names <<< "$union_models"
+        union_mappings=()
+        for name in "${union_names[@]}"; do
+            union_mappings+=(--schema-mappings "$name=$name")
+        done
+
+        # Stock value models provide optional fields and validation. The stock
+        # httplib backend supplies typed unions and discriminator dispatch only.
+        "${cpp_generator[@]}" generate \
+            -i "$tmp_dir/openapi.json" -o "$tmp_dir/values" \
+            -g cpp-pistache-server \
+            --global-property=models,supportingFiles=Helpers.h:Helpers.cpp,modelDocs=false,modelTests=false \
+            --type-mappings JSONValue=nlohmann::json,set=std::vector \
+            --import-mappings 'JSONValue=#include <nlohmann/json.hpp>' \
+            --name-mappings interface=interface_ \
+            --additional-properties="modelPackage=$package_name,helpersPackage=Partout.Helpers,useStructModel=true,variableNameFirstCharacterUppercase=false,sortModelPropertiesByRequiredFlag=false" \
+            "${union_mappings[@]}"
+        "${cpp_generator[@]}" generate \
+            -i "$tmp_dir/openapi.json" -o "$tmp_dir/unions" \
+            -g cpp-httplib-server \
+            --global-property="models=$union_models,modelDocs=false,modelTests=false" \
+            --additional-properties="modelNamespace=${package_name//./::}"
+
+        mkdir -p "$tmp_dir/models"
+        cp "$tmp_dir/values/model/"*.h "$tmp_dir/values/model/"*.cpp "$tmp_dir/models/"
+        cp "$tmp_dir/unions/models/"*.h "$tmp_dir/models/"
+        python3 "$(dirname "$0")/finish-cpp-models.py" "$tmp_dir/models" "$tmp_dir/openapi.json"
+        rm -rf "$models_dir"
+        mkdir -p "$models_dir"
+        cp "$tmp_dir/models/"* "$models_dir/"
         ;;
     *)
         echo "unknown language '$language'; expected 'swift', 'kotlin', or 'cpp'"

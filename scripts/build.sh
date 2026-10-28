@@ -20,7 +20,7 @@ EOF
     print_common_help
     cat <<EOF
   -gen-models [all|swift|kotlin|cpp]
-                                 Generate OpenAPI models (requires java)
+                                 Generate OpenAPI models (Java; C++ also requires Python 3)
   -config Debug|Release          Set the CMake build type
 EOF
 }
@@ -54,8 +54,9 @@ generate_kotlin_models() {
 }
 
 generate_cpp_models() {
-    # TODO
-    :
+    local openapi=$1
+
+    scripts/gen-models.sh "$openapi" cpp cross/windows/src/models Partout.Models
 }
 
 generate_models() {
