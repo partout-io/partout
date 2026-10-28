@@ -80,26 +80,29 @@ void to_json(nlohmann::json& j, const IPModule& o)
 
 void from_json(const nlohmann::json& j, IPModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected IPModule object");
+    IPModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    if (j.find("ipv4") != j.end()) {
+    if (j.find("ipv4") != j.end() && !j.at("ipv4").is_null()) {
         Partout::Models::IPSettings temporary_ipv4;
-        j.at("ipv4").get_to(temporary_ipv4);
-        o.ipv4 = std::move(temporary_ipv4);
+        ReadJsonValue(j.at("ipv4"), temporary_ipv4);
+        parsed.ipv4 = std::move(temporary_ipv4);
     }
 
-    if (j.find("ipv6") != j.end()) {
+    if (j.find("ipv6") != j.end() && !j.at("ipv6").is_null()) {
         Partout::Models::IPSettings temporary_ipv6;
-        j.at("ipv6").get_to(temporary_ipv6);
-        o.ipv6 = std::move(temporary_ipv6);
+        ReadJsonValue(j.at("ipv6"), temporary_ipv6);
+        parsed.ipv6 = std::move(temporary_ipv6);
     }
 
-    if (j.find("mtu") != j.end()) {
+    if (j.find("mtu") != j.end() && !j.at("mtu").is_null()) {
         int32_t temporary_mtu;
-        j.at("mtu").get_to(temporary_mtu);
-        o.mtu = std::move(temporary_mtu);
+        ReadJsonValue(j.at("mtu"), temporary_mtu);
+        parsed.mtu = std::move(temporary_mtu);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

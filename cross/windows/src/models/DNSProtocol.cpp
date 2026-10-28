@@ -93,16 +93,17 @@ void to_json(nlohmann::json& j, const DNSProtocol& o)
 
 void from_json(const nlohmann::json& j, DNSProtocol& o)
 {
+    DNSProtocol parsed{};
 
     auto s = j.get<std::string>();
     if(s == "cleartext") {
-        o.value = DNSProtocol::eDNSProtocol::cleartext;
+        parsed.value = DNSProtocol::eDNSProtocol::cleartext;
     }
     else if(s == "https") {
-        o.value = DNSProtocol::eDNSProtocol::https;
+        parsed.value = DNSProtocol::eDNSProtocol::https;
     }
     else if(s == "tls") {
-        o.value = DNSProtocol::eDNSProtocol::tls;
+        parsed.value = DNSProtocol::eDNSProtocol::tls;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -111,6 +112,7 @@ void from_json(const nlohmann::json& j, DNSProtocol& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

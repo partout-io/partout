@@ -28,6 +28,8 @@
 #pragma warning(pop)
 #endif
 
+#include "models/ConnectionStatus.h"
+
 // Forces this archive member, including its C++ exports, into partout.dll.
 extern "C" void pp_winrt_runtime_link() {}
 
@@ -65,17 +67,23 @@ struct VpnChannelRuntime::Impl {
 
     // Called by the daemon, including during partout_daemon_start(). Only
     // publish state here: stopping the daemon from its callback would deadlock.
-    void OnConnectionStatus(const char *status) noexcept {
-        if (!status) return;
+    void OnConnectionStatus(const Models::ConnectionStatus &status) noexcept {
+        using Status = Models::ConnectionStatus;
         std::scoped_lock lock(startup_mutex);
         if (StartupCompleteLocked()) return;
-        const std::string_view value{status};
-        if (value == "connecting") {
+        switch (status.value) {
+        case Status::connecting:
             startup_status = StartupStatus::connecting;
-        } else if (value == "connected") {
+            break;
+        case Status::connected:
             startup_status = StartupStatus::connected;
-        } else if (value == "disconnected" && startup_status == StartupStatus::connecting) {
-            startup_status = StartupStatus::failed;
+            break;
+        case Status::disconnected:
+            if (startup_status == StartupStatus::connecting)
+                startup_status = StartupStatus::failed;
+            break;
+        default:
+            break;
         }
         // The daemon emits an initial disconnected status before connecting.
         startup_changed.notify_all();
@@ -172,7 +180,9 @@ struct VpnChannelRuntime::Impl {
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
             bindings.events.ctx = this;
             bindings.events.set_connection_status = [](void *ctx, const char *status) noexcept {
-                static_cast<Impl *>(ctx)->OnConnectionStatus(status);
+                const auto parsed = Models::TryReadStringEnum<Models::ConnectionStatus>(status);
+                if (!parsed) return;
+                static_cast<Impl *>(ctx)->OnConnectionStatus(*parsed);
             };
             bindings.release = [](partout_daemon_bindings *owned) noexcept {
                 // Runtime owns the controller and loop through daemon destruction.

@@ -18,7 +18,7 @@
 #ifndef ConnectionStatus_H_
 #define ConnectionStatus_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

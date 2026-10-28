@@ -111,34 +111,35 @@ void to_json(nlohmann::json& j, const ModuleType& o)
 
 void from_json(const nlohmann::json& j, ModuleType& o)
 {
+    ModuleType parsed{};
 
     auto s = j.get<std::string>();
     if(s == "Custom") {
-        o.value = ModuleType::eModuleType::Custom;
+        parsed.value = ModuleType::eModuleType::Custom;
     }
     else if(s == "DNS") {
-        o.value = ModuleType::eModuleType::DNS;
+        parsed.value = ModuleType::eModuleType::DNS;
     }
     else if(s == "HTTPProxy") {
-        o.value = ModuleType::eModuleType::HTTPProxy;
+        parsed.value = ModuleType::eModuleType::HTTPProxy;
     }
     else if(s == "IP") {
-        o.value = ModuleType::eModuleType::IP;
+        parsed.value = ModuleType::eModuleType::IP;
     }
     else if(s == "OnDemand") {
-        o.value = ModuleType::eModuleType::OnDemand;
+        parsed.value = ModuleType::eModuleType::OnDemand;
     }
     else if(s == "OpenVPN") {
-        o.value = ModuleType::eModuleType::OpenVPN;
+        parsed.value = ModuleType::eModuleType::OpenVPN;
     }
     else if(s == "Provider") {
-        o.value = ModuleType::eModuleType::Provider;
+        parsed.value = ModuleType::eModuleType::Provider;
     }
     else if(s == "WireGuard") {
-        o.value = ModuleType::eModuleType::WireGuard;
+        parsed.value = ModuleType::eModuleType::WireGuard;
     }
     else if(s == "Undefined") {
-        o.value = ModuleType::eModuleType::Undefined;
+        parsed.value = ModuleType::eModuleType::Undefined;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -147,6 +148,7 @@ void from_json(const nlohmann::json& j, ModuleType& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

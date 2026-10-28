@@ -99,27 +99,30 @@ void to_json(nlohmann::json& j, const HTTPProxyModule& o)
 
 void from_json(const nlohmann::json& j, HTTPProxyModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected HTTPProxyModule object");
+    HTTPProxyModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    if (j.find("proxy") != j.end()) {
+    if (j.find("proxy") != j.end() && !j.at("proxy").is_null()) {
         std::string temporary_proxy;
-        j.at("proxy").get_to(temporary_proxy);
-        o.proxy = std::move(temporary_proxy);
+        ReadJsonValue(j.at("proxy"), temporary_proxy);
+        parsed.proxy = std::move(temporary_proxy);
     }
 
-    if (j.find("secureProxy") != j.end()) {
+    if (j.find("secureProxy") != j.end() && !j.at("secureProxy").is_null()) {
         std::string temporary_secureProxy;
-        j.at("secureProxy").get_to(temporary_secureProxy);
-        o.secureProxy = std::move(temporary_secureProxy);
+        ReadJsonValue(j.at("secureProxy"), temporary_secureProxy);
+        parsed.secureProxy = std::move(temporary_secureProxy);
     }
 
-    if (j.find("pacURL") != j.end()) {
+    if (j.find("pacURL") != j.end() && !j.at("pacURL").is_null()) {
         std::string temporary_pacURL;
-        j.at("pacURL").get_to(temporary_pacURL);
-        o.pacURL = std::move(temporary_pacURL);
+        ReadJsonValue(j.at("pacURL"), temporary_pacURL);
+        parsed.pacURL = std::move(temporary_pacURL);
     }
-    j.at("bypassDomains").get_to(o.bypassDomains);
+    ReadJsonValue(j.at("bypassDomains"), parsed.bypassDomains);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

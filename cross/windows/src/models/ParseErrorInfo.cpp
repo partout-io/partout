@@ -99,32 +99,35 @@ void to_json(nlohmann::json& j, const ParseErrorInfo& o)
 
 void from_json(const nlohmann::json& j, ParseErrorInfo& o)
 {
+    if (!j.is_object()) throw std::invalid_argument("Expected ParseErrorInfo object");
+    ParseErrorInfo parsed{};
 
-    if (j.find("recognizedType") != j.end()) {
+    if (j.find("recognizedType") != j.end() && !j.at("recognizedType").is_null()) {
         Partout::Models::ModuleType temporary_recognizedType;
-        j.at("recognizedType").get_to(temporary_recognizedType);
-        o.recognizedType = std::move(temporary_recognizedType);
+        ReadJsonValue(j.at("recognizedType"), temporary_recognizedType);
+        parsed.recognizedType = std::move(temporary_recognizedType);
     }
 
-    if (j.find("subCode") != j.end()) {
+    if (j.find("subCode") != j.end() && !j.at("subCode").is_null()) {
         std::string temporary_subCode;
-        j.at("subCode").get_to(temporary_subCode);
-        o.subCode = std::move(temporary_subCode);
+        ReadJsonValue(j.at("subCode"), temporary_subCode);
+        parsed.subCode = std::move(temporary_subCode);
     }
 
-    if (j.find("name") != j.end()) {
+    if (j.find("name") != j.end() && !j.at("name").is_null()) {
         std::string temporary_name;
-        j.at("name").get_to(temporary_name);
-        o.name = std::move(temporary_name);
+        ReadJsonValue(j.at("name"), temporary_name);
+        parsed.name = std::move(temporary_name);
     }
 
-    if (j.find("line") != j.end()) {
+    if (j.find("line") != j.end() && !j.at("line").is_null()) {
         std::string temporary_line;
-        j.at("line").get_to(temporary_line);
-        o.line = std::move(temporary_line);
+        ReadJsonValue(j.at("line"), temporary_line);
+        parsed.line = std::move(temporary_line);
     }
-    j.at("arguments").get_to(o.arguments);
+    ReadJsonValue(j.at("arguments"), parsed.arguments);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

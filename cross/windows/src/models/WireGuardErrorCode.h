@@ -18,7 +18,7 @@
 #ifndef WireGuardErrorCode_H_
 #define WireGuardErrorCode_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

@@ -18,7 +18,7 @@
 #ifndef PartoutErrorCode_H_
 #define PartoutErrorCode_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

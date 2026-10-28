@@ -77,7 +77,7 @@ bool IPSettings::Validate(std::stringstream& msg, const std::string& pathPrefix)
             {
                 const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
 
-        success = value.Validate(msg, currentValuePath + ".includedRoutes") && success;
+        success = ValidateModel(value, msg, currentValuePath + ".includedRoutes") && success;
 
                 i++;
             }
@@ -96,7 +96,7 @@ bool IPSettings::Validate(std::stringstream& msg, const std::string& pathPrefix)
             {
                 const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
 
-        success = value.Validate(msg, currentValuePath + ".excludedRoutes") && success;
+        success = ValidateModel(value, msg, currentValuePath + ".excludedRoutes") && success;
 
                 i++;
             }
@@ -133,12 +133,15 @@ void to_json(nlohmann::json& j, const IPSettings& o)
 
 void from_json(const nlohmann::json& j, IPSettings& o)
 {
-    j.at("subnets").get_to(o.subnets);
+    if (!j.is_object()) throw std::invalid_argument("Expected IPSettings object");
+    IPSettings parsed{};
+    ReadJsonValue(j.at("subnets"), parsed.subnets);
 
-    j.at("includedRoutes").get_to(o.includedRoutes);
+    ReadJsonValue(j.at("includedRoutes"), parsed.includedRoutes);
 
-    j.at("excludedRoutes").get_to(o.excludedRoutes);
+    ReadJsonValue(j.at("excludedRoutes"), parsed.excludedRoutes);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

@@ -50,7 +50,7 @@ bool OnDemandModule::Validate(std::stringstream& msg, const std::string& pathPre
     const std::string _pathPrefix = pathPrefix.empty() ? "OnDemandModule" : pathPrefix;
 
     /* withOtherNetworks */ {
-        const std::vector<Partout::Models::OnDemandModule_OtherNetwork>& value = withOtherNetworks;
+        const std::vector<Partout::Models::OnDemandModuleOtherNetwork>& value = withOtherNetworks;
         const std::string currentValuePath = _pathPrefix + ".withOtherNetworks";
 
         if (!Partout::Helpers::hasOnlyUniqueItems(value))
@@ -61,11 +61,11 @@ bool OnDemandModule::Validate(std::stringstream& msg, const std::string& pathPre
         { // Recursive validation of array elements
             const std::string oldValuePath = currentValuePath;
             int i = 0;
-            for (const Partout::Models::OnDemandModule_OtherNetwork& value : value)
+            for (const Partout::Models::OnDemandModuleOtherNetwork& value : value)
             {
                 const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
 
-        success = value.Validate(msg, currentValuePath) && success;
+        success = ValidateModel(value, msg, currentValuePath) && success;
 
                 i++;
             }
@@ -104,14 +104,17 @@ void to_json(nlohmann::json& j, const OnDemandModule& o)
 
 void from_json(const nlohmann::json& j, OnDemandModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected OnDemandModule object");
+    OnDemandModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    j.at("policy").get_to(o.policy);
+    ReadJsonValue(j.at("policy"), parsed.policy);
 
-    j.at("withSSIDs").get_to(o.withSSIDs);
+    ReadJsonValue(j.at("withSSIDs"), parsed.withSSIDs);
 
-    j.at("withOtherNetworks").get_to(o.withOtherNetworks);
+    ReadJsonValue(j.at("withOtherNetworks"), parsed.withOtherNetworks);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

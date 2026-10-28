@@ -51,17 +51,17 @@ bool TunnelRemoteInfoWrapper::Validate(std::stringstream& msg, const std::string
 
     if (modules.has_value())
     {
-        const std::vector<Partout::Models::JSONValue>& value = modules.value();
+        const std::vector<Partout::Models::TaggedModule>& value = modules.value();
         const std::string currentValuePath = _pathPrefix + ".modules";
 
         { // Recursive validation of array elements
             const std::string oldValuePath = currentValuePath;
             int i = 0;
-            for (const Partout::Models::JSONValue& value : value)
+            for (const Partout::Models::TaggedModule& value : value)
             {
                 const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
 
-        success = value.Validate(msg, currentValuePath + ".modules") && success;
+        success = ValidateModel(value, msg, currentValuePath + ".modules") && success;
 
                 i++;
             }
@@ -100,22 +100,25 @@ void to_json(nlohmann::json& j, const TunnelRemoteInfoWrapper& o)
 
 void from_json(const nlohmann::json& j, TunnelRemoteInfoWrapper& o)
 {
-    j.at("profile").get_to(o.profile);
+    if (!j.is_object()) throw std::invalid_argument("Expected TunnelRemoteInfoWrapper object");
+    TunnelRemoteInfoWrapper parsed{};
+    ReadJsonValue(j.at("profile"), parsed.profile);
 
-    j.at("originalModuleId").get_to(o.originalModuleId);
+    ReadJsonValue(j.at("originalModuleId"), parsed.originalModuleId);
 
-    if (j.find("address") != j.end()) {
+    if (j.find("address") != j.end() && !j.at("address").is_null()) {
         std::string temporary_address;
-        j.at("address").get_to(temporary_address);
-        o.address = std::move(temporary_address);
+        ReadJsonValue(j.at("address"), temporary_address);
+        parsed.address = std::move(temporary_address);
     }
 
-    if (j.find("modules") != j.end()) {
-        std::vector<Partout::Models::JSONValue> temporary_modules;
-        j.at("modules").get_to(temporary_modules);
-        o.modules = std::move(temporary_modules);
+    if (j.find("modules") != j.end() && !j.at("modules").is_null()) {
+        std::vector<Partout::Models::TaggedModule> temporary_modules;
+        ReadJsonValue(j.at("modules"), temporary_modules);
+        parsed.modules = std::move(temporary_modules);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

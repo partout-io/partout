@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models

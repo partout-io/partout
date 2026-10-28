@@ -18,7 +18,7 @@
 #ifndef DataCount_H_
 #define DataCount_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

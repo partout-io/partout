@@ -76,19 +76,22 @@ void to_json(nlohmann::json& j, const Route& o)
 
 void from_json(const nlohmann::json& j, Route& o)
 {
+    if (!j.is_object()) throw std::invalid_argument("Expected Route object");
+    Route parsed{};
 
-    if (j.find("destination") != j.end()) {
+    if (j.find("destination") != j.end() && !j.at("destination").is_null()) {
         std::string temporary_destination;
-        j.at("destination").get_to(temporary_destination);
-        o.destination = std::move(temporary_destination);
+        ReadJsonValue(j.at("destination"), temporary_destination);
+        parsed.destination = std::move(temporary_destination);
     }
 
-    if (j.find("gateway") != j.end()) {
+    if (j.find("gateway") != j.end() && !j.at("gateway").is_null()) {
         std::string temporary_gateway;
-        j.at("gateway").get_to(temporary_gateway);
-        o.gateway = std::move(temporary_gateway);
+        ReadJsonValue(j.at("gateway"), temporary_gateway);
+        parsed.gateway = std::move(temporary_gateway);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

@@ -18,12 +18,12 @@
 #ifndef OnDemandModule_H_
 #define OnDemandModule_H_
 
-#include "OnDemandModule_Policy.h"
+#include "OnDemandModuleOtherNetwork.h"
+#include "OnDemandModulePolicy.h"
 #include <string>
 #include <map>
 #include <vector>
-#include "OnDemandModule_OtherNetwork.h"
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {
@@ -32,9 +32,9 @@ struct  OnDemandModule
 {
 
     std::string id;
-    Partout::Models::OnDemandModule_Policy policy;
+    Partout::Models::OnDemandModulePolicy policy;
     std::map<std::string, bool> withSSIDs;
-    std::vector<Partout::Models::OnDemandModule_OtherNetwork> withOtherNetworks;
+    std::vector<Partout::Models::OnDemandModuleOtherNetwork> withOtherNetworks;
 
     bool operator==(const OnDemandModule& other) const;
     bool operator!=(const OnDemandModule& other) const;

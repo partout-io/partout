@@ -80,26 +80,29 @@ void to_json(nlohmann::json& j, const OpenVPNModule& o)
 
 void from_json(const nlohmann::json& j, OpenVPNModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected OpenVPNModule object");
+    OpenVPNModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    if (j.find("configuration") != j.end()) {
-        Partout::Models::OpenVPN_Configuration temporary_configuration;
-        j.at("configuration").get_to(temporary_configuration);
-        o.configuration = std::move(temporary_configuration);
+    if (j.find("configuration") != j.end() && !j.at("configuration").is_null()) {
+        Partout::Models::OpenVpnConfiguration temporary_configuration;
+        ReadJsonValue(j.at("configuration"), temporary_configuration);
+        parsed.configuration = std::move(temporary_configuration);
     }
 
-    if (j.find("credentials") != j.end()) {
-        Partout::Models::OpenVPN_Credentials temporary_credentials;
-        j.at("credentials").get_to(temporary_credentials);
-        o.credentials = std::move(temporary_credentials);
+    if (j.find("credentials") != j.end() && !j.at("credentials").is_null()) {
+        Partout::Models::OpenVpnCredentials temporary_credentials;
+        ReadJsonValue(j.at("credentials"), temporary_credentials);
+        parsed.credentials = std::move(temporary_credentials);
     }
 
-    if (j.find("requiresInteractiveCredentials") != j.end()) {
+    if (j.find("requiresInteractiveCredentials") != j.end() && !j.at("requiresInteractiveCredentials").is_null()) {
         bool temporary_requiresInteractiveCredentials;
-        j.at("requiresInteractiveCredentials").get_to(temporary_requiresInteractiveCredentials);
-        o.requiresInteractiveCredentials = std::move(temporary_requiresInteractiveCredentials);
+        ReadJsonValue(j.at("requiresInteractiveCredentials"), temporary_requiresInteractiveCredentials);
+        parsed.requiresInteractiveCredentials = std::move(temporary_requiresInteractiveCredentials);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

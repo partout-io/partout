@@ -50,17 +50,17 @@ bool TaggedProfile::Validate(std::stringstream& msg, const std::string& pathPref
     const std::string _pathPrefix = pathPrefix.empty() ? "TaggedProfile" : pathPrefix;
 
     /* modules */ {
-        const std::vector<Partout::Models::JSONValue>& value = modules;
+        const std::vector<Partout::Models::TaggedModule>& value = modules;
         const std::string currentValuePath = _pathPrefix + ".modules";
 
         { // Recursive validation of array elements
             const std::string oldValuePath = currentValuePath;
             int i = 0;
-            for (const Partout::Models::JSONValue& value : value)
+            for (const Partout::Models::TaggedModule& value : value)
             {
                 const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
 
-        success = value.Validate(msg, currentValuePath + ".modules") && success;
+        success = ValidateModel(value, msg, currentValuePath + ".modules") && success;
 
                 i++;
             }
@@ -127,32 +127,35 @@ void to_json(nlohmann::json& j, const TaggedProfile& o)
 
 void from_json(const nlohmann::json& j, TaggedProfile& o)
 {
+    if (!j.is_object()) throw std::invalid_argument("Expected TaggedProfile object");
+    TaggedProfile parsed{};
 
-    if (j.find("version") != j.end()) {
+    if (j.find("version") != j.end() && !j.at("version").is_null()) {
         int32_t temporary_version;
-        j.at("version").get_to(temporary_version);
-        o.version = std::move(temporary_version);
+        ReadJsonValue(j.at("version"), temporary_version);
+        parsed.version = std::move(temporary_version);
     }
-    j.at("id").get_to(o.id);
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    j.at("name").get_to(o.name);
+    ReadJsonValue(j.at("name"), parsed.name);
 
-    j.at("modules").get_to(o.modules);
+    ReadJsonValue(j.at("modules"), parsed.modules);
 
-    j.at("activeModulesIds").get_to(o.activeModulesIds);
+    ReadJsonValue(j.at("activeModulesIds"), parsed.activeModulesIds);
 
-    if (j.find("behavior") != j.end()) {
+    if (j.find("behavior") != j.end() && !j.at("behavior").is_null()) {
         Partout::Models::ProfileBehavior temporary_behavior;
-        j.at("behavior").get_to(temporary_behavior);
-        o.behavior = std::move(temporary_behavior);
+        ReadJsonValue(j.at("behavior"), temporary_behavior);
+        parsed.behavior = std::move(temporary_behavior);
     }
 
     if (j.find("userInfo") != j.end()) {
         nlohmann::json temporary_userInfo;
-        j.at("userInfo").get_to(temporary_userInfo);
-        o.userInfo = std::move(temporary_userInfo);
+        ReadJsonValue(j.at("userInfo"), temporary_userInfo);
+        parsed.userInfo = std::move(temporary_userInfo);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

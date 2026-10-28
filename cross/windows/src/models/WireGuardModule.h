@@ -18,9 +18,9 @@
 #ifndef WireGuardModule_H_
 #define WireGuardModule_H_
 
-#include "WireGuard_Configuration.h"
 #include <string>
-#include <nlohmann/json.hpp>
+#include "WireGuardConfiguration.h"
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -30,7 +30,7 @@ struct  WireGuardModule
 {
 
     std::string id;
-    std::optional<Partout::Models::WireGuard_Configuration> configuration;
+    std::optional<Partout::Models::WireGuardConfiguration> configuration;
 
     bool operator==(const WireGuardModule& other) const;
     bool operator!=(const WireGuardModule& other) const;

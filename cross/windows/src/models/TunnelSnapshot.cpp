@@ -82,20 +82,23 @@ void to_json(nlohmann::json& j, const TunnelSnapshot& o)
 
 void from_json(const nlohmann::json& j, TunnelSnapshot& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected TunnelSnapshot object");
+    TunnelSnapshot parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    j.at("isEnabled").get_to(o.isEnabled);
+    ReadJsonValue(j.at("isEnabled"), parsed.isEnabled);
 
-    j.at("status").get_to(o.status);
+    ReadJsonValue(j.at("status"), parsed.status);
 
-    j.at("onDemand").get_to(o.onDemand);
+    ReadJsonValue(j.at("onDemand"), parsed.onDemand);
 
-    if (j.find("environment") != j.end()) {
-        Partout::Models::TunnelSnapshot_Environment temporary_environment;
-        j.at("environment").get_to(temporary_environment);
-        o.environment = std::move(temporary_environment);
+    if (j.find("environment") != j.end() && !j.at("environment").is_null()) {
+        Partout::Models::TunnelSnapshotEnvironment temporary_environment;
+        ReadJsonValue(j.at("environment"), temporary_environment);
+        parsed.environment = std::move(temporary_environment);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

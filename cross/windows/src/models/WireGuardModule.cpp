@@ -76,14 +76,17 @@ void to_json(nlohmann::json& j, const WireGuardModule& o)
 
 void from_json(const nlohmann::json& j, WireGuardModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected WireGuardModule object");
+    WireGuardModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    if (j.find("configuration") != j.end()) {
-        Partout::Models::WireGuard_Configuration temporary_configuration;
-        j.at("configuration").get_to(temporary_configuration);
-        o.configuration = std::move(temporary_configuration);
+    if (j.find("configuration") != j.end() && !j.at("configuration").is_null()) {
+        Partout::Models::WireGuardConfiguration temporary_configuration;
+        ReadJsonValue(j.at("configuration"), temporary_configuration);
+        parsed.configuration = std::move(temporary_configuration);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

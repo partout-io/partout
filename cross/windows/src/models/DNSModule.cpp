@@ -123,42 +123,45 @@ void to_json(nlohmann::json& j, const DNSModule& o)
 
 void from_json(const nlohmann::json& j, DNSModule& o)
 {
-    j.at("id").get_to(o.id);
+    if (!j.is_object()) throw std::invalid_argument("Expected DNSModule object");
+    DNSModule parsed{};
+    ReadJsonValue(j.at("id"), parsed.id);
 
-    j.at("protocolType").get_to(o.protocolType);
+    ReadJsonValue(j.at("protocolType"), parsed.protocolType);
 
-    j.at("servers").get_to(o.servers);
+    ReadJsonValue(j.at("servers"), parsed.servers);
 
-    if (j.find("domainName") != j.end()) {
+    if (j.find("domainName") != j.end() && !j.at("domainName").is_null()) {
         std::string temporary_domainName;
-        j.at("domainName").get_to(temporary_domainName);
-        o.domainName = std::move(temporary_domainName);
+        ReadJsonValue(j.at("domainName"), temporary_domainName);
+        parsed.domainName = std::move(temporary_domainName);
     }
 
-    if (j.find("searchDomains") != j.end()) {
+    if (j.find("searchDomains") != j.end() && !j.at("searchDomains").is_null()) {
         std::vector<std::string> temporary_searchDomains;
-        j.at("searchDomains").get_to(temporary_searchDomains);
-        o.searchDomains = std::move(temporary_searchDomains);
+        ReadJsonValue(j.at("searchDomains"), temporary_searchDomains);
+        parsed.searchDomains = std::move(temporary_searchDomains);
     }
 
-    if (j.find("inheritsVPN") != j.end()) {
+    if (j.find("inheritsVPN") != j.end() && !j.at("inheritsVPN").is_null()) {
         bool temporary_inheritsVPN;
-        j.at("inheritsVPN").get_to(temporary_inheritsVPN);
-        o.inheritsVPN = std::move(temporary_inheritsVPN);
+        ReadJsonValue(j.at("inheritsVPN"), temporary_inheritsVPN);
+        parsed.inheritsVPN = std::move(temporary_inheritsVPN);
     }
 
-    if (j.find("domainPolicy") != j.end()) {
-        Partout::Models::DNSModule_DomainPolicy temporary_domainPolicy;
-        j.at("domainPolicy").get_to(temporary_domainPolicy);
-        o.domainPolicy = std::move(temporary_domainPolicy);
+    if (j.find("domainPolicy") != j.end() && !j.at("domainPolicy").is_null()) {
+        Partout::Models::DNSModuleDomainPolicy temporary_domainPolicy;
+        ReadJsonValue(j.at("domainPolicy"), temporary_domainPolicy);
+        parsed.domainPolicy = std::move(temporary_domainPolicy);
     }
 
-    if (j.find("routesThroughVPN") != j.end()) {
+    if (j.find("routesThroughVPN") != j.end() && !j.at("routesThroughVPN").is_null()) {
         bool temporary_routesThroughVPN;
-        j.at("routesThroughVPN").get_to(temporary_routesThroughVPN);
-        o.routesThroughVPN = std::move(temporary_routesThroughVPN);
+        ReadJsonValue(j.at("routesThroughVPN"), temporary_routesThroughVPN);
+        parsed.routesThroughVPN = std::move(temporary_routesThroughVPN);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

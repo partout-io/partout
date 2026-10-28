@@ -22,7 +22,8 @@ if(PP_BUILD_WINRT)
         cross/windows/src/log.cc
     )
     target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
-    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi)
+    target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
+        PRIVATE nlohmann_json::nlohmann_json)
 
     # Preserve a single archive for Zig and existing consumers.
     add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)

@@ -18,7 +18,7 @@
 #ifndef DNSProtocol_H_
 #define DNSProtocol_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

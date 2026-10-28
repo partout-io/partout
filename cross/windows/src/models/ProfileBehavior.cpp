@@ -76,14 +76,17 @@ void to_json(nlohmann::json& j, const ProfileBehavior& o)
 
 void from_json(const nlohmann::json& j, ProfileBehavior& o)
 {
-    j.at("disconnectsOnSleep").get_to(o.disconnectsOnSleep);
+    if (!j.is_object()) throw std::invalid_argument("Expected ProfileBehavior object");
+    ProfileBehavior parsed{};
+    ReadJsonValue(j.at("disconnectsOnSleep"), parsed.disconnectsOnSleep);
 
-    if (j.find("includesAllNetworks") != j.end()) {
+    if (j.find("includesAllNetworks") != j.end() && !j.at("includesAllNetworks").is_null()) {
         bool temporary_includesAllNetworks;
-        j.at("includesAllNetworks").get_to(temporary_includesAllNetworks);
-        o.includesAllNetworks = std::move(temporary_includesAllNetworks);
+        ReadJsonValue(j.at("includesAllNetworks"), temporary_includesAllNetworks);
+        parsed.includesAllNetworks = std::move(temporary_includesAllNetworks);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

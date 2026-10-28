@@ -18,7 +18,7 @@
 #ifndef CryptoBackend_H_
 #define CryptoBackend_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

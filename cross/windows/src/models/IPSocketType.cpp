@@ -102,25 +102,26 @@ void to_json(nlohmann::json& j, const IPSocketType& o)
 
 void from_json(const nlohmann::json& j, IPSocketType& o)
 {
+    IPSocketType parsed{};
 
     auto s = j.get<std::string>();
     if(s == "UDP") {
-        o.value = IPSocketType::eIPSocketType::udp;
+        parsed.value = IPSocketType::eIPSocketType::udp;
     }
     else if(s == "TCP") {
-        o.value = IPSocketType::eIPSocketType::tcp;
+        parsed.value = IPSocketType::eIPSocketType::tcp;
     }
     else if(s == "UDP4") {
-        o.value = IPSocketType::eIPSocketType::udp4;
+        parsed.value = IPSocketType::eIPSocketType::udp4;
     }
     else if(s == "TCP4") {
-        o.value = IPSocketType::eIPSocketType::tcp4;
+        parsed.value = IPSocketType::eIPSocketType::tcp4;
     }
     else if(s == "UDP6") {
-        o.value = IPSocketType::eIPSocketType::udp6;
+        parsed.value = IPSocketType::eIPSocketType::udp6;
     }
     else if(s == "TCP6") {
-        o.value = IPSocketType::eIPSocketType::tcp6;
+        parsed.value = IPSocketType::eIPSocketType::tcp6;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -129,6 +130,7 @@ void from_json(const nlohmann::json& j, IPSocketType& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

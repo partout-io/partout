@@ -19,9 +19,9 @@
 #define TunnelSnapshot_H_
 
 #include <string>
+#include "TunnelSnapshotEnvironment.h"
 #include "TunnelStatus.h"
-#include "TunnelSnapshot_Environment.h"
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -34,7 +34,7 @@ struct  TunnelSnapshot
     bool isEnabled;
     Partout::Models::TunnelStatus status;
     bool onDemand;
-    std::optional<Partout::Models::TunnelSnapshot_Environment> environment;
+    std::optional<Partout::Models::TunnelSnapshotEnvironment> environment;
 
     bool operator==(const TunnelSnapshot& other) const;
     bool operator!=(const TunnelSnapshot& other) const;

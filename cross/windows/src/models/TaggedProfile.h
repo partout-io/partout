@@ -18,12 +18,12 @@
 #ifndef TaggedProfile_H_
 #define TaggedProfile_H_
 
-#include <nlohmann/json.hpp>
-#include <string>
 #include "../json.h"
+#include "TaggedModule.h"
+#include <string>
 #include "ProfileBehavior.h"
 #include <vector>
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -35,7 +35,7 @@ struct  TaggedProfile
     std::optional<int32_t> version;
     std::string id;
     std::string name;
-    std::vector<Partout::Models::JSONValue> modules;
+    std::vector<Partout::Models::TaggedModule> modules;
     std::vector<std::string> activeModulesIds;
     std::optional<Partout::Models::ProfileBehavior> behavior;
     std::optional<nlohmann::json> userInfo;

@@ -18,7 +18,7 @@
 #ifndef SocketType_H_
 #define SocketType_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

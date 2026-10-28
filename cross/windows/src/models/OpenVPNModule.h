@@ -18,10 +18,10 @@
 #ifndef OpenVPNModule_H_
 #define OpenVPNModule_H_
 
-#include "OpenVPN_Credentials.h"
+#include "OpenVpnConfiguration.h"
+#include "OpenVpnCredentials.h"
 #include <string>
-#include "OpenVPN_Configuration.h"
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -31,8 +31,8 @@ struct  OpenVPNModule
 {
 
     std::string id;
-    std::optional<Partout::Models::OpenVPN_Configuration> configuration;
-    std::optional<Partout::Models::OpenVPN_Credentials> credentials;
+    std::optional<Partout::Models::OpenVpnConfiguration> configuration;
+    std::optional<Partout::Models::OpenVpnCredentials> credentials;
     std::optional<bool> requiresInteractiveCredentials;
 
     bool operator==(const OpenVPNModule& other) const;

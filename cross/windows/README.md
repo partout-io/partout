@@ -258,37 +258,49 @@ cmake --build .cmake-winrt --target partout-winrt
 
 ### OpenAPI models
 
-Regenerate the entities in `cross/windows/src/models` with:
+Regenerate the entities in `cross/windows/src/models` with OpenAPI Generator
+7.26.0, Java, Python 3 and PyYAML. In a Python virtual environment:
 
 ```sh
+python3 -m pip install -r scripts/requirements-codegen.txt
 scripts/build.sh -gen-models cpp
 ```
 
-This uses `openapi-generator` and Java, just like Swift and Kotlin. The stock
-`cpp-pistache-server` generator emits C++17 structs in `Partout::Models` and
-nlohmann/json conversions; only models and their helpers are retained, so
-Pistache is not a build dependency. There are no custom templates. The script
-renames generated methods to `ToJson`, `FromJson`, and `Validate`.
+If the installed CLI has a different version, set `OPENAPI_GENERATOR_JAR` to the
+7.26.0 CLI jar. The checked-in models need no generator at build time.
 
-Discriminator envelopes use the handwritten `JSONValue` in `src/json.h` to keep
-the complete payload, including unknown tags. Concrete types such as
-`TaggedModule_IP` are also generated. Decode an envelope's `value` into a
-concrete type when needed. Sets use vectors with generated uniqueness validation.
+Both generators use their stock templates: `cpp-pistache-server` produces value
+structs with optional fields, and `cpp-httplib-server` produces discriminator
+unions and their JSON decoders. Only model files and validation helpers are
+retained; neither HTTP server library is a dependency. Runtime dependencies are
+C++17 and nlohmann/json. Boost is not required.
+
+`prepare-cpp-schema.py` projects inheritance-based discriminators into explicit
+`oneOf` unions and normalizes identifiers consistently for both generators. It
+leaves the shared schema and wire tags unchanged. `finish-cpp-models.py` applies
+method naming, schema constant defaults/checks, optional null/reset handling,
+and generic integer/validation
+helpers from `src/json.h`. It does not generate discriminator dispatch or use
+custom templates. Unknown discriminator tags are rejected by generated decoders.
 
 ```cpp
-const auto profile = Partout::Models::TaggedProfile::FromJson(json);
-const auto ip = profile.modules.at(0).value.get<Partout::Models::TaggedModule_IP>();
-const auto encoded = ip.ToJson();
+const auto profile = json.get<Partout::Models::TaggedProfile>();
+const auto &ip = std::get<Partout::Models::TaggedModuleIp>(profile.modules.at(0));
+const auto encoded = nlohmann::json(ip);
 ```
 
-The models are compiled into `partout-winrt`. A standalone serialization test
-can also be built without the Windows SDK, using a C++17 compiler and
-nlohmann/json on the include path:
+`TunSettings` consumes these typed variants and models, including DNS protocol
+variants. Integer conversion rejects fractional or overflowing MTUs before
+platform validation. Typed optional fields treat explicit null as absent;
+arbitrary JSON payloads retain null as a JSON value. Sets use vectors with
+generated uniqueness validation.
+
+The portable model regression tests compile without the Windows SDK:
 
 ```sh
-c++ -std=c++17 -I/path/to/nlohmann/include -Icross/windows/src/models \
-    tests/c/windows/models.cc cross/windows/src/models/*.cpp -o /tmp/partout-models-test
-/tmp/partout-models-test
+cmake -S tests/c/windows -B .cmake-models -G Ninja
+cmake --build .cmake-models
+ctest --test-dir .cmake-models --output-on-failure
 ```
 
 ### Native integration
@@ -306,10 +318,11 @@ transport option is needed. The native archive alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
 The standalone settings mapping test uses real WinRT settings objects, without
-a VPN host. From the same developer shell (adjust the archive path for your build):
+a VPN host. From the same developer shell (adjust the archive and nlohmann/json
+include paths for your build):
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
 & .cmake-winrt/tun-settings-test.exe
 ```
 

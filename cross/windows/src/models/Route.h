@@ -19,7 +19,7 @@
 #define Route_H_
 
 #include <string>
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models

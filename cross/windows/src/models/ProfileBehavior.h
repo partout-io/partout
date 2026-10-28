@@ -18,7 +18,7 @@
 #ifndef ProfileBehavior_H_
 #define ProfileBehavior_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models

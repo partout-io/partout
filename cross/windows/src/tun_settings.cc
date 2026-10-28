@@ -4,12 +4,12 @@
 #include <ws2tcpip.h>
 #include "tun_settings.h"
 #include "winrt/log.h"
+#include "models/TunnelRemoteInfoWrapper.h"
 #include <charconv>
-#include <cmath>
+#include <stdexcept>
 #include <string>
 
 using namespace winrt;
-using namespace winrt::Windows::Data::Json;
 using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Vpn;
 
@@ -17,14 +17,20 @@ namespace Partout {
 
 TunSettings::TunSettings(const char *json) {
     if (!json) throw hresult_invalid_argument(L"Missing negotiated tunnel settings");
-    const auto root = JsonObject::Parse(to_hstring(json));
-    for (const auto &entry : root.GetNamedArray(L"modules")) {
-        const auto module = entry.GetObject();
-        const auto type = module.GetNamedString(L"type");
-        if (type == L"IP")
-            ApplyIP(module.GetNamedObject(L"value"));
-        else if (type == L"DNS")
-            ApplyDNS(module.GetNamedObject(L"value"));
+    try {
+        const auto info = Models::TunnelRemoteInfoWrapper::FromJson(nlohmann::json::parse(json));
+        if (info.modules) {
+            for (const auto &entry : *info.modules) {
+                if (const auto *ip = std::get_if<Models::TaggedModuleIp>(&entry))
+                    ApplyIP(ip->value);
+                else if (const auto *dns = std::get_if<Models::TaggedModuleDns>(&entry))
+                    ApplyDNS(dns->value);
+            }
+        }
+    } catch (const nlohmann::json::exception &) {
+        throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");
+    } catch (const std::logic_error &) {
+        throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");
     }
     Validate();
 }
@@ -33,44 +39,39 @@ uint32_t TunSettings::MaxFrame() const {
     return mtu_ + encapsulation_headroom;
 }
 
-void TunSettings::ApplyIP(const JsonObject &settings) {
-    if (Has(settings, L"ipv4"))
-        ApplyAddresses(settings.GetNamedObject(L"ipv4"), HostNameType::Ipv4);
-    if (Has(settings, L"ipv6"))
-        ApplyAddresses(settings.GetNamedObject(L"ipv6"), HostNameType::Ipv6);
-    if (Has(settings, L"mtu")) ApplyMTU(settings.GetNamedNumber(L"mtu"));
+void TunSettings::ApplyIP(const Models::IPModule &settings) {
+    if (settings.ipv4) ApplyAddresses(*settings.ipv4, HostNameType::Ipv4);
+    if (settings.ipv6) ApplyAddresses(*settings.ipv6, HostNameType::Ipv6);
+    if (settings.mtu) ApplyMTU(*settings.mtu);
 }
 
-void TunSettings::ApplyAddresses(const JsonObject &settings, HostNameType family) {
+void TunSettings::ApplyAddresses(const Models::IPSettings &settings, HostNameType family) {
     const bool v4 = family == HostNameType::Ipv4;
     const auto &addresses = v4 ? ipv4_ : ipv6_;
-    for (const auto &value : ReadArray(settings, L"subnets"))
-        addresses.Append(ParseSubnet(value.GetString(), family, false).Address());
+    for (const auto &subnet : settings.subnets)
+        addresses.Append(ParseSubnet(to_hstring(subnet), family, false).Address());
 
-    const auto included = ReadArray(settings, L"includedRoutes");
-    const auto excluded = ReadArray(settings, L"excludedRoutes");
     if (v4) {
         routes_.Ipv4InclusionRoutes(
-            ReadRoutes(included, routes_.Ipv4InclusionRoutes(), family, true));
+            ReadRoutes(settings.includedRoutes, routes_.Ipv4InclusionRoutes(), family, true));
         routes_.Ipv4ExclusionRoutes(
-            ReadRoutes(excluded, routes_.Ipv4ExclusionRoutes(), family, false));
+            ReadRoutes(settings.excludedRoutes, routes_.Ipv4ExclusionRoutes(), family, false));
     } else {
         routes_.Ipv6InclusionRoutes(
-            ReadRoutes(included, routes_.Ipv6InclusionRoutes(), family, true));
+            ReadRoutes(settings.includedRoutes, routes_.Ipv6InclusionRoutes(), family, true));
         routes_.Ipv6ExclusionRoutes(
-            ReadRoutes(excluded, routes_.Ipv6ExclusionRoutes(), family, false));
+            ReadRoutes(settings.excludedRoutes, routes_.Ipv6ExclusionRoutes(), family, false));
     }
 }
 
-void TunSettings::ApplyDNS(const JsonObject &settings) {
-    if (Has(settings, L"protocolType") &&
-        settings.GetNamedObject(L"protocolType").GetNamedString(L"type") != L"cleartext")
+void TunSettings::ApplyDNS(const Models::DNSModule &settings) {
+    if (!std::holds_alternative<Models::DNSModuleProtocolTypeCleartext>(settings.protocolType))
         throw hresult_not_implemented(
             L"Encrypted DNS is not supported by the VPN channel settings");
 
     const auto servers = single_threaded_vector<HostName>();
-    for (const auto &value : ReadArray(settings, L"servers")) {
-        const HostName host{value.GetString()};
+    for (const auto &server : settings.servers) {
+        const HostName host{to_hstring(server)};
         if (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6)
             throw hresult_invalid_argument(L"DNS servers must be IP addresses");
         servers.Append(host);
@@ -79,31 +80,33 @@ void TunSettings::ApplyDNS(const JsonObject &settings) {
     domains.Clear();
     if (servers.Size() == 0) return;
 
-    const auto names = ReadArray(settings, L"searchDomains");
-    const auto policy = settings.GetNamedString(L"domainPolicy", L"");
-    const bool match = policy == L"match" || policy == L"matchAndSearch";
+    const auto names = settings.searchDomains.value_or(std::vector<std::string>{});
+    const auto policy = settings.domainPolicy
+        ? settings.domainPolicy->value
+        : Models::DNSModuleDomainPolicy::INVALID_VALUE_OPENAPI_GENERATED;
+    const bool match = policy == Models::DNSModuleDomainPolicy::match ||
+        policy == Models::DNSModuleDomainPolicy::matchAndSearch;
     const auto proxies = single_threaded_vector<HostName>();
-    if (match && names.Size()) {
-        for (const auto &value : names)
+    if (match && !names.empty()) {
+        for (const auto &name : names)
             domains.Append(
-                VpnDomainNameInfo{value.GetString(), VpnDomainNameType::Suffix, servers, proxies});
+                VpnDomainNameInfo{to_hstring(name), VpnDomainNameType::Suffix, servers, proxies});
     } else {
         domains.Append(VpnDomainNameInfo{L".", VpnDomainNameType::Suffix, servers, proxies});
     }
-    if (Has(settings, L"domainName"))
-        domains.Append(VpnDomainNameInfo{settings.GetNamedString(L"domainName"),
+    if (settings.domainName)
+        domains.Append(VpnDomainNameInfo{to_hstring(*settings.domainName),
                                          VpnDomainNameType::Suffix, servers, proxies});
-    if (names.Size() && policy != L"match")
+    if (!names.empty() && policy != Models::DNSModuleDomainPolicy::match)
         winrt_log(
             WinrtLogNotice,
             "Partout::TunSettings: DNS search suffixes unsupported; DNS resolution rules applied");
 }
 
-void TunSettings::ApplyMTU(double mtu) {
+void TunSettings::ApplyMTU(int32_t mtu) {
     // Zero requests the platform default, preserving any earlier explicit MTU.
     if (mtu == 0) return;
-    if (!std::isfinite(mtu) || mtu != std::floor(mtu) || mtu < 68 ||
-        mtu > 65535 - encapsulation_headroom)
+    if (mtu < 68 || mtu > static_cast<int32_t>(65535 - encapsulation_headroom))
         throw hresult_invalid_argument(L"Invalid negotiated MTU");
     mtu_ = static_cast<uint32_t>(mtu);
 }
@@ -113,14 +116,6 @@ void TunSettings::Validate() const {
         throw hresult_invalid_argument(L"No negotiated tunnel addresses");
     if (ipv6_.Size() && mtu_ < 1280)
         throw hresult_invalid_argument(L"IPv6 requires an MTU of at least 1280");
-}
-
-bool TunSettings::Has(const JsonObject &object, const wchar_t *key) {
-    return object.HasKey(key) && object.GetNamedValue(key).ValueType() != JsonValueType::Null;
-}
-
-TunSettings::JsonArray TunSettings::ReadArray(const JsonObject &object, const wchar_t *key) {
-    return Has(object, key) ? object.GetNamedArray(key) : JsonArray{};
 }
 
 TunSettings::HostName TunSettings::ParseAddress(const hstring &text, HostNameType family) {
@@ -156,17 +151,16 @@ TunSettings::VpnRoute TunSettings::ParseSubnet(const hstring &text, HostNameType
     return VpnRoute{HostName{address}, static_cast<uint8_t>(prefix)};
 }
 
-TunSettings::RouteList TunSettings::ReadRoutes(const JsonArray &settings, RouteList routes,
+TunSettings::RouteList TunSettings::ReadRoutes(const std::vector<Models::Route> &settings, RouteList routes,
                                                HostNameType family, bool included) {
     if (!routes) routes = single_threaded_vector<VpnRoute>();
     const bool v4 = family == HostNameType::Ipv4;
-    for (const auto &value : settings) {
-        const auto route = value.GetObject();
+    for (const auto &route : settings) {
         // Windows routes select an interface, not a per-route gateway.
-        if (Has(route, L"gateway")) ParseAddress(route.GetNamedString(L"gateway"), family);
+        if (route.gateway) ParseAddress(to_hstring(*route.gateway), family);
         const auto destination =
-            ParseSubnet(Has(route, L"destination") ? route.GetNamedString(L"destination")
-                                                   : hstring{v4 ? L"0.0.0.0/0" : L"::/0"},
+            ParseSubnet(route.destination ? to_hstring(*route.destination)
+                                          : hstring{v4 ? L"0.0.0.0/0" : L"::/0"},
                         family, true);
         if (!included || destination.PrefixSize() != 0) {
             routes.Append(destination);

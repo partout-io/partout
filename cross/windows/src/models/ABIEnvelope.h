@@ -18,9 +18,9 @@
 #ifndef ABIEnvelope_H_
 #define ABIEnvelope_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include "PartoutErrorCode.h"
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models

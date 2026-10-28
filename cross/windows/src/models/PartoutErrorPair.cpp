@@ -76,14 +76,17 @@ void to_json(nlohmann::json& j, const PartoutErrorPair& o)
 
 void from_json(const nlohmann::json& j, PartoutErrorPair& o)
 {
-    j.at("code").get_to(o.code);
+    if (!j.is_object()) throw std::invalid_argument("Expected PartoutErrorPair object");
+    PartoutErrorPair parsed{};
+    ReadJsonValue(j.at("code"), parsed.code);
 
-    if (j.find("subCode") != j.end()) {
+    if (j.find("subCode") != j.end() && !j.at("subCode").is_null()) {
         std::string temporary_subCode;
-        j.at("subCode").get_to(temporary_subCode);
-        o.subCode = std::move(temporary_subCode);
+        ReadJsonValue(j.at("subCode"), temporary_subCode);
+        parsed.subCode = std::move(temporary_subCode);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

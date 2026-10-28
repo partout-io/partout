@@ -171,94 +171,95 @@ void to_json(nlohmann::json& j, const PartoutErrorCode& o)
 
 void from_json(const nlohmann::json& j, PartoutErrorCode& o)
 {
+    PartoutErrorCode parsed{};
 
     auto s = j.get<std::string>();
     if(s == "openVPN") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::openVPN;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::openVPN;
     }
     else if(s == "wireGuard") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::wireGuard;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::wireGuard;
     }
     else if(s == "authentication") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::authentication;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::authentication;
     }
     else if(s == "crypto") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::crypto;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::crypto;
     }
     else if(s == "decoding") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::decoding;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::decoding;
     }
     else if(s == "dnsFailure") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::dnsFailure;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::dnsFailure;
     }
     else if(s == "encoding") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::encoding;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::encoding;
     }
     else if(s == "fdUnavailable") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::fdUnavailable;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::fdUnavailable;
     }
     else if(s == "incompatibleModules") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::incompatibleModules;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::incompatibleModules;
     }
     else if(s == "incompleteModule") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::incompleteModule;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::incompleteModule;
     }
     else if(s == "invalidField") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::invalidField;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::invalidField;
     }
     else if(s == "invalidValue") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::invalidValue;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::invalidValue;
     }
     else if(s == "ioFailure") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::ioFailure;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::ioFailure;
     }
     else if(s == "keychainAddItem") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::keychainAddItem;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::keychainAddItem;
     }
     else if(s == "keychainItemNotFound") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::keychainItemNotFound;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::keychainItemNotFound;
     }
     else if(s == "linkNotActive") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::linkNotActive;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::linkNotActive;
     }
     else if(s == "networkChanged") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::networkChanged;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::networkChanged;
     }
     else if(s == "noActiveModules") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::noActiveModules;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::noActiveModules;
     }
     else if(s == "operationCancelled") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::operationCancelled;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::operationCancelled;
     }
     else if(s == "outOfMemory") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::outOfMemory;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::outOfMemory;
     }
     else if(s == "parsing") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::parsing;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::parsing;
     }
     else if(s == "releasedObject") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::releasedObject;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::releasedObject;
     }
     else if(s == "requiredImplementation") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::requiredImplementation;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::requiredImplementation;
     }
     else if(s == "socketConfiguration") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::socketConfiguration;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::socketConfiguration;
     }
     else if(s == "timeout") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::timeout;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::timeout;
     }
     else if(s == "tunNotAvailable") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::tunNotAvailable;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::tunNotAvailable;
     }
     else if(s == "unhandled") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::unhandled;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::unhandled;
     }
     else if(s == "unknownImportedModule") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::unknownImportedModule;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::unknownImportedModule;
     }
     else if(s == "unknownModuleHandler") {
-        o.value = PartoutErrorCode::ePartoutErrorCode::unknownModuleHandler;
+        parsed.value = PartoutErrorCode::ePartoutErrorCode::unknownModuleHandler;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -267,6 +268,7 @@ void from_json(const nlohmann::json& j, PartoutErrorCode& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

@@ -120,43 +120,44 @@ void to_json(nlohmann::json& j, const OpenVPNErrorCode& o)
 
 void from_json(const nlohmann::json& j, OpenVPNErrorCode& o)
 {
+    OpenVPNErrorCode parsed{};
 
     auto s = j.get<std::string>();
     if(s == "compressionMismatch") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::compressionMismatch;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::compressionMismatch;
     }
     else if(s == "connectionFailure") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::connectionFailure;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::connectionFailure;
     }
     else if(s == "noRouting") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::noRouting;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::noRouting;
     }
     else if(s == "otpRequired") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::otpRequired;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::otpRequired;
     }
     else if(s == "passphraseRequired") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::passphraseRequired;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::passphraseRequired;
     }
     else if(s == "recoverableAuthentication") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::recoverableAuthentication;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::recoverableAuthentication;
     }
     else if(s == "serverShutdown") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::serverShutdown;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::serverShutdown;
     }
     else if(s == "tlsFailure") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::tlsFailure;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::tlsFailure;
     }
     else if(s == "unableToDecrypt") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::unableToDecrypt;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::unableToDecrypt;
     }
     else if(s == "unsupportedAlgorithm") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedAlgorithm;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedAlgorithm;
     }
     else if(s == "unsupportedCompression") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedCompression;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedCompression;
     }
     else if(s == "unsupportedOption") {
-        o.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedOption;
+        parsed.value = OpenVPNErrorCode::eOpenVPNErrorCode::unsupportedOption;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -165,6 +166,7 @@ void from_json(const nlohmann::json& j, OpenVPNErrorCode& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

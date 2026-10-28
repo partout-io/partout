@@ -18,7 +18,7 @@
 #ifndef ModuleType_H_
 #define ModuleType_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

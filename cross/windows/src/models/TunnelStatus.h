@@ -18,7 +18,7 @@
 #ifndef TunnelStatus_H_
 #define TunnelStatus_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

@@ -96,19 +96,20 @@ void to_json(nlohmann::json& j, const ConnectionStatus& o)
 
 void from_json(const nlohmann::json& j, ConnectionStatus& o)
 {
+    ConnectionStatus parsed{};
 
     auto s = j.get<std::string>();
     if(s == "disconnected") {
-        o.value = ConnectionStatus::eConnectionStatus::disconnected;
+        parsed.value = ConnectionStatus::eConnectionStatus::disconnected;
     }
     else if(s == "connecting") {
-        o.value = ConnectionStatus::eConnectionStatus::connecting;
+        parsed.value = ConnectionStatus::eConnectionStatus::connecting;
     }
     else if(s == "connected") {
-        o.value = ConnectionStatus::eConnectionStatus::connected;
+        parsed.value = ConnectionStatus::eConnectionStatus::connected;
     }
     else if(s == "disconnecting") {
-        o.value = ConnectionStatus::eConnectionStatus::disconnecting;
+        parsed.value = ConnectionStatus::eConnectionStatus::disconnecting;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -117,6 +118,7 @@ void from_json(const nlohmann::json& j, ConnectionStatus& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

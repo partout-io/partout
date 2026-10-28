@@ -96,19 +96,20 @@ void to_json(nlohmann::json& j, const TunnelStatus& o)
 
 void from_json(const nlohmann::json& j, TunnelStatus& o)
 {
+    TunnelStatus parsed{};
 
     auto s = j.get<std::string>();
     if(s == "inactive") {
-        o.value = TunnelStatus::eTunnelStatus::inactive;
+        parsed.value = TunnelStatus::eTunnelStatus::inactive;
     }
     else if(s == "activating") {
-        o.value = TunnelStatus::eTunnelStatus::activating;
+        parsed.value = TunnelStatus::eTunnelStatus::activating;
     }
     else if(s == "active") {
-        o.value = TunnelStatus::eTunnelStatus::active;
+        parsed.value = TunnelStatus::eTunnelStatus::active;
     }
     else if(s == "deactivating") {
-        o.value = TunnelStatus::eTunnelStatus::deactivating;
+        parsed.value = TunnelStatus::eTunnelStatus::deactivating;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -117,6 +118,7 @@ void from_json(const nlohmann::json& j, TunnelStatus& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

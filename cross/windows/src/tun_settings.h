@@ -2,12 +2,19 @@
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
 #include <cstdint>
-#include <winrt/Windows.Data.Json.h>
+#include <vector>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
+
+namespace Models {
+struct DNSModule;
+struct IPModule;
+struct IPSettings;
+struct Route;
+}
 
 // Validated channel settings from negotiated IP/DNS modules.
 class TunSettings {
@@ -37,25 +44,21 @@ public:
     uint32_t MaxFrame() const;
 
 private:
-    using JsonObject = winrt::Windows::Data::Json::JsonObject;
-    using JsonArray = winrt::Windows::Data::Json::JsonArray;
     using HostName = winrt::Windows::Networking::HostName;
     using HostNameType = winrt::Windows::Networking::HostNameType;
     using VpnRoute = winrt::Windows::Networking::Vpn::VpnRoute;
     using RouteList = winrt::Windows::Foundation::Collections::IVector<VpnRoute>;
 
-    void ApplyIP(const JsonObject &settings);
-    void ApplyAddresses(const JsonObject &settings, HostNameType family);
-    void ApplyDNS(const JsonObject &settings);
-    void ApplyMTU(double mtu);
+    void ApplyIP(const Models::IPModule &settings);
+    void ApplyAddresses(const Models::IPSettings &settings, HostNameType family);
+    void ApplyDNS(const Models::DNSModule &settings);
+    void ApplyMTU(int32_t mtu);
     void Validate() const;
 
-    static bool Has(const JsonObject &object, const wchar_t *key);
-    static JsonArray ReadArray(const JsonObject &object, const wchar_t *key);
     static HostName ParseAddress(const winrt::hstring &text, HostNameType family);
     static VpnRoute ParseSubnet(const winrt::hstring &text, HostNameType family, bool network);
-    static RouteList ReadRoutes(const JsonArray &settings, RouteList routes, HostNameType family,
-                                bool included);
+    static RouteList ReadRoutes(const std::vector<Models::Route> &settings, RouteList routes,
+                                HostNameType family, bool included);
 
     winrt::Windows::Foundation::Collections::IVector<HostName> ipv4_ =
         winrt::single_threaded_vector<HostName>();

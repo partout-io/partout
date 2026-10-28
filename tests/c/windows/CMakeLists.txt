@@ -1,0 +1,18 @@
+cmake_minimum_required(VERSION 3.28)
+project(PartoutModelTests LANGUAGES CXX)
+
+# This test exercises model decoding without requiring the Windows SDK.
+find_package(nlohmann_json CONFIG REQUIRED)
+get_filename_component(PARTOUT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
+file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_ROOT}/cross/windows/src/models/*.cpp")
+add_executable(partout-models-test models.cc ${model_sources})
+target_compile_features(partout-models-test PRIVATE cxx_std_17)
+target_compile_definitions(partout-models-test PRIVATE NOMINMAX)
+target_link_libraries(partout-models-test PRIVATE nlohmann_json::nlohmann_json)
+if(MSVC)
+    target_compile_options(partout-models-test PRIVATE /UNDEBUG)
+else()
+    target_compile_options(partout-models-test PRIVATE -UNDEBUG)
+endif()
+enable_testing()
+add_test(NAME partout-models COMMAND partout-models-test)

@@ -96,19 +96,21 @@ void to_json(nlohmann::json& j, const CryptoBackend& o)
 
 void from_json(const nlohmann::json& j, CryptoBackend& o)
 {
+    CryptoBackend parsed{};
 
-    auto s = j.get<int32_t>();
+    int32_t s;
+    ReadJsonValue(j, s);
     if(s == 1) {
-        o.value = CryptoBackend::eCryptoBackend::openssl;
+        parsed.value = CryptoBackend::eCryptoBackend::openssl;
     }
     else if(s == 2) {
-        o.value = CryptoBackend::eCryptoBackend::mbedtls;
+        parsed.value = CryptoBackend::eCryptoBackend::mbedtls;
     }
     else if(s == 3) {
-        o.value = CryptoBackend::eCryptoBackend::native;
+        parsed.value = CryptoBackend::eCryptoBackend::native;
     }
     else if(s == 4) {
-        o.value = CryptoBackend::eCryptoBackend::mock;
+        parsed.value = CryptoBackend::eCryptoBackend::mock;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -117,6 +119,7 @@ void from_json(const nlohmann::json& j, CryptoBackend& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

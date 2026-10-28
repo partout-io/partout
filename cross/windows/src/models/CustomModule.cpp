@@ -76,10 +76,13 @@ void to_json(nlohmann::json& j, const CustomModule& o)
 
 void from_json(const nlohmann::json& j, CustomModule& o)
 {
-    j.at("innerType").get_to(o.innerType);
+    if (!j.is_object()) throw std::invalid_argument("Expected CustomModule object");
+    CustomModule parsed{};
+    ReadJsonValue(j.at("innerType"), parsed.innerType);
 
-    j.at("json").get_to(o.json);
+    ReadJsonValue(j.at("json"), parsed.json);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

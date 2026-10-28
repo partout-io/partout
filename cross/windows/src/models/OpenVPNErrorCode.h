@@ -18,7 +18,7 @@
 #ifndef OpenVPNErrorCode_H_
 #define OpenVPNErrorCode_H_
 
-#include <nlohmann/json.hpp>
+#include "../json.h"
 
 namespace Partout::Models
 {

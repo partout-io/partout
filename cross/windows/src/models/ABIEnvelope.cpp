@@ -76,19 +76,22 @@ void to_json(nlohmann::json& j, const ABIEnvelope& o)
 
 void from_json(const nlohmann::json& j, ABIEnvelope& o)
 {
+    if (!j.is_object()) throw std::invalid_argument("Expected ABIEnvelope object");
+    ABIEnvelope parsed{};
 
-    if (j.find("code") != j.end()) {
+    if (j.find("code") != j.end() && !j.at("code").is_null()) {
         Partout::Models::PartoutErrorCode temporary_code;
-        j.at("code").get_to(temporary_code);
-        o.code = std::move(temporary_code);
+        ReadJsonValue(j.at("code"), temporary_code);
+        parsed.code = std::move(temporary_code);
     }
 
     if (j.find("payload") != j.end()) {
         nlohmann::json temporary_payload;
-        j.at("payload").get_to(temporary_payload);
-        o.payload = std::move(temporary_payload);
+        ReadJsonValue(j.at("payload"), temporary_payload);
+        parsed.payload = std::move(temporary_payload);
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

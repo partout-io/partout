@@ -93,16 +93,18 @@ void to_json(nlohmann::json& j, const DaemonFeatureFlag& o)
 
 void from_json(const nlohmann::json& j, DaemonFeatureFlag& o)
 {
+    DaemonFeatureFlag parsed{};
 
-    auto s = j.get<int32_t>();
+    int32_t s;
+    ReadJsonValue(j, s);
     if(s == 1) {
-        o.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalDaemon;
+        parsed.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalDaemon;
     }
     else if(s == 2) {
-        o.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalOpenVPN;
+        parsed.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalOpenVPN;
     }
     else if(s == 4) {
-        o.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalWireGuard;
+        parsed.value = DaemonFeatureFlag::eDaemonFeatureFlag::experimentalWireGuard;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -111,6 +113,7 @@ void from_json(const nlohmann::json& j, DaemonFeatureFlag& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

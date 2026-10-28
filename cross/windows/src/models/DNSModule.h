@@ -19,10 +19,10 @@
 #define DNSModule_H_
 
 #include <string>
-#include "../json.h"
-#include "DNSModule_DomainPolicy.h"
+#include "DNSModuleDomainPolicy.h"
 #include <vector>
-#include <nlohmann/json.hpp>
+#include "DNSModuleProtocolType.h"
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -32,12 +32,12 @@ struct  DNSModule
 {
 
     std::string id;
-    Partout::Models::JSONValue protocolType;
+    Partout::Models::DNSModuleProtocolType protocolType;
     std::vector<std::string> servers;
     std::optional<std::string> domainName;
     std::optional<std::vector<std::string>> searchDomains;
     std::optional<bool> inheritsVPN;
-    std::optional<Partout::Models::DNSModule_DomainPolicy> domainPolicy;
+    std::optional<Partout::Models::DNSModuleDomainPolicy> domainPolicy;
     std::optional<bool> routesThroughVPN;
 
     bool operator==(const DNSModule& other) const;

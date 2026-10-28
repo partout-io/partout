@@ -18,11 +18,11 @@
 #ifndef TunnelRemoteInfoWrapper_H_
 #define TunnelRemoteInfoWrapper_H_
 
+#include "TaggedModule.h"
 #include "TaggedProfile.h"
 #include <string>
-#include "../json.h"
 #include <vector>
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -34,7 +34,7 @@ struct  TunnelRemoteInfoWrapper
     Partout::Models::TaggedProfile profile;
     std::string originalModuleId;
     std::optional<std::string> address;
-    std::optional<std::vector<Partout::Models::JSONValue>> modules;
+    std::optional<std::vector<Partout::Models::TaggedModule>> modules;
 
     bool operator==(const TunnelRemoteInfoWrapper& other) const;
     bool operator!=(const TunnelRemoteInfoWrapper& other) const;

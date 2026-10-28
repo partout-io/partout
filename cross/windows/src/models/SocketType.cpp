@@ -90,13 +90,14 @@ void to_json(nlohmann::json& j, const SocketType& o)
 
 void from_json(const nlohmann::json& j, SocketType& o)
 {
+    SocketType parsed{};
 
     auto s = j.get<std::string>();
     if(s == "UDP") {
-        o.value = SocketType::eSocketType::udp;
+        parsed.value = SocketType::eSocketType::udp;
     }
     else if(s == "TCP") {
-        o.value = SocketType::eSocketType::tcp;
+        parsed.value = SocketType::eSocketType::tcp;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -105,6 +106,7 @@ void from_json(const nlohmann::json& j, SocketType& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

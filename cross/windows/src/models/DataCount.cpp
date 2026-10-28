@@ -76,10 +76,13 @@ void to_json(nlohmann::json& j, const DataCount& o)
 
 void from_json(const nlohmann::json& j, DataCount& o)
 {
-    j.at("received").get_to(o.received);
+    if (!j.is_object()) throw std::invalid_argument("Expected DataCount object");
+    DataCount parsed{};
+    ReadJsonValue(j.at("received"), parsed.received);
 
-    j.at("sent").get_to(o.sent);
+    ReadJsonValue(j.at("sent"), parsed.sent);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

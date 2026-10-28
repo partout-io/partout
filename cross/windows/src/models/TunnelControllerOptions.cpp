@@ -93,10 +93,13 @@ void to_json(nlohmann::json& j, const TunnelControllerOptions& o)
 
 void from_json(const nlohmann::json& j, TunnelControllerOptions& o)
 {
-    j.at("dnsFallbackServers").get_to(o.dnsFallbackServers);
+    if (!j.is_object()) throw std::invalid_argument("Expected TunnelControllerOptions object");
+    TunnelControllerOptions parsed{};
+    ReadJsonValue(j.at("dnsFallbackServers"), parsed.dnsFallbackServers);
 
-    j.at("logsSnapshots").get_to(o.logsSnapshots);
+    ReadJsonValue(j.at("logsSnapshots"), parsed.logsSnapshots);
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models

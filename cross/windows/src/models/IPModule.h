@@ -20,7 +20,7 @@
 
 #include "IPSettings.h"
 #include <string>
-#include <nlohmann/json.hpp>
+#include "../json.h"
 #include <optional>
 
 namespace Partout::Models

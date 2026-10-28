@@ -141,64 +141,65 @@ void to_json(nlohmann::json& j, const WireGuardErrorCode& o)
 
 void from_json(const nlohmann::json& j, WireGuardErrorCode& o)
 {
+    WireGuardErrorCode parsed{};
 
     auto s = j.get<std::string>();
     if(s == "emptyPeers") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::emptyPeers;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::emptyPeers;
     }
     else if(s == "interfaceHasInvalidAddress") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidAddress;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidAddress;
     }
     else if(s == "interfaceHasInvalidDNS") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidDNS;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidDNS;
     }
     else if(s == "interfaceHasInvalidListenPort") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidListenPort;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidListenPort;
     }
     else if(s == "interfaceHasInvalidMTU") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidMTU;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidMTU;
     }
     else if(s == "interfaceHasInvalidPrivateKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidPrivateKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasInvalidPrivateKey;
     }
     else if(s == "interfaceHasNoPrivateKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasNoPrivateKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasNoPrivateKey;
     }
     else if(s == "interfaceHasUnrecognizedKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasUnrecognizedKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::interfaceHasUnrecognizedKey;
     }
     else if(s == "multipleEntriesForKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::multipleEntriesForKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::multipleEntriesForKey;
     }
     else if(s == "multipleInterfaces") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::multipleInterfaces;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::multipleInterfaces;
     }
     else if(s == "multiplePeersWithSamePublicKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::multiplePeersWithSamePublicKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::multiplePeersWithSamePublicKey;
     }
     else if(s == "noInterface") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::noInterface;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::noInterface;
     }
     else if(s == "peerHasInvalidAllowedIP") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidAllowedIP;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidAllowedIP;
     }
     else if(s == "peerHasInvalidEndpoint") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidEndpoint;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidEndpoint;
     }
     else if(s == "peerHasInvalidPersistentKeepAlive") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPersistentKeepAlive;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPersistentKeepAlive;
     }
     else if(s == "peerHasInvalidPreSharedKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPreSharedKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPreSharedKey;
     }
     else if(s == "peerHasInvalidPublicKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPublicKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasInvalidPublicKey;
     }
     else if(s == "peerHasNoPublicKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasNoPublicKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasNoPublicKey;
     }
     else if(s == "peerHasUnrecognizedKey") {
-        o.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasUnrecognizedKey;
+        parsed.value = WireGuardErrorCode::eWireGuardErrorCode::peerHasUnrecognizedKey;
     }  else {
         std::stringstream ss;
         ss << "Unexpected value " << s << " in json"
@@ -207,6 +208,7 @@ void from_json(const nlohmann::json& j, WireGuardErrorCode& o)
         throw std::invalid_argument(ss.str());
     }
 
+    o = std::move(parsed);
 }
 
 } // namespace Partout::Models
