@@ -259,15 +259,18 @@ cmake --build .cmake-winrt --target partout-winrt
 ### OpenAPI models
 
 Regenerate the entities in `cross/windows/src/models` with OpenAPI Generator
-7.26.0, Java, Python 3 and PyYAML. In a Python virtual environment:
+7.26.0, a Java 11+ JDK, and Python 3 (standard library only):
 
 ```sh
-python3 -m pip install -r scripts/requirements-codegen.txt
 scripts/build.sh -gen-models cpp
 ```
 
-If the installed CLI has a different version, set `OPENAPI_GENERATOR_JAR` to the
-7.26.0 CLI jar. The checked-in models need no generator at build time.
+If the installed CLI has a different version or its launcher does not expose
+the JAR path, set `OPENAPI_GENERATOR_JAR` to the 7.26.0 CLI jar.
+The YAML reader reuses the parser bundled in that same JAR;
+common launchers such as Homebrew's are detected automatically. There are no
+Python package dependencies. The checked-in models need no generator at build
+time.
 
 Both generators use their stock templates: `cpp-pistache-server` produces value
 structs with optional fields, and `cpp-httplib-server` produces discriminator

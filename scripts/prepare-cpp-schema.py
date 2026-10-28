@@ -2,10 +2,47 @@
 """Normalize the C++ generator input without changing the shared wire schema."""
 import copy
 import json
+import os
+from pathlib import Path
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
 
-import yaml
+
+def generator_jar():
+    configured = os.environ.get("OPENAPI_GENERATOR_JAR")
+    if configured:
+        jar = Path(configured).expanduser().resolve()
+        if not jar.is_file():
+            raise FileNotFoundError(f"OpenAPI Generator JAR does not exist: {jar}")
+        return jar
+
+    # Packaged launchers such as Homebrew's expose the existing JAR in -jar.
+    # Never evaluate the launcher: only accept a literal path to an existing file.
+    launcher = shutil.which("openapi-generator")
+    if launcher:
+        command = Path(launcher).resolve().read_text(errors="replace")
+        match = re.search(r"-jar\s+(?:\"([^\"]+)\"|'([^']+)'|([^\s;]+))", command)
+        if match:
+            literal = next(group for group in match.groups() if group is not None)
+            if not any(marker in literal for marker in ("$", "`", "%")):
+                jar = Path(literal)
+                if jar.is_absolute() and jar.is_file():
+                    return jar
+    raise RuntimeError("Set OPENAPI_GENERATOR_JAR to the installed generator CLI JAR")
+
+
+def read_document(path):
+    java_home = os.environ.get("JAVA_HOME")
+    java = str(Path(java_home) / "bin" / "java") if java_home else "java"
+    with tempfile.TemporaryDirectory(prefix="partout-openapi-") as temporary:
+        output = Path(temporary) / "openapi.json"
+        subprocess.run([java, "--class-path", str(generator_jar()),
+                        str(Path(__file__).with_name("ReadOpenAPI.java")),
+                        str(path), str(output)], check=True)
+        return json.loads(output.read_text(encoding="utf-8"))
 
 
 def cpp_name(name):
@@ -69,8 +106,7 @@ def prepare(document):
 
 
 if __name__ == "__main__":
-    with open(sys.argv[1], encoding="utf-8") as source:
-        document, unions = prepare(yaml.safe_load(source))
+    document, unions = prepare(read_document(sys.argv[1]))
     with open(sys.argv[2], "w", encoding="utf-8") as output:
         json.dump(document, output, indent=2)
         output.write("\n")
