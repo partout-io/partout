@@ -119,8 +119,8 @@ case $language in
             cpp_generator=(java -jar "$OPENAPI_GENERATOR_JAR")
         fi
         cpp_version=$("${cpp_generator[@]}" version)
-        if [[ "$cpp_version" != 7.26.0 ]]; then
-            echo "C++ models require OpenAPI Generator 7.26.0 (found $cpp_version)."
+        if [[ "$cpp_version" != 7.20.0 ]]; then
+            echo "C++ models require OpenAPI Generator 7.20.0 (found $cpp_version)."
             echo "Install that version or set OPENAPI_GENERATOR_JAR to its CLI jar."
             exit 1
         fi
