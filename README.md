@@ -151,6 +151,7 @@ Libraries:
 
 - [GenericJSON][credits-genericjson]
 - [MbedTLS][credits-mbedtls]
+- [nlohmann_json][credits-nljson]
 - [OpenSSL][credits-openssl]
 - [url.c][credits-url.c]
 - [WireGuard (Go)][credits-wireguard-go]
@@ -189,6 +190,7 @@ Website: [partout.io][partout]
 [github-prebuilts]: https://github.com/partout-io/prebuilts
 
 [credits-genericjson]: https://github.com/iwill/generic-json-swift
+[credits-nljson]: https://github.com/nlohmann/json
 [credits-mbedtls]: https://github.com/Mbed-TLS/mbedtls
 [credits-openssl]: https://github.com/openssl/openssl
 [credits-tmthecoder]: https://github.com/tmthecoder
