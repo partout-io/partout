@@ -6,6 +6,17 @@
 import Testing
 
 struct EndpointTests {
+    @Test(arguments: [
+        ("vpn.example.com:51820", "vpn.example.com:51820"),
+        ("1.2.3.4:51820", "1.2.3.4:51820"),
+        ("2003:123:abc:4f00::1:52999", "[2003:123:abc:4f00::1]:52999"),
+        ("[2003:123:abc:4f00::1]:52999", "[2003:123:abc:4f00::1]:52999")
+    ])
+    func givenEndpoint_whenFormattingForWireGuard_thenFormatsHostAndPort(raw: String, expected: String) throws {
+        let sut = try #require(Endpoint(rawValue: raw))
+        #expect(sut.wireGuardRepresentation == expected)
+    }
+
     @Test
     func givenIPv4_whenParse_thenSucceeds() throws {
         try assertEndpoint(with: "1.2.3.4", 1194, .v4)
