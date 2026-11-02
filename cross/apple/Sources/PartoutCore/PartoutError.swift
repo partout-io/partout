@@ -87,17 +87,40 @@ extension Error {
 
 // MARK: - Description
 
-extension PartoutError: CustomDebugStringConvertible {
+extension PartoutError: CustomDebugStringConvertible, SensitiveDebugStringConvertible {
     public var debugDescription: String {
+        debugDescription(withSensitiveData: PartoutLogger.default.logsModules)
+    }
+
+    public func debugDescription(withSensitiveData: Bool) -> String {
         var desc: [String] = ["PartoutError.\(code.rawValue)"]
         if let context {
-            desc.append("context=\(String(describing: context))")
+            switch context {
+            case .incompatibleModules(let modules):
+                let descriptions = modules.map {
+                    LoggableModule(.global, $0).debugDescription(withSensitiveData: withSensitiveData)
+                }
+                desc.append("modules=\(descriptions)")
+            case .incompleteModule(let builder):
+                let description = LoggableModule(builder).debugDescription(withSensitiveData: withSensitiveData)
+                desc.append("module=\(description)")
+            case .invalidField(let field):
+                desc.append("field=\(field.key)")
+            }
         }
         if let payload {
-            desc.append("payload=\(payload.debugDescription)")
+            desc.append("payload=\(withSensitiveData ? payload.debugDescription : PartoutLogger.redactedValue)")
         }
         if let reason {
-            desc.append("reason=\(reason) (\(reason.localizedDescription))")
+            if withSensitiveData {
+                let detail = (reason as? SensitiveDebugStringConvertible)?
+                    .debugDescription(withSensitiveData: true) ?? String(describing: reason)
+                desc.append("reason=\(detail) (\(reason.localizedDescription))")
+            } else if let reason = reason as? PartoutError {
+                desc.append("reason=PartoutError.\(reason.code.rawValue)")
+            } else {
+                desc.append("reason=\(String(reflecting: type(of: reason)))")
+            }
         }
         return "{\(desc.joined(separator: ", "))}"
     }
