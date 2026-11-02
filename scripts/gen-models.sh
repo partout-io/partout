@@ -3,6 +3,7 @@ set -e
 
 usage() {
     echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports]"
+    echo "extra_imports: comma-separated Partout model names (Kotlin/C++)."
     exit 1
 }
 
@@ -132,21 +133,32 @@ case $language in
         union_models=$(cat "$tmp_dir/unions.txt")
         IFS=':' read -ra union_names <<< "$union_models"
         union_mappings=()
+        external_mappings=()
+        IFS=',' read -ra external_names <<< "$extra_imports"
+        for name in "${external_names[@]}"; do
+            external_mappings+=(--schema-mappings "$name=Partout::Models::$name"
+                --import-mappings "$name=#include \"$name.h\"")
+        done
         for name in "${union_names[@]}"; do
             union_mappings+=(--schema-mappings "$name=$name")
         done
+
+        model_properties=models,modelDocs=false,modelTests=false
+        if [[ -z "$extra_imports" ]]; then
+            model_properties+=,supportingFiles=Helpers.h:Helpers.cpp
+        fi
 
         # Stock value models provide optional fields and validation. The stock
         # httplib backend supplies typed unions and discriminator dispatch only.
         "${cpp_generator[@]}" generate \
             -i "$tmp_dir/openapi.json" -o "$tmp_dir/values" \
             -g cpp-pistache-server \
-            --global-property=models,supportingFiles=Helpers.h:Helpers.cpp,modelDocs=false,modelTests=false \
+            --global-property="$model_properties" \
             --type-mappings JSONValue=nlohmann::json,set=std::vector \
             --import-mappings 'JSONValue=#include <nlohmann/json.hpp>' \
             --name-mappings interface=interface_ \
             --additional-properties="modelPackage=$package_name,helpersPackage=Partout.Helpers,useStructModel=true,variableNameFirstCharacterUppercase=false,sortModelPropertiesByRequiredFlag=false" \
-            "${union_mappings[@]}"
+            "${union_mappings[@]}" "${external_mappings[@]}"
         "${cpp_generator[@]}" generate \
             -i "$tmp_dir/openapi.json" -o "$tmp_dir/unions" \
             -g cpp-httplib-server \
@@ -156,7 +168,7 @@ case $language in
         mkdir -p "$tmp_dir/models"
         cp "$tmp_dir/values/model/"*.h "$tmp_dir/values/model/"*.cpp "$tmp_dir/models/"
         cp "$tmp_dir/unions/models/"*.h "$tmp_dir/models/"
-        python3 "$(dirname "$0")/finish-cpp-models.py" "$tmp_dir/models" "$tmp_dir/openapi.json"
+        python3 "$(dirname "$0")/finish-cpp-models.py" "$tmp_dir/models" "$tmp_dir/openapi.json" "$package_name" "$extra_imports"
         rm -rf "$models_dir"
         mkdir -p "$models_dir"
         cp "$tmp_dir/models/"* "$models_dir/"
