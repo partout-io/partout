@@ -36,7 +36,7 @@ target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_
     PRIVATE nlohmann_json::nlohmann_json)
 
 # Preserve a single archive for Zig and existing consumers.
-add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
+add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc cross/windows/src/tunnel.cc)
 include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 # Generated model implementations do not follow our warning policy.
 target_compile_options(partout-models PRIVATE /w)

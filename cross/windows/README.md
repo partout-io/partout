@@ -308,6 +308,20 @@ ctest --test-dir .cmake-models --output-on-failure
 
 ### Native integration
 
+`partout_winrt.h` exports `Partout::Tunnel` for packaged consumers managing VPN
+profiles through `VpnManagementAgent`. Construct it with the consumer's profile
+name prefix, then call `Fetch`, `Save`, `Connect`, `Disconnect`, or `Remove` from
+a serialized background worker. `Fetch` is read-only. Management is restricted
+to profiles belonging to the current package family and that prefix. An accepted
+connection request does not imply connection completion; observe `Fetch`.
+
+Include `partout/models/TaggedProfile.h` and `partout/models/TunnelSnapshot.h`
+for its typed arguments and results. The Windows installation includes these
+generated model headers and `partout/json.h`; consumers also supply nlohmann/json.
+Link the matching Partout library using the same MSVC runtime as the library.
+The API reports native operation names and status codes without configuration
+payloads. It does not provide transfer counters or detailed engine errors.
+
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
 `-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows

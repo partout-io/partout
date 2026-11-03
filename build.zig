@@ -218,6 +218,7 @@ pub fn build(b: *std.Build) void {
     if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
     if (shared and winrt_library != null) {
         lib.forceUndefinedSymbol("pp_winrt_runtime_link");
+        lib.forceUndefinedSymbol("pp_winrt_tunnel_link");
     }
     if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
@@ -259,6 +260,8 @@ pub fn build(b: *std.Build) void {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
         if (winrt_library != null) {
             lib.installHeader(b.path("cross/windows/include/partout_winrt.h"), "partout_winrt.h");
+            lib.installHeader(b.path("cross/windows/src/json.h"), "partout/json.h");
+            lib.installHeadersDirectory(b.path("cross/windows/src/models"), "partout/models", .{ .include_extensions = &.{".h"} });
         }
         b.installArtifact(lib);
     }

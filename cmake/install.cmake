@@ -20,6 +20,10 @@ if(WIN32)
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
+    install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/partout/models" FILES_MATCHING PATTERN "*.h")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/json.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}/partout")
 endif()
 
 set(PARTOUT_INSTALL_RUNTIME_TARGETS ${PARTOUT_RUNTIME_LIBRARIES})
