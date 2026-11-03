@@ -29,14 +29,25 @@ enum {
     WinrtEOF = 1
 };
 
+enum { WinrtMaxBatch = 256 };
+typedef struct {
+    const uint8_t *data;
+    size_t size;
+} winrt_packet;
+typedef bool (*winrt_receive_batch)(void *, const winrt_packet *, size_t, const winrt_address *, int32_t);
+
 typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_address *, int32_t);
 
 /* Owned transport capability, shared by daemon and passive consumers.
- * subscribe(NULL) drains borrowed callback contexts. Writes copy into a WinRT
- * Buffer before return; writes perform no per-packet apartment initialization.
+ * subscribe(NULL) drains borrowed callback contexts. Writes borrow input until
+ * return: channel output copies directly into VpnChannel's pool; independent
+ * socket output retains a WinRT Buffer until asynchronous completion. Writes
+ * execute on the producer without per-packet apartment initialization.
  * release drains callbacks immediately; native destruction may be deferred.
- * Lifecycle and writes are owner-serialized; receive callbacks must not reenter.
- * Callbacks run on native producers and only enqueue daemon messages or feed the passive adapter.
+ * Lifecycle and writes are owner-serialized. Receive callbacks may submit output
+ * but must defer lifecycle changes (including callback removal and release).
+ * Callbacks run on native producers: serialized OpenVPN execution, owned queue
+ * fallback under contention, or WireGuard's passive adapter.
  */
 typedef struct winrt_transport winrt_transport;
 
@@ -49,6 +60,11 @@ struct winrt_transport {
     int32_t (*write)(void *, const uint8_t *, size_t, const winrt_address *);
     bool (*local_address)(void *, winrt_address *);
     bool unconnected;
+    /* Optional capabilities. Packet views expire at return. Batch write reports
+     * the accepted prefix even on error; packets remain separate datagrams.
+     * count must be 1..WinrtMaxBatch. Rebuild both sides when changing this ABI. */
+    int32_t (*write_batch)(void *, const winrt_packet *, size_t, const winrt_address *, size_t *);
+    bool (*subscribe_batch)(void *, winrt_receive_batch, void *);
 };
 
 typedef bool (*winrt_configure)(void *, uintptr_t);
@@ -56,6 +72,11 @@ typedef bool (*winrt_configure)(void *, uintptr_t);
 typedef struct {
     bool tcp;
     bool unconnected;
+    /* Optional capabilities. Packet views expire at return. Batch write reports
+     * the accepted prefix even on error; packets remain separate datagrams.
+     * count must be 1..WinrtMaxBatch. Rebuild both sides when changing this ABI. */
+    int32_t (*write_batch)(void *, const winrt_packet *, size_t, const winrt_address *, size_t *);
+    bool (*subscribe_batch)(void *, winrt_receive_batch, void *);
     bool dual_stack;
     int timeout_ms;
     winrt_configure configure;

@@ -26,15 +26,22 @@ namespace Partout {
 class Tun::State {
 public:
     VpnChannel channel;
+    // Producers submit directly. Close waits for accepted submissions before
+    // stopping the channel; no producer waits for the native command worker.
+    std::mutex write_mutex;
+    bool accepting_writes = false;
     // Held throughout native delivery and callback removal. The current Tun is
     // borrowed under this gate; its destructor unpublishes it before returning.
-    std::mutex receive_mutex;
+    // Channel submission from a receive callback may reenter native delivery.
+    // The Zig execution gate queues that nested receive rather than recursing
+    // into protocol state.
+    std::recursive_mutex receive_mutex;
     Tun *tun = nullptr;
     Socket::Receiver link_receive;
 
     struct Counters {
-        // Native receives hold receive_mutex. Writes run on the looper.
-        // Snapshot all counters on the looper with receive_mutex held.
+        // Receives hold receive_mutex; writes hold write_mutex.
+        // Snapshots acquire both gates, in that order.
         uint64_t tun_read = 0, tun_dropped = 0, link_send = 0, link_send_failed = 0;
         uint64_t link_read = 0, tun_write = 0, tun_write_failed = 0;
     } counters;
@@ -55,11 +62,23 @@ public:
         receive_time[1].Log(this, "channel.decapsulate_callback_excluding_lock_wait");
     }
 
-    int32_t Write(const uint8_t *bytes, size_t length, bool send);
+    int32_t Write(const uint8_t *bytes, size_t length, bool send) {
+        const PacketView packet{bytes, length};
+        size_t written = 0;
+        return WriteBatch(&packet, 1, send, &written);
+    }
+    int32_t WriteBatch(const PacketView *packets, size_t count, bool send, size_t *written);
 };
 
-int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
-    if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
+int32_t Tun::State::WriteBatch(const PacketView *packets, size_t count, bool send, size_t *written) {
+    *written = 0;
+    std::lock_guard lock(write_mutex);
+    if (!accepting_writes) return E_ABORT;
+    if (!packets || !count || count > MaxPacketBatch) return E_INVALIDARG;
+    for (size_t i = 0; i < count; ++i) {
+        if (!packets[i].data || !packets[i].size || packets[i].size > UINT32_MAX) return E_INVALIDARG;
+    }
+    size_t length = 0;
     const auto append = [&](VpnPacketBuffer const &packet) {
         ScopedIOTiming timing(append_time[send ? 1 : 0]);
         if (send)
@@ -78,22 +97,27 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
     const char *stage = "get buffer";
     uint32_t capacity = 0;
     try {
-        {
-            ScopedIOTiming timing(get_buffer_time[send ? 1 : 0]);
-            packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
+        for (size_t i = 0; i < count; ++i) {
+            length = packets[i].size;
+            stage = "get buffer";
+            {
+                ScopedIOTiming timing(get_buffer_time[send ? 1 : 0]);
+                packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
+            }
+            const auto buffer = packet.Buffer();
+            capacity = buffer.Capacity();
+            stage = "copy packet";
+            if (length > capacity) throw hresult_invalid_argument();
+            {
+                ScopedIOTiming timing(copy_time[send ? 1 : 0]);
+                memcpy(buffer.data(), packets[i].data, length);
+                buffer.Length(static_cast<uint32_t>(length));
+            }
+            stage = "append";
+            append(packet);
+            packet = nullptr; // Ownership returned to the channel.
+            ++*written;
         }
-        const auto buffer = packet.Buffer();
-        capacity = buffer.Capacity();
-        stage = "copy packet";
-        if (length > capacity) throw hresult_invalid_argument();
-        {
-            ScopedIOTiming timing(copy_time[send ? 1 : 0]);
-            memcpy(buffer.data(), bytes, length);
-            buffer.Length(static_cast<uint32_t>(length));
-        }
-        stage = "append";
-        append(packet);
-        packet = nullptr; // Ownership returned to the channel.
         stage = "flush";
         flush();
     } catch (...) {
@@ -107,11 +131,19 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
             try {
                 packet.Buffer().Length(0);
                 append(packet);
+            } catch (...) {}
+        }
+        if (*written || packet) {
+            try {
                 flush();
             } catch (...) {}
         }
+        if (send) ++counters.link_send_failed;
+        else ++counters.tun_write_failed;
         return error;
     }
+    if (send) counters.link_send += *written;
+    else counters.tun_write += *written;
     return 0;
 }
 
@@ -121,14 +153,24 @@ Tun::~Tun() noexcept {
     StopWrites();
     std::lock_guard lock(state_.receive_mutex);
     callback_ = nullptr;
+    batch_callback_ = nullptr;
     // An older handle may be freed after Open publishes its replacement.
     if (state_.tun == this) state_.tun = nullptr;
 }
 
 bool Tun::SetOnReceive(TunOnReceive callback) {
     std::lock_guard lock(state_.receive_mutex);
-    if (callback && callback_) return false;
+    if (callback && (callback_ || batch_callback_)) return false;
+    if (!callback) batch_callback_ = nullptr;
     callback_ = std::move(callback);
+    return true;
+}
+
+bool Tun::SetOnReceiveBatch(TunOnReceiveBatch callback) {
+    std::lock_guard lock(state_.receive_mutex);
+    if (callback && (callback_ || batch_callback_)) return false;
+    if (!callback) callback_ = nullptr;
+    batch_callback_ = std::move(callback);
     return true;
 }
 
@@ -137,17 +179,24 @@ void Tun::ReportError(int32_t error) {
     write_status_.compare_exchange_strong(expected, error);
     std::lock_guard lock(state_.receive_mutex);
     if (callback_) callback_(nullptr, 0, error);
+    if (batch_callback_) batch_callback_(nullptr, 0, error);
 }
 
 int32_t Tun::Write(const uint8_t *bytes, size_t length) {
+    const PacketView packet{bytes, length};
+    size_t written = 0;
+    return WriteBatch(&packet, 1, &written);
+}
+
+int32_t Tun::WriteBatch(const PacketView *packets, size_t count, size_t *written) {
+    *written = 0;
     if (auto status = WriteStatus()) return status;
-    const auto result = state_.Write(bytes, length, false);
+    const auto result = state_.WriteBatch(packets, count, false, written);
     if (result) {
-        ++state_.counters.tun_write_failed;
-        return result;
+        int32_t expected = 0;
+        write_status_.compare_exchange_strong(expected, result);
     }
-    ++state_.counters.tun_write;
-    return 0;
+    return result;
 }
 
 void Tun::StopWrites() {
@@ -223,13 +272,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
-                    const auto result = state->Write(bytes, length, true);
-                    if (result) {
-                        ++state->counters.link_send_failed;
-                        return result;
-                    }
-                    ++state->counters.link_send;
-                    return int32_t{0};
+                    return state->Write(bytes, length, true);
                 });
             std::lock_guard lock(state_->receive_mutex);
             state_->link_receive = std::move(receive);
@@ -240,6 +283,10 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
             settings.IPv6().Size() ? settings.IPv6().GetView() : nullptr, VpnInterfaceId{nullptr},
             settings.Routes(), settings.Domains(), settings.MTU(), settings.MaxFrame(), false,
             transport_);
+        {
+            std::lock_guard lock(state_->write_mutex);
+            state_->accepting_writes = true;
+        }
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
         winrt_log(WinrtLogInfo,
@@ -266,8 +313,13 @@ void TunnelController::Close() noexcept {
         if (auto tun = std::exchange(state_->tun, nullptr)) {
             tun->StopWrites();
             tun->callback_ = nullptr;
+            tun->batch_callback_ = nullptr;
         }
         state_->link_receive = nullptr;
+    }
+    {
+        std::lock_guard lock(state_->write_mutex);
+        state_->accepting_writes = false;
     }
     if (started_) {
         try {
@@ -280,6 +332,7 @@ void TunnelController::Close() noexcept {
         Tun::State::Counters counters;
         {
             std::lock_guard lock(state_->receive_mutex);
+            std::lock_guard write_lock(state_->write_mutex);
             counters = state_->counters;
         }
         winrt_log(WinrtLogInfo,
@@ -307,8 +360,23 @@ void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     auto &counters = state_->counters;
     counters.tun_read += count;
     const auto tun = state_->tun;
-    if (!tun || !tun->callback_) {
+    if (!tun || (!tun->callback_ && !tun->batch_callback_)) {
         counters.tun_dropped += count;
+        return;
+    }
+    if (tun->batch_callback_) {
+        PacketView views[MaxPacketBatch];
+        size_t used = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto packet = packets.RemoveAtBegin();
+            packets.Append(packet); // Keep native ownership until callback return.
+            const auto buffer = packet.Buffer();
+            views[used++] = {buffer.data(), buffer.Length()};
+            if (used == MaxPacketBatch || i + 1 == count) {
+                if (!tun->batch_callback_(views, used, 0)) counters.tun_dropped += used;
+                used = 0;
+            }
+        }
         return;
     }
     // VpnPacketBufferList's iterable view may be empty despite a nonzero Size.

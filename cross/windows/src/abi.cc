@@ -7,8 +7,6 @@
 #include "tun.h"
 #include "io_metrics.h"
 #include <algorithm>
-#include <cstring>
-#include <optional>
 #include <string>
 
 namespace {
@@ -21,29 +19,32 @@ template <typename To, typename From> To ConvertAddress(const From &value) {
     return result;
 }
 
-winrt::Windows::Storage::Streams::Buffer CopyBuffer(const uint8_t *bytes, size_t size) {
-    if ((!bytes && size) || size > UINT32_MAX) throw winrt::hresult_invalid_argument();
-    winrt::Windows::Storage::Streams::Buffer buffer{static_cast<uint32_t>(size)};
-    buffer.Length(static_cast<uint32_t>(size));
-    if (size) memcpy(buffer.data(), bytes, size);
-    return buffer;
+// Copy descriptors only; payloads remain borrowed for synchronous submission.
+bool PacketViews(const winrt_packet *packets, size_t count, Partout::PacketView *views, size_t &bytes) {
+    if (!packets || !count || count > Partout::MaxPacketBatch) return false;
+    bytes = 0;
+    for (size_t i = 0; i < count; ++i) {
+        if ((!packets[i].data && packets[i].size) || packets[i].size > UINT32_MAX) return false;
+        views[i] = {packets[i].data, packets[i].size};
+        bytes += packets[i].size;
+    }
+    return true;
 }
+static_assert(WinrtMaxBatch == Partout::MaxPacketBatch);
 
 struct SocketHandle {
     Partout::RuntimeLoop &loop; // Runtime outlives endpoints and their queued destruction.
     std::unique_ptr<Partout::Socket> socket;
-    // Copy timing belongs to the serialized producer; other metrics to the worker.
-    Partout::IOTiming copy_time, queue_time, submit_time;
-    Partout::IOBatches dequeued_batches;
+    // The transport owner serializes submissions and release.
+    Partout::IOTiming submit_time;
+    Partout::IOBatches submitted_packets;
 
     SocketHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Socket> value)
         : loop(owner), socket(std::move(value)) {}
 
     ~SocketHandle() {
-        copy_time.Log(this, "socket.copy_buffer");
-        queue_time.Log(this, "socket.queue_wait");
         submit_time.Log(this, "socket.write_submit_not_completion");
-        dequeued_batches.Log(this, "socket.dequeued");
+        submitted_packets.Log(this, "socket.submitted");
     }
 
     bool ResumeReading() {
@@ -67,25 +68,23 @@ struct SocketHandle {
         if (auto status = socket->WriteStatus()) return status;
         if (socket->IsUnconnected() && !destination) return E_INVALIDARG;
         if (!socket->Accepts(destination)) return E_INVALIDARG;
-        try {
-            const auto copy_start = Partout::IOTiming::Clock::now();
-            auto buffer = CopyBuffer(bytes, size);
-            const auto copied = Partout::IOTiming::Clock::now();
-            copy_time.Add(copied - copy_start);
-            std::optional<Partout::SocketAddress> address;
-            if (destination) address = *destination;
-            loop.Schedule([this, buffer = std::move(buffer), address, copied]() mutable {
-                queue_time.Add(Partout::IOTiming::Clock::now() - copied);
-                dequeued_batches.Add(1, buffer.Length());
-                if (socket->WriteStatus()) return;
-                Partout::ScopedIOTiming timing(submit_time);
-                const auto result = socket->Write(std::move(buffer), address ? &*address : nullptr);
-                if (result) socket->ReportError(result);
-            });
-            return 0;
-        } catch (...) {
-            return winrt::to_hresult().value;
-        }
+        Partout::ScopedIOTiming timing(submit_time);
+        submitted_packets.Add(1, size);
+        // The socket consumes channel writes now and owns asynchronous buffers.
+        // Return submission errors; the consumer owns failure dispatch.
+        return socket->Write(bytes, size, destination);
+    }
+
+    int32_t WriteBatch(const winrt_packet *packets, size_t count, const Partout::SocketAddress *destination, size_t *written) {
+        if (!written) return E_INVALIDARG;
+        *written = 0;
+        Partout::PacketView views[Partout::MaxPacketBatch];
+        size_t bytes = 0;
+        if (!PacketViews(packets, count, views, bytes) || !socket->Accepts(destination)) return E_INVALIDARG;
+        if (auto status = socket->WriteStatus()) return status;
+        submitted_packets.Add(count, bytes);
+        Partout::ScopedIOTiming timing(submit_time);
+        return socket->WriteBatch(views, count, destination, written);
     }
 
     // Endpoint callback removal holds its delivery mutex until active calls
@@ -146,49 +145,73 @@ struct SocketHandle {
             *result = ConvertAddress<winrt_address>(address);
             return true;
         },
-        .unconnected = socket->IsUnconnected()};
+        .unconnected = socket->IsUnconnected(),
+        .write_batch = [](void *raw, const winrt_packet *packets, size_t count, const winrt_address *destination, size_t *written) {
+            Partout::SocketAddress address{};
+            if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
+            return static_cast<SocketHandle *>(raw)->WriteBatch(packets, count, destination ? &address : nullptr, written);
+        },
+        .subscribe_batch = nullptr};
 };
 
 struct TunHandle {
     Partout::RuntimeLoop &loop;
     std::unique_ptr<Partout::Tun> tun;
-    Partout::IOTiming copy_time, queue_time, submit_time;
-    Partout::IOBatches dequeued_batches;
+    Partout::IOTiming submit_time;
+    Partout::IOBatches submitted_packets;
     uint64_t stopped_batches = 0;
 
     TunHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Tun> value)
         : loop(owner), tun(std::move(value)) {}
 
     ~TunHandle() {
-        copy_time.Log(this, "tun.copy_buffer");
-        queue_time.Log(this, "tun.batch_queue_wait");
         submit_time.Log(this, "tun.write_submit");
-        dequeued_batches.Log(this, "tun.dequeued");
+        submitted_packets.Log(this, "tun.submitted");
         winrt_log(WinrtLogInfo, "IO metrics owner=%p stage=tun.stopped batches=%llu", this, stopped_batches);
     }
 
     int32_t Write(const uint8_t *bytes, size_t size) {
-        if (auto status = tun->WriteStatus()) return status;
+        submitted_packets.Add(1, size);
+        if (auto status = tun->WriteStatus()) {
+            ++stopped_batches;
+            return status;
+        }
+        Partout::ScopedIOTiming timing(submit_time);
         try {
-            const auto copy_start = Partout::IOTiming::Clock::now();
-            auto buffer = CopyBuffer(bytes, size);
-            const auto copied = Partout::IOTiming::Clock::now();
-            copy_time.Add(copied - copy_start);
-            loop.Schedule([this, buffer = std::move(buffer), copied] {
-                queue_time.Add(Partout::IOTiming::Clock::now() - copied);
-                dequeued_batches.Add(1, buffer.Length());
-                if (tun->WriteStatus()) {
-                    ++stopped_batches;
-                    return;
-                }
-                Partout::ScopedIOTiming timing(submit_time);
-                const auto result = tun->Write(buffer.data(), buffer.Length());
-                if (result) tun->ReportError(result);
-            });
-            return 0;
+            return tun->Write(bytes, size);
         } catch (...) {
             return winrt::to_hresult().value;
         }
+    }
+
+    int32_t WriteBatch(const winrt_packet *packets, size_t count, size_t *written) {
+        if (!written) return E_INVALIDARG;
+        *written = 0;
+        Partout::PacketView views[Partout::MaxPacketBatch];
+        size_t bytes = 0;
+        if (!PacketViews(packets, count, views, bytes)) return E_INVALIDARG;
+        submitted_packets.Add(count, bytes);
+        if (auto status = tun->WriteStatus()) {
+            ++stopped_batches;
+            return status;
+        }
+        Partout::ScopedIOTiming timing(submit_time);
+        try {
+            return tun->WriteBatch(views, count, written);
+        } catch (...) {
+            return winrt::to_hresult().value;
+        }
+    }
+
+    bool SubscribeBatch(winrt_receive_batch receive, void *context) {
+        if (!receive) return tun->SetOnReceiveBatch({});
+        return loop.Perform([this, receive, context] {
+            return tun->SetOnReceiveBatch([receive, context](const Partout::PacketView *packets, size_t count, int32_t error) {
+                winrt_packet views[Partout::MaxPacketBatch];
+                for (size_t i = 0; i < count; ++i) views[i] = {packets[i].data, packets[i].size};
+                return receive(context, views, count, nullptr, error);
+            });
+        });
     }
 
     bool Subscribe(winrt_receive receive, void *context) {
@@ -208,7 +231,7 @@ struct TunHandle {
             auto self = static_cast<TunHandle *>(raw);
             self->tun->StopWrites();
             self->Subscribe(nullptr, nullptr);
-            // The controller outlives this handle and its queued writes/destruction.
+            // The controller outlives this handle and its queued destruction.
             try {
                 self->loop.Schedule([self] {
                     delete self;
@@ -240,7 +263,17 @@ struct TunHandle {
         .local_address = [](void *, winrt_address *) {
             return false;
         },
-        .unconnected = false};
+        .unconnected = false,
+        .write_batch = [](void *raw, const winrt_packet *packets, size_t count, const winrt_address *, size_t *written) {
+            return static_cast<TunHandle *>(raw)->WriteBatch(packets, count, written);
+        },
+        .subscribe_batch = [](void *raw, winrt_receive_batch receive, void *context) {
+            try {
+                return static_cast<TunHandle *>(raw)->SubscribeBatch(receive, context);
+            } catch (...) {
+                return false;
+            }
+        }};
 };
 } // namespace
 

@@ -16,6 +16,7 @@
 #include <atomic>
 #include <cstring>
 #include <deque>
+#include <vector>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -60,19 +61,30 @@ SocketAddress ParseAddress(HostName const &host, hstring const &port) {
 // Outstanding reads and writes retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
 struct Socket::State {
-    struct WriteRequest {
-        Buffer buffer{nullptr};
+    struct Endpoint {
+        SocketAddress address{};
         HostName host{nullptr};
         hstring service;
+        IOutputStream output{nullptr}; // Only the single writer coroutine uses this.
     };
+    struct WriteRequest {
+        Buffer buffer{nullptr};
+        std::shared_ptr<Endpoint> endpoint;
+    };
+    // Producer-owned bounded cache, scoped to this native transport. Queued
+    // requests retain evicted entries until their writes finish.
+    std::vector<std::shared_ptr<Endpoint>> endpoints;
+    uint64_t endpoint_hits = 0, endpoint_misses = 0;
 
     // Keep WinRT valid across calls and until the last native operation completes.
     CO_MTA_USAGE_COOKIE apartment{};
-    std::mutex mutex;
+    // A receive callback may submit its synchronous reply through this socket.
+    // Lifecycle changes remain deferred; recursive entry is only for output or
+    // its error notification on the current delivery thread.
+    std::recursive_mutex mutex;
     uint64_t received = 0;
     uint64_t sent = 0;
-    uint64_t endpoint_hits = 0, endpoint_misses = 0;
-    IOTiming output_stream_time, write_async_time;
+    IOTiming output_stream_time, write_async_time, copy_time;
     // Zero accepts writes; E_ABORT stops them; other HRESULTs latch a failure.
     std::atomic<int32_t> write_status{0};
     // The front slot stays queued until completion, including while suspended.
@@ -89,10 +101,12 @@ struct Socket::State {
 
     ~State() {
         winrt_log(WinrtLogInfo, "IO metrics owner=%p stage=socket.endpoint_cache hits=%llu misses=%llu entries=%zu",
-                  this, endpoint_hits, endpoint_misses, size_t{0});
+                  this, endpoint_hits, endpoint_misses, endpoints.size());
+        copy_time.Log(this, "socket.copy_buffer");
         output_stream_time.Log(this, "socket.output_stream_success_wall");
         write_async_time.Log(this, "socket.write_async_success_wall");
         writes.clear();
+        endpoints.clear();
         CoDecrementMTAUsage(apartment);
     }
 
@@ -376,22 +390,52 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
     }
 }
 
-int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
-    uint32_t length = 0;
+int32_t Socket::Write(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
+    const PacketView packet{bytes, length};
+    size_t written = 0;
+    return WriteBatch(&packet, 1, destination, &written);
+}
+
+int32_t Socket::WriteBatch(const PacketView *packets, size_t count, const SocketAddress *destination, size_t *written) {
+    *written = 0;
+    if (!packets || !count || count > MaxPacketBatch) return E_INVALIDARG;
+    for (size_t i = 0; i < count; ++i) {
+        if ((!packets[i].data && packets[i].size) || packets[i].size > UINT32_MAX) return E_INVALIDARG;
+    }
     try {
-        if (!buffer) throw hresult_invalid_argument();
-        length = buffer.Length();
+        std::lock_guard write_lock(write_mutex_);
+        for (size_t i = 0; i < count; ++i) {
+            if (auto error = WriteOne(packets[i].data, packets[i].size, destination)) return error;
+            ++*written;
+        }
+        return 0;
+    } catch (...) {
+        return to_hresult().value;
+    }
+}
+
+int32_t Socket::WriteOne(const uint8_t *bytes, size_t length, const SocketAddress *destination) {
+    try {
+        if ((!bytes && length) || length > UINT32_MAX) return E_INVALIDARG;
         const auto state = state_;
         const auto status = state->write_status.load();
         if (status) return status;
         if (channel_write_) {
             // After takeover, VpnChannel owns transport writes.
-            check_hresult(channel_write_(buffer.data(), length));
+            check_hresult(channel_write_(bytes, length));
         } else {
+            // Asynchronous socket writes must retain their payload after return.
+            const auto started = IOTiming::Clock::now();
+            Buffer buffer{static_cast<uint32_t>(length)};
+            buffer.Length(static_cast<uint32_t>(length));
+            if (length) memcpy(buffer.data(), bytes, length);
+            state->copy_time.Add(IOTiming::Clock::now() - started);
             EnqueueWrite(std::move(buffer), destination);
         }
     } catch (...) {
         const auto error = to_hresult().value;
+        int32_t expected = 0;
+        state_->write_status.compare_exchange_strong(expected, error);
         winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
                   static_cast<unsigned int>(error), static_cast<size_t>(length));
         return error;
@@ -407,15 +451,32 @@ void Socket::EnqueueWrite(Buffer buffer, const SocketAddress *destination) {
             (destination->family == 4 && !accepts_ipv4_) ||
             (destination->family == 6 && !accepts_ipv6_))
             throw hresult_invalid_argument();
-        wchar_t address[INET6_ADDRSTRLEN]{};
-        if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6, destination->address, address,
-                       INET6_ADDRSTRLEN))
-            throw hresult_invalid_argument();
-        std::wstring host{address};
-        if (destination->family == 6 && destination->scope_id)
-            host += L"%" + std::to_wstring(destination->scope_id);
-        request.host = HostName{host};
-        request.service = to_hstring(destination->port);
+        for (const auto &entry : state->endpoints) {
+            const auto &key = entry->address;
+            if (key.family == destination->family && key.port == destination->port &&
+                key.scope_id == destination->scope_id &&
+                memcmp(key.address, destination->address, key.family == 4 ? 4 : 16) == 0) {
+                request.endpoint = entry;
+                ++state->endpoint_hits;
+                break;
+            }
+        }
+        if (!request.endpoint) {
+            auto entry = std::make_shared<State::Endpoint>();
+            entry->address = *destination;
+            wchar_t address[INET6_ADDRSTRLEN]{};
+            if (!InetNtopW(destination->family == 4 ? AF_INET : AF_INET6, destination->address,
+                           address, INET6_ADDRSTRLEN)) throw hresult_invalid_argument();
+            std::wstring host{address};
+            if (destination->family == 6 && destination->scope_id)
+                host += L"%" + std::to_wstring(destination->scope_id);
+            entry->host = HostName{host};
+            entry->service = to_hstring(destination->port);
+            if (state->endpoints.size() == 64) state->endpoints.erase(state->endpoints.begin());
+            state->endpoints.push_back(entry);
+            request.endpoint = std::move(entry);
+            ++state->endpoint_misses;
+        }
     }
     request.buffer = std::move(buffer);
     bool start;
@@ -447,19 +508,23 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state, DatagramSocket da
                     co_return;
                 }
                 request = std::move(state->writes.front());
-                if (request.host) ++state->endpoint_misses;
             }
             IOutputStream output{nullptr};
             const auto output_start = IOTiming::Clock::now();
-            if (request.host) {
-                output = co_await datagram.GetOutputStreamAsync(request.host, request.service);
+            bool acquired = true;
+            if (request.endpoint) {
+                auto &endpoint = *request.endpoint;
+                acquired = !endpoint.output;
+                if (acquired)
+                    endpoint.output = co_await datagram.GetOutputStreamAsync(endpoint.host, endpoint.service);
+                output = endpoint.output;
             } else {
                 output = stream ? stream.OutputStream() : datagram.OutputStream();
             }
             const auto output_elapsed = IOTiming::Clock::now() - output_start;
             {
                 std::lock_guard lock(state->mutex);
-                state->output_stream_time.Add(output_elapsed);
+                if (acquired) state->output_stream_time.Add(output_elapsed);
             }
             // UDP remains one datagram. TCP retries only an unwritten suffix.
             auto &buffer = request.buffer;
@@ -499,6 +564,7 @@ void Socket::StopWrites() {
 }
 
 Socket::Receiver Socket::TakeOver(Writer writer) {
+    std::lock_guard write_lock(write_mutex_);
     const auto state = state_;
     // Negotiation packets must reach the transport before VpnChannel owns it.
     if (write_) write_.get();

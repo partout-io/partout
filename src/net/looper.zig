@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
-//! caller's mux. Windows posts WinRT receives to the caller's mailbox and waits
-//! on its wake event. POSIX runs read callbacks in loopOnce(). Read packet views
+//! caller's mux. Windows delivers WinRT receives to its owner and waits on the
+//! mux wake event. POSIX runs read callbacks in loopOnce(). Read packet views
 //! expire when the callback returns.
 
 const std = @import("std");
@@ -25,6 +25,7 @@ pub const Looper = struct {
         looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
+    pub const ExecutionGate = helpers.ExecutionGate;
     pub const AttachArguments = helpers.AttachArguments;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;

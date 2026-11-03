@@ -55,9 +55,10 @@ const ConnectionError = SessionError || error{
     TunNotAvailable,
 };
 
-/// Connection and Session state are confined to the externally owned looper.
-/// The owner must deliver every runtime call on that looper, and quiesce all
-/// I/O before releasing resources. Creation before publication and destruction
+/// The externally owned looper serializes Connection and Session state. On
+/// Windows, native receives share an execution gate with actor controls/timers;
+/// other platforms deliver runtime calls on the looper thread. The owner must
+/// quiesce all I/O before releasing resources. Creation before publication and destruction
 /// after full shutdown may run outside it. Outgoing callbacks must return
 /// promptly, never wait for the daemon actor, and never reenter the lifecycle.
 const OpenVPNConnection = struct {

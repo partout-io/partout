@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
-//! Native producers feed the caller's mailbox directly. Protocol
-//! processing, backpressure and timers remain on the Zig caller.
+//! Native producers deliver borrowed packet views to the owner. The daemon can
+//! process Windows OpenVPN inline under its execution gate, or queue owned input.
+//! Timer dispatch shares that gate; the mux wait never holds it.
 const std = @import("std");
 const build_options = @import("build_options");
 const helpers = @import("looper_helpers.zig");
@@ -39,6 +40,7 @@ pub const WindowsLooper = struct {
     next_timer: u64,
     max_read_count: usize,
     stopped: bool,
+    execution_gate: ?*helpers.ExecutionGate,
 
     pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
         if (!build_options.winrt) return error.MuxFailure;
@@ -58,6 +60,7 @@ pub const WindowsLooper = struct {
             .timers = .{},
             .next_timer = 1,
             .stopped = false,
+            .execution_gate = options.execution_gate,
         };
         return self;
     }
@@ -99,8 +102,11 @@ pub const WindowsLooper = struct {
 
     pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
-        if (self.stopped) return false;
+        if (self.execution_gate) |gate| gate.enter();
+        const stopped = self.stopped;
         const deadline = self.nextWaitDeadline(max_wait_ms);
+        if (self.execution_gate) |gate| gate.leave();
+        if (stopped) return false;
         while (true) {
             var code: c_int = 0;
             const result = c.pp_mux_wait(self.mux, remainingWaitMs(deadline), &code);
@@ -110,6 +116,8 @@ pub const WindowsLooper = struct {
             }
             if (waitCompleted(result, deadline)) break;
         }
+        if (self.execution_gate) |gate| gate.enter();
+        defer if (self.execution_gate) |gate| gate.leave();
         return self.dispatchExpiredTimers();
     }
 
@@ -162,12 +170,14 @@ pub const WindowsLooper = struct {
         self.cancelTimer(token);
         self.timers.append(node);
         token.id = node.id;
+        if (self.execution_gate != null) _ = c.pp_mux_wake(self.mux);
     }
 
     pub fn cancelTimer(self: *WindowsLooper, token: *io.Timer) void {
         const id = token.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         token.id = null;
+        if (self.execution_gate != null) _ = c.pp_mux_wake(self.mux);
     }
 
     pub fn stop(self: *WindowsLooper) helpers.StopError!void {

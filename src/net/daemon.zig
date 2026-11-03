@@ -7,8 +7,9 @@
 //! and supply the behavior for each profile type.
 //!
 //! SettingsDaemon is synchronous; callers serialize its controls. ConnectionDaemon
-//! owns an actor that serializes connection work and updates to shared state.
-//! Lifecycle callbacks defer actor work; reporting callbacks run on the event-loop thread.
+//! owns an actor for lifecycle and reporting. Windows OpenVPN protocol work may
+//! run on native receive threads under a shared execution gate; actor controls
+//! and timers take the same gate. Lifecycle callbacks always defer actor work.
 //! A serial worker owns endpoint resolution and prepares links outside the event loop.
 //! Ordinary reconnects retain Connection; terminal looper failure ends the event loop.
 //! Stop before destroy; monitors must cease callbacks after setEventHandler(null).
@@ -365,16 +366,17 @@ const SettingsDaemon = struct {
 };
 
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
-// this actor serializes both its connection work and updates to that shared state.
+// its actor owns control work; Windows native protocol dispatch shares a gate.
 const ConnectionDaemon = struct {
     const PacketMetrics = struct {
-        // Admission uses jobs_mutex; dispatch belongs to the actor. Report only
-        // after submissions close and callbacks and queued jobs have drained.
+        // Admission/backlog uses jobs_mutex; dispatch uses the execution gate
+        // (or the actor alone). Report after callbacks and queued jobs drain.
         accepted_packets: u64 = 0,
         error_receipts: u64 = 0,
         inline_packets: u64 = 0,
         queued_packets: u64 = 0,
         queued_bytes: u64 = 0,
+        pending_receipts: usize = 0,
         inline_dispatch_ns: u64 = 0,
         queued_dispatch_ns: u64 = 0,
         dispatched_packets: u64 = 0,
@@ -403,6 +405,8 @@ const ConnectionDaemon = struct {
     jobs_mutex: core.Mutex,
     jobs_condition: core.concurrency.Condition = .{},
     packet_receive_failed: bool = false,
+    execution_gate: Looper.ExecutionGate = .{},
+    direct_receive: bool,
     packet_metrics: [2]PacketMetrics = .{ .{}, .{} },
     is_running: bool,
 
@@ -429,10 +433,12 @@ const ConnectionDaemon = struct {
         errdefer allocator.destroy(self);
         const mux = io_c.pp_mux_create(2) orelse return error.LooperFailure;
         errdefer io_c.pp_mux_free(mux);
+        const direct_receive = builtin.os.tag == .windows and module.typeOf() == .OpenVPN;
         const looper = Looper.create(allocator, .{
             .mux = mux,
             .on_receive = onPacketsReceived,
             .receive_context = self,
+            .execution_gate = if (direct_receive) &self.execution_gate else null,
         }) catch |err| return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.MuxFailure => error.LooperFailure,
@@ -444,6 +450,7 @@ const ConnectionDaemon = struct {
             .actor = undefined,
             .actor_id = null,
             .looper = looper,
+            .direct_receive = direct_receive,
             .jobs = .{},
             .jobs_mutex = .{},
             .jobs_condition = .{},
@@ -476,6 +483,7 @@ const ConnectionDaemon = struct {
 
         // The event loop finalized connection state and quiesced callbacks before exit.
         self.gate.deinit();
+        self.execution_gate.deinit();
         self.jobs_mutex.deinit();
         self.jobs_condition.deinit();
         io_c.pp_mux_free(self.mux);
@@ -539,7 +547,7 @@ const ConnectionDaemon = struct {
                 };
             },
             .needs_rebind => |info| {
-                std.debug.assert(self.isCurrentThread());
+                std.debug.assert(self.isCurrentThread() or self.execution_gate.isCurrent());
                 if (self.conn_request != null) return;
                 const copy = cloneTunnelInfo(self.daemon.allocator, info) catch {
                     onConnectionEvent(ctx, .{ .failed = .{
@@ -634,12 +642,39 @@ const ConnectionDaemon = struct {
         };
     }
 
-    /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
+    /// Borrow native input for inline protocol execution when the gate is free.
+    /// On contention, retain FIFO order through the existing owned mailbox.
     fn onPacketsReceived(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
         if (builtin.os.tag != .windows) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
         const receipt = attachment.makeReceipt(bytes, length, source, code) orelse return false;
+        if (self.direct_receive and code == 0 and self.execution_gate.tryEnter()) {
+            defer self.execution_gate.leave();
+            self.jobs_mutex.lock();
+            const metrics = &self.packet_metrics[@intFromEnum(receipt.side)];
+            const running = self.is_running and !self.packet_receive_failed;
+            const pending = metrics.pending_receipts != 0;
+            self.jobs_mutex.unlock();
+            if (!running) return false;
+            if (!pending and self.looper.canReceivePackets(receipt)) {
+                self.jobs_mutex.lock();
+                metrics.accepted_packets += 1;
+                metrics.inline_packets += 1;
+                self.jobs_mutex.unlock();
+                metrics.inline_dispatch_ns += self.handlePacketsReceived(receipt);
+                return attachment.keepReading(receipt);
+            }
+            return self.enqueuePacket(attachment, receipt);
+        }
+        return self.enqueuePacket(attachment, receipt);
+    }
+
+    fn enqueuePacket(self: *ConnectionDaemon, attachment: anytype, receipt: Looper.PacketReceipt) bool {
+        self.jobs_mutex.lock();
+        const running = self.is_running and !self.packet_receive_failed;
+        self.jobs_mutex.unlock();
+        if (!running) return false;
         var receipt_copy = receipt;
         receipt_copy.bytes = self.daemon.allocator.dupe(u8, receipt.bytes) catch {
             self.onReceivePacketsFailed();
@@ -976,24 +1011,24 @@ const ConnectionDaemon = struct {
 
     //#endregion
 
-    //#region Actor thread - I/O callbacks
+    //#region Serialized protocol execution - I/O callbacks
 
-    fn handlePacketsReceived(self: *ConnectionDaemon, receipt: Looper.PacketReceipt) void {
+    fn handlePacketsReceived(self: *ConnectionDaemon, receipt: Looper.PacketReceipt) u64 {
         const dispatch_start = core.monotonicNs();
         self.looper.receivePackets(receipt);
+        const elapsed = core.monotonicNs() -| dispatch_start;
         if (receipt.code == 0) {
             const metrics = &self.packet_metrics[@intFromEnum(receipt.side)];
-            const elapsed = core.monotonicNs() -| dispatch_start;
             metrics.dispatched_packets += 1;
             metrics.dispatched_bytes += receipt.bytes.len;
             metrics.dispatch_ns += elapsed;
-            metrics.queued_dispatch_ns += elapsed;
             metrics.max_dispatch_ns = @max(metrics.max_dispatch_ns, elapsed);
         }
+        return elapsed;
     }
 
-    // The event loop invokes looper callbacks on the actor thread. They may run
-    // protocol work directly; lifecycle events are queued until loopOnce returns.
+    // Windows OpenVPN native callbacks and the actor share execution_gate.
+    // Protocol work may run on either thread; lifecycle effects stay queued.
 
     fn onLinkRead(ctx: ?*anyopaque, packets: io.Packets, sources: ?[]const io.SocketAddress) !io.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
@@ -1158,6 +1193,9 @@ const ConnectionDaemon = struct {
         var pending = self.jobs.takeAll();
         self.jobs_mutex.unlock();
 
+        // Wait for borrowed protocol input before releasing connection state.
+        if (self.direct_receive) self.execution_gate.enter();
+        defer if (self.direct_receive) self.execution_gate.leave();
         // Explicit shutdown must also finalize a connection if stop was not run.
         self.handleStop(if (unexpected_exit) .preserve_environment else .clear_environment);
 
@@ -1181,10 +1219,9 @@ const ConnectionDaemon = struct {
                 log.writef(.info, "IO metrics daemon={*} side={s} inline_packets={d} queued_packets={d} queued_bytes={d} inline_dispatch_wall_ns={d} queued_dispatch_wall_ns={d}", .{
                     self, side, metrics.inline_packets, metrics.queued_packets, metrics.queued_bytes, metrics.inline_dispatch_ns, metrics.queued_dispatch_ns,
                 });
-                // Keep the diagnostic schema comparable: the baseline delivers
-                // one receipt per job, so every data batch is a singleton.
+                // Packet dispatches remain singletons; only fallback creates jobs.
                 log.writef(.info, "IO metrics daemon={*} side={s} accepted_packets={d} created_batches={d} error_receipts={d}", .{
-                    self, side, metrics.accepted_packets, metrics.accepted_packets, metrics.error_receipts,
+                    self, side, metrics.accepted_packets, metrics.queued_packets, metrics.error_receipts,
                 });
                 log.writef(.info, "IO metrics daemon={*} side={s} dispatched_batches={d} dispatched_packets={d} bytes={d}", .{
                     self, side, metrics.dispatched_packets, metrics.dispatched_packets, metrics.dispatched_bytes,
@@ -1217,6 +1254,8 @@ const ConnectionDaemon = struct {
     }
 
     fn executeJob(self: *ConnectionDaemon, job: *const Job) Error!void {
+        if (self.direct_receive) self.execution_gate.enter();
+        defer if (self.direct_receive) self.execution_gate.leave();
         if (builtin.is_test) {
             if (job.test_task) |task| return task.callback(self, task.context);
         }
@@ -1232,6 +1271,10 @@ const ConnectionDaemon = struct {
         const owned = job.owned;
         self.jobs_mutex.lock();
         const still_running = self.is_running and !self.packet_receive_failed;
+        if (owned and job.message == .onPacketsReceived) {
+            const metrics = &self.packet_metrics[@intFromEnum(job.message.onPacketsReceived.side)];
+            metrics.pending_receipts -= 1;
+        }
         if (!owned) {
             job.result = result;
             job.done = true;
@@ -1264,6 +1307,7 @@ const ConnectionDaemon = struct {
         if (job.owned and job.message == .onPacketsReceived) {
             const receipt = job.message.onPacketsReceived;
             const metrics = &self.packet_metrics[@intFromEnum(receipt.side)];
+            metrics.pending_receipts += 1;
             if (receipt.code == 0) {
                 metrics.accepted_packets += 1;
                 metrics.queued_packets += 1;
@@ -1313,7 +1357,10 @@ const ConnectionDaemon = struct {
             .resumeGate => self.handleResumeGate(),
             .onReachability => |reachability| self.handleReachability(reachability),
             .onBetterPath => self.handleBetterPath(),
-            .onPacketsReceived => |receipt| self.handlePacketsReceived(receipt),
+            .onPacketsReceived => |receipt| {
+                const elapsed = self.handlePacketsReceived(receipt);
+                if (receipt.code == 0) self.packet_metrics[@intFromEnum(receipt.side)].queued_dispatch_ns += elapsed;
+            },
         }
     }
 

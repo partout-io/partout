@@ -10,10 +10,11 @@
 #include <winrt/Windows.Storage.Streams.h>
 #include <functional>
 #include <memory>
+#include <mutex>
 
 namespace Partout {
 
-// Setup and I/O calls run on RuntimeLoop's MTA worker.
+// Setup runs on RuntimeLoop's MTA worker; writes run on the producer.
 // Callers serialize writes with other writes, open/configuration, channel
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
@@ -49,8 +50,9 @@ public:
     void ReportError(int32_t error);
     int32_t WriteStatus() const;
     bool ResumeReading();
-    int32_t Write(winrt::Windows::Storage::Streams::Buffer buffer,
+    int32_t Write(const uint8_t *bytes, size_t size,
                   const SocketAddress *destination);
+    int32_t WriteBatch(const PacketView *packets, size_t count, const SocketAddress *destination, size_t *written);
     void StopWrites();
 
     // Drain direct I/O and install the channel writer. Store the returned receiver
@@ -60,6 +62,7 @@ public:
 private:
     struct State;
 
+    int32_t WriteOne(const uint8_t *bytes, size_t size, const SocketAddress *destination);
     void RegisterForDatagrams();
     static winrt::Windows::Foundation::IAsyncAction
     ReadStream(std::shared_ptr<State> state,
@@ -79,6 +82,7 @@ private:
     winrt::Windows::Foundation::IAsyncAction write_{nullptr};
     winrt::Windows::Networking::Sockets::DatagramSocket::MessageReceived_revoker
         receive_registration_;
+    std::mutex write_mutex_; // Serializes submission with channel takeover.
     Writer channel_write_; // Installed by TakeOver; empty during direct socket I/O.
     bool unconnected_ = false;
     winrt::Windows::Networking::Connectivity::NetworkAdapter adapter_{nullptr};

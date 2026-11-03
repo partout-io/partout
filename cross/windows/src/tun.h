@@ -15,8 +15,9 @@
 namespace Partout {
 class RuntimeLoop;
 
-// Lifecycle and writes run on the native command worker. StopWrites is atomic.
-// Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
+// Lifecycle runs on the native command worker. Producer writes are synchronous
+// and serialized with channel close. StopWrites is atomic. Receive callbacks
+// must not reenter callback management or lifecycle APIs.
 class Tun {
     class State;
     friend class TunnelController;
@@ -29,6 +30,7 @@ public:
 
     // Removing the callback waits for in-flight delivery under the receive mutex.
     bool SetOnReceive(TunOnReceive callback);
+    bool SetOnReceiveBatch(TunOnReceiveBatch callback);
     void ReportError(int32_t error);
 
     int32_t WriteStatus() const {
@@ -36,11 +38,13 @@ public:
     }
 
     int32_t Write(const uint8_t *bytes, size_t length);
+    int32_t WriteBatch(const PacketView *packets, size_t count, size_t *written);
     void StopWrites();
 
 private:
     State &state_; // Borrowed; the controller outlives every TUN handle.
     TunOnReceive callback_ = nullptr;
+    TunOnReceiveBatch batch_callback_ = nullptr;
     std::atomic<int32_t> write_status_{0};
 };
 
