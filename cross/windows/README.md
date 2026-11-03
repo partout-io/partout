@@ -309,10 +309,15 @@ ctest --test-dir .cmake-models --output-on-failure
 ### Native integration
 
 `partout_winrt.h` exports `Partout::Tunnel` for packaged consumers managing VPN
-profiles through `VpnManagementAgent`. Construct it with the consumer's profile
-name prefix, then call `Fetch`, `Save`, `Connect`, `Disconnect`, or `Remove` from
+profiles through `VpnManagementAgent`. Construct it, then call `Fetch`, `Save`,
+`Connect`, `Disconnect`, or `Remove` from
 a serialized background worker. `Fetch` is read-only. Management is restricted
-to profiles belonging to the current package family and that prefix. An accepted
+to profiles belonging to the current package family with a recognized typed
+PartoutProfile configuration. Windows entry names match profile names; identity
+comes from the configuration's stable profile ID. Saving a renamed profile adds
+the new entry before removing the old disconnected entry; failed cleanup can be
+retried without discarding the new registration. Name collisions with another
+profile are rejected. An accepted
 connection request does not imply connection completion; observe `Fetch`.
 
 Include `partout/models/TaggedProfile.h` and `partout/models/TunnelSnapshot.h`

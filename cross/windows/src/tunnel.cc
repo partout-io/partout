@@ -4,6 +4,7 @@
 
 #include <windows.h>
 #include "partout_winrt.h"
+#include "tunnel_profile.h"
 #include "models/TaggedProfile.h"
 #include "models/TunnelSnapshot.h"
 #include "winrt/log.h"
@@ -65,23 +66,59 @@ winrt::hstring Family() {
     family.resize(length - 1);
     return winrt::hstring(family);
 }
-std::wstring Name(const std::wstring &prefix, const std::string &id) {
-    return prefix + winrt::to_hstring(id).c_str();
+} // namespace
+std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml) {
+    // The display name is editable and is never the profile identity.
+    try {
+        if (xml.empty() || xml.size() > 1024 * 1024) return std::nullopt;
+        using namespace winrt::Windows::Data::Xml::Dom;
+        const XmlLoadSettings settings;
+        settings.ProhibitDtd(true);
+        settings.ResolveExternals(false);
+        settings.MaxElementDepth(8);
+        const XmlDocument document;
+        document.LoadXml(xml, settings);
+        const auto root = document.DocumentElement();
+        if (!root || root.TagName() != L"PartoutProfile" || root.GetAttribute(L"version") != L"1")
+            return std::nullopt;
+        std::wstring json;
+        bool hasConnectionDetails = false;
+        for (const auto &node : root.ChildNodes()) {
+            if (node.NodeType() == NodeType::TextNode || node.NodeType() == NodeType::DataSectionNode) {
+                json += node.InnerText();
+            } else if (node.NodeType() == NodeType::ElementNode &&
+                       node.NodeName() == L"ConnectionDetails" && !hasConnectionDetails) {
+                hasConnectionDetails = true;
+            } else {
+                return std::nullopt;
+            }
+        }
+        const auto decoded = Models::TaggedProfile::FromJson(nlohmann::json::parse(winrt::to_string(json)));
+        if (decoded.id.empty()) return std::nullopt;
+        return decoded.id;
+    } catch (...) {
+        // Unrecognized configuration is not ours to modify. Never log payloads.
+        return std::nullopt;
+    }
 }
-std::vector<VpnPlugInProfile> OwnedProfiles(const VpnManagementAgent &agent, const std::wstring &prefix) {
+namespace {
+struct OwnedProfile {
+    VpnPlugInProfile profile;
+    std::string id;
+};
+std::vector<OwnedProfile> OwnedProfiles(const VpnManagementAgent &agent) {
     const auto family = Family();
-    std::vector<VpnPlugInProfile> result;
+    std::vector<OwnedProfile> result;
     for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
         const auto profile = item.try_as<VpnPlugInProfile>();
         if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
-        const auto name = profile.ProfileName();
-        if (std::wstring_view(name).substr(0, prefix.size()) == prefix) result.push_back(profile);
+        if (const auto id = DecodeTunnelProfileId(profile.CustomConfiguration())) result.push_back({profile, *id});
     }
     return result;
 }
-VpnPlugInProfile Find(const VpnManagementAgent &agent, const std::wstring &prefix, const std::string &id) {
-    for (const auto &profile : OwnedProfiles(agent, prefix)) {
-        if (profile.ProfileName() == Name(prefix, id)) return profile;
+VpnPlugInProfile Find(const VpnManagementAgent &agent, const std::string &id) {
+    for (const auto &profile : OwnedProfiles(agent)) {
+        if (profile.id == id) return profile.profile;
     }
     return nullptr;
 }
@@ -100,17 +137,17 @@ auto WithAgent(const char *operation, Action action) {
 
 extern "C" void pp_winrt_tunnel_link() {}
 
-Tunnel::Tunnel(const std::wstring &profilePrefix) : prefix_(profilePrefix) {
-    if (prefix_.empty()) throw std::invalid_argument("A VPN profile prefix is required.");
+Tunnel::Tunnel() {
     winrt_log(WinrtLogInfo, "Partout::Tunnel initialized\n");
 }
 
 std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
     return WithAgent("Fetch profiles", [&](const auto &agent) {
         std::vector<Models::TunnelSnapshot> result;
-        for (const auto &profile : OwnedProfiles(agent, prefix_)) {
+        for (const auto &owned : OwnedProfiles(agent)) {
+            const auto &profile = owned.profile;
             Models::TunnelSnapshot info{};
-            info.id = winrt::to_string(std::wstring_view(profile.ProfileName()).substr(prefix_.size()));
+            info.id = owned.id;
             switch (profile.ConnectionStatus()) {
                 case VpnManagementConnectionStatus::Disconnected: info.status.value = Models::TunnelStatus::inactive; break;
                 case VpnManagementConnectionStatus::Connecting: info.status.value = Models::TunnelStatus::activating; break;
@@ -128,10 +165,18 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
 }
 void Tunnel::Save(const Models::TaggedProfile &profile) {
     if (profile.id.empty()) throw std::invalid_argument("The profile ID is empty.");
+    if (profile.name.empty()) throw std::invalid_argument("The profile name is empty.");
     WithAgent("Save profile", [&](const auto &agent) {
-        auto existing = Find(agent, prefix_, profile.id);
-        if (existing && existing.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)
-            throw std::runtime_error("Disconnect the VPN before updating its configuration.");
+        const auto name = winrt::to_hstring(profile.name);
+        VpnPlugInProfile existing{nullptr};
+        std::vector<VpnPlugInProfile> previousNames;
+        for (const auto &owned : OwnedProfiles(agent)) {
+            if (owned.id != profile.id) continue;
+            if (owned.profile.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)
+                throw std::runtime_error("Disconnect the VPN before updating its configuration.");
+            if (owned.profile.ProfileName() == name) existing = owned.profile;
+            else previousNames.push_back(owned.profile);
+        }
         using namespace winrt::Windows::Data::Xml::Dom;
         const XmlDocument document;
         auto root = document.CreateElement(L"PartoutProfile");
@@ -145,35 +190,50 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         const auto xml = document.GetXml();
         if (xml.size() > 1024 * 1024)
             throw std::runtime_error("The encoded VPN configuration exceeds 1 MiB.");
+        // Windows identifies updates by entry name. Never update another entry
+        // just because its display name matches this profile.
+        for (const auto &other : Await("Check VPN profile names", agent.GetProfilesAsync())) {
+            if (CompareStringOrdinal(other.ProfileName().c_str(), -1, name.c_str(), -1, TRUE) != CSTR_EQUAL)
+                continue;
+            const auto plugin = other.try_as<VpnPlugInProfile>();
+            if (!plugin || plugin.VpnPluginPackageFamilyName() != Family() ||
+                DecodeTunnelProfileId(plugin.CustomConfiguration()) != profile.id)
+                throw std::runtime_error("Another Windows VPN profile already uses this name.");
+        }
         auto target = existing ? existing : VpnPlugInProfile{};
-        target.ProfileName(Name(prefix_, profile.id));
+        target.ProfileName(winrt::to_hstring(profile.name));
         target.VpnPluginPackageFamilyName(Family());
         target.ServerUris().Clear();
         // Required by Windows; Partout obtains actual endpoints from the profile.
         target.ServerUris().Append(Uri(L"https://profile.invalid"));
         target.CustomConfiguration(xml);
         target.RememberCredentials(false);
+        // Add the replacement first: if Windows rejects the name/configuration,
+        // the old disconnected registration remains available.
         Check("Save VPN profile", existing ? Await("Update VPN profile", agent.UpdateProfileFromObjectAsync(target))
                        : Await("Add VPN profile", agent.AddProfileFromObjectAsync(target)));
+        for (const auto &previous : previousNames) {
+            Check("Remove renamed VPN profile", Await("Remove renamed VPN profile", agent.DeleteProfileAsync(previous)));
+        }
     });
 }
 void Tunnel::Connect(const std::string &id) {
     WithAgent("Connect profile", [&](const auto &agent) {
-        const auto profile = Find(agent, prefix_, id);
+        const auto profile = Find(agent, id);
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
         Check("Connect VPN profile", Await("Connect VPN profile", agent.ConnectProfileAsync(profile)));
     });
 }
 void Tunnel::Disconnect(const std::string &id) {
     WithAgent("Disconnect profile", [&](const auto &agent) {
-        const auto profile = Find(agent, prefix_, id);
+        const auto profile = Find(agent, id);
         if (!profile || profile.ConnectionStatus() == VpnManagementConnectionStatus::Disconnected) return;
         Check("Disconnect VPN profile", Await("Disconnect VPN profile", agent.DisconnectProfileAsync(profile)));
     });
 }
 void Tunnel::Remove(const std::string &id) {
     WithAgent("Remove profile", [&](const auto &agent) {
-        const auto profile = Find(agent, prefix_, id);
+        const auto profile = Find(agent, id);
         if (!profile) return;
         if (profile.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)
             throw std::runtime_error("The Windows VPN profile is still active.");
