@@ -42,7 +42,7 @@ include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 target_compile_options(partout-models PRIVATE /w)
 target_include_directories(partout-winrt PRIVATE src src/c/portable/include)
 target_compile_definitions(partout-winrt PRIVATE PARTOUT_WINRT_EXPORTS)
-target_link_libraries(partout-winrt PRIVATE partout-winrt-backend partout-models nlohmann_json::nlohmann_json)
+target_link_libraries(partout-winrt PRIVATE partout-winrt-backend partout-models nlohmann_json::nlohmann_json ole32)
 
 foreach(target IN ITEMS partout-winrt-backend partout-winrt partout-models)
     # Also suppress model header warnings in handwritten translation units.

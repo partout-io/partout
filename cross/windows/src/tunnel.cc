@@ -2,9 +2,14 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
+#include <winsock2.h>
+#include <ws2ipdef.h>
 #include <windows.h>
+#include <iphlpapi.h>
+#include <netioapi.h>
 #include "partout_winrt.h"
 #include "tunnel_profile.h"
+#include "tunnel_internal.h"
 #include "models/TaggedProfile.h"
 #include "models/TunnelSnapshot.h"
 #include "winrt/log.h"
@@ -17,6 +22,7 @@
 #include <stdexcept>
 #include <sstream>
 #include <iomanip>
+#include <limits>
 
 namespace Partout {
 namespace {
@@ -24,6 +30,14 @@ using namespace winrt::Windows::Networking::Vpn;
 using namespace winrt::Windows::Foundation;
 struct Apartment {
     Apartment() {
+        // WinRT activation factories are cached across workers. Keep their MTA
+        // alive for the process lifetime, including after a worker has exited.
+        static const auto processApartment = [] {
+            CO_MTA_USAGE_COOKIE cookie{};
+            winrt::check_hresult(CoIncrementMTAUsage(&cookie));
+            return cookie;
+        }();
+        (void)processApartment;
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
     }
     ~Apartment() {
@@ -122,6 +136,27 @@ VpnPlugInProfile Find(const VpnManagementAgent &agent, const std::string &id) {
     }
     return nullptr;
 }
+std::optional<Models::TunnelSnapshotEnvironment> Environment(const VpnPlugInProfile &profile) {
+    // VpnManagementAgent has no counters. Resolve only this VPN's interface;
+    // never substitute physical-adapter or machine-wide traffic.
+    MIB_IF_ROW2 row{};
+    if (ConvertInterfaceAliasToLuid(profile.ProfileName().c_str(), &row.InterfaceLuid) != NO_ERROR ||
+        GetIfEntry2(&row) != NO_ERROR) return std::nullopt;
+    return TunnelInterfaceEnvironment(row);
+}
+} // namespace
+std::optional<Models::TunnelSnapshotEnvironment> TunnelInterfaceEnvironment(const MIB_IF_ROW2 &row) {
+    if (row.OperStatus != IfOperStatusUp || (row.Type != IF_TYPE_PPP && row.Type != IF_TYPE_TUNNEL))
+        return std::nullopt;
+    const auto maximum = static_cast<ULONG64>(std::numeric_limits<int64_t>::max());
+    if (row.InOctets > maximum || row.OutOctets > maximum) return std::nullopt;
+    Models::TunnelSnapshotEnvironment environment{};
+    environment.connectionStatus.value = Models::ConnectionStatus::connected;
+    environment.dataCount.received = static_cast<int64_t>(row.InOctets);
+    environment.dataCount.sent = static_cast<int64_t>(row.OutOctets);
+    return environment;
+}
+namespace {
 template<typename Action>
 auto WithAgent(const char *operation, Action action) {
     try {
@@ -156,8 +191,7 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
                 default: throw std::runtime_error("Windows returned an unknown VPN status.");
             }
             info.isEnabled = info.status.value != Models::TunnelStatus::inactive;
-            // Management APIs do not expose Partout transfer counters/errors.
-            // Leave them absent instead of reporting fabricated zero values.
+            if (info.status.value == Models::TunnelStatus::active) info.environment = Environment(profile);
             result.push_back(std::move(info));
         }
         return result;

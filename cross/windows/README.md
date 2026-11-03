@@ -325,7 +325,23 @@ for its typed arguments and results. The Windows installation includes these
 generated model headers and `partout/json.h`; consumers also supply nlohmann/json.
 Link the matching Partout library using the same MSVC runtime as the library.
 The API reports native operation names and status codes without configuration
-payloads. It does not provide transfer counters or detailed engine errors.
+payloads. For connected profiles, it resolves the VPN interface by its entry
+name and reads the 64-bit `InOctets`/`OutOctets` counters through IP Helper.
+These are interface totals, not instantaneous rates. Only an up PPP/tunnel
+interface is accepted; missing interfaces, unavailable statistics, and values
+outside the signed model range leave `environment` absent. Physical-adapter
+counters are never substituted. Detailed engine errors remain unavailable.
+The management wrapper retains MTA support for the process lifetime so cached
+WinRT activation factories survive polling workers exiting and being recreated.
+
+The offline native counter regression test covers values above 4 GiB, zero
+totals, disconnected/non-VPN interfaces, and overflow. Run from a developer
+shell with the matching WinRT archive and nlohmann/json includes:
+
+```powershell
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/src /Ipath/to/nlohmann/include tests/c/windows/tunnel.cc /Fo.cmake-winrt/tunnel-test.obj /Fe.cmake-winrt/tunnel-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib iphlpapi.lib ole32.lib
+& .cmake-winrt/tunnel-test.exe
+```
 
 With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
 `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
