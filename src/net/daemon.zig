@@ -367,6 +367,22 @@ const SettingsDaemon = struct {
 // Connection behavior and resources. Shared lifecycle and reporting live in Daemon;
 // this actor serializes both its connection work and updates to that shared state.
 const ConnectionDaemon = struct {
+    const PacketMetrics = struct {
+        // Admission uses jobs_mutex; dispatch belongs to the actor. Report only
+        // after submissions close and callbacks and queued jobs have drained.
+        accepted_packets: u64 = 0,
+        error_receipts: u64 = 0,
+        inline_packets: u64 = 0,
+        queued_packets: u64 = 0,
+        queued_bytes: u64 = 0,
+        inline_dispatch_ns: u64 = 0,
+        queued_dispatch_ns: u64 = 0,
+        dispatched_packets: u64 = 0,
+        dispatched_bytes: u64 = 0,
+        dispatch_ns: u64 = 0,
+        max_dispatch_ns: u64 = 0,
+    };
+
     const ConnectionAction = ConnectionWorker.Action;
     const ConnectionSetup = ConnectionWorker.Completion;
 
@@ -387,6 +403,7 @@ const ConnectionDaemon = struct {
     jobs_mutex: core.Mutex,
     jobs_condition: core.concurrency.Condition = .{},
     packet_receive_failed: bool = false,
+    packet_metrics: [2]PacketMetrics = .{ .{}, .{} },
     is_running: bool,
 
     // Internal state
@@ -962,7 +979,17 @@ const ConnectionDaemon = struct {
     //#region Actor thread - I/O callbacks
 
     fn handlePacketsReceived(self: *ConnectionDaemon, receipt: Looper.PacketReceipt) void {
+        const dispatch_start = core.monotonicNs();
         self.looper.receivePackets(receipt);
+        if (receipt.code == 0) {
+            const metrics = &self.packet_metrics[@intFromEnum(receipt.side)];
+            const elapsed = core.monotonicNs() -| dispatch_start;
+            metrics.dispatched_packets += 1;
+            metrics.dispatched_bytes += receipt.bytes.len;
+            metrics.dispatch_ns += elapsed;
+            metrics.queued_dispatch_ns += elapsed;
+            metrics.max_dispatch_ns = @max(metrics.max_dispatch_ns, elapsed);
+        }
     }
 
     // The event loop invokes looper callbacks on the actor thread. They may run
@@ -1148,6 +1175,26 @@ const ConnectionDaemon = struct {
         // Signal unexpected looper failures.
         if (unexpected_exit) self.handleEventLoopFailure(loop_failure);
 
+        if (builtin.os.tag == .windows) {
+            for (self.packet_metrics, 0..) |metrics, index| {
+                const side = if (index == @intFromEnum(io.Side.link)) "link" else "tun";
+                log.writef(.info, "IO metrics daemon={*} side={s} inline_packets={d} queued_packets={d} queued_bytes={d} inline_dispatch_wall_ns={d} queued_dispatch_wall_ns={d}", .{
+                    self, side, metrics.inline_packets, metrics.queued_packets, metrics.queued_bytes, metrics.inline_dispatch_ns, metrics.queued_dispatch_ns,
+                });
+                // Keep the diagnostic schema comparable: the baseline delivers
+                // one receipt per job, so every data batch is a singleton.
+                log.writef(.info, "IO metrics daemon={*} side={s} accepted_packets={d} created_batches={d} error_receipts={d}", .{
+                    self, side, metrics.accepted_packets, metrics.accepted_packets, metrics.error_receipts,
+                });
+                log.writef(.info, "IO metrics daemon={*} side={s} dispatched_batches={d} dispatched_packets={d} bytes={d}", .{
+                    self, side, metrics.dispatched_packets, metrics.dispatched_packets, metrics.dispatched_bytes,
+                });
+                log.writef(.info, "IO metrics daemon={*} side={s} singletons={d} max_packets={d} dispatch_wall_ns={d} max_dispatch_wall_ns={d}", .{
+                    self, side, metrics.dispatched_packets, @intFromBool(metrics.dispatched_packets != 0), metrics.dispatch_ns, metrics.max_dispatch_ns,
+                });
+            }
+        }
+
         self.jobs_mutex.lock();
         self.actor_id = null;
         self.jobs_condition.broadcast();
@@ -1214,6 +1261,15 @@ const ConnectionDaemon = struct {
         if (!self.is_running or self.packet_receive_failed) return error.Closed;
 
         self.jobs.append(job);
+        if (job.owned and job.message == .onPacketsReceived) {
+            const receipt = job.message.onPacketsReceived;
+            const metrics = &self.packet_metrics[@intFromEnum(receipt.side)];
+            if (receipt.code == 0) {
+                metrics.accepted_packets += 1;
+                metrics.queued_packets += 1;
+                metrics.queued_bytes += receipt.bytes.len;
+            } else metrics.error_receipts += 1;
+        }
         _ = io_c.pp_mux_wake(self.mux);
     }
 

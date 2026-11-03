@@ -5,6 +5,7 @@
 #include "loop.h"
 #include "socket.h"
 #include "tun.h"
+#include "io_metrics.h"
 #include <algorithm>
 #include <cstring>
 #include <optional>
@@ -31,9 +32,19 @@ winrt::Windows::Storage::Streams::Buffer CopyBuffer(const uint8_t *bytes, size_t
 struct SocketHandle {
     Partout::RuntimeLoop &loop; // Runtime outlives endpoints and their queued destruction.
     std::unique_ptr<Partout::Socket> socket;
+    // Copy timing belongs to the serialized producer; other metrics to the worker.
+    Partout::IOTiming copy_time, queue_time, submit_time;
+    Partout::IOBatches dequeued_batches;
 
     SocketHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Socket> value)
         : loop(owner), socket(std::move(value)) {}
+
+    ~SocketHandle() {
+        copy_time.Log(this, "socket.copy_buffer");
+        queue_time.Log(this, "socket.queue_wait");
+        submit_time.Log(this, "socket.write_submit_not_completion");
+        dequeued_batches.Log(this, "socket.dequeued");
+    }
 
     bool ResumeReading() {
         try {
@@ -57,11 +68,17 @@ struct SocketHandle {
         if (socket->IsUnconnected() && !destination) return E_INVALIDARG;
         if (!socket->Accepts(destination)) return E_INVALIDARG;
         try {
+            const auto copy_start = Partout::IOTiming::Clock::now();
             auto buffer = CopyBuffer(bytes, size);
+            const auto copied = Partout::IOTiming::Clock::now();
+            copy_time.Add(copied - copy_start);
             std::optional<Partout::SocketAddress> address;
             if (destination) address = *destination;
-            loop.Schedule([this, buffer = std::move(buffer), address]() mutable {
+            loop.Schedule([this, buffer = std::move(buffer), address, copied]() mutable {
+                queue_time.Add(Partout::IOTiming::Clock::now() - copied);
+                dequeued_batches.Add(1, buffer.Length());
                 if (socket->WriteStatus()) return;
+                Partout::ScopedIOTiming timing(submit_time);
                 const auto result = socket->Write(std::move(buffer), address ? &*address : nullptr);
                 if (result) socket->ReportError(result);
             });
@@ -135,16 +152,36 @@ struct SocketHandle {
 struct TunHandle {
     Partout::RuntimeLoop &loop;
     std::unique_ptr<Partout::Tun> tun;
+    Partout::IOTiming copy_time, queue_time, submit_time;
+    Partout::IOBatches dequeued_batches;
+    uint64_t stopped_batches = 0;
 
     TunHandle(Partout::RuntimeLoop &owner, std::unique_ptr<Partout::Tun> value)
         : loop(owner), tun(std::move(value)) {}
 
+    ~TunHandle() {
+        copy_time.Log(this, "tun.copy_buffer");
+        queue_time.Log(this, "tun.batch_queue_wait");
+        submit_time.Log(this, "tun.write_submit");
+        dequeued_batches.Log(this, "tun.dequeued");
+        winrt_log(WinrtLogInfo, "IO metrics owner=%p stage=tun.stopped batches=%llu", this, stopped_batches);
+    }
+
     int32_t Write(const uint8_t *bytes, size_t size) {
         if (auto status = tun->WriteStatus()) return status;
         try {
+            const auto copy_start = Partout::IOTiming::Clock::now();
             auto buffer = CopyBuffer(bytes, size);
-            loop.Schedule([this, buffer = std::move(buffer)] {
-                if (tun->WriteStatus()) return;
+            const auto copied = Partout::IOTiming::Clock::now();
+            copy_time.Add(copied - copy_start);
+            loop.Schedule([this, buffer = std::move(buffer), copied] {
+                queue_time.Add(Partout::IOTiming::Clock::now() - copied);
+                dequeued_batches.Add(1, buffer.Length());
+                if (tun->WriteStatus()) {
+                    ++stopped_batches;
+                    return;
+                }
+                Partout::ScopedIOTiming timing(submit_time);
                 const auto result = tun->Write(buffer.data(), buffer.Length());
                 if (result) tun->ReportError(result);
             });

@@ -7,6 +7,7 @@
 #include <windows.h>
 
 #include "socket.h"
+#include "io_metrics.h"
 #include "winrt/log.h"
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -70,6 +71,8 @@ struct Socket::State {
     std::mutex mutex;
     uint64_t received = 0;
     uint64_t sent = 0;
+    uint64_t endpoint_hits = 0, endpoint_misses = 0;
+    IOTiming output_stream_time, write_async_time;
     // Zero accepts writes; E_ABORT stops them; other HRESULTs latch a failure.
     std::atomic<int32_t> write_status{0};
     // The front slot stays queued until completion, including while suspended.
@@ -85,6 +88,10 @@ struct Socket::State {
     }
 
     ~State() {
+        winrt_log(WinrtLogInfo, "IO metrics owner=%p stage=socket.endpoint_cache hits=%llu misses=%llu entries=%zu",
+                  this, endpoint_hits, endpoint_misses, size_t{0});
+        output_stream_time.Log(this, "socket.output_stream_success_wall");
+        write_async_time.Log(this, "socket.write_async_success_wall");
         writes.clear();
         CoDecrementMTAUsage(apartment);
     }
@@ -440,17 +447,30 @@ IAsyncAction Socket::WriteQueued(std::shared_ptr<State> state, DatagramSocket da
                     co_return;
                 }
                 request = std::move(state->writes.front());
+                if (request.host) ++state->endpoint_misses;
             }
             IOutputStream output{nullptr};
+            const auto output_start = IOTiming::Clock::now();
             if (request.host) {
                 output = co_await datagram.GetOutputStreamAsync(request.host, request.service);
             } else {
                 output = stream ? stream.OutputStream() : datagram.OutputStream();
             }
+            const auto output_elapsed = IOTiming::Clock::now() - output_start;
+            {
+                std::lock_guard lock(state->mutex);
+                state->output_stream_time.Add(output_elapsed);
+            }
             // UDP remains one datagram. TCP retries only an unwritten suffix.
             auto &buffer = request.buffer;
             for (;;) {
+                const auto write_start = IOTiming::Clock::now();
                 const auto written = co_await output.WriteAsync(buffer);
+                const auto write_elapsed = IOTiming::Clock::now() - write_start;
+                {
+                    std::lock_guard lock(state->mutex);
+                    state->write_async_time.Add(write_elapsed);
+                }
                 if (written == buffer.Length()) break;
                 if (datagram || !written || written > buffer.Length())
                     throw hresult_error(HRESULT_FROM_WIN32(ERROR_WRITE_FAULT));

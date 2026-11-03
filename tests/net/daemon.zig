@@ -2451,6 +2451,11 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqualStrings("original", probe.bytes[0..probe.length]);
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        const initial_metrics = owner.packet_metrics[@intFromEnum(io.Side.tun)];
+        try std.testing.expectEqual(@as(u64, 1), initial_metrics.accepted_packets);
+        try std.testing.expectEqual(@as(u64, 1), initial_metrics.dispatched_packets);
+        try std.testing.expectEqual(@as(u64, "original".len), initial_metrics.dispatched_bytes);
+        try std.testing.expectEqual(@as(u64, 0), initial_metrics.error_receipts);
 
         // Queue one in-flight packet while paused, then run a control past it.
         const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
@@ -2487,6 +2492,9 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(?i32, -123), probe.code);
+        const final_metrics = owner.packet_metrics[@intFromEnum(io.Side.tun)];
+        try std.testing.expectEqual(@as(u64, 2), final_metrics.error_receipts);
+        try std.testing.expectEqual(@as(u64, @intCast(all_reads)), final_metrics.dispatched_packets);
 
         if (oom_offset) |offset| {
             try daemon.testing.onLoop(owner, &probe, Probe.attach);

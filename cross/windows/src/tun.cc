@@ -3,6 +3,7 @@
 #include "tun_settings.h"
 #include <windows.h>
 #include "tun.h"
+#include "io_metrics.h"
 #include "loop.h"
 #include "socket.h"
 #include "winrt/log.h"
@@ -38,7 +39,21 @@ public:
         uint64_t link_read = 0, tun_write = 0, tun_write_failed = 0;
     } counters;
 
+    // Index 0 is downstream into TUN; index 1 is upstream into the link.
+    IOTiming get_buffer_time[2], copy_time[2], append_time[2], flush_time[2], receive_time[2];
+
     explicit State(VpnChannel const &value) : channel(value) {}
+
+    ~State() {
+        for (size_t i = 0; i < 2; ++i) {
+            get_buffer_time[i].Log(this, i ? "channel.link.get_buffer" : "channel.tun.get_buffer");
+            copy_time[i].Log(this, i ? "channel.link.copy" : "channel.tun.copy");
+            append_time[i].Log(this, i ? "channel.link.append" : "channel.tun.append");
+            flush_time[i].Log(this, i ? "channel.link.flush" : "channel.tun.flush");
+        }
+        receive_time[0].Log(this, "channel.encapsulate_callback_excluding_lock_wait");
+        receive_time[1].Log(this, "channel.decapsulate_callback_excluding_lock_wait");
+    }
 
     int32_t Write(const uint8_t *bytes, size_t length, bool send);
 };
@@ -46,12 +61,14 @@ public:
 int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
     if (!bytes || !length || length > UINT32_MAX) return E_INVALIDARG;
     const auto append = [&](VpnPacketBuffer const &packet) {
+        ScopedIOTiming timing(append_time[send ? 1 : 0]);
         if (send)
             channel.AppendVpnSendPacketBuffer(packet);
         else
             channel.AppendVpnReceivePacketBuffer(packet);
     };
     const auto flush = [&] {
+        ScopedIOTiming timing(flush_time[send ? 1 : 0]);
         if (send)
             channel.FlushVpnSendPacketBuffers();
         else
@@ -61,13 +78,19 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
     const char *stage = "get buffer";
     uint32_t capacity = 0;
     try {
-        packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
+        {
+            ScopedIOTiming timing(get_buffer_time[send ? 1 : 0]);
+            packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
+        }
         const auto buffer = packet.Buffer();
         capacity = buffer.Capacity();
         stage = "copy packet";
         if (length > capacity) throw hresult_invalid_argument();
-        memcpy(buffer.data(), bytes, length);
-        buffer.Length(static_cast<uint32_t>(length));
+        {
+            ScopedIOTiming timing(copy_time[send ? 1 : 0]);
+            memcpy(buffer.data(), bytes, length);
+            buffer.Length(static_cast<uint32_t>(length));
+        }
         stage = "append";
         append(packet);
         packet = nullptr; // Ownership returned to the channel.
@@ -280,6 +303,7 @@ void TunnelController::Close() noexcept {
 void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     const auto count = packets.Size();
     std::lock_guard lock(state_->receive_mutex);
+    ScopedIOTiming timing(state_->receive_time[0]);
     auto &counters = state_->counters;
     counters.tun_read += count;
     const auto tun = state_->tun;
@@ -300,6 +324,7 @@ void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
 
 void TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     std::lock_guard lock(state_->receive_mutex);
+    ScopedIOTiming timing(state_->receive_time[1]);
     ++state_->counters.link_read;
     if (!state_->link_receive) return;
     const auto buffer = packet.Buffer();

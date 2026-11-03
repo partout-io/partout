@@ -371,6 +371,10 @@ test "WireGuard passive waiting reads receive without packet allocations" {
             try std.testing.expectEqualSlices(u8, &address.address, &packets[0].source.address);
         }
         try std.testing.expectEqual(@as(usize, 0), bridge.PassiveIO.testing.pendingReads(&passive, side));
+        const metrics = bridge.PassiveIO.testing.metrics(&passive, side);
+        try std.testing.expectEqual(@as(u64, 2), metrics.direct_packets);
+        try std.testing.expectEqual(@as(u64, 0), metrics.queued_packets);
+        try std.testing.expectEqual(@as(u64, 2), metrics.notifications);
         try std.testing.expect(!failing.has_induced_failure);
     }
 }
@@ -397,6 +401,9 @@ test "WireGuard passive queued reads preserve batching and discard oversized pac
     try std.testing.expectEqualStrings("two", buffers[1][0..packets[1].size]);
     // Payloads must be freed before their nodes, including the discarded packet.
     try std.testing.expectEqual(@as(usize, 6), clearing.frees);
+    const metrics = bridge.PassiveIO.testing.metrics(&passive, .tun);
+    try std.testing.expectEqual(@as(u64, 3), metrics.queued_packets);
+    try std.testing.expectEqual(@as(u64, 1), metrics.oversized_drops);
 }
 
 test "WireGuard passive pending buffers are unregistered on timeout cancellation detach and failure" {

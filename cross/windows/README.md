@@ -336,3 +336,62 @@ connectivity, route-cost preference, offline recovery and monitor lifecycle:
 cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
 & .cmake-winrt/network-test.exe
 ```
+
+## Packet-path diagnostics
+
+Connect, run one speedtest, disconnect, and search the Info-level logs for
+`IO metrics`. Reports are cumulative per daemon, native endpoint, or channel
+lifetime and emitted at shutdown. No per-packet log messages are emitted.
+
+This instrumentation leaves baseline packet handling unchanged: one daemon
+receipt per job, one native write per command, and immediate channel flushing.
+There is no additional packet pool, batch ABI, or write coalescing.
+
+- Daemon reports count accepted data packets, error receipts, dispatched packets,
+  payload bytes, and dispatch wall time separately for link and TUN. Dispatch
+  counts attempts, including stale receipts the looper discards. Historical
+  batch field names remain comparable; each data job is a singleton here.
+- `socket.dequeued` and `tun.dequeued` count worker commands and payload bytes,
+  including commands discarded after stopping. `tun.stopped` counts those TUN
+  commands. Their batch size is one in this baseline.
+- `copy_buffer` measures successful allocation and copying into a WinRT buffer.
+  Queue wait runs from completion of that copy to worker execution. The retained
+  `tun.batch_queue_wait` name now describes a single-packet command.
+- `socket.write_submit_not_completion` includes synchronous channel submission
+  and flushing, or direct-socket enqueueing. `tun.write_submit` includes channel
+  buffer preparation, copying, appending, and flushing.
+- `socket.output_stream_success_wall` and `socket.write_async_success_wall`
+  include asynchronous waits and record successful returns only.
+- `channel.tun` is downstream; `channel.link` is upstream. Buffer acquisition,
+  copy/length adjustment, append, and flush timings include failed/throwing calls.
+  Callback timings exclude waiting for the receive mutex.
+
+Times are elapsed wall time, not CPU time. Nested stages overlap and must not be
+summed as independent costs. Compare totals normalized by packet/byte counts
+under matched traffic. Pool and deferred batch-flush counters from the removed
+performance experiments are intentionally absent.
+
+The standalone metric regression verifies units, counts, maxima, and scope
+timing on exceptions. Run from a Visual Studio developer shell:
+
+```powershell
+cl /std:c++17 /EHsc /MD /UNDEBUG /Icross/windows/src /Icross/windows/include tests/c/windows/io_metrics.cc /Fo.zig-cache/io-metrics-test.obj /Fe.zig-cache/io-metrics-test.exe
+& .zig-cache/io-metrics-test.exe
+```
+
+Additional comparison counters are available before changing packet handling:
+
+- Daemon `inline_packets` / `queued_packets`, `queued_bytes`, and separate inline
+  and queued dispatch wall times. The baseline queues all input, so inline counts
+  and time are zero.
+- Passive adapter input batches, packets, maximum batch size, direct copies into
+  waiting Go readers, queued copies, bytes, queue peak, queue-full/oversized drops,
+  allocation failures, and reader notifications. The baseline receives single
+  packets and broadcasts once per direct or queued packet.
+- `socket.endpoint_cache`: hits, misses, and retained entries. The baseline has
+  no cache: unconnected output-stream requests count as misses and entries are zero.
+
+The existing fallback queue allocates a node and payload per queued packet.
+Measure its queued fraction before introducing a reusable pool. All counters are
+cumulative per owner lifetime and emitted at shutdown; queued totals count
+successful enqueues, not the number still pending at shutdown.

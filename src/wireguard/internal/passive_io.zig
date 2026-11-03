@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const c = @import("wireguard_c");
@@ -37,6 +38,20 @@ pub const PassiveIO = struct {
         interrupted: bool = false,
         next: ?*PendingRead = null,
     };
+    const ReceiveMetrics = struct {
+        batches: u64 = 0,
+        packets: u64 = 0,
+        max_batch: usize = 0,
+        direct_packets: u64 = 0,
+        direct_bytes: u64 = 0,
+        queued_packets: u64 = 0,
+        queued_bytes: u64 = 0,
+        queue_peak: usize = 0,
+        queue_full_drops: u64 = 0,
+        oversized_drops: u64 = 0,
+        allocation_failures: u64 = 0,
+        notifications: u64 = 0,
+    };
     const Side = struct {
         owner: *PassiveIO = undefined,
         tag: net.Side,
@@ -45,6 +60,7 @@ pub const PassiveIO = struct {
         packets: core.Fifo(Packet) = .{},
         count: usize = 0,
         readers: core.Fifo(PendingRead) = .{},
+        metrics: ReceiveMetrics = .{},
 
         fn cancelReads(self: *Side) void {
             while (self.readers.take()) |reader| reader.interrupted = true;
@@ -75,7 +91,10 @@ pub const PassiveIO = struct {
                     allocator.free(packet.data);
                     allocator.destroy(packet);
                 }
-                if (!copyPacket(output, packet.data, packet.source)) break;
+                if (!copyPacket(output, packet.data, packet.source)) {
+                    self.metrics.oversized_drops += 1;
+                    break;
+                }
                 completed += 1;
             }
             return completed;
@@ -98,6 +117,18 @@ pub const PassiveIO = struct {
 
     pub fn deinit(self: *PassiveIO) void {
         self.release();
+        if (builtin.os.tag == .windows) for (self.sides) |side| {
+            const m = side.metrics;
+            core.logging.writef(.info, "IO metrics passive={*} side={s} batches={d} packets={d} max_batch={d} notifications={d}", .{
+                self, @tagName(side.tag), m.batches, m.packets, m.max_batch, m.notifications,
+            });
+            core.logging.writef(.info, "IO metrics passive={*} side={s} direct_packets={d} direct_bytes={d} queued_packets={d} queued_bytes={d}", .{
+                self, @tagName(side.tag), m.direct_packets, m.direct_bytes, m.queued_packets, m.queued_bytes,
+            });
+            core.logging.writef(.info, "IO metrics passive={*} side={s} queue_peak={d} queue_full_drops={d} oversized_drops={d} allocation_failures={d}", .{
+                self, @tagName(side.tag), m.queue_peak, m.queue_full_drops, m.oversized_drops, m.allocation_failures,
+            });
+        };
         self.ready.deinit();
         self.writes.deinit();
         self.lock.deinit();
@@ -227,6 +258,10 @@ pub const PassiveIO = struct {
             self.fail();
             return false;
         }
+        const metrics = &side.metrics;
+        metrics.batches += 1;
+        metrics.packets += 1;
+        metrics.max_batch = 1;
         const address = if (source == null) std.mem.zeroes(net.SocketAddress) else source[0];
         if (side.readers.head) |reader| {
             const output = &reader.packets[reader.completed];
@@ -235,24 +270,34 @@ pub const PassiveIO = struct {
             if (!copyPacket(output, bytes[0..length], address)) {
                 _ = side.readers.take();
                 reader.interrupted = true;
+                metrics.oversized_drops += 1;
             } else {
                 reader.completed += 1;
+                metrics.direct_packets += 1;
+                metrics.direct_bytes += length;
                 if (reader.completed == reader.packets.len) _ = side.readers.take();
             }
+            metrics.notifications += 1;
             self.ready.broadcast();
             self.lock.unlock();
             return true;
         }
         // Bound memory without pausing UDP delivery indefinitely. Drop newest.
         if (side.count >= 1024) {
+            metrics.queue_full_drops += 1;
             self.lock.unlock();
             return true;
         }
         side.enqueue(self.allocator, bytes[0..length], address) catch {
+            metrics.allocation_failures += 1;
             self.lock.unlock();
             self.fail();
             return false;
         };
+        metrics.queued_packets += 1;
+        metrics.queued_bytes += length;
+        metrics.queue_peak = @max(metrics.queue_peak, side.count);
+        metrics.notifications += 1;
         self.ready.broadcast();
         self.lock.unlock();
         return true;
@@ -325,6 +370,12 @@ pub const PassiveIO = struct {
 
         pub fn receive(self: *PassiveIO, tag: net.Side, bytes: []const u8, source: ?*const net.SocketAddress, code: i32) bool {
             return onReceive(self.sideFor(tag), bytes.ptr, bytes.len, source, code);
+        }
+
+        pub fn metrics(self: *PassiveIO, tag: net.Side) ReceiveMetrics {
+            self.lock.lock();
+            defer self.lock.unlock();
+            return self.sideFor(tag).metrics;
         }
 
         pub fn pendingReads(self: *PassiveIO, tag: net.Side) usize {
