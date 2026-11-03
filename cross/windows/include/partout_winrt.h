@@ -28,12 +28,16 @@ struct TunnelSnapshot;
 // Include partout/models/TaggedProfile.h and TunnelSnapshot.h for typed values.
 class Tunnel {
 public:
-    PARTOUT_WINRT_API Tunnel();
+    // Absolute placeholder URI supplied by the consumer app.
+    // Actual VPN endpoints come from the saved profile configuration.
+    PARTOUT_WINRT_API explicit Tunnel(const std::string &serverUri);
     PARTOUT_WINRT_API std::vector<Models::TunnelSnapshot> Fetch();
     PARTOUT_WINRT_API void Save(const Models::TaggedProfile &profile);
     PARTOUT_WINRT_API void Connect(const std::string &id);
     PARTOUT_WINRT_API void Disconnect(const std::string &id);
     PARTOUT_WINRT_API void Remove(const std::string &id);
+private:
+    std::string serverUri_;
 };
 
 // One runtime per channel. Callbacks must be serialized by the consumer.

@@ -172,7 +172,8 @@ auto WithAgent(const char *operation, Action action) {
 
 extern "C" void pp_winrt_tunnel_link() {}
 
-Tunnel::Tunnel() {
+Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
+    if (serverUri_.empty()) throw std::invalid_argument("The server URI is empty.");
     winrt_log(WinrtLogInfo, "Partout::Tunnel initialized\n");
 }
 
@@ -181,9 +182,10 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
         std::vector<Models::TunnelSnapshot> result;
         for (const auto &owned : OwnedProfiles(agent)) {
             const auto &profile = owned.profile;
+            const auto status = profile.ConnectionStatus();
             Models::TunnelSnapshot info{};
             info.id = owned.id;
-            switch (profile.ConnectionStatus()) {
+            switch (status) {
                 case VpnManagementConnectionStatus::Disconnected: info.status.value = Models::TunnelStatus::inactive; break;
                 case VpnManagementConnectionStatus::Connecting: info.status.value = Models::TunnelStatus::activating; break;
                 case VpnManagementConnectionStatus::Connected: info.status.value = Models::TunnelStatus::active; break;
@@ -239,7 +241,7 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         target.VpnPluginPackageFamilyName(Family());
         target.ServerUris().Clear();
         // Required by Windows; Partout obtains actual endpoints from the profile.
-        target.ServerUris().Append(Uri(L"https://profile.invalid"));
+        target.ServerUris().Append(Uri(winrt::to_hstring(serverUri_)));
         target.CustomConfiguration(xml);
         target.RememberCredentials(false);
         // Despite its name, true makes the entry visible in Windows VPN Settings.
