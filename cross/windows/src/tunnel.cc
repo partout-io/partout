@@ -242,6 +242,8 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         target.ServerUris().Append(Uri(L"https://profile.invalid"));
         target.CustomConfiguration(xml);
         target.RememberCredentials(false);
+        // Despite its name, true makes the entry visible in Windows VPN Settings.
+        target.RequireVpnClientAppUI(true);
         // Add the replacement first: if Windows rejects the name/configuration,
         // the old disconnected registration remains available.
         Check("Save VPN profile", existing ? Await("Update VPN profile", agent.UpdateProfileFromObjectAsync(target))
