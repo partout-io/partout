@@ -26,6 +26,14 @@ const util = core.util;
 
 pub const panic = std.debug.FullPanic(panicHandler);
 
+// Let the linked Windows CRT own DLL startup and shutdown. Zig's default
+// startup stub skips the C/C++ initializers required by the native bridge.
+pub extern fn _DllMainCRTStartup(
+    instance: std.os.windows.HINSTANCE,
+    reason: std.os.windows.DWORD,
+    reserved: std.os.windows.LPVOID,
+) callconv(.winapi) std.os.windows.BOOL;
+
 const allocator = std.heap.c_allocator;
 
 var daemon_runtime: ?*abi.DaemonRuntime = null;
