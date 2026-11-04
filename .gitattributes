@@ -1,3 +1,2 @@
-# Keep the native Windows backend consistent across editors and Git checkouts.
-cross/windows/** text eol=lf
-src/c/portable/tun_windows.c text eol=lf
+# Keep text files LF on every platform, including Windows checkouts.
+* text=auto eol=lf
