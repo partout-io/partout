@@ -73,6 +73,7 @@ public final class PartoutProviderRuntime: Sendable {
         let retainedEnvironment = Unmanaged.passRetained(environment)
         var bindings = partout_daemon_bindings(
             controller: retainedController.toOpaque(),
+            controller_functions: .init(),
             events: .asDaemonEvents(retainedEnvironment.toOpaque()),
             release: { bindings in
                 if let rawController = bindings?.pointee.controller {

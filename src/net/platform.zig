@@ -56,6 +56,7 @@ pub const Platform = struct {
     //#region Input
 
     ref: ?*anyopaque,
+    uses_supplied_functions: bool,
     fnt: FunctionTable,
     dns: PlatformDNS,
     socket_configurator: io_c.pp_socket_configurator,
@@ -82,7 +83,7 @@ pub const Platform = struct {
         const functions = options.fnt orelse io_c.pp_tun_ctrl_fnt_current();
         validateFunctionTable(functions);
         var ref_copy: ?*anyopaque = null;
-        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_new_global_ref")) {
+        if (options.fnt == null and builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_new_global_ref")) {
             ref_copy = io_c.pp_jni_new_global_ref(options.ref);
             if (ref_copy == null) {
                 log.write(.fault, "Unable to retain platform JNI ref");
@@ -93,6 +94,7 @@ pub const Platform = struct {
         }
         return .{
             .ref = ref_copy,
+            .uses_supplied_functions = options.fnt != null,
             .fnt = functions,
             .dns = .{},
             .socket_configurator = options.socket_configurator orelse io_c.pp_socket_configurator_current(ref_copy),
@@ -113,12 +115,11 @@ pub const Platform = struct {
             .on_reachability = cOnReachability,
             .on_better_path = cOnBetterPath,
         };
-        if (self.ref) |ref| {
-            log.writef(.debug, "Platform: Set delegate ({*})", .{ref});
+        if (self.ref != null or self.uses_supplied_functions) {
             const set_delegate = self.fnt.set_delegate orelse
                 @panic("Platform function table has no set_delegate callback");
             log.write(.debug, "Platform.attach: set_delegate entered");
-            set_delegate(ref, &self.delegate);
+            set_delegate(self.ref, &self.delegate);
             log.write(.debug, "Platform.attach: set_delegate returned");
             self.delegate_attached = true;
         }
@@ -132,7 +133,7 @@ pub const Platform = struct {
             set_delegate(self.ref, null);
             self.delegate_attached = false;
         }
-        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_delete_global_ref")) {
+        if (!self.uses_supplied_functions and builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_delete_global_ref")) {
             io_c.pp_jni_delete_global_ref(self.ref);
         }
         log.write(.debug, "Deinit Platform");
