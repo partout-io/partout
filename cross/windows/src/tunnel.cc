@@ -177,15 +177,34 @@ Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
     winrt_log(WinrtLogInfo, "Partout::Tunnel initialized\n");
 }
 
-std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
+std::optional<VpnManagementConnectionStatus> ReadTunnelConnectionStatus(
+    const std::function<VpnManagementConnectionStatus()> &read, std::string &error) {
+    error.clear();
+    try {
+        return read();
+    } catch (const winrt::hresult_error &failure) {
+        error = WindowsError("Read VPN profile status", failure.code()).what();
+        return std::nullopt;
+    }
+}
+
+std::vector<Models::TunnelSnapshot> Tunnel::Fetch(std::map<std::string, std::string> *errors) {
     return WithAgent("Fetch profiles", [&](const auto &agent) {
         std::vector<Models::TunnelSnapshot> result;
+        std::map<std::string, std::string> failures;
         for (const auto &owned : OwnedProfiles(agent)) {
             const auto &profile = owned.profile;
-            const auto status = profile.ConnectionStatus();
+            std::string error;
+            const auto status = errors
+                ? ReadTunnelConnectionStatus([&] { return profile.ConnectionStatus(); }, error)
+                : std::optional<VpnManagementConnectionStatus>(profile.ConnectionStatus());
+            if (!status) {
+                failures.emplace(owned.id, std::move(error));
+                continue;
+            }
             Models::TunnelSnapshot info{};
             info.id = owned.id;
-            switch (status) {
+            switch (*status) {
                 case VpnManagementConnectionStatus::Disconnected: info.status.value = Models::TunnelStatus::inactive; break;
                 case VpnManagementConnectionStatus::Connecting: info.status.value = Models::TunnelStatus::activating; break;
                 case VpnManagementConnectionStatus::Connected: info.status.value = Models::TunnelStatus::active; break;
@@ -196,6 +215,7 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
             if (info.status.value == Models::TunnelStatus::active) info.environment = Environment(profile);
             result.push_back(std::move(info));
         }
+        if (errors) *errors = std::move(failures);
         return result;
     });
 }

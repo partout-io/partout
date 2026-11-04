@@ -7,6 +7,7 @@
 
 #if defined(_WIN32) && defined(__cplusplus)
 #include <memory>
+#include <map>
 #include <string>
 #include <vector>
 #include <winrt/Windows.Networking.Vpn.h>
@@ -31,7 +32,9 @@ public:
     // Absolute placeholder URI supplied by the consumer app.
     // Actual VPN endpoints come from the saved profile configuration.
     PARTOUT_WINRT_API explicit Tunnel(const std::string &serverUri);
-    PARTOUT_WINRT_API std::vector<Models::TunnelSnapshot> Fetch();
+    // When supplied, errors receives unavailable profiles by ID; snapshots
+    // contain only observed states. Without it, any observation error throws.
+    PARTOUT_WINRT_API std::vector<Models::TunnelSnapshot> Fetch(std::map<std::string, std::string> *errors = nullptr);
     PARTOUT_WINRT_API void Save(const Models::TaggedProfile &profile);
     PARTOUT_WINRT_API void Connect(const std::string &id);
     PARTOUT_WINRT_API void Disconnect(const std::string &id);

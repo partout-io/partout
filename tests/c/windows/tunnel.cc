@@ -7,6 +7,19 @@
 #include <limits>
 
 int main() {
+    using Status = winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus;
+    std::string error;
+    auto status = Partout::ReadTunnelConnectionStatus([]() -> Status {
+        throw winrt::hresult_error(E_HANDLE);
+    }, error);
+    assert(!status && error.find("80070006") != std::string::npos);
+    status = Partout::ReadTunnelConnectionStatus([] { return Status::Connected; }, error);
+    assert(status == Status::Connected && error.empty());
+    status = Partout::ReadTunnelConnectionStatus([]() -> Status {
+        throw winrt::hresult_error(E_ACCESSDENIED);
+    }, error);
+    assert(!status && error.find("80070005") != std::string::npos);
+
     MIB_IF_ROW2 row{};
     row.Type = IF_TYPE_PPP;
     row.OperStatus = IfOperStatusUp;
