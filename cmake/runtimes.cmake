@@ -7,22 +7,22 @@ endif()
 
 # Native integration layers consume the public core ABI.
 if(TARGET partout-windows-backend)
-    add_library(partout-windows STATIC
+    add_library(partout-windows-runtime STATIC
         cross/windows/src/tunnel.cc
         cross/windows/src/runtime.cc
         cross/windows/src/platform.cc
     )
-    add_library(Partout::WindowsRuntime ALIAS partout-windows)
-    target_include_directories(partout-windows PUBLIC cross/windows/include PRIVATE src)
-    target_compile_features(partout-windows PUBLIC cxx_std_20)
-    target_compile_definitions(partout-windows PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
-    target_compile_options(partout-windows PRIVATE /EHsc /permissive- /W4)
+    add_library(Partout::WindowsRuntime ALIAS partout-windows-runtime)
+    target_include_directories(partout-windows-runtime PUBLIC cross/windows/include PRIVATE src)
+    target_compile_features(partout-windows-runtime PUBLIC cxx_std_20)
+    target_compile_definitions(partout-windows-runtime PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
+    target_compile_options(partout-windows-runtime PRIVATE /EHsc /permissive- /W4)
     # AppContainer consumers use a CRT without the /RTC helpers.
-    set_target_properties(partout-windows PROPERTIES
+    set_target_properties(partout-windows-runtime PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
     )
-    target_link_libraries(partout-windows
+    target_link_libraries(partout-windows-runtime
         PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE nlohmann_json::nlohmann_json ole32
     )
@@ -39,13 +39,20 @@ if(TARGET partout-windows-backend)
         target_link_libraries(partout-runtime-link-test PRIVATE Partout::WindowsRuntime)
         add_custom_command(TARGET partout-runtime-link-test POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:Partout::Partout>"
+                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-windows-backend>"
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>"
         )
+        foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
+            add_custom_command(TARGET partout-runtime-link-test POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy_if_different
+                    "$<TARGET_FILE:${runtime}>"
+                    "$<TARGET_FILE_DIR:partout-runtime-link-test>")
+        endforeach()
         add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
         add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
             "-DLINKER=${CMAKE_LINKER}"
             "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
+            "-DBACKEND=$<TARGET_FILE:partout-windows-backend>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
         foreach(test IN ITEMS tunnel tunnel_profile)
             add_executable(partout-${test}-test tests/c/windows/${test}.cc)

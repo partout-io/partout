@@ -9,11 +9,18 @@ endif()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(TARGET partout-windows-backend AND NOT PP_BUILD_LIBRARY)
-    install(TARGETS partout-windows-backend ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+if(TARGET partout-windows-backend)
+    install(TARGETS partout-windows-backend
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    if(PP_BUILD_LIBRARY)
+        install(FILES "$<TARGET_PDB_FILE:partout-windows-backend>"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
+    endif()
 endif()
-if(TARGET partout-windows)
-    install(TARGETS partout-windows ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+if(TARGET partout-windows-runtime)
+    install(TARGETS partout-windows-runtime ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )

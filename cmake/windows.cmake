@@ -23,7 +23,11 @@ include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 
 # The native backend cannot include Partout headers. Keep it independently
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
-add_library(partout-windows-backend STATIC
+set(partout_backend_type STATIC)
+if(PP_BUILD_LIBRARY)
+    set(partout_backend_type SHARED)
+endif()
+add_library(partout-windows-backend ${partout_backend_type}
     cross/windows/src/abi.cc
     cross/windows/src/controller.cc
     cross/windows/src/loop.cc
@@ -35,12 +39,19 @@ add_library(partout-windows-backend STATIC
 )
 target_include_directories(partout-windows-backend PUBLIC cross/windows/include)
 if(PP_BUILD_LIBRARY)
+    set_target_properties(partout-windows-backend PROPERTIES
+        OUTPUT_NAME partout-runtime
+        WINDOWS_EXPORT_ALL_SYMBOLS OFF
+        RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+        ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
+        PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+    )
     target_compile_definitions(partout-windows-backend PRIVATE
         PARTOUT_WINDOWS_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
 endif()
 target_link_libraries(partout-windows-backend
     PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
-    PRIVATE nlohmann_json::nlohmann_json
+    PRIVATE nlohmann_json::nlohmann_json ole32
 )
 
 # Keep the standalone backend archive self-contained for Zig tests.

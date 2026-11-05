@@ -37,10 +37,10 @@ Runtime callback table      -> src/platform.cc -> src/controller.cc
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
 | `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-CMake uses MSVC to link the Zig core archive and static Windows backend into
-`partout.dll`, so the core and native SDK share one copy of the loop and transport
-state. `partout-windows.lib` contains the consumer-side runtime and controller
-adapters. Consumers link `Partout::WindowsRuntime`, which depends on `partout.dll`.
+CMake uses MSVC to link the Zig/C core into `partout.dll` and the native backend
+and models into `partout-runtime.dll`. The core and native SDK share one copy
+of the loop and transport state. `partout-windows-runtime.lib` contains the consumer-side runtime and controller
+adapters. Consumers link `Partout::WindowsRuntime`, which depends on both DLLs. `partout.dll` exports only the Zig/C ABI.
 Optional vendors may still require their own DLLs.
 
 ## Logging
@@ -256,7 +256,7 @@ root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-windows -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINDOWS=ON -DPP_BUILD_LIBRARY=OFF
-cmake --build .cmake-windows --target partout-windows
+cmake --build .cmake-windows --target partout-windows-runtime
 ```
 
 ### OpenAPI models
@@ -327,7 +327,7 @@ Include `partout/models/TaggedProfile.h` and `partout/models/TunnelSnapshot.h`
 for its typed arguments and results. The Windows installation includes these
 generated model headers and `partout/json.h`. `Partout::Models` supplies those
 headers, nlohmann/json, and the core import library. Model implementations live
-only in `partout.dll`; consumers do not link `partout-models.lib`.
+only in `partout-runtime.dll`; consumers do not link `partout-models.lib`.
 These C++ exports require matching compiler, CRT, and model versions.
 Link `Partout::WindowsRuntime`; it includes the management API and supplies
 `Partout::Models` transitively. Use the same MSVC runtime as the library.
@@ -347,8 +347,8 @@ The offline native counter and profile decoding tests are included when
 CMake owns the Windows DLL link. With `PP_BUILD_LIBRARY=OFF`, it builds only the
 static backend. Direct Zig builds produce the static core archive; use CMake for
 shared builds. Zig tests link the same static backend, selected with
-`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. No backend DLL is
-built or copied.
+`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. Shared core
+builds instead deploy `partout-runtime.dll` alongside `partout.dll`.
 Builds without Windows retain low-level cleanup stubs, but have no implicit controller.
 The Windows looper also requires the native backend; without it, creation
 reports `MuxFailure`. Native dispatch tests run when Windows is enabled.

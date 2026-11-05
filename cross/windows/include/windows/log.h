@@ -20,7 +20,7 @@ typedef void (*windows_log_callback)(windows_log_level level, const char *messag
 
 /* Replace the process-wide sink atomically. Null uses OutputDebugString.
  * Replacement does not drain calls; keep the old sink valid until they return. */
-void windows_set_logger(windows_log_callback callback);
+PARTOUT_WINDOWS_API void windows_set_logger(windows_log_callback callback);
 
 /* Format and deliver a message. Null formats, formatting failures and exceptions
  * are discarded; diagnostics never propagate exceptions to the caller. */
