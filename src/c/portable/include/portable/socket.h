@@ -37,8 +37,6 @@ typedef struct {
                       const pp_socket_fd *fds, size_t fds_len);
 } pp_socket_configurator;
 
-/* Build the platform policy using the host controller as its borrowed context. */
-pp_socket_configurator pp_socket_configurator_current(void *_Nullable ref);
 
 /* Configure existing descriptors without taking ownership. Empty batches succeed. */
 bool pp_socket_configure_descriptors(pp_socket_configurator configurator,

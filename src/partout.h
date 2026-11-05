@@ -67,6 +67,14 @@ typedef struct {
  * does not introduce a replacement transport API. */
 typedef struct __pp_tun_struct *partout_tun;
 
+/* Low-level TUN construction for controller callbacks. Unsupported platforms
+ * return NULL. The core releases returned handles after accepting set_tunnel.
+ * open: Linux/macOS device; lookup: duplicated Apple NetworkExtension descriptor;
+ * borrow_fd: Android descriptor, still owned by the VPN service. */
+partout_tun partout_tun_open(const char *uuid);
+partout_tun partout_tun_lookup(void);
+partout_tun partout_tun_borrow_fd(int fd);
+
 typedef struct {
     bool reachable;
 #if defined(__ANDROID__)
@@ -105,8 +113,7 @@ typedef struct {
  * Callbacks must not propagate language exceptions across this boundary. */
 typedef struct __partout_daemon_bindings {
     void *controller;
-    /* All NULL selects the existing platform implementation. Otherwise every
-     * callback is required, and controller is borrowed without reinterpretation
+    /* Every callback is required. Controller is borrowed without reinterpretation
      * or platform-specific retention. The runtime owns it through release. */
     partout_controller_functions controller_functions;
     partout_daemon_events events;

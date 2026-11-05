@@ -22,7 +22,7 @@ FetchContent_MakeAvailable(json)
 
 # The native backend cannot include Partout headers. Keep it independently
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
-add_library(partout-winrt-backend OBJECT
+add_library(partout-winrt-backend SHARED
     cross/windows/src/abi.cc
     cross/windows/src/loop.cc
     cross/windows/src/network.cc
@@ -35,7 +35,7 @@ target_include_directories(partout-winrt-backend PUBLIC cross/windows/include)
 target_link_libraries(partout-winrt-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
     PRIVATE nlohmann_json::nlohmann_json)
 
-# Preserve a single archive for Zig and existing consumers.
+# Runtime integration is linked by consumers; the core links only the backend.
 add_library(partout-winrt STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
 file(GLOB partout_model_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp")
@@ -43,9 +43,12 @@ file(GLOB partout_model_sources CONFIGURE_DEPENDS
 add_library(partout-winrt-models OBJECT ${partout_model_sources})
 target_compile_options(partout-winrt-models PRIVATE /w)
 target_link_libraries(partout-winrt-models PRIVATE nlohmann_json::nlohmann_json)
-target_include_directories(partout-winrt PRIVATE src src/c/portable/include)
-target_compile_definitions(partout-winrt PRIVATE PARTOUT_WINRT_EXPORTS)
-target_link_libraries(partout-winrt PRIVATE partout-winrt-backend partout-winrt-models nlohmann_json::nlohmann_json)
+target_link_libraries(partout-winrt-backend PRIVATE partout-winrt-models)
+set_target_properties(partout-winrt-backend PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+target_include_directories(partout-winrt PUBLIC cross/windows/include PRIVATE src)
+target_compile_features(partout-winrt PUBLIC cxx_std_20)
+target_link_libraries(partout-winrt PUBLIC partout-winrt-backend PRIVATE nlohmann_json::nlohmann_json)
+add_library(Partout::WinRTRuntime ALIAS partout-winrt)
 
 foreach(target IN ITEMS partout-winrt-backend partout-winrt partout-winrt-models)
     # Also suppress model header warnings in handwritten translation units.

@@ -9,11 +9,6 @@
 #include <memory>
 #include <winrt/Windows.Networking.Vpn.h>
 
-#if defined(PARTOUT_WINRT_EXPORTS)
-#define PARTOUT_WINRT_API __declspec(dllexport)
-#else
-#define PARTOUT_WINRT_API __declspec(dllimport)
-#endif
 
 namespace Partout {
 
@@ -22,23 +17,23 @@ namespace Partout {
 // remain valid while registered with Partout's process-wide logger.
 class VpnChannelRuntime {
 public:
-    PARTOUT_WINRT_API VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+    VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                                         const char *profile, const partout_init_args &init_args,
                                         const partout_daemon_options &options);
-    PARTOUT_WINRT_API ~VpnChannelRuntime();
+    ~VpnChannelRuntime();
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
 
-    PARTOUT_WINRT_API void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    PARTOUT_WINRT_API void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    PARTOUT_WINRT_API void
+    void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    void
     GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                         winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
-    PARTOUT_WINRT_API void
+    void
     Encapsulate(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &encapsulated_packets);
-    PARTOUT_WINRT_API void
+    void
     Decapsulate(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                 winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &decapsulated_packets,
@@ -51,5 +46,4 @@ private:
 
 } // namespace Partout
 
-#undef PARTOUT_WINRT_API
 #endif

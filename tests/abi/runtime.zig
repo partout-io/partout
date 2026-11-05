@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const hooks = @import("../controller_hooks.zig");
 const builtin = @import("builtin");
 const source = @import("source");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
@@ -138,7 +139,7 @@ test "daemon runtime owns options during lifecycle" {
         args.options.cache_dir = cache_root_z.ptr;
         if (experimental) args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
         const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
-        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &hooks.bindings) catch |err| {
             options.deinit(allocator);
             return err;
         };
@@ -251,6 +252,9 @@ test "daemon bindings reject incomplete controller hooks" {
     const allocator = std.testing.allocator;
     const options = try abi_runtime.DaemonOptions.init(allocator, daemonStartArgs(mock.dnsOnlyProfileJson().ptr), null);
     defer options.deinit(allocator);
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, null));
+    const empty_bindings: partout_c.partout_daemon_bindings = .{};
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &empty_bindings));
     inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
         var functions = ControllerProbe.functions();
         @field(functions, field.name) = null;
@@ -385,7 +389,7 @@ test "legacy feature flags preserve the current implementations" {
             args.options.cache_dir = cache_dir.ptr;
             args.options.feature_flags = flags;
             const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
-            const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+            const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &hooks.bindings) catch |err| {
                 options.deinit(allocator);
                 return err;
             };

@@ -75,6 +75,15 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
 pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) callconv(.c) void {
     const args = args_pointer orelse return;
     log.init(args.logs_private_data, args.logger_fn, args.logger_ctx);
+    if (comptime builtin.os.tag == .windows and build_options.winrt) {
+        ffi.io.winrt_set_logger(nativeLogger);
+    }
+}
+
+fn nativeLogger(level: c_int, message: [*c]const u8) callconv(.c) void {
+    if (message == null) return;
+    const severity = std.enums.fromInt(log.Level, level) orelse return;
+    log.writeCString(severity, @ptrCast(message));
 }
 
 pub export fn partout_import_profile(
@@ -214,6 +223,22 @@ pub export fn partout_daemon_start(
 pub export fn partout_daemon_hold() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     runtime.hold();
+}
+
+pub export fn partout_tun_open(uuid: ?[*:0]const u8) callconv(.c) partout_c.partout_tun {
+    const value = uuid orelse return null;
+    if (comptime @hasDecl(ffi.io, "pp_tun_open")) return @ptrCast(ffi.io.pp_tun_open(value));
+    return null;
+}
+
+pub export fn partout_tun_lookup() callconv(.c) partout_c.partout_tun {
+    if (comptime @hasDecl(ffi.io, "pp_tun_lookup")) return @ptrCast(ffi.io.pp_tun_lookup());
+    return null;
+}
+
+pub export fn partout_tun_borrow_fd(fd: c_int) callconv(.c) partout_c.partout_tun {
+    if (comptime @hasDecl(ffi.io, "pp_tun_borrow_fd")) return @ptrCast(ffi.io.pp_tun_borrow_fd(fd));
+    return null;
 }
 
 pub export fn partout_daemon_stop() callconv(.c) void {

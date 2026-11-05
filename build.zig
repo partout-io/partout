@@ -172,7 +172,7 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
+    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built private WinRT backend import library.", false);
     const use_winrt = b.option(bool, "winrt", "Build and link the WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
     if (!use_winrt and winrt_path != null)
         std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
@@ -216,9 +216,6 @@ pub fn build(b: *std.Build) void {
         .root_module = module,
     });
     if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
-    if (shared and winrt_library != null) {
-        lib.forceUndefinedSymbol("pp_winrt_runtime_link");
-    }
     if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
             std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
@@ -244,6 +241,14 @@ pub fn build(b: *std.Build) void {
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
+    if (winrt_library) |library| {
+        // Core and SDK share this private backend, including its native loop.
+        const dll = library.dirname().path(b, "partout-winrt-backend.dll");
+        const install_backend = b.addInstallBinFile(dll, "partout-winrt-backend.dll");
+        b.getInstallStep().dependOn(&install_backend.step);
+        run_unit_tests.step.dependOn(&install_backend.step);
+        run_unit_tests.addPathDir(b.getInstallPath(.bin, ""));
+    }
 
     const test_step = b.step("test", "Run Zig tests");
     test_step.dependOn(&run_unit_tests.step);
@@ -257,9 +262,6 @@ pub fn build(b: *std.Build) void {
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
-        if (winrt_library != null) {
-            lib.installHeader(b.path("cross/windows/include/partout_winrt.h"), "partout_winrt.h");
-        }
         b.installArtifact(lib);
     }
 
@@ -272,7 +274,7 @@ pub fn build(b: *std.Build) void {
     docs_step.dependOn(&install_docs.step);
 }
 
-// CMake builds the C++/WinRT bridge with MSVC; Zig consumes the resulting archive.
+// CMake builds the private WinRT backend DLL; Zig consumes its import library.
 fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
@@ -294,10 +296,10 @@ fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
-    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt" });
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt-backend" });
     compile.has_side_effects = true;
     return .{
-        .library = directory.path(b, b.fmt("{s}/partout-winrt.lib", .{configuration})),
+        .library = directory.path(b, b.fmt("{s}/partout-winrt-backend.lib", .{configuration})),
         .step = &compile.step,
     };
 }
@@ -743,7 +745,6 @@ fn addAppleSDKLibraryPath(
 fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool) void {
     addCSourceFiles(module, &.{
         "src/partout.c",
-        "src/partout_jni.c",
     });
     addCSourceFiles(module, &.{
         "src/c/portable/common.c",

@@ -16,6 +16,10 @@
 /* Opaque tun device. */
 typedef struct __pp_tun_struct *pp_tun;
 
+#if PARTOUT_ANDROID
+pp_tun _Nullable pp_tun_borrow_fd(int fd);
+#endif
+
 #if PARTOUT_MACOS || PARTOUT_LINUX
 /* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);

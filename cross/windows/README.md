@@ -14,7 +14,7 @@ VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
 Partout io_windows.zig       -> winrt/abi.h -> src/abi.cc
 Partout looper_windows.zig   -> winrt/abi.h -> src/abi.cc
-Partout portable controller  -> src/platform.cc -> src/tun.cc
+Runtime callback table      -> src/platform.cc -> src/tun.cc
 ```
 
 ## Where code belongs
@@ -24,21 +24,24 @@ Partout portable controller  -> src/platform.cc -> src/tun.cc
 | `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
 | `include/winrt/abi.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
 | `include/winrt/log.h` | Native logging boundary. |
-| `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
+| `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; supplies the runtime-owned controller callbacks. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
 | `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
 | `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
 | `src/abi.h`, `src/abi.cc` | C ABI loop handles, endpoint ownership and scheduling, address conversions, native socket policy tokens and link setup. |
-| `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
+| `src/platform.cc` | Builds the public controller callback table for the runtime. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Native setup completions and transport capabilities, including passive subscriptions. |
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
-| `../../src/c/portable/tun_windows.c` | Fallback controller stubs for builds without WinRT. |
+| `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-`partout-winrt-backend` compiles sockets, the controller and logging with only
-the native include directory. `partout-winrt` adds `runtime.cc`, `platform.cc` and packages all
-objects into one archive for Zig. The backend has no portable ABI dependency.
+`partout-winrt-backend.dll` is a private low-level implementation dependency shared
+by the core and native SDK, so loop and transport state exist only once. It has
+no core ABI dependency. Zig links its import library. `partout-winrt.lib` contains
+only the consumer-side runtime and controller adapters; it is not linked into
+`partout.dll`. CMake consumers link `Partout::WinRTRuntime`, which depends on the
+core and private backend.
 
 ## Logging
 
@@ -215,9 +218,9 @@ Standalone native consumers and tests must explicitly create a loop, release all
 workers and transports, drain teardown, and free it; socket creation no longer
 creates an implicit loop. Only one loop may be active, matching the daemon API.
 
-CMake builds Partout as a shared library and installs `partout.h` and
-`partout_winrt.h`. Plugins link Partout's import library with a compatible MSVC
-runtime. Backend headers are internal integration interfaces, not installed
+The Zig core installs only `partout.h`. CMake installs the separate runtime header
+`partout_winrt.h`, its static library, and the private backend DLL. Plugins link
+`Partout::WinRTRuntime` with a compatible MSVC runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
 Transport association, socket I/O and the TUN packet bridge are implemented.
@@ -308,24 +311,24 @@ ctest --test-dir .cmake-models --output-on-failure
 
 ### Native integration
 
-With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
-`-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
-`-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
-builds without WinRT use the fallback branch in `tun_windows.c` for
-tests and builds that do not need native VPN support.
-The Windows looper also requires the native archive; without it, creation
+With `PP_BUILD_LIBRARY=ON`, CMake passes the private backend import library to Zig
+through `-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build that backend
+or `-Dwinrt-lib=<path>` to reuse its import library. The matching backend DLL must
+be beside that import library; Zig copies it into the installed bin directory.
+Builds without WinRT retain low-level cleanup stubs, but have no implicit controller.
+The Windows looper also requires the native backend; without it, creation
 reports `MuxFailure`. Native dispatch tests run when WinRT is enabled.
 
 Independent UDP is automatic for unconnected sockets; no additional
-transport option is needed. The native archive alone does not register a VPN
+transport option is needed. The native backend alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
 The standalone settings mapping test uses real WinRT settings objects, without
-a VPN host. From the same developer shell (adjust the archive and nlohmann/json
+a VPN host. From the same developer shell (adjust the backend import library and nlohmann/json
 include paths for your build):
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib
 & .cmake-winrt/tun-settings-test.exe
 ```
 
@@ -333,6 +336,6 @@ The network selection regression test covers simultaneous Wi-Fi and Ethernet
 connectivity, route-cost preference, offline recovery and monitor lifecycle:
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
 & .cmake-winrt/network-test.exe
 ```

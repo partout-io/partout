@@ -9,4 +9,5 @@
 #include <portable/tun_ctrl.h>
 #if PARTOUT_WINDOWS
 #include <winrt/abi.h>
+#include <winrt/log.h>
 #endif

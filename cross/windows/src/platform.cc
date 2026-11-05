@@ -5,52 +5,13 @@
 #include "tun.h"
 #include "winrt/log.h"
 
-// Partout integration belongs here; the native backend has no portable headers.
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma warning(push)
-#pragma warning(disable : 4068)
-#define _Nullable
-#define _Nonnull
-#endif
-extern "C" {
-#include "portable/tun.h"
-#include "portable/tun_ctrl.h"
-#include "portable/socket.h"
-}
-#if defined(_MSC_VER) && !defined(__clang__)
-#undef _Nonnull
-#undef _Nullable
-#pragma warning(pop)
-#endif
+#include "partout_winrt.h"
 
-static_assert(sizeof(pp_socket_address) == sizeof(winrt_address));
-static_assert(offsetof(pp_socket_address, family) == offsetof(winrt_address, family));
+namespace Partout {
+partout_controller_functions ControllerFunctions() {
 
-extern "C" {
-void pp_tun_free(pp_tun raw) {
-    if (auto transport = reinterpret_cast<winrt_transport *>(raw))
-        transport->release(transport->context);
-}
-
-pp_socket_configurator pp_socket_configurator_current(void *ref) {
-    return {ref, [](void *raw, const pp_reachability *, const pp_socket_fd *tokens, size_t count) {
-                if (count && !tokens) return false;
-                auto controller = static_cast<Partout::TunnelController *>(raw);
-                for (size_t i = 0; i < count; ++i) {
-                    if (!Partout::ABI::ConfigureSocket(controller, tokens[i])) return false;
-                }
-                return true;
-            }};
-}
-
-pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
-    winrt_set_logger([](winrt_log_level level, const char *message) {
-        static const pp_log_level levels[] = {PPLogLevelFault, PPLogLevelError, PPLogLevelNotice,
-                                              PPLogLevelInfo, PPLogLevelDebug};
-        if (static_cast<unsigned>(level) < std::size(levels)) pp_clog(levels[level], message);
-    });
-    pp_tun_ctrl_fnt functions{};
-    functions.set_delegate = [](void *raw, const pp_tun_ctrl_delegate *delegate) {
+    partout_controller_functions functions{};
+    functions.set_delegate = [](void *raw, const partout_controller_delegate *delegate) {
         auto controller = static_cast<Partout::TunnelController *>(raw);
         if (!controller) return;
         if (!delegate) {
@@ -60,22 +21,22 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
         controller->Monitor().Start([callbacks = *delegate](bool reachable, bool changed) {
             winrt_log(WinrtLogInfo, "Partout: physical network changed: reachable=%s, refresh=%s",
                       reachable ? "true" : "false", changed ? "true" : "false");
-            const pp_reachability info{reachable};
+            const partout_reachability info{reachable};
             if (callbacks.on_reachability) callbacks.on_reachability(callbacks.ctx, &info);
             // Notify the daemon that the available physical path has changed.
             if (changed && reachable && callbacks.on_better_path) callbacks.on_better_path(callbacks.ctx);
         });
     };
-    functions.set_tunnel = [](void *raw, const char *, const char *json) -> pp_tun {
+    functions.set_tunnel = [](void *raw, const char *, const char *json) -> partout_tun {
         auto controller = static_cast<Partout::TunnelController *>(raw);
         if (!controller) return nullptr;
         try {
             auto &loop = controller->Loop();
             // TUN commit and StartWithMainTransport serialize with all socket I/O.
-            return loop.Perform([controller, json, &loop]() -> pp_tun {
+            return loop.Perform([controller, json, &loop]() -> partout_tun {
                 auto tun = controller->Open(json);
                 if (!tun) return nullptr;
-                return reinterpret_cast<pp_tun>(Partout::ABI::WrapTun(loop, std::move(tun)));
+                return reinterpret_cast<partout_tun>(Partout::ABI::WrapTun(loop, std::move(tun)));
             });
         } catch (...) {
             winrt_log(WinrtLogError, "Partout: channel open failed: HRESULT=0x%08x",
@@ -96,6 +57,14 @@ pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current() {
     };
     functions.cancel_tunnel = [](void *, const char *) {
         // FIXME: ###, Cancel the tunnel connection.
+    };
+    functions.configure_sockets = [](void *raw, const partout_reachability *, const partout_socket_descriptor *tokens, size_t count) {
+        if (count && !tokens) return false;
+        auto controller = static_cast<TunnelController *>(raw);
+        for (size_t i = 0; i < count; ++i) {
+            if (!ABI::ConfigureSocket(controller, tokens[i])) return false;
+        }
+        return true;
     };
     return functions;
 }

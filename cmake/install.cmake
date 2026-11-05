@@ -16,7 +16,10 @@ endfunction()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(WIN32)
+if(TARGET partout-winrt)
+    install(TARGETS partout-winrt partout-winrt-backend
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
@@ -41,4 +44,9 @@ if(WIN32 AND PP_BUILD_LIBRARY)
         CONFIGURATIONS Debug RelWithDebInfo
         OPTIONAL
     )
+endif()
+
+if(TARGET partout-posix-runtime)
+    install(TARGETS partout-posix-runtime ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES cross/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
