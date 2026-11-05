@@ -156,7 +156,7 @@ if(WIN32)
     if(PP_BUILD_WINDOWS)
         target_sources(partout PRIVATE
             $<TARGET_OBJECTS:partout-windows-backend>
-            $<TARGET_OBJECTS:partout-windows-models>
+            $<TARGET_OBJECTS:partout-models>
         )
         target_link_libraries(partout PRIVATE partout-windows-backend)
         set_property(TARGET partout PROPERTY LINKER_LANGUAGE CXX)

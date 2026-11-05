@@ -1,7 +1,7 @@
 # Portable generated models, independent of the Windows bridge.
 # The caller supplies nlohmann_json::nlohmann_json.
 include_guard(GLOBAL)
-get_filename_component(PARTOUT_MODELS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../cross/windows/src" ABSOLUTE)
+get_filename_component(PARTOUT_MODELS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../cross/cpp" ABSOLUTE)
 set(PARTOUT_MODELS_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/partout-models/include")
 file(GLOB partout_model_headers CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.h")
 foreach(header IN LISTS partout_model_headers)

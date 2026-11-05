@@ -261,7 +261,7 @@ cmake --build .cmake-windows --target partout-windows
 
 ### OpenAPI models
 
-Regenerate the entities in `cross/windows/src/models` with OpenAPI Generator
+Regenerate the entities in `cross/cpp/models` with OpenAPI Generator
 7.20.0 or newer, a Java 11+ JDK, and Python 3 (standard library only):
 
 ```sh

@@ -7,14 +7,12 @@ endif()
 
 # Native integration layers consume the public core ABI.
 if(TARGET partout-windows-backend)
-    include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
     add_library(partout-windows STATIC
         cross/windows/src/runtime.cc
         cross/windows/src/platform.cc
     )
     add_library(Partout::WindowsRuntime ALIAS partout-windows)
     target_include_directories(partout-windows PUBLIC cross/windows/include PRIVATE src)
-    target_include_directories(partout-windows SYSTEM PRIVATE cross/windows/src/models)
     target_compile_features(partout-windows PUBLIC cxx_std_20)
     target_compile_definitions(partout-windows PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
     target_compile_options(partout-windows PRIVATE /EHsc /permissive- /W4)

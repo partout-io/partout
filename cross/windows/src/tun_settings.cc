@@ -4,7 +4,7 @@
 #include <ws2tcpip.h>
 #include "tun_settings.h"
 #include "windows/log.h"
-#include "models/TunnelRemoteInfoWrapper.h"
+#include <partout/models/TunnelRemoteInfoWrapper.h>
 #include <charconv>
 #include <stdexcept>
 #include <string>

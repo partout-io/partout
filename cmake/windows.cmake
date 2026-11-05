@@ -19,6 +19,7 @@ FetchContent_Declare(json
     URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
 )
 FetchContent_MakeAvailable(json)
+include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 
 # The native backend cannot include Partout headers. Keep it independently
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
@@ -38,22 +39,17 @@ target_link_libraries(partout-windows-backend
     PRIVATE nlohmann_json::nlohmann_json
 )
 
-file(GLOB partout_model_sources CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp"
-)
+# Keep the standalone backend archive self-contained for Zig tests.
+target_sources(partout-windows-backend PRIVATE $<TARGET_OBJECTS:partout-models>)
+target_link_libraries(partout-windows-backend PRIVATE Partout::Models)
 # Generated model implementations do not follow our warning policy.
-add_library(partout-windows-models OBJECT ${partout_model_sources})
-target_compile_options(partout-windows-models PRIVATE /w)
-target_link_libraries(partout-windows-models PRIVATE nlohmann_json::nlohmann_json)
-target_link_libraries(partout-windows-backend PRIVATE partout-windows-models)
+target_compile_options(partout-models PRIVATE /w)
 
-foreach(target IN ITEMS partout-windows-backend partout-windows-models)
-    # Also suppress model header warnings in handwritten translation units.
-    target_include_directories(${target} SYSTEM PRIVATE cross/windows/src/models)
+foreach(target IN ITEMS partout-windows-backend partout-models)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_definitions(${target} PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
     target_compile_options(${target} PRIVATE /EHsc /permissive-)
-    if(NOT target STREQUAL "partout-windows-models")
+    if(NOT target STREQUAL "partout-models")
         target_compile_options(${target} PRIVATE /W4)
     endif()
     # AppContainer consumers use a CRT without the /RTC helpers.

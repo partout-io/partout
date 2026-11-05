@@ -14,7 +14,7 @@
 #include "tun.h"
 #include "loop.h"
 
-#include "models/ConnectionStatus.h"
+#include <partout/models/ConnectionStatus.h>
 
 using namespace winrt;
 using namespace winrt::Windows::Networking::Vpn;
