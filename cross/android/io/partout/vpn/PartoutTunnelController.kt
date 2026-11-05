@@ -297,7 +297,7 @@ internal class PartoutTunnelController(
             get() = network?.networkHandle
     }
 
-    // Signatures in tun_android.c MUST MATCH!
+    // Signatures in native/controller.c MUST MATCH!
     private external fun onNativeReachabilityUpdate(delegate: Long, networkHandle: Long)
     private external fun onNativeBetterPathUpdate(delegate: Long)
 

@@ -1,10 +1,7 @@
 /* SPDX-FileCopyrightText: 2026 Davide De Rosa
  * SPDX-License-Identifier: GPL-3.0 */
 
-#include "portable/conditionals.h"
 #include "portable/tun.h"
-#include "portable/tun_ctrl.h"
-#include "portable/socket.h"
 
 #if PARTOUT_WINDOWS
 #if PARTOUT_WINDOWS_RUNTIME

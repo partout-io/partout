@@ -306,7 +306,6 @@ test "settings-only daemons release owned TUN descriptors" {
     const NativeTun = extern struct {
         fd: c_int,
         owned: bool = !platform_target.abi.isAndroid(),
-        dev_name: ?[*:0]const u8 = null,
     };
     const Controller = struct {
         mock: mock.MockTunnelController = .{},

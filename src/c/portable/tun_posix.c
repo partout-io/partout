@@ -7,23 +7,25 @@
 #include "portable/common.h"
 #include "portable/tun.h"
 
-#if PARTOUT_APPLE
+#if PARTOUT_APPLE || PARTOUT_LINUX || PARTOUT_ANDROID
 
 #include "portable/io_posix.h"
+#include <stdlib.h>
+#include <unistd.h>
+#if PARTOUT_APPLE
 #include <sys/socket.h>
 #include <sys/uio.h>
-#include <unistd.h>
 #include "portable/endian.h"
+#endif
 
 struct __partout_tun_struct {
     pp_fd fd;
     bool owned;
-    const char *dev_name;
 };
 
 pp_tun pp_tun_wrap_fd(int fd, bool owned) {
     if (fd < 0) return NULL;
-    pp_tun tun = calloc(1, sizeof(*tun));
+    pp_tun tun = malloc(sizeof(*tun));
     if (!tun) return NULL;
     tun->fd = fd;
     tun->owned = owned;
@@ -33,12 +35,10 @@ pp_tun pp_tun_wrap_fd(int fd, bool owned) {
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     if (tun->owned && tun->fd >= 0) close(tun->fd);
-    if (tun->dev_name) {
-        pp_free((void *)tun->dev_name);
-    }
     pp_free(tun);
 }
 
+#if PARTOUT_APPLE
 /* The first 4 bits of a local packet identify the IP family. */
 static inline
 uint32_t pp_tun_proto_for(uint8_t byte) {
@@ -49,14 +49,17 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
         case 6:
             return AF_INET6;
         default:
-            pp_clog_v(PPLogLevelError, "tun_darwin: Unexpected utun packet header (%u)", header);
+            pp_clog_v(PPLogLevelError, "tun_posix: Unexpected utun packet header (%u)", header);
             return 0;
     }
 }
 
+#endif
+
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
     if (!tun || tun->fd < 0) return -1;
     if (!dst || dst_len == 0) return -1;
+#if PARTOUT_APPLE
     uint32_t pi = 0; // 4-byte utun protocol header
 
     struct iovec iov[2];
@@ -71,15 +74,21 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
         return pp_io_handle_result(read_len);
     }
     if (read_len < (int)sizeof(pi)) {
-        pp_clog(PPLogLevelError, "tun_darwin: Missing 4-byte utun packet header");
+        pp_clog(PPLogLevelError, "tun_posix: Missing 4-byte utun packet header");
         return -1;
     }
     return read_len - (int)sizeof(pi);
+#else
+    int ret;
+    PP_IO_RETRY(ret, read(tun->fd, dst, dst_len));
+    return pp_io_handle_result(ret);
+#endif
 }
 
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
     if (!src || src_len == 0) return -1;
+#if PARTOUT_APPLE
     const uint32_t proto_byte = pp_tun_proto_for(*src);
     if (proto_byte == 0) return -1;
     const uint32_t pi = pp_endian_htonl(proto_byte);
@@ -98,16 +107,16 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
     }
     if (written_len != (int)(pi_len + src_len)) return -3;
     return (int)src_len;
+#else
+    int ret;
+    PP_IO_RETRY(ret, write(tun->fd, src, src_len));
+    return pp_io_handle_result(ret);
+#endif
 }
 
 pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
     if (!tun) return -1;
     return tun->fd;
-}
-
-const char *pp_tun_name(const pp_tun tun) {
-    if (!tun) return NULL;
-    return tun->dev_name;
 }
 
 #endif

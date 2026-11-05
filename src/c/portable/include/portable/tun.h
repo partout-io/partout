@@ -27,9 +27,6 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 
 /* Return the file descriptor. Check result with pp_fd_is_valid(). */
 pp_fd pp_tun_get_watch_fd(const pp_tun tun);
-
-/* Return the device name or NULL if none. */
-const char *_Nullable pp_tun_name(const pp_tun tun);
 #endif
 
 /* Free the wrapper and release its owned native resources. */

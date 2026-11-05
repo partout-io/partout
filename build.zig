@@ -758,9 +758,7 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
         "src/c/portable/network.c",
         "src/c/portable/prng.c",
         "src/c/portable/socket.c",
-        "src/c/portable/tun_android.c",
-        "src/c/portable/tun_darwin.c",
-        "src/c/portable/tun_linux.c",
+        "src/c/portable/tun_posix.c",
         "src/c/portable/zd.c",
     });
 
