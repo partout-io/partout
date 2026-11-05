@@ -41,8 +41,8 @@ targets: [
 ### CMake
 
 CMake orchestrates the complete native build. It resolves the selected vendors,
-builds the Go bridge when WireGuard is enabled, and invokes Zig with their include
-and library paths. Zig always builds a static core archive. CMake links that
+builds the Go bridge when WireGuard is enabled, and invokes Zig with feature settings
+and header paths. Zig always builds a static core archive. CMake links that
 archive and the selected backends into the final shared library on every platform.
 Native runtime targets link against `Partout::Partout`.
 

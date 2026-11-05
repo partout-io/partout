@@ -85,7 +85,7 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    windows_library: ?std.Build.LazyPath,
+    windows: bool,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -163,22 +163,12 @@ pub fn build(b: *std.Build) void {
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
     const windows_path = pathOption(b, "windows-lib", "MSVC-built static Windows backend library.", false);
-    const use_windows = b.option(bool, "windows", "Build and link the Windows bridge (Windows MSVC only).") orelse (windows_path != null);
+    const use_windows = b.option(bool, "windows", "Enable the Windows backend (Windows MSVC only).") orelse (windows_path != null);
     if (!use_windows and windows_path != null)
         std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
     if (use_windows and (target.result.os.tag != .windows or target.result.abi != .msvc))
         std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
-    const windows_build = if (use_windows and windows_path == null)
-        addWindowsBuild(b, target, optimize)
-    else
-        null;
-    const windows_library: ?std.Build.LazyPath = if (windows_path) |path|
-        .{ .cwd_relative = path }
-    else if (windows_build) |bridge|
-        bridge.library
-    else
-        null;
-    build_options.addOption(bool, "windows", windows_library != null);
+    build_options.addOption(bool, "windows", use_windows);
 
     const config = BuildConfig{
         .target = target,
@@ -187,7 +177,7 @@ pub fn build(b: *std.Build) void {
         .libc_installation = parseLibCInstallation(b, target),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
-        .windows_library = windows_library,
+        .windows = use_windows,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -202,7 +192,6 @@ pub fn build(b: *std.Build) void {
         .root_module = module,
     });
     lib.bundle_compiler_rt = true;
-    if (windows_build) |bridge| lib.step.dependOn(bridge.step);
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
     b.default_step = check;
@@ -213,15 +202,28 @@ pub fn build(b: *std.Build) void {
         test_module.addIncludePath(b.path("cross/posix/include"));
         addCSourceFiles(test_module, &.{"cross/posix/tun.c"});
     }
-    linkVendorLibraries(test_module, b, config, true);
     test_module.addImport("source", test_source_module);
 
     const unit_tests = b.addTest(.{
         .root_module = test_module,
     });
-    // The MSVC C++/WinRT bridge is built with /MD.
-    if (windows_library != null) unit_tests.linkage = .dynamic;
-    if (windows_build) |bridge| unit_tests.step.dependOn(bridge.step);
+    linkTestLibraries(test_module, b, config, &unit_tests.step);
+    if (use_windows) {
+        // Tests link the MSVC backend; the core archive only needs its headers.
+        unit_tests.linkage = .dynamic;
+        if (windows_path) |path| {
+            test_module.addObjectFile(.{ .cwd_relative = path });
+        } else if (builtin.os.tag == .windows) {
+            const backend = addWindowsBuild(b, target, optimize);
+            test_module.addObjectFile(backend.library);
+            unit_tests.step.dependOn(backend.step);
+        } else {
+            unit_tests.step.dependOn(&b.addFail("Windows tests require a Windows host or -Dwindows-lib").step);
+        }
+        test_module.linkSystemLibrary("windowsapp", .{});
+        test_module.linkSystemLibrary("runtimeobject", .{});
+        test_module.linkSystemLibrary("iphlpapi", .{});
+    }
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -255,8 +257,6 @@ fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     library: std.Build.LazyPath,
     step: *std.Build.Step,
 } {
-    if (builtin.os.tag != .windows)
-        std.debug.panic("Building the Windows backend requires a Windows host; supply -Dwindows-lib when cross-compiling", .{});
     const architecture = switch (target.result.cpu.arch) {
         .aarch64 => "ARM64",
         .x86_64 => "x64",
@@ -326,8 +326,8 @@ fn vendorPathsOption(b: *std.Build, vendor: Vendor) VendorPaths {
     const library = pathOption(
         b,
         b.fmt("{s}-lib", .{name}),
-        b.fmt("{s} library search path.", .{display_name}),
-        include != null,
+        b.fmt("{s} library search path for tests.", .{display_name}),
+        false,
     );
     if (include == null and library != null) {
         std.debug.panic("-{s}-include is required with -{s}-lib", .{ name, name });
@@ -512,7 +512,7 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINDOWS_RUNTIME", if (config.windows_library != null) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINDOWS_RUNTIME", if (config.windows) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,
@@ -569,22 +569,19 @@ fn addVendorIncludePaths(
     }
 }
 
-fn linkVendorLibraries(
+fn linkTestLibraries(
     module: *std.Build.Module,
     b: *std.Build,
     config: BuildConfig,
-    add_library_rpath: bool,
+    test_step: *std.Build.Step,
 ) void {
-    if (config.windows_library) |library| {
-        module.addObjectFile(library);
-        module.linkSystemLibrary("windowsapp", .{});
-        module.linkSystemLibrary("runtimeobject", .{});
-        module.linkSystemLibrary("iphlpapi", .{});
-    }
     for (config.vendors.all()) |paths| {
         if (!paths.enabled()) continue;
         if (paths.vendor == .wg_go and !config.wireguard) continue;
-        const library_path = paths.library orelse unreachable;
+        const library_path = paths.library orelse {
+            test_step.dependOn(&b.addFail(b.fmt("Tests require -D{s}-lib", .{paths.vendor.optionName()})).step);
+            continue;
+        };
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
@@ -594,7 +591,7 @@ fn linkVendorLibraries(
                     .{ library_path, paths.vendor.appleStaticArchiveName() },
                 );
                 std.Io.Dir.accessAbsolute(b.graph.io, archive, .{}) catch {
-                    linkSystemLibraries(module, config.target, paths, add_library_rpath);
+                    linkSystemLibraries(module, config.target, paths);
                     continue;
                 };
                 module.addObjectFile(.{ .cwd_relative = archive });
@@ -602,11 +599,9 @@ fn linkVendorLibraries(
             };
             module.addSystemFrameworkPath(.{ .cwd_relative = library_path });
             module.linkFramework(framework_name, .{});
-            if (add_library_rpath) {
-                module.addRPath(.{ .cwd_relative = library_path });
-            }
+            module.addRPath(.{ .cwd_relative = library_path });
         } else {
-            linkSystemLibraries(module, config.target, paths, add_library_rpath);
+            linkSystemLibraries(module, config.target, paths);
         }
     }
 }
@@ -615,13 +610,10 @@ fn linkSystemLibraries(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     paths: VendorPaths,
-    add_library_rpath: bool,
 ) void {
     const library_path = paths.library orelse unreachable;
     module.addLibraryPath(.{ .cwd_relative = library_path });
-    if (add_library_rpath) {
-        module.addRPath(.{ .cwd_relative = library_path });
-    }
+    module.addRPath(.{ .cwd_relative = library_path });
     linkSystemLibraryNames(module, target, paths.vendor);
 }
 

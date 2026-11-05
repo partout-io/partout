@@ -17,7 +17,6 @@ set(PARTOUT_ZIG_ARGS build install
 if(PP_BUILD_USE_OPENSSL)
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dopenssl-include=${PARTOUT_OPENSSL_INCLUDE_DIR}"
-        "-Dopenssl-lib=${PARTOUT_OPENSSL_LIBRARY_DIR}"
     )
     if(PARTOUT_OPENSSL_CONFIG_INCLUDE_DIR)
         list(APPEND PARTOUT_ZIG_ARGS
@@ -29,7 +28,6 @@ endif()
 if(PP_BUILD_USE_MBEDTLS)
     list(APPEND PARTOUT_ZIG_ARGS
         "-Dmbedtls-include=${PARTOUT_MBEDTLS_INCLUDE_DIR}"
-        "-Dmbedtls-lib=${PARTOUT_MBEDTLS_LIBRARY_DIR}"
     )
 endif()
 
@@ -41,7 +39,6 @@ if(PP_BUILD_USE_WIREGUARD)
     list(APPEND PARTOUT_ZIG_ARGS
         -Dwireguard=true
         "-Dwg-go-include=${wg_source}/include"
-        "-Dwg-go-lib=${wg_work}/lib"
     )
 endif()
 
@@ -81,19 +78,7 @@ elseif(APPLE)
     if(CMAKE_OSX_SYSROOT MATCHES "[Ss]imulator")
         string(APPEND PARTOUT_ZIG_TARGET "-simulator")
     endif()
-    if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")
-        set(PARTOUT_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
-    else()
-        execute_process(
-            COMMAND xcrun --sdk macosx --show-sdk-path
-            OUTPUT_VARIABLE PARTOUT_APPLE_SDK
-            OUTPUT_STRIP_TRAILING_WHITESPACE
-            ERROR_QUIET
-        )
-    endif()
-    if(PARTOUT_APPLE_SDK)
-        list(APPEND PARTOUT_ZIG_ARGS "-Dapple-sdk-path=${PARTOUT_APPLE_SDK}")
-    endif()
+    list(APPEND PARTOUT_ZIG_ARGS "-Dapple-sdk-path=${PARTOUT_APPLE_SDK}")
 elseif(WIN32)
     set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-windows-msvc")
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -104,7 +89,7 @@ if(PARTOUT_ZIG_TARGET)
 endif()
 
 if(PP_BUILD_WINDOWS)
-    list(APPEND PARTOUT_ZIG_ARGS "-Dwindows-lib=$<TARGET_LINKER_FILE:partout-windows-backend>")
+    list(APPEND PARTOUT_ZIG_ARGS -Dwindows=true)
 endif()
 # Zig compiles the static core; CMake owns the final shared library.
 find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
@@ -117,13 +102,6 @@ add_custom_target(partout-zig ALL
     COMMAND_EXPAND_LISTS
     VERBATIM
 )
-if(PP_BUILD_USE_WIREGUARD)
-    add_dependencies(partout-zig partout-wg-go)
-endif()
-if(PP_BUILD_WINDOWS)
-    add_dependencies(partout-zig partout-windows-backend)
-endif()
-
 set_source_files_properties("${PARTOUT_ZIG_LIBRARY}" PROPERTIES GENERATED TRUE)
 add_library(partout SHARED "${PARTOUT_ZIG_LIBRARY}")
 set_target_properties(partout PROPERTIES

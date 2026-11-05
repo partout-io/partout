@@ -38,8 +38,23 @@ set(PP_BUILD_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/bin/${PLATFORM_NAME}-${ARCH_NAM
     CACHE PATH "Build output directory")
 file(TO_CMAKE_PATH "${PP_BUILD_OUTPUT}" PP_BUILD_OUTPUT)
 
+# Resolve the Apple SDK once for both Zig and the Go bridge.
+if(APPLE)
+    if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")
+        set(PARTOUT_APPLE_SDK "${CMAKE_OSX_SYSROOT}")
+    else()
+        set(apple_sdk macosx)
+        if(CMAKE_OSX_SYSROOT)
+            set(apple_sdk "${CMAKE_OSX_SYSROOT}")
+        endif()
+        execute_process(COMMAND xcrun --sdk "${apple_sdk}" --show-sdk-path
+            OUTPUT_VARIABLE PARTOUT_APPLE_SDK OUTPUT_STRIP_TRAILING_WHITESPACE
+            COMMAND_ERROR_IS_FATAL ANY)
+    endif()
+endif()
+
 include("cmake/windows.cmake")
 include("cmake/vendors.cmake")
-include("cmake/zig.cmake")
+include("cmake/core.cmake")
 include("cmake/runtimes.cmake")
 include("cmake/install.cmake")

@@ -157,13 +157,12 @@ foreach(vendor openssl mbedtls)
             endif()
         endforeach()
     endif()
-    # Zig needs headers and a library directory; CMake consumes the package targets.
+    # Zig consumes headers; CMake links the package targets.
     get_target_property(include_dirs ${target} INTERFACE_INCLUDE_DIRECTORIES)
     unset(include_dir)
     find_path(include_dir NAMES "${vendor}/ssl.h" PATHS ${include_dirs}
         NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH NO_CACHE REQUIRED)
     set(PARTOUT_${vendor_id}_INCLUDE_DIR "${include_dir}")
-    set(PARTOUT_${vendor_id}_LIBRARY_DIR "$<TARGET_FILE_DIR:${target}>")
     list(APPEND PARTOUT_CORE_LIBRARIES ${libraries})
     foreach(library IN LISTS libraries)
         get_target_property(type ${library} TYPE)
