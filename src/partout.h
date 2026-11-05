@@ -15,10 +15,10 @@
 extern "C" {
 #endif
 
-/* Current library version. */
+/* Returns the library version. The returned string must not be freed. */
 const char *partout_version(void);
 
-/* Library initializiation, call it ASAP. */
+/* Logging configuration. */
 typedef enum {
     PartoutLogLevelFault = 0,
     PartoutLogLevelError,
@@ -26,18 +26,20 @@ typedef enum {
     PartoutLogLevelInfo,
     PartoutLogLevelDebug
 } partout_log_level;
+/* The message is borrowed for the duration of the callback. */
 typedef void (*partout_logger_cb)(void *ctx, int level, const char *message);
 typedef struct {
     bool logs_private_data;
     partout_logger_cb logger_fn;
     void *logger_ctx;
 } partout_init_args;
+/* Configures process-wide logging. Keep logger_ctx alive while registered. */
 void partout_init(const partout_init_args *args);
 
-/* Common functions. */
+/* File utilities. */
 char *partout_readfile(const char *rel_path, const char *parent);
 
-/* ABI result codes. */
+/* Daemon startup result codes. */
 typedef enum {
     PartoutCompletionCodeOK         = 0,
     PartoutCompletionCodeMemory     = -3,
@@ -45,15 +47,17 @@ typedef enum {
     PartoutCompletionCodeFailure    = -1
 } partout_completion_code;
 
-/* Import profiles. */
+/* Import functions return an ABIEnvelope JSON string containing a result or error.
+ * The caller must free the returned string. NULL means no result was produced. */
+/* Imports a profile with an optional name. */
 char *partout_import_profile(const char *text, const char *name);
-/* context_json is an optional serialized ModuleImportContext. */
+/* Imports a module. context_json is an optional ModuleImportContext JSON string. */
 char *partout_import_module(const char *text, const char *context_json);
-/* Serializes a TaggedModule JSON to its native format.
- * The caller owns the returned string and must free it. */
+/* Serializes TaggedModule JSON to its native format, or returns NULL on failure.
+ * The caller must free the returned string. */
 char *partout_export_module(const char *module_json);
 
-/* Callbacks invoked on daemon events. */
+/* Optional daemon event callbacks. */
 typedef struct {
     void *ctx;
     void (*set_connection_status)(void *ctx, const char *status);
@@ -62,9 +66,7 @@ typedef struct {
     void (*remove)(void *ctx, const char *key);
 } partout_daemon_events;
 
-/* Existing native controller hooks. No generated models cross this interface.
- * TUN handles use the core's native representation and ownership rules; this
- * does not introduce a replacement transport API. */
+/* Opaque TUN handle. */
 typedef struct __partout_tun_struct *partout_tun;
 
 /* Opens a Linux/macOS TUN device. Unsupported platforms return NULL. */
@@ -96,9 +98,10 @@ typedef struct {
 } partout_controller_delegate;
 
 typedef struct {
-    /* NULL detaches the delegate. Stop callbacks before returning from detach. */
+    /* Copy the delegate if needed after this call. NULL detaches it; stop and
+     * drain delegate callbacks before returning from detach. */
     void (*set_delegate)(void *controller, const partout_controller_delegate *delegate);
-    /* Returns an owned native TUN handle, or NULL on failure. */
+    /* Transfers the returned TUN handle to the core, or returns NULL on failure. */
     partout_tun (*set_tunnel)(void *controller, const char *uuid, const char *info_json);
     void (*report_snapshot)(void *controller, const char *snapshot_json);
     void (*set_environment_value)(void *controller, const char *key, const char *value_json);
@@ -108,18 +111,17 @@ typedef struct {
                               const partout_socket_descriptor *sockets, size_t count);
 } partout_controller_functions;
 
-/* Bindings to externally executed code. Rebuild callers with the matching ABI.
- * The core copies the bindings. Controller/context resources live until release.
+/* Runtime callbacks and context. The core copies the bindings.
+ * The runtime must keep controller/context resources alive until release.
  * Callback strings and arrays are borrowed for the duration of each call.
  * Callbacks must not propagate language exceptions across this boundary. */
 typedef struct __partout_daemon_bindings {
     void *controller;
-    /* Every callback is required. Controller is borrowed without reinterpretation
-     * or platform-specific retention. The runtime owns it through release. */
+    /* All controller callbacks are required. */
     partout_controller_functions controller_functions;
     partout_daemon_events events;
-    /* Releases the resources referenced by the struct (not
-     * the struct itself). */
+    /* Optional cleanup, called on startup failure or daemon destruction.
+     * Releases referenced resources, not this struct. */
     void (*release)(struct __partout_daemon_bindings *);
 } partout_daemon_bindings;
 
@@ -131,8 +133,7 @@ typedef enum {
     PartoutCryptoNative
 } partout_crypto;
 
-/* Daemon feature flags (DaemonFeatureFlag bit values). */
-/* Deprecated compatibility flags: the current implementations are always used. */
+/* Deprecated DaemonFeatureFlag values, accepted for compatibility but ignored. */
 #define PartoutDaemonFlagExperimentalDaemon (UINT64_C(1) << 0)
 #define PartoutDaemonFlagExperimentalOpenVPN (UINT64_C(1) << 1)
 #define PartoutDaemonFlagExperimentalWireGuard (UINT64_C(1) << 2)
@@ -146,7 +147,7 @@ typedef struct {
     const char *cache_dir;
     uint64_t min_data_count_delta;
     partout_crypto crypto;
-    /* DaemonFeatureFlag bit mask. Zero disables all optional features. */
+    /* DaemonFeatureFlag bit mask. Use zero; unknown bits are rejected. */
     uint64_t feature_flags;
 } partout_daemon_options;
 
@@ -162,8 +163,8 @@ int partout_daemon_start(const partout_daemon_start_args *args);
 void partout_daemon_hold(void);
 void partout_daemon_stop(void);
 
-/* Specific module ABI. */
-/* Returned strings are owned by the caller and must be freed. */
+/* WireGuard keys are base64-encoded. Returns NULL on failure or if WireGuard
+ * is unavailable. The caller must free returned strings. */
 char *partout_wireguard_genkey(void);
 char *partout_wireguard_pubkey(const char *key);
 
