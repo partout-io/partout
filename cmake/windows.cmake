@@ -1,4 +1,4 @@
-# Windows uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
+# The Windows backend uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
 # separately from Zig's portable C sources; consumers opt in when needed.
 option(PP_BUILD_WINDOWS "Build the Windows VPN channel bridge" OFF)
 if(NOT PP_BUILD_WINDOWS)

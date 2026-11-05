@@ -177,7 +177,7 @@ pub fn build(b: *std.Build) void {
     if (!use_windows and windows_path != null)
         std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
     if (use_windows and (target.result.os.tag != .windows or target.result.abi != .msvc))
-        std.debug.panic("Windows requires a Windows MSVC target", .{});
+        std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
     const windows_build = if (use_windows and windows_path == null)
         addWindowsBuild(b, target, optimize)
     else
@@ -280,7 +280,7 @@ fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     step: *std.Build.Step,
 } {
     if (builtin.os.tag != .windows)
-        std.debug.panic("Building Windows requires a Windows host; supply -Dwindows-lib when cross-compiling", .{});
+        std.debug.panic("Building the Windows backend requires a Windows host; supply -Dwindows-lib when cross-compiling", .{});
     const architecture = switch (target.result.cpu.arch) {
         .aarch64 => "ARM64",
         .x86_64 => "x64",

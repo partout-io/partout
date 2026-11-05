@@ -1,3 +1,4 @@
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "partout_posix.h"
 static void set_delegate(void *ctx, const partout_controller_delegate *delegate) {
