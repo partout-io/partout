@@ -54,7 +54,8 @@ target_link_libraries(partout-windows-backend
     PRIVATE nlohmann_json::nlohmann_json ole32
 )
 
-# Keep the standalone backend archive self-contained for Zig tests.
+# Include every model implementation in the DLL exports and keep the standalone
+# backend archive self-contained for Zig tests.
 target_sources(partout-windows-backend PRIVATE $<TARGET_OBJECTS:partout-models-impl>)
 target_link_libraries(partout-windows-backend PRIVATE partout-models-impl)
 # Generated model implementations do not follow our warning policy.

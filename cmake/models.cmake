@@ -56,7 +56,7 @@ target_link_libraries(partout-models-impl PUBLIC nlohmann_json::nlohmann_json)
 
 # Windows SDK consumers use the DLL's model exports. The implementation archive
 # is only a build input; linking it into consumers would duplicate those symbols.
-if(WIN32 AND PP_BUILD_WINDOWS AND PP_BUILD_LIBRARY)
+if(partout_models_dll)
     add_library(partout-models-interface INTERFACE)
     add_library(Partout::Models ALIAS partout-models-interface)
     target_compile_features(partout-models-interface INTERFACE cxx_std_17)

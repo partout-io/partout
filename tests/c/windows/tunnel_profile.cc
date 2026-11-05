@@ -30,5 +30,4 @@ int main() {
     assert(!Partout::DecodeTunnelProfileId(L"malformed"));
     assert(!Partout::DecodeTunnelProfileId(L"<PartoutProfile version='1'>{}</PartoutProfile>"));
     assert(!Partout::DecodeTunnelProfileId(L"<!DOCTYPE x [<!ENTITY a 'secret'>]><PartoutProfile version='1'>&a;</PartoutProfile>"));
-
 }
