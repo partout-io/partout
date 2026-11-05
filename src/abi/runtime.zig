@@ -233,13 +233,10 @@ pub const DaemonRuntime = struct {
 fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{InvalidArgs}!net.Platform.Options {
     const value = bindings orelse return error.InvalidArgs;
     const functions = value.controller_functions;
-    var supplied: usize = 0;
     // Check that all controller bindings are non-NULL.
     inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
-        if (@field(functions, field.name) != null) supplied += 1;
+        if (@field(functions, field.name) == null) return error.InvalidArgs;
     }
-    if (supplied != @typeInfo(partout_c.partout_controller_functions).@"struct".fields.len)
-        return error.InvalidArgs;
 
     // The public hooks preserve the native C signatures. Separate translate-c
     // modules give these otherwise identical C types different Zig identities.
