@@ -1,6 +1,10 @@
 # SPDX-FileCopyrightText: 2026 Davide De Rosa
 # SPDX-License-Identifier: GPL-3.0
 
+if(NOT PP_BUILD_LIBRARY)
+    return()
+endif()
+
 if(TARGET partout-windows)
     target_link_libraries(partout-windows PUBLIC Partout::Partout)
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)

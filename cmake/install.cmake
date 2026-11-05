@@ -6,13 +6,6 @@ else()
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-function(partout_install_runtime_file file)
-    install(FILES "${file}"
-        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
-        OPTIONAL
-    )
-endfunction()
-
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
