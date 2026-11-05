@@ -266,7 +266,7 @@ test "daemon bindings reject incomplete controller hooks" {
 test "starts DNS-only profile through tunnel controller" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);

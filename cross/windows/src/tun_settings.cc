@@ -3,7 +3,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "tun_settings.h"
-#include "winrt/log.h"
+#include "windows/log.h"
 #include "models/TunnelRemoteInfoWrapper.h"
 #include <charconv>
 #include <stdexcept>
@@ -98,8 +98,8 @@ void TunSettings::ApplyDNS(const Models::DNSModule &settings) {
         domains.Append(VpnDomainNameInfo{to_hstring(*settings.domainName),
                                          VpnDomainNameType::Suffix, servers, proxies});
     if (!names.empty() && policy != Models::DNSModuleDomainPolicy::match)
-        winrt_log(
-            WinrtLogNotice,
+        windows_log(
+            WindowsLogNotice,
             "Partout::TunSettings: DNS search suffixes unsupported; DNS resolution rules applied");
 }
 

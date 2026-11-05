@@ -17,9 +17,9 @@ fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        native: *c.winrt_transport,
+        native: *c.windows_transport,
 
-        pub fn wrap(allocator: std.mem.Allocator, native: *c.winrt_transport) std.mem.Allocator.Error!*Self {
+        pub fn wrap(allocator: std.mem.Allocator, native: *c.windows_transport) std.mem.Allocator.Error!*Self {
             const self = try allocator.create(Self);
             self.* = .{ .allocator = allocator, .native = native };
             return self;
@@ -71,7 +71,7 @@ fn NativeTransport(comptime side: io.Side) type {
         pub const create = if (side == .link) createLink else createTun;
 
         fn createLink(allocator: std.mem.Allocator, endpoint: ?core.api.ExtendedEndpoint, options: io.SocketOptions) std.mem.Allocator.Error!?*Self {
-            if (!build_options.winrt) return null;
+            if (!build_options.windows) return null;
             if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
             const peer = endpoint orelse core.api.ExtendedEndpoint{
                 .address = if (options.ipv6) "::" else "0.0.0.0",
@@ -81,7 +81,7 @@ fn NativeTransport(comptime side: io.Side) type {
             try host.init(allocator, peer.address);
             defer host.deinit();
             const options_ctx = @constCast(&options);
-            const native: *c.winrt_transport = c.winrt_connect(
+            const native: *c.windows_transport = c.windows_connect(
                 host.ptr(),
                 peer.proto.port,
                 &.{

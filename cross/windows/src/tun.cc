@@ -5,7 +5,7 @@
 #include "tun.h"
 #include "loop.h"
 #include "socket.h"
-#include "winrt/log.h"
+#include "windows/log.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -75,8 +75,8 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
         flush();
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(
-            WinrtLogError,
+        windows_log(
+            WindowsLogError,
             "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
@@ -155,7 +155,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
             socket_ = &socket;
         }
     } catch (...) {
-        winrt_log(WinrtLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
+        windows_log(WindowsLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
                   static_cast<unsigned int>(to_hresult().value));
         return false;
     }
@@ -189,7 +189,7 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
     }
     idle_transport_ = idle;
     transport_ = idle;
-    winrt_log(WinrtLogDebug, "Partout::TunnelController: idle UDP transport ready");
+    windows_log(WindowsLogDebug, "Partout::TunnelController: idle UDP transport ready");
 }
 
 std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
@@ -219,7 +219,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
             transport_);
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
-        winrt_log(WinrtLogInfo,
+        windows_log(WindowsLogInfo,
                   "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
                   settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
@@ -251,7 +251,7 @@ void TunnelController::Close() noexcept {
             state_->channel.Stop();
             started_ = false;
         } catch (...) {
-            winrt_log(WinrtLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
+            windows_log(WindowsLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
                       static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
@@ -259,7 +259,7 @@ void TunnelController::Close() noexcept {
             std::lock_guard lock(state_->receive_mutex);
             counters = state_->counters;
         }
-        winrt_log(WinrtLogInfo,
+        windows_log(WindowsLogInfo,
                   "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
                   "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
                   "tun_write_failed=%llu",

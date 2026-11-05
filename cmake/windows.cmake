@@ -1,15 +1,15 @@
-# WinRT uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
+# Windows uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
 # separately from Zig's portable C sources; consumers opt in when needed.
-option(PP_BUILD_WINRT "Build the WinRT VPN channel bridge" OFF)
-if(NOT PP_BUILD_WINRT)
+option(PP_BUILD_WINDOWS "Build the Windows VPN channel bridge" OFF)
+if(NOT PP_BUILD_WINDOWS)
     return()
 endif()
 
 if(CMAKE_VERSION VERSION_LESS 4.0)
-    message(FATAL_ERROR "PP_BUILD_WINRT requires CMake 4.0 or newer")
+    message(FATAL_ERROR "PP_BUILD_WINDOWS requires CMake 4.0 or newer")
 endif()
 if(NOT WIN32 OR NOT MSVC)
-    message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
+    message(FATAL_ERROR "PP_BUILD_WINDOWS requires MSVC and the Windows SDK")
 endif()
 
 include(FetchContent)

@@ -85,7 +85,7 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    winrt_library: ?std.Build.LazyPath,
+    windows_library: ?std.Build.LazyPath,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -172,23 +172,23 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built private WinRT backend import library.", false);
-    const use_winrt = b.option(bool, "winrt", "Build and link the WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
-    if (!use_winrt and winrt_path != null)
-        std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
-    if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
-        std.debug.panic("WinRT requires a Windows MSVC target", .{});
-    const winrt_build = if (use_winrt and winrt_path == null)
-        addWinRTBuild(b, target, optimize)
+    const windows_path = pathOption(b, "windows-lib", "MSVC-built private Windows backend import library.", false);
+    const use_windows = b.option(bool, "windows", "Build and link the Windows bridge (Windows MSVC only).") orelse (windows_path != null);
+    if (!use_windows and windows_path != null)
+        std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
+    if (use_windows and (target.result.os.tag != .windows or target.result.abi != .msvc))
+        std.debug.panic("Windows requires a Windows MSVC target", .{});
+    const windows_build = if (use_windows and windows_path == null)
+        addWindowsBuild(b, target, optimize)
     else
         null;
-    const winrt_library: ?std.Build.LazyPath = if (winrt_path) |path|
+    const windows_library: ?std.Build.LazyPath = if (windows_path) |path|
         .{ .cwd_relative = path }
-    else if (winrt_build) |bridge|
+    else if (windows_build) |bridge|
         bridge.library
     else
         null;
-    build_options.addOption(bool, "winrt", winrt_library != null);
+    build_options.addOption(bool, "windows", windows_library != null);
 
     const config = BuildConfig{
         .target = target,
@@ -197,7 +197,7 @@ pub fn build(b: *std.Build) void {
         .libc_installation = parseLibCInstallation(b, target),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
-        .winrt_library = winrt_library,
+        .windows_library = windows_library,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -215,7 +215,7 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
-    if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
+    if (windows_build) |bridge| lib.step.dependOn(bridge.step);
     if (install_name) |value| {
         if (!shared or !target.result.os.tag.isDarwin()) {
             std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
@@ -236,12 +236,12 @@ pub fn build(b: *std.Build) void {
         .root_module = test_module,
     });
     // The MSVC C++/WinRT bridge is built with /MD.
-    if (winrt_library != null) unit_tests.linkage = .dynamic;
-    if (winrt_build) |bridge| unit_tests.step.dependOn(bridge.step);
+    if (windows_library != null) unit_tests.linkage = .dynamic;
+    if (windows_build) |bridge| unit_tests.step.dependOn(bridge.step);
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
-    if (winrt_library) |library| {
+    if (windows_library) |library| {
         // Core and SDK share this private backend, including its native loop.
         const dll = library.dirname().path(b, "partout-windows-backend.dll");
         const install_backend = b.addInstallBinFile(dll, "partout-windows-backend.dll");
@@ -274,25 +274,25 @@ pub fn build(b: *std.Build) void {
     docs_step.dependOn(&install_docs.step);
 }
 
-// CMake builds the private WinRT backend DLL; Zig consumes its import library.
-fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
+// CMake builds the private Windows backend DLL; Zig consumes its import library.
+fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
 } {
     if (builtin.os.tag != .windows)
-        std.debug.panic("Building WinRT requires a Windows host; supply -Dwinrt-lib when cross-compiling", .{});
+        std.debug.panic("Building Windows requires a Windows host; supply -Dwindows-lib when cross-compiling", .{});
     const architecture = switch (target.result.cpu.arch) {
         .aarch64 => "ARM64",
         .x86_64 => "x64",
         .x86 => "Win32",
-        else => std.debug.panic("Unsupported WinRT architecture", .{}),
+        else => std.debug.panic("Unsupported Windows architecture", .{}),
     };
     const configuration = if (optimize == .Debug) "Debug" else "Release";
     const configure = b.addSystemCommand(&.{ "cmake", "-G", "Visual Studio 17 2022", "-A", architecture, "-S" });
     configure.addDirectoryArg(b.path("."));
     configure.addArg("-B");
-    const directory = configure.addOutputDirectoryArg("winrt");
-    configure.addArgs(&.{ "-DPP_BUILD_WINRT=ON", "-DPP_BUILD_LIBRARY=OFF" });
+    const directory = configure.addOutputDirectoryArg("windows");
+    configure.addArgs(&.{ "-DPP_BUILD_WINDOWS=ON", "-DPP_BUILD_LIBRARY=OFF" });
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
@@ -443,7 +443,7 @@ fn createPartoutModule(
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
             addCSourceFiles(module, &.{"src/c/portable/tun_windows.c"});
-            if (config.winrt_library) |library| {
+            if (config.windows_library) |library| {
                 module.addObjectFile(library);
                 module.linkSystemLibrary("windowsapp", .{});
                 module.linkSystemLibrary("runtimeobject", .{});
@@ -542,7 +542,7 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINRT", if (config.winrt_library != null) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINDOWS_RUNTIME", if (config.windows_library != null) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,

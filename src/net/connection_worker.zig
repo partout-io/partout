@@ -55,7 +55,7 @@ pub const ConnectionWorker = struct {
         request: Request,
         completion_context: *anyopaque,
     };
-    const Executor = if (builtin.os.tag == .windows and build_options.winrt)
+    const Executor = if (builtin.os.tag == .windows and build_options.windows)
         windows.Executor(Self, Work, execute)
     else
         core.actor.Actor(Self, null, Work, error{}, execute);

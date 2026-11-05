@@ -11,10 +11,10 @@ const io = @import("source").net_io;
 
 const reachabilityNone = io.testing.reachabilityNone;
 
-test "WinRT local address reports wildcard family and assigned UDP port" {
+test "Windows local address reports wildcard family and assigned UDP port" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const cases = [_]struct { ipv4: bool, ipv6: bool, family: u8 }{
         .{ .ipv4 = true, .ipv6 = false, .family = 4 },
         .{ .ipv4 = false, .ipv6 = true, .family = 6 },
@@ -35,10 +35,10 @@ test "WinRT local address reports wildcard family and assigned UDP port" {
     }
 }
 
-test "WinRT local address reports connected UDP loopback endpoint" {
+test "Windows local address reports connected UDP loopback endpoint" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const socket = (try io.SocketWrapper.create(std.testing.allocator, .{
         .address = "127.0.0.1",
         .proto = .init(.udp, 9),

@@ -6,7 +6,7 @@ const std = @import("std");
 const hooks = @import("../controller_hooks.zig");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
-const winrt_enabled = @import("source").winrt_enabled;
+const windows_enabled = @import("source").windows_enabled;
 
 const core = @import("source").core;
 const io = @import("source").net_io;
@@ -227,7 +227,7 @@ test "socket creation and existing descriptors share independent platform policy
 test "Windows configuration callback receives a native policy token and can reject open" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
+    if (platform_target.os.tag != .windows or !windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
         descriptor: SocketDescriptor = 0,

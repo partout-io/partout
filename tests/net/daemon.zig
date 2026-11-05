@@ -297,7 +297,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 test "daemon preserves settings-only failure and hold behavior" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
         callbacks_on_caller: bool = true,
@@ -1685,7 +1685,7 @@ fn waitForExit(owner: anytype) !void {
 test "stop waits for terminal submission failure before immediate destruction" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         entered: std.atomic.Value(bool) = .init(false),
         released: std.atomic.Value(bool) = .init(false),
@@ -2224,7 +2224,7 @@ test "connection worker rolls back endpoint and thread allocations" {
 test "daemon yields to timers between mailbox batches on every platform" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         connection: FailingStartConnection = .{},
         writer: net.ConnectionWriter = undefined,
@@ -2299,12 +2299,12 @@ test "daemon yields to timers between mailbox batches on every platform" {
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const Probe = struct {
-        callback: c.winrt_receive = null,
+        callback: c.windows_receive = null,
         callback_context: ?*anyopaque = null,
-        capability: c.winrt_transport = undefined,
+        capability: c.windows_transport = undefined,
         actor: std.Thread.Id = 0,
         reads: usize = 0,
         failures: usize = 0,
@@ -2317,7 +2317,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         measure_timer: bool = false,
         reads_at_timer: ?usize = null,
 
-        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(raw: ?*anyopaque, callback: c.windows_receive, context: ?*anyopaque) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.callback = callback;
             self.callback_context = context;
@@ -2332,10 +2332,10 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.windows_address) callconv(.c) i32 {
             return 0;
         }
-        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]c.windows_address) callconv(.c) bool {
             return false;
         }
 

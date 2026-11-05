@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "partout_winrt.h"
+#include "partout_windows.h"
 #include <cstring>
 
 int main() {

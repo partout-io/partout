@@ -28,7 +28,7 @@ typedef struct __pp_socket_struct *pp_socket;
 void pp_socket_free(pp_socket sock);
 
 /* Platform policy for transport sockets, including descriptors owned by a backend.
- * POSIX uses native descriptors; WinRT uses wrapper pointers encoded as uintptr_t.
+ * POSIX uses native descriptors; Windows uses wrapper pointers encoded as uintptr_t.
  * The borrowed context must outlive calls through this configurator. */
 typedef struct {
     void *_Nullable ctx;

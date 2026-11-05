@@ -10,7 +10,7 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-#include "partout_winrt.h"
+#include "partout_windows.h"
 #include "tun.h"
 #include "loop.h"
 

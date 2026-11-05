@@ -14,7 +14,7 @@ Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, 
 
 Partout is the backbone of [Passepartout][passepartout].
 
-Windows has an experimental [WinRT VPN plug-in backend](cross/windows/README.md)
+Windows has an experimental [Windows VPN plug-in backend](cross/windows/README.md)
 with OpenVPN and WireGuard packet I/O. See its README for build requirements,
 transport ownership and current limitations.
 

@@ -75,8 +75,8 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
 pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) callconv(.c) void {
     const args = args_pointer orelse return;
     log.init(args.logs_private_data, args.logger_fn, args.logger_ctx);
-    if (comptime builtin.os.tag == .windows and build_options.winrt) {
-        ffi.io.winrt_set_logger(nativeLogger);
+    if (comptime builtin.os.tag == .windows and build_options.windows) {
+        ffi.io.windows_set_logger(nativeLogger);
     }
 }
 

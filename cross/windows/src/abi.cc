@@ -73,20 +73,20 @@ struct SocketHandle {
 
     // Endpoint callback removal holds its delivery mutex until active calls
     // return. No callback storage or second delivery gate is needed here.
-    bool Subscribe(winrt_receive receive, void *context) {
+    bool Subscribe(windows_receive receive, void *context) {
         if (!receive) return socket->SetOnReceive({});
         return loop.Perform([this, receive, context] {
             return socket->SetOnReceive([receive, context](const uint8_t *bytes, size_t size,
                                                            const Partout::SocketAddress *source,
                                                            int32_t error) {
-                winrt_address address{};
-                if (source) address = ConvertAddress<winrt_address>(*source);
+                windows_address address{};
+                if (source) address = ConvertAddress<windows_address>(*source);
                 return receive(context, bytes, size, source ? &address : nullptr, error);
             });
         });
     }
 
-    winrt_transport api{
+    windows_transport api{
         .context = this,
         .release = [](void *raw) {
             auto self = static_cast<SocketHandle *>(raw);
@@ -103,7 +103,7 @@ struct SocketHandle {
                 });
             }
         },
-        .subscribe = [](void *raw, winrt_receive receive, void *receive_context) {
+        .subscribe = [](void *raw, windows_receive receive, void *receive_context) {
             auto self = static_cast<SocketHandle *>(raw);
             try {
                 return self->Subscribe(receive, receive_context);
@@ -117,16 +117,16 @@ struct SocketHandle {
         .stop = [](void *raw) {
             static_cast<SocketHandle *>(raw)->socket->StopWrites();
         },
-        .write = [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *destination) {
+        .write = [](void *raw, const uint8_t *bytes, size_t size, const windows_address *destination) {
             Partout::SocketAddress address{};
             if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
             return static_cast<SocketHandle *>(raw)->Write(bytes, size,
                                                            destination ? &address : nullptr);
         },
-        .local_address = [](void *raw, winrt_address *result) {
+        .local_address = [](void *raw, windows_address *result) {
             Partout::SocketAddress address{};
             if (!static_cast<SocketHandle *>(raw)->GetAddress(&address)) return false;
-            *result = ConvertAddress<winrt_address>(address);
+            *result = ConvertAddress<windows_address>(address);
             return true;
         },
         .unconnected = socket->IsUnconnected()};
@@ -154,7 +154,7 @@ struct TunHandle {
         }
     }
 
-    bool Subscribe(winrt_receive receive, void *context) {
+    bool Subscribe(windows_receive receive, void *context) {
         // Removing the endpoint callback drains active delivery immediately.
         if (!receive) return tun->SetOnReceive({});
         return loop.Perform([this, receive, context] {
@@ -165,7 +165,7 @@ struct TunHandle {
         });
     }
 
-    winrt_transport api{
+    windows_transport api{
         .context = this,
         .release = [](void *raw) {
             auto self = static_cast<TunHandle *>(raw);
@@ -182,7 +182,7 @@ struct TunHandle {
                 });
             }
         },
-        .subscribe = [](void *raw, winrt_receive receive, void *receive_context) {
+        .subscribe = [](void *raw, windows_receive receive, void *receive_context) {
             try {
                 return static_cast<TunHandle *>(raw)->Subscribe(receive, receive_context);
             } catch (...) {
@@ -196,11 +196,11 @@ struct TunHandle {
         .stop = [](void *raw) {
             static_cast<TunHandle *>(raw)->tun->StopWrites();
         },
-        .write = [](void *raw, const uint8_t *bytes, size_t size, const winrt_address *) {
+        .write = [](void *raw, const uint8_t *bytes, size_t size, const windows_address *) {
             return static_cast<TunHandle *>(raw)->Write(bytes, size);
         },
         // A channel TUN has no bound socket address.
-        .local_address = [](void *, winrt_address *) {
+        .local_address = [](void *, windows_address *) {
             return false;
         },
         .unconnected = false};
@@ -208,7 +208,7 @@ struct TunHandle {
 } // namespace
 
 namespace Partout::ABI {
-winrt_transport *WrapTun(RuntimeLoop &loop, std::unique_ptr<Tun> tun) {
+windows_transport *WrapTun(RuntimeLoop &loop, std::unique_ptr<Tun> tun) {
     auto wrapper = std::make_unique<TunHandle>(loop, std::move(tun));
     auto api = &wrapper->api;
     wrapper.release();
@@ -225,7 +225,7 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
 } // namespace Partout::ABI
 
 extern "C" {
-winrt_loop winrt_loop_create(void) {
+windows_loop windows_loop_create(void) {
     try {
         return new Partout::RuntimeLoop;
     } catch (...) {
@@ -233,11 +233,11 @@ winrt_loop winrt_loop_create(void) {
     }
 }
 
-winrt_loop winrt_loop_current(void) {
+windows_loop windows_loop_current(void) {
     return Partout::RuntimeLoop::Current();
 }
 
-bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) {
+bool windows_loop_submit(windows_loop loop, void (*execute)(void *), void *context) {
     try {
         if (!loop) return false;
         loop->Schedule([=] {
@@ -249,24 +249,24 @@ bool winrt_loop_submit(winrt_loop loop, void (*execute)(void *), void *context) 
     }
 }
 
-void winrt_loop_drain(winrt_loop loop) {
+void windows_loop_drain(windows_loop loop) {
     if (!loop) return;
     loop->Drain();
 }
 
-void winrt_loop_free(winrt_loop loop) {
+void windows_loop_free(windows_loop loop) {
     delete loop;
 }
 
-winrt_transport *winrt_connect(const char *host, uint16_t port,
-                               const winrt_connect_options *options) {
+windows_transport *windows_connect(const char *host, uint16_t port,
+                               const windows_connect_options *options) {
     try {
         auto loop = Partout::RuntimeLoop::Current();
         if (!loop) return nullptr;
         return loop->Perform([
             loop, host = std::string{host}, port,
             settings = *options
-        ]() -> winrt_transport * {
+        ]() -> windows_transport * {
             std::unique_ptr<Partout::Socket> socket = std::make_unique<Partout::Socket>(
                 settings.tcp ? Partout::SocketProtoTCP : Partout::SocketProtoUDP,
                 settings.unconnected
