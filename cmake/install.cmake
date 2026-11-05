@@ -51,5 +51,6 @@ if(TARGET partout-models-impl)
     if(NOT TARGET partout-models-interface)
         install(TARGETS partout-models-impl ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     endif()
-    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+        FILES_MATCHING PATTERN "*.h")
 endif()

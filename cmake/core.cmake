@@ -146,9 +146,9 @@ if(WIN32)
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
-        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
-    # Export the C ABI from the Zig archive; CMake exports the backend objects.
+    # Export the public C ABI; backend and model methods opt in explicitly.
     foreach(symbol IN LISTS partout_exports)
         target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
     endforeach()

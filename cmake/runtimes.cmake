@@ -15,7 +15,7 @@ if(TARGET partout-windows-backend)
     add_library(Partout::WindowsRuntime ALIAS partout-windows)
     target_include_directories(partout-windows PUBLIC cross/windows/include PRIVATE src)
     target_compile_features(partout-windows PUBLIC cxx_std_20)
-    target_compile_definitions(partout-windows PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
+    target_compile_definitions(partout-windows PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
     target_compile_options(partout-windows PRIVATE /EHsc /permissive- /W4)
     # AppContainer consumers use a CRT without the /RTC helpers.
     set_target_properties(partout-windows PROPERTIES
@@ -43,6 +43,10 @@ if(TARGET partout-windows-backend)
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>"
         )
         add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
+        add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
+            "-DLINKER=${CMAKE_LINKER}"
+            "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
         foreach(test IN ITEMS tunnel tunnel_profile)
             add_executable(partout-${test}-test tests/c/windows/${test}.cc)
             target_include_directories(partout-${test}-test PRIVATE cross/windows/src)

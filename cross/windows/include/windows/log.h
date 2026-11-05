@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
+#include "export.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,7 +24,7 @@ void windows_set_logger(windows_log_callback callback);
 
 /* Format and deliver a message. Null formats, formatting failures and exceptions
  * are discarded; diagnostics never propagate exceptions to the caller. */
-void windows_log(windows_log_level level, const char *format, ...);
+PARTOUT_WINDOWS_API void windows_log(windows_log_level level, const char *format, ...);
 
 #ifdef __cplusplus
 }

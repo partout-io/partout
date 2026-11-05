@@ -34,6 +34,10 @@ add_library(partout-windows-backend STATIC
     cross/windows/src/log.cc
 )
 target_include_directories(partout-windows-backend PUBLIC cross/windows/include)
+if(PP_BUILD_LIBRARY)
+    target_compile_definitions(partout-windows-backend PRIVATE
+        PARTOUT_WINDOWS_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
+endif()
 target_link_libraries(partout-windows-backend
     PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
     PRIVATE nlohmann_json::nlohmann_json
