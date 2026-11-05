@@ -35,8 +35,6 @@ target_include_directories(partout-windows-backend PUBLIC cross/windows/include)
 target_link_libraries(partout-windows-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
     PRIVATE nlohmann_json::nlohmann_json)
 
-# Runtime integration is linked by consumers; the core links only the backend.
-add_library(partout-windows STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
 file(GLOB partout_model_sources CONFIGURE_DEPENDS
     "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp")
 # Generated model implementations do not follow our warning policy.
@@ -45,12 +43,8 @@ target_compile_options(partout-windows-models PRIVATE /w)
 target_link_libraries(partout-windows-models PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(partout-windows-backend PRIVATE partout-windows-models)
 set_target_properties(partout-windows-backend PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
-target_include_directories(partout-windows PUBLIC cross/windows/include PRIVATE src)
-target_compile_features(partout-windows PUBLIC cxx_std_20)
-target_link_libraries(partout-windows PUBLIC partout-windows-backend PRIVATE nlohmann_json::nlohmann_json)
-add_library(Partout::WindowsRuntime ALIAS partout-windows)
 
-foreach(target IN ITEMS partout-windows-backend partout-windows partout-windows-models)
+foreach(target IN ITEMS partout-windows-backend partout-windows-models)
     # Also suppress model header warnings in handwritten translation units.
     target_include_directories(${target} SYSTEM PRIVATE cross/windows/src/models)
     target_compile_features(${target} PRIVATE cxx_std_20)

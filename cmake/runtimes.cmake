@@ -5,8 +5,23 @@ if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
 
-if(TARGET partout-windows)
-    target_link_libraries(partout-windows PUBLIC Partout::Partout)
+# Native integration layers consume the public core ABI.
+if(TARGET partout-windows-backend)
+    add_library(partout-windows STATIC cross/windows/src/runtime.cc cross/windows/src/platform.cc)
+    add_library(Partout::WindowsRuntime ALIAS partout-windows)
+    target_include_directories(partout-windows PUBLIC cross/windows/include PRIVATE src)
+    target_include_directories(partout-windows SYSTEM PRIVATE cross/windows/src/models)
+    target_compile_features(partout-windows PUBLIC cxx_std_20)
+    target_compile_definitions(partout-windows PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
+    target_compile_options(partout-windows PRIVATE /EHsc /permissive- /W4)
+    # AppContainer consumers use a CRT without the /RTC helpers.
+    set_target_properties(partout-windows PROPERTIES
+        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+        MSVC_RUNTIME_CHECKS ""
+    )
+    target_link_libraries(partout-windows PUBLIC Partout::Partout partout-windows-backend
+        PRIVATE nlohmann_json::nlohmann_json)
+
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
     if(PP_TEST_RUNTIME_LINK)
         enable_testing()
@@ -19,9 +34,7 @@ if(TARGET partout-windows)
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>")
         add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
     endif()
-endif()
-# Native integration layers consume the public core ABI.
-if(ANDROID)
+elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
         cross/android/native/controller.c
         cross/android/native/jni.c

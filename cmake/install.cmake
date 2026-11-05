@@ -9,10 +9,13 @@ endif()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(TARGET partout-windows)
-    install(TARGETS partout-windows partout-windows-backend
+if(TARGET partout-windows-backend)
+    install(TARGETS partout-windows-backend
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
+if(TARGET partout-windows)
+    install(TARGETS partout-windows ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
