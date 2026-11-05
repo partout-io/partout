@@ -1,6 +1,13 @@
 # Portable generated models, independent of the Windows bridge.
-# The caller supplies nlohmann_json::nlohmann_json.
 include_guard(GLOBAL)
+if(NOT TARGET nlohmann_json::nlohmann_json)
+    include(FetchContent)
+    FetchContent_Declare(json
+        URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+        URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+    )
+    FetchContent_MakeAvailable(json)
+endif()
 get_filename_component(PARTOUT_MODELS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../cross/cpp" ABSOLUTE)
 set(PARTOUT_MODELS_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/partout-models/include")
 set(partout_models_dll OFF)
