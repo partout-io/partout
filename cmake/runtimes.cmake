@@ -7,22 +7,22 @@ endif()
 
 # Native integration layers consume the public core ABI.
 if(TARGET partout-windows-backend)
-    add_library(partout-windows-runtime STATIC
+    add_library(partout-bindings STATIC
         cross/windows/src/tunnel.cc
         cross/windows/src/runtime.cc
         cross/windows/src/platform.cc
     )
-    add_library(Partout::WindowsRuntime ALIAS partout-windows-runtime)
-    target_include_directories(partout-windows-runtime PUBLIC cross/windows/include PRIVATE src)
-    target_compile_features(partout-windows-runtime PUBLIC cxx_std_20)
-    target_compile_definitions(partout-windows-runtime PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
-    target_compile_options(partout-windows-runtime PRIVATE /EHsc /permissive- /W4)
+    add_library(Partout::WindowsRuntime ALIAS partout-bindings)
+    target_include_directories(partout-bindings PUBLIC cross/windows/include PRIVATE src)
+    target_compile_features(partout-bindings PUBLIC cxx_std_20)
+    target_compile_definitions(partout-bindings PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
+    target_compile_options(partout-bindings PRIVATE /EHsc /permissive- /W4)
     # AppContainer consumers use a CRT without the /RTC helpers.
-    set_target_properties(partout-windows-runtime PROPERTIES
+    set_target_properties(partout-bindings PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
     )
-    target_link_libraries(partout-windows-runtime
+    target_link_libraries(partout-bindings
         PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE nlohmann_json::nlohmann_json ole32
     )

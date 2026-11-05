@@ -39,7 +39,7 @@ Runtime callback table      -> src/platform.cc -> src/controller.cc
 
 CMake uses MSVC to link the Zig/C core into `partout.dll` and the native backend
 and models into `partout-runtime.dll`. The core and native SDK share one copy
-of the loop and transport state. `partout-windows-runtime.lib` contains the consumer-side runtime and controller
+of the loop and transport state. `partout-bindings.lib` contains the consumer-side runtime and controller
 adapters. Consumers link `Partout::WindowsRuntime`, which depends on both DLLs. `partout.dll` exports only the Zig/C ABI.
 Optional vendors may still require their own DLLs.
 
@@ -256,7 +256,7 @@ root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-windows -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINDOWS=ON -DPP_BUILD_LIBRARY=OFF
-cmake --build .cmake-windows --target partout-windows-runtime
+cmake --build .cmake-windows --target partout-bindings
 ```
 
 ### OpenAPI models

@@ -19,8 +19,8 @@ if(TARGET partout-windows-backend)
             CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
     endif()
 endif()
-if(TARGET partout-windows-runtime)
-    install(TARGETS partout-windows-runtime ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+if(TARGET partout-bindings)
+    install(TARGETS partout-bindings ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
