@@ -1,4 +1,4 @@
-# Prefer supplied or installed packages; download a matching prebuilt as a fallback.
+# Prefer installed packages; download a matching prebuilt as a fallback.
 include(FetchContent)
 set(PP_BUILD_VENDOR_PREBUILT_URL "" CACHE STRING "Root URL containing prebuilt vendor archives")
 set(PP_BUILD_APPLE_PREBUILTS "" CACHE PATH "Directory containing Apple vendor XCFrameworks")
@@ -98,9 +98,6 @@ endfunction()
 
 function(partout_find_vendor package vendor target)
     set(bundle_vendor OFF PARENT_SCOPE)
-    if(TARGET ${target})
-        return()
-    endif()
     if(package STREQUAL "OpenSSL")
         set(version 3)
     endif()

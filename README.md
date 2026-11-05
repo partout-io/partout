@@ -46,7 +46,7 @@ and header paths. Zig always builds a static core archive. CMake links that
 archive and the selected backends into the final shared library on every platform.
 Native runtime targets link against `Partout::Partout`.
 
-Dependencies are resolved from existing targets or installed CMake packages first.
+Dependencies are resolved from installed CMake packages first.
 Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During
 cross-compilation, supply packages built for the target platform; host packages
 are not searched implicitly. If a package is unavailable, set
