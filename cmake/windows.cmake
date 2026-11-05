@@ -32,11 +32,14 @@ add_library(partout-windows-backend STATIC
     cross/windows/src/log.cc
 )
 target_include_directories(partout-windows-backend PUBLIC cross/windows/include)
-target_link_libraries(partout-windows-backend PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
-    PRIVATE nlohmann_json::nlohmann_json)
+target_link_libraries(partout-windows-backend
+    PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
+    PRIVATE nlohmann_json::nlohmann_json
+)
 
 file(GLOB partout_model_sources CONFIGURE_DEPENDS
-    "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp")
+    "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/src/models/*.cpp"
+)
 # Generated model implementations do not follow our warning policy.
 add_library(partout-windows-models OBJECT ${partout_model_sources})
 target_compile_options(partout-windows-models PRIVATE /w)

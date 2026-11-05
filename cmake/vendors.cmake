@@ -11,7 +11,8 @@ function(partout_vendor_source vendor output_dir)
     if(NOT PP_BUILD_VENDOR_PREBUILT_URL)
         message(FATAL_ERROR
             "No ${vendor} package found. Supply its package directory or CMAKE_PREFIX_PATH, "
-            "or set PP_BUILD_VENDOR_PREBUILT_URL for automatic downloads.")
+            "or set PP_BUILD_VENDOR_PREBUILT_URL for automatic downloads."
+        )
     endif()
 
     if(ANDROID)
@@ -45,7 +46,8 @@ function(partout_vendor_source vendor output_dir)
     set(hash_var "PP_BUILD_${vendor_id}_PREBUILT_HASH")
     string(REPLACE "-" "_" content_name "partout_${vendor}_${target}_prebuilt")
     set(fetch_args URL "${vendor_root}/${archive}"
-        SOURCE_SUBDIR "__partout_no_cmake_subdir" DOWNLOAD_EXTRACT_TIMESTAMP FALSE)
+        SOURCE_SUBDIR "__partout_no_cmake_subdir" DOWNLOAD_EXTRACT_TIMESTAMP FALSE
+    )
     if(DEFINED ${hash_var} AND NOT "${${hash_var}}" STREQUAL "")
         list(APPEND fetch_args URL_HASH "${${hash_var}}")
     endif()
@@ -86,7 +88,8 @@ function(partout_import_apple_vendor vendor source_dir)
     add_library(${target} STATIC IMPORTED GLOBAL)
     set_target_properties(${target} PROPERTIES
         IMPORTED_LOCATION "${slice_dir}/lib${vendor}.a"
-        INTERFACE_INCLUDE_DIRECTORIES "${slice_dir}/Headers")
+        INTERFACE_INCLUDE_DIRECTORIES "${slice_dir}/Headers"
+    )
     if(vendor STREQUAL "openssl")
         add_library(OpenSSL::SSL INTERFACE IMPORTED GLOBAL)
         target_link_libraries(OpenSSL::SSL INTERFACE OpenSSL::Crypto)
@@ -105,7 +108,8 @@ function(partout_find_vendor package vendor target)
         # Never discover host packages implicitly while cross-compiling.
         if(CMAKE_CROSSCOMPILING)
             set(search_options NO_CMAKE_SYSTEM_PATH NO_SYSTEM_ENVIRONMENT_PATH
-                NO_CMAKE_PACKAGE_REGISTRY NO_CMAKE_SYSTEM_PACKAGE_REGISTRY)
+                NO_CMAKE_PACKAGE_REGISTRY NO_CMAKE_SYSTEM_PACKAGE_REGISTRY
+            )
         elseif(APPLE)
             find_program(HOMEBREW_EXECUTABLE brew)
             if(HOMEBREW_EXECUTABLE)
@@ -115,7 +119,8 @@ function(partout_find_vendor package vendor target)
                 endif()
                 execute_process(COMMAND "${HOMEBREW_EXECUTABLE}" --prefix "${formula}"
                     OUTPUT_VARIABLE prefix OUTPUT_STRIP_TRAILING_WHITESPACE
-                    RESULT_VARIABLE result ERROR_QUIET)
+                    RESULT_VARIABLE result ERROR_QUIET
+                )
                 if(result EQUAL 0)
                     list(APPEND CMAKE_PREFIX_PATH "${prefix}")
                 endif()
@@ -131,7 +136,8 @@ function(partout_find_vendor package vendor target)
         # Package directories are cached by find_package, including our downloads.
         cmake_path(IS_PREFIX FETCHCONTENT_BASE_DIR "${${package}_DIR}" NORMALIZE downloaded)
         if(downloaded OR (PARTOUT_${vendor}_DOWNLOADED_DIR AND
-           "${${package}_DIR}" STREQUAL "${PARTOUT_${vendor}_DOWNLOADED_DIR}"))
+            "${${package}_DIR}" STREQUAL "${PARTOUT_${vendor}_DOWNLOADED_DIR}")
+        )
             set(bundle_vendor ON PARENT_SCOPE)
         endif()
         return()
@@ -141,9 +147,11 @@ function(partout_find_vendor package vendor target)
         partout_import_apple_vendor("${vendor}" "${source_dir}")
     else()
         find_package(${package} ${version} REQUIRED CONFIG GLOBAL
-            PATHS "${source_dir}/lib/cmake/${package}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH)
+            PATHS "${source_dir}/lib/cmake/${package}" NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH
+        )
         set(PARTOUT_${vendor}_DOWNLOADED_DIR "${${package}_DIR}" CACHE INTERNAL
-            "Package directory supplied by Partout's download fallback" FORCE)
+            "Package directory supplied by Partout's download fallback" FORCE
+        )
         set(bundle_vendor ON PARENT_SCOPE)
     endif()
 endfunction()
@@ -171,7 +179,8 @@ foreach(vendor openssl mbedtls)
     get_target_property(include_dirs ${target} INTERFACE_INCLUDE_DIRECTORIES)
     unset(include_dir)
     find_path(include_dir NAMES "${vendor}/ssl.h" PATHS ${include_dirs}
-        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH NO_CACHE REQUIRED)
+        NO_DEFAULT_PATH NO_CMAKE_FIND_ROOT_PATH NO_CACHE REQUIRED
+    )
     set(PARTOUT_${vendor_id}_INCLUDE_DIR "${include_dir}")
     list(APPEND PARTOUT_CORE_LIBRARIES ${libraries})
     foreach(library IN LISTS libraries)
@@ -183,7 +192,8 @@ foreach(vendor openssl mbedtls)
 endforeach()
 
 if(PP_BUILD_USE_OPENSSL AND CMAKE_LIBRARY_ARCHITECTURE AND
-   EXISTS "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/openssl/opensslconf.h")
+    EXISTS "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}/openssl/opensslconf.h"
+)
     set(PARTOUT_OPENSSL_CONFIG_INCLUDE_DIR "/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}")
 endif()
 if(PP_BUILD_USE_WIREGUARD)

@@ -23,12 +23,14 @@ endif()
 execute_process(COMMAND "${PARTOUT_GO_EXECUTABLE}" -C "${wg_source}" env -json
         GOROOT GOVERSION GOFLAGS GOEXPERIMENT GOTOOLCHAIN GOAMD64 GOARM64 GOWORK
         CGO_CFLAGS CGO_CPPFLAGS CGO_CXXFLAGS CGO_LDFLAGS
-    OUTPUT_VARIABLE wg_toolchain COMMAND_ERROR_IS_FATAL ANY)
+    OUTPUT_VARIABLE wg_toolchain COMMAND_ERROR_IS_FATAL ANY
+)
 string(JSON wg_goroot GET "${wg_toolchain}" GOROOT)
 # Module/toolchain changes must also refresh the selected GOROOT and patch key.
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS
     "${wg_source}/go.mod" "${wg_source}/go.sum" "${wg_goroot}/VERSION"
-    "${PARTOUT_GO_EXECUTABLE}" "${wg_source}/goruntime-boottime-over-monotonic.diff")
+    "${PARTOUT_GO_EXECUTABLE}" "${wg_source}/goruntime-boottime-over-monotonic.diff"
+)
 set(wg_env CGO_ENABLED=1 "GOARCH=${wg_arch}")
 set(wg_flags "${CMAKE_C_FLAGS}")
 set(wg_mode c-shared)
@@ -45,7 +47,8 @@ if(WIN32)
     set(wg_library "${wg_work}/lib/wg-go.dll")
     set(wg_implib "${wg_work}/lib/wg-go.lib")
     set(wg_import_command COMMAND "${PARTOUT_ZIG_EXECUTABLE}" dlltool
-        -m "${wg_machine}" -d "${wg_source}/exports.def" -l "${wg_implib}")
+        -m "${wg_machine}" -d "${wg_source}/exports.def" -l "${wg_implib}"
+    )
     list(APPEND wg_inputs "${PARTOUT_ZIG_EXECUTABLE}" "${wg_source}/exports.def")
 else()
     set(wg_cc "\"${CMAKE_C_COMPILER}\"")
@@ -73,7 +76,8 @@ else()
         list(APPEND wg_inputs "${wg_sdk}/SDKSettings.json")
 
         set(PP_BUILD_GO_RUNTIME_CACHE "${CMAKE_CURRENT_BINARY_DIR}/go-runtime" CACHE PATH
-            "Cache for the patched Apple Go runtime, shareable across slices")
+            "Cache for the patched Apple Go runtime, shareable across slices"
+        )
         set(wg_patch "${wg_source}/goruntime-boottime-over-monotonic.diff")
         file(SHA256 "${wg_patch}" wg_patch_hash)
         string(JSON wg_version GET "${wg_toolchain}" GOVERSION)
@@ -87,7 +91,8 @@ else()
             COMMAND "${PARTOUT_PATCH_EXECUTABLE}" -p1 -f -N -d "${wg_runtime}" -i "${wg_patch}"
             COMMAND "${CMAKE_COMMAND}" -E touch "${wg_runtime}/.prepared"
             DEPENDS "${wg_patch}" "${wg_goroot}/VERSION"
-            COMMENT "Prepare Apple Go runtime" VERBATIM)
+            COMMENT "Prepare Apple Go runtime" VERBATIM
+        )
         list(APPEND wg_inputs "${wg_runtime}/.prepared")
         list(APPEND wg_env "GOROOT=${wg_runtime}")
     else()
@@ -114,12 +119,18 @@ endforeach()
 
 # The bridge is flat. Never scan old .goroot/build directories as source input.
 file(GLOB wg_sources CONFIGURE_DEPENDS
-    "${wg_source}/*.go" "${wg_source}/*.c" "${wg_source}/*.h" "${wg_source}/*.s"
-    "${wg_source}/go.*" "${wg_source}/include/wg_go/*.h")
+    "${wg_source}/*.go"
+    "${wg_source}/*.c"
+    "${wg_source}/*.h"
+    "${wg_source}/*.s"
+    "${wg_source}/go.*"
+    "${wg_source}/include/wg_go/*.h"
+)
 # Reconfiguration updates this file only when settings or the source list change.
 # The output rule skips Go entirely on unchanged builds.
 file(CONFIGURE OUTPUT "${wg_work}/settings.txt"
-    CONTENT "${wg_toolchain}\n${wg_env}\n${wg_mode}\n${wg_ldflags}\n${wg_sources}\n" @ONLY)
+    CONTENT "${wg_toolchain}\n${wg_env}\n${wg_mode}\n${wg_ldflags}\n${wg_sources}\n" @ONLY
+)
 add_custom_command(OUTPUT "${wg_library}" ${wg_implib}
     COMMAND "${CMAKE_COMMAND}" -E env ${wg_env}
         "${PARTOUT_GO_EXECUTABLE}" build -C "${wg_source}" -trimpath
@@ -127,7 +138,8 @@ add_custom_command(OUTPUT "${wg_library}" ${wg_implib}
     ${wg_import_command}
     COMMAND "${CMAKE_COMMAND}" -E touch "${wg_library}" ${wg_implib}
     DEPENDS ${wg_sources} ${wg_inputs} "${wg_work}/settings.txt" "${CMAKE_CURRENT_LIST_FILE}"
-    COMMENT "Build WireGuard Go bridge (${wg_os}/${wg_arch})" VERBATIM)
+    COMMENT "Build WireGuard Go bridge (${wg_os}/${wg_arch})" VERBATIM
+)
 # Keep compilation outputs local to each CMake configuration. Publish runtimes
 # beside Partout as well, so the build output can be loaded before installation.
 if(NOT APPLE)
@@ -136,14 +148,17 @@ if(NOT APPLE)
         set(wg_runtime_destination "${wg_output}/bin")
         set(wg_copy_implib
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${wg_output}/lib"
-            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_implib}" "${wg_output}/lib/")
+            COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_implib}" "${wg_output}/lib/"
+        )
     endif()
     set(wg_copy_runtime
         COMMAND "${CMAKE_COMMAND}" -E make_directory "${wg_runtime_destination}"
-        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_library}" "${wg_runtime_destination}/")
+        COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_library}" "${wg_runtime_destination}/"
+    )
 endif()
 add_custom_target(partout-wg-go DEPENDS "${wg_library}" ${wg_implib}
-    ${wg_copy_runtime} ${wg_copy_implib} VERBATIM)
+    ${wg_copy_runtime} ${wg_copy_implib} VERBATIM
+)
 if(APPLE)
     add_library(Partout::WireGuard STATIC IMPORTED GLOBAL)
 else()

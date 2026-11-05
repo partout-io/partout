@@ -55,13 +55,14 @@ if(ANDROID)
     set(PARTOUT_ZIG_TARGET "${PARTOUT_ZIG_ARCH}-linux-android.${PARTOUT_ANDROID_API}")
     set(PARTOUT_ZIG_LIBC "${CMAKE_CURRENT_BINARY_DIR}/android.libc")
     file(WRITE "${PARTOUT_ZIG_LIBC}"
-"include_dir=${CMAKE_SYSROOT}/usr/include
+        "include_dir=${CMAKE_SYSROOT}/usr/include
 sys_include_dir=${CMAKE_SYSROOT}/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
 crt_dir=${CMAKE_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/${PARTOUT_ANDROID_API}
 msvc_lib_dir=
 kernel32_lib_dir=
 gcc_dir=
-")
+"
+    )
     list(APPEND PARTOUT_ZIG_ARGS --libc "${PARTOUT_ZIG_LIBC}")
 elseif(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
@@ -116,7 +117,8 @@ add_library(Partout::Partout ALIAS partout)
 target_include_directories(partout INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src")
 target_link_libraries(partout PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,${PARTOUT_ZIG_LIBRARY}>"
-    ${PARTOUT_CORE_LIBRARIES})
+    ${PARTOUT_CORE_LIBRARIES}
+)
 
 file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
 list(TRANSFORM partout_exports REPLACE "^_" "")
@@ -124,7 +126,8 @@ set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.expor
 
 if(APPLE)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
-        "Install name for the Apple shared library")
+        "Install name for the Apple shared library"
+    )
     set_target_properties(partout PROPERTIES NO_SONAME TRUE)
     target_link_options(partout PRIVATE
         "LINKER:-install_name,${PP_BUILD_APPLE_INSTALL_NAME}"
@@ -133,7 +136,8 @@ if(APPLE)
         "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
     )
     set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports")
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+    )
     target_link_libraries(partout PRIVATE "-framework CoreFoundation" "-framework Security")
 endif()
 
@@ -152,7 +156,8 @@ if(WIN32)
     if(PP_BUILD_WINDOWS)
         target_sources(partout PRIVATE
             $<TARGET_OBJECTS:partout-windows-backend>
-            $<TARGET_OBJECTS:partout-windows-models>)
+            $<TARGET_OBJECTS:partout-windows-models>
+        )
         target_link_libraries(partout PRIVATE partout-windows-backend)
         set_property(TARGET partout PROPERTY LINKER_LANGUAGE CXX)
     endif()
@@ -165,8 +170,10 @@ elseif(NOT APPLE)
     endif()
     list(JOIN partout_exports "; " partout_elf_exports)
     file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
-        CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY)
+        CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY
+    )
     target_link_options(partout PRIVATE "LINKER:-z,defs"
-        "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+        "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map"
+    )
     set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
 endif()
