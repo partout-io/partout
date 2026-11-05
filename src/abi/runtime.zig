@@ -234,6 +234,7 @@ fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{In
     const value = bindings orelse return error.InvalidArgs;
     const functions = value.controller_functions;
     var supplied: usize = 0;
+    // Check that all controller bindings are non-NULL.
     inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
         if (@field(functions, field.name) != null) supplied += 1;
     }
