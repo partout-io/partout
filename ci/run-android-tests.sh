@@ -96,7 +96,7 @@ add_jar "$maven_central" org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.
 sources=()
 while IFS= read -r source; do
     sources[${#sources[@]}]=$source
-done < <(find "$repo_root/cross/android" -type f -name '*.kt' | sort)
+done < <(find "$repo_root/cross/android/src" -type f -name '*.kt' | sort)
 [[ ${#sources[@]} -gt 0 ]] || fail "no Kotlin sources found"
 
 "$kotlinc" \

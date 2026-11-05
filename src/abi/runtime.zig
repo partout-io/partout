@@ -121,9 +121,9 @@ pub const DaemonRuntime = struct {
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: openvpn.ConnectionContext,
+        OpenVPN: if (build_options.openvpn) openvpn.ConnectionContext else void,
         Provider: void,
-        WireGuard: wireguard.ConnectionContext,
+        WireGuard: if (build_options.wireguard) wireguard.ConnectionContext else void,
         Undefined: void,
     };
 
@@ -142,6 +142,7 @@ pub const DaemonRuntime = struct {
         options: DaemonOptions,
         bindings: ?*const partout_c.partout_daemon_bindings,
     ) RuntimeError!*DaemonRuntime {
+        const platform_options = try platformOptions(bindings);
         if (!portable_c.pp_file_create_directory(options.cache_dir.ptr))
             return error.CacheDirectory;
 
@@ -169,9 +170,7 @@ pub const DaemonRuntime = struct {
         errdefer self.registry.deinit(allocator);
 
         // Build the daemon with the platform implementations
-        self.platform = try net.Platform.init(.{
-            .ref = if (bindings) |b| b.*.controller else null,
-        });
+        self.platform = try net.Platform.init(platform_options);
         errdefer self.platform.deinit();
         self.events = helpers.BoundDaemonEvents.init(bindings);
         self.daemon = try net.Daemon.create(
@@ -230,3 +229,30 @@ pub const DaemonRuntime = struct {
         self.daemon.stop();
     }
 };
+
+fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{InvalidArgs}!net.Platform.Options {
+    const value = bindings orelse return error.InvalidArgs;
+    const functions = value.controller_functions;
+    // Check that all controller bindings are non-NULL.
+    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
+        if (@field(functions, field.name) == null) return error.InvalidArgs;
+    }
+
+    // The public hooks preserve the native C signatures. Separate translate-c
+    // modules give these otherwise identical C types different Zig identities.
+    return .{
+        .ref = value.controller,
+        .fnt = .{
+            .set_delegate = @ptrCast(functions.set_delegate),
+            .set_tunnel = @ptrCast(functions.set_tunnel),
+            .report_snapshot = @ptrCast(functions.report_snapshot),
+            .set_environment_value = @ptrCast(functions.set_environment_value),
+            .clear_tunnel = @ptrCast(functions.clear_tunnel),
+            .cancel_tunnel = @ptrCast(functions.cancel_tunnel),
+        },
+        .socket_configurator = .{
+            .ctx = value.controller,
+            .configure = @ptrCast(functions.configure_sockets),
+        },
+    };
+}

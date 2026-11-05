@@ -19,8 +19,9 @@ bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
 }
 
 // A missing preference excludes an unusable profile from selection.
-std::optional<size_t> SelectPhysicalNetwork(size_t count,
-    const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
+std::optional<size_t>
+SelectPhysicalNetwork(size_t count,
+                      const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
     std::optional<size_t> selected;
     NetworkPreference best{};
     for (size_t i = 0; i < count; ++i) {
@@ -35,7 +36,8 @@ std::optional<size_t> SelectPhysicalNetwork(size_t count,
 }
 
 namespace {
-std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter, const MIB_IPFORWARD_TABLE2 *routes) {
+std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
+                                           const MIB_IPFORWARD_TABLE2 *routes) {
     if (!routes) return std::nullopt;
     std::optional<uint64_t> best;
     for (ULONG i = 0; i < routes->NumEntries; ++i) {
@@ -43,7 +45,9 @@ std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter, const MIB_IPFORW
         // Ignore more-specific routes, including the VPN's split default /1s.
         if (route.DestinationPrefix.PrefixLength != 0 || route.ValidLifetime == 0) continue;
         GUID id{};
-        if (ConvertInterfaceLuidToGuid(&route.InterfaceLuid, &id) != NO_ERROR || winrt::guid{id} != adapter) continue;
+        if (ConvertInterfaceLuidToGuid(&route.InterfaceLuid, &id) != NO_ERROR ||
+            winrt::guid{id} != adapter)
+            continue;
         MIB_IPINTERFACE_ROW ip_interface{};
         InitializeIpInterfaceEntry(&ip_interface);
         ip_interface.Family = route.DestinationPrefix.Prefix.si_family;
@@ -73,8 +77,9 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile() {
         // WLAN and WWAN have dedicated profile flags; accept these three
         // physical network kinds.
         // Local access is sufficient: the remote endpoint may be on the LAN.
-        return (type == IF_TYPE_ETHERNET_CSMACD || profile.IsWlanConnectionProfile() || profile.IsWwanConnectionProfile()) &&
-            profile.GetNetworkConnectivityLevel() != NetworkConnectivityLevel::None;
+        return (type == IF_TYPE_ETHERNET_CSMACD || profile.IsWlanConnectionProfile() ||
+                profile.IsWwanConnectionProfile()) &&
+               profile.GetNetworkConnectivityLevel() != NetworkConnectivityLevel::None;
     };
     const auto preferred = NetworkInformation::GetInternetConnectionProfile();
     if (usable(preferred)) return preferred;
@@ -82,16 +87,18 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile() {
     // route costs rather than enumeration order when several remain connected.
     MIB_IPFORWARD_TABLE2 *raw_routes = nullptr;
     const auto result = GetIpForwardTable2(AF_UNSPEC, &raw_routes);
-    const std::unique_ptr<MIB_IPFORWARD_TABLE2, decltype(&FreeMibTable)> routes(raw_routes, FreeMibTable);
+    const std::unique_ptr<MIB_IPFORWARD_TABLE2, decltype(&FreeMibTable)> routes(raw_routes,
+                                                                                FreeMibTable);
     if (result != NO_ERROR) throw winrt::hresult_error(HRESULT_FROM_WIN32(result));
     const auto profiles = NetworkInformation::GetConnectionProfiles();
-    const auto selected = SelectPhysicalNetwork(profiles.Size(), [&](size_t i) -> std::optional<NetworkPreference> {
-        const auto profile = profiles.GetAt(static_cast<uint32_t>(i));
-        if (!usable(profile)) return std::nullopt;
-        return NetworkPreference{
-            static_cast<uint32_t>(profile.GetNetworkConnectivityLevel()),
-            DefaultRouteMetric(profile.NetworkAdapter().NetworkAdapterId(), routes.get())};
-    });
+    const auto selected =
+        SelectPhysicalNetwork(profiles.Size(), [&](size_t i) -> std::optional<NetworkPreference> {
+            const auto profile = profiles.GetAt(static_cast<uint32_t>(i));
+            if (!usable(profile)) return std::nullopt;
+            return NetworkPreference{
+                static_cast<uint32_t>(profile.GetNetworkConnectivityLevel()),
+                DefaultRouteMetric(profile.NetworkAdapter().NetworkAdapterId(), routes.get())};
+        });
     return selected ? profiles.GetAt(static_cast<uint32_t>(*selected)) : ConnectionProfile{nullptr};
 }
 
@@ -136,10 +143,11 @@ void NetworkMonitor::Start(std::function<void(bool, bool)> notify) {
     // A queued system event may outlive the subscription. Locking a weak state
     // reference avoids retaining or dereferencing the destroyed monitor.
     const std::weak_ptr<State> weak = state_;
-    registration_ = winrt::Windows::Networking::Connectivity::NetworkInformation::NetworkStatusChanged(
-        winrt::auto_revoke, [weak](auto const &) {
-            if (auto state = weak.lock()) state->Refresh();
-        });
+    registration_ =
+        winrt::Windows::Networking::Connectivity::NetworkInformation::NetworkStatusChanged(
+            winrt::auto_revoke, [weak](auto const &) {
+                if (auto state = weak.lock()) state->Refresh();
+            });
     // Subscribe before querying so a transition during startup is not missed.
     state_->Refresh();
 }

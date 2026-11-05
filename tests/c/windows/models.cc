@@ -1,12 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "../../../cross/windows/src/models/ABIEnvelope.h"
-#include "../../../cross/windows/src/models/ConnectionStatus.h"
-#include "../../../cross/windows/src/models/CryptoBackend.h"
-#include "../../../cross/windows/src/models/DataCount.h"
-#include "../../../cross/windows/src/models/ModuleImportContext.h"
-#include "../../../cross/windows/src/models/OpenVpnObfuscationMethod.h"
-#include "../../../cross/windows/src/models/TunnelRemoteInfoWrapper.h"
+#include "../../../cross/cpp/models/ABIEnvelope.h"
+#include "../../../cross/cpp/models/ConnectionStatus.h"
+#include "../../../cross/cpp/models/CryptoBackend.h"
+#include "../../../cross/cpp/models/DataCount.h"
+#include "../../../cross/cpp/models/ModuleImportContext.h"
+#include "../../../cross/cpp/models/OpenVpnObfuscationMethod.h"
+#include "../../../cross/cpp/models/TunnelRemoteInfoWrapper.h"
 #include <cassert>
 #include <cstdio>
 #include <utility>

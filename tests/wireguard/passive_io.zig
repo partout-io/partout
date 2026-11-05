@@ -52,7 +52,7 @@ const ClearingAllocator = struct {
 test "WireGuard passive UDP preserves multiple peer sources and reply destinations" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var receiver = try bridge.PassiveIO.init(Completion.finish);
@@ -147,7 +147,7 @@ const FailureRecorder = struct {
 test "WireGuard passive initial transport allocation failure stays closed and reports once" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
@@ -324,7 +324,7 @@ test "POSIX passive receive and short write failures report once" {
 }
 
 test "WireGuard passive waiting reads receive without packet allocations" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     for ([_]source.net.Side{ .link, .tun }) |side| {
         var passive = try bridge.PassiveIO.init(Completion.finish);
         defer passive.deinit();
@@ -376,7 +376,7 @@ test "WireGuard passive waiting reads receive without packet allocations" {
 }
 
 test "WireGuard passive queued reads preserve batching and discard oversized packets" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var passive = try bridge.PassiveIO.init(Completion.finish);
@@ -400,7 +400,7 @@ test "WireGuard passive queued reads preserve batching and discard oversized pac
 }
 
 test "WireGuard passive pending buffers are unregistered on timeout cancellation detach and failure" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Scenario = enum { timeout, cancel, detach, failure, oversized };
     for (std.enums.values(Scenario)) |scenario| {
         var passive = try bridge.PassiveIO.init(Completion.finish);

@@ -1,44 +1,47 @@
-# Windows WinRT backend
+# Windows backend
 
 Windows support is experimental. The backend has carried traffic in manual
 VPN-host testing; this is not yet production or full platform-parity
 validation. The transport paths below are the default implementation, with no
 separate experiment flag.
 
-The native backend owns WinRT objects and a single command worker for setup,
+The native backend owns Windows objects and a single command worker for setup,
 writes and handover. Received packets and failures enter the existing daemon mailbox.
 Zig owns protocol processing, backpressure and timers:
 
 ```text
-VPN plugin -> partout_winrt.h -> src/runtime.cc -> Partout public API
+VPN plugin -> partout_windows.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
-Partout io_windows.zig       -> winrt/abi.h -> src/abi.cc
-Partout looper_windows.zig   -> winrt/abi.h -> src/abi.cc
-Partout portable controller  -> src/platform.cc -> src/tun.cc
+Partout io_windows.zig       -> windows/abi.h -> src/abi.cc
+Partout looper_windows.zig   -> windows/abi.h -> src/abi.cc
+Runtime callback table      -> src/platform.cc -> src/controller.cc
 ```
 
 ## Where code belongs
 
 | Location | Responsibility |
 | --- | --- |
-| `include/partout_winrt.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
-| `include/winrt/abi.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
-| `include/winrt/log.h` | Native logging boundary. |
-| `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; the only native source importing the Partout API. |
+| `include/partout_windows.h` | Plugin-facing C++ runtime API; depends on `partout.h`. |
+| `include/windows/abi.h` | Native I/O boundary for transport capabilities, the loop and link setup; no socket or TUN object ABI. |
+| `include/windows/log.h` | Native logging boundary. |
+| `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; supplies the runtime-owned controller callbacks. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
-| `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
+| `src/tun.h`, `src/tun.cc` | Private TUN handles, packet writes, and shared channel state. |
+| `src/controller.cc` | `Partout::TunnelController`, transport association and channel startup/stop. |
 | `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
 | `src/abi.h`, `src/abi.cc` | C ABI loop handles, endpoint ownership and scheduling, address conversions, native socket policy tokens and link setup. |
-| `src/platform.cc` | Implements Partout's portable controller and socket policy interfaces directly in C++. |
+| `src/platform.cc` | Builds the public controller callback table for the runtime. |
 | `src/tun_settings.h`, `src/tun_settings.cc` | Negotiated IP/DNS settings mapping and validation. |
 | `src/log.cc` | Optional process-wide logging callback, with a debugger-output fallback. |
 | `../../src/net/io_windows.zig` | Native setup completions and transport capabilities, including passive subscriptions. |
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
-| `../../src/c/portable/tun_windows.c` | Fallback controller stubs for builds without WinRT. |
+| `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-`partout-winrt-backend` compiles sockets, the controller and logging with only
-the native include directory. `partout-winrt` adds `runtime.cc`, `platform.cc` and packages all
-objects into one archive for Zig. The backend has no portable ABI dependency.
+CMake uses MSVC to link the Zig core archive and static Windows backend into
+`partout.dll`, so the core and native SDK share one copy of the loop and transport
+state. `partout-windows.lib` contains the consumer-side runtime and controller
+adapters. Consumers link `Partout::WindowsRuntime`, which depends on `partout.dll`.
+Optional vendors may still require their own DLLs.
 
 ## Logging
 
@@ -69,7 +72,7 @@ reenter socket APIs. Receive buffers are borrowed until return. Writes copy the
 packet and destination; one coroutine drains the native queue in FIFO order using
 `co_await` for output-stream acquisition and writes. Success means accepted, with
 later failures routed through the same callback. Channel-buffer writes copy into
-VpnChannel's pool directly. See `include/winrt/abi.h` for the boundary contract.
+VpnChannel's pool directly. See `include/windows/abi.h` for the boundary contract.
 Callers serialize writes with other writes, socket configuration, channel
 takeover, writer replacement and destruction. The caller supplies this serialization.
 Stopping writes and clearing receive callbacks may overlap an admitted write;
@@ -175,7 +178,7 @@ the daemon loop, preserving per-peer source addresses, destination-aware writes,
 quiesce/reactivation and callback draining during replacement. The protocol's
 bounded queue for pending Go reads stays separate from daemon dispatch.
 
-Writes copy the submission into a WinRT `Buffer` before posting it to the native
+Writes copy the submission into a Windows `Buffer` before posting it to the native
 worker. Direct socket writes move that buffer into the socket queue without a
 second payload copy. Zig and Go writer threads use the implicit MTA held alive
 by the native worker and socket state. No thread hooks or per-packet apartment
@@ -189,7 +192,7 @@ commands. Channel close is queued while the runtime retains the controller. Work
 drainage stays on the destroying caller, outside the daemon actor.
 
 `ConnectionWorker` selects its executor internally: RuntimeLoop on Windows
-with WinRT enabled, or a Zig actor otherwise. Its request, completion and
+with Windows enabled, or a Zig actor otherwise. Its request, completion and
 factory contracts are shared across platforms. Shared endpoint
 preparation runs on the C++ RuntimeLoop thread; the socket factory reuses that
 loop for creation, association and open. No Zig preparation thread is started.
@@ -200,7 +203,7 @@ daemon's existing mailbox; protocol processing and timers remain in Zig.
 
 ## VPN channel runtime
 
-C++ plugins include `partout_winrt.h` and construct `Partout::VpnChannelRuntime`
+C++ plugins include `partout_windows.h` and construct `Partout::VpnChannelRuntime`
 with a retained `VpnChannel`, profile JSON, logger settings and nonblocking
 daemon options (`is_daemon = false`). The runtime copies the profile and cache
 path. Serialize calls and forward the five `IVpnPlugIn` callbacks unchanged.
@@ -208,16 +211,16 @@ The runtime stops Partout before releasing the controller and transport.
 `VpnChannelRuntime` exclusively owns the active loop. Stop joins the daemon actor
 and drains accepted preparation, waits for plugin packet callbacks, destroys the
 controller on the native worker after queued transport teardown, and drains and
-joins that worker before releasing its WinRT apartment. Socket destruction also
+joins that worker before releasing its Windows apartment. Socket destruction also
 waits for canceled read/write coroutines. Connect creates a fresh loop after Stop.
 The process-wide loop lookup is borrowed and never extends this lifetime.
 Standalone native consumers and tests must explicitly create a loop, release all
 workers and transports, drain teardown, and free it; socket creation no longer
 creates an implicit loop. Only one loop may be active, matching the daemon API.
 
-CMake builds Partout as a shared library and installs `partout.h` and
-`partout_winrt.h`. Plugins link Partout's import library with a compatible MSVC
-runtime. Backend headers are internal integration interfaces, not installed
+The Zig core installs only `partout.h`. CMake installs the separate runtime header
+`partout_windows.h`, its static library, and the private backend DLL. Plugins link
+`Partout::WindowsRuntime` with a compatible MSVC runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
 Transport association, socket I/O and the TUN packet bridge are implemented.
@@ -252,13 +255,13 @@ Pass the package's toolchain file or prefix to CMake as needed. From the Partout
 root in a developer shell matching the target architecture:
 
 ```powershell
-cmake -S . -B .cmake-winrt -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINRT=ON -DPP_BUILD_LIBRARY=OFF
-cmake --build .cmake-winrt --target partout-winrt
+cmake -S . -B .cmake-windows -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINDOWS=ON -DPP_BUILD_LIBRARY=OFF
+cmake --build .cmake-windows --target partout-windows
 ```
 
 ### OpenAPI models
 
-Regenerate the entities in `cross/windows/src/models` with OpenAPI Generator
+Regenerate the entities in `cross/cpp/models` with OpenAPI Generator
 7.20.0 or newer, a Java 11+ JDK, and Python 3 (standard library only):
 
 ```sh
@@ -308,31 +311,32 @@ ctest --test-dir .cmake-models --output-on-failure
 
 ### Native integration
 
-With `PP_BUILD_LIBRARY=ON`, CMake passes the archive to Zig through
-`-Dwinrt-lib`. Direct Zig builds can use `-Dwinrt=true` to build the archive or
-`-Dwinrt-lib=<path>` to reuse one matching the Windows MSVC target. Windows
-builds without WinRT use the fallback branch in `tun_windows.c` for
-tests and builds that do not need native VPN support.
-The Windows looper also requires the native archive; without it, creation
-reports `MuxFailure`. Native dispatch tests run when WinRT is enabled.
+CMake owns the Windows DLL link. With `PP_BUILD_LIBRARY=OFF`, it builds only the
+static backend. Direct Zig builds produce the static core archive; use CMake for
+shared builds. Zig tests link the same static backend, selected with
+`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. No backend DLL is
+built or copied.
+Builds without Windows retain low-level cleanup stubs, but have no implicit controller.
+The Windows looper also requires the native backend; without it, creation
+reports `MuxFailure`. Native dispatch tests run when Windows is enabled.
 
 Independent UDP is automatic for unconnected sockets; no additional
-transport option is needed. The native archive alone does not register a VPN
+transport option is needed. The native backend alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
-The standalone settings mapping test uses real WinRT settings objects, without
-a VPN host. From the same developer shell (adjust the archive and nlohmann/json
+The standalone settings mapping test uses real Windows settings objects, without
+a VPN host. From the same developer shell (adjust the backend static library and nlohmann/json
 include paths for your build):
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib
-& .cmake-winrt/tun-settings-test.exe
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-windows/tun-settings-test.obj /Fe.cmake-windows/tun-settings-test.exe .cmake-windows/partout-windows-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+& .cmake-windows/tun-settings-test.exe
 ```
 
 The network selection regression test covers simultaneous Wi-Fi and Ethernet
 connectivity, route-cost preference, offline recovery and monitor lifecycle:
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
-& .cmake-winrt/network-test.exe
+cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-windows/network-test.obj /Fe.cmake-windows/network-test.exe .cmake-windows/partout-windows-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
+& .cmake-windows/network-test.exe
 ```

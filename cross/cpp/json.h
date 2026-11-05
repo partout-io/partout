@@ -15,8 +15,7 @@ namespace Partout::Models {
 
 // C ABI string enums arrive as unquoted tokens, rather than JSON documents.
 // Keep invalid input and decoding failures inside the noexcept callback boundary.
-template<typename T>
-std::optional<T> TryReadStringEnum(const char *token) noexcept {
+template <typename T> std::optional<T> TryReadStringEnum(const char *token) noexcept {
     if (!token) return std::nullopt;
     try {
         return T::FromJson(nlohmann::json(token));
@@ -27,8 +26,7 @@ std::optional<T> TryReadStringEnum(const char *token) noexcept {
 
 // nlohmann's default integer conversion truncates fractions and wraps overflow.
 // Keep representation checks generic and separate from platform-specific limits.
-template<typename T>
-void ReadJsonValue(const nlohmann::json &json, T &value) {
+template <typename T> void ReadJsonValue(const nlohmann::json &json, T &value) {
     if constexpr (!std::is_integral_v<T> || std::is_same_v<T, bool>) {
         json.get_to(value);
     } else {
@@ -43,7 +41,7 @@ void ReadJsonValue(const nlohmann::json &json, T &value) {
             const auto raw = json.get_ref<const nlohmann::json::number_integer_t &>();
             if constexpr (std::is_unsigned_v<T>) {
                 if (raw < 0 || static_cast<nlohmann::json::number_unsigned_t>(raw) >
-                    std::numeric_limits<T>::max())
+                                   std::numeric_limits<T>::max())
                     throw std::invalid_argument("JSON integer is out of range");
             } else {
                 if (raw < std::numeric_limits<T>::lowest() || raw > std::numeric_limits<T>::max())
@@ -62,17 +60,19 @@ void ReadJsonValue(const nlohmann::json &json, T &value) {
     }
 }
 
-template<typename T>
+template <typename T>
 bool ValidateModel(const T &value, std::stringstream &errors, const std::string &path) {
     return value.Validate(errors, path);
 }
 
-template<typename... T>
+template <typename... T>
 bool ValidateModel(const std::variant<T...> &value, std::stringstream &errors,
                    const std::string &path) {
-    return std::visit([&](const auto &model) {
-        return ValidateModel(model, errors, path);
-    }, value);
+    return std::visit(
+        [&](const auto &model) {
+            return ValidateModel(model, errors, path);
+        },
+        value);
 }
 
 } // namespace Partout::Models

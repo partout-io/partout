@@ -22,6 +22,7 @@ public:
 private:
     struct State;
     std::shared_ptr<State> state_;
-    winrt::Windows::Networking::Connectivity::NetworkInformation::NetworkStatusChanged_revoker registration_;
+    winrt::Windows::Networking::Connectivity::NetworkInformation::NetworkStatusChanged_revoker
+        registration_;
 };
 } // namespace Partout

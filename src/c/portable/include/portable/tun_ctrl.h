@@ -34,7 +34,5 @@ typedef struct {
                           const char *_Nullable error_code);
 } pp_tun_ctrl_fnt;
 
-/* Return the function table for the current platform. */
-pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void);
 
 #pragma clang assume_nonnull end

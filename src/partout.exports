@@ -2,14 +2,26 @@
 #
 # SPDX-License-Identifier: GPL-3.0
 
+# Public C ABI symbols exported by the core library (Mach-O spelling).
+
+# Initialization and logging
 _partout_version
 _partout_init
+_partout_log
+
+# Profile and module import/export
 _partout_import_profile
 _partout_import_module
 _partout_export_module
+
+# Daemon lifecycle
 _partout_daemon_start
 _partout_daemon_hold
 _partout_daemon_stop
-_partout_log
+
+# TUN descriptors
+_partout_tun_wrap_fd
+
+# WireGuard keys
 _partout_wireguard_genkey
 _partout_wireguard_pubkey

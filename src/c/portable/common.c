@@ -203,55 +203,7 @@ void pp_panic(const char *message) {
     abort();
 }
 
-#if PARTOUT_ANDROID
-JNIEnv *pp_jni_attach_thread(bool *did_attach) {
-    JNIEnv *env;
-    jint status = (*jvm)->GetEnv(jvm, (void **)&env, JNI_VERSION_1_6);
-    switch (status) {
-        case JNI_OK:
-            *did_attach = false;
-            return env;
-        case JNI_EDETACHED:
-            status = (*jvm)->AttachCurrentThread(jvm, &env, NULL);
-            if (status != JNI_OK) {
-                pp_clog_v(PPLogLevelFault, "AttachCurrentThread failed (%d)", status);
-                return NULL;
-            }
-            *did_attach = true;
-            return env;
-        default:
-            pp_clog_v(PPLogLevelFault, "GetEnv failed (%d)", status);
-            return NULL;
-    }
-}
 
-void *pp_jni_new_global_ref(void *ref) {
-    if (!ref) return NULL;
-
-    PP_JNI_ATTACH_OR_RETURN(env, NULL);
-
-    jobject global_ref = (*env)->NewGlobalRef(env, (jobject)ref);
-    if ((*env)->ExceptionCheck(env)) {
-        (*env)->ExceptionDescribe(env);
-        (*env)->ExceptionClear(env);
-        global_ref = NULL;
-    }
-
-    PP_JNI_DETACH(env);
-    return global_ref;
-}
-
-void pp_jni_delete_global_ref(void *ref) {
-    if (!ref) return;
-
-    PP_JNI_ATTACH_OR_RETURN_VOID(env);
-
-    (*env)->DeleteGlobalRef(env, (jobject)ref);
-
-    PP_JNI_DETACH(env);
-}
-
-#endif
 
 #if !PARTOUT_WINDOWS
 #include <fcntl.h>
