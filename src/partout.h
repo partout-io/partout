@@ -67,13 +67,14 @@ typedef struct {
  * does not introduce a replacement transport API. */
 typedef struct __partout_tun_struct *partout_tun;
 
-/* Low-level TUN construction for controller callbacks. Unsupported platforms
- * return NULL. The core releases returned handles after accepting set_tunnel.
- * open: Linux/macOS device; lookup: duplicated Apple NetworkExtension descriptor;
- * borrow_fd: Android descriptor, still owned by the VPN service. */
+/* Opens a Linux/macOS TUN device. Unsupported platforms return NULL. */
 partout_tun partout_tun_open(const char *uuid);
-partout_tun partout_tun_lookup(void);
-partout_tun partout_tun_borrow_fd(int fd);
+
+/* Wraps a native TUN descriptor, or returns NULL on failure.
+ * If owned, the core takes ownership on success and closes it on release.
+ * Otherwise, the caller must keep the descriptor open until TUN release.
+ * Failure leaves the descriptor with the caller. */
+partout_tun partout_tun_wrap_fd(int fd, bool owned);
 
 typedef struct {
     bool reachable;

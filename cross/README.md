@@ -6,9 +6,10 @@ Missing bindings or callbacks are rejected; there is no platform-controller
 fallback. The core copies the table, detaches callbacks during teardown, and
 then invokes `release`. Generated language models remain in the native SDKs.
 
-Low-level I/O remains in the core. The public TUN construction helpers let
-controllers open a Linux/macOS TUN, look up Apple's NetworkExtension TUN, or
-wrap an Android descriptor borrowed from its VPN service.
+Low-level I/O remains in the core. Apple’s runtime finds and duplicates the
+NetworkExtension descriptor; Android’s runtime borrows its VPN service descriptor.
+Both use `partout_tun_wrap_fd`: Apple passes `owned=true`, Android `owned=false`.
+The core also retains `partout_tun_open` for Linux/macOS devices.
 
 * Apple: SwiftPM's `PartoutRuntime` supplies callbacks directly. It needs only
   the public C header, without exported Swift callback names or symbol lookup.

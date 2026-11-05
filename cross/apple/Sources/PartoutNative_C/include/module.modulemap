@@ -1,4 +1,5 @@
 module PartoutNative_C {
     header "partout.h"
+    header "partout_apple.h"
     export *
 }

@@ -19,19 +19,21 @@
 
 struct __partout_tun_struct {
     pp_fd fd;
+    bool owned;
 };
 
-pp_tun pp_tun_borrow_fd(int fd) {
+pp_tun pp_tun_wrap_fd(int fd, bool owned) {
     if (fd < 0) return NULL;
     pp_tun tun = malloc(sizeof(*tun));
     if (!tun) return NULL;
     tun->fd = fd;
+    tun->owned = owned;
     return tun;
 }
 
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-    /* The VPN service owns the descriptor; do not close or shut it down. */
+    if (tun->owned && tun->fd >= 0) close(tun->fd);
     pp_free(tun);
 }
 

@@ -145,6 +145,10 @@ cleanup:
     return success;
 }
 
+static partout_tun partout_tun_borrow_fd(int fd) {
+    return partout_tun_wrap_fd(fd, false);
+}
+
 // Balance with pp_tun_ctrl_clear_tunnel
 static partout_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
     (void)uuid;

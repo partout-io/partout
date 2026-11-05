@@ -231,13 +231,8 @@ pub export fn partout_tun_open(uuid: ?[*:0]const u8) callconv(.c) partout_c.part
     return null;
 }
 
-pub export fn partout_tun_lookup() callconv(.c) partout_c.partout_tun {
-    if (comptime @hasDecl(ffi.io, "pp_tun_lookup")) return @ptrCast(ffi.io.pp_tun_lookup());
-    return null;
-}
-
-pub export fn partout_tun_borrow_fd(fd: c_int) callconv(.c) partout_c.partout_tun {
-    if (comptime @hasDecl(ffi.io, "pp_tun_borrow_fd")) return @ptrCast(ffi.io.pp_tun_borrow_fd(fd));
+pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
+    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_fd")) return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
     return null;
 }
 

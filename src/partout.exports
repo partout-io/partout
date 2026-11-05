@@ -11,8 +11,7 @@ _partout_daemon_start
 _partout_daemon_hold
 _partout_daemon_stop
 _partout_tun_open
-_partout_tun_lookup
-_partout_tun_borrow_fd
+_partout_tun_wrap_fd
 _partout_log
 _partout_wireguard_genkey
 _partout_wireguard_pubkey

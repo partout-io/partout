@@ -16,19 +16,13 @@
 /* Opaque tun device. */
 typedef struct __partout_tun_struct *pp_tun;
 
-#if PARTOUT_ANDROID
-pp_tun _Nullable pp_tun_borrow_fd(int fd);
+#if PARTOUT_APPLE || PARTOUT_ANDROID
+pp_tun _Nullable pp_tun_wrap_fd(int fd, bool owned);
 #endif
 
 #if PARTOUT_MACOS || PARTOUT_LINUX
 /* Request a new device. */
 pp_tun _Nullable pp_tun_open(const char *uuid);
-#endif
-
-#if PARTOUT_APPLE
-/* Look up Network Extension fd. */
-pp_tun _Nullable pp_tun_lookup(void);
-pp_fd pp_tun_network_extension_fd(void);
 #endif
 
 #if !PARTOUT_WINDOWS

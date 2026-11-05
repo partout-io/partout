@@ -302,9 +302,13 @@ test "settings-only daemons release owned TUN descriptors" {
         extern "c" fn close(fd: c_int) c_int;
     };
     // Match portable TUN storage on POSIX. A pipe exercises ownership without
-    // requiring privileges to create a real TUN device. Android uses only fd.
-    const NativeTun = extern struct {
+    // requiring privileges to create a real TUN device.
+    const NativeTun = if (platform_target.os.tag == .linux and !platform_target.abi.isAndroid()) extern struct {
         fd: c_int,
+        dev_name: ?[*:0]const u8 = null,
+    } else extern struct {
+        fd: c_int,
+        owned: bool = !platform_target.abi.isAndroid(),
         dev_name: ?[*:0]const u8 = null,
     };
     const Controller = struct {
