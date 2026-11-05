@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "loop.h"
-#include "winrt/log.h"
+#include "windows/log.h"
 #include <winrt/base.h>
 #include <stdexcept>
 #include <atomic>
@@ -85,8 +85,8 @@ void RuntimeLoop::Run() {
         try {
             command();
         } catch (...) {
-            winrt_log(WinrtLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
-                      static_cast<unsigned>(winrt::to_hresult().value));
+            windows_log(WindowsLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
+                        static_cast<unsigned>(winrt::to_hresult().value));
         }
     }
     // Cached activation factories must not survive the apartment that supplied

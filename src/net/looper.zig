@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Platform I/O. Callers serialize lifecycle operations. POSIX borrows the
-//! caller's mux. Windows posts WinRT receives to the caller's mailbox and waits
+//! caller's mux. Windows posts Windows receives to the caller's mailbox and waits
 //! on its wake event. POSIX runs read callbacks in loopOnce(). Read packet views
 //! expire when the callback returns.
 

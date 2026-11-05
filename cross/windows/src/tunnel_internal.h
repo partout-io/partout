@@ -7,7 +7,7 @@
 #include <ws2ipdef.h>
 #include <netioapi.h>
 #include <winrt/base.h>
-#include "models/TunnelSnapshotEnvironment.h"
+#include "partout/models/TunnelSnapshotEnvironment.h"
 #include <optional>
 #include <string>
 #include <functional>

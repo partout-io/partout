@@ -1,60 +1,9 @@
-/*
- * SPDX-FileCopyrightText: 2026 Davide De Rosa
- *
- * SPDX-License-Identifier: GPL-3.0
- */
+// SPDX-FileCopyrightText: 2026 Davide De Rosa
+// SPDX-License-Identifier: GPL-3.0
 
-#include "portable/common.h"
-#include "portable/tun.h"
-#include "portable/tun_ctrl.h"
-#include "portable/socket.h"
-
-#if PARTOUT_ANDROID
-
-#include "portable/io_posix.h"
-#include <jni.h>
+#include "runtime.h"
 #include <assert.h>
-#include <stdio.h>
 #include <stdint.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <sys/socket.h>
-
-struct __pp_tun_struct {
-    pp_fd fd;
-};
-
-void pp_tun_free(pp_tun tun) {
-    if (!tun) return;
-    /* The VPN service owns the descriptor; do not close or shut it down. */
-    pp_free(tun);
-}
-
-int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
-    if (!tun || tun->fd < 0) return -1;
-    if (!dst || dst_len == 0) return -1;
-    int ret;
-    PP_IO_RETRY(ret, read(tun->fd, dst, dst_len));
-    return pp_io_handle_result(ret);
-}
-
-int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
-    if (!tun || tun->fd < 0) return -1;
-    if (!src || src_len == 0) return -1;
-    int ret;
-    PP_IO_RETRY(ret, write(tun->fd, src, src_len));
-    return pp_io_handle_result(ret);
-}
-
-pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
-    if (!tun) return -1;
-    return tun->fd;
-}
-
-const char *pp_tun_name(const pp_tun tun) {
-    (void)tun;
-    return NULL;
-}
 
 /* PartoutTunnelController */
 
@@ -92,16 +41,20 @@ static const kotlin_sig sig_ctrl_cancelTunnel = {
     "(Ljava/lang/String;)V"
 };
 
-static void pp_tun_ctrl_set_delegate(void *jni_ref, const pp_tun_ctrl_delegate *delegate) {
+static void pp_tun_ctrl_set_delegate(void *jni_ref, const partout_controller_delegate *delegate) {
     assert(jni_ref);
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_set_delegate(%p, %p)", jni_ref, delegate);
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
 
-    pp_tun_ctrl_delegate *new_delegate = NULL;
+    partout_controller_delegate *new_delegate = NULL;
     jlong old_delegate = 0;
     if (delegate) {
         new_delegate = pp_alloc(sizeof(*new_delegate));
+        if (!new_delegate) {
+            PP_JNI_DETACH(env);
+            return;
+        }
         *new_delegate = *delegate;
     }
 
@@ -135,8 +88,8 @@ cleanup:
 }
 
 static bool configure_sockets(
-    void *jni_ref, const pp_reachability *info,
-    const pp_socket_fd *fds, const size_t fds_len
+    void *jni_ref, const partout_reachability *info,
+    const partout_socket_descriptor *fds, const size_t fds_len
 ) {
     assert(jni_ref);
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_configure_sockets(%p)", jni_ref);
@@ -192,8 +145,12 @@ cleanup:
     return success;
 }
 
+static partout_tun partout_tun_borrow_fd(int fd) {
+    return partout_tun_wrap_fd(fd, false);
+}
+
 // Balance with pp_tun_ctrl_clear_tunnel
-static pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
+static partout_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char *info_json) {
     (void)uuid;
     assert(jni_ref);
     pp_clog_v(PPLogLevelDebug, "tun_android: ctrl_set_tunnel(%p)", jni_ref);
@@ -205,12 +162,8 @@ static pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char
     jstring j_info_json = NULL;
 
     // This will be the result on success
-    pp_tun tun_impl = malloc(sizeof(*tun_impl));
-    if (tun_impl == NULL) {
-        pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), NULL tun_impl");
-        goto cleanup;
-    }
-    tun_impl->fd = -1;
+    partout_tun tun_impl = NULL;
+    int fd = -1;
 
     cls = (*env)->GetObjectClass(env, jni_ref);
     if (cls == NULL) {
@@ -223,30 +176,27 @@ static pp_tun pp_tun_ctrl_set_tunnel(void *jni_ref, const char *uuid, const char
         goto cleanup;
     }
     j_info_json = info_json ? (*env)->NewStringUTF(env, info_json) : NULL;
-    tun_impl->fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
+    fd = (*env)->CallIntMethod(env, jni_ref, method, j_info_json);
     if ((*env)->ExceptionCheck(env)) {
         (*env)->ExceptionDescribe(env);
         (*env)->ExceptionClear(env);
         pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Kotlin exception");
-        tun_impl->fd = -1;
+        fd = -1;
         goto cleanup;
     }
-    if (tun_impl->fd < 0) {
+    if (fd < 0) {
         pp_clog(PPLogLevelFault, "tun_android: ctrl_set_tunnel(), Invalid fd");
         goto cleanup;
     }
 cleanup:
-    if (tun_impl != NULL && tun_impl->fd < 0) {
-        pp_free(tun_impl);
-        tun_impl = NULL;
-    }
+    if (fd >= 0) tun_impl = partout_tun_borrow_fd(fd);
     if (j_info_json != NULL) (*env)->DeleteLocalRef(env, j_info_json);
     if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
     return tun_impl;
 }
 
-static void pp_tun_ctrl_report_snapshot(void *_Nullable ref, const char *snapshot_json) {
+static void pp_tun_ctrl_report_snapshot(void *ref, const char *snapshot_json) {
     assert(ref);
 
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
@@ -362,6 +312,7 @@ static void pp_tun_ctrl_clear_tunnel(void *jni_ref, bool kill_switch) {
     }
 
 cleanup:
+    if (cls != NULL) (*env)->DeleteLocalRef(env, cls);
     PP_JNI_DETACH(env);
 }
 
@@ -400,18 +351,15 @@ cleanup:
     PP_JNI_DETACH(env);
 }
 
-pp_socket_configurator pp_socket_configurator_current(void *ref) {
-    return (pp_socket_configurator){ .ctx = ref, .configure = configure_sockets };
-}
-
-pp_tun_ctrl_fnt pp_tun_ctrl_fnt_current(void) {
-    pp_tun_ctrl_fnt fnt = {
+partout_controller_functions partout_android_controller_functions(void) {
+    partout_controller_functions fnt = {
         .set_delegate = pp_tun_ctrl_set_delegate,
         .set_tunnel = pp_tun_ctrl_set_tunnel,
         .report_snapshot = pp_tun_ctrl_report_snapshot,
         .set_environment_value = pp_tun_ctrl_set_environment_value,
         .clear_tunnel = pp_tun_ctrl_clear_tunnel,
-        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel
+        .cancel_tunnel = pp_tun_ctrl_cancel_tunnel,
+        .configure_sockets = configure_sockets
     };
     return fnt;
 }
@@ -423,10 +371,10 @@ Java_io_partout_vpn_PartoutTunnelController_onNativeReachabilityUpdate(JNIEnv *e
                                                                        jlong net_handle) {
     (void)env;
     (void)thiz;
-    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
+    partout_controller_delegate *ctrl_delegate = (partout_controller_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
     // Kotlin uses -1 for an unavailable network; native code uses zero.
-    pp_reachability reachability = pp_reachability_none();
+    partout_reachability reachability = {0};
     if (net_handle != -1) {
         reachability.reachable = true;
         reachability.network_handle = net_handle;
@@ -440,9 +388,7 @@ Java_io_partout_vpn_PartoutTunnelController_onNativeBetterPathUpdate(JNIEnv *env
                                                                      jlong delegate) {
     (void)env;
     (void)thiz;
-    pp_tun_ctrl_delegate *ctrl_delegate = (pp_tun_ctrl_delegate *)(intptr_t)delegate;
+    partout_controller_delegate *ctrl_delegate = (partout_controller_delegate *)(intptr_t)delegate;
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
     ctrl_delegate->on_better_path(ctrl_delegate->ctx);
 }
-
-#endif

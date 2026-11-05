@@ -4,12 +4,11 @@
  * SPDX-License-Identifier: GPL-3.0
  */
 
-#include "portable/conditionals.h"
+#include "runtime.h"
 
-#if PARTOUT_ANDROID
+#if defined(__ANDROID__)
 #include <stdlib.h>
 #include <android/log.h>
-#include "portable/common.h"
 #include "partout.h"
 
 #define PARTOUT_JNI_CB(e, c) PARTOUT_CB(abi_completion_proxy, abi_handler_create(e, c))
@@ -104,6 +103,12 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
 
     partout_daemon_bindings bindings = {0};
     bindings.controller = (*env)->NewGlobalRef(env, controller);
+    if (!bindings.controller) {
+        if (jni_profile) (*env)->ReleaseStringUTFChars(env, profile, jni_profile);
+        if (jni_cache_dir) (*env)->ReleaseStringUTFChars(env, cacheDir, jni_cache_dir);
+        return PartoutCompletionCodeMemory;
+    }
+    bindings.controller_functions = partout_android_controller_functions();
     bindings.release = daemon_bindings_free;
 
     partout_daemon_start_args args = {0};

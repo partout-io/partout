@@ -8,5 +8,6 @@
 #include <portable/tun.h>
 #include <portable/tun_ctrl.h>
 #if PARTOUT_WINDOWS
-#include <winrt/abi.h>
+#include <windows/abi.h>
+#include <windows/log.h>
 #endif

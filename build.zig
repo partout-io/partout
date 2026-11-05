@@ -85,7 +85,7 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    winrt_library: ?std.Build.LazyPath,
+    windows: bool,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -133,16 +133,6 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
     const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
-    const shared = b.option(
-        bool,
-        "shared",
-        "Build Partout as a shared library.",
-    ) orelse false;
-    const install_name = b.option(
-        []const u8,
-        "install-name",
-        "Darwin install name for a shared Partout library.",
-    );
     const use_openvpn = b.option(
         bool,
         "openvpn",
@@ -172,23 +162,13 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built portable WinRT bridge archive.", false);
-    const use_winrt = b.option(bool, "winrt", "Build and link the WinRT bridge (Windows MSVC only).") orelse (winrt_path != null);
-    if (!use_winrt and winrt_path != null)
-        std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
-    if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
-        std.debug.panic("WinRT requires a Windows MSVC target", .{});
-    const winrt_build = if (use_winrt and winrt_path == null)
-        addWinRTBuild(b, target, optimize)
-    else
-        null;
-    const winrt_library: ?std.Build.LazyPath = if (winrt_path) |path|
-        .{ .cwd_relative = path }
-    else if (winrt_build) |bridge|
-        bridge.library
-    else
-        null;
-    build_options.addOption(bool, "winrt", winrt_library != null);
+    const windows_path = pathOption(b, "windows-lib", "MSVC-built static Windows backend library.", false);
+    const use_windows = b.option(bool, "windows", "Enable the Windows backend (Windows MSVC only).") orelse (windows_path != null);
+    if (!use_windows and windows_path != null)
+        std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
+    if (use_windows and (target.result.os.tag != .windows or target.result.abi != .msvc))
+        std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
+    build_options.addOption(bool, "windows", use_windows);
 
     const config = BuildConfig{
         .target = target,
@@ -197,7 +177,7 @@ pub fn build(b: *std.Build) void {
         .libc_installation = parseLibCInstallation(b, target),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
-        .winrt_library = winrt_library,
+        .windows = use_windows,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -205,43 +185,45 @@ pub fn build(b: *std.Build) void {
     const c_bindings = createCBindings(b, config);
 
     const module = createPartoutModule(b, config, c_bindings, "src/partout.zig", true);
-    if (shared) {
-        linkVendorLibraries(module, b, config, false);
-        addRuntimeOrigin(module, target);
-    }
-
+    module.pic = true;
     const lib = b.addLibrary(.{
-        .linkage = if (shared) .dynamic else .static,
+        .linkage = .static,
         .name = "partout",
         .root_module = module,
     });
-    if (winrt_build) |bridge| lib.step.dependOn(bridge.step);
-    if (shared and winrt_library != null) {
-        lib.forceUndefinedSymbol("pp_winrt_runtime_link");
-        lib.forceUndefinedSymbol("pp_winrt_tunnel_link");
-    }
-    if (install_name) |value| {
-        if (!shared or !target.result.os.tag.isDarwin()) {
-            std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
-        }
-        lib.install_name = value;
-    }
-
+    lib.bundle_compiler_rt = true;
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
     b.default_step = check;
 
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
-    linkVendorLibraries(test_module, b, config, true);
+    if (target.result.os.tag != .windows) {
+        test_module.addIncludePath(b.path("cross/posix/include"));
+        addCSourceFiles(test_module, &.{"cross/posix/tun.c"});
+    }
     test_module.addImport("source", test_source_module);
 
     const unit_tests = b.addTest(.{
         .root_module = test_module,
     });
-    // The MSVC C++/WinRT bridge is built with /MD.
-    if (winrt_library != null) unit_tests.linkage = .dynamic;
-    if (winrt_build) |bridge| unit_tests.step.dependOn(bridge.step);
+    linkTestLibraries(test_module, b, config, &unit_tests.step);
+    if (use_windows) {
+        // Tests link the MSVC backend; the core archive only needs its headers.
+        unit_tests.linkage = .dynamic;
+        if (windows_path) |path| {
+            test_module.addObjectFile(.{ .cwd_relative = path });
+        } else if (builtin.os.tag == .windows) {
+            const backend = addWindowsBuild(b, target, optimize);
+            test_module.addObjectFile(backend.library);
+            unit_tests.step.dependOn(backend.step);
+        } else {
+            unit_tests.step.dependOn(&b.addFail("Windows tests require a Windows host or -Dwindows-lib").step);
+        }
+        test_module.linkSystemLibrary("windowsapp", .{});
+        test_module.linkSystemLibrary("runtimeobject", .{});
+        test_module.linkSystemLibrary("iphlpapi", .{});
+    }
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
@@ -252,17 +234,12 @@ pub fn build(b: *std.Build) void {
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 
-    if (!shared and target.result.os.tag.isDarwin()) {
+    if (target.result.os.tag.isDarwin()) {
         const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
     } else {
         lib.installHeader(b.path("src/partout.h"), "partout.h");
-        if (winrt_library != null) {
-            lib.installHeader(b.path("cross/windows/include/partout_winrt.h"), "partout_winrt.h");
-            lib.installHeader(b.path("cross/windows/src/json.h"), "partout/json.h");
-            lib.installHeadersDirectory(b.path("cross/windows/src/models"), "partout/models", .{ .include_extensions = &.{".h"} });
-        }
         b.installArtifact(lib);
     }
 
@@ -275,32 +252,30 @@ pub fn build(b: *std.Build) void {
     docs_step.dependOn(&install_docs.step);
 }
 
-// CMake builds the C++/WinRT bridge with MSVC; Zig consumes the resulting archive.
-fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
+// CMake builds the static Windows backend with MSVC.
+fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
 } {
-    if (builtin.os.tag != .windows)
-        std.debug.panic("Building WinRT requires a Windows host; supply -Dwinrt-lib when cross-compiling", .{});
     const architecture = switch (target.result.cpu.arch) {
         .aarch64 => "ARM64",
         .x86_64 => "x64",
         .x86 => "Win32",
-        else => std.debug.panic("Unsupported WinRT architecture", .{}),
+        else => std.debug.panic("Unsupported Windows architecture", .{}),
     };
     const configuration = if (optimize == .Debug) "Debug" else "Release";
     const configure = b.addSystemCommand(&.{ "cmake", "-G", "Visual Studio 17 2022", "-A", architecture, "-S" });
     configure.addDirectoryArg(b.path("."));
     configure.addArg("-B");
-    const directory = configure.addOutputDirectoryArg("winrt");
-    configure.addArgs(&.{ "-DPP_BUILD_WINRT=ON", "-DPP_BUILD_LIBRARY=OFF" });
+    const directory = configure.addOutputDirectoryArg("windows");
+    configure.addArgs(&.{ "-DPP_BUILD_WINDOWS=ON", "-DPP_BUILD_LIBRARY=OFF" });
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
-    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt" });
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-windows-backend" });
     compile.has_side_effects = true;
     return .{
-        .library = directory.path(b, b.fmt("{s}/partout-winrt.lib", .{configuration})),
+        .library = directory.path(b, b.fmt("{s}/partout-windows-backend.lib", .{configuration})),
         .step = &compile.step,
     };
 }
@@ -351,8 +326,8 @@ fn vendorPathsOption(b: *std.Build, vendor: Vendor) VendorPaths {
     const library = pathOption(
         b,
         b.fmt("{s}-lib", .{name}),
-        b.fmt("{s} library search path.", .{display_name}),
-        include != null,
+        b.fmt("{s} library search path for tests.", .{display_name}),
+        false,
     );
     if (include == null and library != null) {
         std.debug.panic("-{s}-include is required with -{s}-lib", .{ name, name });
@@ -444,12 +419,6 @@ fn createPartoutModule(
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
             addCSourceFiles(module, &.{"src/c/portable/tun_windows.c"});
-            if (config.winrt_library) |library| {
-                module.addObjectFile(library);
-                module.linkSystemLibrary("windowsapp", .{});
-                module.linkSystemLibrary("runtimeobject", .{});
-                module.linkSystemLibrary("iphlpapi", .{});
-            }
         }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
@@ -543,7 +512,7 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINRT", if (config.winrt_library != null) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINDOWS_RUNTIME", if (config.windows) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,
@@ -600,16 +569,19 @@ fn addVendorIncludePaths(
     }
 }
 
-fn linkVendorLibraries(
+fn linkTestLibraries(
     module: *std.Build.Module,
     b: *std.Build,
     config: BuildConfig,
-    add_library_rpath: bool,
+    test_step: *std.Build.Step,
 ) void {
     for (config.vendors.all()) |paths| {
         if (!paths.enabled()) continue;
         if (paths.vendor == .wg_go and !config.wireguard) continue;
-        const library_path = paths.library orelse unreachable;
+        const library_path = paths.library orelse {
+            test_step.dependOn(&b.addFail(b.fmt("Tests require -D{s}-lib", .{paths.vendor.optionName()})).step);
+            continue;
+        };
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
@@ -619,7 +591,7 @@ fn linkVendorLibraries(
                     .{ library_path, paths.vendor.appleStaticArchiveName() },
                 );
                 std.Io.Dir.accessAbsolute(b.graph.io, archive, .{}) catch {
-                    linkSystemLibraries(module, config.target, paths, add_library_rpath);
+                    linkSystemLibraries(module, config.target, paths);
                     continue;
                 };
                 module.addObjectFile(.{ .cwd_relative = archive });
@@ -627,11 +599,9 @@ fn linkVendorLibraries(
             };
             module.addSystemFrameworkPath(.{ .cwd_relative = library_path });
             module.linkFramework(framework_name, .{});
-            if (add_library_rpath) {
-                module.addRPath(.{ .cwd_relative = library_path });
-            }
+            module.addRPath(.{ .cwd_relative = library_path });
         } else {
-            linkSystemLibraries(module, config.target, paths, add_library_rpath);
+            linkSystemLibraries(module, config.target, paths);
         }
     }
 }
@@ -640,13 +610,10 @@ fn linkSystemLibraries(
     module: *std.Build.Module,
     target: std.Build.ResolvedTarget,
     paths: VendorPaths,
-    add_library_rpath: bool,
 ) void {
     const library_path = paths.library orelse unreachable;
     module.addLibraryPath(.{ .cwd_relative = library_path });
-    if (add_library_rpath) {
-        module.addRPath(.{ .cwd_relative = library_path });
-    }
+    module.addRPath(.{ .cwd_relative = library_path });
     linkSystemLibraryNames(module, target, paths.vendor);
 }
 
@@ -678,17 +645,6 @@ fn linkSystemLibraryNames(
             }
             module.linkSystemLibrary("wg-go", options);
         },
-    }
-}
-
-fn addRuntimeOrigin(
-    module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-) void {
-    if (target.result.os.tag.isDarwin()) {
-        module.addRPath(.{ .cwd_relative = "@loader_path" });
-    } else if (target.result.os.tag != .windows) {
-        module.addRPath(.{ .cwd_relative = "$ORIGIN" });
     }
 }
 
@@ -746,7 +702,6 @@ fn addAppleSDKLibraryPath(
 fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool) void {
     addCSourceFiles(module, &.{
         "src/partout.c",
-        "src/partout_jni.c",
     });
     addCSourceFiles(module, &.{
         "src/c/portable/common.c",
@@ -756,9 +711,7 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
         "src/c/portable/network.c",
         "src/c/portable/prng.c",
         "src/c/portable/socket.c",
-        "src/c/portable/tun_android.c",
-        "src/c/portable/tun_darwin.c",
-        "src/c/portable/tun_linux.c",
+        "src/c/portable/tun_posix.c",
         "src/c/portable/zd.c",
     });
 

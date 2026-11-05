@@ -10,33 +10,17 @@
 #include <mutex>
 #include <string>
 #include <string_view>
-// MSVC does not support Clang's nullability annotations.
-#if defined(_MSC_VER) && !defined(__clang__)
-#pragma warning(push)
-#pragma warning(disable : 4068)
-#define _Nullable
-#define _Nonnull
-#endif
-
-#include "partout_winrt.h"
+#include "partout_windows.h"
 #include "tun.h"
 #include "loop.h"
 
-#if defined(_MSC_VER) && !defined(__clang__)
-#undef _Nonnull
-#undef _Nullable
-#pragma warning(pop)
-#endif
-
-#include "models/ConnectionStatus.h"
-
-// Forces this archive member, including its C++ exports, into partout.dll.
-extern "C" void pp_winrt_runtime_link() {}
+#include <partout/models/ConnectionStatus.h>
 
 using namespace winrt;
 using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
+partout_controller_functions ControllerFunctions();
 
 struct VpnChannelRuntime::Impl {
     VpnChannel channel;
@@ -79,8 +63,7 @@ struct VpnChannelRuntime::Impl {
             startup_status = StartupStatus::connected;
             break;
         case Status::disconnected:
-            if (startup_status == StartupStatus::connecting)
-                startup_status = StartupStatus::failed;
+            if (startup_status == StartupStatus::connecting) startup_status = StartupStatus::failed;
             break;
         default:
             break;
@@ -176,6 +159,7 @@ struct VpnChannelRuntime::Impl {
                 std::lock_guard lock(controller_mutex);
                 controller = std::make_unique<TunnelController>(*loop, channel);
                 bindings.controller = controller.get();
+                bindings.controller_functions = ControllerFunctions();
             }
             // Impl outlives the daemon; Stop() drains callbacks before destruction.
             bindings.events.ctx = this;

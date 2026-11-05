@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #include "tunnel_profile.h"
-#include "models/TaggedProfile.h"
+#include "partout/models/TaggedProfile.h"
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <cassert>
 

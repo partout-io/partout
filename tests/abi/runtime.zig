@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const hooks = @import("../controller_hooks.zig");
 const builtin = @import("builtin");
 const source = @import("source");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
@@ -138,7 +139,7 @@ test "daemon runtime owns options during lifecycle" {
         args.options.cache_dir = cache_root_z.ptr;
         if (experimental) args.options.feature_flags = partout_c.PartoutDaemonFlagExperimentalDaemon;
         const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
-        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+        const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &hooks.bindings) catch |err| {
             options.deinit(allocator);
             return err;
         };
@@ -157,10 +158,115 @@ test "daemon runtime owns options during lifecycle" {
     }
 }
 
+const ControllerProbe = struct {
+    attached: bool = false,
+    detached: bool = false,
+    released: bool = false,
+    configured: bool = false,
+
+    fn from(raw: ?*anyopaque) *ControllerProbe {
+        return @ptrCast(@alignCast(raw orelse unreachable));
+    }
+
+    fn setDelegate(raw: ?*anyopaque, delegate: [*c]const partout_c.partout_controller_delegate) callconv(.c) void {
+        const self = from(raw);
+        if (delegate == null) {
+            self.detached = true;
+            return;
+        }
+        self.attached = true;
+        const reachability: partout_c.partout_reachability = .{ .reachable = true };
+        delegate.*.on_reachability.?(delegate.*.ctx, &reachability);
+        delegate.*.on_better_path.?(delegate.*.ctx);
+    }
+
+    fn setTunnel(_: ?*anyopaque, _: [*c]const u8, _: [*c]const u8) callconv(.c) partout_c.partout_tun {
+        return null;
+    }
+
+    fn reportSnapshot(_: ?*anyopaque, _: [*c]const u8) callconv(.c) void {}
+    fn setEnvironment(_: ?*anyopaque, _: [*c]const u8, _: [*c]const u8) callconv(.c) void {}
+    fn clearTunnel(_: ?*anyopaque, _: bool) callconv(.c) void {}
+    fn cancelTunnel(_: ?*anyopaque, _: [*c]const u8) callconv(.c) void {}
+
+    fn configure(raw: ?*anyopaque, _: [*c]const partout_c.partout_reachability, _: [*c]const partout_c.partout_socket_descriptor, _: usize) callconv(.c) bool {
+        from(raw).configured = true;
+        return false;
+    }
+
+    fn release(bindings: [*c]partout_c.partout_daemon_bindings) callconv(.c) void {
+        const self = from(bindings.*.controller);
+        std.debug.assert(self.detached);
+        std.debug.assert(!self.released);
+        self.released = true;
+    }
+
+    fn functions() partout_c.partout_controller_functions {
+        return .{
+            .set_delegate = setDelegate,
+            .set_tunnel = setTunnel,
+            .report_snapshot = reportSnapshot,
+            .set_environment_value = setEnvironment,
+            .clear_tunnel = clearTunnel,
+            .cancel_tunnel = cancelTunnel,
+            .configure_sockets = configure,
+        };
+    }
+};
+
+test "daemon bindings copy supplied controller hooks and release after detach" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    const cache_root = try std.fmt.allocPrintSentinel(allocator, ".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
+    defer allocator.free(cache_root);
+    var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
+    args.options.cache_dir = cache_root.ptr;
+    const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
+    var probe: ControllerProbe = .{};
+    var bindings: partout_c.partout_daemon_bindings = .{
+        .controller = &probe,
+        .controller_functions = ControllerProbe.functions(),
+        .release = ControllerProbe.release,
+    };
+    const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &bindings) catch |err| {
+        options.deinit(allocator);
+        return err;
+    };
+    {
+        defer runtime.destroy(allocator);
+        // The original bindings need not survive initialization.
+        bindings = std.mem.zeroes(partout_c.partout_daemon_bindings);
+        try std.testing.expect(probe.attached);
+        try std.testing.expect(runtime.platform.currentReachability().?.reachable);
+        const policy = runtime.platform.socket_configurator;
+        try std.testing.expect(!policy.configure.?(policy.ctx, null, null, 0));
+        try std.testing.expect(probe.configured);
+        try std.testing.expect(!probe.released);
+    }
+    try std.testing.expect(probe.detached);
+    try std.testing.expect(probe.released);
+}
+
+test "daemon bindings reject incomplete controller hooks" {
+    const allocator = std.testing.allocator;
+    const options = try abi_runtime.DaemonOptions.init(allocator, daemonStartArgs(mock.dnsOnlyProfileJson().ptr), null);
+    defer options.deinit(allocator);
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, null));
+    const empty_bindings: partout_c.partout_daemon_bindings = .{};
+    try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &empty_bindings));
+    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
+        var functions = ControllerProbe.functions();
+        @field(functions, field.name) = null;
+        const bindings: partout_c.partout_daemon_bindings = .{ .controller_functions = functions };
+        try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &bindings));
+    }
+}
+
 test "starts DNS-only profile through tunnel controller" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var runtime: MockDaemonRuntime = .{};
     var registry = try emptyConnectionRegistry(allocator);
@@ -283,7 +389,7 @@ test "legacy feature flags preserve the current implementations" {
             args.options.cache_dir = cache_dir.ptr;
             args.options.feature_flags = flags;
             const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
-            const runtime = abi_runtime.DaemonRuntime.init(allocator, options, null) catch |err| {
+            const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &hooks.bindings) catch |err| {
                 options.deinit(allocator);
                 return err;
             };

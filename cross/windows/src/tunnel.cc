@@ -7,12 +7,12 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
-#include "partout_winrt.h"
+#include "partout_windows.h"
 #include "tunnel_profile.h"
 #include "tunnel_internal.h"
-#include "models/TaggedProfile.h"
-#include "models/TunnelSnapshot.h"
-#include "winrt/log.h"
+#include "partout/models/TaggedProfile.h"
+#include "partout/models/TunnelSnapshot.h"
+#include "windows/log.h"
 #include <appmodel.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -170,11 +170,9 @@ auto WithAgent(const char *operation, Action action) {
 
 } // namespace
 
-extern "C" void pp_winrt_tunnel_link() {}
-
 Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
     if (serverUri_.empty()) throw std::invalid_argument("The server URI is empty.");
-    winrt_log(WinrtLogInfo, "Partout::Tunnel initialized\n");
+    windows_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
 }
 
 std::optional<VpnManagementConnectionStatus> ReadTunnelConnectionStatus(

@@ -7,7 +7,7 @@
 #include <windows.h>
 
 #include "socket.h"
-#include "winrt/log.h"
+#include "windows/log.h"
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Networking.h>
@@ -30,7 +30,7 @@ namespace {
 void WaitForConnect(IAsyncAction const &action, int timeout_ms) {
     if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
         action.Cancel();
-        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"WinRT socket connect timed out");
+        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Windows socket connect timed out");
     }
     action.GetResults();
 }
@@ -65,7 +65,7 @@ struct Socket::State {
         hstring service;
     };
 
-    // Keep WinRT valid across calls and until the last native operation completes.
+    // Keep Windows valid across calls and until the last native operation completes.
     CO_MTA_USAGE_COOKIE apartment{};
     std::mutex mutex;
     uint64_t received = 0;
@@ -108,11 +108,11 @@ struct Socket::State {
         }
         if (!callback || (paused && !error)) return;
         if (error == SocketEOF) {
-            winrt_log(WinrtLogInfo, "Partout::Socket: TCP peer closed the connection");
+            windows_log(WindowsLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
-            winrt_log(WinrtLogError,
-                      "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
-                      static_cast<unsigned int>(error), channel_owned ? "true" : "false");
+            windows_log(WindowsLogError,
+                        "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
+                        static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         }
         paused = !callback(bytes, size, source, error);
     }
@@ -134,8 +134,9 @@ Socket::~Socket() noexcept {
     SetOnReceive({});
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
-        winrt_log(WinrtLogInfo, "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
-                  state_->received, state_->sent);
+        windows_log(WindowsLogInfo,
+                    "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
+                    state_->received, state_->sent);
     }
     receive_registration_.revoke();
     // Close each transport independently.
@@ -191,18 +192,18 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
             RegisterForDatagrams();
         }
         if (unconnected_) {
-            // WinRT rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
+            // Windows rejects 0.0.0.0 as a BindEndpointAsync hostname. A service
             // bind covers all interfaces; the receive handler enforces family
-            // policy because WinRT exposes no IPV6_V6ONLY control.
+            // policy because Windows exposes no IPV6_V6ONLY control.
             const bool ipv4_wildcard = host.CanonicalName() == L"0.0.0.0";
             const bool ipv6_wildcard = host.CanonicalName() == L"::";
             const auto local_service = port == 0 ? hstring{} : service;
             if (adapter_) {
                 if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
                 datagram_.BindServiceNameAsync(local_service, adapter_).get();
-                winrt_log(WinrtLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
-                          datagram_.Information().LocalPort().c_str(),
-                          to_hstring(adapter_.NetworkAdapterId()).c_str());
+                windows_log(WindowsLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
+                            datagram_.Information().LocalPort().c_str(),
+                            to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
                 datagram_.BindServiceNameAsync(local_service).get();
             } else {
@@ -215,22 +216,22 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
             WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
                            options->timeout_ms);
         }
-        winrt_log(WinrtLogDebug,
-                  "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
-                  datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
-                  unconnected_ ? "unconnected" : "connected",
-                  options->dual_stack ? "true" : "false");
+        windows_log(WindowsLogDebug,
+                    "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
+                    datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
+                    unconnected_ ? "unconnected" : "connected",
+                    options->dual_stack ? "true" : "false");
     } catch (hresult_error const &error) {
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
             const auto message = to_string(error.message());
-            winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
-                      static_cast<unsigned int>(error.code().value), message.c_str());
+            windows_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
+                        static_cast<unsigned int>(error.code().value), message.c_str());
         } catch (...) {}
         return false;
     } catch (...) {
-        winrt_log(WinrtLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
-                  static_cast<unsigned int>(to_hresult().value));
+        windows_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
+                    static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -238,7 +239,7 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
 
 void Socket::RegisterForDatagrams() {
     const auto state = state_;
-    // WinRT requires registration before bind/connect. Attach only changes
+    // Windows requires registration before bind/connect. Attach only changes
     // the consumer; the OS handler remains registered until the socket closes.
     receive_registration_ = datagram_.MessageReceived(
         auto_revoke,
@@ -385,8 +386,8 @@ int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
         }
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(WinrtLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
-                  static_cast<unsigned int>(error), static_cast<size_t>(length));
+        windows_log(WindowsLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
+                    static_cast<unsigned int>(error), static_cast<size_t>(length));
         return error;
     }
     return 0;

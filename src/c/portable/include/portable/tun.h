@@ -14,17 +14,10 @@
 #pragma clang assume_nonnull begin
 
 /* Opaque tun device. */
-typedef struct __pp_tun_struct *pp_tun;
+typedef struct __partout_tun_struct *pp_tun;
 
-#if PARTOUT_MACOS || PARTOUT_LINUX
-/* Request a new device. */
-pp_tun _Nullable pp_tun_open(const char *uuid);
-#endif
-
-#if PARTOUT_APPLE
-/* Look up Network Extension fd. */
-pp_tun _Nullable pp_tun_lookup(void);
-pp_fd pp_tun_network_extension_fd(void);
+#if PARTOUT_APPLE || PARTOUT_ANDROID || PARTOUT_LINUX
+pp_tun _Nullable pp_tun_wrap_fd(int fd, bool owned);
 #endif
 
 #if !PARTOUT_WINDOWS
@@ -34,9 +27,6 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 
 /* Return the file descriptor. Check result with pp_fd_is_valid(). */
 pp_fd pp_tun_get_watch_fd(const pp_tun tun);
-
-/* Return the device name or NULL if none. */
-const char *_Nullable pp_tun_name(const pp_tun tun);
 #endif
 
 /* Free the wrapper and release its owned native resources. */

@@ -13,7 +13,7 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         const Self = @This();
         allocator: std.mem.Allocator,
         context: *Context,
-        loop: c.winrt_loop,
+        loop: c.windows_loop,
 
         const Task = struct {
             owner: *Self,
@@ -30,7 +30,7 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         pub fn create(allocator: std.mem.Allocator, context: *Context) error{OutOfMemory}!*Self {
             const self = try allocator.create(Self);
             errdefer allocator.destroy(self);
-            const loop = c.winrt_loop_current() orelse return error.OutOfMemory;
+            const loop = c.windows_loop_current() orelse return error.OutOfMemory;
             self.* = .{ .allocator = allocator, .context = context, .loop = loop };
             return self;
         }
@@ -39,13 +39,13 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
             const task = try self.allocator.create(Task);
             errdefer self.allocator.destroy(task);
             task.* = .{ .owner = self, .message = message };
-            if (!c.winrt_loop_submit(self.loop, Task.run, task)) return error.OutOfMemory;
+            if (!c.windows_loop_submit(self.loop, Task.run, task)) return error.OutOfMemory;
         }
 
         pub fn destroy(self: *Self) void {
             // Drain accepted preparation before freeing its Zig context. The
             // native loop is borrowed and remains owned by VpnChannelRuntime.
-            c.winrt_loop_drain(self.loop);
+            c.windows_loop_drain(self.loop);
             self.allocator.destroy(self);
         }
     };

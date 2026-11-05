@@ -12,12 +12,6 @@
 #include <vector>
 #include <winrt/Windows.Networking.Vpn.h>
 
-#if defined(PARTOUT_WINRT_EXPORTS)
-#define PARTOUT_WINRT_API __declspec(dllexport)
-#else
-#define PARTOUT_WINRT_API __declspec(dllimport)
-#endif
-
 namespace Partout {
 namespace Models {
 struct TaggedProfile;
@@ -31,14 +25,14 @@ class Tunnel {
 public:
     // Absolute placeholder URI supplied by the consumer app.
     // Actual VPN endpoints come from the saved profile configuration.
-    PARTOUT_WINRT_API explicit Tunnel(const std::string &serverUri);
+    explicit Tunnel(const std::string &serverUri);
     // When supplied, errors receives unavailable profiles by ID; snapshots
     // contain only observed states. Without it, any observation error throws.
-    PARTOUT_WINRT_API std::vector<Models::TunnelSnapshot> Fetch(std::map<std::string, std::string> *errors = nullptr);
-    PARTOUT_WINRT_API void Save(const Models::TaggedProfile &profile);
-    PARTOUT_WINRT_API void Connect(const std::string &id);
-    PARTOUT_WINRT_API void Disconnect(const std::string &id);
-    PARTOUT_WINRT_API void Remove(const std::string &id);
+    std::vector<Models::TunnelSnapshot> Fetch(std::map<std::string, std::string> *errors = nullptr);
+    void Save(const Models::TaggedProfile &profile);
+    void Connect(const std::string &id);
+    void Disconnect(const std::string &id);
+    void Remove(const std::string &id);
 private:
     std::string serverUri_;
 };
@@ -48,23 +42,22 @@ private:
 // remain valid while registered with Partout's process-wide logger.
 class VpnChannelRuntime {
 public:
-    PARTOUT_WINRT_API VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-                                        const char *profile, const partout_init_args &init_args,
-                                        const partout_daemon_options &options);
-    PARTOUT_WINRT_API ~VpnChannelRuntime();
+    VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+                      const char *profile, const partout_init_args &init_args,
+                      const partout_daemon_options &options);
+    ~VpnChannelRuntime();
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
 
-    PARTOUT_WINRT_API void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    PARTOUT_WINRT_API void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    PARTOUT_WINRT_API void
-    GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-                        winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
-    PARTOUT_WINRT_API void
+    void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    void GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+                             winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
+    void
     Encapsulate(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &encapsulated_packets);
-    PARTOUT_WINRT_API void
+    void
     Decapsulate(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                 winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &decapsulated_packets,
@@ -77,5 +70,4 @@ private:
 
 } // namespace Partout
 
-#undef PARTOUT_WINRT_API
 #endif

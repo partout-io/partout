@@ -11,6 +11,7 @@
 #include <winrt/Windows.Networking.Sockets.h>
 #include <memory>
 #include <atomic>
+#include <mutex>
 
 namespace Partout {
 class RuntimeLoop;
@@ -18,7 +19,27 @@ class RuntimeLoop;
 // Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
-    class State;
+    // Owned by the controller; TUN handles and the socket writer borrow it.
+    class State {
+    public:
+        winrt::Windows::Networking::Vpn::VpnChannel channel;
+        // Held throughout native delivery and callback removal. The current Tun is
+        // borrowed under this gate; its destructor unpublishes it before returning.
+        std::mutex receive_mutex;
+        Tun *tun = nullptr;
+        Socket::Receiver link_receive;
+
+        struct Counters {
+            // Native receives hold receive_mutex. Writes run on the looper.
+            // Snapshot all counters on the looper with receive_mutex held.
+            uint64_t tun_read = 0, tun_dropped = 0, link_send = 0, link_send_failed = 0;
+            uint64_t link_read = 0, tun_write = 0, tun_write_failed = 0;
+        } counters;
+
+        explicit State(winrt::Windows::Networking::Vpn::VpnChannel const &value) : channel(value) {}
+
+        int32_t Write(const uint8_t *bytes, size_t length, bool send);
+    };
     friend class TunnelController;
 
 public:
@@ -54,8 +75,14 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    RuntimeLoop &Loop() const { return loop_; }
-    NetworkMonitor &Monitor() { return monitor_; }
+
+    RuntimeLoop &Loop() const {
+        return loop_;
+    }
+
+    NetworkMonitor &Monitor() {
+        return monitor_;
+    }
 
     std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;
