@@ -229,6 +229,10 @@ pub fn build(b: *std.Build) void {
 
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
+    if (target.result.os.tag != .windows) {
+        test_module.addIncludePath(b.path("cross/posix/include"));
+        addCSourceFiles(test_module, &.{"cross/posix/tun.c"});
+    }
     linkVendorLibraries(test_module, b, config, true);
     test_module.addImport("source", test_source_module);
 

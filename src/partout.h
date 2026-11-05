@@ -69,9 +69,6 @@ typedef struct {
 /* Opaque TUN handle. */
 typedef struct __partout_tun_struct *partout_tun;
 
-/* Opens a Linux/macOS TUN device. Unsupported platforms return NULL. */
-partout_tun partout_tun_open(const char *uuid);
-
 /* Wraps a native TUN descriptor, or returns NULL on failure.
  * If owned, the core takes ownership on success and closes it on release.
  * Otherwise, the caller must keep the descriptor open until TUN release.

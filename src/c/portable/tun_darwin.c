@@ -11,12 +11,7 @@
 
 #include "portable/io_posix.h"
 #include <sys/socket.h>
-#include <sys/ioctl.h>
 #include <sys/uio.h>
-#include <net/if.h>
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 #include "portable/endian.h"
 
@@ -25,65 +20,6 @@ struct __partout_tun_struct {
     bool owned;
     const char *dev_name;
 };
-
-#if PARTOUT_MACOS
-#include <sys/sys_domain.h>
-#include <sys/kern_control.h>
-#include <net/if_utun.h>
-
-pp_tun pp_tun_open(const char *uuid) {
-    (void)uuid;
-    struct sockaddr_ctl sc = { 0 };
-    struct ctl_info ctl_info = { 0 };
-    char ifname[IFNAMSIZ] = { 0 };
-    socklen_t ifname_len = sizeof(ifname);
-    int fd = -1;
-
-    fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
-    if (fd < 0) {
-        pp_clog(PPLogLevelFault, "tun_darwin: socket(PF_SYSTEM)");
-        goto failure;
-    }
-
-    strncpy(ctl_info.ctl_name, UTUN_CONTROL_NAME, sizeof(ctl_info.ctl_name));
-    int ret;
-    PP_IO_RETRY(ret, ioctl(fd, CTLIOCGINFO, &ctl_info));
-    if (ret < 0) {
-        pp_clog(PPLogLevelFault, "tun_darwin: ioctl(CTLIOCGINFO)");
-        goto failure;
-    }
-
-    sc.sc_id = ctl_info.ctl_id;
-    sc.sc_len = sizeof(sc);
-    sc.sc_family = AF_SYSTEM;
-    sc.ss_sysaddr = AF_SYS_CONTROL;
-    sc.sc_unit = 0;  // First free utunX
-    PP_IO_RETRY(ret, connect(fd, (struct sockaddr *)&sc, sizeof(sc)));
-    if (ret < 0) {
-        pp_clog_v(PPLogLevelFault, "tun_darwin: connect(AF_SYSTEM, AF_SYS_CONTROL): %s", strerror(errno));
-        goto failure;
-    }
-
-    // Get actual name
-    if (getsockopt(fd, SYSPROTO_CONTROL, UTUN_OPT_IFNAME,
-                   ifname, &ifname_len) == -1) {
-        pp_clog(PPLogLevelFault, "tun_darwin: getsockopt(UTUN_OPT_IFNAME)");
-        goto failure;
-    }
-
-    pp_clog_v(PPLogLevelInfo, "tun_darwin: Created utun device %s", ifname);
-    pp_tun tun = pp_alloc(sizeof(*tun));
-    tun->fd = fd;
-    tun->owned = true;
-    tun->dev_name = pp_dup(ifname);
-    return tun;
-
-failure:
-    if (fd != -1) close(fd);
-    return NULL;
-}
-
-#endif
 
 pp_tun pp_tun_wrap_fd(int fd, bool owned) {
     if (fd < 0) return NULL;

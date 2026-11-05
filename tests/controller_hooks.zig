@@ -1,13 +1,16 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
+const builtin = @import("builtin");
 const source = @import("source");
 const c = source.abi_helpers.partout_c;
 const io = source.ffi.io;
 const Platform = source.net_platform.Platform;
+extern "c" fn partout_tun_open(uuid: [*c]const u8) c.partout_tun;
+
 fn setDelegate(_: ?*anyopaque, _: [*c]const c.partout_controller_delegate) callconv(.c) void {}
 fn setTunnel(_: ?*anyopaque, uuid: [*c]const u8, _: [*c]const u8) callconv(.c) c.partout_tun {
-    if (comptime @hasDecl(io, "pp_tun_open")) return @ptrCast(io.pp_tun_open(uuid));
+    if (comptime builtin.os.tag != .windows) return partout_tun_open(uuid);
     return null;
 }
 fn report(_: ?*anyopaque, _: [*c]const u8) callconv(.c) void {}

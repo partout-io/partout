@@ -9,7 +9,8 @@ then invokes `release`. Generated language models remain in the native SDKs.
 Low-level I/O remains in the core. Apple’s runtime finds and duplicates the
 NetworkExtension descriptor; Android’s runtime borrows its VPN service descriptor.
 Both use `partout_tun_wrap_fd`: Apple passes `owned=true`, Android `owned=false`.
-The core also retains `partout_tun_open` for Linux/macOS devices.
+The POSIX runtime provides `partout_tun_open` for Linux/macOS devices and passes
+`owned=true` to the core wrapper.
 
 * Apple: SwiftPM's `PartoutRuntime` supplies callbacks directly. It needs only
   the public C header, without exported Swift callback names or symbol lookup.
