@@ -24,6 +24,7 @@ FetchContent_MakeAvailable(json)
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
 add_library(partout-windows-backend STATIC
     cross/windows/src/abi.cc
+    cross/windows/src/controller.cc
     cross/windows/src/loop.cc
     cross/windows/src/network.cc
     cross/windows/src/socket.cc

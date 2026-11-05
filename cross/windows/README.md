@@ -14,7 +14,7 @@ VPN plugin -> partout_windows.h -> src/runtime.cc -> Partout public API
                                               -> Partout::TunnelController
 Partout io_windows.zig       -> windows/abi.h -> src/abi.cc
 Partout looper_windows.zig   -> windows/abi.h -> src/abi.cc
-Runtime callback table      -> src/platform.cc -> src/tun.cc
+Runtime callback table      -> src/platform.cc -> src/controller.cc
 ```
 
 ## Where code belongs
@@ -26,7 +26,8 @@ Runtime callback table      -> src/platform.cc -> src/tun.cc
 | `include/windows/log.h` | Native logging boundary. |
 | `src/runtime.cc` | Integrates VPN plugin callbacks with Partout; supplies the runtime-owned controller callbacks. |
 | `src/socket.h`, `src/socket.cc` | Private `Partout::Socket`, owning UDP/TCP transports, callbacks, reads, writes and callback lifetime. |
-| `src/tun.h`, `src/tun.cc` | Private `Partout::TunnelController`, transport association and channel startup/stop. |
+| `src/tun.h`, `src/tun.cc` | Private TUN handles, packet writes, and shared channel state. |
+| `src/controller.cc` | `Partout::TunnelController`, transport association and channel startup/stop. |
 | `src/loop.h`, `src/loop.cc` | Persistent native command worker; no output queue or timer scheduler. |
 | `src/abi.h`, `src/abi.cc` | C ABI loop handles, endpoint ownership and scheduling, address conversions, native socket policy tokens and link setup. |
 | `src/platform.cc` | Builds the public controller callback table for the runtime. |
