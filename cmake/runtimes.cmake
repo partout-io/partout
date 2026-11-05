@@ -7,6 +7,7 @@ endif()
 
 # Native integration layers consume the public core ABI.
 if(TARGET partout-windows-backend)
+    include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
     add_library(partout-windows STATIC
         cross/windows/src/runtime.cc
         cross/windows/src/platform.cc
@@ -23,7 +24,7 @@ if(TARGET partout-windows-backend)
         MSVC_RUNTIME_CHECKS ""
     )
     target_link_libraries(partout-windows
-        PUBLIC Partout::Partout windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE nlohmann_json::nlohmann_json
     )
 

@@ -46,3 +46,8 @@ if(TARGET partout-posix-runtime)
     install(TARGETS partout-posix-runtime ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES cross/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
+
+if(TARGET partout-models)
+    install(TARGETS partout-models ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
