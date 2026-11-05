@@ -23,7 +23,9 @@ if(ANDROID)
         cross/android/native/jni.c
         cross/android/native/partout_jni.c)
     add_library(Partout::AndroidRuntime ALIAS partout-android-runtime)
-    set_target_properties(partout-android-runtime PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(partout-android-runtime PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        C_VISIBILITY_PRESET hidden)
     target_include_directories(partout-android-runtime PRIVATE src)
     target_link_libraries(partout-android-runtime PUBLIC Partout::Partout android log)
 elseif(UNIX)
