@@ -65,7 +65,7 @@ typedef struct {
 /* Existing native controller hooks. No generated models cross this interface.
  * TUN handles use the core's native representation and ownership rules; this
  * does not introduce a replacement transport API. */
-typedef struct __pp_tun_struct *partout_tun;
+typedef struct __partout_tun_struct *partout_tun;
 
 /* Low-level TUN construction for controller callbacks. Unsupported platforms
  * return NULL. The core releases returned handles after accepting set_tunnel.

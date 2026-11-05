@@ -17,7 +17,7 @@
 #include <unistd.h>
 #include <sys/socket.h>
 
-struct __pp_tun_struct {
+struct __partout_tun_struct {
     pp_fd fd;
 };
 

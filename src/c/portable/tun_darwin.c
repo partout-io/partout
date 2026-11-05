@@ -34,7 +34,7 @@
 
 #define PP_TUN_NE_FD_MAX 1024
 
-struct __pp_tun_struct {
+struct __partout_tun_struct {
     pp_fd fd;
     const char *dev_name;
 };

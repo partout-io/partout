@@ -14,7 +14,7 @@
 #pragma clang assume_nonnull begin
 
 /* Opaque tun device. */
-typedef struct __pp_tun_struct *pp_tun;
+typedef struct __partout_tun_struct *pp_tun;
 
 #if PARTOUT_ANDROID
 pp_tun _Nullable pp_tun_borrow_fd(int fd);

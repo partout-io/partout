@@ -19,7 +19,7 @@
 #include <sys/ioctl.h>
 #include <sys/unistd.h>
 
-struct __pp_tun_struct {
+struct __partout_tun_struct {
     pp_fd fd;
     const char *dev_name;
 };
