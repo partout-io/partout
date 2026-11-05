@@ -121,9 +121,9 @@ pub const DaemonRuntime = struct {
         HTTPProxy: void,
         IP: void,
         OnDemand: void,
-        OpenVPN: openvpn.ConnectionContext,
+        OpenVPN: if (build_options.openvpn) openvpn.ConnectionContext else void,
         Provider: void,
-        WireGuard: wireguard.ConnectionContext,
+        WireGuard: if (build_options.wireguard) wireguard.ConnectionContext else void,
         Undefined: void,
     };
 
