@@ -86,7 +86,7 @@ void RuntimeLoop::Run() {
             command();
         } catch (...) {
             windows_log(WindowsLogError, "Partout::RuntimeLoop: command failed: HRESULT=0x%08x",
-                      static_cast<unsigned>(winrt::to_hresult().value));
+                        static_cast<unsigned>(winrt::to_hresult().value));
         }
     }
     // Cached activation factories must not survive the apartment that supplied

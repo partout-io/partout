@@ -67,7 +67,7 @@ typedef struct {
  * Borrows the active runtime's loop; fails if no runtime is active. The owner
  * must outlive all transports and drain their queued destruction. */
 windows_transport *windows_connect(const char *host, uint16_t port,
-                               const windows_connect_options *options);
+                                   const windows_connect_options *options);
 
 /* Explicit owner API for standalone native consumers and tests. Only one loop
  * may be active. VpnChannelRuntime owns its loop directly in C++.

@@ -88,47 +88,53 @@ struct SocketHandle {
 
     windows_transport api{
         .context = this,
-        .release = [](void *raw) {
-            auto self = static_cast<SocketHandle *>(raw);
-            self->socket->StopWrites();
-            self->Subscribe(nullptr, nullptr);
-            // Drain callbacks now; destroy on the worker after accepted commands.
-            try {
-                self->loop.Schedule([self] {
-                    delete self;
-                });
-            } catch (...) {
-                self->loop.Perform([self] {
-                    delete self;
-                });
-            }
-        },
-        .subscribe = [](void *raw, windows_receive receive, void *receive_context) {
-            auto self = static_cast<SocketHandle *>(raw);
-            try {
-                return self->Subscribe(receive, receive_context);
-            } catch (...) {
-                return false;
-            }
-        },
-        .resume = [](void *raw) {
-            return static_cast<SocketHandle *>(raw)->ResumeReading();
-        },
-        .stop = [](void *raw) {
-            static_cast<SocketHandle *>(raw)->socket->StopWrites();
-        },
-        .write = [](void *raw, const uint8_t *bytes, size_t size, const windows_address *destination) {
-            Partout::SocketAddress address{};
-            if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
-            return static_cast<SocketHandle *>(raw)->Write(bytes, size,
-                                                           destination ? &address : nullptr);
-        },
-        .local_address = [](void *raw, windows_address *result) {
-            Partout::SocketAddress address{};
-            if (!static_cast<SocketHandle *>(raw)->GetAddress(&address)) return false;
-            *result = ConvertAddress<windows_address>(address);
-            return true;
-        },
+        .release =
+            [](void *raw) {
+                auto self = static_cast<SocketHandle *>(raw);
+                self->socket->StopWrites();
+                self->Subscribe(nullptr, nullptr);
+                // Drain callbacks now; destroy on the worker after accepted commands.
+                try {
+                    self->loop.Schedule([self] {
+                        delete self;
+                    });
+                } catch (...) {
+                    self->loop.Perform([self] {
+                        delete self;
+                    });
+                }
+            },
+        .subscribe =
+            [](void *raw, windows_receive receive, void *receive_context) {
+                auto self = static_cast<SocketHandle *>(raw);
+                try {
+                    return self->Subscribe(receive, receive_context);
+                } catch (...) {
+                    return false;
+                }
+            },
+        .resume =
+            [](void *raw) {
+                return static_cast<SocketHandle *>(raw)->ResumeReading();
+            },
+        .stop =
+            [](void *raw) {
+                static_cast<SocketHandle *>(raw)->socket->StopWrites();
+            },
+        .write =
+            [](void *raw, const uint8_t *bytes, size_t size, const windows_address *destination) {
+                Partout::SocketAddress address{};
+                if (destination) address = ConvertAddress<Partout::SocketAddress>(*destination);
+                return static_cast<SocketHandle *>(raw)->Write(bytes, size,
+                                                               destination ? &address : nullptr);
+            },
+        .local_address =
+            [](void *raw, windows_address *result) {
+                Partout::SocketAddress address{};
+                if (!static_cast<SocketHandle *>(raw)->GetAddress(&address)) return false;
+                *result = ConvertAddress<windows_address>(address);
+                return true;
+            },
         .unconnected = socket->IsUnconnected()};
 };
 
@@ -167,42 +173,48 @@ struct TunHandle {
 
     windows_transport api{
         .context = this,
-        .release = [](void *raw) {
-            auto self = static_cast<TunHandle *>(raw);
-            self->tun->StopWrites();
-            self->Subscribe(nullptr, nullptr);
-            // The controller outlives this handle and its queued writes/destruction.
-            try {
-                self->loop.Schedule([self] {
-                    delete self;
-                });
-            } catch (...) {
-                self->loop.Perform([self] {
-                    delete self;
-                });
-            }
-        },
-        .subscribe = [](void *raw, windows_receive receive, void *receive_context) {
-            try {
-                return static_cast<TunHandle *>(raw)->Subscribe(receive, receive_context);
-            } catch (...) {
-                return false;
-            }
-        },
+        .release =
+            [](void *raw) {
+                auto self = static_cast<TunHandle *>(raw);
+                self->tun->StopWrites();
+                self->Subscribe(nullptr, nullptr);
+                // The controller outlives this handle and its queued writes/destruction.
+                try {
+                    self->loop.Schedule([self] {
+                        delete self;
+                    });
+                } catch (...) {
+                    self->loop.Perform([self] {
+                        delete self;
+                    });
+                }
+            },
+        .subscribe =
+            [](void *raw, windows_receive receive, void *receive_context) {
+                try {
+                    return static_cast<TunHandle *>(raw)->Subscribe(receive, receive_context);
+                } catch (...) {
+                    return false;
+                }
+            },
         // TUN admission is controlled by the consumer; there is no native read loop.
-        .resume = [](void *) {
-            return true;
-        },
-        .stop = [](void *raw) {
-            static_cast<TunHandle *>(raw)->tun->StopWrites();
-        },
-        .write = [](void *raw, const uint8_t *bytes, size_t size, const windows_address *) {
-            return static_cast<TunHandle *>(raw)->Write(bytes, size);
-        },
+        .resume =
+            [](void *) {
+                return true;
+            },
+        .stop =
+            [](void *raw) {
+                static_cast<TunHandle *>(raw)->tun->StopWrites();
+            },
+        .write =
+            [](void *raw, const uint8_t *bytes, size_t size, const windows_address *) {
+                return static_cast<TunHandle *>(raw)->Write(bytes, size);
+            },
         // A channel TUN has no bound socket address.
-        .local_address = [](void *, windows_address *) {
-            return false;
-        },
+        .local_address =
+            [](void *, windows_address *) {
+                return false;
+            },
         .unconnected = false};
 };
 } // namespace
@@ -259,28 +271,25 @@ void windows_loop_free(windows_loop loop) {
 }
 
 windows_transport *windows_connect(const char *host, uint16_t port,
-                               const windows_connect_options *options) {
+                                   const windows_connect_options *options) {
     try {
         auto loop = Partout::RuntimeLoop::Current();
         if (!loop) return nullptr;
-        return loop->Perform([
-            loop, host = std::string{host}, port,
-            settings = *options
-        ]() -> windows_transport * {
-            std::unique_ptr<Partout::Socket> socket = std::make_unique<Partout::Socket>(
-                settings.tcp ? Partout::SocketProtoTCP : Partout::SocketProtoUDP,
-                settings.unconnected
-            );
-            auto handle = std::make_unique<SocketHandle>(*loop, std::move(socket));
-            const uintptr_t socket_token = reinterpret_cast<uintptr_t>(handle.get());
-            if (settings.configure && !settings.configure(settings.context, socket_token))
-                return nullptr;
-            Partout::SocketOpenOptions options{settings.dual_stack, settings.timeout_ms};
-            if (!handle->socket->Open(host.c_str(), port, &options)) return nullptr;
-            auto api = &handle->api;
-            handle.release();
-            return api;
-        });
+        return loop->Perform(
+            [loop, host = std::string{host}, port, settings = *options]() -> windows_transport * {
+                std::unique_ptr<Partout::Socket> socket = std::make_unique<Partout::Socket>(
+                    settings.tcp ? Partout::SocketProtoTCP : Partout::SocketProtoUDP,
+                    settings.unconnected);
+                auto handle = std::make_unique<SocketHandle>(*loop, std::move(socket));
+                const uintptr_t socket_token = reinterpret_cast<uintptr_t>(handle.get());
+                if (settings.configure && !settings.configure(settings.context, socket_token))
+                    return nullptr;
+                Partout::SocketOpenOptions options{settings.dual_stack, settings.timeout_ms};
+                if (!handle->socket->Open(host.c_str(), port, &options)) return nullptr;
+                auto api = &handle->api;
+                handle.release();
+                return api;
+            });
     } catch (...) {
         return nullptr;
     }

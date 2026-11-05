@@ -19,12 +19,14 @@ partout_controller_functions ControllerFunctions() {
             return;
         }
         controller->Monitor().Start([callbacks = *delegate](bool reachable, bool changed) {
-            windows_log(WindowsLogInfo, "Partout: physical network changed: reachable=%s, refresh=%s",
-                      reachable ? "true" : "false", changed ? "true" : "false");
+            windows_log(WindowsLogInfo,
+                        "Partout: physical network changed: reachable=%s, refresh=%s",
+                        reachable ? "true" : "false", changed ? "true" : "false");
             const partout_reachability info{reachable};
             if (callbacks.on_reachability) callbacks.on_reachability(callbacks.ctx, &info);
             // Notify the daemon that the available physical path has changed.
-            if (changed && reachable && callbacks.on_better_path) callbacks.on_better_path(callbacks.ctx);
+            if (changed && reachable && callbacks.on_better_path)
+                callbacks.on_better_path(callbacks.ctx);
         });
     };
     functions.set_tunnel = [](void *raw, const char *, const char *json) -> partout_tun {
@@ -40,7 +42,7 @@ partout_controller_functions ControllerFunctions() {
             });
         } catch (...) {
             windows_log(WindowsLogError, "Partout: channel open failed: HRESULT=0x%08x",
-                      static_cast<unsigned>(winrt::to_hresult().value));
+                        static_cast<unsigned>(winrt::to_hresult().value));
             return nullptr;
         }
     };
@@ -58,7 +60,8 @@ partout_controller_functions ControllerFunctions() {
     functions.cancel_tunnel = [](void *, const char *) {
         // FIXME: ###, Cancel the tunnel connection.
     };
-    functions.configure_sockets = [](void *raw, const partout_reachability *, const partout_socket_descriptor *tokens, size_t count) {
+    functions.configure_sockets = [](void *raw, const partout_reachability *,
+                                     const partout_socket_descriptor *tokens, size_t count) {
         if (count && !tokens) return false;
         auto controller = static_cast<TunnelController *>(raw);
         for (size_t i = 0; i < count; ++i) {
@@ -68,4 +71,4 @@ partout_controller_functions ControllerFunctions() {
     };
     return functions;
 }
-}
+} // namespace Partout

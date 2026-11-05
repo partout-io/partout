@@ -9,7 +9,6 @@
 #include <memory>
 #include <winrt/Windows.Networking.Vpn.h>
 
-
 namespace Partout {
 
 // One runtime per channel. Callbacks must be serialized by the consumer.
@@ -18,17 +17,16 @@ namespace Partout {
 class VpnChannelRuntime {
 public:
     VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-                                        const char *profile, const partout_init_args &init_args,
-                                        const partout_daemon_options &options);
+                      const char *profile, const partout_init_args &init_args,
+                      const partout_daemon_options &options);
     ~VpnChannelRuntime();
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
 
     void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    void
-    GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-                        winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
+    void GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+                             winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
     void
     Encapsulate(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                 winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets,

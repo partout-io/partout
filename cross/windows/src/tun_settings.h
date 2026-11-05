@@ -14,7 +14,7 @@ struct DNSModule;
 struct IPModule;
 struct IPSettings;
 struct Route;
-}
+} // namespace Models
 
 // Validated channel settings from negotiated IP/DNS modules.
 class TunSettings {

@@ -156,7 +156,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
         }
     } catch (...) {
         windows_log(WindowsLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
-                  static_cast<unsigned int>(to_hresult().value));
+                    static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -220,8 +220,8 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
         windows_log(WindowsLogInfo,
-                  "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
-                  settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
+                    "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
+                    settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
     std::lock_guard lock(state_->receive_mutex);
     state_->tun = tun.get();
@@ -252,7 +252,7 @@ void TunnelController::Close() noexcept {
             started_ = false;
         } catch (...) {
             windows_log(WindowsLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
-                      static_cast<unsigned int>(to_hresult().value));
+                        static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
         {
@@ -260,12 +260,12 @@ void TunnelController::Close() noexcept {
             counters = state_->counters;
         }
         windows_log(WindowsLogInfo,
-                  "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
-                  "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
-                  "tun_write_failed=%llu",
-                  counters.tun_read, counters.tun_dropped, counters.link_send,
-                  counters.link_send_failed, counters.link_read, counters.tun_write,
-                  counters.tun_write_failed);
+                    "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
+                    "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
+                    "tun_write_failed=%llu",
+                    counters.tun_read, counters.tun_dropped, counters.link_send,
+                    counters.link_send_failed, counters.link_read, counters.tun_write,
+                    counters.tun_write_failed);
     }
     // Release setup resources even if channel startup failed.
     try {

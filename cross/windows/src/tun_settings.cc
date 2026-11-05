@@ -82,10 +82,10 @@ void TunSettings::ApplyDNS(const Models::DNSModule &settings) {
 
     const auto names = settings.searchDomains.value_or(std::vector<std::string>{});
     const auto policy = settings.domainPolicy
-        ? settings.domainPolicy->value
-        : Models::DNSModuleDomainPolicy::INVALID_VALUE_OPENAPI_GENERATED;
+                            ? settings.domainPolicy->value
+                            : Models::DNSModuleDomainPolicy::INVALID_VALUE_OPENAPI_GENERATED;
     const bool match = policy == Models::DNSModuleDomainPolicy::match ||
-        policy == Models::DNSModuleDomainPolicy::matchAndSearch;
+                       policy == Models::DNSModuleDomainPolicy::matchAndSearch;
     const auto proxies = single_threaded_vector<HostName>();
     if (match && !names.empty()) {
         for (const auto &name : names)
@@ -151,8 +151,9 @@ TunSettings::VpnRoute TunSettings::ParseSubnet(const hstring &text, HostNameType
     return VpnRoute{HostName{address}, static_cast<uint8_t>(prefix)};
 }
 
-TunSettings::RouteList TunSettings::ReadRoutes(const std::vector<Models::Route> &settings, RouteList routes,
-                                               HostNameType family, bool included) {
+TunSettings::RouteList TunSettings::ReadRoutes(const std::vector<Models::Route> &settings,
+                                               RouteList routes, HostNameType family,
+                                               bool included) {
     if (!routes) routes = single_threaded_vector<VpnRoute>();
     const bool v4 = family == HostNameType::Ipv4;
     for (const auto &route : settings) {

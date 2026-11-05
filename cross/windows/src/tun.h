@@ -54,8 +54,14 @@ public:
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    RuntimeLoop &Loop() const { return loop_; }
-    NetworkMonitor &Monitor() { return monitor_; }
+
+    RuntimeLoop &Loop() const {
+        return loop_;
+    }
+
+    NetworkMonitor &Monitor() {
+        return monitor_;
+    }
 
     std::unique_ptr<Tun> Open(const char *info_json);
     void Close() noexcept;

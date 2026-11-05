@@ -16,7 +16,6 @@
 
 #include "models/ConnectionStatus.h"
 
-
 using namespace winrt;
 using namespace winrt::Windows::Networking::Vpn;
 
@@ -64,8 +63,7 @@ struct VpnChannelRuntime::Impl {
             startup_status = StartupStatus::connected;
             break;
         case Status::disconnected:
-            if (startup_status == StartupStatus::connecting)
-                startup_status = StartupStatus::failed;
+            if (startup_status == StartupStatus::connecting) startup_status = StartupStatus::failed;
             break;
         default:
             break;
