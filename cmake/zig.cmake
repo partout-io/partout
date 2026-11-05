@@ -2,12 +2,16 @@ if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
 
+if(WIN32 AND NOT MSVC)
+    message(FATAL_ERROR "The Windows core DLL requires MSVC")
+endif()
+set(PARTOUT_ZIG_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/zig-core")
+
 # Build options and enabled backends.
 set(PARTOUT_ZIG_ARGS build install
-    --prefix "${PP_BUILD_OUTPUT}/partout"
+    --prefix "${PARTOUT_ZIG_PREFIX}"
     "-Drelease=$<IF:$<CONFIG:Debug>,false,true>"
     "-Dstrip=$<IF:$<CONFIG:Debug,RelWithDebInfo>,false,true>"
-    "-Dshared=$<IF:$<BOOL:${APPLE}>,false,true>"
 )
 
 if(PP_BUILD_USE_OPENSSL)
@@ -102,84 +106,89 @@ endif()
 if(PP_BUILD_WINDOWS)
     list(APPEND PARTOUT_ZIG_ARGS "-Dwindows-lib=$<TARGET_LINKER_FILE:partout-windows-backend>")
 endif()
-# Compile the core; Apple links the resulting archive below.
+# Zig compiles the static core; CMake owns the final shared library.
 find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
-if(WIN32)
-    set(PARTOUT_LINK_LIBRARY "${PP_BUILD_OUTPUT}/partout/lib/partout.lib")
-    set(PARTOUT_ZIG_BYPRODUCTS
-        "${PARTOUT_LINK_LIBRARY}"
-        "${PP_BUILD_OUTPUT}/partout/bin/partout.dll"
-    )
-else()
-    set(PARTOUT_LINK_LIBRARY
-        "${PP_BUILD_OUTPUT}/partout/lib/${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}")
-    set(PARTOUT_ZIG_BYPRODUCTS "${PARTOUT_LINK_LIBRARY}")
-endif()
-
-set(PARTOUT_COMPILE_TARGET partout)
-if(APPLE)
-    set(PARTOUT_COMPILE_TARGET partout-zig)
-    set(PARTOUT_ZIG_BYPRODUCTS "${PP_BUILD_OUTPUT}/partout/lib/libpartout.a")
-endif()
-add_custom_target(${PARTOUT_COMPILE_TARGET} ALL
+set(PARTOUT_ZIG_LIBRARY "${PARTOUT_ZIG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}")
+add_custom_target(partout-zig ALL
     COMMAND "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
-    BYPRODUCTS ${PARTOUT_ZIG_BYPRODUCTS}
+    BYPRODUCTS ${PARTOUT_ZIG_LIBRARY}
     WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
     USES_TERMINAL
     COMMAND_EXPAND_LISTS
     VERBATIM
 )
 if(PP_BUILD_USE_WIREGUARD)
-    add_dependencies(${PARTOUT_COMPILE_TARGET} partout-wg-go)
+    add_dependencies(partout-zig partout-wg-go)
 endif()
 if(PP_BUILD_WINDOWS)
-    add_dependencies(${PARTOUT_COMPILE_TARGET} partout-windows-backend)
+    add_dependencies(partout-zig partout-windows-backend)
 endif()
+
+set_source_files_properties("${PARTOUT_ZIG_LIBRARY}" PROPERTIES GENERATED TRUE)
+add_library(partout SHARED "${PARTOUT_ZIG_LIBRARY}")
+set_target_properties(partout PROPERTIES
+    LINKER_LANGUAGE C
+    LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
+    RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+    ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
+    LINK_DEPENDS "${PARTOUT_ZIG_LIBRARY}"
+)
+add_dependencies(partout partout-zig)
+add_library(Partout::Partout ALIAS partout)
+target_include_directories(partout INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(partout PRIVATE
+    "$<LINK_LIBRARY:WHOLE_ARCHIVE,${PARTOUT_ZIG_LIBRARY}>"
+    ${PARTOUT_CORE_LIBRARIES})
+
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
+list(TRANSFORM partout_exports REPLACE "^_" "")
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
 
 if(APPLE)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
         "Install name for the Apple shared library")
-    set_source_files_properties(${PARTOUT_ZIG_BYPRODUCTS} PROPERTIES GENERATED TRUE)
-    add_library(partout SHARED ${PARTOUT_ZIG_BYPRODUCTS})
-    set_target_properties(partout PROPERTIES
-        LINKER_LANGUAGE C
-        LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib"
-        OUTPUT_NAME partout
-        NO_SONAME TRUE
-    )
-    add_dependencies(partout partout-zig)
+    set_target_properties(partout PROPERTIES NO_SONAME TRUE)
     target_link_options(partout PRIVATE
         "LINKER:-install_name,${PP_BUILD_APPLE_INSTALL_NAME}"
         "LINKER:-compatibility_version,1.0.0" "LINKER:-current_version,1.0.0"
         "LINKER:-dead_strip" "LINKER:-rpath,@loader_path"
         "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
-        "LINKER:-force_load,${PP_BUILD_OUTPUT}/partout/lib/libpartout.a"
     )
     set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" ${PARTOUT_ZIG_BYPRODUCTS})
-    target_link_libraries(partout PRIVATE ${PARTOUT_APPLE_LIBRARIES}
-        "-framework CoreFoundation" "-framework Security")
-    if(PP_BUILD_USE_WIREGUARD)
-        target_link_libraries(partout PRIVATE Partout::WireGuard)
-    endif()
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports")
+    target_link_libraries(partout PRIVATE "-framework CoreFoundation" "-framework Security")
 endif()
 
-# Expose the core and its runtime dependencies to consumers.
-file(MAKE_DIRECTORY "${PP_BUILD_OUTPUT}/partout/include")
-add_library(Partout::Partout SHARED IMPORTED GLOBAL)
 if(WIN32)
-    set_target_properties(Partout::Partout PROPERTIES
-        IMPORTED_IMPLIB "${PARTOUT_LINK_LIBRARY}"
-        IMPORTED_LOCATION "${PP_BUILD_OUTPUT}/partout/bin/partout.dll"
+    set_target_properties(partout PROPERTIES
+        PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+        MSVC_RUNTIME_CHECKS ""
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
     )
-else()
-    set_target_properties(Partout::Partout PROPERTIES
-        IMPORTED_LOCATION "${PARTOUT_LINK_LIBRARY}"
-        IMPORTED_SONAME "${CMAKE_SHARED_LIBRARY_PREFIX}partout${CMAKE_SHARED_LIBRARY_SUFFIX}"
-    )
+    # Export the C ABI from the Zig archive; CMake exports the backend objects.
+    foreach(symbol IN LISTS partout_exports)
+        target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
+    endforeach()
+    target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32)
+    if(PP_BUILD_WINDOWS)
+        target_sources(partout PRIVATE
+            $<TARGET_OBJECTS:partout-windows-backend>
+            $<TARGET_OBJECTS:partout-windows-models>)
+        target_link_libraries(partout PRIVATE partout-windows-backend)
+        set_property(TARGET partout PROPERTY LINKER_LANGUAGE CXX)
+    endif()
+elseif(NOT APPLE)
+    find_package(Threads REQUIRED)
+    target_link_libraries(partout PRIVATE Threads::Threads ${CMAKE_DL_LIBS} m)
+    set_target_properties(partout PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
+    if(ANDROID)
+        target_link_libraries(partout PRIVATE android)
+    endif()
+    list(JOIN partout_exports "; " partout_elf_exports)
+    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
+        CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY)
+    target_link_options(partout PRIVATE "LINKER:-z,defs"
+        "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+    set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
 endif()
-add_dependencies(Partout::Partout partout)
-set_target_properties(Partout::Partout PROPERTIES
-    INTERFACE_INCLUDE_DIRECTORIES "${PP_BUILD_OUTPUT}/partout/include"
-    INTERFACE_LINK_LIBRARIES "${PARTOUT_RUNTIME_LIBRARIES}"
-)

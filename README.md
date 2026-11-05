@@ -42,8 +42,19 @@ targets: [
 
 CMake orchestrates the complete native build. It resolves the selected vendors,
 builds the Go bridge when WireGuard is enabled, and invokes Zig with their include
-and library paths. On Apple platforms, CMake links the Zig archive and selected
-backends into the final shared library with the native linker.
+and library paths. Zig always builds a static core archive. CMake links that
+archive and the selected backends into the final shared library on every platform.
+Native runtime targets link against `Partout::Partout`.
+
+Dependencies are resolved from existing targets or installed CMake packages first.
+Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During
+cross-compilation, supply packages built for the target platform; host packages
+are not searched implicitly. If a package is unavailable, set
+`PP_BUILD_VENDOR_PREBUILT_URL` to download the matching prebuilt archive. Existing
+Apple XCFrameworks can be supplied through `PP_BUILD_APPLE_PREBUILTS`.
+Downloaded packages and Apple slices are consumed in place, without copying them
+into the build output. These workflows work directly with CMake, including
+`add_subdirectory()`, without running a preparation script.
 
 #### Requirements
 

@@ -19,7 +19,7 @@ if(TARGET partout-windows-backend)
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
     )
-    target_link_libraries(partout-windows PUBLIC Partout::Partout partout-windows-backend
+    target_link_libraries(partout-windows PUBLIC Partout::Partout windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE nlohmann_json::nlohmann_json)
 
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
@@ -30,7 +30,7 @@ if(TARGET partout-windows-backend)
         target_link_libraries(partout-runtime-link-test PRIVATE msvcrt Partout::WindowsRuntime)
         add_custom_command(TARGET partout-runtime-link-test POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-windows-backend>"
+                "$<TARGET_FILE:Partout::Partout>"
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>")
         add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
     endif()

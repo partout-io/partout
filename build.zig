@@ -133,16 +133,6 @@ pub fn build(b: *std.Build) void {
     const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
     const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
-    const shared = b.option(
-        bool,
-        "shared",
-        "Build Partout as a shared library.",
-    ) orelse false;
-    const install_name = b.option(
-        []const u8,
-        "install-name",
-        "Darwin install name for a shared Partout library.",
-    );
     const use_openvpn = b.option(
         bool,
         "openvpn",
@@ -172,7 +162,7 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const windows_path = pathOption(b, "windows-lib", "MSVC-built private Windows backend import library.", false);
+    const windows_path = pathOption(b, "windows-lib", "MSVC-built static Windows backend library.", false);
     const use_windows = b.option(bool, "windows", "Build and link the Windows bridge (Windows MSVC only).") orelse (windows_path != null);
     if (!use_windows and windows_path != null)
         std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
@@ -205,24 +195,14 @@ pub fn build(b: *std.Build) void {
     const c_bindings = createCBindings(b, config);
 
     const module = createPartoutModule(b, config, c_bindings, "src/partout.zig", true);
-    if (shared) {
-        linkVendorLibraries(module, b, config, false);
-        addRuntimeOrigin(module, target);
-    }
-
+    module.pic = true;
     const lib = b.addLibrary(.{
-        .linkage = if (shared) .dynamic else .static,
+        .linkage = .static,
         .name = "partout",
         .root_module = module,
     });
+    lib.bundle_compiler_rt = true;
     if (windows_build) |bridge| lib.step.dependOn(bridge.step);
-    if (install_name) |value| {
-        if (!shared or !target.result.os.tag.isDarwin()) {
-            std.debug.panic("-Dinstall-name requires a shared Darwin target", .{});
-        }
-        lib.install_name = value;
-    }
-
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
     b.default_step = check;
@@ -245,14 +225,6 @@ pub fn build(b: *std.Build) void {
     unit_tests.step.dependOn(api_codegen_step);
     check.dependOn(&unit_tests.step);
     const run_unit_tests = b.addRunArtifact(unit_tests);
-    if (windows_library) |library| {
-        // Core and SDK share this private backend, including its native loop.
-        const dll = library.dirname().path(b, "partout-windows-backend.dll");
-        const install_backend = b.addInstallBinFile(dll, "partout-windows-backend.dll");
-        b.getInstallStep().dependOn(&install_backend.step);
-        run_unit_tests.step.dependOn(&install_backend.step);
-        run_unit_tests.addPathDir(b.getInstallPath(.bin, ""));
-    }
 
     const test_step = b.step("test", "Run Zig tests");
     test_step.dependOn(&run_unit_tests.step);
@@ -260,7 +232,7 @@ pub fn build(b: *std.Build) void {
     const coverage_step = b.step("coverage", "Run Zig tests under kcov");
     coverage_step.dependOn(&addCoverageRunStep(b, unit_tests).step);
 
-    if (!shared and target.result.os.tag.isDarwin()) {
+    if (target.result.os.tag.isDarwin()) {
         const repacked_lib = addDarwinStaticArchiveRepackStep(b, lib.getEmittedBin());
         b.getInstallStep().dependOn(&b.addInstallLibFile(repacked_lib, "libpartout.a").step);
         b.getInstallStep().dependOn(&b.addInstallHeaderFile(b.path("src/partout.h"), "partout.h").step);
@@ -278,7 +250,7 @@ pub fn build(b: *std.Build) void {
     docs_step.dependOn(&install_docs.step);
 }
 
-// CMake builds the private Windows backend DLL; Zig consumes its import library.
+// CMake builds the static Windows backend with MSVC.
 fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
@@ -447,12 +419,6 @@ fn createPartoutModule(
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
             addCSourceFiles(module, &.{"src/c/portable/tun_windows.c"});
-            if (config.windows_library) |library| {
-                module.addObjectFile(library);
-                module.linkSystemLibrary("windowsapp", .{});
-                module.linkSystemLibrary("runtimeobject", .{});
-                module.linkSystemLibrary("iphlpapi", .{});
-            }
         }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
@@ -609,6 +575,12 @@ fn linkVendorLibraries(
     config: BuildConfig,
     add_library_rpath: bool,
 ) void {
+    if (config.windows_library) |library| {
+        module.addObjectFile(library);
+        module.linkSystemLibrary("windowsapp", .{});
+        module.linkSystemLibrary("runtimeobject", .{});
+        module.linkSystemLibrary("iphlpapi", .{});
+    }
     for (config.vendors.all()) |paths| {
         if (!paths.enabled()) continue;
         if (paths.vendor == .wg_go and !config.wireguard) continue;
@@ -681,17 +653,6 @@ fn linkSystemLibraryNames(
             }
             module.linkSystemLibrary("wg-go", options);
         },
-    }
-}
-
-fn addRuntimeOrigin(
-    module: *std.Build.Module,
-    target: std.Build.ResolvedTarget,
-) void {
-    if (target.result.os.tag.isDarwin()) {
-        module.addRPath(.{ .cwd_relative = "@loader_path" });
-    } else if (target.result.os.tag != .windows) {
-        module.addRPath(.{ .cwd_relative = "$ORIGIN" });
     }
 }
 

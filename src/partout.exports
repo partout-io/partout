@@ -2,7 +2,7 @@
 #
 # SPDX-License-Identifier: GPL-3.0
 
-# Public C ABI symbols exported by the core library on Apple platforms.
+# Public C ABI symbols exported by the core library (Mach-O spelling).
 
 # Initialization and logging
 _partout_version

@@ -36,12 +36,11 @@ Runtime callback table      -> src/platform.cc -> src/tun.cc
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
 | `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-`partout-windows-backend.dll` is a private low-level implementation dependency shared
-by the core and native SDK, so loop and transport state exist only once. It has
-no core ABI dependency. Zig links its import library. `partout-windows.lib` contains
-only the consumer-side runtime and controller adapters; it is not linked into
-`partout.dll`. CMake consumers link `Partout::WindowsRuntime`, which depends on the
-core and private backend.
+CMake uses MSVC to link the Zig core archive and static Windows backend into
+`partout.dll`, so the core and native SDK share one copy of the loop and transport
+state. `partout-windows.lib` contains the consumer-side runtime and controller
+adapters. Consumers link `Partout::WindowsRuntime`, which depends on `partout.dll`.
+Optional vendors may still require their own DLLs.
 
 ## Logging
 
@@ -311,10 +310,11 @@ ctest --test-dir .cmake-models --output-on-failure
 
 ### Native integration
 
-With `PP_BUILD_LIBRARY=ON`, CMake passes the private backend import library to Zig
-through `-Dwindows-lib`. Direct Zig builds can use `-Dwindows=true` to build that backend
-or `-Dwindows-lib=<path>` to reuse its import library. The matching backend DLL must
-be beside that import library; Zig copies it into the installed bin directory.
+CMake owns the Windows DLL link. With `PP_BUILD_LIBRARY=OFF`, it builds only the
+static backend. Direct Zig builds produce the static core archive; use CMake for
+shared builds. Zig tests link the same static backend, selected with
+`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. No backend DLL is
+built or copied.
 Builds without Windows retain low-level cleanup stubs, but have no implicit controller.
 The Windows looper also requires the native backend; without it, creation
 reports `MuxFailure`. Native dispatch tests run when Windows is enabled.
@@ -324,7 +324,7 @@ transport option is needed. The native backend alone does not register a VPN
 plug-in or create a VPN profile; a packaged host must supply those.
 
 The standalone settings mapping test uses real Windows settings objects, without
-a VPN host. From the same developer shell (adjust the backend import library and nlohmann/json
+a VPN host. From the same developer shell (adjust the backend static library and nlohmann/json
 include paths for your build):
 
 ```powershell

@@ -22,7 +22,7 @@ FetchContent_MakeAvailable(json)
 
 # The native backend cannot include Partout headers. Keep it independently
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.
-add_library(partout-windows-backend SHARED
+add_library(partout-windows-backend STATIC
     cross/windows/src/abi.cc
     cross/windows/src/loop.cc
     cross/windows/src/network.cc
@@ -42,7 +42,6 @@ add_library(partout-windows-models OBJECT ${partout_model_sources})
 target_compile_options(partout-windows-models PRIVATE /w)
 target_link_libraries(partout-windows-models PRIVATE nlohmann_json::nlohmann_json)
 target_link_libraries(partout-windows-backend PRIVATE partout-windows-models)
-set_target_properties(partout-windows-backend PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
 
 foreach(target IN ITEMS partout-windows-backend partout-windows-models)
     # Also suppress model header warnings in handwritten translation units.
