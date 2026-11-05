@@ -19,9 +19,9 @@ wrap an Android descriptor borrowed from its VPN service.
 * POSIX: `Partout::PosixRuntime` supplies the existing minimal TUN-only controller
   for command-line consumers. Routing and DNS configuration remain unimplemented;
   the extraction does not add those capabilities.
-* Windows: `Partout::WinRTRuntime` supplies the plugin runtime and callback table.
+* Windows: `Partout::WindowsRuntime` supplies the plugin runtime and callback table.
   Its static library links separately from the core. Both use the private
-  `partout-winrt-backend.dll`, so native loop and transport state are not duplicated.
+  `partout-windows-backend.dll`, so native loop and transport state are not duplicated.
   Deploy that DLL alongside `partout.dll`. It is an implementation dependency,
   not an extension of the public core ABI.
 

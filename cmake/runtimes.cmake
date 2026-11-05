@@ -1,17 +1,17 @@
 # SPDX-FileCopyrightText: 2026 Davide De Rosa
 # SPDX-License-Identifier: GPL-3.0
 
-if(TARGET partout-winrt)
-    target_link_libraries(partout-winrt PUBLIC Partout::Partout)
+if(TARGET partout-windows)
+    target_link_libraries(partout-windows PUBLIC Partout::Partout)
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
     if(PP_TEST_RUNTIME_LINK)
         enable_testing()
         add_executable(partout-runtime-link-test tests/c/windows/runtime_link.cc)
         target_compile_options(partout-runtime-link-test PRIVATE /EHsc)
-        target_link_libraries(partout-runtime-link-test PRIVATE msvcrt Partout::WinRTRuntime)
+        target_link_libraries(partout-runtime-link-test PRIVATE msvcrt Partout::WindowsRuntime)
         add_custom_command(TARGET partout-runtime-link-test POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"
+                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-windows-backend>"
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>")
         add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
     endif()

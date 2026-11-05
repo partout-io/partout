@@ -36,11 +36,11 @@ Runtime callback table      -> src/platform.cc -> src/tun.cc
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
 | `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-`partout-winrt-backend.dll` is a private low-level implementation dependency shared
+`partout-windows-backend.dll` is a private low-level implementation dependency shared
 by the core and native SDK, so loop and transport state exist only once. It has
-no core ABI dependency. Zig links its import library. `partout-winrt.lib` contains
+no core ABI dependency. Zig links its import library. `partout-windows.lib` contains
 only the consumer-side runtime and controller adapters; it is not linked into
-`partout.dll`. CMake consumers link `Partout::WinRTRuntime`, which depends on the
+`partout.dll`. CMake consumers link `Partout::WindowsRuntime`, which depends on the
 core and private backend.
 
 ## Logging
@@ -220,7 +220,7 @@ creates an implicit loop. Only one loop may be active, matching the daemon API.
 
 The Zig core installs only `partout.h`. CMake installs the separate runtime header
 `partout_winrt.h`, its static library, and the private backend DLL. Plugins link
-`Partout::WinRTRuntime` with a compatible MSVC runtime. Backend headers are internal integration interfaces, not installed
+`Partout::WindowsRuntime` with a compatible MSVC runtime. Backend headers are internal integration interfaces, not installed
 plugin headers.
 
 Transport association, socket I/O and the TUN packet bridge are implemented.
@@ -256,7 +256,7 @@ root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-winrt -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINRT=ON -DPP_BUILD_LIBRARY=OFF
-cmake --build .cmake-winrt --target partout-winrt
+cmake --build .cmake-winrt --target partout-windows
 ```
 
 ### OpenAPI models
@@ -328,7 +328,7 @@ a VPN host. From the same developer shell (adjust the backend import library and
 include paths for your build):
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-winrt-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX /Icross/windows/include /Ipath/to/nlohmann/include tests/c/windows/tun_settings.cc /Fo.cmake-winrt/tun-settings-test.obj /Fe.cmake-winrt/tun-settings-test.exe .cmake-winrt/partout-windows-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib
 & .cmake-winrt/tun-settings-test.exe
 ```
 
@@ -336,6 +336,6 @@ The network selection regression test covers simultaneous Wi-Fi and Ethernet
 connectivity, route-cost preference, offline recovery and monitor lifecycle:
 
 ```powershell
-cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-winrt-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
+cl /std:c++20 /EHsc /MD /DNOMINMAX tests/c/windows/network.cc /Fo.cmake-winrt/network-test.obj /Fe.cmake-winrt/network-test.exe .cmake-winrt/partout-windows-backend.lib windowsapp.lib runtimeobject.lib ws2_32.lib iphlpapi.lib
 & .cmake-winrt/network-test.exe
 ```

@@ -243,8 +243,8 @@ pub fn build(b: *std.Build) void {
     const run_unit_tests = b.addRunArtifact(unit_tests);
     if (winrt_library) |library| {
         // Core and SDK share this private backend, including its native loop.
-        const dll = library.dirname().path(b, "partout-winrt-backend.dll");
-        const install_backend = b.addInstallBinFile(dll, "partout-winrt-backend.dll");
+        const dll = library.dirname().path(b, "partout-windows-backend.dll");
+        const install_backend = b.addInstallBinFile(dll, "partout-windows-backend.dll");
         b.getInstallStep().dependOn(&install_backend.step);
         run_unit_tests.step.dependOn(&install_backend.step);
         run_unit_tests.addPathDir(b.getInstallPath(.bin, ""));
@@ -296,10 +296,10 @@ fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
-    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt-backend" });
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-windows-backend" });
     compile.has_side_effects = true;
     return .{
-        .library = directory.path(b, b.fmt("{s}/partout-winrt-backend.lib", .{configuration})),
+        .library = directory.path(b, b.fmt("{s}/partout-windows-backend.lib", .{configuration})),
         .step = &compile.step,
     };
 }

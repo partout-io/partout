@@ -16,8 +16,8 @@ endfunction()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(TARGET partout-winrt)
-    install(TARGETS partout-winrt partout-winrt-backend
+if(TARGET partout-windows)
+    install(TARGETS partout-windows partout-windows-backend
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
