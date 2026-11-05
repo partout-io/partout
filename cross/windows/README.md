@@ -325,7 +325,10 @@ connection request does not imply connection completion; observe `Fetch`.
 
 Include `partout/models/TaggedProfile.h` and `partout/models/TunnelSnapshot.h`
 for its typed arguments and results. The Windows installation includes these
-generated model headers and `partout/json.h`; consumers also supply nlohmann/json.
+generated model headers and `partout/json.h`. `Partout::Models` supplies those
+headers, nlohmann/json, and the core import library. Model implementations live
+only in `partout.dll`; consumers do not link `partout-models.lib`.
+These C++ exports require matching compiler, CRT, and model versions.
 Link `Partout::WindowsRuntime`; it includes the management API and supplies
 `Partout::Models` transitively. Use the same MSVC runtime as the library.
 The API reports native operation names and status codes without configuration

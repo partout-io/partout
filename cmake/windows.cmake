@@ -40,16 +40,16 @@ target_link_libraries(partout-windows-backend
 )
 
 # Keep the standalone backend archive self-contained for Zig tests.
-target_sources(partout-windows-backend PRIVATE $<TARGET_OBJECTS:partout-models>)
-target_link_libraries(partout-windows-backend PRIVATE Partout::Models)
+target_sources(partout-windows-backend PRIVATE $<TARGET_OBJECTS:partout-models-impl>)
+target_link_libraries(partout-windows-backend PRIVATE partout-models-impl)
 # Generated model implementations do not follow our warning policy.
-target_compile_options(partout-models PRIVATE /w)
+target_compile_options(partout-models-impl PRIVATE /w)
 
-foreach(target IN ITEMS partout-windows-backend partout-models)
+foreach(target IN ITEMS partout-windows-backend partout-models-impl)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_definitions(${target} PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
     target_compile_options(${target} PRIVATE /EHsc /permissive-)
-    if(NOT target STREQUAL "partout-models")
+    if(NOT target STREQUAL "partout-models-impl")
         target_compile_options(${target} PRIVATE /W4)
     endif()
     # AppContainer consumers use a CRT without the /RTC helpers.

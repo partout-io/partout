@@ -152,11 +152,11 @@ if(WIN32)
     foreach(symbol IN LISTS partout_exports)
         target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
     endforeach()
-    target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32)
+    target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32 ntdll)
     if(PP_BUILD_WINDOWS)
         target_sources(partout PRIVATE
             $<TARGET_OBJECTS:partout-windows-backend>
-            $<TARGET_OBJECTS:partout-models>
+            $<TARGET_OBJECTS:partout-models-impl>
         )
         target_link_libraries(partout PRIVATE partout-windows-backend)
         set_property(TARGET partout PROPERTY LINKER_LANGUAGE CXX)
