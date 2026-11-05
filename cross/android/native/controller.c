@@ -392,3 +392,4 @@ Java_io_partout_vpn_PartoutTunnelController_onNativeBetterPathUpdate(JNIEnv *env
     if (!ctrl_delegate || !ctrl_delegate->ctx) return;
     ctrl_delegate->on_better_path(ctrl_delegate->ctx);
 }
+
