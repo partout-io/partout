@@ -10,7 +10,7 @@ class TunnelController;
 
 // Native integration helpers; the capability's owner stays private to abi.cc.
 namespace ABI {
-windows_transport *WrapTun(RuntimeLoop &, std::unique_ptr<Tun>);
-bool ConfigureSocket(TunnelController *, uintptr_t token);
+PARTOUT_WINDOWS_API windows_transport *WrapTun(RuntimeLoop &, std::unique_ptr<Tun>);
+PARTOUT_WINDOWS_API bool ConfigureSocket(TunnelController *, uintptr_t token);
 } // namespace ABI
 } // namespace Partout

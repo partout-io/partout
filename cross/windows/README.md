@@ -37,10 +37,10 @@ Runtime callback table      -> src/platform.cc -> src/controller.cc
 | `../../src/net/looper_windows.zig` | Owns Zig timers and feeds the existing daemon I/O callbacks. |
 | `../../src/c/portable/tun_windows.c` | Core-owned native TUN cleanup. |
 
-CMake uses MSVC to link the Zig core archive and static Windows backend into
-`partout.dll`, so the core and native SDK share one copy of the loop and transport
-state. `partout-windows.lib` contains the consumer-side runtime and controller
-adapters. Consumers link `Partout::WindowsRuntime`, which depends on `partout.dll`.
+CMake uses MSVC to link the Zig/C core into `partout.dll` and the native backend
+and models into `partout-runtime.dll`. The core and native SDK share one copy
+of the loop and transport state. `partout-bindings.lib` contains the consumer-side runtime and controller
+adapters. Consumers link `Partout::WindowsRuntime`, which depends on both DLLs. `partout.dll` exports only the Zig/C ABI.
 Optional vendors may still require their own DLLs.
 
 ## Logging
@@ -256,7 +256,7 @@ root in a developer shell matching the target architecture:
 
 ```powershell
 cmake -S . -B .cmake-windows -G Ninja -DCMAKE_BUILD_TYPE=Debug -DPP_BUILD_WINDOWS=ON -DPP_BUILD_LIBRARY=OFF
-cmake --build .cmake-windows --target partout-windows
+cmake --build .cmake-windows --target partout-bindings
 ```
 
 ### OpenAPI models
@@ -286,7 +286,7 @@ C++17 and nlohmann/json. Boost is not required.
 leaves the shared schema and wire tags unchanged. `finish-cpp-models.py` applies
 method naming, schema constant defaults/checks, optional null/reset handling,
 and generic integer/validation
-helpers from `src/json.h`. It does not generate discriminator dispatch or use
+helpers from `cross/cpp/json.h`. It does not generate discriminator dispatch or use
 custom templates. Unknown discriminator tags are rejected by generated decoders.
 
 ```cpp
@@ -311,11 +311,44 @@ ctest --test-dir .cmake-models --output-on-failure
 
 ### Native integration
 
+`partout_windows.h` exports `Partout::Tunnel` for packaged consumers managing VPN
+profiles through `VpnManagementAgent`. Construct it, then call `Fetch`, `Save`,
+`Connect`, `Disconnect`, or `Remove` from
+a serialized background worker. `Fetch` is read-only. Management is restricted
+to profiles belonging to the current package family with a recognized typed
+PartoutProfile configuration. Windows entry names match profile names; identity
+comes from the configuration's stable profile ID. Saving a renamed profile adds
+the new entry before removing the old disconnected entry; failed cleanup can be
+retried without discarding the new registration. Name collisions with another
+profile are rejected. An accepted
+connection request does not imply connection completion; observe `Fetch`.
+
+Include `partout/models/TaggedProfile.h` and `partout/models/TunnelSnapshot.h`
+for its typed arguments and results. The Windows installation includes these
+generated model headers and `partout/json.h`. `Partout::Models` supplies those
+headers, nlohmann/json, and the `partout-runtime` import library. Model implementations live
+only in `partout-runtime.dll`; consumers do not link `partout-models.lib`.
+These C++ exports require matching compiler, CRT, and model versions.
+Link `Partout::WindowsRuntime`; it includes the management API and supplies
+`Partout::Models` transitively. Use the same MSVC runtime as the library.
+The API reports native operation names and status codes without configuration
+payloads. For connected profiles, it resolves the VPN interface by its entry
+name and reads the 64-bit `InOctets`/`OutOctets` counters through IP Helper.
+These are interface totals, not instantaneous rates. Only an up PPP/tunnel
+interface is accepted; missing interfaces, unavailable statistics, and values
+outside the signed model range leave `environment` absent. Physical-adapter
+counters are never substituted. Detailed engine errors remain unavailable.
+The management wrapper retains MTA support for the process lifetime so cached
+WinRT activation factories survive polling workers exiting and being recreated.
+
+The offline native counter and profile decoding tests are included when
+`PP_TEST_RUNTIME_LINK=ON`. Build the tests and run CTest; no VPN settings are changed.
+
 CMake owns the Windows DLL link. With `PP_BUILD_LIBRARY=OFF`, it builds only the
 static backend. Direct Zig builds produce the static core archive; use CMake for
 shared builds. Zig tests link the same static backend, selected with
-`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. No backend DLL is
-built or copied.
+`-Dwindows=true` or supplied through `-Dwindows-lib=<path>`. Shared core
+builds instead deploy `partout-runtime.dll` alongside `partout.dll`.
 Builds without Windows retain low-level cleanup stubs, but have no implicit controller.
 The Windows looper also requires the native backend; without it, creation
 reports `MuxFailure`. Native dispatch tests run when Windows is enabled.

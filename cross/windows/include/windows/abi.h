@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
+#include "export.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -66,21 +67,21 @@ typedef struct {
  * temporary native policy token; it must not retain or dereference that token.
  * Borrows the active runtime's loop; fails if no runtime is active. The owner
  * must outlive all transports and drain their queued destruction. */
-windows_transport *windows_connect(const char *host, uint16_t port,
-                                   const windows_connect_options *options);
+PARTOUT_WINDOWS_API windows_transport *windows_connect(const char *host, uint16_t port,
+                                                       const windows_connect_options *options);
 
 /* Explicit owner API for standalone native consumers and tests. Only one loop
  * may be active. VpnChannelRuntime owns its loop directly in C++.
  * Before free: stop producers, drain preparation, release every transport and
  * drain teardown. Never free a borrowed handle or free on the worker itself. */
-windows_loop windows_loop_create(void);
-void windows_loop_free(windows_loop);
+PARTOUT_WINDOWS_API windows_loop windows_loop_create(void);
+PARTOUT_WINDOWS_API void windows_loop_free(windows_loop);
 /* Borrowed lookup: the runtime owner must outlive every user of this handle. */
-windows_loop windows_loop_current(void);
+PARTOUT_WINDOWS_API windows_loop windows_loop_current(void);
 /* Accepted work executes once on the runtime worker. Drain is a barrier for
  * previously submitted commands; callers must first quiesce their producers. */
-bool windows_loop_submit(windows_loop, void (*execute)(void *), void *context);
-void windows_loop_drain(windows_loop);
+PARTOUT_WINDOWS_API bool windows_loop_submit(windows_loop, void (*execute)(void *), void *context);
+PARTOUT_WINDOWS_API void windows_loop_drain(windows_loop);
 #ifdef __cplusplus
 }
 #endif

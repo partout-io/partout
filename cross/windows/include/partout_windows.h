@@ -7,9 +7,35 @@
 
 #if defined(_WIN32) && defined(__cplusplus)
 #include <memory>
+#include <map>
+#include <string>
+#include <vector>
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
+namespace Models {
+struct TaggedProfile;
+struct TunnelSnapshot;
+}
+
+// Synchronous management API: call from a serialized background worker.
+// Fetch is read-only. All methods require the consumer package identity.
+// Include partout/models/TaggedProfile.h and TunnelSnapshot.h for typed values.
+class Tunnel {
+public:
+    // Absolute placeholder URI supplied by the consumer app.
+    // Actual VPN endpoints come from the saved profile configuration.
+    explicit Tunnel(const std::string &serverUri);
+    // When supplied, errors receives unavailable profiles by ID; snapshots
+    // contain only observed states. Without it, any observation error throws.
+    std::vector<Models::TunnelSnapshot> Fetch(std::map<std::string, std::string> *errors = nullptr);
+    void Save(const Models::TaggedProfile &profile);
+    void Connect(const std::string &id);
+    void Disconnect(const std::string &id);
+    void Remove(const std::string &id);
+private:
+    std::string serverUri_;
+};
 
 // One runtime per channel. Callbacks must be serialized by the consumer.
 // Profile and cache_dir are copied; logger_ctx must outlive the runtime and

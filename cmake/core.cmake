@@ -142,24 +142,22 @@ if(APPLE)
 endif()
 
 if(WIN32)
+    # With no native object files, MSVC cannot infer the machine from the Zig
+    # archive passed through /WHOLEARCHIVE.
+    target_link_options(partout PRIVATE "LINKER:/MACHINE:${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
     set_target_properties(partout PROPERTIES
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
-        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
-    # Export the C ABI from the Zig archive; CMake exports the backend objects.
+    # The core DLL exports only the public Zig/C ABI.
     foreach(symbol IN LISTS partout_exports)
         target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
     endforeach()
-    target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32)
+    target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32 ntdll)
     if(PP_BUILD_WINDOWS)
-        target_sources(partout PRIVATE
-            $<TARGET_OBJECTS:partout-windows-backend>
-            $<TARGET_OBJECTS:partout-models>
-        )
         target_link_libraries(partout PRIVATE partout-windows-backend)
-        set_property(TARGET partout PROPERTY LINKER_LANGUAGE CXX)
     endif()
 elseif(NOT APPLE)
     find_package(Threads REQUIRED)

@@ -9,11 +9,18 @@ endif()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(TARGET partout-windows-backend AND NOT PP_BUILD_LIBRARY)
-    install(TARGETS partout-windows-backend ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+if(TARGET partout-windows-backend)
+    install(TARGETS partout-windows-backend
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    if(PP_BUILD_LIBRARY)
+        install(FILES "$<TARGET_PDB_FILE:partout-windows-backend>"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
+    endif()
 endif()
-if(TARGET partout-windows)
-    install(TARGETS partout-windows ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+if(TARGET partout-bindings)
+    install(TARGETS partout-bindings ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
@@ -47,7 +54,10 @@ if(TARGET partout-posix-runtime)
     install(FILES cross/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
 
-if(TARGET partout-models)
-    install(TARGETS partout-models ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+if(TARGET partout-models-impl)
+    if(NOT TARGET partout-models-interface)
+        install(TARGETS partout-models-impl ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    endif()
+    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+        FILES_MATCHING PATTERN "*.h")
 endif()
