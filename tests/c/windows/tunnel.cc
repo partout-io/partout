@@ -7,6 +7,13 @@
 #include <limits>
 
 int main() {
+    assert(Partout::TunnelProfileNamesEqual(L"Office", L"Office"));
+    assert(Partout::TunnelProfileNamesEqual(L"Office", L"office"));
+    assert(Partout::TunnelProfileNamesEqual(L"office", L"OFFICE"));
+    assert(Partout::TunnelProfileNamesEqual(L"B\u00fcro", L"B\u00dcRO"));
+    assert(!Partout::TunnelProfileNamesEqual(L"Office", L"Home"));
+    assert(!Partout::TunnelProfileNamesEqual(L"Office", L"Office 2"));
+
     using Status = winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus;
     std::string error;
     auto status = Partout::ReadTunnelConnectionStatus([]() -> Status {

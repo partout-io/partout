@@ -14,6 +14,7 @@
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
+bool TunnelProfileNamesEqual(const winrt::hstring &left, const winrt::hstring &right);
 std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadTunnelConnectionStatus(
     const std::function<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus()> &read,
     std::string &error);

@@ -81,6 +81,9 @@ winrt::hstring Family() {
     return winrt::hstring(family);
 }
 } // namespace
+bool TunnelProfileNamesEqual(const winrt::hstring &left, const winrt::hstring &right) {
+    return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
+}
 std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml) {
     // The display name is editable and is never the profile identity.
     try {
@@ -228,7 +231,9 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
             if (owned.id != profile.id) continue;
             if (owned.profile.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)
                 throw std::runtime_error("Disconnect the VPN before updating its configuration.");
-            if (owned.profile.ProfileName() == name) existing = owned.profile;
+            // Case-only renames refer to the same Windows entry: update it and
+            // never queue that entry for deletion after saving.
+            if (TunnelProfileNamesEqual(owned.profile.ProfileName(), name)) existing = owned.profile;
             else previousNames.push_back(owned.profile);
         }
         using namespace winrt::Windows::Data::Xml::Dom;
@@ -247,7 +252,7 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         // Windows identifies updates by entry name. Never update another entry
         // just because its display name matches this profile.
         for (const auto &other : Await("Check VPN profile names", agent.GetProfilesAsync())) {
-            if (CompareStringOrdinal(other.ProfileName().c_str(), -1, name.c_str(), -1, TRUE) != CSTR_EQUAL)
+            if (!TunnelProfileNamesEqual(other.ProfileName(), name))
                 continue;
             const auto plugin = other.try_as<VpnPlugInProfile>();
             if (!plugin || plugin.VpnPluginPackageFamilyName() != Family() ||
