@@ -24,6 +24,16 @@ const portable_c = ffi.portable;
 const log = core.logging;
 const util = core.util;
 
+// Zig 0.16.0's Windows SelfInfo casts an unaligned dynamic symbol address to
+// an ARM64 function pointer when compiling a static library. Avoid that broken
+// optional diagnostic path; native debugger symbols and safety checks remain on.
+pub const std_options: std.Options = if (builtin.os.tag == .windows and
+    builtin.cpu.arch == .aarch64 and builtin.zig_version.major == 0 and
+    builtin.zig_version.minor == 16 and builtin.zig_version.patch == 0)
+    .{ .unexpected_error_tracing = false }
+else
+    .{};
+
 pub const panic = std.debug.FullPanic(panicHandler);
 
 const allocator = std.heap.c_allocator;
@@ -75,6 +85,15 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
 pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) callconv(.c) void {
     const args = args_pointer orelse return;
     log.init(args.logs_private_data, args.logger_fn, args.logger_ctx);
+    if (comptime builtin.os.tag == .windows and build_options.windows) {
+        ffi.io.windows_set_logger(nativeLogger);
+    }
+}
+
+fn nativeLogger(level: c_int, message: [*c]const u8) callconv(.c) void {
+    if (message == null) return;
+    const severity = std.enums.fromInt(log.Level, level) orelse return;
+    log.writeCString(severity, @ptrCast(message));
 }
 
 pub export fn partout_import_profile(
@@ -214,6 +233,11 @@ pub export fn partout_daemon_start(
 pub export fn partout_daemon_hold() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     runtime.hold();
+}
+
+pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
+    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_fd")) return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
+    return null;
 }
 
 pub export fn partout_daemon_stop() callconv(.c) void {

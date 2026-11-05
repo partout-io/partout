@@ -10,6 +10,37 @@ const api = source.core.api;
 const Parser = source.wireguard_parser.Parser;
 const serializer = source.wireguard_serializer;
 
+test "WireGuard parser and serializer preserve incomplete configurations" {
+    const allocator = std.testing.allocator;
+    const configurations = [_][]const u8{
+        \\[Interface]
+        \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+        ,
+        \\[Interface]
+        \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
+        \\[Peer]
+        \\PublicKey = muwialz9E36nXp9qgbGIxwMrH+5Ovr8d7cutH8JHdvE=
+        ,
+    };
+
+    for (configurations, 0..) |contents, peer_count| {
+        var configuration = try Parser.parse(allocator, contents);
+        defer configuration.deinit(allocator);
+        const serialized = try serializer.serializeConfiguration(allocator, &configuration);
+        defer allocator.free(serialized);
+        try std.testing.expectEqualStrings(contents, serialized);
+
+        var reparsed = try Parser.parse(allocator, serialized);
+        defer reparsed.deinit(allocator);
+        try std.testing.expectEqual(peer_count, reparsed.peers.len);
+        try std.testing.expectEqual(@as(usize, 0), reparsed.interface.addresses.len);
+        for (reparsed.peers) |peer| {
+            try std.testing.expect(peer.endpoint == null);
+            try std.testing.expectEqual(@as(usize, 0), peer.allowed_ips.len);
+        }
+    }
+}
+
 test "WireGuard serializer generates wg-quick configuration" {
     const allocator = std.testing.allocator;
     var configuration = try Parser.parse(allocator,

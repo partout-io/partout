@@ -3,8 +3,8 @@
 #include <winsock2.h>
 #include "../../../cross/windows/src/socket.h"
 #include "../../../cross/windows/src/loop.h"
-#include "../../../cross/windows/include/winrt/abi.h"
-#include "../../../cross/windows/include/winrt/log.h"
+#include "../../../cross/windows/include/windows/abi.h"
+#include "../../../cross/windows/include/windows/log.h"
 #include <cassert>
 #include <chrono>
 #include <cstdio>
@@ -16,7 +16,7 @@
 
 std::mutex logMutex;
 std::vector<std::string> messages;
-void CaptureLog(winrt_log_level, const char *message) {
+void CaptureLog(windows_log_level, const char *message) {
     std::lock_guard lock(logMutex);
     messages.emplace_back(message);
 }
@@ -72,9 +72,9 @@ void TestOutputBypassesWorker() {
     const DWORD timeout = 1000;
     assert(setsockopt(peer, SOL_SOCKET, SO_RCVTIMEO,
                      reinterpret_cast<const char *>(&timeout), sizeof(timeout)) == 0);
-    winrt_connect_options options{};
+    windows_connect_options options{};
     options.timeout_ms = 1000;
-    auto transport = winrt_connect("127.0.0.1", ntohs(address.sin_port), &options);
+    auto transport = windows_connect("127.0.0.1", ntohs(address.sin_port), &options);
     assert(transport);
 
     std::promise<void> entered, release;
@@ -133,7 +133,7 @@ void TestReplyDuringReceive() {
 void TestBatchDestinationsAndStreamCache() {
     Partout::RuntimeLoop loop;
     SOCKET peers[2];
-    winrt_address destinations[2]{};
+    windows_address destinations[2]{};
     for (size_t i = 0; i < 2; ++i) {
         peers[i] = ::socket(AF_INET, SOCK_DGRAM, IPPROTO_UDP);
         assert(peers[i] != INVALID_SOCKET);
@@ -151,16 +151,16 @@ void TestBatchDestinationsAndStreamCache() {
         destinations[i].address[3] = 1;
         destinations[i].port = ntohs(address.sin_port);
     }
-    winrt_connect_options options{};
+    windows_connect_options options{};
     options.unconnected = true;
     options.timeout_ms = 1000;
-    auto transport = winrt_connect("127.0.0.1", 0, &options);
+    auto transport = windows_connect("127.0.0.1", 0, &options);
     assert(transport && transport->write_batch);
-    winrt_set_logger(CaptureLog);
+    windows_set_logger(CaptureLog);
     for (size_t round = 0; round < 2; ++round) {
         for (size_t peer = 0; peer < 2; ++peer) {
             uint8_t payload[3]{static_cast<uint8_t>(peer), static_cast<uint8_t>(round), 42};
-            winrt_packet packets[3]{{payload, 1}, {payload, 2}, {payload, 3}};
+            windows_packet packets[3]{{payload, 1}, {payload, 2}, {payload, 3}};
             size_t written = 0;
             assert(transport->write_batch(transport->context, packets, 3, &destinations[peer], &written) == 0);
             assert(written == 3);
@@ -175,7 +175,7 @@ void TestBatchDestinationsAndStreamCache() {
     }
     transport->release(transport->context);
     loop.Drain();
-    winrt_set_logger(nullptr);
+    windows_set_logger(nullptr);
     bool found = false;
     for (const auto &message : messages) {
         if (message.find("hits=10 misses=2 entries=2") != std::string::npos) found = true;

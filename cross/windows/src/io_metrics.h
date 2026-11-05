@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
 
-#include "winrt/log.h"
+#include "windows/log.h"
 #include <algorithm>
 #include <chrono>
 #include <cstdint>
@@ -22,7 +22,7 @@ struct IOTiming {
 
     void Log(const void *owner, const char *stage) const {
         if (!calls) return;
-        winrt_log(WinrtLogInfo,
+        windows_log(WindowsLogInfo,
                   "IO metrics owner=%p stage=%s calls=%llu total_us=%.3f mean_us=%.3f max_us=%.3f",
                   owner, stage, calls, total_ns / 1000.0, total_ns / (1000.0 * calls), max_ns / 1000.0);
     }
@@ -54,7 +54,7 @@ struct IOBatches {
 
     void Log(const void *owner, const char *stage) const {
         if (!batches) return;
-        winrt_log(WinrtLogInfo,
+        windows_log(WindowsLogInfo,
                   "IO metrics owner=%p stage=%s batches=%llu packets=%llu bytes=%llu "
                   "singletons=%llu mean_packets=%.3f max_packets=%llu",
                   owner, stage, batches, packets, bytes, singletons,

@@ -255,13 +255,13 @@ pub const PassiveIO = struct {
         return side.owner.receivePackets(side, &.{if (length == 0) &.{} else bytes[0..length]}, if (source == null) null else source[0], code);
     }
 
-    fn onReceiveBatch(raw: ?*anyopaque, packets: [*c]const ffi.io.winrt_packet, count: usize, source: [*c]const ffi.io.winrt_address, code: i32) callconv(.c) bool {
+    fn onReceiveBatch(raw: ?*anyopaque, packets: [*c]const ffi.io.windows_packet, count: usize, source: [*c]const ffi.io.windows_address, code: i32) callconv(.c) bool {
         const side: *Side = @ptrCast(@alignCast(raw.?));
-        if (count > ffi.io.WinrtMaxBatch or (count != 0 and packets == null)) {
+        if (count > ffi.io.WindowsMaxBatch or (count != 0 and packets == null)) {
             side.owner.fail();
             return false;
         }
-        var views: [ffi.io.WinrtMaxBatch][]const u8 = undefined;
+        var views: [ffi.io.WindowsMaxBatch][]const u8 = undefined;
         for (packets[0..count], 0..) |packet, index| {
             if (packet.size != 0 and packet.data == null) {
                 side.owner.fail();

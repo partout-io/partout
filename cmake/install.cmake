@@ -6,39 +6,58 @@ else()
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-function(partout_install_runtime_file file)
-    install(FILES "${file}"
-        DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
-        OPTIONAL
-    )
-endfunction()
-
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(WIN32)
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
+if(TARGET partout-windows-backend)
+    install(TARGETS partout-windows-backend
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
+    if(PP_BUILD_LIBRARY)
+        install(FILES "$<TARGET_PDB_FILE:partout-windows-backend>"
+            DESTINATION "${CMAKE_INSTALL_BINDIR}"
+            CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
+    endif()
+endif()
+if(TARGET partout-bindings)
+    install(TARGETS partout-bindings ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif()
 
-set(PARTOUT_INSTALL_RUNTIME_TARGETS ${PARTOUT_RUNTIME_LIBRARIES})
 if(PP_BUILD_LIBRARY)
-    list(PREPEND PARTOUT_INSTALL_RUNTIME_TARGETS Partout::Partout)
+    install(TARGETS partout
+        LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+    )
 endif()
-if(PARTOUT_INSTALL_RUNTIME_TARGETS)
-    install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_INSTALL_RUNTIME_TARGETS}
+if(PARTOUT_RUNTIME_LIBRARIES)
+    install(IMPORTED_RUNTIME_ARTIFACTS ${PARTOUT_RUNTIME_LIBRARIES}
         LIBRARY DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
         RUNTIME DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
     )
 endif()
 
 if(WIN32 AND PP_BUILD_LIBRARY)
-    # Zig installs the PDB beside its DLL; preserve it in the final package so
-    # native debuggers can find the matching symbols without extra search paths.
-    install(FILES "${PP_BUILD_OUTPUT}/partout/bin/partout.pdb"
+    # MSVC writes the PDB beside the final DLL.
+    install(FILES "$<TARGET_PDB_FILE:partout>"
         DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
         CONFIGURATIONS Debug RelWithDebInfo
         OPTIONAL
     )
+endif()
+
+if(TARGET partout-posix-runtime)
+    install(TARGETS partout-posix-runtime ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES cross/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
+
+if(TARGET partout-models-impl)
+    if(NOT TARGET partout-models-interface)
+        install(TARGETS partout-models-impl ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    endif()
+    install(DIRECTORY "${PARTOUT_MODELS_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+        FILES_MATCHING PATTERN "*.h")
 endif()

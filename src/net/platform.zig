@@ -44,10 +44,10 @@ pub const Platform = struct {
         ref: ?*anyopaque = null,
 
         /// The tunnel controller implementation.
-        fnt: ?FunctionTable = null,
+        fnt: FunctionTable,
 
         /// Platform socket policy, independent of the tunnel function table.
-        socket_configurator: ?io_c.pp_socket_configurator = null,
+        socket_configurator: io_c.pp_socket_configurator,
 
         /// The socket buffer size.
         socket_buf_size: c_int = 1024 * 1024,
@@ -79,23 +79,12 @@ pub const Platform = struct {
     //#endregion
 
     pub fn init(options: Options) error{OutOfMemory}!Platform {
-        const functions = options.fnt orelse io_c.pp_tun_ctrl_fnt_current();
-        validateFunctionTable(functions);
-        var ref_copy: ?*anyopaque = null;
-        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_new_global_ref")) {
-            ref_copy = io_c.pp_jni_new_global_ref(options.ref);
-            if (ref_copy == null) {
-                log.write(.fault, "Unable to retain platform JNI ref");
-                return error.OutOfMemory;
-            }
-        } else {
-            ref_copy = options.ref;
-        }
+        validateFunctionTable(options.fnt);
         return .{
-            .ref = ref_copy,
-            .fnt = functions,
+            .ref = options.ref,
+            .fnt = options.fnt,
             .dns = .{},
-            .socket_configurator = options.socket_configurator orelse io_c.pp_socket_configurator_current(ref_copy),
+            .socket_configurator = options.socket_configurator,
             .socket_buf_size = options.socket_buf_size,
             .callbacks_mutex = .{},
             .monitor_drainer = .{},
@@ -113,15 +102,12 @@ pub const Platform = struct {
             .on_reachability = cOnReachability,
             .on_better_path = cOnBetterPath,
         };
-        if (self.ref) |ref| {
-            log.writef(.debug, "Platform: Set delegate ({*})", .{ref});
-            const set_delegate = self.fnt.set_delegate orelse
-                @panic("Platform function table has no set_delegate callback");
-            log.write(.debug, "Platform.attach: set_delegate entered");
-            set_delegate(ref, &self.delegate);
-            log.write(.debug, "Platform.attach: set_delegate returned");
-            self.delegate_attached = true;
-        }
+        const set_delegate = self.fnt.set_delegate orelse
+            @panic("Platform function table has no set_delegate callback");
+        log.write(.debug, "Platform.attach: set_delegate entered");
+        set_delegate(self.ref, &self.delegate);
+        log.write(.debug, "Platform.attach: set_delegate returned");
+        self.delegate_attached = true;
     }
 
     pub fn deinit(self: *Platform) void {
@@ -131,9 +117,6 @@ pub const Platform = struct {
                 @panic("Platform function table has no set_delegate callback");
             set_delegate(self.ref, null);
             self.delegate_attached = false;
-        }
-        if (builtin.abi.isAndroid() and @hasDecl(io_c, "pp_jni_delete_global_ref")) {
-            io_c.pp_jni_delete_global_ref(self.ref);
         }
         log.write(.debug, "Deinit Platform");
         self.monitor_drainer.deinit();

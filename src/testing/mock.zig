@@ -260,20 +260,20 @@ pub fn createTun(allocator: std.mem.Allocator) std.mem.Allocator.Error!*net.TunW
     if (builtin.os.tag != .windows) return net.TunWrapper.create(allocator, null);
     const Native = struct {
         fn release(_: ?*anyopaque) callconv(.c) void {}
-        fn subscribe(_: ?*anyopaque, _: ffi.io.winrt_receive, _: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(_: ?*anyopaque, _: ffi.io.windows_receive, _: ?*anyopaque) callconv(.c) bool {
             return true;
         }
         fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const ffi.io.winrt_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const ffi.io.windows_address) callconv(.c) i32 {
             return 0;
         }
-        fn address(_: ?*anyopaque, _: [*c]ffi.io.winrt_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]ffi.io.windows_address) callconv(.c) bool {
             return false;
         }
-        var capability: ffi.io.winrt_transport = .{
+        var capability: ffi.io.windows_transport = .{
             .context = null,
             .release = release,
             .subscribe = subscribe,

@@ -10,6 +10,10 @@ import re
 import sys
 
 
+# Like Kotlin, extra imports name types owned by Partout. Consumers use the
+# public headers supplied by the Partout::Models CMake target.
+namespace = sys.argv[3].replace(".", "::")
+external = [name.strip() for name in sys.argv[4].split(",") if name.strip()]
 schemas = json.loads(Path(sys.argv[2]).read_text())["components"]["schemas"]
 
 
@@ -34,9 +38,10 @@ def repair_decoder(match, source):
     body = re.sub(r"auto s = j.get<(int(?:32|64)_t)>\(\);",
                   r"\1 s;\n    ReadJsonValue(j, s);", body)
     check = ""
-    if schemas[name].get("type") == "object":
+    schema = schemas.get(name, {})  # Generators also create models for inline schemas.
+    if schema.get("type") == "object":
         check = f'\n    if (!j.is_object()) throw std::invalid_argument("Expected {name} object");'
-    for field, property_schema in schemas[name].get("properties", {}).items():
+    for field, property_schema in schema.get("properties", {}).items():
         if "const" in property_schema:
             literal = json.dumps(property_schema["const"])
             check += (f'\n    if (j.at("{field}") != {literal}) '
@@ -90,6 +95,16 @@ for path in Path(sys.argv[1]).iterdir():
         decoders = list(re.finditer(r"void from_json\(const nlohmann::json& j, (\w+)& o\)\n\{", source))
         for decoder in reversed(decoders):
             source = repair_decoder(decoder, source)
+    if external:
+        source = source.replace('#include "../json.h"', '#include <partout/json.h>')
+        for name in [*external, "Helpers"]:
+            source = source.replace(f'#include "{name}.h"',
+                                    f'#include <partout/models/{name}.h>')
+        for name in external:
+            source = re.sub(rf"\b{re.escape(namespace)}::{re.escape(name)}\b",
+                            f"Partout::Models::{name}", source)
+        for helper in ("ReadJsonValue", "ValidateModel"):
+            source = re.sub(rf"(?<![\w:]){helper}\(", f"Partout::Models::{helper}(", source)
     source = re.sub(r"[ \t]+$", "", source, flags=re.M)
     source = re.sub(r"\n{3,}", "\n\n", source)
     path.write_text(source)

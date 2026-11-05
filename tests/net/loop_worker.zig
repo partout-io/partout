@@ -24,7 +24,7 @@ const request: Worker.Request = .{
 };
 
 test "runtime MTA supports uninitialized writer threads and preserves buffer ownership" {
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
     const Probe = struct {
@@ -91,7 +91,7 @@ test "runtime MTA supports uninitialized writer threads and preserves buffer own
 }
 
 test "native receive removal drains the ABI callback before replacing its context" {
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
     const Probe = struct {
@@ -164,9 +164,9 @@ test "native receive removal drains the ABI callback before replacing its contex
 }
 
 test "native setup requires an owner and runtime shutdown permits recreation" {
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    try std.testing.expect(c.winrt_loop_current() == null);
-    try std.testing.expect(c.winrt_connect("127.0.0.1", 9, &.{ .unconnected = false, .timeout_ms = 1000 }) == null);
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
+    try std.testing.expect(c.windows_loop_current() == null);
+    try std.testing.expect(c.windows_connect("127.0.0.1", 9, &.{ .unconnected = false, .timeout_ms = 1000 }) == null);
     const Probe = struct {
         done: bool = false,
         fn run(raw: ?*anyopaque) callconv(.c) void {
@@ -179,27 +179,27 @@ test "native setup requires an owner and runtime shutdown permits recreation" {
         {
             const native_runtime = try NativeRuntime.init();
             defer native_runtime.deinit();
-            const loop = c.winrt_loop_current().?;
+            const loop = c.windows_loop_current().?;
             // A failed second owner must leave the active runtime untouched.
-            try std.testing.expect(c.winrt_loop_create() == null);
-            try std.testing.expectEqual(loop, c.winrt_loop_current().?);
+            try std.testing.expect(c.windows_loop_create() == null);
+            try std.testing.expectEqual(loop, c.windows_loop_current().?);
             {
                 const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
                 defer socket.cleanup(); // Destruction is queued on the borrowed loop.
                 try std.testing.expectEqual(@as(i32, 0), socket.write("queued", try io.testing.socketAddress(.{ .address = "127.0.0.1", .proto = .init(.udp, 9) })));
             }
-            try std.testing.expect(c.winrt_loop_submit(loop, Probe.run, &probe));
+            try std.testing.expect(c.windows_loop_submit(loop, Probe.run, &probe));
         }
         // Owner shutdown joins queued commands and leaves no active loop.
         try std.testing.expect(probe.done);
-        try std.testing.expect(c.winrt_loop_current() == null);
+        try std.testing.expect(c.windows_loop_current() == null);
     }
 }
 
 test "runtime-owned loop outlives preparation worker and serves borrowed transports" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         factory_thread: std.Thread.Id = 0,
         socket_thread: std.Thread.Id = 0,
@@ -262,7 +262,7 @@ test "runtime-owned loop outlives preparation worker and serves borrowed transpo
 test "RuntimeLoop close drains each accepted completion and rejects new requests" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         started: std.atomic.Value(bool) = .init(false),
         released: std.atomic.Value(bool) = .init(false),
@@ -315,7 +315,7 @@ test "RuntimeLoop close drains each accepted completion and rejects new requests
 test "RuntimeLoop transport teardown does not wait for a blocked rebind" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
         first: ?Worker.Completion = null,

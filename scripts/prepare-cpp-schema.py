@@ -85,7 +85,8 @@ def prepare(document):
     # The ABI's named JSON bridge carries arrays and scalars as well as objects.
     schemas["JSONValue"] = {}
     names = {name: cpp_name(name) for name in schemas}
-    names["Profile"] = "TaggedProfile"
+    if "Profile" in names:
+        names["Profile"] = "TaggedProfile"
     if len(set(names.values())) != len(names):
         raise ValueError("C++ schema names collide after normalization")
 

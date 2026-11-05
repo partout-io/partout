@@ -15,7 +15,7 @@ final class PartoutTunnelController: Sendable {
     private let networkMonitor: NetworkMonitor
 
     private let delegateLock = SemaphoreMutex()
-    private nonisolated(unsafe) var delegate: pp_tun_ctrl_delegate?
+    private nonisolated(unsafe) var delegate: partout_controller_delegate?
 
     init(
         _ ctx: PartoutLoggerContext,
@@ -45,22 +45,20 @@ final class PartoutTunnelController: Sendable {
     }
 
     func onReachable(_ isReachable: Bool) {
-        let delegate = delegateLock.with { self.delegate }
-        guard let delegate else { return }
-
-        var cReach = pp_reachability(reachable: isReachable)
-        pp_log(ctx, .runtime, .debug, "On reachability: \(cReach)")
-        withUnsafePointer(to: &cReach) {
-            delegate.on_reachability(delegate.ctx, $0)
+        delegateLock.with {
+            guard let delegate = self.delegate else { return }
+            var reachability = partout_reachability(reachable: isReachable)
+            withUnsafePointer(to: &reachability) {
+                delegate.on_reachability?(delegate.ctx, $0)
+            }
         }
     }
 
     func onBetterPath() {
-        let delegate = delegateLock.with { self.delegate }
-        guard let delegate else { return }
-
-        pp_log(ctx, .runtime, .debug, "On better path")
-        delegate.on_better_path(delegate.ctx)
+        delegateLock.with {
+            guard let delegate = self.delegate else { return }
+            delegate.on_better_path?(delegate.ctx)
+        }
     }
 
     func setTunnelSettings(with info: TunnelRemoteInfoWrapper) async throws {
@@ -133,7 +131,7 @@ extension PartoutTunnelController {
                 return
             }
             let copied = delegate?
-                .assumingMemoryBound(to: pp_tun_ctrl_delegate.self)
+                .assumingMemoryBound(to: partout_controller_delegate.self)
                 .pointee
 
             controller.delegateLock.with {
@@ -261,70 +259,34 @@ extension PartoutTunnelController {
     }
 }
 
-// Exported for pp_tun_ctrl_fnt_current() in tun_darwin.c.
-@c(pp_swift_tun_ctrl_set_delegate)
-public func pp_swift_tun_ctrl_set_delegate(
-    _ ref: UnsafeMutableRawPointer?,
-    _ delegate: UnsafeRawPointer?
-) {
-    PartoutTunnelController.Bindings.setDelegate(ref, delegate: delegate)
-}
-
-@c(pp_swift_tun_ctrl_set_tunnel)
-public func pp_swift_tun_ctrl_set_tunnel(
-    _ ref: UnsafeMutableRawPointer?,
-    _ uuid: UnsafePointer<CChar>?,
-    _ infoJSON: UnsafePointer<CChar>?
-) -> Bool {
-    PartoutTunnelController.Bindings.setTunnel(ref, uuid: uuid, infoJSON: infoJSON)
-}
-
-@c(pp_swift_tun_ctrl_configure_sockets)
-public func pp_swift_tun_ctrl_configure_sockets(
-    _ ref: UnsafeMutableRawPointer?,
-    _ reachability: UnsafeRawPointer?,
-    _ descriptors: UnsafePointer<Int32>?,
-    _ descriptorsCount: Int
-) -> Bool {
-    PartoutTunnelController.Bindings.configureSockets(
-        ref,
-        reachability: reachability,
-        descriptors: descriptors,
-        descriptorsCount: descriptorsCount
-    )
-}
-
-@c(pp_swift_tun_ctrl_report_snapshot)
-public func pp_swift_tun_ctrl_report_snapshot(
-    _ ref: UnsafeMutableRawPointer?,
-    _ snapshotJSON: UnsafePointer<CChar>?
-) {
-    PartoutTunnelController.Bindings.reportSnapshot(ref, snapshotJSON: snapshotJSON)
-}
-
-@c(pp_swift_tun_ctrl_set_environment_value)
-public func pp_swift_tun_ctrl_set_environment_value(
-    _ ref: UnsafeMutableRawPointer?,
-    _ key: UnsafePointer<CChar>?,
-    _ value: UnsafePointer<CChar>?
-) {
-    PartoutTunnelController.Bindings.setEnvironmentValue(ref, key: key, value: value)
-}
-
-@c(pp_swift_tun_ctrl_clear_tunnel)
-public func pp_swift_tun_ctrl_clear_tunnel(
-    _ ref: UnsafeMutableRawPointer?,
-    _ killSwitch: Bool
-) {
-    PartoutTunnelController.Bindings.clearTunnel(ref, killSwitch: killSwitch)
-}
-
-@c(pp_swift_tun_ctrl_cancel_tunnel)
-public func pp_swift_tun_ctrl_cancel_tunnel(
-    _ ref: UnsafeMutableRawPointer?,
-    _ errorCode: UnsafePointer<CChar>?
-) {
-    PartoutTunnelController.Bindings.cancelTunnel(ref, errorCode: errorCode)
+extension PartoutTunnelController {
+    static var functions: partout_controller_functions {
+        partout_controller_functions(
+            set_delegate: { ref, delegate in
+                Bindings.setDelegate(ref, delegate: delegate.map(UnsafeRawPointer.init))
+            },
+            set_tunnel: { ref, uuid, infoJSON in
+                guard Bindings.setTunnel(ref, uuid: uuid, infoJSON: infoJSON) else { return nil }
+                return partout_tun_lookup()
+            },
+            report_snapshot: { ref, json in
+                Bindings.reportSnapshot(ref, snapshotJSON: json)
+            },
+            set_environment_value: { ref, key, value in
+                Bindings.setEnvironmentValue(ref, key: key, value: value)
+            },
+            clear_tunnel: { ref, killSwitch in
+                Bindings.clearTunnel(ref, killSwitch: killSwitch)
+            },
+            cancel_tunnel: { ref, errorCode in
+                Bindings.cancelTunnel(ref, errorCode: errorCode)
+            },
+            configure_sockets: { ref, reachability, descriptors, count in
+                Bindings.configureSockets(ref, reachability: reachability.map(UnsafeRawPointer.init),
+                                          descriptors: descriptors, descriptorsCount: count)
+            }
+        )
+    }
 }
 
 private extension PartoutTunnelController {

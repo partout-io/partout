@@ -48,15 +48,15 @@ generate_kotlin_models() {
     local tmpmodels=cross-models
 
     scripts/gen-models.sh $openapi kotlin $tmpmodels $package
-    rm -rf $models/android/io/partout/models
-    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/io/partout
+    rm -rf $models/android/src/io/partout/models
+    mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/src/io/partout
     rm -rf $tmpmodels
 }
 
 generate_cpp_models() {
     local openapi=$1
 
-    scripts/gen-models.sh "$openapi" cpp cross/windows/src/models Partout.Models
+    scripts/gen-models.sh "$openapi" cpp cross/cpp/models Partout.Models
 }
 
 generate_models() {

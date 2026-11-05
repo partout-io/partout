@@ -297,7 +297,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 test "daemon preserves settings-only failure and hold behavior" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
         callbacks_on_caller: bool = true,
@@ -1685,7 +1685,7 @@ fn waitForExit(owner: anytype) !void {
 test "stop waits for terminal submission failure before immediate destruction" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         entered: std.atomic.Value(bool) = .init(false),
         released: std.atomic.Value(bool) = .init(false),
@@ -2224,7 +2224,7 @@ test "connection worker rolls back endpoint and thread allocations" {
 test "daemon yields to timers between mailbox batches on every platform" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         connection: FailingStartConnection = .{},
         writer: net.ConnectionWriter = undefined,
@@ -2297,9 +2297,9 @@ test "daemon yields to timers between mailbox batches on every platform" {
 }
 
 const WindowsReceiveProbe = struct {
-    callback: source.ffi.io.winrt_receive = null,
+    callback: source.ffi.io.windows_receive = null,
     callback_context: ?*anyopaque = null,
-    capability: source.ffi.io.winrt_transport = undefined,
+    capability: source.ffi.io.windows_transport = undefined,
     actor: std.Thread.Id = 0,
     reads: usize = 0,
     failures: usize = 0,
@@ -2319,7 +2319,7 @@ const WindowsReceiveProbe = struct {
     measure_timer: bool = false,
     reads_at_timer: ?usize = null,
 
-    fn subscribe(raw: ?*anyopaque, callback: source.ffi.io.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+    fn subscribe(raw: ?*anyopaque, callback: source.ffi.io.windows_receive, context: ?*anyopaque) callconv(.c) bool {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.delivery.lock();
         defer self.delivery.unlock();
@@ -2339,10 +2339,10 @@ const WindowsReceiveProbe = struct {
         return true;
     }
     fn stop(_: ?*anyopaque) callconv(.c) void {}
-    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const source.ffi.io.winrt_address) callconv(.c) i32 {
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const source.ffi.io.windows_address) callconv(.c) i32 {
         return 0;
     }
-    fn address(_: ?*anyopaque, _: [*c]source.ffi.io.winrt_address) callconv(.c) bool {
+    fn address(_: ?*anyopaque, _: [*c]source.ffi.io.windows_address) callconv(.c) bool {
         return false;
     }
 
@@ -2466,7 +2466,7 @@ const WindowsActorPause = struct {
 test "Windows OpenVPN receives borrow input inline, preserve fallback order and drain on stop" {
     const runtime = try NativeRuntime.init();
     defer runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = WindowsReceiveProbe;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
@@ -2600,7 +2600,7 @@ test "Windows OpenVPN receives borrow input inline, preserve fallback order and 
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = WindowsReceiveProbe;
     for ([_]?usize{ null, 0, 1 }) |oom_offset| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});

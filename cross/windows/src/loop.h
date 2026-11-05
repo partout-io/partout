@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
+#include "windows/export.h"
 #include <functional>
 #include <future>
 #include <memory>
@@ -16,18 +17,18 @@ namespace Partout {
 // protocol code.
 class RuntimeLoop {
 public:
-    RuntimeLoop();
-    ~RuntimeLoop();
+    PARTOUT_WINDOWS_API RuntimeLoop();
+    PARTOUT_WINDOWS_API ~RuntimeLoop();
     RuntimeLoop(const RuntimeLoop &) = delete;
     RuntimeLoop &operator=(const RuntimeLoop &) = delete;
 
     // Borrowed process runtime. Its owner must quiesce all users before destruction.
     // Only one runtime may be active, matching the daemon's process-wide lifetime.
-    static RuntimeLoop *Current();
-    bool IsWorker() const;
+    PARTOUT_WINDOWS_API static RuntimeLoop *Current();
+    PARTOUT_WINDOWS_API bool IsWorker() const;
     // Queue a command without waiting for its completion.
-    void Schedule(std::function<void()> command);
-    void Drain();
+    PARTOUT_WINDOWS_API void Schedule(std::function<void()> command);
+    PARTOUT_WINDOWS_API void Drain();
 
     // Run inline on the worker, otherwise wait for the result. Setup and lifecycle
     // barriers only; packet writes bypass the worker, resumes use Schedule.

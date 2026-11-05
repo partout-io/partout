@@ -52,7 +52,7 @@ const ClearingAllocator = struct {
 test "WireGuard passive UDP preserves multiple peer sources and reply destinations" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var receiver = try bridge.PassiveIO.init(Completion.finish);
@@ -148,7 +148,7 @@ const FailureRecorder = struct {
 test "WireGuard passive initial transport allocation failure stays closed and reports once" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
@@ -325,7 +325,7 @@ test "POSIX passive receive and short write failures report once" {
 }
 
 test "WireGuard passive waiting reads receive without packet allocations" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     for ([_]source.net.Side{ .link, .tun }) |side| {
         var passive = try bridge.PassiveIO.init(Completion.finish);
         defer passive.deinit();
@@ -381,7 +381,7 @@ test "WireGuard passive waiting reads receive without packet allocations" {
 }
 
 test "WireGuard passive queued reads preserve batching and discard oversized packets" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var clearing = ClearingAllocator{ .arena = .init(std.testing.allocator) };
     defer clearing.arena.deinit();
     var passive = try bridge.PassiveIO.init(Completion.finish);
@@ -408,7 +408,7 @@ test "WireGuard passive queued reads preserve batching and discard oversized pac
 }
 
 test "WireGuard native input batch fills waiting Go buffers with one notification" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     var passive = try bridge.PassiveIO.init(Completion.finish);
     defer passive.deinit();
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
@@ -455,19 +455,19 @@ test "WireGuard receive metrics distinguish queued input and bounded queue drops
 }
 
 test "Windows WireGuard uses native batch capabilities and preserves partial failure counts" {
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const native = source.ffi.io;
     const Probe = struct {
-        receive: native.winrt_receive_batch = null,
+        receive: native.windows_receive_batch = null,
         context: ?*anyopaque = null,
         calls: usize = 0,
         fail: bool,
 
         fn release(_: ?*anyopaque) callconv(.c) void {}
-        fn subscribe(_: ?*anyopaque, _: native.winrt_receive, _: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(_: ?*anyopaque, _: native.windows_receive, _: ?*anyopaque) callconv(.c) bool {
             return false; // This fixture requires the batch subscription.
         }
-        fn subscribeBatch(raw: ?*anyopaque, callback: native.winrt_receive_batch, context: ?*anyopaque) callconv(.c) bool {
+        fn subscribeBatch(raw: ?*anyopaque, callback: native.windows_receive_batch, context: ?*anyopaque) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.receive = callback;
             self.context = context;
@@ -477,13 +477,13 @@ test "Windows WireGuard uses native batch capabilities and preserves partial fai
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn address(_: ?*anyopaque, _: [*c]native.winrt_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]native.windows_address) callconv(.c) bool {
             return false;
         }
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const native.winrt_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const native.windows_address) callconv(.c) i32 {
             return -1;
         }
-        fn writeBatch(raw: ?*anyopaque, packets: [*c]const native.winrt_packet, count: usize, _: [*c]const native.winrt_address, written: [*c]usize) callconv(.c) i32 {
+        fn writeBatch(raw: ?*anyopaque, packets: [*c]const native.windows_packet, count: usize, _: [*c]const native.windows_address, written: [*c]usize) callconv(.c) i32 {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.calls += 1;
             std.debug.assert(count == 2);
@@ -499,7 +499,7 @@ test "Windows WireGuard uses native batch capabilities and preserves partial fai
         defer passive.deinit();
         bridge.PassiveIO.testing.attach(&passive, .link);
         var probe = Probe{ .fail = fail };
-        var capability = native.winrt_transport{
+        var capability = native.windows_transport{
             .context = &probe,
             .release = Probe.release,
             .subscribe = Probe.subscribe,
@@ -512,7 +512,7 @@ test "Windows WireGuard uses native batch capabilities and preserves partial fai
             .subscribe_batch = Probe.subscribeBatch,
         };
         passive.replaceTun(try io.TunWrapper.wrap(std.testing.allocator, &capability));
-        const incoming = [_]native.winrt_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
+        const incoming = [_]native.windows_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
         try std.testing.expect(probe.receive.?(probe.context, &incoming, incoming.len, null, 0));
         try std.testing.expectEqual(@as(u64, 1), bridge.PassiveIO.testing.metrics(&passive, .tun).batches);
         try std.testing.expectEqual(@as(u64, 2), bridge.PassiveIO.testing.metrics(&passive, .tun).queued_packets);
@@ -528,7 +528,7 @@ test "Windows WireGuard uses native batch capabilities and preserves partial fai
 }
 
 test "WireGuard passive pending buffers are unregistered on timeout cancellation detach and failure" {
-    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
     const Scenario = enum { timeout, cancel, detach, failure, oversized };
     for (std.enums.values(Scenario)) |scenario| {
         var passive = try bridge.PassiveIO.init(Completion.finish);

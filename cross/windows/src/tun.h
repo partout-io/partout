@@ -2,8 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include "windows/export.h"
 
 #include "io_types.h"
+#include "io_metrics.h"
 #include "socket.h"
 #include "network.h"
 #include <winrt/Windows.Networking.Connectivity.h>
@@ -11,6 +13,7 @@
 #include <winrt/Windows.Networking.Sockets.h>
 #include <memory>
 #include <atomic>
+#include <mutex>
 
 namespace Partout {
 class RuntimeLoop;
@@ -19,12 +22,58 @@ class RuntimeLoop;
 // and serialized with channel close. StopWrites is atomic. Receive callbacks
 // must not reenter callback management or lifecycle APIs.
 class Tun {
-    class State;
+    // Owned by the controller; TUN handles and the socket writer borrow it.
+    class State {
+    public:
+        winrt::Windows::Networking::Vpn::VpnChannel channel;
+        // Producers submit directly. Close waits for accepted submissions before
+        // stopping the channel; no producer waits for the native command worker.
+        std::mutex write_mutex;
+        bool accepting_writes = false;
+        // Held throughout native delivery and callback removal. The current Tun is
+        // borrowed under this gate; its destructor unpublishes it before returning.
+        // Channel submission from a receive callback may reenter native delivery.
+        // The Zig execution gate queues that nested receive rather than recursing
+        // into protocol state.
+        std::recursive_mutex receive_mutex;
+        Tun *tun = nullptr;
+        Socket::Receiver link_receive;
+
+        struct Counters {
+            // Receives hold receive_mutex; writes hold write_mutex.
+            // Snapshots acquire both gates, in that order.
+            uint64_t tun_read = 0, tun_dropped = 0, link_send = 0, link_send_failed = 0;
+            uint64_t link_read = 0, tun_write = 0, tun_write_failed = 0;
+        } counters;
+
+        // Index 0 is downstream into TUN; index 1 is upstream into the link.
+        IOTiming get_buffer_time[2], copy_time[2], append_time[2], flush_time[2], receive_time[2];
+
+        explicit State(winrt::Windows::Networking::Vpn::VpnChannel const &value) : channel(value) {}
+
+        ~State() {
+            for (size_t i = 0; i < 2; ++i) {
+                get_buffer_time[i].Log(this, i ? "channel.link.get_buffer" : "channel.tun.get_buffer");
+                copy_time[i].Log(this, i ? "channel.link.copy" : "channel.tun.copy");
+                append_time[i].Log(this, i ? "channel.link.append" : "channel.tun.append");
+                flush_time[i].Log(this, i ? "channel.link.flush" : "channel.tun.flush");
+            }
+            receive_time[0].Log(this, "channel.encapsulate_callback_excluding_lock_wait");
+            receive_time[1].Log(this, "channel.decapsulate_callback_excluding_lock_wait");
+        }
+
+        int32_t Write(const uint8_t *bytes, size_t length, bool send) {
+            const PacketView packet{bytes, length};
+            size_t written = 0;
+            return WriteBatch(&packet, 1, send, &written);
+        }
+        int32_t WriteBatch(const PacketView *packets, size_t count, bool send, size_t *written);
+    };
     friend class TunnelController;
 
 public:
     explicit Tun(State &state);
-    ~Tun() noexcept;
+    PARTOUT_WINDOWS_API ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
@@ -52,19 +101,25 @@ private:
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
-    TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    ~TunnelController();
+    PARTOUT_WINDOWS_API TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    PARTOUT_WINDOWS_API ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
     bool Associate(Socket &socket) noexcept;
-    RuntimeLoop &Loop() const { return loop_; }
-    NetworkMonitor &Monitor() { return monitor_; }
 
-    std::unique_ptr<Tun> Open(const char *info_json);
-    void Close() noexcept;
-    void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
-    void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+    RuntimeLoop &Loop() const {
+        return loop_;
+    }
+
+    NetworkMonitor &Monitor() {
+        return monitor_;
+    }
+
+    PARTOUT_WINDOWS_API std::unique_ptr<Tun> Open(const char *info_json);
+    PARTOUT_WINDOWS_API void Close() noexcept;
+    PARTOUT_WINDOWS_API void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
+    PARTOUT_WINDOWS_API void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);

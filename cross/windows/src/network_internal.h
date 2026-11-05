@@ -25,6 +25,7 @@ struct NetworkPreference {
 };
 
 // A missing preference excludes an unusable profile from selection.
-std::optional<size_t> SelectPhysicalNetwork(size_t count,
-    const std::function<std::optional<NetworkPreference>(size_t)> &preference);
+std::optional<size_t>
+SelectPhysicalNetwork(size_t count,
+                      const std::function<std::optional<NetworkPreference>(size_t)> &preference);
 } // namespace Partout

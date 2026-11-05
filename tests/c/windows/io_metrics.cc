@@ -10,8 +10,8 @@ namespace {
 std::string message;
 }
 
-extern "C" void winrt_log(winrt_log_level level, const char *format, ...) {
-    assert(level == WinrtLogInfo);
+extern "C" void windows_log(windows_log_level level, const char *format, ...) {
+    assert(level == WindowsLogInfo);
     char buffer[1024];
     va_list args;
     va_start(args, format);

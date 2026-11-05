@@ -18,9 +18,9 @@ fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        native: *c.winrt_transport,
+        native: *c.windows_transport,
 
-        pub fn wrap(allocator: std.mem.Allocator, native: *c.winrt_transport) std.mem.Allocator.Error!*Self {
+        pub fn wrap(allocator: std.mem.Allocator, native: *c.windows_transport) std.mem.Allocator.Error!*Self {
             const self = try allocator.create(Self);
             self.* = .{ .allocator = allocator, .native = native };
             return self;
@@ -43,7 +43,7 @@ fn NativeTransport(comptime side: io.Side) type {
             if (!self.native.subscribe.?(self.native.context, @ptrCast(callback), context)) return error.ReceiveSetupFailed;
         }
 
-        pub fn setOnReceiveBatch(self: *Self, callback: c.winrt_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
+        pub fn setOnReceiveBatch(self: *Self, callback: c.windows_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
             const subscribe = self.native.subscribe_batch orelse return false;
             if (!subscribe(self.native.context, callback, context)) return error.ReceiveSetupFailed;
             return true;
@@ -52,8 +52,8 @@ fn NativeTransport(comptime side: io.Side) type {
         pub fn writeBatch(self: *Self, packets: io.Packets, destination: ?io.SocketAddress) struct { count: usize, status: i32 } {
             if (packets.len == 0) return .{ .count = 0, .status = 0 };
             if (self.native.write_batch) |write_batch| {
-                if (packets.len > c.WinrtMaxBatch) return .{ .count = 0, .status = -1 };
-                var views: [c.WinrtMaxBatch]c.winrt_packet = undefined;
+                if (packets.len > c.WindowsMaxBatch) return .{ .count = 0, .status = -1 };
+                var views: [c.WindowsMaxBatch]c.windows_packet = undefined;
                 for (packets, 0..) |packet, index| views[index] = .{ .data = packet.ptr, .size = packet.len };
                 var written: usize = 0;
                 const status = write_batch(self.native.context, &views, packets.len, if (destination) |*address| @ptrCast(address) else null, &written);
@@ -96,7 +96,7 @@ fn NativeTransport(comptime side: io.Side) type {
         pub const create = if (side == .link) createLink else createTun;
 
         fn createLink(allocator: std.mem.Allocator, endpoint: ?core.api.ExtendedEndpoint, options: io.SocketOptions) std.mem.Allocator.Error!?*Self {
-            if (!build_options.winrt) return null;
+            if (!build_options.windows) return null;
             if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
             const peer = endpoint orelse core.api.ExtendedEndpoint{
                 .address = if (options.ipv6) "::" else "0.0.0.0",
@@ -106,7 +106,7 @@ fn NativeTransport(comptime side: io.Side) type {
             try host.init(allocator, peer.address);
             defer host.deinit();
             const options_ctx = @constCast(&options);
-            const native: *c.winrt_transport = c.winrt_connect(
+            const native: *c.windows_transport = c.windows_connect(
                 host.ptr(),
                 peer.proto.port,
                 &.{
@@ -167,7 +167,7 @@ pub fn CallbackTransport(comptime DescriptorType: type) type {
             }
         }
 
-        pub fn setOnReceiveBatch(self: *Self, callback: c.winrt_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
+        pub fn setOnReceiveBatch(self: *Self, callback: c.windows_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
             return switch (self.descriptor) {
                 inline else => |value| value.setOnReceiveBatch(callback, context),
             };

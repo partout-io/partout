@@ -3,9 +3,10 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const hooks = @import("../controller_hooks.zig");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
-const winrt_enabled = @import("source").winrt_enabled;
+const windows_enabled = @import("source").windows_enabled;
 
 const core = @import("source").core;
 const io = @import("source").net_io;
@@ -69,10 +70,10 @@ fn recordEnvironmentValue(
 }
 
 fn platformOptions(recorder: *TunnelCommitRecorder) Platform.Options {
-    var functions = io_c.pp_tun_ctrl_fnt_current();
+    var functions = hooks.nativeFunctions();
     functions.set_tunnel = recordSetTunnel;
     functions.set_environment_value = recordEnvironmentValue;
-    return .{ .ref = recorder, .fnt = functions };
+    return .{ .ref = recorder, .fnt = functions, .socket_configurator = .{ .ctx = recorder, .configure = @ptrCast(hooks.functions.configure_sockets) } };
 }
 
 test "platform reports unavailable tunnel after committing settings" {
@@ -107,7 +108,7 @@ test "platform forwards environment values and removals" {
 }
 
 test "platform socket factory returns current reachability" {
-    var platform = try Platform.init(.{});
+    var platform = try hooks.initPlatform(.{});
     defer platform.deinit();
 
     try std.testing.expect(platform.socketFactory().currentReachability() == null);
@@ -132,7 +133,7 @@ test "platform network monitor receives reachability changes" {
         fn notifyBetterPath(_: ?*anyopaque) void {}
     };
 
-    var platform = try Platform.init(.{});
+    var platform = try hooks.initPlatform(.{});
     defer platform.deinit();
     var recorder = Recorder{};
     const monitor = platform.networkMonitor();
@@ -156,7 +157,7 @@ test "platform network monitor receives reachability changes" {
 }
 
 test "platform builds identical socket configuration options on all backends" {
-    var platform = try Platform.init(.{
+    var platform = try hooks.initPlatform(.{
         .socket_buf_size = 4096,
     });
     defer platform.deinit();
@@ -191,7 +192,7 @@ test "socket creation and existing descriptors share independent platform policy
         }
     };
     var policy = Policy{};
-    var platform = try Platform.init(.{
+    var platform = try hooks.initPlatform(.{
         .socket_configurator = .{ .ctx = &policy, .configure = Policy.configure },
     });
     defer platform.deinit();
@@ -226,7 +227,7 @@ test "socket creation and existing descriptors share independent platform policy
 test "Windows configuration callback receives a native policy token and can reject open" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
+    if (platform_target.os.tag != .windows or !windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
         descriptor: SocketDescriptor = 0,
@@ -243,7 +244,7 @@ test "Windows configuration callback receives a native policy token and can reje
         }
     };
     var probe = Probe{};
-    var platform = try Platform.init(.{ .socket_configurator = .{ .ctx = &probe, .configure = Probe.configure } });
+    var platform = try hooks.initPlatform(.{ .socket_configurator = .{ .ctx = &probe, .configure = Probe.configure } });
     defer platform.deinit();
     const endpoint: api.ExtendedEndpoint = .{ .address = "127.0.0.1", .proto = .init(.udp, 1194) };
     const options = socketOptions(&platform, reachable(true), 1000);
@@ -272,7 +273,7 @@ test "platform records better path notifications" {
     };
 
     var recorder = Recorder{};
-    var platform = try Platform.init(.{});
+    var platform = try hooks.initPlatform(.{});
     defer platform.deinit();
     const monitor = platform.networkMonitor();
     monitor.setEventHandler(.{
@@ -301,10 +302,10 @@ test "settings-only daemons release owned TUN descriptors" {
         extern "c" fn close(fd: c_int) c_int;
     };
     // Match portable TUN storage on POSIX. A pipe exercises ownership without
-    // requiring privileges to create a real TUN device. Android uses only fd.
+    // requiring privileges to create a real TUN device.
     const NativeTun = extern struct {
         fd: c_int,
-        dev_name: ?[*:0]const u8 = null,
+        owned: bool = !platform_target.abi.isAndroid(),
     };
     const Controller = struct {
         mock: mock.MockTunnelController = .{},
@@ -385,9 +386,9 @@ test "platform cancellation formats extended errors only at the C boundary" {
         }
     };
     var recorder = Recorder{};
-    var functions = io_c.pp_tun_ctrl_fnt_current();
+    var functions = hooks.nativeFunctions();
     functions.cancel_tunnel = Recorder.cancel;
-    var platform = try Platform.init(.{ .ref = &recorder, .fnt = functions });
+    var platform = try hooks.initPlatform(.{ .ref = &recorder, .fnt = functions });
     defer platform.deinit();
     const controller = platform.tunnelController();
 
@@ -421,7 +422,7 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
         }
     };
     var policy = Policy{};
-    var platform = try Platform.init(.{ .socket_configurator = .{ .ctx = &policy, .configure = Policy.configure } });
+    var platform = try hooks.initPlatform(.{ .socket_configurator = .{ .ctx = &policy, .configure = Policy.configure } });
     defer platform.deinit();
     const reservation = (try io.SocketWrapper.create(allocator, null, .{ .ipv6 = false })).?;
     const port = (try reservation.linkDescriptor().localAddress()).port;

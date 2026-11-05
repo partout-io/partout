@@ -27,7 +27,7 @@ const TimerProbe = struct {
 test "looper runs and cancels timers on its caller" {
     try std.testing.expectError(error.MuxFailure, Looper.init(std.testing.allocator, .{ .mux = null }));
     // Windows dispatch is supplied by the optional native runtime archive.
-    if (builtin.os.tag == .windows and !source.winrt_enabled) {
+    if (builtin.os.tag == .windows and !source.windows_enabled) {
         return;
     }
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
@@ -66,7 +66,7 @@ test "looper runs and cancels timers on its caller" {
 }
 
 test "Windows timer callback can cancel a due task and rearm for the next iteration" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const Probe = struct {
         looper: *Looper,
         first: io.Timer = .{},
@@ -106,7 +106,7 @@ test "Windows timer callback can cancel a due task and rearm for the next iterat
 }
 
 test "Windows dispatcher waits for the earlier timer deadline" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
@@ -131,7 +131,7 @@ test "Windows dispatcher waits for the earlier timer deadline" {
 }
 
 test "Windows dispatcher shares the daemon wake event without spinning or losing a wake" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const mux = c.pp_mux_create(1) orelse return error.MuxCreationFailed;
     defer c.pp_mux_free(mux);
@@ -182,7 +182,7 @@ test "Windows dispatcher shares the daemon wake event without spinning or losing
 }
 
 test "Windows timer replacement failure preserves the old task and token" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
@@ -207,7 +207,7 @@ test "Windows timer replacement failure preserves the old task and token" {
 }
 
 test "Windows timer expiry cannot invoke a context after cancellation or stop" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
@@ -250,7 +250,7 @@ const WindowsWriteProbe = struct {
 test "Windows looper owns attachments and routes socket write failure" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
@@ -305,7 +305,7 @@ const WindowsRejectedReceiver = struct {
 test "Windows native write failures return asynchronously through the looper" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
@@ -394,7 +394,7 @@ const WindowsDetachProbe = struct {
 test "Windows TCP receive resumes and detaches its side on the looper thread" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const ws = WindowsSockets;
     // Initialize Winsock using the native backend, then make a local TCP peer.
@@ -509,11 +509,11 @@ const WindowsAdmissionProbe = struct {
 // Exercises native producer admission without requiring a VPN channel host.
 const WindowsProducer = struct {
     const c = source.ffi.io;
-    callback: c.winrt_receive = null,
+    callback: c.windows_receive = null,
     context: ?*anyopaque = null,
     released: bool = false,
 
-    fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+    fn subscribe(raw: ?*anyopaque, callback: c.windows_receive, context: ?*anyopaque) callconv(.c) bool {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.callback = callback;
         self.context = context;
@@ -529,16 +529,16 @@ const WindowsProducer = struct {
         return true;
     }
     fn stop(_: ?*anyopaque) callconv(.c) void {}
-    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.windows_address) callconv(.c) i32 {
         return 0;
     }
-    fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+    fn address(_: ?*anyopaque, _: [*c]c.windows_address) callconv(.c) bool {
         return false;
     }
     fn send(self: *@This(), bytes: []const u8, code: i32) bool {
         return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
     }
-    fn capability(self: *@This()) c.winrt_transport {
+    fn capability(self: *@This()) c.windows_transport {
         return .{
             .context = self,
             .release = release,
@@ -552,7 +552,7 @@ const WindowsProducer = struct {
             .subscribe_batch = null,
         };
     }
-    fn pair(native: *c.winrt_transport, side: io.Side) !io.DescriptorPair {
+    fn pair(native: *c.windows_transport, side: io.Side) !io.DescriptorPair {
         return switch (side) {
             .link => .{ .link = try io.SocketWrapper.wrap(std.testing.allocator, native) },
             .tun => .{ .tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(native)) },
@@ -561,7 +561,7 @@ const WindowsProducer = struct {
 };
 
 test "Windows paused TUN drops new input but admits failures and resumes delivery" {
-    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    if (builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{ .mux = mux });
