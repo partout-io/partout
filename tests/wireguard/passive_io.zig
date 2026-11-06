@@ -129,10 +129,11 @@ const ReadRequest = struct {
     packets: [*c]c.wg_read_packet,
     result: *Completion,
     status: i32 = 99,
+    count: u32 = 1,
     fn run(self: *ReadRequest) void {
         const transport = self.passive.transport(51820, 1400);
         const read = if (self.side == .link) transport.link.read else transport.tun.read;
-        self.status = read.?(transport.context, self.packets, 1, self.result.token());
+        self.status = read.?(transport.context, self.packets, self.count, self.result.token());
     }
 };
 
@@ -371,6 +372,10 @@ test "WireGuard passive waiting reads receive without packet allocations" {
             try std.testing.expectEqualSlices(u8, &address.address, &packets[0].source.address);
         }
         try std.testing.expectEqual(@as(usize, 0), bridge.PassiveIO.testing.pendingReads(&passive, side));
+        const metrics = bridge.PassiveIO.testing.metrics(&passive, side);
+        try std.testing.expectEqual(@as(u64, 2), metrics.direct_packets);
+        try std.testing.expectEqual(@as(u64, 0), metrics.queued_packets);
+        try std.testing.expectEqual(@as(u64, 2), metrics.notifications);
         try std.testing.expect(!failing.has_induced_failure);
     }
 }
@@ -397,6 +402,129 @@ test "WireGuard passive queued reads preserve batching and discard oversized pac
     try std.testing.expectEqualStrings("two", buffers[1][0..packets[1].size]);
     // Payloads must be freed before their nodes, including the discarded packet.
     try std.testing.expectEqual(@as(usize, 6), clearing.frees);
+    const metrics = bridge.PassiveIO.testing.metrics(&passive, .tun);
+    try std.testing.expectEqual(@as(u64, 3), metrics.queued_packets);
+    try std.testing.expectEqual(@as(u64, 1), metrics.oversized_drops);
+}
+
+test "WireGuard native input batch fills waiting Go buffers with one notification" {
+    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    defer passive.deinit();
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{ .fail_index = 0 });
+    passive.allocator = failing.allocator();
+    bridge.PassiveIO.testing.attach(&passive, .tun);
+    var buffers: [3][16]u8 = undefined;
+    var packets: [3]c.wg_read_packet = undefined;
+    for (&packets, &buffers) |*packet, *buffer| packet.* = .{ .data = buffer, .capacity = buffer.len };
+    var result = Completion{};
+    var request = ReadRequest{ .passive = &passive, .side = .tun, .packets = &packets, .result = &result, .count = packets.len };
+    var thread: ?std.Thread = try std.Thread.spawn(.{}, ReadRequest.run, .{&request});
+    defer if (thread) |value| {
+        passive.quiesce();
+        value.join();
+    };
+    try waitForPendingReads(&passive, .tun, 1);
+    const input = [_][]const u8{ "one", "two", "three" };
+    try std.testing.expect(bridge.PassiveIO.testing.receiveBatch(&passive, .tun, &input, null));
+    thread.?.join();
+    thread = null;
+    try std.testing.expectEqual(@as(u32, 3), result.count);
+    for (input, packets, buffers) |expected, packet, buffer| try std.testing.expectEqualStrings(expected, buffer[0..packet.size]);
+    const metrics = bridge.PassiveIO.testing.metrics(&passive, .tun);
+    try std.testing.expectEqual(@as(u64, 3), metrics.direct_packets);
+    try std.testing.expectEqual(@as(u64, 0), metrics.queued_packets);
+    try std.testing.expectEqual(@as(u64, 1), metrics.notifications);
+    try std.testing.expectEqual(@as(usize, 3), metrics.max_batch);
+    try std.testing.expect(!failing.has_induced_failure);
+}
+
+test "WireGuard receive metrics distinguish queued input and bounded queue drops" {
+    var passive = try bridge.PassiveIO.init(Completion.finish);
+    passive.allocator = std.testing.allocator;
+    defer passive.deinit();
+    bridge.PassiveIO.testing.attach(&passive, .tun);
+    for (0..1024) |_| try std.testing.expect(bridge.PassiveIO.testing.receiveBatch(&passive, .tun, &.{"queued"}, null));
+    try std.testing.expect(bridge.PassiveIO.testing.receiveBatch(&passive, .tun, &.{ "drop", "drop" }, null));
+    const metrics = bridge.PassiveIO.testing.metrics(&passive, .tun);
+    try std.testing.expectEqual(@as(u64, 1024), metrics.queued_packets);
+    try std.testing.expectEqual(@as(u64, 6144), metrics.queued_bytes);
+    try std.testing.expectEqual(@as(usize, 1024), metrics.queue_peak);
+    try std.testing.expectEqual(@as(u64, 2), metrics.queue_full_drops);
+    try std.testing.expectEqual(@as(u64, 0), metrics.notifications);
+}
+
+test "Windows WireGuard uses native batch capabilities and preserves partial failure counts" {
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
+    const native = source.ffi.io;
+    const Probe = struct {
+        receive: native.windows_receive_batch = null,
+        context: ?*anyopaque = null,
+        calls: usize = 0,
+        fail: bool,
+
+        fn release(_: ?*anyopaque) callconv(.c) void {}
+        fn subscribe(_: ?*anyopaque, _: native.windows_receive, _: ?*anyopaque) callconv(.c) bool {
+            return false; // This fixture requires the batch subscription.
+        }
+        fn subscribeBatch(raw: ?*anyopaque, callback: native.windows_receive_batch, context: ?*anyopaque) callconv(.c) bool {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.receive = callback;
+            self.context = context;
+            return true;
+        }
+        fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
+            return true;
+        }
+        fn stop(_: ?*anyopaque) callconv(.c) void {}
+        fn address(_: ?*anyopaque, _: [*c]native.windows_address) callconv(.c) bool {
+            return false;
+        }
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const native.windows_address) callconv(.c) i32 {
+            return -1;
+        }
+        fn writeBatch(raw: ?*anyopaque, packets: [*c]const native.windows_packet, count: usize, _: [*c]const native.windows_address, written: [*c]usize) callconv(.c) i32 {
+            const self: *@This() = @ptrCast(@alignCast(raw.?));
+            self.calls += 1;
+            std.debug.assert(count == 2);
+            std.debug.assert(std.mem.eql(u8, packets[0].data[0..packets[0].size], "one"));
+            std.debug.assert(std.mem.eql(u8, packets[1].data[0..packets[1].size], "two"));
+            written.* = if (self.fail) 1 else count;
+            return if (self.fail) -1 else 0;
+        }
+    };
+    for ([_]bool{ false, true }) |fail| {
+        var passive = try bridge.PassiveIO.init(Completion.finish);
+        passive.allocator = std.testing.allocator;
+        defer passive.deinit();
+        bridge.PassiveIO.testing.attach(&passive, .link);
+        var probe = Probe{ .fail = fail };
+        var capability = native.windows_transport{
+            .context = &probe,
+            .release = Probe.release,
+            .subscribe = Probe.subscribe,
+            .@"resume" = Probe.resumeReads,
+            .stop = Probe.stop,
+            .write = Probe.write,
+            .local_address = Probe.address,
+            .unconnected = false,
+            .write_batch = Probe.writeBatch,
+            .subscribe_batch = Probe.subscribeBatch,
+        };
+        passive.replaceTun(try io.TunWrapper.wrap(std.testing.allocator, &capability));
+        const incoming = [_]native.windows_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
+        try std.testing.expect(probe.receive.?(probe.context, &incoming, incoming.len, null, 0));
+        try std.testing.expectEqual(@as(u64, 1), bridge.PassiveIO.testing.metrics(&passive, .tun).batches);
+        try std.testing.expectEqual(@as(u64, 2), bridge.PassiveIO.testing.metrics(&passive, .tun).queued_packets);
+        const transport = passive.transport(0, 1400);
+        const outgoing = [_]c.wg_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
+        var result = Completion{};
+        try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, &outgoing, outgoing.len, result.token()));
+        try std.testing.expectEqual(@as(usize, 1), probe.calls);
+        try std.testing.expectEqual(@as(u32, if (fail) 1 else 2), result.count);
+        try std.testing.expectEqual(if (fail) c.WG_IO_INVALID else c.WG_IO_OK, result.status);
+        try std.testing.expectEqual(fail, passive.failed);
+    }
 }
 
 test "WireGuard passive pending buffers are unregistered on timeout cancellation detach and failure" {

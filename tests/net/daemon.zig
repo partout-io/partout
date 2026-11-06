@@ -2296,118 +2296,312 @@ test "daemon yields to timers between mailbox batches on every platform" {
     try std.testing.expect(probe.calls_at_timer.? < probe.calls);
 }
 
+const WindowsReceiveProbe = struct {
+    callback: source.ffi.io.windows_receive = null,
+    callback_context: ?*anyopaque = null,
+    capability: source.ffi.io.windows_transport = undefined,
+    actor: std.Thread.Id = 0,
+    reads: usize = 0,
+    failures: usize = 0,
+    code: ?i32 = null,
+    bytes: [16]u8 = undefined,
+    length: usize = 0,
+    on_actor: bool = true,
+    pause_next: bool = false,
+    pause_first: bool = true,
+    last_thread: std.Thread.Id = 0,
+    input_pointer: ?[*]const u8 = null,
+    delivery: core.Mutex = .{},
+    read_entered: std.atomic.Value(bool) = .init(false),
+    release_read: std.atomic.Value(bool) = .init(true),
+    released: std.atomic.Value(bool) = .init(false),
+    looper: *Looper = undefined,
+    measure_timer: bool = false,
+    reads_at_timer: ?usize = null,
+
+    fn subscribe(raw: ?*anyopaque, callback: source.ffi.io.windows_receive, context: ?*anyopaque) callconv(.c) bool {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.delivery.lock();
+        defer self.delivery.unlock();
+        self.callback = callback;
+        self.callback_context = context;
+        return true;
+    }
+    fn release(raw: ?*anyopaque) callconv(.c) void {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.delivery.lock();
+        defer self.delivery.unlock();
+        self.released.store(true, .release);
+        self.callback = null;
+        self.callback_context = null;
+    }
+    fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
+        return true;
+    }
+    fn stop(_: ?*anyopaque) callconv(.c) void {}
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const source.ffi.io.windows_address) callconv(.c) i32 {
+        return 0;
+    }
+    fn address(_: ?*anyopaque, _: [*c]source.ffi.io.windows_address) callconv(.c) bool {
+        return false;
+    }
+
+    fn read(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.last_thread = std.Thread.getCurrentId();
+        self.input_pointer = packets[0].ptr;
+        self.read_entered.store(true, .release);
+        while (!self.release_read.load(.acquire)) core.sleepMs(1);
+        self.on_actor = self.on_actor and self.last_thread == self.actor;
+        self.length = packets[0].len;
+        @memcpy(self.bytes[0..self.length], packets[0]);
+        self.reads += 1;
+        if (self.measure_timer) {
+            self.measure_timer = false;
+            var timer: io.Timer = .{};
+            try self.looper.scheduleTimer(&timer, 0, .{ .context = self, .callback = timerFired });
+        }
+        if (self.pause_next) {
+            self.pause_next = false;
+            return .pause;
+        }
+        return if (self.pause_first and self.reads == 1) .pause else .keep;
+    }
+    fn failed(raw: ?*anyopaque, failure: io.Failure) void {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.on_actor = self.on_actor and std.Thread.getCurrentId() == self.actor;
+        self.failures += 1;
+        self.code = failure.io.code;
+    }
+    fn attach(owner: anytype, self: *@This()) daemon.Error!void {
+        self.actor = std.Thread.getCurrentId();
+        self.looper = owner.looper;
+        if (owner.looper.isTunAttached()) owner.looper.detach(.tun) catch return error.LooperFailure;
+        const wrapper = try io.TunWrapper.create(std.testing.allocator, @ptrCast(&self.capability));
+        errdefer wrapper.destroy();
+        owner.looper.attach(.{
+            .pair = .{ .tun = wrapper },
+            .on_read = .{ .context = self, .callback = read },
+            .on_failure = .{ .context = self, .callback = failed },
+        }) catch return error.LooperFailure;
+    }
+    fn deliver(self: *@This(), packet: []const u8, code: i32) bool {
+        self.delivery.lock();
+        defer self.delivery.unlock();
+        const callback = self.callback orelse return false;
+        return callback(self.callback_context, packet.ptr, packet.len, null, code);
+    }
+
+    fn sendOriginal(_: anytype, self: *@This()) daemon.Error!void {
+        var packet = "original".*;
+        if (!self.deliver(&packet, 0)) return error.LooperFailure;
+        @memset(&packet, 'x');
+    }
+
+    fn sendOOM(_: anytype, self: *@This()) daemon.Error!void {
+        if (self.deliver("oom", 0)) return error.LooperFailure;
+    }
+
+    fn barrier(_: anytype, _: void) daemon.Error!void {}
+    fn resumeInput(owner: anytype, _: void) daemon.Error!void {
+        owner.looper.resumeReading(.tun) catch return error.LooperFailure;
+    }
+
+    // Simulate receipts already admitted before a pause or replacement.
+    fn queue(owner: anytype, receipt: Looper.PacketReceipt) daemon.Error!void {
+        var owned = receipt;
+        owned.bytes = try owner.daemon.allocator.dupe(u8, receipt.bytes);
+        errdefer owner.daemon.allocator.free(owned.bytes);
+        try daemon.testing.schedule(owner, .{ .onPacketsReceived = owned });
+    }
+
+    fn burst(owner: anytype, self: *@This()) daemon.Error!void {
+        self.pause_next = true;
+        const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+        for ([_][]const u8{ "first", "second", "third" }) |bytes| {
+            try queue(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
+        }
+    }
+
+    fn timerFired(raw: ?*anyopaque) void {
+        const self: *@This() = @ptrCast(@alignCast(raw.?));
+        self.reads_at_timer = self.reads;
+    }
+
+    fn flood(owner: anytype, self: *@This()) daemon.Error!void {
+        self.measure_timer = true;
+        const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
+        for (0..owner.looper.impl.max_read_count + 1) |_| {
+            try queue(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
+        }
+    }
+};
+
+// Park the actor outside protocol execution, like its normal mux wait, so
+// admission and contention tests do not depend on scheduler timing.
+const WindowsActorPause = struct {
+    ready: std.atomic.Value(bool) = .init(false),
+    release: std.atomic.Value(bool) = .init(false),
+
+    fn run(owner: anytype, self: *@This()) void {
+        daemon.testing.onLoop(owner, self, park) catch unreachable;
+    }
+
+    fn park(owner: anytype, self: *@This()) daemon.Error!void {
+        owner.execution_gate.leave();
+        defer owner.execution_gate.enter();
+        self.ready.store(true, .release);
+        while (!self.release.load(.acquire)) core.sleepMs(1);
+    }
+
+    fn wait(flag: *const std.atomic.Value(bool)) !void {
+        for (0..5000) |_| {
+            if (flag.load(.acquire)) return;
+            core.sleepMs(1);
+        }
+        return error.Timeout;
+    }
+};
+
+test "Windows OpenVPN receives borrow input inline, preserve fallback order and drain on stop" {
+    const runtime = try NativeRuntime.init();
+    defer runtime.deinit();
+    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
+    const Probe = WindowsReceiveProbe;
+    var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
+    var profile = try api.Profile.parse(std.testing.allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(std.testing.allocator);
+    var connection = FailingStartConnection{};
+    var registry = try net.ConnectionRegistry.init(std.testing.allocator, &.{connection.implementation()});
+    defer registry.deinit(std.testing.allocator);
+    var controller = mock_mod.MockTunnelController{};
+    var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
+    var probe = Probe{ .pause_first = false };
+    defer probe.delivery.deinit();
+    probe.capability = .{
+        .context = &probe,
+        .release = Probe.release,
+        .subscribe = Probe.subscribe,
+        .@"resume" = Probe.resumeReads,
+        .stop = Probe.stop,
+        .write = Probe.write,
+        .local_address = Probe.address,
+        .unconnected = false,
+        .write_batch = null,
+        .subscribe_batch = null,
+    };
+    const sut = try Daemon.create(failing.allocator(), &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{ .starts_immediately = false, .cancels_unrecoverable = false },
+    });
+    defer sut.destroy();
+    try sut.start();
+    defer sut.stop();
+    const owner = sut.implementation.connection;
+    try std.testing.expect(owner.direct_receive);
+    try cancelGateTimer(owner);
+    try daemon.testing.onLoop(owner, &probe, Probe.attach);
+    {
+        var park = WindowsActorPause{};
+        const thread = try std.Thread.spawn(.{}, WindowsActorPause.run, .{ owner, &park });
+        defer {
+            park.release.store(true, .release);
+            thread.join();
+        }
+        try WindowsActorPause.wait(&park.ready);
+        var packet = "borrowed".*;
+        const allocations = failing.alloc_index;
+        failing.fail_index = allocations;
+        defer failing.fail_index = std.math.maxInt(usize);
+        try std.testing.expect(probe.deliver(&packet, 0));
+        try std.testing.expectEqual(allocations, failing.alloc_index);
+        try std.testing.expect(!failing.has_induced_failure);
+        try std.testing.expectEqual(std.Thread.getCurrentId(), probe.last_thread);
+        try std.testing.expect(probe.input_pointer.? == &packet);
+        try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        failing.fail_index = std.math.maxInt(usize);
+
+        // A timer scheduled by the producer must wake the actor and retain its
+        // callback until execution; it cannot overlap the borrowed packet.
+        probe.measure_timer = true;
+        try std.testing.expect(probe.deliver("timer", 0));
+        try std.testing.expect(probe.reads_at_timer == null);
+
+        owner.execution_gate.enter();
+        const queued = probe.deliver("first", 0);
+        owner.execution_gate.leave();
+        try std.testing.expect(queued);
+        // The gate is free, but a newer packet must not overtake queued input.
+        try std.testing.expect(probe.deliver("second", 0));
+        try std.testing.expectEqual(@as(usize, 2), probe.reads);
+        const metrics = owner.packet_metrics[@intFromEnum(io.Side.tun)];
+        try std.testing.expectEqual(@as(u64, 2), metrics.inline_packets);
+        try std.testing.expectEqual(@as(u64, 2), metrics.queued_packets);
+        try std.testing.expectEqual(@as(u64, 11), metrics.queued_bytes);
+    }
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try daemon.testing.onLoop(owner, {}, Probe.barrier);
+    try std.testing.expectEqual(@as(usize, 4), probe.reads);
+    try std.testing.expectEqualStrings("second", probe.bytes[0..probe.length]);
+    try std.testing.expect(probe.reads_at_timer != null);
+
+    {
+        // Stop must wait for inline protocol work and then drain the native
+        // delivery gate, rather than freeing a borrowed callback context early.
+        var park = WindowsActorPause{};
+        const parked = try std.Thread.spawn(.{}, WindowsActorPause.run, .{ owner, &park });
+        defer {
+            park.release.store(true, .release);
+            parked.join();
+        }
+        try WindowsActorPause.wait(&park.ready);
+        probe.read_entered.store(false, .release);
+        probe.release_read.store(false, .release);
+        const producer = try std.Thread.spawn(.{}, struct {
+            fn run(value: *Probe) void {
+                _ = value.deliver("in flight", 0);
+            }
+        }.run, .{&probe});
+        defer {
+            probe.release_read.store(true, .release);
+            producer.join();
+        }
+        try WindowsActorPause.wait(&probe.read_entered);
+        const stopper = try std.Thread.spawn(.{}, struct {
+            fn run(value: *Daemon) void {
+                value.stop();
+            }
+        }.run, .{sut});
+        defer stopper.join();
+        defer probe.release_read.store(true, .release);
+        park.release.store(true, .release);
+        var waiting = false;
+        for (0..5000) |_| {
+            owner.execution_gate.mutex.lock();
+            waiting = owner.execution_gate.waiters != 0;
+            owner.execution_gate.mutex.unlock();
+            if (waiting) break;
+            core.sleepMs(1);
+        }
+        try std.testing.expect(waiting);
+        try std.testing.expect(!probe.released.load(.acquire));
+        probe.release_read.store(true, .release);
+    }
+    try std.testing.expect(probe.released.load(.acquire));
+    try std.testing.expect(probe.callback == null);
+}
+
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
     if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
-    const c = source.ffi.io;
-    const Probe = struct {
-        callback: c.windows_receive = null,
-        callback_context: ?*anyopaque = null,
-        capability: c.windows_transport = undefined,
-        actor: std.Thread.Id = 0,
-        reads: usize = 0,
-        failures: usize = 0,
-        code: ?i32 = null,
-        bytes: [16]u8 = undefined,
-        length: usize = 0,
-        on_actor: bool = true,
-        pause_next: bool = false,
-        looper: *Looper = undefined,
-        measure_timer: bool = false,
-        reads_at_timer: ?usize = null,
-
-        fn subscribe(raw: ?*anyopaque, callback: c.windows_receive, context: ?*anyopaque) callconv(.c) bool {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.callback = callback;
-            self.callback_context = context;
-            return true;
-        }
-        fn release(raw: ?*anyopaque) callconv(.c) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.callback = null;
-            self.callback_context = null;
-        }
-        fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
-            return true;
-        }
-        fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.windows_address) callconv(.c) i32 {
-            return 0;
-        }
-        fn address(_: ?*anyopaque, _: [*c]c.windows_address) callconv(.c) bool {
-            return false;
-        }
-
-        fn read(raw: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) anyerror!io.ReadAction {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.on_actor = self.on_actor and std.Thread.getCurrentId() == self.actor;
-            self.length = packets[0].len;
-            @memcpy(self.bytes[0..self.length], packets[0]);
-            self.reads += 1;
-            if (self.measure_timer) {
-                self.measure_timer = false;
-                var timer: io.Timer = .{};
-                try self.looper.scheduleTimer(&timer, 0, .{ .context = self, .callback = timerFired });
-            }
-            if (self.pause_next) {
-                self.pause_next = false;
-                return .pause;
-            }
-            return if (self.reads == 1) .pause else .keep;
-        }
-        fn failed(raw: ?*anyopaque, failure: io.Failure) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.on_actor = self.on_actor and std.Thread.getCurrentId() == self.actor;
-            self.failures += 1;
-            self.code = failure.io.code;
-        }
-        fn attach(owner: anytype, self: *@This()) daemon.Error!void {
-            self.actor = std.Thread.getCurrentId();
-            self.looper = owner.looper;
-            if (owner.looper.isTunAttached()) owner.looper.detach(.tun) catch return error.LooperFailure;
-            const wrapper = try io.TunWrapper.create(std.testing.allocator, @ptrCast(&self.capability));
-            errdefer wrapper.destroy();
-            owner.looper.attach(.{
-                .pair = .{ .tun = wrapper },
-                .on_read = .{ .context = self, .callback = read },
-                .on_failure = .{ .context = self, .callback = failed },
-            }) catch return error.LooperFailure;
-        }
-        fn barrier(_: anytype, _: void) daemon.Error!void {}
-        fn resumeInput(owner: anytype, _: void) daemon.Error!void {
-            owner.looper.resumeReading(.tun) catch return error.LooperFailure;
-        }
-
-        // Simulate receipts already admitted before a pause or replacement.
-        fn queue(owner: anytype, receipt: Looper.PacketReceipt) daemon.Error!void {
-            var owned = receipt;
-            owned.bytes = try owner.daemon.allocator.dupe(u8, receipt.bytes);
-            errdefer owner.daemon.allocator.free(owned.bytes);
-            try daemon.testing.schedule(owner, .{ .onPacketsReceived = owned });
-        }
-
-        fn burst(owner: anytype, self: *@This()) daemon.Error!void {
-            self.pause_next = true;
-            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
-            for ([_][]const u8{ "first", "second", "third" }) |bytes| {
-                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = bytes });
-            }
-        }
-
-        fn timerFired(raw: ?*anyopaque) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.reads_at_timer = self.reads;
-        }
-
-        fn flood(owner: anytype, self: *@This()) daemon.Error!void {
-            self.measure_timer = true;
-            const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
-            for (0..owner.looper.impl.max_read_count + 1) |_| {
-                try queue(owner, .{ .side = .tun, .generation = generation, .bytes = "load" });
-            }
-        }
-    };
+    const Probe = WindowsReceiveProbe;
     for ([_]?usize{ null, 0, 1 }) |oom_offset| {
         var failing = std.testing.FailingAllocator.init(std.testing.allocator, .{});
         const allocator = failing.allocator();
@@ -2419,6 +2613,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         var controller = mock_mod.MockTunnelController{};
         var monitor = mock_mod.MockNetworkMonitor{ .reachable = false };
         var probe = Probe{};
+        defer probe.delivery.deinit();
         probe.capability = .{
             .context = &probe,
             .release = Probe.release,
@@ -2428,6 +2623,8 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             .write = Probe.write,
             .local_address = Probe.address,
             .unconnected = false,
+            .write_batch = null,
+            .subscribe_batch = null,
         };
         const sut = try Daemon.create(allocator, &profile, .{
             .objects = .{
@@ -2445,12 +2642,16 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         defer sut.stop();
         try cancelGateTimer(owner);
         try daemon.testing.onLoop(owner, &probe, Probe.attach);
-        var packet = "original".*;
-        try std.testing.expect(probe.callback.?(probe.callback_context, &packet, packet.len, null, 0));
-        @memset(&packet, 'x');
+        // Force actor contention to exercise the ordered fallback path.
+        try daemon.testing.onLoop(owner, &probe, Probe.sendOriginal);
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqualStrings("original", probe.bytes[0..probe.length]);
         try std.testing.expectEqual(@as(usize, 1), probe.reads);
+        const initial_metrics = owner.packet_metrics[@intFromEnum(io.Side.tun)];
+        try std.testing.expectEqual(@as(u64, 1), initial_metrics.accepted_packets);
+        try std.testing.expectEqual(@as(u64, 1), initial_metrics.dispatched_packets);
+        try std.testing.expectEqual(@as(u64, "original".len), initial_metrics.dispatched_bytes);
+        try std.testing.expectEqual(@as(u64, 0), initial_metrics.error_receipts);
 
         // Queue one in-flight packet while paused, then run a control past it.
         const generation = owner.looper.impl.attachments[@intFromEnum(io.Side.tun)].generation;
@@ -2487,11 +2688,14 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         try std.testing.expect(!probe.callback.?(probe.callback_context, null, 0, null, -123));
         try daemon.testing.onLoop(owner, {}, Probe.barrier);
         try std.testing.expectEqual(@as(?i32, -123), probe.code);
+        const final_metrics = owner.packet_metrics[@intFromEnum(io.Side.tun)];
+        try std.testing.expectEqual(@as(u64, 2), final_metrics.error_receipts);
+        try std.testing.expectEqual(@as(u64, @intCast(all_reads)), final_metrics.dispatched_packets);
 
         if (oom_offset) |offset| {
             try daemon.testing.onLoop(owner, &probe, Probe.attach);
             failing.fail_index = failing.alloc_index + offset;
-            try std.testing.expect(!probe.callback.?(probe.callback_context, "oom", 3, null, 0));
+            try daemon.testing.onLoop(owner, &probe, Probe.sendOOM);
             // Actor finalization and cancellation must work while allocation fails.
             try waitForExit(owner);
             try std.testing.expect(failing.has_induced_failure);

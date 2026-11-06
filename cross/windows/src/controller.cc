@@ -45,7 +45,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
         }
     } catch (...) {
         windows_log(WindowsLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
-                    static_cast<unsigned int>(to_hresult().value));
+                  static_cast<unsigned int>(to_hresult().value));
         return false;
     }
     return true;
@@ -89,13 +89,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
-                    const auto result = state->Write(bytes, length, true);
-                    if (result) {
-                        ++state->counters.link_send_failed;
-                        return result;
-                    }
-                    ++state->counters.link_send;
-                    return int32_t{0};
+                    return state->Send(bytes, length);
                 });
             std::lock_guard lock(state_->receive_mutex);
             state_->link_receive = std::move(receive);
@@ -106,11 +100,15 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
             settings.IPv6().Size() ? settings.IPv6().GetView() : nullptr, VpnInterfaceId{nullptr},
             settings.Routes(), settings.Domains(), settings.MTU(), settings.MaxFrame(), false,
             transport_);
+        {
+            std::lock_guard lock(state_->write_mutex);
+            state_->accepting_writes = true;
+        }
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
         windows_log(WindowsLogInfo,
-                    "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
-                    settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
+                  "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
+                  settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
     std::lock_guard lock(state_->receive_mutex);
     state_->tun = tun.get();
@@ -132,8 +130,13 @@ void TunnelController::Close() noexcept {
         if (auto tun = std::exchange(state_->tun, nullptr)) {
             tun->StopWrites();
             tun->callback_ = nullptr;
+            tun->batch_callback_ = nullptr;
         }
         state_->link_receive = nullptr;
+    }
+    {
+        std::lock_guard lock(state_->write_mutex);
+        state_->accepting_writes = false;
     }
     if (started_) {
         try {
@@ -141,20 +144,21 @@ void TunnelController::Close() noexcept {
             started_ = false;
         } catch (...) {
             windows_log(WindowsLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
-                        static_cast<unsigned int>(to_hresult().value));
+                      static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
         {
             std::lock_guard lock(state_->receive_mutex);
+            std::lock_guard write_lock(state_->write_mutex);
             counters = state_->counters;
         }
         windows_log(WindowsLogInfo,
-                    "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
-                    "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
-                    "tun_write_failed=%llu",
-                    counters.tun_read, counters.tun_dropped, counters.link_send,
-                    counters.link_send_failed, counters.link_read, counters.tun_write,
-                    counters.tun_write_failed);
+                  "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
+                  "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
+                  "tun_write_failed=%llu",
+                  counters.tun_read, counters.tun_dropped, counters.link_send,
+                  counters.link_send_failed, counters.link_read, counters.tun_write,
+                  counters.tun_write_failed);
     }
     // Release setup resources even if channel startup failed.
     try {
@@ -169,11 +173,27 @@ void TunnelController::Close() noexcept {
 void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
     const auto count = packets.Size();
     std::lock_guard lock(state_->receive_mutex);
+    ScopedIOTiming timing(state_->receive_time[0]);
     auto &counters = state_->counters;
     counters.tun_read += count;
     const auto tun = state_->tun;
-    if (!tun || !tun->callback_) {
+    if (!tun || (!tun->callback_ && !tun->batch_callback_)) {
         counters.tun_dropped += count;
+        return;
+    }
+    if (tun->batch_callback_) {
+        PacketView views[MaxPacketBatch];
+        size_t used = 0;
+        for (uint32_t i = 0; i < count; ++i) {
+            const auto packet = packets.RemoveAtBegin();
+            packets.Append(packet); // Keep native ownership until callback return.
+            const auto buffer = packet.Buffer();
+            views[used++] = {buffer.data(), buffer.Length()};
+            if (used == MaxPacketBatch || i + 1 == count) {
+                if (!tun->batch_callback_(views, used, 0)) counters.tun_dropped += used;
+                used = 0;
+            }
+        }
         return;
     }
     // VpnPacketBufferList's iterable view may be empty despite a nonzero Size.
@@ -189,6 +209,7 @@ void TunnelController::Encapsulate(VpnPacketBufferList const &packets) {
 
 void TunnelController::Decapsulate(VpnPacketBuffer const &packet) {
     std::lock_guard lock(state_->receive_mutex);
+    ScopedIOTiming timing(state_->receive_time[1]);
     ++state_->counters.link_read;
     if (!state_->link_receive) return;
     const auto buffer = packet.Buffer();

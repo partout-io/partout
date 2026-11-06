@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const builtin = @import("builtin");
+const ffi = @import("../../c/exports.zig");
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
 const c = @import("wireguard_c");
@@ -37,6 +39,20 @@ pub const PassiveIO = struct {
         interrupted: bool = false,
         next: ?*PendingRead = null,
     };
+    const ReceiveMetrics = struct {
+        batches: u64 = 0,
+        packets: u64 = 0,
+        max_batch: usize = 0,
+        direct_packets: u64 = 0,
+        direct_bytes: u64 = 0,
+        queued_packets: u64 = 0,
+        queued_bytes: u64 = 0,
+        queue_peak: usize = 0,
+        queue_full_drops: u64 = 0,
+        oversized_drops: u64 = 0,
+        allocation_failures: u64 = 0,
+        notifications: u64 = 0,
+    };
     const Side = struct {
         owner: *PassiveIO = undefined,
         tag: net.Side,
@@ -45,6 +61,7 @@ pub const PassiveIO = struct {
         packets: core.Fifo(Packet) = .{},
         count: usize = 0,
         readers: core.Fifo(PendingRead) = .{},
+        metrics: ReceiveMetrics = .{},
 
         fn cancelReads(self: *Side) void {
             while (self.readers.take()) |reader| reader.interrupted = true;
@@ -75,7 +92,10 @@ pub const PassiveIO = struct {
                     allocator.free(packet.data);
                     allocator.destroy(packet);
                 }
-                if (!copyPacket(output, packet.data, packet.source)) break;
+                if (!copyPacket(output, packet.data, packet.source)) {
+                    self.metrics.oversized_drops += 1;
+                    break;
+                }
                 completed += 1;
             }
             return completed;
@@ -98,6 +118,18 @@ pub const PassiveIO = struct {
 
     pub fn deinit(self: *PassiveIO) void {
         self.release();
+        if (builtin.os.tag == .windows) for (self.sides) |side| {
+            const m = side.metrics;
+            core.logging.writef(.info, "IO metrics passive={*} side={s} batches={d} packets={d} max_batch={d} notifications={d}", .{
+                self, @tagName(side.tag), m.batches, m.packets, m.max_batch, m.notifications,
+            });
+            core.logging.writef(.info, "IO metrics passive={*} side={s} direct_packets={d} direct_bytes={d} queued_packets={d} queued_bytes={d}", .{
+                self, @tagName(side.tag), m.direct_packets, m.direct_bytes, m.queued_packets, m.queued_bytes,
+            });
+            core.logging.writef(.info, "IO metrics passive={*} side={s} queue_peak={d} queue_full_drops={d} oversized_drops={d} allocation_failures={d}", .{
+                self, @tagName(side.tag), m.queue_peak, m.queue_full_drops, m.oversized_drops, m.allocation_failures,
+            });
+        };
         self.ready.deinit();
         self.writes.deinit();
         self.lock.deinit();
@@ -137,6 +169,13 @@ pub const PassiveIO = struct {
         side.attached = true;
         self.ready.broadcast();
         self.lock.unlock();
+        if (builtin.os.tag == .windows) {
+            const batch = callback_transport.setOnReceiveBatch(onReceiveBatch, side) catch {
+                self.fail();
+                return;
+            };
+            if (batch) return;
+        }
         callback_transport.setOnReceive(onReceive, side) catch self.fail();
     }
 
@@ -213,11 +252,30 @@ pub const PassiveIO = struct {
 
     fn onReceive(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const net.SocketAddress, code: i32) callconv(.c) bool {
         const side: *Side = @ptrCast(@alignCast(raw.?));
-        const self = side.owner;
+        return side.owner.receivePackets(side, &.{if (length == 0) &.{} else bytes[0..length]}, if (source == null) null else source[0], code);
+    }
+
+    fn onReceiveBatch(raw: ?*anyopaque, packets: [*c]const ffi.io.windows_packet, count: usize, source: [*c]const ffi.io.windows_address, code: i32) callconv(.c) bool {
+        const side: *Side = @ptrCast(@alignCast(raw.?));
+        if (count > ffi.io.WindowsMaxBatch or (count != 0 and packets == null)) {
+            side.owner.fail();
+            return false;
+        }
+        var views: [ffi.io.WindowsMaxBatch][]const u8 = undefined;
+        for (packets[0..count], 0..) |packet, index| {
+            if (packet.size != 0 and packet.data == null) {
+                side.owner.fail();
+                return false;
+            }
+            views[index] = if (packet.size == 0) &.{} else packet.data[0..packet.size];
+        }
+        const address: ?net.SocketAddress = if (source == null) null else @as(*const net.SocketAddress, @ptrCast(source)).*;
+        return side.owner.receivePackets(side, views[0..count], address, code);
+    }
+
+    fn receivePackets(self: *PassiveIO, side: *Side, packets: net.Packets, source: ?net.SocketAddress, code: i32) bool {
         self.lock.lock();
         if (self.closed or !side.attached) {
-            // A quiesced descriptor may be reused on activation. Discard input
-            // without pausing its producer; detach alone ends delivery.
             const keep_receiving = side.attached;
             self.lock.unlock();
             return keep_receiving;
@@ -227,33 +285,47 @@ pub const PassiveIO = struct {
             self.fail();
             return false;
         }
-        const address = if (source == null) std.mem.zeroes(net.SocketAddress) else source[0];
-        if (side.readers.head) |reader| {
-            const output = &reader.packets[reader.completed];
-            // Consume an oversized datagram without delivering truncated input.
-            // Finish this wait just as the queued read path does on a drop.
-            if (!copyPacket(output, bytes[0..length], address)) {
-                _ = side.readers.take();
-                reader.interrupted = true;
-            } else {
-                reader.completed += 1;
-                if (reader.completed == reader.packets.len) _ = side.readers.take();
+        const address = source orelse std.mem.zeroes(net.SocketAddress);
+        const metrics = &side.metrics;
+        metrics.batches += 1;
+        metrics.packets += packets.len;
+        metrics.max_batch = @max(metrics.max_batch, packets.len);
+        var notify = false;
+        for (packets) |bytes| {
+            if (side.readers.head) |reader| {
+                const output = &reader.packets[reader.completed];
+                if (!copyPacket(output, bytes, address)) {
+                    _ = side.readers.take();
+                    reader.interrupted = true;
+                    metrics.oversized_drops += 1;
+                } else {
+                    reader.completed += 1;
+                    metrics.direct_packets += 1;
+                    metrics.direct_bytes += bytes.len;
+                    if (reader.completed == reader.packets.len) _ = side.readers.take();
+                }
+                notify = true;
+                continue;
             }
+            // Preserve the existing bound and drop-newest policy. No buffer pool.
+            if (side.count >= 1024) {
+                metrics.queue_full_drops += 1;
+                continue;
+            }
+            side.enqueue(self.allocator, bytes, address) catch {
+                metrics.allocation_failures += 1;
+                self.lock.unlock();
+                self.fail();
+                return false;
+            };
+            metrics.queued_packets += 1;
+            metrics.queued_bytes += bytes.len;
+            metrics.queue_peak = @max(metrics.queue_peak, side.count);
+        }
+        if (notify) {
+            metrics.notifications += 1;
             self.ready.broadcast();
-            self.lock.unlock();
-            return true;
         }
-        // Bound memory without pausing UDP delivery indefinitely. Drop newest.
-        if (side.count >= 1024) {
-            self.lock.unlock();
-            return true;
-        }
-        side.enqueue(self.allocator, bytes[0..length], address) catch {
-            self.lock.unlock();
-            self.fail();
-            return false;
-        };
-        self.ready.broadcast();
         self.lock.unlock();
         return true;
     }
@@ -327,6 +399,16 @@ pub const PassiveIO = struct {
             return onReceive(self.sideFor(tag), bytes.ptr, bytes.len, source, code);
         }
 
+        pub fn receiveBatch(self: *PassiveIO, tag: net.Side, packets: net.Packets, source: ?net.SocketAddress) bool {
+            return self.receivePackets(self.sideFor(tag), packets, source, 0);
+        }
+
+        pub fn metrics(self: *PassiveIO, tag: net.Side) ReceiveMetrics {
+            self.lock.lock();
+            defer self.lock.unlock();
+            return self.sideFor(tag).metrics;
+        }
+
         pub fn pendingReads(self: *PassiveIO, tag: net.Side) usize {
             self.lock.lock();
             defer self.lock.unlock();
@@ -376,6 +458,16 @@ pub const PassiveIO = struct {
     }
 
     fn writePackets(callback_transport: *net.CallbackTransport, packets: []const c.wg_packet, destination: ?net.SocketAddress) BatchResult {
+        if (builtin.os.tag == .windows) {
+            var views: [c.WG_IO_MAX_BATCH][]const u8 = undefined;
+            for (packets, 0..) |packet, index| views[index] = if (packet.size == 0) &.{} else packet.data[0..packet.size];
+            const result = callback_transport.writeBatch(views[0..packets.len], destination);
+            return .{
+                .count = @intCast(result.count),
+                .status = if (result.result == .ok) c.WG_IO_OK else c.WG_IO_INVALID,
+                .fatal = result.result == .failed,
+            };
+        }
         var result = BatchResult{ .status = c.WG_IO_OK };
         for (packets) |packet| {
             const bytes: []const u8 = if (packet.size == 0) &.{} else packet.data[0..packet.size];

@@ -6,6 +6,13 @@
 #include <functional>
 
 namespace Partout {
+constexpr size_t MaxPacketBatch = 256;
+struct PacketView {
+    const uint8_t *data;
+    size_t size;
+};
+using TunOnReceiveBatch = std::function<bool(const PacketView *, size_t, int32_t)>;
+
 enum SocketProto {
     SocketProtoTCP,
     SocketProtoUDP

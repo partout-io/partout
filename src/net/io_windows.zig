@@ -1,8 +1,9 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
-//! Windows setup and owned transport capabilities. Native I/O runs on one C++
-//! command worker; callbacks enqueue daemon messages or feed passive consumers.
+//! Windows setup and owned transport capabilities. Native setup uses the C++
+//! command worker; writes submit on their producer. Callbacks enter serialized
+//! protocol execution, enqueue owned fallback input, or feed passive consumers.
 const std = @import("std");
 const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
@@ -40,6 +41,30 @@ fn NativeTransport(comptime side: io.Side) type {
 
         pub fn setOnReceive(self: *Self, callback: io.PacketReceiveCallback, context: ?*anyopaque) error{ReceiveSetupFailed}!void {
             if (!self.native.subscribe.?(self.native.context, @ptrCast(callback), context)) return error.ReceiveSetupFailed;
+        }
+
+        pub fn setOnReceiveBatch(self: *Self, callback: c.windows_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
+            const subscribe = self.native.subscribe_batch orelse return false;
+            if (!subscribe(self.native.context, callback, context)) return error.ReceiveSetupFailed;
+            return true;
+        }
+
+        pub fn writeBatch(self: *Self, packets: io.Packets, destination: ?io.SocketAddress) struct { count: usize, status: i32 } {
+            if (packets.len == 0) return .{ .count = 0, .status = 0 };
+            if (self.native.write_batch) |write_batch| {
+                if (packets.len > c.WindowsMaxBatch) return .{ .count = 0, .status = -1 };
+                var views: [c.WindowsMaxBatch]c.windows_packet = undefined;
+                for (packets, 0..) |packet, index| views[index] = .{ .data = packet.ptr, .size = packet.len };
+                var written: usize = 0;
+                const status = write_batch(self.native.context, &views, packets.len, if (destination) |*address| @ptrCast(address) else null, &written);
+                if (written > packets.len or (status == 0 and written != packets.len)) return .{ .count = 0, .status = -1 };
+                return .{ .count = written, .status = status };
+            }
+            for (packets, 0..) |packet, index| {
+                const status = self.write(packet, destination);
+                if (status != 0) return .{ .count = index, .status = status };
+            }
+            return .{ .count = packets.len, .status = 0 };
         }
 
         pub fn stopWrites(self: *Self) void {
@@ -140,6 +165,19 @@ pub fn CallbackTransport(comptime DescriptorType: type) type {
             switch (self.descriptor) {
                 inline else => |value| try value.setOnReceive(callback, context),
             }
+        }
+
+        pub fn setOnReceiveBatch(self: *Self, callback: c.windows_receive_batch, context: ?*anyopaque) error{ReceiveSetupFailed}!bool {
+            return switch (self.descriptor) {
+                inline else => |value| value.setOnReceiveBatch(callback, context),
+            };
+        }
+
+        pub fn writeBatch(self: *Self, packets: io.Packets, destination: ?io.SocketAddress) struct { count: usize, result: WriteResult } {
+            const result = switch (self.descriptor) {
+                inline else => |value| value.writeBatch(packets, destination),
+            };
+            return .{ .count = result.count, .result = if (result.status == 0) .ok else .failed };
         }
 
         pub fn write(self: *Self, bytes: []const u8, destination: ?io.SocketAddress) WriteResult {

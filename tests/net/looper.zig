@@ -548,6 +548,8 @@ const WindowsProducer = struct {
             .write = write,
             .local_address = address,
             .unconnected = false,
+            .write_batch = null,
+            .subscribe_batch = null,
         };
     }
     fn pair(native: *c.windows_transport, side: io.Side) !io.DescriptorPair {

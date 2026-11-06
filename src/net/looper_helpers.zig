@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const gate_mod = @import("execution_gate.zig");
 
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
@@ -10,6 +11,8 @@ const io = @import("io.zig");
 const io_common = @import("io_common.zig");
 const io_c = ffi.io;
 const log = core.logging;
+
+pub const ExecutionGate = gate_mod.ExecutionGate;
 
 // FIXME: ###, Abuse of anyerror in callbacks
 
@@ -23,10 +26,12 @@ pub const Options = struct {
     max_read_count: usize = 128,
     on_receive: io_common.PacketReceiveCallback = null,
     receive_context: ?*anyopaque = null,
+    /// Windows-only protocol execution gate; never held while waiting for I/O.
+    execution_gate: ?*ExecutionGate = null,
 };
 
 /// A borrowed view of native input; constructing this does not copy the payload.
-/// Mailbox submission copies bytes once, and the actor consumes that owned copy.
+/// Inline dispatch borrows it until return; mailbox fallback copies the payload.
 pub const PacketReceipt = struct {
     side: io.Side,
     generation: u64,

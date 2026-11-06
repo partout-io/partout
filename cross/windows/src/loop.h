@@ -12,8 +12,9 @@
 #include <thread>
 
 namespace Partout {
-// One native command worker. Completions go directly to the consumer's mailbox
-// (or WireGuard's passive adapter); this class never dispatches protocol code.
+// One native command worker for setup and lifecycle. Receives go directly to
+// the consumer's execution gate or passive adapter; this worker never dispatches
+// protocol code.
 class RuntimeLoop {
 public:
     PARTOUT_WINDOWS_API RuntimeLoop();
@@ -30,7 +31,7 @@ public:
     PARTOUT_WINDOWS_API void Drain();
 
     // Run inline on the worker, otherwise wait for the result. Setup and lifecycle
-    // barriers only; packet writes and resumes use Schedule.
+    // barriers only; packet writes bypass the worker, resumes use Schedule.
     template <typename Task> auto Perform(Task &&task) -> decltype(task()) {
         if (IsWorker()) return task();
         using Result = decltype(task());

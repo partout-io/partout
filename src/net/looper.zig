@@ -25,6 +25,7 @@ pub const Looper = struct {
         looper_posix.PosixLooper;
 
     pub const Options = helpers.Options;
+    pub const ExecutionGate = helpers.ExecutionGate;
     pub const AttachArguments = helpers.AttachArguments;
     pub const AttachError = helpers.AttachError;
     pub const DetachError = helpers.DetachError;

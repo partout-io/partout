@@ -30,6 +30,13 @@ enum {
     WindowsEOF = 1
 };
 
+enum { WindowsMaxBatch = 256 };
+typedef struct {
+    const uint8_t *data;
+    size_t size;
+} windows_packet;
+typedef bool (*windows_receive_batch)(void *, const windows_packet *, size_t, const windows_address *, int32_t);
+
 typedef bool (*windows_receive)(void *, const uint8_t *, size_t, const windows_address *, int32_t);
 
 /* Owned transport capability, shared by daemon and passive consumers.
@@ -50,6 +57,11 @@ struct windows_transport {
     int32_t (*write)(void *, const uint8_t *, size_t, const windows_address *);
     bool (*local_address)(void *, windows_address *);
     bool unconnected;
+    /* Optional capabilities. Packet views expire at return. Batch write reports
+     * the accepted prefix even on error; packets remain separate datagrams.
+     * count must be 1..WindowsMaxBatch. Rebuild both sides when changing this ABI. */
+    int32_t (*write_batch)(void *, const windows_packet *, size_t, const windows_address *, size_t *);
+    bool (*subscribe_batch)(void *, windows_receive_batch, void *);
 };
 
 typedef bool (*windows_configure)(void *, uintptr_t);

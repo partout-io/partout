@@ -5,6 +5,7 @@
 #include "windows/export.h"
 
 #include "io_types.h"
+#include "io_metrics.h"
 #include "socket.h"
 #include "network.h"
 #include <winrt/Windows.Networking.Connectivity.h>
@@ -17,29 +18,66 @@
 namespace Partout {
 class RuntimeLoop;
 
-// Lifecycle and writes run on the native command worker. StopWrites is atomic.
-// Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
+// Lifecycle runs on the native command worker. Producer writes are synchronous
+// and serialized with channel close. StopWrites is atomic. Receive callbacks
+// must not reenter callback management or lifecycle APIs.
 class Tun {
     // Owned by the controller; TUN handles and the socket writer borrow it.
     class State {
     public:
         winrt::Windows::Networking::Vpn::VpnChannel channel;
+        // Producers submit directly. Close waits for accepted submissions before
+        // stopping the channel; no producer waits for the native command worker.
+        std::mutex write_mutex;
+        bool accepting_writes = false;
         // Held throughout native delivery and callback removal. The current Tun is
         // borrowed under this gate; its destructor unpublishes it before returning.
-        std::mutex receive_mutex;
+        // Channel submission from a receive callback may reenter native delivery.
+        // The Zig execution gate queues that nested receive rather than recursing
+        // into protocol state.
+        std::recursive_mutex receive_mutex;
         Tun *tun = nullptr;
         Socket::Receiver link_receive;
 
         struct Counters {
-            // Native receives hold receive_mutex. Writes run on the looper.
-            // Snapshot all counters on the looper with receive_mutex held.
+            // Receives hold receive_mutex; writes hold write_mutex.
+            // Snapshots acquire both gates, in that order.
             uint64_t tun_read = 0, tun_dropped = 0, link_send = 0, link_send_failed = 0;
             uint64_t link_read = 0, tun_write = 0, tun_write_failed = 0;
         } counters;
 
+        // Index 0 is downstream into TUN; index 1 is upstream into the link.
+        IOTiming get_buffer_time[2], copy_time[2], append_time[2], flush_time[2], receive_time[2];
+
         explicit State(winrt::Windows::Networking::Vpn::VpnChannel const &value) : channel(value) {}
 
-        int32_t Write(const uint8_t *bytes, size_t length, bool send);
+        ~State() {
+            for (size_t i = 0; i < 2; ++i) {
+                get_buffer_time[i].Log(this, i ? "channel.link.get_buffer" : "channel.tun.get_buffer");
+                copy_time[i].Log(this, i ? "channel.link.copy" : "channel.tun.copy");
+                append_time[i].Log(this, i ? "channel.link.append" : "channel.tun.append");
+                flush_time[i].Log(this, i ? "channel.link.flush" : "channel.tun.flush");
+            }
+            receive_time[0].Log(this, "channel.encapsulate_callback_excluding_lock_wait");
+            receive_time[1].Log(this, "channel.decapsulate_callback_excluding_lock_wait");
+        }
+
+        int32_t Send(const uint8_t *bytes, size_t length) {
+            const PacketView packet{bytes, length};
+            size_t written = 0;
+            return SendBatch(&packet, 1, &written);
+        }
+        int32_t SendBatch(const PacketView *packets, size_t count, size_t *written);
+        int32_t ReceiveBatch(const PacketView *packets, size_t count, size_t *written);
+
+    private:
+        template <bool Send>
+        int32_t WriteBatch(const PacketView *packets, size_t count, size_t *written);
+
+        void AppendSend(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+        void FlushSend();
+        void AppendReceive(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+        void FlushReceive();
     };
     friend class TunnelController;
 
@@ -51,6 +89,7 @@ public:
 
     // Removing the callback waits for in-flight delivery under the receive mutex.
     bool SetOnReceive(TunOnReceive callback);
+    bool SetOnReceiveBatch(TunOnReceiveBatch callback);
     void ReportError(int32_t error);
 
     int32_t WriteStatus() const {
@@ -58,11 +97,13 @@ public:
     }
 
     int32_t Write(const uint8_t *bytes, size_t length);
+    int32_t WriteBatch(const PacketView *packets, size_t count, size_t *written);
     void StopWrites();
 
 private:
     State &state_; // Borrowed; the controller outlives every TUN handle.
     TunOnReceive callback_ = nullptr;
+    TunOnReceiveBatch batch_callback_ = nullptr;
     std::atomic<int32_t> write_status_{0};
 };
 
