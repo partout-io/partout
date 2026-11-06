@@ -71,6 +71,9 @@ class Tun {
         int32_t ReceiveBatch(const PacketView *packets, size_t count, size_t *written);
 
     private:
+        template <bool Send>
+        int32_t WriteBatch(const PacketView *packets, size_t count, size_t *written);
+
         void AppendSend(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
         void FlushSend();
         void AppendReceive(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
