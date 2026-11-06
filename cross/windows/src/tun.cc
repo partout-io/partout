@@ -20,7 +20,17 @@ using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
 
-int32_t Tun::State::WriteBatch(const PacketView *packets, size_t count, bool send, size_t *written) {
+void Tun::State::AppendSend(VpnPacketBuffer const &packet) {
+    ScopedIOTiming timing(append_time[1]);
+    channel.AppendVpnSendPacketBuffer(packet);
+}
+
+void Tun::State::FlushSend() {
+    ScopedIOTiming timing(flush_time[1]);
+    channel.FlushVpnSendPacketBuffers();
+}
+
+int32_t Tun::State::SendBatch(const PacketView *packets, size_t count, size_t *written) {
     *written = 0;
     std::lock_guard lock(write_mutex);
     if (!accepting_writes) return E_ABORT;
@@ -29,20 +39,6 @@ int32_t Tun::State::WriteBatch(const PacketView *packets, size_t count, bool sen
         if (!packets[i].data || !packets[i].size || packets[i].size > UINT32_MAX) return E_INVALIDARG;
     }
     size_t length = 0;
-    const auto append = [&](VpnPacketBuffer const &packet) {
-        ScopedIOTiming timing(append_time[send ? 1 : 0]);
-        if (send)
-            channel.AppendVpnSendPacketBuffer(packet);
-        else
-            channel.AppendVpnReceivePacketBuffer(packet);
-    };
-    const auto flush = [&] {
-        ScopedIOTiming timing(flush_time[send ? 1 : 0]);
-        if (send)
-            channel.FlushVpnSendPacketBuffers();
-        else
-            channel.FlushVpnReceivePacketBuffers();
-    };
     VpnPacketBuffer packet{nullptr};
     const char *stage = "get buffer";
     uint32_t capacity = 0;
@@ -51,49 +47,118 @@ int32_t Tun::State::WriteBatch(const PacketView *packets, size_t count, bool sen
             length = packets[i].size;
             stage = "get buffer";
             {
-                ScopedIOTiming timing(get_buffer_time[send ? 1 : 0]);
-                packet = send ? channel.GetVpnSendPacketBuffer() : channel.GetVpnReceivePacketBuffer();
+                ScopedIOTiming timing(get_buffer_time[1]);
+                packet = channel.GetVpnSendPacketBuffer();
             }
             const auto buffer = packet.Buffer();
             capacity = buffer.Capacity();
             stage = "copy packet";
             if (length > capacity) throw hresult_invalid_argument();
             {
-                ScopedIOTiming timing(copy_time[send ? 1 : 0]);
+                ScopedIOTiming timing(copy_time[1]);
                 memcpy(buffer.data(), packets[i].data, length);
                 buffer.Length(static_cast<uint32_t>(length));
             }
             stage = "append";
-            append(packet);
+            AppendSend(packet);
             packet = nullptr; // Ownership returned to the channel.
             ++*written;
         }
         stage = "flush";
-        flush();
+        FlushSend();
     } catch (...) {
         const auto error = to_hresult().value;
         windows_log(
             WindowsLogError,
             "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
-            send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
+            "link", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
         if (packet) {
             try {
                 packet.Buffer().Length(0);
-                append(packet);
+                AppendSend(packet);
             } catch (...) {}
         }
         if (*written || packet) {
             try {
-                flush();
+                FlushSend();
             } catch (...) {}
         }
-        if (send) ++counters.link_send_failed;
-        else ++counters.tun_write_failed;
+        ++counters.link_send_failed;
         return error;
     }
-    if (send) counters.link_send += *written;
-    else counters.tun_write += *written;
+    counters.link_send += *written;
+    return 0;
+}
+
+void Tun::State::AppendReceive(VpnPacketBuffer const &packet) {
+    ScopedIOTiming timing(append_time[0]);
+    channel.AppendVpnReceivePacketBuffer(packet);
+}
+
+void Tun::State::FlushReceive() {
+    ScopedIOTiming timing(flush_time[0]);
+    channel.FlushVpnReceivePacketBuffers();
+}
+
+int32_t Tun::State::ReceiveBatch(const PacketView *packets, size_t count, size_t *written) {
+    *written = 0;
+    std::lock_guard lock(write_mutex);
+    if (!accepting_writes) return E_ABORT;
+    if (!packets || !count || count > MaxPacketBatch) return E_INVALIDARG;
+    for (size_t i = 0; i < count; ++i) {
+        if (!packets[i].data || !packets[i].size || packets[i].size > UINT32_MAX) return E_INVALIDARG;
+    }
+    size_t length = 0;
+    VpnPacketBuffer packet{nullptr};
+    const char *stage = "get buffer";
+    uint32_t capacity = 0;
+    try {
+        for (size_t i = 0; i < count; ++i) {
+            length = packets[i].size;
+            stage = "get buffer";
+            {
+                ScopedIOTiming timing(get_buffer_time[0]);
+                packet = channel.GetVpnReceivePacketBuffer();
+            }
+            const auto buffer = packet.Buffer();
+            capacity = buffer.Capacity();
+            stage = "copy packet";
+            if (length > capacity) throw hresult_invalid_argument();
+            {
+                ScopedIOTiming timing(copy_time[0]);
+                memcpy(buffer.data(), packets[i].data, length);
+                buffer.Length(static_cast<uint32_t>(length));
+            }
+            stage = "append";
+            AppendReceive(packet);
+            packet = nullptr; // Ownership returned to the channel.
+            ++*written;
+        }
+        stage = "flush";
+        FlushReceive();
+    } catch (...) {
+        const auto error = to_hresult().value;
+        windows_log(
+            WindowsLogError,
+            "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
+            "TUN", stage, static_cast<unsigned int>(error), length, capacity);
+        // Return an unused pool buffer even if preparing the packet failed.
+        if (packet) {
+            try {
+                packet.Buffer().Length(0);
+                AppendReceive(packet);
+            } catch (...) {}
+        }
+        if (*written || packet) {
+            try {
+                FlushReceive();
+            } catch (...) {}
+        }
+        ++counters.tun_write_failed;
+        return error;
+    }
+    counters.tun_write += *written;
     return 0;
 }
 
@@ -141,7 +206,7 @@ int32_t Tun::Write(const uint8_t *bytes, size_t length) {
 int32_t Tun::WriteBatch(const PacketView *packets, size_t count, size_t *written) {
     *written = 0;
     if (auto status = WriteStatus()) return status;
-    const auto result = state_.WriteBatch(packets, count, false, written);
+    const auto result = state_.ReceiveBatch(packets, count, written);
     if (result) {
         int32_t expected = 0;
         write_status_.compare_exchange_strong(expected, result);

@@ -62,12 +62,19 @@ class Tun {
             receive_time[1].Log(this, "channel.decapsulate_callback_excluding_lock_wait");
         }
 
-        int32_t Write(const uint8_t *bytes, size_t length, bool send) {
+        int32_t Send(const uint8_t *bytes, size_t length) {
             const PacketView packet{bytes, length};
             size_t written = 0;
-            return WriteBatch(&packet, 1, send, &written);
+            return SendBatch(&packet, 1, &written);
         }
-        int32_t WriteBatch(const PacketView *packets, size_t count, bool send, size_t *written);
+        int32_t SendBatch(const PacketView *packets, size_t count, size_t *written);
+        int32_t ReceiveBatch(const PacketView *packets, size_t count, size_t *written);
+
+    private:
+        void AppendSend(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+        void FlushSend();
+        void AppendReceive(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+        void FlushReceive();
     };
     friend class TunnelController;
 

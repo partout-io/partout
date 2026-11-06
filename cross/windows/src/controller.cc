@@ -89,7 +89,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {
-                    return state->Write(bytes, length, true);
+                    return state->Send(bytes, length);
                 });
             std::lock_guard lock(state_->receive_mutex);
             state_->link_receive = std::move(receive);
