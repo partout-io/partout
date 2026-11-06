@@ -12,13 +12,7 @@ if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "PP_BUILD_WINDOWS requires MSVC and the Windows SDK")
 endif()
 
-include(FetchContent)
 enable_language(CXX)
-FetchContent_Declare(json
-    URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
-    URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
-)
-FetchContent_MakeAvailable(json)
 include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 
 # The native backend cannot include Partout headers. Keep it independently
