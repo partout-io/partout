@@ -7,6 +7,16 @@ import Testing
 
 struct LoggableModuleTests {
     @Test
+    func redactionDoesNotDependOnTheModuleEncoder() {
+        let module = SomeEncodableModule()
+        let sut = LoggableModule(.global, module)
+        let redacted = sut.debugDescription(withSensitiveData: false)
+        #expect(redacted.contains(module.id.uuidString))
+        #expect(!redacted.contains("private-value"))
+        #expect(sut.debugDescription(withSensitiveData: true).contains("private-value"))
+    }
+
+    @Test
     func givenModule_whenLog_thenReturnsModuleType() {
         let sut = SomeModule()
         let loggable = LoggableModule(.global, sut)
@@ -53,7 +63,9 @@ struct LoggableModuleTests {
 
 private struct SomeModule: Module {}
 
-private struct SomeEncodableModule: Module, Encodable {}
+private struct SomeEncodableModule: Module, Encodable {
+    let value = "private-value"
+}
 
 private struct SomeDebuggableModule: Module, SensitiveDebugStringConvertible {
     func debugDescription(withSensitiveData: Bool) -> String {

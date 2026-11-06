@@ -5,7 +5,37 @@
 @testable import PartoutCore
 import Testing
 
+@Suite(.serialized)
 struct PartoutErrorTests {
+    @Test(arguments: [false, true])
+    func richDescriptionsFollowPrivateDataPreference(logsPrivateData: Bool) {
+        let previous = PartoutLogger.default
+        defer { PartoutLogger.register(previous) }
+        var logger = PartoutLogger.Builder()
+        logger.logsModules = logsPrivateData
+        PartoutLogger.register(logger.build())
+
+        let credentials = OpenVPN.Credentials(username: "private-user", password: "private-password", otpMethod: .none)
+        let builder = OpenVPNModule.Builder(credentials: credentials)
+        let module = OpenVPNModule(id: builder.id, credentials: credentials)
+        let errors = [
+            PartoutError(.incompleteModule, context: .incompleteModule(builder)),
+            PartoutError.incompatibleModules(module: module, otherModule: module)
+        ]
+        for error in errors {
+            for wrapped in [error, PartoutError(.unhandled, reason: error)] {
+                #expect("\(wrapped)".contains("private-password") == logsPrivateData)
+                let explicit = wrapped.debugDescription(withSensitiveData: !logsPrivateData)
+                #expect(explicit.contains("private-password") == !logsPrivateData)
+            }
+        }
+        let rich = PartoutError(.parsing, payload: .string("private-payload"), reason: SomeDescriptiveError())
+        #expect("\(rich)".contains("private-payload") == logsPrivateData)
+        #expect("\(rich)".contains("errorDescription") == logsPrivateData)
+        #expect(rich.payload == .string("private-payload"))
+        #expect(rich.reason?.localizedDescription == "errorDescription")
+    }
+
     @Test
     func givenNativeContext_whenWrap_thenPreservesContextAndReason() {
         let field = PartoutError.ModuleField.DNS.ipDomains
@@ -123,6 +153,11 @@ struct PartoutErrorTests {
         (PartoutError(.authentication, payload: .null, reason: SomeDescriptiveError()), "{PartoutError.authentication, payload=null, reason=SomeDescriptiveError() (errorDescription)}")
     ])
     func givenError_whenDescribe_thenReturnsDescription(error: PartoutError, expectedDescription: String) {
+        let previous = PartoutLogger.default
+        defer { PartoutLogger.register(previous) }
+        var logger = PartoutLogger.Builder()
+        logger.logsModules = true
+        PartoutLogger.register(logger.build())
         #expect(error.debugDescription == expectedDescription)
     }
 }
