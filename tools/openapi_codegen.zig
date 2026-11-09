@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const native = @import("openapi_native.zig");
 
 const ParseError = error{
     ExpectedComponents,
@@ -14,9 +15,8 @@ const ParseError = error{
 const AllocError = std.mem.Allocator.Error;
 const WriterError = std.Io.Writer.Error;
 const RenderError = AllocError || WriterError || ParseError;
-const MainError = RenderError || std.process.Args.Iterator.InitError || std.Io.Dir.ReadFileAllocError || std.Io.Dir.WriteFileError;
 
-const Primitive = enum {
+pub const Primitive = enum {
     string,
     integer,
     number,
@@ -24,7 +24,7 @@ const Primitive = enum {
     object,
 };
 
-const TypeSpec = union(enum) {
+pub const TypeSpec = union(enum) {
     none,
     primitive: Primitive,
     ref: []const u8,
@@ -32,18 +32,26 @@ const TypeSpec = union(enum) {
     raw_json,
 };
 
-const Property = struct {
+pub const Property = struct {
     name: []const u8,
     spec: TypeSpec = .none,
+    description: []const u8 = "",
+    format: ?[]const u8 = null,
+    constant: ?[]const u8 = null,
+    unique: bool = false,
+    map_value: ?TypeSpec = null,
 };
 
-const Variant = struct {
+pub const Variant = struct {
     raw: []const u8,
     schema: []const u8,
 };
 
-const Schema = struct {
+pub const Schema = struct {
     name: []const u8,
+    description: []const u8 = "",
+    parent: ?[]const u8 = null,
+    enum_descriptions: std.ArrayList([]const u8) = .empty,
     typ: ?[]const u8 = null,
     format: ?[]const u8 = null,
     enum_values: std.ArrayList([]const u8) = .empty,
@@ -54,10 +62,10 @@ const Schema = struct {
     discriminator_property: ?[]const u8 = null,
 };
 
-const Document = struct {
+pub const Document = struct {
     schemas: std.ArrayList(Schema) = .empty,
 
-    fn schema(self: Document, name: []const u8) ?*const Schema {
+    pub fn schema(self: Document, name: []const u8) ?*const Schema {
         for (self.schemas.items) |*item| {
             if (std.mem.eql(u8, item.name, name)) return item;
         }
@@ -93,7 +101,7 @@ fn matchesExclusion(pattern: []const u8, name: []const u8) bool {
     return std.mem.eql(u8, pattern, name);
 }
 
-pub fn main(init: std.process.Init) MainError!void {
+pub fn main(init: std.process.Init) !void {
     const allocator = init.arena.allocator();
 
     var args = try std.process.Args.Iterator.initAllocator(init.minimal.args, init.gpa);
@@ -101,25 +109,31 @@ pub fn main(init: std.process.Init) MainError!void {
     _ = args.next();
     const input_path = args.next() orelse {
         try usage();
-        return;
+        return error.InvalidArguments;
     };
     const output_path = args.next() orelse {
         try usage();
-        return;
+        return error.InvalidArguments;
     };
 
+    var language: native.Language = .zig;
+    var package: ?[]const u8 = null;
     var exclusions = SchemaExclusions{};
     while (args.next()) |arg| {
-        if (std.mem.eql(u8, arg, "--exclude")) {
+        if (std.mem.eql(u8, arg, "--language")) {
+            language = std.meta.stringToEnum(native.Language, args.next() orelse return error.MissingLanguage) orelse return error.InvalidLanguage;
+        } else if (std.mem.eql(u8, arg, "--package")) {
+            package = args.next() orelse return error.MissingPackage;
+        } else if (std.mem.eql(u8, arg, "--exclude")) {
             exclusions = try parseSchemaExclusions(allocator, args.next() orelse {
                 try usage();
-                return;
+                return error.InvalidArguments;
             });
         } else if (std.mem.startsWith(u8, arg, "--exclude=")) {
             exclusions = try parseSchemaExclusions(allocator, arg["--exclude=".len..]);
         } else {
             try usage();
-            return;
+            return error.InvalidArguments;
         }
     }
 
@@ -127,7 +141,13 @@ pub fn main(init: std.process.Init) MainError!void {
     const input = try readFileAlloc(cwd, init.io, allocator, input_path);
     defer allocator.free(input);
 
+    if (language != .zig) try native.validateInput(input);
     const doc = try parseDocument(allocator, input);
+    if (language != .zig) {
+        if (exclusions.names.len != 0) return error.NativeExclusionsUnsupported;
+        try native.generate(allocator, init.io, doc, language, output_path, package);
+        return;
+    }
     const generated = try renderDocument(allocator, doc, exclusions);
     defer allocator.free(generated);
 
@@ -152,7 +172,8 @@ fn usage() WriterError!void {
     var stderr = std.debug.lockStderr(&.{});
     defer std.debug.unlockStderr();
     try stderr.file_writer.interface.writeAll(
-        \\usage: zig run tools/openapi_codegen.zig -- <openapi.yaml> <generated.zig> [--exclude SchemaA,SchemaB]
+        \\usage: zig run tools/openapi_codegen.zig -- <openapi.yaml> <output> [--exclude SchemaA,SchemaB]
+        \\       [--language zig|swift|kotlin|cpp] [--package package.name]
         \\
     );
 }
@@ -212,7 +233,24 @@ fn parseSchemaBlock(allocator: std.mem.Allocator, schema_item: *Schema, lines: [
             continue;
         }
         const trimmed = std.mem.trim(u8, line, " ");
-        if (std.mem.startsWith(u8, trimmed, "type: ")) {
+        if (std.mem.startsWith(u8, trimmed, "description: ")) {
+            schema_item.description = cleanScalar(trimmed["description: ".len..]);
+            index += 1;
+        } else if (std.mem.eql(u8, trimmed, "allOf:")) {
+            index += 1;
+            if (index < lines.len) {
+                const parent_line = std.mem.trim(u8, lines[index], " ");
+                const prefix = "- $ref: ";
+                if (!std.mem.startsWith(u8, parent_line, prefix)) return error.InvalidSchema;
+                schema_item.parent = refName(cleanScalar(parent_line[prefix.len..])) orelse return error.InvalidSchema;
+                index += 1;
+            }
+        } else if (std.mem.eql(u8, trimmed, "x-enum-descriptions:")) {
+            index += 1;
+            while (index < lines.len and indentOf(lines[index]) == 8 and std.mem.startsWith(u8, std.mem.trim(u8, lines[index], " "), "- ")) : (index += 1) {
+                try schema_item.enum_descriptions.append(allocator, cleanScalar(std.mem.trim(u8, lines[index], " ")[2..]));
+            }
+        } else if (std.mem.startsWith(u8, trimmed, "type: ")) {
             schema_item.typ = try allocator.dupe(u8, cleanScalar(trimmed["type: ".len..]));
             index += 1;
         } else if (std.mem.startsWith(u8, trimmed, "format: ")) {
@@ -267,6 +305,19 @@ fn parseProperties(
         index += 1;
         const block_start = index;
         while (index < lines.len and indentOf(lines[index]) > 8) : (index += 1) {}
+        for (lines[block_start..index]) |metadata_line| {
+            if (indentOf(metadata_line) != 10) continue;
+            const metadata = std.mem.trim(u8, metadata_line, " ");
+            if (std.mem.startsWith(u8, metadata, "description: ")) property.description = cleanScalar(metadata[13..]);
+            if (std.mem.startsWith(u8, metadata, "format: ")) property.format = cleanScalar(metadata[8..]);
+            if (std.mem.startsWith(u8, metadata, "const: ")) property.constant = cleanScalar(metadata[7..]);
+            if (std.mem.eql(u8, metadata, "uniqueItems: true")) property.unique = true;
+        }
+        for (lines[block_start..index], 0..) |metadata_line, mi| {
+            if (indentOf(metadata_line) == 10 and eqScalar(metadata_line, "additionalProperties:")) {
+                property.map_value = try parseTypeSpec(allocator, lines[block_start + mi + 1 .. index], 12);
+            }
+        }
         property.spec = try parseTypeSpec(allocator, lines[block_start..index], 10);
         try schema_item.properties.append(allocator, property);
     }
@@ -1459,4 +1510,8 @@ fn indentOf(line: []const u8) usize {
     var count: usize = 0;
     while (count < line.len and line[count] == ' ') : (count += 1) {}
     return count;
+}
+
+fn eqScalar(line: []const u8, expected: []const u8) bool {
+    return std.mem.eql(u8, std.mem.trim(u8, line, " "), expected);
 }

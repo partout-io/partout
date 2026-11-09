@@ -1,0 +1,38 @@
+#include "@NAME@.h"
+#include "Helpers.h"
+
+namespace Partout::Models
+{
+
+nlohmann::json @NAME@::ToJson() const
+{
+    nlohmann::json j;
+    ::Partout::Models::to_json(j, *this);
+    return j;
+}
+
+@NAME@ @NAME@::FromJson(const nlohmann::json& j)
+{
+    @NAME@ o{};
+    ::Partout::Models::from_json(j, o);
+    return o;
+}
+
+void @NAME@::Validate() const
+{
+    std::stringstream msg;
+    if (!Validate(msg))
+    {
+        throw Partout::Helpers::ValidationException(msg.str());
+    }
+}
+
+bool @NAME@::Validate(std::stringstream& msg) const
+{
+    return Validate(msg, "");
+}
+
+bool @NAME@::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+{
+    bool success = true;
+    const std::string _pathPrefix = pathPrefix.empty() ? "@NAME@" : pathPrefix;

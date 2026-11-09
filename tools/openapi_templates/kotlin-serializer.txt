@@ -1,0 +1,14 @@
+
+internal object @NAME@Serializer : KSerializer<@NAME@> {
+    override val descriptor = kotlin.Int.serializer().descriptor
+
+    override fun deserialize(decoder: Decoder): @NAME@ {
+        val value = decoder.decodeSerializableValue(kotlin.Int.serializer())
+        return @NAME@.entries.firstOrNull { it.value == value }
+            ?: throw IllegalArgumentException("Unknown enum value: $value")
+    }
+
+    override fun serialize(encoder: Encoder, value: @NAME@) {
+        encoder.encodeSerializableValue(kotlin.Int.serializer(), value.value)
+    }
+}
