@@ -409,7 +409,7 @@ test "WireGuard passive pending buffers are unregistered on timeout cancellation
         var failure = FailureRecorder{};
         passive.failure = .{ .ctx = &failure, .report = FailureRecorder.report };
         bridge.PassiveIO.testing.attach(&passive, .link);
-        var bytes = [_]u8{42} ** 4;
+        var bytes = @as([4]u8, @splat(42));
         var packet = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
         var result = Completion{};
         var request = ReadRequest{ .passive = &passive, .side = .link, .packets = &packet, .result = &result };
@@ -438,7 +438,7 @@ test "WireGuard passive pending buffers are unregistered on timeout cancellation
         // A callback after completion must queue instead of touching old storage.
         bridge.PassiveIO.testing.attach(&passive, .link);
         try std.testing.expect(bridge.PassiveIO.testing.receive(&passive, .link, "late", &address, 0));
-        try std.testing.expectEqualSlices(u8, &([_]u8{42} ** 4), &bytes);
+        try std.testing.expectEqualSlices(u8, &(@as([4]u8, @splat(42))), &bytes);
         try std.testing.expectEqual(@as(usize, 1), passive.sides[0].count);
     }
 }

@@ -70,7 +70,7 @@ test "ACK packet serializes IDs and remote session" {
 }
 
 test "move prevents duplicate C ownership" {
-    const id = [_]u8{0} ** ControlConstants.session_id_length;
+    const id = @as([ControlConstants.session_id_length]u8, @splat(0));
     var original = try ControlPacket.init(.controlV1, 0, &id, 0, null, null, null);
     var destination = original.move();
     defer destination.deinit();
@@ -78,7 +78,7 @@ test "move prevents duplicate C ownership" {
 }
 
 test "control packet rejects the native ACK sentinel on data opcodes" {
-    const id = [_]u8{0} ** ControlConstants.session_id_length;
+    const id = @as([ControlConstants.session_id_length]u8, @splat(0));
     try std.testing.expectError(
         error.InvalidPacketId,
         ControlPacket.init(.controlV1, 0, &id, std.math.maxInt(u32), null, null, null),
@@ -86,7 +86,7 @@ test "control packet rejects the native ACK sentinel on data opcodes" {
 }
 
 test "packet code wire values match OpenVPN" {
-    try std.testing.expectEqual(@as(u8, 0x04), @intFromEnum(PacketCode.controlV1));
+    try std.testing.expectEqual(@as(u8, 0x04), @backingInt(PacketCode.controlV1));
     try std.testing.expectEqual(PacketCode.hardResetClientV3, PacketCode.fromRaw(0x0a).?);
     try std.testing.expect(PacketCode.fromRaw(0x7f) == null);
 }

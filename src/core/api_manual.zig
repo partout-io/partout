@@ -162,10 +162,10 @@ pub const Endpoint = struct {
     pub fn rawAlloc(self: Endpoint, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
         if (Address.parseRaw(self.address)) |parsed_address| {
             if (parsed_address.isIPv6()) {
-                return std.fmt.allocPrint(allocator, "[{s}]:{}", .{ self.address, self.port });
+                return allocator.print("[{s}]:{}", .{ self.address, self.port });
             }
         }
-        return std.fmt.allocPrint(allocator, "{s}:{}", .{ self.address, self.port });
+        return allocator.print("{s}:{}", .{ self.address, self.port });
     }
 
     pub fn jsonStringify(self: Endpoint, jw: anytype) JsonStringifyError!void {
@@ -216,7 +216,7 @@ pub const EndpointProtocol = struct {
     }
 
     pub fn rawAlloc(self: EndpointProtocol, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
-        return std.fmt.allocPrint(allocator, "{s}:{}", .{
+        return allocator.print("{s}:{}", .{
             self.socket_type.raw(),
             self.port,
         });
@@ -297,7 +297,7 @@ pub const ExtendedEndpoint = struct {
     }
 
     pub fn rawAlloc(self: ExtendedEndpoint, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
-        return std.fmt.allocPrint(allocator, "{s}:{s}:{}", .{
+        return allocator.print("{s}:{s}:{}", .{
             self.address,
             self.proto.socket_type.raw(),
             self.proto.port,
@@ -488,14 +488,14 @@ pub const Subnet = struct {
     }
 
     pub fn rawAlloc(self: Subnet, allocator: std.mem.Allocator) error{OutOfMemory}![]u8 {
-        return std.fmt.allocPrint(allocator, "{s}/{}", .{ self.address.raw, self.prefix_length });
+        return allocator.print("{s}/{}", .{ self.address.raw, self.prefix_length });
     }
 
     /// Returns the classic dotted-decimal netmask for an IPv4 subnet.
     pub fn ipv4MaskAlloc(self: Subnet, allocator: std.mem.Allocator) EncodeError![]u8 {
         if (self.address.family != .v4 or self.prefix_length > 32) return error.InvalidModel;
         const mask = ipv4Netmask(self.prefix_length);
-        return std.fmt.allocPrint(allocator, "{}.{}.{}.{}", .{
+        return allocator.print("{}.{}.{}.{}", .{
             (mask >> 24) & 0xff,
             (mask >> 16) & 0xff,
             (mask >> 8) & 0xff,
@@ -510,7 +510,7 @@ pub const Subnet = struct {
             .hostname => return error.InvalidModel,
         };
         defer allocator.free(network);
-        return std.fmt.allocPrint(allocator, "{s}/{}", .{ network, self.prefix_length });
+        return allocator.print("{s}/{}", .{ network, self.prefix_length });
     }
 
     pub fn jsonStringify(self: Subnet, jw: anytype) JsonStringifyError!void {
@@ -535,7 +535,7 @@ pub const Subnet = struct {
             (@as(u32, parsed.bytes[2]) << 8) |
             @as(u32, parsed.bytes[3]);
         const network = raw & ipv4Netmask(prefix);
-        return std.fmt.allocPrint(allocator, "{}.{}.{}.{}", .{
+        return allocator.print("{}.{}.{}.{}", .{
             (network >> 24) & 0xff,
             (network >> 16) & 0xff,
             (network >> 8) & 0xff,
@@ -563,7 +563,7 @@ pub const Subnet = struct {
             .bytes = parsed.bytes,
             .interface_name = null,
         };
-        return std.fmt.allocPrint(allocator, "{f}", .{unresolved});
+        return allocator.print("{f}", .{unresolved});
     }
 };
 

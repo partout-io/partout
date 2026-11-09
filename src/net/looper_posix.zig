@@ -107,7 +107,7 @@ pub const PosixLooper = struct {
 
         // Drain outgoing batches before accepting more input. Read TUN first.
         for ([_]io.Side{ .link, .tun }) |side| {
-            const attachment = self.attachments[@intFromEnum(side)] orelse continue;
+            const attachment = self.attachments[@backingInt(side)] orelse continue;
             if (attachment.write_ready and attachment.write_retry == null) {
                 if (self.processWrite(attachment)) |internal_failure| {
                     self.removeAttachment(side, internal_failure);
@@ -117,7 +117,7 @@ pub const PosixLooper = struct {
             }
         }
         for ([_]io.Side{ .tun, .link }) |side| {
-            const attachment = self.attachments[@intFromEnum(side)] orelse continue;
+            const attachment = self.attachments[@backingInt(side)] orelse continue;
             if (attachment.read_ready and attachment.reading and attachment.read_retry == null) {
                 if (self.processRead(attachment)) |internal_failure| {
                     self.removeAttachment(side, internal_failure);
@@ -166,7 +166,7 @@ pub const PosixLooper = struct {
             .tun => self.options.tun_buf_size,
         };
         if (buffer_size == 0 or self.options.max_read_count == 0 or self.options.max_read_size == 0) return error.InvalidBuffers;
-        const slot = &self.attachments[@intFromEnum(side)];
+        const slot = &self.attachments[@backingInt(side)];
         if (slot.* != null) return error.SideAlreadyAttached;
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
@@ -190,12 +190,12 @@ pub const PosixLooper = struct {
     }
 
     pub fn isAttached(self: *const PosixLooper, side: io.Side) bool {
-        return self.attachments[@intFromEnum(side)] != null;
+        return self.attachments[@backingInt(side)] != null;
     }
 
     pub fn resumeReading(self: *PosixLooper, side: io.Side) error{LooperUnavailable}!void {
         if (self.stopped) return error.LooperUnavailable;
-        if (self.attachments[@intFromEnum(side)]) |attachment| {
+        if (self.attachments[@backingInt(side)]) |attachment| {
             attachment.reading = true;
             attachment.read_retry = null;
         }
@@ -205,7 +205,7 @@ pub const PosixLooper = struct {
     pub fn write(self: *PosixLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
-        const attachment = self.attachments[@intFromEnum(side)] orelse return error.SideNotAttached;
+        const attachment = self.attachments[@backingInt(side)] orelse return error.SideNotAttached;
         if (attachment.native_io.isUnconnected() and destination == null) return error.MissingDestination;
         try attachment.write_queue.append(packets, destination);
         if (attachment.write_retry == null) attachment.write_ready = true;
@@ -218,7 +218,7 @@ pub const PosixLooper = struct {
         if (self.stopped) return error.LooperUnavailable;
         self.busy = true;
         defer self.busy = false;
-        const attachment = self.attachments[@intFromEnum(side)] orelse return null;
+        const attachment = self.attachments[@backingInt(side)] orelse return null;
         return self.processWrite(attachment);
     }
 
@@ -232,7 +232,7 @@ pub const PosixLooper = struct {
                         const deadline = deadlineAfter(retry_delay_ms);
                         attachment.write_retry = deadline;
                         const opposite: io.Side = if (attachment.side == .link) .tun else .link;
-                        if (self.attachments[@intFromEnum(opposite)]) |other| {
+                        if (self.attachments[@backingInt(opposite)]) |other| {
                             if (other.reading and other.read_retry == null) other.read_retry = deadline;
                         }
                         return null;
@@ -314,7 +314,7 @@ pub const PosixLooper = struct {
 
     // All callers hold the reentrancy guard, including while cancelling writes.
     fn removeAttachment(self: *PosixLooper, side: io.Side, failure: ?io.Failure) void {
-        const slot = &self.attachments[@intFromEnum(side)];
+        const slot = &self.attachments[@backingInt(side)];
         const attachment = slot.* orelse return;
         slot.* = null;
         _ = io_c.pp_mux_delete(self.options.mux, attachment.fd);

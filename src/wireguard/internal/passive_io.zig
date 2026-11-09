@@ -89,7 +89,7 @@ pub const PassiveIO = struct {
     };
 
     fn sideFor(self: *PassiveIO, tag: net.Side) *Side {
-        return &self.sides[@intFromEnum(tag)];
+        return &self.sides[@backingInt(tag)];
     }
 
     pub fn init(complete: *const fn (usize, u32, i32) callconv(.c) void) std.mem.Allocator.Error!PassiveIO {

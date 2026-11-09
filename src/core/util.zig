@@ -84,7 +84,8 @@ pub const TemporaryCString = TemporaryCStringWithCapacity(256);
 /// before it leaves scope.
 pub fn TemporaryCStringWithCapacity(comptime capacity: usize) type {
     return struct {
-        stack_allocator: std.heap.StackFallbackAllocator(capacity) = undefined,
+        buffer: [capacity]u8 = undefined,
+        stack_allocator: std.heap.BufferFirstAllocator = undefined,
         allocator: std.mem.Allocator = undefined,
         value: ?[:0]u8 = null,
 
@@ -98,8 +99,8 @@ pub fn TemporaryCStringWithCapacity(comptime capacity: usize) type {
             if (self.value != null)
                 @panic("TemporaryCString.init() called while already initialized");
 
-            self.stack_allocator = std.heap.stackFallback(capacity, fallback_allocator);
-            self.allocator = self.stack_allocator.get();
+            self.stack_allocator = std.heap.BufferFirstAllocator.init(&self.buffer, fallback_allocator);
+            self.allocator = self.stack_allocator.allocator();
             self.value = try self.allocator.dupeSentinel(u8, value, 0);
         }
 
@@ -371,8 +372,8 @@ pub fn platformVersionAlloc(allocator: std.mem.Allocator) ![]u8 {
 /// Parses an enum by comparing `value` case-insensitively with each field's
 /// string returned by `raw()`.
 pub fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
-    inline for (std.meta.fields(T)) |field| {
-        const candidate: T = @field(T, field.name);
+    inline for (@typeInfo(T).@"enum".field_names) |field_name| {
+        const candidate: T = @field(T, field_name);
         if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
     }
     return null;
@@ -406,8 +407,7 @@ fn windowsVersionAlloc(allocator: std.mem.Allocator) !?[]u8 {
     );
     information.dwOSVersionInfoSize = @sizeOf(@TypeOf(information));
     if (std.os.windows.ntdll.RtlGetVersion(&information) != .SUCCESS) return null;
-    return try std.fmt.allocPrint(
-        allocator,
+    return try allocator.print(
         "{d}.{d}",
         .{ information.dwMajorVersion, information.dwMinorVersion },
     );
@@ -421,7 +421,7 @@ fn majorMinorAlloc(
     const major = numericPrefix(components.next() orelse return null);
     const minor = numericPrefix(components.next() orelse return null);
     if (major.len == 0 or minor.len == 0) return null;
-    return try std.fmt.allocPrint(allocator, "{s}.{s}", .{ major, minor });
+    return try allocator.print("{s}.{s}", .{ major, minor });
 }
 
 fn numericPrefix(value: []const u8) []const u8 {

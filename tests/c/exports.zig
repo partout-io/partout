@@ -12,8 +12,7 @@ test "portable filesystem creates nested directories" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    const nested = try std.fmt.allocPrintSentinel(
-        allocator,
+    const nested = try allocator.printSentinel(
         ".zig-cache/tmp/{s}/first/second",
         .{tmp.sub_path},
         0,

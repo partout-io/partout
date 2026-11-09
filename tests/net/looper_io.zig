@@ -172,7 +172,7 @@ test "owned reads bound batches and drain remaining packets" {
                     .link => .{ .link = descriptor },
                     .tun => .{ .tun = descriptor },
                 }));
-                const payload = [_]u8{'x'} ** 128;
+                const payload = @as([128]u8, @splat('x'));
                 try std.testing.expectEqual(@as(isize, payload.len), std.c.write(fds[1], &payload, payload.len));
                 try std.testing.expectEqual(@as(usize, 0), mock.reads);
                 try test_helpers.wait(&loop, &probe.total, payload.len);
@@ -529,7 +529,7 @@ test "UDP packet errors discard only the bad packet and retain the link" {
     remote.address[0..4].* = .{ 127, 0, 0, 1 };
     try loop.attach(.{ .pair = .{ .link = socket.linkDescriptor() } });
     try std.testing.expectError(error.MissingDestination, loop.write(&.{"x"}, .link, null));
-    const oversized = [_]u8{0} ** 65535;
+    const oversized = @as([65535]u8, @splat(0));
     try loop.write(&.{ &oversized, "valid" }, .link, remote);
     try std.testing.expect(try test_helpers.poll(&loop, 0));
     try std.testing.expect(loop.isLinkAttached());

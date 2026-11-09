@@ -117,7 +117,7 @@ pub fn moduleCacheFilename(
     module_id: uuid.UUID,
     filename: []const u8,
 ) std.mem.Allocator.Error![]u8 {
-    return std.fmt.allocPrint(allocator, "{s}-{s}", .{
+    return allocator.print("{s}-{s}", .{
         module_id[0..],
         filename,
     });

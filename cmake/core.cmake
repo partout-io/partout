@@ -63,7 +63,7 @@ kernel32_lib_dir=
 gcc_dir=
 "
     )
-    list(APPEND PARTOUT_ZIG_ARGS --libc "${PARTOUT_ZIG_LIBC}")
+    list(APPEND PARTOUT_ZIG_ARGS "-Dlibc-file=${PARTOUT_ZIG_LIBC}")
 elseif(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(PARTOUT_APPLE_OS ios)

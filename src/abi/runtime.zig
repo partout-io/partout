@@ -31,7 +31,7 @@ pub const DaemonOptions = struct {
     cancels_unrecoverable: bool,
     min_data_count_delta: u64,
     crypto_backend: ?api.CryptoBackend,
-    feature_flags: std.EnumSet(api.DaemonFeatureFlag) = .initEmpty(),
+    feature_flags: std.EnumSet(api.DaemonFeatureFlag) = .empty,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -39,10 +39,11 @@ pub const DaemonOptions = struct {
         error_info: ?*api.JsonErrorInfo,
     ) RuntimeError!DaemonOptions {
         const c_profile = args.profile orelse return error.InvalidArgs;
-        var feature_flags = std.EnumSet(api.DaemonFeatureFlag).initEmpty();
+        var feature_flags = std.EnumSet(api.DaemonFeatureFlag).empty;
         var remaining_flags = args.options.feature_flags;
-        inline for (std.meta.tags(api.DaemonFeatureFlag)) |flag| {
-            const mask: u64 = @intCast(@intFromEnum(flag));
+        inline for (@typeInfo(api.DaemonFeatureFlag).@"enum".field_names) |name| {
+            const flag = @field(api.DaemonFeatureFlag, name);
+            const mask: u64 = @intCast(@backingInt(flag));
             if (remaining_flags & mask != 0) feature_flags.insert(flag);
             remaining_flags &= ~mask;
         }
@@ -72,8 +73,7 @@ pub const DaemonOptions = struct {
         else
             try util.defaultCacheDir(allocator);
         defer allocator.free(cache_root);
-        const cache_directory_name = try std.fmt.allocPrint(
-            allocator,
+        const cache_directory_name = try allocator.print(
             "partout-{s}",
             .{profile.id[0..]},
         );
@@ -234,8 +234,8 @@ fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{In
     const value = bindings orelse return error.InvalidArgs;
     const functions = value.controller_functions;
     // Check that all controller bindings are non-NULL.
-    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
-        if (@field(functions, field.name) == null) return error.InvalidArgs;
+    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".field_names) |field_name| {
+        if (@field(functions, field_name) == null) return error.InvalidArgs;
     }
 
     // The public hooks preserve the native C signatures. Separate translate-c

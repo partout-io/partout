@@ -249,7 +249,7 @@ const InterfaceBuilder = struct {
     fn init() InterfaceBuilder {
         return .{
             .interface = .{},
-            .seen_keys = std.EnumSet(InterfaceKey).initEmpty(),
+            .seen_keys = std.EnumSet(InterfaceKey).empty,
             .addresses = .empty,
             .dns_servers = .empty,
             .dns_domains = .empty,
@@ -338,7 +338,7 @@ const PeerBuilder = struct {
     fn init() PeerBuilder {
         return .{
             .peer = .{},
-            .seen_keys = std.EnumSet(PeerKey).initEmpty(),
+            .seen_keys = std.EnumSet(PeerKey).empty,
             .allowed_ips = .empty,
         };
     }

@@ -116,7 +116,7 @@ test "external logger callback receives context and log messages" {
             called = true;
             const saw_context: *bool = @ptrCast(@alignCast(ctx.?));
             saw_context.* = true;
-            saw_level = level == @intFromEnum(logging.Level.notice);
+            saw_level = level == @backingInt(logging.Level.notice);
             saw_message = std.mem.eql(u8, std.mem.span(message), "hello");
         }
     };

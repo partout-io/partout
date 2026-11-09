@@ -24,16 +24,6 @@ const portable_c = ffi.portable;
 const log = core.logging;
 const util = core.util;
 
-// Zig 0.16.0's Windows SelfInfo casts an unaligned dynamic symbol address to
-// an ARM64 function pointer when compiling a static library. Avoid that broken
-// optional diagnostic path; native debugger symbols and safety checks remain on.
-pub const std_options: std.Options = if (builtin.os.tag == .windows and
-    builtin.cpu.arch == .aarch64 and builtin.zig_version.major == 0 and
-    builtin.zig_version.minor == 16 and builtin.zig_version.patch == 0)
-    .{ .unexpected_error_tracing = false }
-else
-    .{};
-
 pub const panic = std.debug.FullPanic(panicHandler);
 
 const allocator = std.heap.c_allocator;

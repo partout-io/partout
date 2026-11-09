@@ -57,7 +57,7 @@ pub const NegotiatorState = enum(u8) {
     connected,
 
     pub fn before(self: NegotiatorState, other: NegotiatorState) bool {
-        return @intFromEnum(self) < @intFromEnum(other);
+        return @backingInt(self) < @backingInt(other);
     }
 };
 

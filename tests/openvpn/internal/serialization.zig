@@ -158,7 +158,7 @@ test "tls-crypt round trips the whole datagram and ignores bounds" {
     defer serializer.deinit();
 
     const session_id = [_]u8{ 1, 2, 3, 4, 5, 6, 7, 8 };
-    const payload = [_]u8{0xa5} ** 40;
+    const payload = @as([40]u8, @splat(0xa5));
     var control_packet = try ControlPacket.init(.controlV1, 3, &session_id, 42, &payload, null, null);
     defer control_packet.deinit();
     const raw = try serializer.serializeAt(std.testing.allocator, &control_packet, 1234);

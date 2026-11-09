@@ -69,11 +69,11 @@ pub const WindowsLooper = struct {
     }
 
     pub fn canReceivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) bool {
-        return self.attachments[@intFromEnum(receipt.side)].canReceivePackets(receipt);
+        return self.attachments[@backingInt(receipt.side)].canReceivePackets(receipt);
     }
 
     pub fn receivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) void {
-        const attachment = &self.attachments[@intFromEnum(receipt.side)];
+        const attachment = &self.attachments[@backingInt(receipt.side)];
         if (attachment.generation != receipt.generation) return;
         const arguments = attachment.arguments orelse return;
         if (receipt.code != 0) {
@@ -182,7 +182,7 @@ pub const WindowsLooper = struct {
         if (self.on_receive == null) return error.LooperUnavailable;
         if (self.stopped) return error.LooperUnavailable;
         const side = std.meta.activeTag(arguments.pair);
-        const attachment = &self.attachments[@intFromEnum(side)];
+        const attachment = &self.attachments[@backingInt(side)];
         self.mutex.lock();
         if (attachment.arguments != null) {
             self.mutex.unlock();
@@ -203,7 +203,7 @@ pub const WindowsLooper = struct {
     }
 
     pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
-        const attachment = &self.attachments[@intFromEnum(side)];
+        const attachment = &self.attachments[@backingInt(side)];
         self.mutex.lock();
         const arguments = attachment.arguments orelse {
             self.mutex.unlock();
@@ -219,12 +219,12 @@ pub const WindowsLooper = struct {
     }
 
     pub fn isAttached(self: *const WindowsLooper, side: io.Side) bool {
-        return self.attachments[@intFromEnum(side)].arguments != null;
+        return self.attachments[@backingInt(side)].arguments != null;
     }
 
     pub fn resumeReading(self: *WindowsLooper, side: io.Side) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
-        const attachment = &self.attachments[@intFromEnum(side)];
+        const attachment = &self.attachments[@backingInt(side)];
         const arguments = attachment.arguments orelse return error.LooperUnavailable;
         self.mutex.lock();
         attachment.reading = true;
@@ -238,7 +238,7 @@ pub const WindowsLooper = struct {
     pub fn write(self: *WindowsLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
-        const attachment = &self.attachments[@intFromEnum(side)];
+        const attachment = &self.attachments[@backingInt(side)];
         const arguments = attachment.arguments orelse return error.SideNotAttached;
         if (arguments.pair == .link and arguments.pair.link.native.unconnected and destination == null) return error.MissingDestination;
         for (packets) |packet| {

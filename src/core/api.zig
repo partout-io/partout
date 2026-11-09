@@ -103,9 +103,9 @@ const supports_native_crypto_backend = builtin.os.tag == .windows or builtin.os.
 
 pub fn errorPairFormatZ(allocator: std.mem.Allocator, err_pair: PartoutErrorPair) error{OutOfMemory}![:0]u8 {
     if (err_pair.sub_code) |sub_code| {
-        return std.fmt.allocPrintSentinel(allocator, "{s}.{s}", .{ err_pair.code.raw(), sub_code }, 0);
+        return allocator.printSentinel("{s}.{s}", .{ err_pair.code.raw(), sub_code }, 0);
     }
-    return allocator.dupeZ(u8, err_pair.code.raw());
+    return allocator.dupeSentinel(u8, err_pair.code.raw(), 0);
 }
 
 pub fn openVPNErrorPair(code: OpenVPNErrorCode) PartoutErrorPair {

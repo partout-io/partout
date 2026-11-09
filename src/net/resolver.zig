@@ -136,7 +136,7 @@ fn resolveEndpoint(
     const records = try resolver.resolve(
         allocator,
         endpoint.address,
-        std.EnumSet(DNSResolver.Flag).initEmpty(),
+        std.EnumSet(DNSResolver.Flag).empty,
         reachability,
         timeout_ms,
     );
@@ -205,7 +205,7 @@ pub const PlatformDNS = struct {
         const records = try self.resolve(
             allocator,
             address,
-            .initEmpty(),
+            .empty,
             reachability,
             timeout_ms,
         );
@@ -372,7 +372,7 @@ pub const testing = struct {
 const QueryPool = struct {
     mutex: core.Mutex = .{},
     cond: core.Condition = .{},
-    queries: [max_pending_queries]Query = [_]Query{.{}} ** max_pending_queries,
+    queries: [max_pending_queries]Query = @splat(.{}),
 
     fn acquire(
         self: *QueryPool,
@@ -381,7 +381,7 @@ const QueryPool = struct {
         reachability: ?ReachabilityInfo,
         resolve_fn: ResolveFn,
     ) DNSResolver.Error!*Query {
-        const hostname_copy = try std.heap.c_allocator.dupeZ(u8, hostname);
+        const hostname_copy = try std.heap.c_allocator.dupeSentinel(u8, hostname, 0);
         errdefer std.heap.c_allocator.free(hostname_copy);
 
         self.mutex.lock();

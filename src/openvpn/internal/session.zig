@@ -444,8 +444,7 @@ pub const Session = struct {
         if (negotiator.shouldRenegotiate())
             negotiator = try self.startRenegotiation(negotiator, .client);
 
-        var grouped = [_]std.ArrayList([]const u8){.empty} **
-            ControlConstants.number_of_keys;
+        var grouped = @as([ControlConstants.number_of_keys]std.ArrayList([]const u8), @splat(.empty));
         defer for (&grouped) |*list| list.deinit(self.allocator);
         for (processed.packets()) |packet| {
             if (packet.len == 0) {
@@ -796,8 +795,8 @@ pub const Session = struct {
 fn sideFailureError(failure: net.Failure, fallback: SessionError) SessionError {
     return switch (failure) {
         .user => |cause| blk: {
-            inline for (@typeInfo(SessionError).error_set.?) |entry| {
-                const session_error = @field(SessionError, entry.name);
+            inline for (@typeInfo(SessionError).error_set.error_names.?) |name| {
+                const session_error = @field(SessionError, name);
                 if (cause == session_error) break :blk session_error;
             }
             log.writef(.err, "Looper callback failed: {s}", .{@errorName(cause)});

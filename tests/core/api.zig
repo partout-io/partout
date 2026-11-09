@@ -82,7 +82,7 @@ test "unavailable crypto backend logs and falls back to default" {
 
     try std.testing.expectEqualStrings(std.mem.span(expected.name), std.mem.span(actual.name));
     try std.testing.expectEqual(
-        @intFromEnum(logging.Level.notice),
+        @backingInt(logging.Level.notice),
         CapturingLogger.level,
     );
     var expected_message_buffer: [128]u8 = undefined;

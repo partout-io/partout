@@ -334,7 +334,7 @@ test "Windows native write failures return asynchronously through the looper" {
     destination.address[3] = 1;
     destination.port = 1194;
     // Too large for UDP: submission owns the bytes, native completion fails.
-    const payload = [_]u8{0} ** 65536;
+    const payload = @as([65536]u8, @splat(0));
     try std.testing.expectEqual(@as(i32, 0), socket.write(&payload, destination));
     try std.testing.expectEqual(@as(usize, 0), probe.failures);
     for (0..5000) |_| {

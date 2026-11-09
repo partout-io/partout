@@ -98,8 +98,7 @@ pub fn credentialsForAuthentication(
             defer allocator.free(encoded_password);
             const encoded_otp = try core_mod.util.base64EncodeAlloc(allocator, otp);
             defer allocator.free(encoded_otp);
-            break :blk try std.fmt.allocPrint(
-                allocator,
+            break :blk try allocator.print(
                 "SCRV1:{s}:{s}",
                 .{ encoded_password, encoded_otp },
             );
@@ -136,7 +135,7 @@ pub fn endpointWithRandomPrefix(
         encoded[index * 2 + 1] = alphabet[byte & 0x0f];
     }
     return .{
-        .address = try std.fmt.allocPrint(allocator, "{s}.{s}", .{ encoded, endpoint.address }),
+        .address = try allocator.print("{s}.{s}", .{ encoded, endpoint.address }),
         .proto = endpoint.proto,
         .owned = true,
     };

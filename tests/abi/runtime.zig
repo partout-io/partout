@@ -126,13 +126,12 @@ test "daemon runtime owns options during lifecycle" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cache_root = try std.fmt.allocPrint(
-        allocator,
+    const cache_root = try allocator.print(
         ".zig-cache/tmp/{s}",
         .{tmp.sub_path},
     );
     defer allocator.free(cache_root);
-    const cache_root_z = try allocator.dupeZ(u8, cache_root);
+    const cache_root_z = try allocator.dupeSentinel(u8, cache_root, 0);
     defer allocator.free(cache_root_z);
     for ([_]bool{ false, true }) |experimental| {
         var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
@@ -218,7 +217,7 @@ test "daemon bindings copy supplied controller hooks and release after detach" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cache_root = try std.fmt.allocPrintSentinel(allocator, ".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
+    const cache_root = try allocator.printSentinel(".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
     defer allocator.free(cache_root);
     var args = daemonStartArgs(mock.dnsOnlyProfileJson().ptr);
     args.options.cache_dir = cache_root.ptr;
@@ -255,9 +254,9 @@ test "daemon bindings reject incomplete controller hooks" {
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, null));
     const empty_bindings: partout_c.partout_daemon_bindings = .{};
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &empty_bindings));
-    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".fields) |field| {
+    inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".field_names) |field_name| {
         var functions = ControllerProbe.functions();
-        @field(functions, field.name) = null;
+        @field(functions, field_name) = null;
         const bindings: partout_c.partout_daemon_bindings = .{ .controller_functions = functions };
         try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &bindings));
     }
@@ -380,7 +379,7 @@ test "legacy feature flags preserve the current implementations" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    const cache_dir = try std.fmt.allocPrintSentinel(allocator, ".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
+    const cache_dir = try allocator.printSentinel(".zig-cache/tmp/{s}", .{tmp.sub_path}, 0);
     defer allocator.free(cache_dir);
     for (cases) |case| {
         if (!case.enabled) continue;

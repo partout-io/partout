@@ -156,7 +156,7 @@ test "actor preserves aligned aggregate results and recovers after errors" {
     const owner: usize = 42;
     for ([_]?usize{ null, 17 }) |optional| {
         const payload = PayloadState.Payload{
-            .words = [_]u64{0x0123456789abcdef} ** 64,
+            .words = @as([64]u64, @splat(0x0123456789abcdef)),
             .owner = &owner,
             .optional = optional,
         };
@@ -188,7 +188,7 @@ test "actor keeps concurrent callers results and errors isolated" {
         fn check(self: *@This()) !void {
             for (0..128) |iteration| {
                 const payload = PayloadState.Payload{
-                    .words = [_]u64{@intCast(self.id * 128 + iteration)} ** 64,
+                    .words = @as([64]u64, @splat(@intCast(self.id * 128 + iteration))),
                     .owner = &self.id,
                     .optional = if (iteration % 2 == 0) iteration else null,
                 };

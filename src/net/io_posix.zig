@@ -280,14 +280,14 @@ pub const SocketWrapper = struct {
         // Truncation and per-destination errors (including asynchronous ICMP)
         // do not invalidate a shared UDP socket or its other peers.
         return switch (io_c.pp_socket_last_error_binding()) {
-            @intFromEnum(std.c.E.MSGSIZE),
-            @intFromEnum(std.c.E.NETUNREACH),
-            @intFromEnum(std.c.E.HOSTUNREACH),
-            @intFromEnum(std.c.E.CONNREFUSED),
-            @intFromEnum(std.c.E.AFNOSUPPORT),
+            @backingInt(std.c.E.MSGSIZE),
+            @backingInt(std.c.E.NETUNREACH),
+            @backingInt(std.c.E.HOSTUNREACH),
+            @backingInt(std.c.E.CONNREFUSED),
+            @backingInt(std.c.E.AFNOSUPPORT),
             => error.DatagramDropped,
             // macOS reports a destination/socket family mismatch as EINVAL.
-            @intFromEnum(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
+            @backingInt(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
             else => error.LibcFailure,
         };
     }

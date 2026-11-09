@@ -111,7 +111,7 @@ pub fn write(level: Level, message: [:0]const u8) void {
     };
     const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchSlice(logger, logger_ctx, @intFromEnum(level), message);
+    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
 }
 
 /// Formats and writes a core log message.
@@ -137,8 +137,8 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
         args,
         private_data,
     ) catch return;
-    const message = std.fmt.allocPrintSentinel(allocator, fmt, prepared, 0) catch return;
-    dispatchSlice(logger, logger_ctx, @intFromEnum(level), message);
+    const message = allocator.printSentinel(fmt, prepared, 0) catch return;
+    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
 }
 
 /// Forwards a borrowed C string directly to the configured C logger.
@@ -150,7 +150,7 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
     };
     const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchCString(logger, logger_ctx, @intFromEnum(level), message);
+    dispatchCString(logger, logger_ctx, @backingInt(level), message);
 }
 
 /// Logs a profile using the structured layout of the legacy Apple runtime.
@@ -188,14 +188,14 @@ pub fn writeProfileModules(level: Level, profile: *const api.Profile) void {
 
 pub fn writeAndFailDebug(message: [:0]const u8) void {
     write(.err, message);
-    if (builtin.mode == .Debug) {
+    if (builtin.mode == .debug) {
         @panic(message);
     }
 }
 
 pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
     writef(.err, fmt, args);
-    if (builtin.mode == .Debug) {
+    if (builtin.mode == .debug) {
         std.debug.panic(fmt, args);
     }
 }
@@ -351,9 +351,9 @@ fn prepareArguments(
     const Args = @TypeOf(args);
     const args_info = @typeInfo(Args).@"struct";
     var prepared: PreparedArguments(Args) = undefined;
-    inline for (args_info.fields) |field| {
-        const value = @field(args, field.name);
-        @field(prepared, field.name) = if (comptime logFormat(field.type) != null)
+    inline for (args_info.field_names, args_info.field_types) |name, FieldType| {
+        const value = @field(args, name);
+        @field(prepared, name) = if (comptime logFormat(FieldType) != null)
             if (private_data)
                 try forLog(allocator, value)
             else
@@ -366,14 +366,14 @@ fn prepareArguments(
 
 fn PreparedArguments(comptime Args: type) type {
     const args_info = @typeInfo(Args).@"struct";
-    var names: [args_info.fields.len][]const u8 = undefined;
-    var types: [args_info.fields.len]type = undefined;
-    for (args_info.fields, 0..) |field, index| {
-        names[index] = field.name;
-        types[index] = if (logFormat(field.type) != null)
+    var names: [args_info.field_names.len][]const u8 = undefined;
+    var types: [args_info.field_names.len]type = undefined;
+    for (args_info.field_names, args_info.field_types, 0..) |name, FieldType, index| {
+        names[index] = name;
+        types[index] = if (logFormat(FieldType) != null)
             []const u8
         else
-            runtimeType(field.type);
+            runtimeType(FieldType);
     }
     if (args_info.is_tuple) return @Tuple(&types);
     return @Struct(.auto, null, &names, &types, &@splat(.{}));
@@ -465,7 +465,7 @@ fn formatExplicitSensitive(
     const T = @TypeOf(value);
     if (comptime logFormat(T) != null) return forLog(allocator, value);
     if (comptime isString(T)) return allocator.dupe(u8, value);
-    return std.fmt.allocPrint(allocator, "{any}", .{value});
+    return allocator.print("{any}", .{value});
 }
 
 fn formatIPSettings(

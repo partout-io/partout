@@ -127,7 +127,7 @@ test "socket argument errors are rejected before native I/O" {
 
     // Valid arguments reach the invalid native handle and retain its native error.
     try std.testing.expectError(error.LibcFailure, native.writePacket("payload", 0, endpoint.address));
-    try std.testing.expectEqual(@as(c_int, @intFromEnum(std.c.E.BADF)), native.lastErrorCode());
+    try std.testing.expectEqual(@as(c_int, @backingInt(std.c.E.BADF)), native.lastErrorCode());
 }
 
 test "looper owns heap TUN wrapper and closes transferred handle exactly once" {

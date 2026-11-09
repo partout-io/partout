@@ -58,7 +58,7 @@ into the build output. These workflows work directly with CMake, including
 
 #### Requirements
 
-- Zig 0.16
+- Zig 0.17
 - C build tools
 - CMake
 - ninja

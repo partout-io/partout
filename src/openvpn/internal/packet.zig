@@ -44,7 +44,7 @@ pub const PacketCode = enum(u8) {
     }
 
     pub fn native(self: PacketCode) openvpn_c.openvpn_packet_code {
-        return @intFromEnum(self);
+        return @backingInt(self);
     }
 };
 
@@ -233,7 +233,7 @@ pub const OCCPacket = enum(u8) {
     pub fn serialized(self: OCCPacket) [magic_string.len + 1]u8 {
         var result: [magic_string.len + 1]u8 = undefined;
         @memcpy(result[0..magic_string.len], &magic_string);
-        result[magic_string.len] = @intFromEnum(self);
+        result[magic_string.len] = @backingInt(self);
         return result;
     }
 };
@@ -286,8 +286,7 @@ const PIAHardReset = struct {
         defer allocator.free(cipher_name);
         const digest_name = try lowerAlloc(allocator, self.digest_name);
         defer allocator.free(digest_name);
-        const plain = try std.fmt.allocPrint(
-            allocator,
+        const plain = try allocator.print(
             "{s}crypto\t{s}|{s}\tca\t{s}",
             .{ magic, cipher_name, digest_name, self.ca_md5_digest },
         );

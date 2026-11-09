@@ -198,7 +198,7 @@ test "WireGuardParser enforces wg-quick endpoint grammar" {
     };
 
     for (invalid_endpoints) |endpoint| {
-        const contents = try std.fmt.allocPrint(allocator,
+        const contents = try allocator.print(
             \\[Interface]
             \\PrivateKey = 4hBza7JtPKZFKwqtEmDR0iZyru1kqpQta/DRduMbHQw=
             \\[Peer]

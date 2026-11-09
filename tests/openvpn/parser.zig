@@ -360,8 +360,7 @@ test "OpenVPNParser parses tls-crypt-v2 static and wrapped keys" {
     @memcpy(combined[256..], &wrapped_bytes);
     var encoded = try api.SecureData.initBytesAlloc(allocator, &combined);
     defer encoded.deinit(allocator);
-    const contents = try std.fmt.allocPrint(
-        allocator,
+    const contents = try allocator.print(
         "tls-crypt-v2 [inline]\n<tls-crypt-v2>\n-----BEGIN OpenVPN tls-crypt-v2 client key-----\n{s}\n-----END OpenVPN tls-crypt-v2 client key-----\n</tls-crypt-v2>",
         .{encoded.base64},
     );
@@ -399,8 +398,7 @@ test "OpenVPNParser requires inline blocks for bare TLS wrap directives" {
 
     var key_hex: [512]u8 = undefined;
     @memset(&key_hex, '0');
-    const contents = try std.fmt.allocPrint(
-        allocator,
+    const contents = try allocator.print(
         "client\n<tls-auth>\n-----BEGIN OpenVPN Static key V1-----\n{s}\n-----END OpenVPN Static key V1-----\n</tls-auth>",
         .{&key_hex},
     );
