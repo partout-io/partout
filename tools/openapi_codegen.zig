@@ -1226,14 +1226,14 @@ fn typeExprAlloc(allocator: std.mem.Allocator, doc: Document, spec: TypeSpec, ex
             if (integerType(ref)) |typ| break :blk allocator.dupe(u8, typ);
             if (std.mem.eql(u8, ref, "UniqueID")) break :blk allocator.dupe(u8, "uuid.UUID");
             if (exclusions.contains(ref)) {
-                break :blk std.fmt.allocPrint(allocator, "manual.{s}", .{zigTypeName(ref)});
+                break :blk allocator.print("manual.{s}", .{zigTypeName(ref)});
             }
             break :blk allocator.dupe(u8, zigTypeName(ref));
         },
         .array => |child| blk: {
             const child_expr = try typeExprAlloc(allocator, doc, child.*, exclusions);
             defer allocator.free(child_expr);
-            break :blk try std.fmt.allocPrint(allocator, "[]const {s}", .{child_expr});
+            break :blk try allocator.print("[]const {s}", .{child_expr});
         },
     };
 }
@@ -1253,7 +1253,7 @@ fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSp
                 break :blk try allocator.dupe(u8, "uuid.zero_id");
             }
             if (exclusions.contains(ref)) {
-                break :blk try std.fmt.allocPrint(allocator, "manual.defaultValue(manual.{s})", .{zigTypeName(ref)});
+                break :blk try allocator.print("manual.defaultValue(manual.{s})", .{zigTypeName(ref)});
             }
             if (doc.schema(ref)) |schema_item| {
                 if (schema_item.enum_names.items.len > 0) {
@@ -1275,7 +1275,7 @@ fn defaultValueForSpec(allocator: std.mem.Allocator, doc: Document, spec: TypeSp
                         try allocator.dupe(u8, ".{}");
                     const value = payload_default orelse break :blk null;
                     defer allocator.free(value);
-                    break :blk try std.fmt.allocPrint(allocator, ".{{ .{s} = {s} }}", .{
+                    break :blk try allocator.print(".{{ .{s} = {s} }}", .{
                         zigEnumField(selected_variant.raw),
                         value,
                     });

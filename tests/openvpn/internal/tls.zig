@@ -71,7 +71,7 @@ test "TLSWrapper delegates its complete TLS surface to the C table" {
     const allocator = std.testing.allocator;
     var tmp = std.testing.tmpDir(.{});
     defer tmp.cleanup();
-    const caches_directory = try std.fmt.allocPrint(allocator, ".zig-cache/tmp/{s}", .{tmp.sub_path});
+    const caches_directory = try allocator.print(".zig-cache/tmp/{s}", .{tmp.sub_path});
     defer allocator.free(caches_directory);
 
     var verification_failures: usize = 0;

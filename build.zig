@@ -80,7 +80,7 @@ const Vendors = struct {
 
 const BuildConfig = struct {
     target: std.Build.ResolvedTarget,
-    optimize: std.builtin.OptimizeMode,
+    optimize: std.lang.Optimize,
     strip: ?bool,
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
@@ -130,7 +130,7 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{
         .default_target = .{ .abi = if (builtin.os.tag == .windows) .msvc else null },
     });
-    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .ReleaseSmall });
+    const optimize = b.standardOptimizeOption(.{ .preferred_optimize_mode = .small });
     const strip = b.option(bool, "strip", "Omit debug information from emitted binaries.");
     const api_codegen_step = addAPICodegenStep(b);
     const use_openvpn = b.option(
@@ -170,11 +170,12 @@ pub fn build(b: *std.Build) void {
         std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
     build_options.addOption(bool, "windows", use_windows);
 
+    const libc_file = pathOption(b, "libc-file", "Path to the target libc installation file.", false);
     const config = BuildConfig{
         .target = target,
         .optimize = optimize,
         .strip = strip,
-        .libc_installation = parseLibCInstallation(b, target),
+        .libc_installation = parseLibCInstallation(b, target, libc_file),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .windows = use_windows,
@@ -191,6 +192,7 @@ pub fn build(b: *std.Build) void {
         .name = "partout",
         .root_module = module,
     });
+    if (libc_file) |path| lib.setLibCFile(.{ .cwd_relative = path });
     lib.bundle_compiler_rt = true;
     const check = b.step("check", "Check if partout compiles");
     check.dependOn(&lib.step);
@@ -207,6 +209,7 @@ pub fn build(b: *std.Build) void {
     const unit_tests = b.addTest(.{
         .root_module = test_module,
     });
+    if (libc_file) |path| unit_tests.setLibCFile(.{ .cwd_relative = path });
     linkTestLibraries(test_module, b, config, &unit_tests.step);
     if (use_windows) {
         // Tests link the MSVC backend; the core archive only needs its headers.
@@ -253,7 +256,7 @@ pub fn build(b: *std.Build) void {
 }
 
 // CMake builds the static Windows backend with MSVC.
-fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.builtin.OptimizeMode) struct {
+fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
 } {
@@ -263,7 +266,7 @@ fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
         .x86 => "Win32",
         else => std.debug.panic("Unsupported Windows architecture", .{}),
     };
-    const configuration = if (optimize == .Debug) "Debug" else "Release";
+    const configuration = if (optimize == .debug) "Debug" else "Release";
     const configure = b.addSystemCommand(&.{ "cmake", "-G", "Visual Studio 17 2022", "-A", architecture, "-S" });
     configure.addDirectoryArg(b.path("."));
     configure.addArg("-B");
@@ -283,14 +286,16 @@ fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
 fn parseLibCInstallation(
     b: *std.Build,
     target: std.Build.ResolvedTarget,
+    path: ?[]const u8,
 ) ?std.zig.LibCInstallation {
-    const libc_file = b.libc_file orelse return null;
+    const libc_file = path orelse return null;
+    b.dependOnFileContents(.{ .cwd_relative = libc_file });
     return std.zig.LibCInstallation.parse(
         b.allocator,
         b.graph.io,
         libc_file,
         &target.result,
-    ) catch |err| std.debug.panic("unable to parse --libc file '{s}': {s}", .{
+    ) catch |err| std.debug.panic("unable to parse -Dlibc-file '{s}': {s}", .{
         libc_file,
         @errorName(err),
     });
@@ -306,10 +311,12 @@ fn pathOption(
         if (required) std.debug.panic("-{s} is required by the selected build options", .{name});
         return null;
     };
+    // Path existence and vendor framework probes affect the configured graph.
+    b.graph.poisonCache();
     if (raw.len == 0) std.debug.panic("-{s} cannot be empty", .{name});
 
-    const path = if (std.fs.path.isAbsolute(raw)) raw else b.pathFromRoot(raw);
-    std.Io.Dir.accessAbsolute(b.graph.io, path, .{}) catch
+    const path = if (std.fs.path.isAbsolute(raw)) raw else (b.root.joinString(b.allocator, raw) catch @panic("OOM"));
+    std.Io.Dir.cwd().access(b.graph.io, path, .{}) catch
         std.debug.panic("-{s} path is missing: {s}", .{ name, path });
     return b.dupe(path);
 }
@@ -344,7 +351,7 @@ fn addAPICodegenStep(b: *std.Build) *std.Build.Step {
     const generator_module = b.createModule(.{
         .root_source_file = b.path("tools/openapi_codegen.zig"),
         .target = b.graph.host,
-        .optimize = .Debug,
+        .optimize = .debug,
     });
     const generator = b.addExecutable(.{
         .name = "api-codegen",
@@ -372,12 +379,12 @@ fn addCoverageRunStep(
         []const u8,
         "coverage-include",
         "Comma-separated paths to include in the kcov report.",
-    ) orelse b.pathFromRoot("src");
+    ) orelse (b.root.joinString(b.allocator, "src") catch @panic("OOM"));
     const output_path = b.option(
         []const u8,
         "coverage-output",
         "Directory for the kcov report.",
-    ) orelse b.pathFromRoot("zig-out/coverage");
+    ) orelse (b.root.joinString(b.allocator, "zig-out/coverage") catch @panic("OOM"));
 
     const clean = b.addSystemCommand(&.{ "rm", "-rf", output_path });
     clean.has_side_effects = true;
@@ -463,6 +470,12 @@ fn configureCTranslation(
     config: BuildConfig,
 ) void {
     configureCHeadersAndMacros(translate_c, b, config);
+    if (config.target.result.abi.isAndroid()) {
+        // C translation must expose the selected API level to NDK headers.
+        const api_level = b.fmt("{d}", .{config.target.result.os.version_range.linux.android});
+        translate_c.defineCMacro("__ANDROID_API__", api_level);
+        translate_c.defineCMacro("__ANDROID_MIN_SDK_VERSION__", api_level);
+    }
 }
 
 fn configurePartoutModule(
@@ -526,9 +539,10 @@ fn addLibCHeaderPaths(
     libc_installation: ?std.zig.LibCInstallation,
 ) void {
     const libc = libc_installation orelse return;
-    consumer.addSystemIncludePath(.{ .cwd_relative = libc.include_dir orelse unreachable });
+    const include_dir = libc.include_dir orelse unreachable;
+    consumer.addSystemIncludePath(.{ .cwd_relative = include_dir });
     const sys_include_dir = libc.sys_include_dir orelse unreachable;
-    if (!std.mem.eql(u8, libc.include_dir.?, sys_include_dir)) {
+    if (!std.mem.eql(u8, include_dir, sys_include_dir)) {
         consumer.addSystemIncludePath(.{ .cwd_relative = sys_include_dir });
     }
 }
@@ -553,7 +567,7 @@ fn addVendorIncludePaths(
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ include_path, framework_name });
-            std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
+            std.Io.Dir.cwd().access(b.graph.io, framework, .{}) catch {
                 consumer.addSystemIncludePath(.{ .cwd_relative = include_path });
                 continue;
             };
@@ -585,12 +599,12 @@ fn linkTestLibraries(
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
-            std.Io.Dir.accessAbsolute(b.graph.io, framework, .{}) catch {
+            std.Io.Dir.cwd().access(b.graph.io, framework, .{}) catch {
                 const archive = b.fmt(
                     "{s}/{s}",
                     .{ library_path, paths.vendor.appleStaticArchiveName() },
                 );
-                std.Io.Dir.accessAbsolute(b.graph.io, archive, .{}) catch {
+                std.Io.Dir.cwd().access(b.graph.io, archive, .{}) catch {
                     linkSystemLibraries(module, config.target, paths);
                     continue;
                 };
@@ -658,6 +672,9 @@ fn addDarwinStaticArchiveRepackStep(
         \\set -eu
         \\archive="$1"
         \\out="$2"
+        \\out_dir="$(dirname "$out")"
+        \\out_base="$(basename "$out")"
+        \\out="$(cd "$out_dir" && pwd)/$out_base"
         \\work="${out}.objects"
         \\archive_dir="$(dirname "$archive")"
         \\archive_base="$(basename "$archive")"

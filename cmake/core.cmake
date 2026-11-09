@@ -60,10 +60,11 @@ sys_include_dir=${CMAKE_SYSROOT}/usr/include/${CMAKE_LIBRARY_ARCHITECTURE}
 crt_dir=${CMAKE_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/${PARTOUT_ANDROID_API}
 msvc_lib_dir=
 kernel32_lib_dir=
-gcc_dir=
+cc_dir=${CMAKE_SYSROOT}/usr/lib/${CMAKE_LIBRARY_ARCHITECTURE}/${PARTOUT_ANDROID_API}
+darwin_sdk_dir=
 "
     )
-    list(APPEND PARTOUT_ZIG_ARGS --libc "${PARTOUT_ZIG_LIBC}")
+    list(APPEND PARTOUT_ZIG_ARGS "-Dlibc-file=${PARTOUT_ZIG_LIBC}")
 elseif(APPLE)
     if(CMAKE_SYSTEM_NAME STREQUAL "iOS")
         set(PARTOUT_APPLE_OS ios)

@@ -995,7 +995,7 @@ const FakeResolver = struct {
     resolve_error: ?sandbox.DNSResolver.Error = null,
     resolve_address_count: usize = 0,
     last_hostname: ?[]const u8 = null,
-    last_flags: std.EnumSet(sandbox.DNSResolver.Flag) = std.EnumSet(sandbox.DNSResolver.Flag).initEmpty(),
+    last_flags: std.EnumSet(sandbox.DNSResolver.Flag) = std.EnumSet(sandbox.DNSResolver.Flag).empty,
     last_timeout_ms: u32 = 0,
 
     fn resolver(self: *FakeResolver) sandbox.DNSResolver {

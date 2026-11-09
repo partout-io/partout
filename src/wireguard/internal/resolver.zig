@@ -126,7 +126,7 @@ pub const PeerEndpointResolver = struct {
         // so a real A record remains available even if the active DNS64 network
         // would otherwise expose only a synthesized AAAA record. The chosen
         // numeric base is retained until an offline interval forces a reset.
-        var flags = std.EnumSet(net.DNSResolver.Flag).initEmpty();
+        var flags = std.EnumSet(net.DNSResolver.Flag).empty;
         flags.insert(.allAddresses);
         try self.populate(allocator, flags);
     }

@@ -505,7 +505,7 @@ fn buildConfiguration(
 ) WireGuardAdapter.BuildConfigurationError![:0]u8 {
     const resolved_endpoints = try endpoint_resolver.resolve(
         allocator,
-        std.EnumSet(net.DNSResolver.Flag).initEmpty(),
+        std.EnumSet(net.DNSResolver.Flag).empty,
     );
     return switch (scope) {
         .full => uapi.buildConfiguration(allocator, configuration, resolved_endpoints),

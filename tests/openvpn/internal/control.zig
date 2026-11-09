@@ -25,8 +25,8 @@ test "control channel fragments payload and retains opcode" {
     const packets = try channel.writeOutboundPackets(0);
     defer core.util.freeSliceOfStrings(std.testing.allocator, packets);
     try std.testing.expectEqual(@as(usize, 2), packets.len);
-    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[0][0] >> 3);
-    try std.testing.expectEqual(@as(u8, @intFromEnum(PacketCode.controlV1)), packets[1][0] >> 3);
+    try std.testing.expectEqual(@as(u8, @backingInt(PacketCode.controlV1)), packets[0][0] >> 3);
+    try std.testing.expectEqual(@as(u8, @backingInt(PacketCode.controlV1)), packets[1][0] >> 3);
 }
 
 test "control channel reorders and deduplicates inbound packets" {
@@ -146,11 +146,11 @@ test "tls-crypt-v2 carries the wrapped key only on leading WKC packets" {
     defer core.util.freeSliceOfStrings(allocator, packets);
     try std.testing.expectEqual(@as(usize, 3), packets.len);
     try std.testing.expectEqual(
-        @as(u8, @intFromEnum(PacketCode.controlWkcV1)),
+        @as(u8, @backingInt(PacketCode.controlWkcV1)),
         packets[0][0] >> 3,
     );
     try std.testing.expectEqual(
-        @as(u8, @intFromEnum(PacketCode.controlV1)),
+        @as(u8, @backingInt(PacketCode.controlV1)),
         packets[1][0] >> 3,
     );
     try std.testing.expect(std.mem.endsWith(u8, packets[0], &wrapped_bytes));
@@ -227,7 +227,7 @@ fn expectProtectedRoundTrip(
     defer server.destroy();
     try client.reset(true);
     try server.reset(true);
-    const payload = [_]u8{payload_byte} ** 6;
+    const payload = @as([6]u8, @splat(payload_byte));
     try client.enqueueOutboundPackets(
         .controlV1,
         .controlV1,

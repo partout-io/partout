@@ -653,7 +653,13 @@ const ConnectionDaemon = struct {
 
     fn handleStart(self: *ConnectionDaemon) Error!void {
         log.write(.debug, "ConnectionDaemon.handleStart entered");
-        errdefer |err| log.writef(.err, "ConnectionDaemon.handleStart failed: {s}", .{@errorName(err)});
+        self.handleStartImpl() catch |err| {
+            log.writef(.err, "ConnectionDaemon.handleStart failed: {s}", .{@errorName(err)});
+            return err;
+        };
+    }
+
+    fn handleStartImpl(self: *ConnectionDaemon) Error!void {
         if (self.daemon.state != .initial) return error.AlreadyStarted;
         try self.createConnection();
         try self.daemon.beginStart();

@@ -32,9 +32,9 @@ pub const Platform = struct {
     pub const FunctionTable = io_c.pp_tun_ctrl_fnt;
 
     fn validateFunctionTable(fnt: FunctionTable) void {
-        inline for (@typeInfo(FunctionTable).@"struct".fields) |field| {
-            if (@field(fnt, field.name) == null) {
-                @panic("Platform function table has no " ++ field.name ++ " callback");
+        inline for (@typeInfo(FunctionTable).@"struct".field_names) |field_name| {
+            if (@field(fnt, field_name) == null) {
+                @panic("Platform function table has no " ++ field_name ++ " callback");
             }
         }
     }

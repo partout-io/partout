@@ -206,7 +206,7 @@ pub const MockTunnelController = struct {
         module_count: usize,
         has_dns_module: bool = false,
         dns_server_count: usize = 0,
-        dns_server_lens: [4]usize = .{0} ** 4,
+        dns_server_lens: [4]usize = @splat(0),
         dns_servers: [4][64]u8 = undefined,
 
         pub fn dnsServer(self: *const LastTunnelSettings, index: usize) []const u8 {

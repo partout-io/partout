@@ -91,17 +91,17 @@ pub const TLSWrapper = struct {
         errdefer _ = portable_c.remove(ca_path.ptr);
 
         const cert_pem = if (configuration.client_certificate) |value|
-            try allocator.dupeZ(u8, value.pem)
+            try allocator.dupeSentinel(u8, value.pem, 0)
         else
             null;
         defer if (cert_pem) |value| allocator.free(value);
         const key_pem = if (configuration.client_key) |value|
-            try allocator.dupeZ(u8, value.pem)
+            try allocator.dupeSentinel(u8, value.pem, 0)
         else
             null;
         defer if (key_pem) |value| allocator.free(value);
         const hostname = if (configuration.san_host) |value|
-            try allocator.dupeZ(u8, value)
+            try allocator.dupeSentinel(u8, value, 0)
         else
             null;
         defer if (hostname) |value| allocator.free(value);

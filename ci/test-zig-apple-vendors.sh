@@ -45,9 +45,8 @@ global_cache_dir="$repo_root/zig-out/vendor-test-global-cache"
 mkdir -p "$cache_dir" "$global_cache_dir"
 
 cd "$repo_root"
-zig build test \
+ZIG_GLOBAL_CACHE_DIR="$global_cache_dir" zig build test \
     --cache-dir "$cache_dir" \
-    --global-cache-dir "$global_cache_dir" \
     -Dtarget="$target" \
     -Dapple-sdk-path="$sdk" \
     -Dopenvpn=true \

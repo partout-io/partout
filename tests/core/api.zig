@@ -57,7 +57,8 @@ test "crypto function table follows the selected backend" {
         try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
         if (supports_native_crypto_backend) {
             const native = try api.cryptoFunctionTable(.native);
-            try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+            const expected_name = if (builtin.os.tag == .windows) "BCrypt" else "CommonCrypto";
+            try std.testing.expectEqualStrings(expected_name, std.mem.span(native.name));
         }
     }
 }
@@ -82,7 +83,7 @@ test "unavailable crypto backend logs and falls back to default" {
 
     try std.testing.expectEqualStrings(std.mem.span(expected.name), std.mem.span(actual.name));
     try std.testing.expectEqual(
-        @intFromEnum(logging.Level.notice),
+        @backingInt(logging.Level.notice),
         CapturingLogger.level,
     );
     var expected_message_buffer: [128]u8 = undefined;

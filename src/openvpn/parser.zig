@@ -665,7 +665,7 @@ const Builder = struct {
             std.ascii.eqlIgnoreCase(components[3], "net_gateway")) return;
         const mask = if (components.len > 2) components[2] else "255.255.255.255";
         const prefix = ipv4MaskPrefix(mask) orelse return error.MalformedOption;
-        const destination = try std.fmt.allocPrint(allocator, "{s}/{d}", .{ components[1], prefix });
+        const destination = try allocator.print("{s}/{d}", .{ components[1], prefix });
         defer allocator.free(destination);
         var parsed_destination = (try api.Subnet.parseRawAlloc(allocator, destination)) orelse return error.MalformedOption;
         errdefer parsed_destination.deinit(allocator);
@@ -1034,8 +1034,7 @@ fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
     if (std.ascii.eqlIgnoreCase(value, "tcp4-client")) return .tcp4;
     if (std.ascii.eqlIgnoreCase(value, "tcp6-client")) return .tcp6;
 
-    inline for (std.meta.fields(api.IPSocketType)) |field| {
-        const socket_type: api.IPSocketType = @field(api.IPSocketType, field.name);
+    inline for (std.enums.values(api.IPSocketType)) |socket_type| {
         if (std.ascii.eqlIgnoreCase(value, socket_type.raw())) return socket_type;
     }
     return null;
@@ -1151,8 +1150,7 @@ fn ipSettings(
     prefix: u8,
     family: api.Address.Family,
 ) ParseError!api.IPSettings {
-    const raw_subnet = try std.fmt.allocPrint(
-        allocator,
+    const raw_subnet = try allocator.print(
         "{s}/{d}",
         .{ address, prefix },
     );

@@ -30,7 +30,7 @@ test "Windows local address reports wildcard family and assigned UDP port" {
         try std.testing.expectEqual(case.family, address.family);
         try std.testing.expect(address.port != 0);
         try std.testing.expectEqual(@as(u32, 0), address.scope_id);
-        try std.testing.expectEqualSlices(u8, &([_]u8{0} ** 16), &address.address);
+        try std.testing.expectEqualSlices(u8, &(@as([16]u8, @splat(0))), &address.address);
         try std.testing.expectEqualDeep(address, try socket.localAddress());
     }
 }
