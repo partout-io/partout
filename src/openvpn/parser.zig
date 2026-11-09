@@ -1034,8 +1034,7 @@ fn parseIPSocketType(value: []const u8) ?api.IPSocketType {
     if (std.ascii.eqlIgnoreCase(value, "tcp4-client")) return .tcp4;
     if (std.ascii.eqlIgnoreCase(value, "tcp6-client")) return .tcp6;
 
-    inline for (@typeInfo(api.IPSocketType).@"enum".field_names) |field_name| {
-        const socket_type: api.IPSocketType = @field(api.IPSocketType, field_name);
+    inline for (std.enums.values(api.IPSocketType)) |socket_type| {
         if (std.ascii.eqlIgnoreCase(value, socket_type.raw())) return socket_type;
     }
     return null;

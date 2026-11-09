@@ -41,8 +41,7 @@ pub const DaemonOptions = struct {
         const c_profile = args.profile orelse return error.InvalidArgs;
         var feature_flags = std.EnumSet(api.DaemonFeatureFlag).empty;
         var remaining_flags = args.options.feature_flags;
-        inline for (@typeInfo(api.DaemonFeatureFlag).@"enum".field_names) |name| {
-            const flag = @field(api.DaemonFeatureFlag, name);
+        inline for (std.enums.values(api.DaemonFeatureFlag)) |flag| {
             const mask: u64 = @intCast(@backingInt(flag));
             if (remaining_flags & mask != 0) feature_flags.insert(flag);
             remaining_flags &= ~mask;

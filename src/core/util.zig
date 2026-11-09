@@ -372,8 +372,7 @@ pub fn platformVersionAlloc(allocator: std.mem.Allocator) ![]u8 {
 /// Parses an enum by comparing `value` case-insensitively with each field's
 /// string returned by `raw()`.
 pub fn parseRawIgnoreCase(comptime T: type, value: []const u8) ?T {
-    inline for (@typeInfo(T).@"enum".field_names) |field_name| {
-        const candidate: T = @field(T, field_name);
+    inline for (std.enums.values(T)) |candidate| {
         if (std.ascii.eqlIgnoreCase(value, candidate.raw())) return candidate;
     }
     return null;
