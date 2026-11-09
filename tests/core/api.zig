@@ -57,7 +57,8 @@ test "crypto function table follows the selected backend" {
         try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
         if (supports_native_crypto_backend) {
             const native = try api.cryptoFunctionTable(.native);
-            try std.testing.expect(std.mem.startsWith(u8, std.mem.span(native.name), "native-"));
+            const expected_name = if (builtin.os.tag == .windows) "BCrypt" else "CommonCrypto";
+            try std.testing.expectEqualStrings(expected_name, std.mem.span(native.name));
         }
     }
 }

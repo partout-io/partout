@@ -295,7 +295,7 @@ fn parseLibCInstallation(
         b.graph.io,
         libc_file,
         &target.result,
-    ) catch |err| std.debug.panic("unable to parse --libc file '{s}': {s}", .{
+    ) catch |err| std.debug.panic("unable to parse -Dlibc-file '{s}': {s}", .{
         libc_file,
         @errorName(err),
     });
@@ -470,6 +470,12 @@ fn configureCTranslation(
     config: BuildConfig,
 ) void {
     configureCHeadersAndMacros(translate_c, b, config);
+    if (config.target.result.abi.isAndroid()) {
+        // C translation must expose the selected API level to NDK headers.
+        const api_level = b.fmt("{d}", .{config.target.result.os.version_range.linux.android});
+        translate_c.defineCMacro("__ANDROID_API__", api_level);
+        translate_c.defineCMacro("__ANDROID_MIN_SDK_VERSION__", api_level);
+    }
 }
 
 fn configurePartoutModule(
