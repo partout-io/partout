@@ -104,10 +104,11 @@ extension PartoutLogger {
         queue.sync {
             NSLog("Partout: Set global logger")
             if let pastLocalLogger = globalLogger.localLogger, pastLocalLogger !== logger.localLogger {
-                if preservingLog {
-                    logger.localLogger?.restart(from: pastLocalLogger)
+                if preservingLog, let localLogger = logger.localLogger {
+                    localLogger.restart(from: pastLocalLogger)
+                } else {
+                    pastLocalLogger.stop()
                 }
-                pastLocalLogger.stop()
             }
             globalLogger = logger
         }

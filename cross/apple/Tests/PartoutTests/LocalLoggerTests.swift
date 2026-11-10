@@ -7,6 +7,24 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenBufferedLogger_whenRestarting_thenTransfersBufferAndStopsPreviousLogger() {
+        let options = LocalLogger.Options(maxLevel: .debug, maxSize: 10000, maxBufferedLines: 100)
+        let url = URL(fileURLWithPath: "unused")
+        let previous = LocalLogger(strategy: MockStrategy(), url: url, options: options, mapper: \.message)
+        let replacement = LocalLogger(strategy: MockStrategy(), url: url, options: options, mapper: \.message)
+        previous.append(.info, message: "before replacement")
+
+        replacement.restart(from: previous)
+        previous.append(.info, message: "stale writer")
+        replacement.append(.info, message: "after replacement")
+
+        #expect(previous.currentLog(sinceLast: 60, maxLevel: .debug).isEmpty)
+        #expect(replacement.currentLog(sinceLast: 60, maxLevel: .debug) == [
+            "before replacement", "after replacement"
+        ])
+    }
+
+    @Test
     func givenSensitiveLogs_whenReset_thenClearsBufferAndCurrentFile() throws {
         let fm = FileManager.default
         let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)

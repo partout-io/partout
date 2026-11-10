@@ -76,7 +76,7 @@ public final class LocalLogger: @unchecked Sendable {
     }
 
     func restart(from logger: LocalLogger) {
-        let previousLines = logger.queue.sync { logger.lines }
+        let previousLines = logger.stop()
         queue.sync {
             lines = previousLines
         }
@@ -89,10 +89,12 @@ public final class LocalLogger: @unchecked Sendable {
         }
     }
 
-    func stop() {
+    @discardableResult
+    func stop() -> [DebugLog.Line] {
         queue.sync {
             isStopped = true
-            lines.removeAll()
+            defer { lines.removeAll() }
+            return lines
         }
     }
 
