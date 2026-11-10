@@ -7,6 +7,37 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenLogFiles_whenPurgingExpiredLogs_thenPreservesRecentAndCurrentLogs() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: directory) }
+
+        let currentURL = directory.appendingPathComponent("app.txt")
+        let expiredURL = currentURL.appendingPathExtension("expired")
+        let recentURL = currentURL.appendingPathExtension("recent")
+        let maxAge: TimeInterval = 86400
+        let files = [
+            (currentURL, -3 * maxAge),
+            (expiredURL, -2 * maxAge),
+            (recentURL, -maxAge / 2)
+        ]
+        for (url, age) in files {
+            try "log\n".write(to: url, atomically: true, encoding: .utf8)
+            try fm.setAttributes(
+                [.modificationDate: Date(timeIntervalSinceNow: age)],
+                ofItemAtPath: url.path
+            )
+        }
+
+        LocalLogger.FileStrategy().purgeLogs(at: currentURL, beyond: maxAge, includingCurrent: false)
+
+        #expect(!fm.fileExists(atPath: expiredURL.path))
+        #expect(fm.fileExists(atPath: recentURL.path))
+        #expect(fm.fileExists(atPath: currentURL.path))
+    }
+
+    @Test
     func givenLogger_whenCurrentLogFits_thenDoesNotRotate() {
         let strategy = MockStrategy()
         let sut = newLogger(strategy: strategy)

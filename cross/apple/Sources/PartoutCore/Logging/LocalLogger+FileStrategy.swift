@@ -55,12 +55,12 @@ extension LocalLogger {
 
         public func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
             let logs = availableLogs(at: url)
-            // Filter max age if provided, else purge everything (no date is >= .max)
+            // Filter max age if provided, else purge everything.
             let minDate = maxAge.map {
-                Date(timeIntervalSince1970: -$0)
+                Date(timeIntervalSinceNow: -$0)
             }
             logs.forEach { date, logURL in
-                guard includingCurrent || logURL != url else { // Skip current log
+                guard includingCurrent || logURL.standardizedFileURL != url.standardizedFileURL else { // Skip current log
                     return
                 }
                 if minDate == nil || date < minDate! {
