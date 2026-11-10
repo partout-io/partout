@@ -6,7 +6,6 @@ on:
     paths-ignore:
       - "README.md"
       - "**/*.md"
-      - "scripts/*.sh"
       - "scripts/*.ps1"
 
 concurrency:
@@ -43,6 +42,9 @@ jobs:
       - name: Set up Zig
         uses: partout-io/setup-zig@main
         if: matrix.suite == 'zig'
+      - name: Check generated model parity and determinism
+        if: matrix.suite == 'zig'
+        run: python3 tests/codegen/test_codegen.py
       - name: Run Zig tests
         if: matrix.suite == 'zig'
         run: ci/run-tests.sh

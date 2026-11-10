@@ -1,0 +1,27 @@
+
+    /**
+     * Override [toString()] to avoid using the enum variable name as the value, and instead use
+     * the actual value defined in the API spec file.
+     *
+     * This solves a problem when the variable name and its value are different, and ensures that
+     * the client sends the correct enum values to the server always.
+     */
+    override fun toString(): kotlin.String = @VALUE@
+
+    companion object {
+        /**
+         * Converts the provided [data] to a [String] on success, null otherwise.
+         */
+        fun encode(data: kotlin.Any?): kotlin.String? = if (data is @NAME@) "$data" else null
+
+        /**
+         * Returns a valid [@NAME@] for [data], null otherwise.
+         */
+        fun decode(data: kotlin.Any?): @NAME@? = data?.let {
+          val normalizedData = "$it".lowercase()
+          entries.firstOrNull { value ->
+            it == value || normalizedData == "$value".lowercase()
+          }
+        }
+    }
+}
