@@ -7,6 +7,38 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenSensitiveLogs_whenReset_thenClearsBufferAndCurrentFile() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("app.txt")
+        let archive = url.appendingPathExtension("archive")
+        try "archived".write(to: archive, atomically: true, encoding: .utf8)
+        let sut = LocalLogger(
+            url: url,
+            options: .init(maxLevel: .debug, maxSize: 10000, maxBufferedLines: 100),
+            mapper: \.message
+        )
+        sut.append(.info, message: "persisted secret")
+        sut.save()
+        sut.append(.info, message: "buffered secret")
+
+        try sut.reset()
+
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .debug).isEmpty)
+        #expect(try String(contentsOf: url, encoding: .utf8).isEmpty)
+        #expect(try String(contentsOf: archive, encoding: .utf8) == "archived")
+        sut.append(.info, message: "redacted")
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "redacted\n")
+        sut.stop()
+        sut.append(.info, message: "late secret")
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "redacted\n")
+    }
+
+    @Test
     func givenLogFiles_whenPurgingExpiredLogs_thenPreservesRecentAndCurrentLogs() throws {
         let fm = FileManager.default
         let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
@@ -130,6 +162,10 @@ private final class MockStrategy: LocalLogger.Strategy {
 
     func availableLogs(at url: URL) -> [Date: URL] {
         [:]
+    }
+
+    func reset(at url: URL) throws {
+        currentSize = 0
     }
 
     func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {

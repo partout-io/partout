@@ -31,6 +31,11 @@ extension LocalLogger {
             try write(lines: lines, to: url)
         }
 
+        public func reset(at url: URL) throws {
+            guard FileManager.default.fileExists(atPath: url.filePath()) else { return }
+            try "".write(to: url, atomically: true, encoding: .utf8)
+        }
+
         public func availableLogs(at url: URL) -> [Date: URL] {
             let parent = url.deletingLastPathComponent()
             let prefix = url.lastPathComponent

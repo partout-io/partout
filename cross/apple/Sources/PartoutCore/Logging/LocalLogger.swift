@@ -13,6 +13,8 @@ public final class LocalLogger: @unchecked Sendable {
 
         func append(lines: [String], to url: URL) throws
 
+        func reset(at url: URL) throws
+
         func availableLogs(at url: URL) -> [Date: URL]
 
         func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool)
@@ -53,6 +55,8 @@ public final class LocalLogger: @unchecked Sendable {
 
     private var lines: [DebugLog.Line]
 
+    private var isStopped = false
+
     init(
         strategy: Strategy = FileStrategy(),
         url: URL,
@@ -72,13 +76,29 @@ public final class LocalLogger: @unchecked Sendable {
     }
 
     func restart(from logger: LocalLogger) {
+        let previousLines = logger.queue.sync { logger.lines }
         queue.sync {
-            lines = logger.lines
+            lines = previousLines
+        }
+    }
+
+    func reset() throws {
+        try queue.sync {
+            lines.removeAll()
+            try strategy.reset(at: currentURL)
+        }
+    }
+
+    func stop() {
+        queue.sync {
+            isStopped = true
+            lines.removeAll()
         }
     }
 
     func append(_ level: DebugLog.Level, message: String) {
         queue.sync {
+            guard !isStopped else { return }
             lines.append(DebugLog.Line(
                 timestamp: Date(),
                 level: level,
