@@ -1,17 +1,23 @@
 .DS_Store
 *.swp
+/prebuilts/
+
+# Xcode/Swift
 *.pbxuser
 **/*.xcodeproj/project.xcworkspace
 **/xcuserdata
 **/.swiftpm/xcode
 Package.resolved
+PartoutNative.xcframework
 .build
-/prebuilts/
+
+# CMake
 .cmake*
 bin
-cross-models
-PartoutNative.xcframework
 
 # Zig
 /.zig-cache/
 /zig-out/
+
+# Python
+__pycache__
