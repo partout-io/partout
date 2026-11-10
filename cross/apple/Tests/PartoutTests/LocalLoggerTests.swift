@@ -7,6 +7,87 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenBufferedLogger_whenRestarting_thenTransfersBufferAndStopsPreviousLogger() {
+        let options = LocalLogger.Options(maxLevel: .debug, maxSize: 10000, maxBufferedLines: 100)
+        let url = URL(fileURLWithPath: "unused")
+        let previous = LocalLogger(strategy: MockStrategy(), url: url, options: options, mapper: \.message)
+        let replacement = LocalLogger(strategy: MockStrategy(), url: url, options: options, mapper: \.message)
+        previous.append(.info, message: "before replacement")
+
+        replacement.restart(from: previous)
+        previous.append(.info, message: "stale writer")
+        replacement.append(.info, message: "after replacement")
+
+        #expect(previous.currentLog(sinceLast: 60, maxLevel: .debug).isEmpty)
+        #expect(replacement.currentLog(sinceLast: 60, maxLevel: .debug) == [
+            "before replacement", "after replacement"
+        ])
+    }
+
+    @Test
+    func givenSensitiveLogs_whenReset_thenClearsBufferAndCurrentFile() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("app.txt")
+        let archive = url.appendingPathExtension("archive")
+        try "archived".write(to: archive, atomically: true, encoding: .utf8)
+        let sut = LocalLogger(
+            url: url,
+            options: .init(maxLevel: .debug, maxSize: 10000, maxBufferedLines: 100),
+            mapper: \.message
+        )
+        sut.append(.info, message: "persisted secret")
+        sut.save()
+        sut.append(.info, message: "buffered secret")
+
+        try sut.reset()
+
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .debug).isEmpty)
+        #expect(try String(contentsOf: url, encoding: .utf8).isEmpty)
+        #expect(try String(contentsOf: archive, encoding: .utf8) == "archived")
+        sut.append(.info, message: "redacted")
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "redacted\n")
+        sut.stop()
+        sut.append(.info, message: "late secret")
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "redacted\n")
+    }
+
+    @Test
+    func givenLogFiles_whenPurgingExpiredLogs_thenPreservesRecentAndCurrentLogs() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: directory) }
+
+        let currentURL = directory.appendingPathComponent("app.txt")
+        let expiredURL = currentURL.appendingPathExtension("expired")
+        let recentURL = currentURL.appendingPathExtension("recent")
+        let maxAge: TimeInterval = 86400
+        let files = [
+            (currentURL, -3 * maxAge),
+            (expiredURL, -2 * maxAge),
+            (recentURL, -maxAge / 2)
+        ]
+        for (url, age) in files {
+            try "log\n".write(to: url, atomically: true, encoding: .utf8)
+            try fm.setAttributes(
+                [.modificationDate: Date(timeIntervalSinceNow: age)],
+                ofItemAtPath: url.path
+            )
+        }
+
+        LocalLogger.FileStrategy().purgeLogs(at: currentURL, beyond: maxAge, includingCurrent: false)
+
+        #expect(!fm.fileExists(atPath: expiredURL.path))
+        #expect(fm.fileExists(atPath: recentURL.path))
+        #expect(fm.fileExists(atPath: currentURL.path))
+    }
+
+    @Test
     func givenLogger_whenCurrentLogFits_thenDoesNotRotate() {
         let strategy = MockStrategy()
         let sut = newLogger(strategy: strategy)
@@ -99,6 +180,10 @@ private final class MockStrategy: LocalLogger.Strategy {
 
     func availableLogs(at url: URL) -> [Date: URL] {
         [:]
+    }
+
+    func reset(at url: URL) throws {
+        currentSize = 0
     }
 
     func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {

@@ -53,10 +53,12 @@ extension TunnelStrategy {
 
 extension TunnelStrategy {
     public func sendMessage(_ input: Message.Input, to profileId: Profile.ID) async throws -> Message.Output? {
+        try Task.checkCancellation()
         let encoded = try JSONEncoder.shared().encode(input)
         guard let output = try await sendMessage(encoded, to: profileId) else {
             return nil
         }
+        try Task.checkCancellation()
         return try JSONDecoder.shared().decode(Message.Output.self, from: output)
     }
 }

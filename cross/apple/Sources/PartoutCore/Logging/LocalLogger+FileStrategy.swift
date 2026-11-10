@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension LocalLogger {
-    public final class FileStrategy: LocalLogger.Strategy {
+    public final class FileStrategy: LocalLogger.Strategy, Sendable {
         public init() {
         }
 
@@ -31,6 +31,11 @@ extension LocalLogger {
             try write(lines: lines, to: url)
         }
 
+        public func reset(at url: URL) throws {
+            guard FileManager.default.fileExists(atPath: url.filePath()) else { return }
+            try "".write(to: url, atomically: true, encoding: .utf8)
+        }
+
         public func availableLogs(at url: URL) -> [Date: URL] {
             let parent = url.deletingLastPathComponent()
             let prefix = url.lastPathComponent
@@ -55,12 +60,12 @@ extension LocalLogger {
 
         public func purgeLogs(at url: URL, beyond maxAge: TimeInterval?, includingCurrent: Bool) {
             let logs = availableLogs(at: url)
-            // Filter max age if provided, else purge everything (no date is >= .max)
+            // Filter max age if provided, else purge everything.
             let minDate = maxAge.map {
-                Date(timeIntervalSince1970: -$0)
+                Date(timeIntervalSinceNow: -$0)
             }
             logs.forEach { date, logURL in
-                guard includingCurrent || logURL != url else { // Skip current log
+                guard includingCurrent || logURL.standardizedFileURL != url.standardizedFileURL else { // Skip current log
                     return
                 }
                 if minDate == nil || date < minDate! {

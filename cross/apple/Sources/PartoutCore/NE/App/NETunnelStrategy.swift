@@ -129,6 +129,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
         guard let session = session.value else {
             return nil
         }
+        try Task.checkCancellation()
         return try await withCheckedThrowingContinuation { continuation in
             do {
                 try session.sendProviderMessage(message) { response in

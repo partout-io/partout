@@ -100,11 +100,15 @@ extension PartoutLogger {
 
 extension PartoutLogger {
     /// Registers a new ``PartoutLogger`` globally.
-    public static func register(_ logger: PartoutLogger) {
+    public static func register(_ logger: PartoutLogger, preservingLog: Bool = true) {
         queue.sync {
             NSLog("Partout: Set global logger")
-            if let pastLocalLogger = globalLogger.localLogger {
-                logger.localLogger?.restart(from: pastLocalLogger)
+            if let pastLocalLogger = globalLogger.localLogger, pastLocalLogger !== logger.localLogger {
+                if preservingLog, let localLogger = logger.localLogger {
+                    localLogger.restart(from: pastLocalLogger)
+                } else {
+                    pastLocalLogger.stop()
+                }
             }
             globalLogger = logger
         }
@@ -136,6 +140,10 @@ extension PartoutLogger {
 
     public func flushLog() {
         localLogger?.save()
+    }
+
+    public func resetLog() throws {
+        try localLogger?.reset()
     }
 }
 
