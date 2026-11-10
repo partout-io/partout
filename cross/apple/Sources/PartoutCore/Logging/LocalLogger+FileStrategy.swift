@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 extension LocalLogger {
-    public final class FileStrategy: LocalLogger.Strategy {
+    public final class FileStrategy: LocalLogger.Strategy, Sendable {
         public init() {
         }
 
