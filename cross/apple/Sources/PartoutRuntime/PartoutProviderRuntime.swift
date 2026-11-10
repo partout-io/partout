@@ -145,7 +145,7 @@ public final class PartoutProviderRuntime: Sendable {
             case .environment:
                 break
             default:
-                pp_log(ctx, .runtime, .info, "Message handled and response encoded (\(encodedOutput.asSensitiveBytes(ctx)))")
+                pp_log(ctx, .runtime, .info, "Message handled and response encoded (\(encodedOutput.count) bytes)")
             }
             return encodedOutput
         } catch {
