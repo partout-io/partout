@@ -4,6 +4,7 @@
 
 const std = @import("std");
 const native = @import("openapi_native.zig");
+const native_schema = @import("openapi_schema.zig");
 
 const ParseError = error{
     ExpectedComponents,
@@ -38,6 +39,8 @@ pub const Property = struct {
     description: []const u8 = "",
     format: ?[]const u8 = null,
     constant: ?[]const u8 = null,
+    default_value: ?[]const u8 = null,
+    nullable: bool = false,
     unique: bool = false,
     map_value: ?TypeSpec = null,
 };
@@ -48,6 +51,7 @@ pub const Variant = struct {
 };
 
 pub const Schema = struct {
+    inline_model: bool = false,
     name: []const u8,
     description: []const u8 = "",
     parent: ?[]const u8 = null,
@@ -118,12 +122,17 @@ pub fn main(init: std.process.Init) !void {
 
     var language: native.Language = .zig;
     var package: ?[]const u8 = null;
+    var options = native.Options{};
     var exclusions = SchemaExclusions{};
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--language")) {
             language = std.meta.stringToEnum(native.Language, args.next() orelse return error.MissingLanguage) orelse return error.InvalidLanguage;
         } else if (std.mem.eql(u8, arg, "--package")) {
             package = args.next() orelse return error.MissingPackage;
+        } else if (std.mem.eql(u8, arg, "--external")) {
+            options.external = args.next() orelse return error.MissingExternal;
+        } else if (std.mem.eql(u8, arg, "--swift-prefix")) {
+            options.swift_prefix = args.next() orelse return error.MissingPrefix;
         } else if (std.mem.eql(u8, arg, "--exclude")) {
             exclusions = try parseSchemaExclusions(allocator, args.next() orelse {
                 try usage();
@@ -141,11 +150,10 @@ pub fn main(init: std.process.Init) !void {
     const input = try readFileAlloc(cwd, init.io, allocator, input_path);
     defer allocator.free(input);
 
-    if (language != .zig) try native.validateInput(input);
-    const doc = try parseDocument(allocator, input);
+    const doc = if (language == .zig) try parseDocument(allocator, input) else try native_schema.parse(allocator, input);
     if (language != .zig) {
         if (exclusions.names.len != 0) return error.NativeExclusionsUnsupported;
-        try native.generate(allocator, init.io, doc, language, output_path, package);
+        try native.generate(allocator, init.io, doc, language, output_path, package, options);
         return;
     }
     const generated = try renderDocument(allocator, doc, exclusions);
@@ -174,6 +182,7 @@ fn usage() WriterError!void {
     try stderr.file_writer.interface.writeAll(
         \\usage: zig run tools/openapi_codegen.zig -- <openapi.yaml> <output> [--exclude SchemaA,SchemaB]
         \\       [--language zig|swift|kotlin|cpp] [--package package.name]
+        \\       [--external SchemaA,SchemaB] [--swift-prefix Prefix]
         \\
     );
 }

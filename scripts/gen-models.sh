@@ -1,8 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ $# -lt 4 || $# -gt 5 ]]; then
-    echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports]" >&2
+if [[ $# -lt 4 || $# -gt 6 ]]; then
+    echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports] [swift_prefix]" >&2
     exit 1
 fi
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
@@ -12,11 +12,7 @@ destination=$3
 package=$4
 extra_imports=${5:-}
 
-# PARITY: the parent app's external/inline schema still needs the legacy backend.
-# Remove this explicit route only after that schema has its own parity coverage.
-if [[ -n "$extra_imports" ]]; then
-    exec "$script_dir/gen-models-legacy.sh" "$@"
-fi
+swift_prefix=${6:-}
 case "$language" in
     swift) ;;
     kotlin)
@@ -42,7 +38,8 @@ cleanup() {
 }
 trap cleanup EXIT
 zig run "$script_dir/../tools/openapi_codegen.zig" -- \
-    "$input" "$staging/models" --language "$language" --package "$package"
+    "$input" "$staging/models" --language "$language" --package "$package" \
+    --external "$extra_imports" --swift-prefix "$swift_prefix"
 if [[ -e "$destination" ]]; then
     mv "$destination" "$staging/previous"
 fi

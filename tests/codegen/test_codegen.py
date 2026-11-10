@@ -26,6 +26,7 @@ def run(*args, **kwargs):
 
 
 def main():
+    run('zig', 'test', str(ROOT / 'tools/openapi_schema.zig'), cwd=ROOT)
     golden = json.loads(Path(__file__).with_name('golden.json').read_text())
     schema = (ROOT / 'scripts/openapi.yaml').read_text()
     with tempfile.TemporaryDirectory(prefix='partout-codegen-test-') as tmp:
