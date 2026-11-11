@@ -64,6 +64,7 @@ public final class PartoutProviderRuntime: Sendable {
         )
         pp_log(ctx, .runtime, .info, "Initialize Partout library")
         partout_init(&init_args)
+        partout_set_log_level(Int32(ctx.logger.maxLevel.rawValue))
 
         let profileJSON = try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
         let loggedProfileJSON = profileJSON.debugDescription(withSensitiveData: logsPrivateData)

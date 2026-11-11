@@ -68,17 +68,17 @@ const ProfileLogger = struct {
             message,
             "\tID: 00000000-0000-0000-0000-000000000000",
         );
-        saw_name = saw_name or std.mem.eql(u8, message, "\tName: Test profile");
+        saw_name = saw_name or std.mem.eql(u8, message, "\tName: <redacted>");
         saw_header = saw_header or std.mem.eql(u8, message, "\tModules:");
         saw_inactive_wireguard = saw_inactive_wireguard or std.mem.eql(
             u8,
             message,
-            "\t\t- WireGuardModule: <redacted>",
+            "\t\t- WireGuardModule: WireGuardModule(id=11111111-1111-4111-8111-111111111111)",
         );
         saw_active_on_demand = saw_active_on_demand or std.mem.eql(
             u8,
             message,
-            "\t\t+ OnDemandModule: <redacted>",
+            "\t\t+ OnDemandModule: OnDemandModule(id=22222222-2222-4222-8222-222222222222)",
         );
     }
 };
@@ -399,24 +399,25 @@ test "writef recognizes generated sensitive models without generated methods" {
     };
     logging.writef(.notice, "Credentials: {s}", .{credentials});
     try std.testing.expectEqualStrings(
-        "Credentials: <redacted>",
+        "Credentials: OpenVPNCredentials",
         CapturingLogger.lastMessage(),
     );
 
     logging.init(true, CapturingLogger.log, null);
     logging.writef(.notice, "Credentials: {s}", .{credentials});
-    try std.testing.expect(std.mem.indexOf(
-        u8,
-        CapturingLogger.lastMessage(),
-        "\"password\":\"secret\"",
-    ) != null);
+    try std.testing.expectEqualStrings("Credentials: OpenVPNCredentials", CapturingLogger.lastMessage());
+    logging.writef(.debug, "Details: {s}", .{logging.details(credentials)});
+    try std.testing.expect(std.mem.indexOf(u8, CapturingLogger.lastMessage(), "secret") != null);
+    logging.init(false, CapturingLogger.log, null);
+    logging.writef(.debug, "Details: {s}", .{logging.details(credentials)});
+    try std.testing.expectEqualStrings("Details: <redacted>", CapturingLogger.lastMessage());
 
     const module = api.TaggedModule{ .DNS = .{} };
     logging.writef(.notice, "Module: {s}", .{module});
     try std.testing.expect(std.mem.startsWith(
         u8,
         CapturingLogger.lastMessage(),
-        "Module: {\"type\":\"DNS\"",
+        "Module: DNSModule(id=",
     ));
 }
 
@@ -452,4 +453,23 @@ test "connection context does not leak into another thread" {
     worker.join();
     try std.testing.expect(isolated);
     try std.testing.expectEqualStrings("11111111-1111-1111-1111-111111111111", &logging.currentContext().profile_id.?);
+}
+
+test "rejected severity does not invoke a formatter or callback" {
+    const Value = struct {
+        pub fn logging_formatter(_: std.mem.Allocator, _: @This()) ![]const u8 {
+            @panic("rejected formatter was evaluated");
+        }
+    };
+    logging.init(true, CapturingLogger.log, null);
+    defer logging.deinit();
+    logging.setMaxLevel(.info);
+    logging.write(.info, "retained");
+    logging.writef(.debug, "{s}", .{Value{}});
+    logging.write(.debug, "ignored");
+    logging.writeCString(.debug, "ignored");
+    try std.testing.expectEqualStrings("retained", CapturingLogger.lastMessage());
+    logging.setMaxLevel(.debug);
+    logging.write(.debug, "enabled");
+    try std.testing.expectEqualStrings("enabled", CapturingLogger.lastMessage());
 }

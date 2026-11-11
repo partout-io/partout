@@ -7,6 +7,22 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenInfoThreshold_whenLoggingDebug_thenDoesNotEvaluateMessage() {
+        var builder = PartoutLogger.Builder()
+        builder.maxLevel = .info
+        let logger = builder.build()
+        var evaluations = 0
+        func message() -> String {
+            evaluations += 1
+            return "message"
+        }
+        logger.log(.global, .core, .debug, message())
+        #expect(evaluations == 0)
+        logger.log(.global, .core, .info, message())
+        #expect(evaluations == 1)
+    }
+
+    @Test
     func givenBoundedHistory_whenBufferFlushes_thenKeepsNewestEntries() {
         let sut = LocalLogger(strategy: MockStrategy(), url: URL(fileURLWithPath: "unused"),
                               options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 2), mapper: \.message)
