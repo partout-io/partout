@@ -60,6 +60,7 @@ pub const ConnectionWorker = struct {
     else
         core.actor.Actor(Self, null, Work, error{}, execute);
 
+    log_context: log.Context,
     allocator: std.mem.Allocator,
     resolver: sandbox.DNSResolver,
     factory: sandbox.SocketFactory,
@@ -78,6 +79,7 @@ pub const ConnectionWorker = struct {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
+            .log_context = log.currentContext(),
             .allocator = allocator,
             .resolver = resolver,
             .factory = factory,
@@ -131,6 +133,8 @@ pub const ConnectionWorker = struct {
     }
 
     fn execute(self: *Self, comptime Result: type, work: Work) error{}!Result {
+        const log_scope = self.log_context.enter();
+        defer log_scope.leave();
         const remote = if (self.closed.load(.acquire)) error.Closed else self.prepareLink(work.request);
         self.callback.call(self.callback.context, work.completion_context, .{
             .request_id = work.request.request_id,

@@ -19,6 +19,33 @@ pub const Level = enum(c_int) {
     debug = 4,
 };
 
+/// Immutable identity copied across asynchronous execution boundaries.
+/// A scope is thread-local and must be restored before returning to a caller.
+pub const Context = struct {
+    profile_id: ?api.UUID = null,
+    module_id: ?api.UUID = null,
+
+    pub fn enter(self: Context) Scope {
+        const previous = current_context;
+        current_context = self;
+        return .{ .previous = previous };
+    }
+};
+
+pub const Scope = struct {
+    previous: Context,
+
+    pub fn leave(self: Scope) void {
+        current_context = self.previous;
+    }
+};
+
+threadlocal var current_context: Context = .{};
+
+pub fn currentContext() Context {
+    return current_context;
+}
+
 const Logger = *const fn (
     ctx: ?*anyopaque,
     level: c_int,
@@ -215,7 +242,18 @@ fn dispatchCString(
     level: c_int,
     message: [*:0]const u8,
 ) void {
-    logger(logger_ctx, level, message);
+    const context = current_context;
+    const profile_id = context.profile_id orelse {
+        logger(logger_ctx, level, message);
+        return;
+    };
+    const allocator = std.heap.c_allocator;
+    const contextual = if (context.module_id) |module_id|
+        allocator.printSentinel("[profile={s} module={s}] {s}", .{ profile_id, module_id, message }, 0) catch return
+    else
+        allocator.printSentinel("[profile={s}] {s}", .{ profile_id, message }, 0) catch return;
+    defer allocator.free(contextual);
+    logger(logger_ctx, level, contextual.ptr);
 }
 
 fn writeProfileModule(
