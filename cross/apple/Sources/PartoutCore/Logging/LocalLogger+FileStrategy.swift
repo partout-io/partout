@@ -8,6 +8,7 @@ extension LocalLogger {
         }
 
         public func size(of url: URL) -> UInt64 {
+            guard FileManager.default.fileExists(atPath: url.filePath()) else { return 0 }
             do {
                 let attrs = try FileManager.default.attributesOfItem(atPath: url.filePath())
                 return attrs[.size] as? UInt64 ?? 0
@@ -18,10 +19,12 @@ extension LocalLogger {
         }
 
         public func rotate(url: URL, withLines oldLines: [String]?) throws {
-            let suffix = Int(Date().timeIntervalSince1970).description
+            let suffix = "\(Int(Date().timeIntervalSince1970)).\(UUID().uuidString)"
             let rotatedURL = url.appendingPathExtension(suffix)
 
-            try? FileManager.default.moveItem(at: url, to: rotatedURL)
+            if FileManager.default.fileExists(atPath: url.filePath()) {
+                try FileManager.default.moveItem(at: url, to: rotatedURL)
+            }
             if let oldLines {
                 try write(lines: oldLines, to: rotatedURL)
             }
@@ -78,17 +81,14 @@ extension LocalLogger {
 
 private extension LocalLogger.FileStrategy {
     func write(lines: [String], to url: URL) throws {
-        do {
-            let mf = FileManager.default
-            let textToAppend = (lines + [""]).joined(separator: "\n")
-            let path = url.filePath()
-            guard mf.fileExists(atPath: path) else {
-                try textToAppend.write(toFile: path, encoding: .utf8)
-                return
-            }
-            try textToAppend.append(toFile: path, encoding: .utf8)
-        } catch {
-            NSLog("LocalLogger: Unable to save log to disk: \(error)")
+        guard !lines.isEmpty else { return }
+        let fm = FileManager.default
+        let textToAppend = (lines + [""]).joined(separator: "\n")
+        let path = url.filePath()
+        guard fm.fileExists(atPath: path) else {
+            try textToAppend.write(toFile: path, encoding: .utf8)
+            return
         }
+        try textToAppend.append(toFile: path, encoding: .utf8)
     }
 }

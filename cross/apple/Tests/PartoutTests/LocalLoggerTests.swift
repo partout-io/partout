@@ -7,6 +7,21 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenMissingDirectory_whenSaveFails_thenRetriesPendingEntries() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("log.txt")
+        let sut = LocalLogger(url: url, options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 10), mapper: \.message)
+        sut.append(.info, message: "retained")
+        sut.save()
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "retained\n")
+    }
+
+
+    @Test
     func givenInfoLogger_whenDebugArrives_thenDoesNotBufferOrRotate() {
         let strategy = MockStrategy()
         let sut = LocalLogger(strategy: strategy, url: URL(fileURLWithPath: "unused"),
