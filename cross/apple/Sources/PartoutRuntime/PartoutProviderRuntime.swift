@@ -141,12 +141,6 @@ public final class PartoutProviderRuntime: Sendable {
                 return nil
             }
             let encodedOutput = try JSONEncoder.shared().encode(output)
-            switch input {
-            case .environment:
-                break
-            default:
-                pp_log(ctx, .runtime, .info, "Message handled and response encoded (\(encodedOutput.count) bytes)")
-            }
             return encodedOutput
         } catch {
             pp_log(ctx, .runtime, .error, "Unable to handle runtime message: \(error)")

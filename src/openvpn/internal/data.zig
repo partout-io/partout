@@ -526,12 +526,12 @@ fn loggingDataPathErrorFromNative(native: openvpn_c.openvpn_dp_error) DataPath.P
         openvpn_c.OpenVPNDataPathErrorPeerIdMismatch => error.PeerIdMismatch,
         openvpn_c.OpenVPNDataPathErrorCompression => error.CompressionMismatch,
         openvpn_c.OpenVPNDataPathErrorCrypto => {
-            log.writef(.fault, "Unable to process packet (crypto): {d}", .{native.crypto_code});
+            log.writef(.err, "Unable to process packet (crypto): {d}", .{native.crypto_code});
             return ffi.errorForCryptoErrorCode(native.crypto_code);
         },
         openvpn_c.OpenVPNDataPathErrorNone => error.DataPathFailure,
         else => {
-            log.writef(.fault, "Unable to process packet (data path): {d}", .{native.dp_code});
+            log.writef(.err, "Unable to process packet (data path): {d}", .{native.dp_code});
             return error.DataPathFailure;
         },
     };

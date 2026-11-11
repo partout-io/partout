@@ -130,7 +130,7 @@ const PlainSerializer = struct {
         const code = PacketCode.fromRaw(data[offset] >> 3) orelse return error.UnknownCode;
         const key = data[offset] & 0b111;
         offset += openvpn_c.OpenVPNPacketOpcodeLength;
-        log.writef(.info, "Control: Try read packet with code {s} and key {d}", .{
+        log.writef(.debug, "Control: Try read packet with code {s} and key {d}", .{
             @tagName(code),
             key,
         });
@@ -281,7 +281,6 @@ const AuthSerializer = struct {
             return ffi.errorForCryptoErrorCode(crypto_error_code);
         }
         return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
             return err;
         };
     }
@@ -427,7 +426,6 @@ const CryptSerializer = struct {
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
         return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
             return err;
         };
     }

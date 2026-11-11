@@ -12,10 +12,15 @@ const util = @import("util.zig");
 
 /// Log severity values exposed through the C ABI.
 pub const Level = enum(c_int) {
+    /// Broken invariant or failure of the logging/runtime subsystem.
     fault = 0,
+    /// An operation failed; include the cause and owning connection.
     err = 1,
+    /// Connection lifecycle milestones and concise negotiated summaries.
     notice = 2,
+    /// Useful state transitions during normal operation.
     info = 3,
+    /// Protocol traces and detailed diagnostics; never routine counters.
     debug = 4,
 };
 
