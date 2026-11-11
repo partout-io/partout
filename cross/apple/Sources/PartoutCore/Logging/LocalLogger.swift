@@ -82,8 +82,8 @@ public final class LocalLogger: @unchecked Sendable {
     func restart(from logger: LocalLogger) {
         let previous = logger.stop()
         queue.sync {
-            lines = previous.pending
-            history = previous.history
+            lines = previous.pending.filter { $0.level <= options.maxLevel }
+            history = previous.history.filter { $0.level <= options.maxLevel }
             trimHistory()
         }
     }
@@ -110,7 +110,7 @@ public final class LocalLogger: @unchecked Sendable {
 
     func append(_ level: DebugLog.Level, message: String) {
         queue.sync {
-            guard !isStopped else { return }
+            guard !isStopped, level <= options.maxLevel else { return }
             let line = DebugLog.Line(
                 timestamp: Date(),
                 level: level,
@@ -190,6 +190,8 @@ extension LocalLogger {
                 $0.level <= options.maxLevel
             }
             .map(mapper)
+
+        guard !linesToAppend.isEmpty else { return }
 
         var nextSize = size
         var indexOfLastLine: Int?

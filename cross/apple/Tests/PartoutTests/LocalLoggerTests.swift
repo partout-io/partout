@@ -7,6 +7,34 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenInfoLogger_whenDebugArrives_thenDoesNotBufferOrRotate() {
+        let strategy = MockStrategy()
+        let sut = LocalLogger(strategy: strategy, url: URL(fileURLWithPath: "unused"),
+                              options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 0), mapper: \.message)
+        sut.append(.debug, message: "ignored")
+        sut.save()
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .debug).isEmpty)
+        #expect(strategy.moveCount == 0)
+        #expect(strategy.currentSize == 0)
+    }
+
+    @Test
+    func givenHistory_whenFlushingAndReplacing_thenPreservesOnlyAllowedEntries() {
+        let url = URL(fileURLWithPath: "unused")
+        let previous = LocalLogger(strategy: MockStrategy(), url: url,
+                                   options: .init(maxLevel: .debug, maxSize: 100, maxBufferedLines: 3), mapper: \.message)
+        previous.append(.info, message: "connected")
+        previous.append(.debug, message: "detail")
+        previous.save()
+        #expect(previous.currentLog(sinceLast: 60, maxLevel: .info) == ["connected"])
+        let replacement = LocalLogger(strategy: MockStrategy(), url: url,
+                                      options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 3), mapper: \.message)
+        replacement.restart(from: previous)
+        #expect(replacement.currentLog(sinceLast: 60, maxLevel: .debug) == ["connected"])
+    }
+
+
+    @Test
     func givenBoundedHistory_whenBufferFlushes_thenKeepsNewestEntries() {
         let sut = LocalLogger(strategy: MockStrategy(), url: URL(fileURLWithPath: "unused"),
                               options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 2), mapper: \.message)
