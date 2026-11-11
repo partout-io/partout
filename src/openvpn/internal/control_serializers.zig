@@ -280,9 +280,7 @@ const AuthSerializer = struct {
         if (!crypto_c.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &crypto_error_code)) {
             return ffi.errorForCryptoErrorCode(crypto_error_code);
         }
-        return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
-            return err;
-        };
+        return self.plain.deserialize(allocator, swapped, self.auth_length, null);
     }
 };
 
@@ -425,9 +423,7 @@ const CryptSerializer = struct {
             @panic("OpenVPN crypto backend returned plaintext larger than its destination buffer");
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
-        return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
-            return err;
-        };
+        return self.plain.deserialize(allocator, decrypted, 0, null);
     }
 };
 

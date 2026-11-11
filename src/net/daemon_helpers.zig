@@ -42,8 +42,6 @@ pub const ConnectionGate = struct {
 
     const Submission = struct {
         is_ready: bool,
-        did_change: bool,
-        state: State,
         on_ready: ?OnReadyBlock,
 
         fn callAndReturn(self: *const Submission) bool {
@@ -172,8 +170,6 @@ pub const ConnectionGate = struct {
         if (std.meta.eql(self.state, new_state)) {
             return .{
                 .is_ready = false,
-                .did_change = false,
-                .state = self.state,
                 .on_ready = null,
             };
         }
@@ -182,8 +178,6 @@ pub const ConnectionGate = struct {
         const is_ready = self.state.isReady();
         return .{
             .is_ready = is_ready,
-            .did_change = true,
-            .state = self.state,
             .on_ready = if (is_ready) self.on_ready else null,
         };
     }

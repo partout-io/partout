@@ -139,23 +139,17 @@ pub fn ControlChannel(comptime Serializer: type) type {
             data: []const u8,
             offset: usize,
         ) ReadInboundPacketError!ControlPacket {
-            var packet = self.serializer.deserialize(
+            var packet = try self.serializer.deserialize(
                 self.allocator,
                 data,
                 offset,
                 null,
-            ) catch |err| {
-                return err;
-            };
+            );
             errdefer packet.deinit();
             log.write(.debug, "Control: Read packet");
             if (packet.ackIds()) |ids| {
-                const remote = packet.ackRemoteSessionId() orelse {
-                    return error.InvalidAck;
-                };
-                self.readAcks(ids, remote) catch |err| {
-                    return err;
-                };
+                const remote = packet.ackRemoteSessionId() orelse return error.InvalidAck;
+                try self.readAcks(ids, remote);
             }
             return packet;
         }
