@@ -194,8 +194,14 @@ private extension PartoutTunnel {
     }
 
     func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
+        for (id, snapshot) in snapshots {
+            if let previous = strategySnapshots[id], snapshot.isEquivalentExceptDataCount(to: previous) { continue }
+            pp_log(ctx, .core, .info, "Tunnel \(id) state: \(snapshot.status.rawValue), onDemand=\(snapshot.onDemand)")
+        }
+        for id in strategySnapshots.keys where snapshots[id] == nil {
+            pp_log(ctx, .core, .info, "Tunnel \(id) removed")
+        }
         strategySnapshots = snapshots
-        pp_log(ctx, .core, .info, "Snapshots: \(strategySnapshots.values.description)")
         publishSnapshots()
     }
 
