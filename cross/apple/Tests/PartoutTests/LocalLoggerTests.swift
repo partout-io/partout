@@ -7,19 +7,16 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
-    func givenMissingDirectory_whenSaveFails_thenRetriesPendingEntries() throws {
-        let fm = FileManager.default
-        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
-        defer { try? fm.removeItem(at: directory) }
-        let url = directory.appendingPathComponent("log.txt")
-        let sut = LocalLogger(url: url, options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 10), mapper: \.message)
-        sut.append(.info, message: "retained")
+    func givenBoundedHistory_whenBufferFlushes_thenKeepsNewestEntries() {
+        let sut = LocalLogger(strategy: MockStrategy(), url: URL(fileURLWithPath: "unused"),
+                              options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 2), mapper: \.message)
+        for message in ["first", "second", "third"] {
+            sut.append(.info, message: message)
+        }
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
         sut.save()
-        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
-        sut.save()
-        #expect(try String(contentsOf: url, encoding: .utf8) == "retained\n")
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
     }
-
 
     @Test
     func givenInfoLogger_whenDebugArrives_thenDoesNotBufferOrRotate() {
@@ -48,19 +45,43 @@ struct LocalLoggerTests {
         #expect(replacement.currentLog(sinceLast: 60, maxLevel: .debug) == ["connected"])
     }
 
-
     @Test
-    func givenBoundedHistory_whenBufferFlushes_thenKeepsNewestEntries() {
-        let sut = LocalLogger(strategy: MockStrategy(), url: URL(fileURLWithPath: "unused"),
-                              options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 2), mapper: \.message)
-        for message in ["first", "second", "third"] {
+    func givenUnicodeBatch_whenRotating_thenPreservesEveryEntryWithinByteBudget() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("log.txt")
+        let sut = LocalLogger(url: url, options: .init(maxLevel: .info, maxSize: 7, maxBufferedLines: 10), mapper: \.message)
+        for message in ["é", "a", "界", "b", "c"] {
             sut.append(.info, message: message)
         }
-        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
         sut.save()
-        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
+        let files = try fm.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil)
+        var entries: [String] = []
+        for file in files {
+            let data = try Data(contentsOf: file)
+            #expect(data.count <= 7)
+            entries += String(decoding: data, as: UTF8.self).split(separator: "\n").map(String.init)
+        }
+        #expect(entries.sorted() == ["é", "a", "界", "b", "c"].sorted())
+        #expect(files.count == 3)
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info).count == 5)
     }
 
+    @Test
+    func givenMissingDirectory_whenSaveFails_thenRetriesPendingEntries() throws {
+        let fm = FileManager.default
+        let directory = fm.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? fm.removeItem(at: directory) }
+        let url = directory.appendingPathComponent("log.txt")
+        let sut = LocalLogger(url: url, options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 10), mapper: \.message)
+        sut.append(.info, message: "retained")
+        sut.save()
+        try fm.createDirectory(at: directory, withIntermediateDirectories: true)
+        sut.save()
+        #expect(try String(contentsOf: url, encoding: .utf8) == "retained\n")
+    }
 
     @Test
     func givenBufferedLogger_whenRestarting_thenTransfersBufferAndStopsPreviousLogger() {

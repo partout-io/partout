@@ -181,51 +181,30 @@ extension LocalLogger {
             return
         }
 
-        // current size
-        let size = strategy.size(of: currentURL)
-
-        // split lines across current and next log
-        var linesToAppend = lines
-            .filter {
-                $0.level <= options.maxLevel
-            }
-            .map(mapper)
-
-        guard !linesToAppend.isEmpty else { return }
-
-        var nextSize = size
-        var indexOfLastLine: Int?
-        for pair in linesToAppend.enumerated() {
-            nextSize += UInt64(pair.element.count) + 1 // "\n"
-            if nextSize > options.maxSize {
-                break
-            }
-            indexOfLastLine = pair.offset
-        }
-
         do {
-            // current log can fit new lines
-            if indexOfLastLine == linesToAppend.count - 1 {
-                try strategy.append(lines: linesToAppend, to: currentURL)
-            } else {
-
-                // append old lines to current log
-                if let indexOfLastLine {
-                    let oldLines = Array(linesToAppend.prefix(indexOfLastLine))
-                    try strategy.rotate(url: currentURL, withLines: oldLines)
-                } else {
+            var size = strategy.size(of: currentURL)
+            while !lines.isEmpty {
+                var batch: [String] = []
+                var nextSize = size
+                for line in lines {
+                    let text = mapper(line)
+                    let byteCount = UInt64(text.utf8.count) + 1
+                    // Keep an oversized entry intact in its own file.
+                    if nextSize > 0 && (nextSize >= options.maxSize || byteCount > options.maxSize - nextSize) {
+                        break
+                    }
+                    batch.append(text)
+                    nextSize += byteCount
+                }
+                if batch.isEmpty {
                     try strategy.rotate(url: currentURL, withLines: nil)
+                    size = 0
+                    continue
                 }
-
-                // flush remaining lines to new log
-                if let indexOfLastLine {
-                    linesToAppend.removeSubrange(0..<indexOfLastLine)
-                }
-                try strategy.append(lines: linesToAppend, to: currentURL)
+                try strategy.append(lines: batch, to: currentURL)
+                lines.removeFirst(batch.count)
+                size = nextSize
             }
-
-            // reset buffer
-            lines.removeAll()
         } catch {
             NSLog("LocalLogger: Unable to save log to disk: \(error)")
         }
