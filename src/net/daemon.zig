@@ -397,6 +397,7 @@ const ConnectionDaemon = struct {
     jobs_mutex: core.Mutex,
     jobs_condition: core.concurrency.Condition = .{},
     packet_receive_failed: bool = false,
+    logged_reachability: ?io.ReachabilityInfo = null,
     is_running: bool,
 
     // Internal state
@@ -962,6 +963,11 @@ const ConnectionDaemon = struct {
         if (self.conn_request != null) self.is_stale_conn_request = true;
         _ = self.gate.updateReachability(reachability.reachable);
         if (self.daemon.state != .started) return;
+        const changed = if (self.logged_reachability) |previous| !std.meta.eql(previous, reachability) else true;
+        if (changed) {
+            log.writef(.info, "Network reachability: {}", .{reachability.reachable});
+            self.logged_reachability = reachability;
+        }
         const connection = self.connection orelse @panic("handleReachability but no connection");
         connection.networkChange(reachability);
     }
@@ -969,6 +975,7 @@ const ConnectionDaemon = struct {
     // Forwards the event to the underlying connection
     fn handleBetterPath(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) return;
+        log.write(.info, "Better network path available");
         if (self.conn_request != null) self.is_stale_conn_request = true;
         const connection = self.connection orelse @panic("handleBetterPath but no connection");
         connection.betterPath();

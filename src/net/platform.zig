@@ -194,7 +194,6 @@ pub const Platform = struct {
         }
         self.callbacks_mutex.unlock();
 
-        log.write(.debug, "Reachability changed");
         if (handler) |block| {
             defer self.monitor_drainer.leave(&self.callbacks_mutex);
             block.onReachability(reachability);
@@ -210,7 +209,6 @@ pub const Platform = struct {
         }
         self.callbacks_mutex.unlock();
 
-        log.write(.debug, "Network better path available");
         if (handler) |block| {
             defer self.monitor_drainer.leave(&self.callbacks_mutex);
             block.onBetterPath();
@@ -480,14 +478,6 @@ fn cOnReachability(ctx: ?*anyopaque, reachability: [*c]const ReachabilityInfo) c
     if (reachability == null) return;
     const reach = reachability.*;
     self.notifyReachability(reach);
-    if (builtin.abi.isAndroid() and @hasField(ReachabilityInfo, "network_handle")) {
-        log.writef(.debug, "Network reachability changed: reachable={}, network_handle={}", .{
-            reach.reachable,
-            reach.network_handle,
-        });
-    } else {
-        log.writef(.debug, "Network reachability changed: reachable={}", .{reach.reachable});
-    }
 }
 
 fn cOnBetterPath(ctx: ?*anyopaque) callconv(.c) void {

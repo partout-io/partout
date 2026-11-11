@@ -47,14 +47,6 @@ pub const ConnectionGate = struct {
         on_ready: ?OnReadyBlock,
 
         fn callAndReturn(self: *const Submission) bool {
-            if (self.did_change) {
-                log.writef(.info, "ConnectionGate.onReady({{signal={}, network={}, status={s}}}) -> {}", .{
-                    self.state.enabled,
-                    self.state.network_available,
-                    self.state.connection_status.raw(),
-                    self.is_ready,
-                });
-            }
             if (self.on_ready) |handler| handler.call();
             return self.is_ready;
         }

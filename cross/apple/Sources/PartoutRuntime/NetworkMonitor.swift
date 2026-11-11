@@ -12,8 +12,6 @@ final class NetworkMonitor: @unchecked Sendable {
         case betterPath
     }
 
-    private let ctx: PartoutLoggerContext
-
     private let monitor: NWPathMonitor
 
     private let monitorQueue: DispatchQueue
@@ -24,12 +22,9 @@ final class NetworkMonitor: @unchecked Sendable {
 
     private var currentReachability: Bool
 
-    private var previousReachability: Bool?
-
     private var previousPathPreference: NetworkPathPreference?
 
-    init(_ ctx: PartoutLoggerContext) {
-        self.ctx = ctx
+    init() {
         monitor = NWPathMonitor()
         monitorQueue = DispatchQueue(label: "NetworkMonitor")
         subject = PassthroughStream()
@@ -64,14 +59,9 @@ final class NetworkMonitor: @unchecked Sendable {
 private extension NetworkMonitor {
     func handle(_ path: NWPath) {
         let isReachable = path.isSatisfiable
-        let didChangeReachability = isReachable != previousReachability
-        let level: DebugLog.Level = didChangeReachability ? .info : .debug
-        pp_log(ctx, .runtime, level, "Path updated: \(path.debugDescription)")
-
         reachabilityLock.with {
             currentReachability = isReachable
         }
-        previousReachability = isReachable
         subject.send(.reachability(isReachable))
 
         let nextPathPreference = NetworkPathPreference(path)
@@ -85,7 +75,6 @@ private extension NetworkMonitor {
             return
         }
 
-        pp_log(ctx, .runtime, .notice, "Better network path detected")
         subject.send(.betterPath)
     }
 }
