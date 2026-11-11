@@ -7,6 +7,19 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenBoundedHistory_whenBufferFlushes_thenKeepsNewestEntries() {
+        let sut = LocalLogger(strategy: MockStrategy(), url: URL(fileURLWithPath: "unused"),
+                              options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 2), mapper: \.message)
+        for message in ["first", "second", "third"] {
+            sut.append(.info, message: message)
+        }
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
+        sut.save()
+        #expect(sut.currentLog(sinceLast: 60, maxLevel: .info) == ["second", "third"])
+    }
+
+
+    @Test
     func givenBufferedLogger_whenRestarting_thenTransfersBufferAndStopsPreviousLogger() {
         let options = LocalLogger.Options(maxLevel: .debug, maxSize: 10000, maxBufferedLines: 100)
         let url = URL(fileURLWithPath: "unused")

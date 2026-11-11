@@ -26,8 +26,10 @@ public final class LocalLogger: @unchecked Sendable {
 
         public let maxSize: UInt64
 
+        /// Pending-write threshold and maximum retained live-history entries (at least one).
         public let maxBufferedLines: Int
 
+        /// Maximum age of archived files and retained live-history entries.
         public let maxAge: TimeInterval?
 
         public init(
@@ -55,6 +57,8 @@ public final class LocalLogger: @unchecked Sendable {
 
     private var lines: [DebugLog.Line]
 
+    private var history: [DebugLog.Line] = []
+
     private var isStopped = false
 
     init(
@@ -76,36 +80,45 @@ public final class LocalLogger: @unchecked Sendable {
     }
 
     func restart(from logger: LocalLogger) {
-        let previousLines = logger.stop()
+        let previous = logger.stop()
         queue.sync {
-            lines = previousLines
+            lines = previous.pending
+            history = previous.history
+            trimHistory()
         }
     }
 
     func reset() throws {
         try queue.sync {
             lines.removeAll()
+            history.removeAll()
             try strategy.reset(at: currentURL)
         }
     }
 
     @discardableResult
-    func stop() -> [DebugLog.Line] {
+    func stop() -> (pending: [DebugLog.Line], history: [DebugLog.Line]) {
         queue.sync {
             isStopped = true
-            defer { lines.removeAll() }
-            return lines
+            defer {
+                lines.removeAll()
+                history.removeAll()
+            }
+            return (lines, history)
         }
     }
 
     func append(_ level: DebugLog.Level, message: String) {
         queue.sync {
             guard !isStopped else { return }
-            lines.append(DebugLog.Line(
+            let line = DebugLog.Line(
                 timestamp: Date(),
                 level: level,
                 message: message
-            ))
+            )
+            lines.append(line)
+            history.append(line)
+            trimHistory()
             if lines.count > options.maxBufferedLines {
                 unsafeSave()
             }
@@ -115,7 +128,8 @@ public final class LocalLogger: @unchecked Sendable {
     func currentLines(sinceLast: TimeInterval, maxLevel: DebugLog.Level) -> [DebugLog.Line] {
         queue.sync {
             let since = Date(timeIntervalSinceNow: -sinceLast)
-            return lines
+            trimHistory()
+            return history
                 .filter {
                     $0.timestamp >= since && $0.level <= maxLevel
                 }
@@ -150,6 +164,18 @@ extension LocalLogger.Strategy {
 // MARK: - Private API
 
 extension LocalLogger {
+    // Live history is independent of pending writes and bounded by count and age.
+    private func trimHistory() {
+        if let maxAge = options.maxAge {
+            let since = Date(timeIntervalSinceNow: -maxAge)
+            history.removeAll { $0.timestamp < since }
+        }
+        let limit = max(1, options.maxBufferedLines)
+        if history.count > limit {
+            history.removeFirst(history.count - limit)
+        }
+    }
+
     func unsafeSave() {
         guard !lines.isEmpty else {
             return
