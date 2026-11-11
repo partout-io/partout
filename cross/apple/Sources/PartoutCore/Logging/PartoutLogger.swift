@@ -103,6 +103,31 @@ extension PartoutLogger {
 }
 
 extension PartoutLogger {
+    /// Replaces the writer atomically while preserving allowed history and pending writes.
+    public static func setMaxLevel(_ level: DebugLog.Level) {
+        queue.sync {
+            guard globalLogger.maxLevel != level else { return }
+            let replacement = globalLogger.withMaxLevel(level)
+            if let previous = globalLogger.localLogger {
+                replacement.localLogger?.restart(from: previous)
+            }
+            globalLogger = replacement
+        }
+    }
+
+    func withMaxLevel(_ level: DebugLog.Level) -> PartoutLogger {
+        PartoutLogger(
+            destinations: destinations,
+            localLogger: localLogger?.withMaxLevel(level),
+            maxLevel: level,
+            logsAddresses: logsAddresses,
+            logsModules: logsModules,
+            logsRawBytes: logsRawBytes,
+            assertsMissingLoggingCategory: assertsMissingLoggingCategory,
+            willPrint: willPrint
+        )
+    }
+
     /// Registers a new ``PartoutLogger`` globally.
     public static func register(_ logger: PartoutLogger, preservingLog: Bool = true) {
         queue.sync {

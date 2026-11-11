@@ -79,6 +79,20 @@ public final class LocalLogger: @unchecked Sendable {
         currentURL
     }
 
+    func withMaxLevel(_ maxLevel: DebugLog.Level) -> LocalLogger {
+        LocalLogger(
+            strategy: strategy,
+            url: currentURL,
+            options: .init(
+                maxLevel: maxLevel,
+                maxSize: options.maxSize,
+                maxBufferedLines: options.maxBufferedLines,
+                maxAge: options.maxAge
+            ),
+            mapper: mapper
+        )
+    }
+
     func restart(from logger: LocalLogger) {
         let previous = logger.stop()
         queue.sync {

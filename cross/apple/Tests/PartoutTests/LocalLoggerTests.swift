@@ -7,6 +7,31 @@ import Testing
 
 struct LocalLoggerTests {
     @Test
+    func givenLogger_whenChangingLevel_thenReplacementUsesNewWriteThreshold() {
+        let strategy = MockStrategy()
+        let previous = LocalLogger(strategy: strategy, url: URL(fileURLWithPath: "unused"),
+                                   options: .init(maxLevel: .info, maxSize: 100, maxBufferedLines: 10), mapper: \.message)
+        previous.append(.info, message: "retained")
+        let extensive = previous.withMaxLevel(.debug)
+        extensive.restart(from: previous)
+        extensive.append(.debug, message: "details")
+        #expect(extensive.currentLog(sinceLast: 60, maxLevel: .debug) == ["retained", "details"])
+        let normal = extensive.withMaxLevel(.info)
+        normal.restart(from: extensive)
+        normal.append(.debug, message: "ignored")
+        #expect(normal.currentLog(sinceLast: 60, maxLevel: .debug) == ["retained"])
+        normal.save()
+        #expect(strategy.currentSize == UInt64("retained\n".utf8.count))
+    }
+
+    @Test
+    func givenLogLevelMessage_whenEncoding_thenRoundTrips() throws {
+        let input = Message.Input.logLevel(maxLevel: .debug)
+        let data = try JSONEncoder().encode(input)
+        #expect(try JSONDecoder().decode(Message.Input.self, from: data) == input)
+    }
+
+    @Test
     func givenInfoThreshold_whenLoggingDebug_thenDoesNotEvaluateMessage() {
         var builder = PartoutLogger.Builder()
         builder.maxLevel = .info

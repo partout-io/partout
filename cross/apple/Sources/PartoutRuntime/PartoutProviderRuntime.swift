@@ -40,7 +40,13 @@ public final class PartoutProviderRuntime: Sendable {
             options: options,
             environment: environment
         )
-        messageHandler = DefaultMessageHandler(ctx, environment: environment)
+        let loggingLock = SemaphoreMutex()
+        messageHandler = DefaultMessageHandler(ctx, environment: environment) { level in
+            loggingLock.with {
+                PartoutLogger.setMaxLevel(level)
+                partout_set_log_level(Int32(level.rawValue))
+            }
+        }
         self.options = options
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
