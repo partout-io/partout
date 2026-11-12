@@ -68,17 +68,17 @@ const ProfileLogger = struct {
             message,
             "\tID: 00000000-0000-0000-0000-000000000000",
         );
-        saw_name = saw_name or std.mem.eql(u8, message, "\tName: <redacted>");
+        saw_name = saw_name or std.mem.eql(u8, message, "\tName: Test profile");
         saw_header = saw_header or std.mem.eql(u8, message, "\tModules:");
         saw_inactive_wireguard = saw_inactive_wireguard or std.mem.eql(
             u8,
             message,
-            "\t\t- WireGuardModule: WireGuardModule(id=11111111-1111-4111-8111-111111111111)",
+            "\t\t- WireGuardModule: <redacted>",
         );
         saw_active_on_demand = saw_active_on_demand or std.mem.eql(
             u8,
             message,
-            "\t\t+ OnDemandModule: OnDemandModule(id=22222222-2222-4222-8222-222222222222)",
+            "\t\t+ OnDemandModule: <redacted>",
         );
     }
 };
@@ -399,25 +399,24 @@ test "writef recognizes generated sensitive models without generated methods" {
     };
     logging.writef(.notice, "Credentials: {s}", .{credentials});
     try std.testing.expectEqualStrings(
-        "Credentials: OpenVPNCredentials",
+        "Credentials: <redacted>",
         CapturingLogger.lastMessage(),
     );
 
     logging.init(true, CapturingLogger.log, null);
     logging.writef(.notice, "Credentials: {s}", .{credentials});
-    try std.testing.expectEqualStrings("Credentials: OpenVPNCredentials", CapturingLogger.lastMessage());
-    logging.writef(.debug, "Details: {s}", .{logging.details(credentials)});
-    try std.testing.expect(std.mem.indexOf(u8, CapturingLogger.lastMessage(), "secret") != null);
-    logging.init(false, CapturingLogger.log, null);
-    logging.writef(.debug, "Details: {s}", .{logging.details(credentials)});
-    try std.testing.expectEqualStrings("Details: <redacted>", CapturingLogger.lastMessage());
+    try std.testing.expect(std.mem.indexOf(
+        u8,
+        CapturingLogger.lastMessage(),
+        "\"password\":\"secret\"",
+    ) != null);
 
     const module = api.TaggedModule{ .DNS = .{} };
     logging.writef(.notice, "Module: {s}", .{module});
     try std.testing.expect(std.mem.startsWith(
         u8,
         CapturingLogger.lastMessage(),
-        "Module: DNSModule(id=",
+        "Module: {\"type\":\"DNS\"",
     ));
 }
 
