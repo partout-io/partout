@@ -10,12 +10,11 @@ public enum PartoutCore {
 }
 
 extension LoggerCategory: CaseIterable {
-    public static let abi = Self(rawValue: "abi")
     public static let core = Self(rawValue: "core")
     public static let os = Self(rawValue: "os")
     public static let runtime = Self(rawValue: "runtime")
 
-    public static let allCases: [LoggerCategory] = [.abi, .core, .os, .runtime]
+    public static let allCases: [LoggerCategory] = [.core, .os, .runtime]
 }
 
 // MARK: Profile
