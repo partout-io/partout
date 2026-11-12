@@ -420,6 +420,40 @@ test "writef recognizes generated sensitive models without generated methods" {
     ));
 }
 
+test "connection context is copied and nested scopes restore their caller" {
+    logging.init(false, CapturingLogger.log, null);
+    defer logging.deinit();
+    const profile = "11111111-1111-1111-1111-111111111111".*;
+    const module = "22222222-2222-2222-2222-222222222222".*;
+    const context = logging.Context{ .profile_id = profile, .module_id = module };
+    const outer = context.enter();
+    logging.write(.info, "connected");
+    try std.testing.expectEqualStrings("[profile=11111111-1111-1111-1111-111111111111 module=22222222-2222-2222-2222-222222222222] connected", CapturingLogger.lastMessage());
+    const inner = (logging.Context{}).enter();
+    logging.write(.info, "global");
+    try std.testing.expectEqualStrings("global", CapturingLogger.lastMessage());
+    inner.leave();
+    try std.testing.expectEqualDeep(context, logging.currentContext());
+    outer.leave();
+    try std.testing.expectEqualDeep(logging.Context{}, logging.currentContext());
+}
+
+test "connection context does not leak into another thread" {
+    const outer = (logging.Context{ .profile_id = "11111111-1111-1111-1111-111111111111".* }).enter();
+    defer outer.leave();
+    var isolated = false;
+    const worker = try std.Thread.spawn(.{}, struct {
+        fn run(result: *bool) void {
+            result.* = logging.currentContext().profile_id == null;
+            const scope = (logging.Context{ .profile_id = "22222222-2222-2222-2222-222222222222".* }).enter();
+            defer scope.leave();
+        }
+    }.run, .{&isolated});
+    worker.join();
+    try std.testing.expect(isolated);
+    try std.testing.expectEqualStrings("11111111-1111-1111-1111-111111111111", &logging.currentContext().profile_id.?);
+}
+
 test "rejected severity does not invoke a formatter or callback" {
     const Value = struct {
         pub fn logging_formatter(_: std.mem.Allocator, _: @This()) ![]const u8 {

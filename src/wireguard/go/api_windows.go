@@ -21,8 +21,8 @@ func init() {
 //export wgTurnOn
 func wgTurnOn(settings *C.char, uuid *C.char) int32 {
 	logger := &device.Logger{
-		Verbosef: CLogger(0).Printf,
-		Errorf:   CLogger(1).Printf,
+		Verbosef: newCLogger(0).Printf,
+		Errorf:   newCLogger(1).Printf,
 	}
 	uuidString := C.GoString(uuid)
 	guidString := fmt.Sprintf("{%s}", uuidString)
@@ -44,5 +44,9 @@ func wgTurnOn(settings *C.char, uuid *C.char) int32 {
 		dev.Close()
 		return -1
 	}
-	return wgTurnOnDevice(settings, dev, logger)
+	handle := wgTurnOnDevice(settings, dev, logger)
+	if handle < 0 {
+		dev.Close()
+	}
+	return handle
 }

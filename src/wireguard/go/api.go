@@ -18,6 +18,7 @@ import (
 	"math"
 	"runtime/debug"
 	"strings"
+	"sync"
 	"time"
 	"unsafe"
 
@@ -25,6 +26,7 @@ import (
 	"golang.zx2c4.com/wireguard/device"
 )
 
+var loggerMutex sync.RWMutex
 var loggerFunc unsafe.Pointer
 var loggerCtx unsafe.Pointer
 
@@ -37,6 +39,8 @@ var tunnelHandles = make(map[int32]tunnelHandle)
 
 //export wgSetLogger
 func wgSetLogger(context, loggerFn uintptr) {
+	loggerMutex.Lock()
+	defer loggerMutex.Unlock()
 	loggerCtx = unsafe.Pointer(context)
 	loggerFunc = unsafe.Pointer(loggerFn)
 }
@@ -210,16 +214,26 @@ func wgVersion() *C.char {
 	return C.CString("unknown")
 }
 
-type CLogger int
+type CLogger struct {
+	level    int
+	function unsafe.Pointer
+	context  unsafe.Pointer
+}
+
+func newCLogger(level int) CLogger {
+	loggerMutex.RLock()
+	defer loggerMutex.RUnlock()
+	return CLogger{level, loggerFunc, loggerCtx}
+}
 
 func (l CLogger) Printf(format string, args ...interface{}) {
-	if uintptr(loggerFunc) == 0 {
+	if uintptr(l.function) == 0 {
 		return
 	}
 	gomsg := fmt.Sprintf(format, args...)
 	cmsg := C.CString(gomsg)
 	msg := (*C.char)(unsafe.Pointer(cmsg))
-	C.callLogger(loggerFunc, loggerCtx, C.int(l), msg)
+	C.callLogger(l.function, l.context, C.int(l.level), msg)
 	C.free(unsafe.Pointer(cmsg))
 }
 
