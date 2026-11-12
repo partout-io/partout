@@ -446,3 +446,22 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
     try std.testing.expectError(error.LinkNotActive, factory.create(allocator, .{ .address = "127.0.0.1", .proto = .init(.udp, 51820) }, port, reachable(true), 100));
     try std.testing.expectEqual(before_connected + 1, policy.calls);
 }
+
+test "inactive platform monitoring updates state without logging" {
+    const Capture = struct {
+        fn log(raw: ?*anyopaque, _: c_int, _: [*:0]const u8) callconv(.c) void {
+            const count: *usize = @ptrCast(@alignCast(raw orelse return));
+            count.* += 1;
+        }
+    };
+    var count: usize = 0;
+    core.logging.init(false, Capture.log, &count);
+    defer core.logging.deinit();
+    var platform = try hooks.initPlatform(.{});
+    defer platform.deinit();
+    count = 0;
+    platform_source.testing.notifyReachability(&platform, reachable(true));
+    platform_source.testing.notifyBetterPath(&platform);
+    try std.testing.expect(platform.networkMonitor().isReachable());
+    try std.testing.expectEqual(@as(usize, 0), count);
+}

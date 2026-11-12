@@ -91,6 +91,7 @@ public final class PartoutProviderRuntime: Sendable {
                 }
             }
         )
+        controller.setNetworkLoggingEnabled(true)
         let result = profileJSON.withCString { profile in
             let cCacheDir = cacheDir?.withCString {
                 strdup($0)
@@ -123,6 +124,7 @@ public final class PartoutProviderRuntime: Sendable {
         case PartoutCompletionCodeOK:
             break
         default:
+            controller.setNetworkLoggingEnabled(false)
             pp_log(ctx, .runtime, .fault, "Unable to start runtime: result=\(cResult)")
             throw PartoutError(.invalidValue)
         }
@@ -136,6 +138,7 @@ public final class PartoutProviderRuntime: Sendable {
 
     public func stopTunnel() async {
         pp_log(ctx, .runtime, .notice, "Stop runtime")
+        controller.setNetworkLoggingEnabled(false)
         partout_daemon_stop()
     }
 

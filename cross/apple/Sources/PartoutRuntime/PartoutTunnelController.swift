@@ -44,6 +44,10 @@ final class PartoutTunnelController: Sendable {
         networkMonitor.start()
     }
 
+    func setNetworkLoggingEnabled(_ enabled: Bool) {
+        networkMonitor.setLoggingEnabled(enabled)
+    }
+
     func onReachable(_ isReachable: Bool) {
         delegateLock.with {
             guard let delegate = self.delegate else { return }

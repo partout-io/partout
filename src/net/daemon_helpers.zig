@@ -189,7 +189,7 @@ pub const ConnectionGate = struct {
         // Call private non-locking version, self.isReady() WOULD DEADLOCK
         const is_ready = self.state.isReady();
         return .{
-            .did_change = true,
+            .did_change = self.observing,
             .state = self.state,
             .is_ready = is_ready,
             .on_ready = if (is_ready) self.on_ready else null,
