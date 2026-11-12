@@ -52,6 +52,7 @@ Java_io_partout_PartoutWrapper_partoutInit(
     partout_init_args args = { 0 };
     const char *jni_tag = (*env)->GetStringUTFChars(env, tag, NULL);
     char *c_tag = jni_tag ? pp_dup(jni_tag) : NULL;
+    args.log_level = PartoutLogLevelDebug;
     args.logs_private_data = logs_private_data;
     args.logger_fn = android_logger;
     args.logger_ctx = (void *)c_tag;

@@ -455,7 +455,7 @@ test "inactive platform monitoring updates state without logging" {
         }
     };
     var count: usize = 0;
-    core.logging.init(false, Capture.log, &count);
+    core.logging.init(.debug, false, Capture.log, &count);
     defer core.logging.deinit();
     var platform = try hooks.initPlatform(.{});
     defer platform.deinit();

@@ -77,7 +77,7 @@ test "unavailable crypto backend logs and falls back to default" {
     const fallback = api.defaultCryptoBackend();
     const expected = try api.cryptoFunctionTable(fallback);
 
-    logging.init(false, CapturingLogger.log, null);
+    logging.init(.debug, false, CapturingLogger.log, null);
     defer logging.deinit();
     const actual = try api.cryptoFunctionTable(requested);
 

@@ -45,7 +45,7 @@ test "DNS resolver times out and caps abandoned queries" {
     const allocator = std.testing.allocator;
     const max_pending_queries = resolver.testing.maxPendingQueries;
     var dns = PlatformDNS.init();
-    logging.init(false, CapturingLogger.log, null);
+    logging.init(.debug, false, CapturingLogger.log, null);
     defer logging.deinit();
     HangingResolver.release.store(false, .release);
     defer {

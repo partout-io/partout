@@ -25,13 +25,6 @@ struct LocalLoggerTests {
     }
 
     @Test
-    func givenLogLevelMessage_whenEncoding_thenRoundTrips() throws {
-        let input = Message.Input.logLevel(maxLevel: .debug)
-        let data = try JSONEncoder().encode(input)
-        #expect(try JSONDecoder().decode(Message.Input.self, from: data) == input)
-    }
-
-    @Test
     func givenInfoThreshold_whenLoggingDebug_thenDoesNotEvaluateMessage() {
         var builder = PartoutLogger.Builder()
         builder.maxLevel = .info

@@ -94,13 +94,14 @@ comptime {
 /// `private_data` records whether callers permit sensitive values in logs.
 /// Passing a null `logger` disables logging.
 pub fn init(
+    level: Level,
     private_data: bool,
     logger: Callback,
     logger_ctx: ?*anyopaque,
 ) void {
     mutex.lock();
+    max_level = level;
     logs_private_data = private_data;
-    max_level = .debug;
     external_logger = logger;
     external_logger_ctx = logger_ctx;
     mutex.unlock();
@@ -116,13 +117,6 @@ pub fn deinit() void {
     max_level = .debug;
     external_logger_ctx = null;
     external_logger = null;
-}
-
-/// Changes accepted severity without replacing callback ownership or privacy.
-pub fn setMaxLevel(level: Level) void {
-    mutex.lock();
-    defer mutex.unlock();
-    max_level = level;
 }
 
 /// Reports whether logging sensitive values is currently allowed.
