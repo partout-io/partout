@@ -31,14 +31,14 @@ typedef enum {
  * ctx is the caller-owned logger_ctx, independent of the record's profile. */
 typedef void (*partout_logger_cb)(void *ctx, const char *profile_id, int level, const char *message);
 typedef struct {
+    /* Maximum accepted severity (PartoutLogLevel*). Invalid values use Debug. */
+    int log_level;
     bool logs_private_data;
     partout_logger_cb logger_fn;
     void *logger_ctx;
 } partout_init_args;
 /* Configures process-wide logging. Keep logger_ctx alive while registered. */
 void partout_init(const partout_init_args *args);
-/* Set the maximum accepted severity after init (default: Debug). Invalid values are ignored. */
-void partout_log_set_level(int level);
 
 /* File utilities. */
 char *partout_readfile(const char *rel_path, const char *parent);

@@ -7,15 +7,11 @@ public enum Message {
     public enum Input: Hashable, Codable, Sendable {
         case debugLog(sinceLast: TimeInterval, maxLevel: DebugLog.Level)
 
-        case logLevel(maxLevel: DebugLog.Level)
-
         case environment(excludingKeys: Set<String>? = nil)
     }
 
     public enum Output: Hashable, Codable, Sendable {
         case debugLog(log: DebugLog)
-
-        case logLevel(maxLevel: DebugLog.Level)
 
         case environment(StaticTunnelEnvironment)
     }

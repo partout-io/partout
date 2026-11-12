@@ -40,13 +40,7 @@ public final class PartoutProviderRuntime: Sendable {
             options: options,
             environment: environment
         )
-        let loggingLock = SemaphoreMutex()
-        messageHandler = DefaultMessageHandler(ctx, environment: environment) { level in
-            loggingLock.with {
-                PartoutLogger.setMaxLevel(level)
-                partout_log_set_level(Int32(level.rawValue))
-            }
-        }
+        messageHandler = DefaultMessageHandler(ctx, environment: environment)
         self.options = options
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
@@ -64,13 +58,13 @@ public final class PartoutProviderRuntime: Sendable {
         pp_log(ctx, .runtime, .notice, "Start runtime")
 
         var init_args = partout_init_args(
+            log_level: Int32(ctx.logger.maxLevel.rawValue),
             logs_private_data: logsPrivateData,
             logger_fn: logger,
             logger_ctx: nil
         )
         pp_log(ctx, .runtime, .info, "Initialize Partout library")
         partout_init(&init_args)
-        partout_log_set_level(Int32(ctx.logger.maxLevel.rawValue))
 
         let profileJSON = try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
         let loggedProfileJSON = profileJSON.debugDescription(withSensitiveData: logsPrivateData)
