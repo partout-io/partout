@@ -297,7 +297,7 @@ pub const PlatformDNS = struct {
             if (io_c.pp_dns_error_is_bad_flags(status)) {
                 log.write(.fault, "getaddrinfo() failed with EAI_BADFLAGS");
             } else {
-                log.writef(.fault, "getaddrinfo() failed with result {d}", .{status});
+                log.writef(.err, "getaddrinfo() failed with result {d}", .{status});
             }
             return error.ResolutionFailure;
         }

@@ -323,7 +323,7 @@ const SettingsDaemon = struct {
         const daemon = self.daemon;
         try daemon.beginStart();
         var maybe_info = buildSettingsOnlyTunnelInfo(daemon.allocator, &daemon.profile) catch |err| {
-            log.writef(.fault, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
             const code = daemon.handleStartError(err);
             daemon.requestCancellation(.{ .code = code }, false);
             return;
@@ -331,7 +331,7 @@ const SettingsDaemon = struct {
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
             const tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
-                log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
+                log.writef(.err, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(.{ .code = code }, false);
                 return;
@@ -929,10 +929,10 @@ const ConnectionDaemon = struct {
 
     fn handleResumeGate(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
+            log.write(.debug, "Ignore resume connection gate, daemon not started");
             return;
         }
-        log.write(.info, "Resume connection gate now");
+        log.write(.debug, "Resume connection gate now");
         _ = self.gate.setEnabled(true);
     }
 
@@ -1375,7 +1375,7 @@ const ConnectionDaemon = struct {
 
     fn evaluateConnection(self: *ConnectionDaemon, force: bool) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore evaluation, daemon not started");
+            log.write(.debug, "Ignore evaluation, daemon not started");
             return;
         }
         _ = self.connection orelse @panic("evaluateConnection but no connection");
@@ -1385,12 +1385,12 @@ const ConnectionDaemon = struct {
         }
 
         if (!force and !self.monitor.isReachable()) {
-            log.write(.info, "Ignore evaluation, wait for reachable network");
+            log.write(.debug, "Ignore evaluation, wait for reachable network");
             _ = self.gate.setEnabled(true);
             return;
         }
 
-        log.write(.info, "Pause connection gate during reconnection");
+        log.write(.debug, "Pause connection gate during reconnection");
         _ = self.gate.setEnabled(false);
 
         log.write(.notice, "Start connection");
@@ -1445,7 +1445,7 @@ const ConnectionDaemon = struct {
     fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
         const connection = self.connection orelse @panic("createConnectionTun but no connection");
         const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
-            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+            log.writef(.err, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
         errdefer tunnel.destroy();
@@ -1486,7 +1486,7 @@ const ConnectionDaemon = struct {
                 defer owned.info.deinit(self.daemon.allocator);
                 // Complete startup before yielding to queued reachability events.
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
@@ -1504,11 +1504,11 @@ const ConnectionDaemon = struct {
 
     fn scheduleResumeGate(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
+            log.write(.debug, "Ignore resume connection gate, daemon not started");
             return;
         }
         const delay_ms = self.daemon.options.reconnection_delay_ms;
-        log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
+        log.writef(.debug, "Resume connection gate in {} milliseconds", .{delay_ms});
 
         // Contextually cancels the previous attempt
         self.looper.scheduleTimer(&self.resume_gate_timer, delay_ms, .{
@@ -1520,7 +1520,7 @@ const ConnectionDaemon = struct {
             // before the gate can start another attempt.
             self.looper.cancelTimer(&self.resume_gate_timer);
             self.schedule(.resumeGate) catch |schedule_err| {
-                log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
+                log.writef(.err, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
                 self.daemon.requestCancellation(null, true);
             };
         };

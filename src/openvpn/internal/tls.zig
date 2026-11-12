@@ -125,7 +125,7 @@ pub const TLSWrapper = struct {
         var code: crypto_c.pp_tls_error_code = crypto_c.PPTLSErrorNone;
         const tls = create_tls(options, &code) orelse {
             crypto_c.pp_tls_options_free(options);
-            log.writef(.fault, "Unable to create TLS: {d}", .{code});
+            log.writef(.err, "Unable to create TLS: {d}", .{code});
             return error.TLSFailure;
         };
         errdefer free_tls(tls);
@@ -257,6 +257,6 @@ pub const TLSWrapper = struct {
 };
 
 fn loggingTLSErrorFromCode(code: crypto_c.pp_tls_error_code) TLSError {
-    log.writef(.fault, "Unable to execute TLS operation: {d}", .{code});
+    log.writef(.err, "Unable to execute TLS operation: {d}", .{code});
     return error.TLSFailure;
 }
