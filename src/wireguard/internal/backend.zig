@@ -140,29 +140,6 @@ const go_backend_vtable = Backend.VTable{
     .complete_io = wireguard_c.pp_wg_complete_io,
 };
 
-// Serialize registration with device creation. Go captures this callback context
-// in each device logger; it remains alive until that device has fully stopped.
-var logger_mutex: core.Mutex = .{};
-var logger_contexts: std.AutoHashMapUnmanaged(i32, *log.Context) = .empty;
-
-fn registerDeviceLogger() !*log.Context {
-    const context = try std.heap.c_allocator.create(log.Context);
-    errdefer std.heap.c_allocator.destroy(context);
-    try logger_contexts.ensureUnusedCapacity(std.heap.c_allocator, 1);
-    context.* = log.currentContext();
-    wireguard_c.pp_wg_set_logger(cLog, context);
-    return context;
-}
-
-fn retainDeviceLogger(handle: i32, context: *log.Context) i32 {
-    if (handle < 0) {
-        std.heap.c_allocator.destroy(context);
-    } else {
-        logger_contexts.putAssumeCapacity(handle, context);
-    }
-    return handle;
-}
-
 fn cTurnOn(
     _: ?*anyopaque,
     allocator: std.mem.Allocator,
@@ -170,11 +147,8 @@ fn cTurnOn(
     start: StartTunnel,
 ) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    logger_mutex.lock();
-    defer logger_mutex.unlock();
-    const context = try registerDeviceLogger();
-    errdefer std.heap.c_allocator.destroy(context);
-    defer wireguard_c.pp_wg_set_logger(cLog, null);
+    const context = log.currentContext();
+    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
 
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
@@ -182,20 +156,20 @@ fn cTurnOn(
         var c_ifname: util.TemporaryCString = .{};
         try c_ifname.init(allocator, start.ifname);
         defer c_ifname.deinit();
-        return retainDeviceLogger(wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr()), context);
+        return wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr(), cLog, profile_id);
     }
 
     const fd = start.descriptor() orelse return error.CannotLocateTunnelFileDescriptor;
-    return retainDeviceLogger(wireguard_c.pp_wg_turn_on(settings.ptr, fd), context);
+    return wireguard_c.pp_wg_turn_on(settings.ptr, fd, cLog, profile_id);
 }
 
 fn cLog(
-    raw_context: ?*anyopaque,
+    profile_id: [*c]const u8,
     level: c_int,
     message: [*c]const u8,
 ) callconv(.c) void {
     if (message == null) return;
-    const context: log.Context = if (raw_context) |raw| @as(*const log.Context, @ptrCast(@alignCast(raw))).* else .{};
+    const context: log.Context = if (profile_id != null) log.Context.init(profile_id[0..36].*) else .{};
     const scope = context.enter();
     defer scope.leave();
     const message_z: [*:0]const u8 = @ptrCast(message);
@@ -203,10 +177,7 @@ fn cLog(
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {
-    logger_mutex.lock();
-    defer logger_mutex.unlock();
     wireguard_c.pp_wg_turn_off(handle);
-    if (logger_contexts.fetchRemove(handle)) |entry| std.heap.c_allocator.destroy(entry.value);
 }
 
 fn cGetConfig(
@@ -257,12 +228,9 @@ fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
 
 fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, start: StartTunnelPassive) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    logger_mutex.lock();
-    defer logger_mutex.unlock();
-    const context = try registerDeviceLogger();
-    errdefer std.heap.c_allocator.destroy(context);
-    defer wireguard_c.pp_wg_set_logger(cLog, null);
-    return retainDeviceLogger(wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context), context);
+    const context = log.currentContext();
+    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context, cLog, profile_id);
 }
 
 fn cSendKeepalives(_: ?*anyopaque, handle: i32) void {

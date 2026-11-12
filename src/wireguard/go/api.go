@@ -7,18 +7,18 @@ package main
 
 // #include <stdlib.h>
 // #include <sys/types.h>
-// static void callLogger(void *func, void *ctx, int level, const char *msg)
+// static void callLogger(void *func, const char *profile, int level, const char *msg)
 // {
-// 	((void(*)(void *, int, const char *))func)(ctx, level, msg);
+// 	((void(*)(const char *, int, const char *))func)(profile, level, msg);
 // }
 import "C"
 
 import (
 	"fmt"
 	"math"
+	"runtime"
 	"runtime/debug"
 	"strings"
-	"sync"
 	"time"
 	"unsafe"
 
@@ -26,24 +26,12 @@ import (
 	"golang.zx2c4.com/wireguard/device"
 )
 
-var loggerMutex sync.RWMutex
-var loggerFunc unsafe.Pointer
-var loggerCtx unsafe.Pointer
-
 type tunnelHandle struct {
 	*device.Device
 	*device.Logger
 }
 
 var tunnelHandles = make(map[int32]tunnelHandle)
-
-//export wgSetLogger
-func wgSetLogger(context, loggerFn uintptr) {
-	loggerMutex.Lock()
-	defer loggerMutex.Unlock()
-	loggerCtx = unsafe.Pointer(context)
-	loggerFunc = unsafe.Pointer(loggerFn)
-}
 
 func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger) int32 {
 	err := dev.IpcSet(C.GoString(settings))
@@ -217,13 +205,22 @@ func wgVersion() *C.char {
 type CLogger struct {
 	level    int
 	function unsafe.Pointer
-	context  unsafe.Pointer
+	profile  []byte
 }
 
-func newCLogger(level int) CLogger {
-	loggerMutex.RLock()
-	defer loggerMutex.RUnlock()
-	return CLogger{level, loggerFunc, loggerCtx}
+func newCLogger(level int, function unsafe.Pointer, profile string) CLogger {
+	var owned []byte
+	if profile != "" {
+		owned = append([]byte(profile), 0)
+	}
+	return CLogger{level, function, owned}
+}
+
+func newDeviceLogger(function unsafe.Pointer, profile string) *device.Logger {
+	return &device.Logger{
+		Verbosef: newCLogger(0, function, profile).Printf,
+		Errorf:   newCLogger(1, function, profile).Printf,
+	}
 }
 
 func (l CLogger) Printf(format string, args ...interface{}) {
@@ -233,7 +230,12 @@ func (l CLogger) Printf(format string, args ...interface{}) {
 	gomsg := fmt.Sprintf(format, args...)
 	cmsg := C.CString(gomsg)
 	msg := (*C.char)(unsafe.Pointer(cmsg))
-	C.callLogger(l.function, l.context, C.int(l.level), msg)
+	var profile *C.char
+	if len(l.profile) != 0 {
+		profile = (*C.char)(unsafe.Pointer(&l.profile[0]))
+	}
+	C.callLogger(l.function, profile, C.int(l.level), msg)
+	runtime.KeepAlive(l.profile)
 	C.free(unsafe.Pointer(cmsg))
 }
 

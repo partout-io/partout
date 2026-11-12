@@ -43,22 +43,18 @@ const char *pp_wg_version(void) {
     return wgVersion();
 }
 
-void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context) {
-    wgSetLogger(context, logger_fn);
-}
-
 #if PARTOUT_WINDOWS
-int pp_wg_turn_on(const char *settings, const char *ifname) {
+int pp_wg_turn_on(const char *settings, const char *ifname, pp_wg_logger_fn logger, const char *profile_id) {
     lock_devices();
-    int handle = wgTurnOn(settings, ifname);
+    int handle = wgTurnOn(settings, ifname, logger, profile_id);
     if (handle >= 0) atomic_store(&passive_mode, false);
     unlock_devices();
     return handle;
 }
 #else
-int pp_wg_turn_on(const char *settings, int32_t tun_fd) {
+int pp_wg_turn_on(const char *settings, int32_t tun_fd, pp_wg_logger_fn logger, const char *profile_id) {
     lock_devices();
-    int handle = wgTurnOn(settings, tun_fd);
+    int handle = wgTurnOn(settings, tun_fd, logger, profile_id);
     if (handle >= 0) atomic_store(&passive_mode, false);
     unlock_devices();
     return handle;
@@ -127,9 +123,9 @@ int pp_wg_get_socket_v6(int handle) {
 }
 #endif
 
-int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context, pp_wg_logger_fn logger, const char *profile_id) {
     lock_devices();
-    int32_t handle = wgTurnOnWithPassiveIO(settings, link, tun, context);
+    int32_t handle = wgTurnOnWithPassiveIO(settings, link, tun, context, logger, profile_id);
     if (handle >= 0) atomic_store(&passive_mode, true);
     unlock_devices();
     return handle;
@@ -155,19 +151,16 @@ const char *pp_wg_version(void) {
     return "mock";
 }
 
-void pp_wg_set_logger(pp_wg_logger_fn logger_fn, void *context) {
-    (void)logger_fn;
-    (void)context;
-}
-
 #if PARTOUT_WINDOWS
-int pp_wg_turn_on(const char *settings, const char *ifname) {
+int pp_wg_turn_on(const char *settings, const char *ifname, pp_wg_logger_fn logger, const char *profile_id) {
+    (void)logger; (void)profile_id;
     (void)settings;
     (void)ifname;
     return -1;
 }
 #else
-int pp_wg_turn_on(const char *settings, int32_t tun_fd) {
+int pp_wg_turn_on(const char *settings, int32_t tun_fd, pp_wg_logger_fn logger, const char *profile_id) {
+    (void)logger; (void)profile_id;
     (void)settings;
     (void)tun_fd;
     return -1;
@@ -210,7 +203,8 @@ int pp_wg_get_socket_v6(int handle) {
 }
 #endif
 
-int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context) {
+int32_t pp_wg_turn_on_passive(const char *settings, const wg_passive_link *link, const wg_passive_tun *tun, void *context, pp_wg_logger_fn logger, const char *profile_id) {
+    (void)logger; (void)profile_id;
     (void)settings; (void)link; (void)tun; (void)context;
     return -1;
 }

@@ -7,7 +7,6 @@
 
 package main
 
-// static void callLogger(void *func, void *ctx, int level, const char *msg);
 import "C"
 
 import (
@@ -30,23 +29,15 @@ func init() {
 			select {
 			case <-signals:
 				n := runtime.Stack(buf, true)
-				buf[n] = 0
-				loggerMutex.RLock()
-				if uintptr(loggerFunc) != 0 {
-					C.callLogger(loggerFunc, nil, 0, (*C.char)(unsafe.Pointer(&buf[0])))
-				}
-				loggerMutex.RUnlock()
+				_, _ = os.Stderr.Write(buf[:n])
 			}
 		}
 	}()
 }
 
 //export wgTurnOn
-func wgTurnOn(settings *C.char, tunFd int32) int32 {
-	logger := &device.Logger{
-		Verbosef: newCLogger(0).Printf,
-		Errorf:   newCLogger(1).Printf,
-	}
+func wgTurnOn(settings *C.char, tunFd int32, loggerFn unsafe.Pointer, profile *C.char) int32 {
+	logger := newDeviceLogger(loggerFn, C.GoString(profile))
 	dupTunFd, err := unix.Dup(int(tunFd))
 	if err != nil {
 		logger.Errorf("Unable to dup tun fd: %v", err)

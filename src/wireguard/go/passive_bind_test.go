@@ -375,7 +375,7 @@ func TestPassiveEncryptedRoundTrip(t *testing.T) {
 			var handles [2]int32
 			for i := range devices {
 				config := fmt.Sprintf("private_key=%x\npublic_key=%x\nendpoint=%s\nallowed_ip=10.0.0.%d/32\n", keys[i], public[1-i], addresses[1-i], 2-i)
-				handles[i] = turnOnPassiveDevice(config, binds[i], tuns[i])
+				handles[i] = turnOnPassiveDevice(config, binds[i], tuns[i], newDeviceLogger(nil, ""))
 				if handles[i] < 0 {
 					t.Fatal("passive startup failed")
 				}

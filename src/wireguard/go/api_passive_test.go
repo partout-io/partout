@@ -19,7 +19,7 @@ import (
 
 func startPassiveTestDevice(t *testing.T) int32 {
 	t.Helper()
-	handle := turnOnPassiveDevice("", testBind(), testTun())
+	handle := turnOnPassiveDevice("", testBind(), testTun(), newDeviceLogger(nil, ""))
 	if handle < 0 {
 		t.Fatal("passive startup failed")
 	}
@@ -81,7 +81,7 @@ func TestPassiveStartupFailureClosesIO(t *testing.T) {
 	bind := testBind()
 	tun := testTun()
 	// The host bound 51820; a conflicting requested port must fail at Up.
-	if handle := turnOnPassiveDevice("listen_port=1234\n", bind, tun); handle != -1 {
+	if handle := turnOnPassiveDevice("listen_port=1234\n", bind, tun, newDeviceLogger(nil, "")); handle != -1 {
 		wgTurnOffWithPassiveIO(handle)
 		t.Fatal("startup accepted a conflicting listen port")
 	}
@@ -111,7 +111,7 @@ func TestPassiveIdlePayloadBudget(t *testing.T) {
 	tun := newPassiveTun(1400,
 		func(bufs [][]byte, _ []int, _ int, done <-chan struct{}) (int, error) { return read(bufs, done) },
 		func(bufs [][]byte, _ int) (int, error) { return len(bufs), nil })
-	handle := turnOnPassiveDevice("", bind, tun)
+	handle := turnOnPassiveDevice("", bind, tun, newDeviceLogger(nil, ""))
 	if handle < 0 {
 		t.Fatal("startup failed")
 	}

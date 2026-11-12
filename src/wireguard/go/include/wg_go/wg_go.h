@@ -8,12 +8,12 @@
 #include <sys/types.h>
 #include <stdint.h>
 
-typedef void(*logger_fn_t)(void *context, int level, const char *msg);
-extern void wgSetLogger(void *context, logger_fn_t logger_fn);
+/* The profile UUID is copied at startup; callback strings are borrowed. */
+typedef void(*logger_fn_t)(const char *profile_id, int level, const char *msg);
 #ifdef _WIN32
-extern int wgTurnOn(const char *settings, const char *ifname);
+extern int wgTurnOn(const char *settings, const char *ifname, logger_fn_t logger, const char *profile_id);
 #else
-extern int wgTurnOn(const char *settings, int32_t tun_fd);
+extern int wgTurnOn(const char *settings, int32_t tun_fd, logger_fn_t logger, const char *profile_id);
 #endif
 #ifdef __ANDROID__
 extern int wgGetSocketV4(int handle);
@@ -40,7 +40,7 @@ extern const char *wgVersion(void);
  * wgTurnOffWithPassiveIO joins callbacks and host reads have been detached.
  * Returns -1 on failure. */
 extern int32_t wgTurnOnWithPassiveIO(const char *settings,
-    const wg_passive_link *link, const wg_passive_tun *tun, void *context);
+    const wg_passive_link *link, const wg_passive_tun *tun, void *context, logger_fn_t logger, const char *profile_id);
 
 /* Passive devices support the original config getter, roaming and keepalive
  * functions. Use passive shutdown and endpoint updates below; other
