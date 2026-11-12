@@ -235,7 +235,7 @@ pub const Negotiator = struct {
                 log.write(.err, "PIA CA MD5 could not be computed, skip custom HARD_RESET");
                 break :blk null;
             };
-            log.writef(.debug, "PIA CA MD5 is: {s}", .{digest});
+            log.writef(.info, "PIA CA MD5 is: {s}", .{digest});
             break :blk digest;
         } else null;
         defer if (ca_md5_digest) |digest| self.allocator.free(digest);
@@ -275,7 +275,7 @@ pub const Negotiator = struct {
     }
 
     pub fn sendAck(self: *const Negotiator, packet: *const ControlPacket) !void {
-        log.writef(.debug, "Send ack for received packetId {d}", .{packet.packetId()});
+        log.writef(.info, "Send ack for received packetId {d}", .{packet.packetId()});
         self.sendAckToLink(packet) catch |err| {
             log.writef(.err, "Failed LINK write during send ack for packetId {d}: {s}", .{
                 packet.packetId(),
@@ -283,7 +283,7 @@ pub const Negotiator = struct {
             });
             return err;
         };
-        log.writef(.debug, "Ack successfully written to LINK for packetId {d}", .{
+        log.writef(.info, "Ack successfully written to LINK for packetId {d}", .{
             packet.packetId(),
         });
     }
@@ -311,7 +311,7 @@ pub const Negotiator = struct {
         if (core_mod.concurrency.monotonicNs() <= next) return;
         const tls = self.tls orelse
             @panic("Cannot send a push request without an owned TLS session");
-        log.write(.debug, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)");
+        log.write(.info, "TLS.ifconfig: Put plaintext (PUSH_REQUEST)");
         try tls.putPlainText("PUSH_REQUEST\x00");
         if (!try self.sendAvailableCipherText(tls)) return;
         self.next_push_request_ns = core_mod.concurrency.deadlineAfterMs(
@@ -355,7 +355,7 @@ pub const Negotiator = struct {
         defer core_mod.util.freeSliceOfStrings(self.allocator, raw_packets);
         if (raw_packets.len == 0) return;
         for (raw_packets) |_|
-            log.write(.debug, "Send control packet");
+            log.write(.info, "Send control packet");
         try self.writeLink(@ptrCast(raw_packets));
     }
 
@@ -414,7 +414,7 @@ pub const Negotiator = struct {
             return error.MissingSessionId;
         };
         if (!std.mem.eql(u8, packet.sessionId(), remote_session_id)) {
-            log.writef(.err, "Packet session mismatch ({x} != {x}): SessionMismatch", .{
+            log.writef(.fault, "Packet session mismatch ({x} != {x}): SessionMismatch", .{
                 packet.sessionId(),
                 remote_session_id,
             });
@@ -429,7 +429,7 @@ pub const Negotiator = struct {
                     @panic("Cannot start the TLS handshake without an owned TLS session");
                 try tls.start();
                 const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-                    log.writef(.err, "TLS.connect: Failed pulling ciphertext: {s}", .{
+                    log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {s}", .{
                         @errorName(err),
                     });
                     return err;
@@ -438,7 +438,7 @@ pub const Negotiator = struct {
                     return null;
                 };
                 defer self.allocator.free(ciphertext);
-                log.write(.debug, "TLS.connect: Pulled ciphertext");
+                log.write(.info, "TLS.connect: Pulled ciphertext");
                 try self.enqueueControlPackets(.controlV1, ciphertext);
             },
             .tls, .auth, .push, .connected => {
@@ -448,7 +448,7 @@ pub const Negotiator = struct {
                 };
                 const tls = self.tls orelse
                     @panic("Cannot process TLS control data without an owned TLS session");
-                log.writef(.debug, "TLS.connect: Put received ciphertext [{d}]", .{
+                log.writef(.info, "TLS.connect: Put received ciphertext [{d}]", .{
                     packet.packetId(),
                 });
                 try tls.putCipherText(payload);
@@ -484,7 +484,7 @@ pub const Negotiator = struct {
 
     fn handleControlData(self: *Negotiator, data: []const u8) !?NegotiationResult {
         const authenticator = if (self.authenticator) |*value| value else return null;
-        log.write(.debug, "Pulled plain control data");
+        log.write(.info, "Pulled plain control data");
         authenticator.appendControlData(data);
         var renegotiation_history: ?*const PushReply = null;
         if (self.state == .auth) {
@@ -506,7 +506,7 @@ pub const Negotiator = struct {
         const messages = try authenticator.parseMessages(self.allocator);
         defer core_mod.util.freeSliceOfStrings(self.allocator, messages);
         for (messages) |message| {
-            log.write(.debug, "Parsed control message");
+            log.write(.info, "Parsed control message");
             if (try self.handleControlMessage(message)) |result| return result;
         }
         if (renegotiation_history) |history| return try self.completeConnection(history);
@@ -514,7 +514,7 @@ pub const Negotiator = struct {
     }
 
     fn handleControlMessage(self: *Negotiator, message: []const u8) !?NegotiationResult {
-        log.write(.debug, "Received control message");
+        log.write(.info, "Received control message");
         if (std.mem.startsWith(u8, message, "AUTH_FAILED")) {
             const authenticator = self.authenticator orelse
                 @panic("AUTH_FAILED received without an authenticator");
@@ -544,7 +544,7 @@ pub const Negotiator = struct {
         ) catch null;
         if (loggable_message) |value| {
             defer self.allocator.free(value);
-            log.writef(.debug, "Attempt to parse PUSH_REPLY: \"{s}\"", .{value});
+            log.writef(.info, "Attempt to parse PUSH_REPLY: \"{s}\"", .{value});
         }
 
         var reply = PushReply.parse(self.allocator, complete_message) catch |err| {
@@ -564,10 +564,10 @@ pub const Negotiator = struct {
         if (self.continued_push_reply_message) |old| self.allocator.free(old);
         self.continued_push_reply_message = null;
 
-        log.writef(.debug, "Received PUSH_REPLY: \"{s}\"", .{reply});
+        log.writef(.info, "Received PUSH_REPLY: \"{s}\"", .{reply});
         if (reply.options.auth_token) |value| {
             self.options.auth_token.update(value);
-            log.write(.debug, "Updated authentication token");
+            log.write(.info, "Updated authentication token");
         }
         if (self.state == .connected) return null;
 
@@ -575,11 +575,11 @@ pub const Negotiator = struct {
             const algorithm = reply.options.compression_algorithm orelse .disabled;
             if (algorithm != .disabled) {
                 if (algorithm == .LZO) {
-                    log.writef(.err, "Server has LZO compression enabled and this was not built into the library (framing={s}): CompressionMismatch", .{
+                    log.writef(.fault, "Server has LZO compression enabled and this was not built into the library (framing={s}): CompressionMismatch", .{
                         @tagName(framing),
                     });
                 } else {
-                    log.writef(.err, "Server has compression enabled ({s}) and this is not supported (framing={s}): CompressionMismatch", .{
+                    log.writef(.fault, "Server has compression enabled ({s}) and this is not supported (framing={s}): CompressionMismatch", .{
                         @tagName(algorithm),
                         @tagName(framing),
                     });
@@ -597,7 +597,7 @@ pub const Negotiator = struct {
         self: *Negotiator,
         push_reply: *const PushReply,
     ) !NegotiationResult {
-        log.writef(.debug, "Complete connection of key {d}", .{self.key});
+        log.writef(.info, "Complete connection of key {d}", .{self.key});
         const data_channel = try self.newDataChannel(push_reply);
         errdefer data_channel.destroy();
         const history = try push_reply.clone(self.allocator);
@@ -678,7 +678,7 @@ pub const Negotiator = struct {
 
     fn setState(self: *Negotiator, state: NegotiatorState) void {
         self.state = state;
-        log.writef(.debug, "Negotiator: {d} -> {s}", .{ self.key, @tagName(state) });
+        log.writef(.info, "Negotiator: {d} -> {s}", .{ self.key, @tagName(state) });
     }
 
     /// A lack of TLS output is expected while draining; actual TLS and control
@@ -688,7 +688,7 @@ pub const Negotiator = struct {
         tls: *TLSWrapper,
     ) !bool {
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            log.writef(.err, "TLS: Failed pulling ciphertext: {s}", .{
+            log.writef(.fault, "TLS: Failed pulling ciphertext: {s}", .{
                 @errorName(err),
             });
             return err;
@@ -697,7 +697,7 @@ pub const Negotiator = struct {
             return false;
         };
         defer self.allocator.free(ciphertext);
-        log.write(.debug, "TLS: Send pulled ciphertext");
+        log.write(.info, "TLS: Send pulled ciphertext");
         try self.enqueueControlPackets(.controlV1, ciphertext);
         return true;
     }

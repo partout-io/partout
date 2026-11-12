@@ -241,7 +241,7 @@ const OpenVPNConnection = struct {
         self.reportServerConfiguration(null);
 
         session.start() catch |err| {
-            log.writef(.err, "Unable to start session: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to start session: {s}", .{@errorName(err)});
             self.releaseSession();
             return switch (err) {
                 error.OutOfMemory => error.OutOfMemory,
@@ -326,7 +326,7 @@ const OpenVPNConnection = struct {
         log.write(.notice, "Session established");
         var address_buffer: [64]u8 = undefined;
         const address = remote_endpoint.ipAddress(&address_buffer) catch {
-            log.write(.err, "Unable to parse remote endpoint");
+            log.write(.fault, "Unable to parse remote endpoint");
             self.handleConnectionFailure(error.InvalidEndpoint);
             return;
         };
@@ -335,9 +335,9 @@ const OpenVPNConnection = struct {
             remote_endpoint.type.raw(),
             remote_endpoint.address.port,
         });
-        log.write(.debug, "Local options:");
+        log.write(.notice, "Local options:");
         openvpn_log.logConfiguration(&self.configuration, true);
-        log.write(.debug, "Remote options:");
+        log.write(.notice, "Remote options:");
         openvpn_log.logConfiguration(remote_options, false);
         self.reportServerConfiguration(remote_options);
 
@@ -347,7 +347,7 @@ const OpenVPNConnection = struct {
             remote_options,
         );
         const modules = builder.modules(self.allocator) catch |err| {
-            log.writef(.err, "Unable to allocate settings modules: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to allocate settings modules: {s}", .{@errorName(err)});
             self.handleConnectionFailure(error.ModulesAllocation);
             return;
         };

@@ -131,7 +131,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             var copy: [openvpn_c.OpenVPNPacketSessionIdLength]u8 = undefined;
             @memcpy(&copy, value);
             self.remote_session_id = copy;
-            log.writef(.debug, "Control: Remote sessionId is {x}", .{value});
+            log.writef(.info, "Control: Remote sessionId is {x}", .{value});
         }
 
         pub fn readInboundPacket(
@@ -139,17 +139,26 @@ pub fn ControlChannel(comptime Serializer: type) type {
             data: []const u8,
             offset: usize,
         ) ReadInboundPacketError!ControlPacket {
-            var packet = try self.serializer.deserialize(
+            var packet = self.serializer.deserialize(
                 self.allocator,
                 data,
                 offset,
                 null,
-            );
+            ) catch |err| {
+                log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
+                return err;
+            };
             errdefer packet.deinit();
-            log.write(.debug, "Control: Read packet");
+            log.write(.info, "Control: Read packet");
             if (packet.ackIds()) |ids| {
-                const remote = packet.ackRemoteSessionId() orelse return error.InvalidAck;
-                try self.readAcks(ids, remote);
+                const remote = packet.ackRemoteSessionId() orelse {
+                    log.write(.fault, "Control: Channel failure: InvalidAck");
+                    return error.InvalidAck;
+                };
+                self.readAcks(ids, remote) catch |err| {
+                    log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
+                    return err;
+                };
             }
             return packet;
         }
@@ -233,13 +242,13 @@ pub fn ControlChannel(comptime Serializer: type) type {
             }
             const packet_count = self.current_outbound_id -% old_outbound_id;
             if (packet_count > 1) {
-                log.writef(.debug, "Control: Enqueued {d} packets [{d}-{d}]", .{
+                log.writef(.info, "Control: Enqueued {d} packets [{d}-{d}]", .{
                     packet_count,
                     old_outbound_id,
                     self.current_outbound_id -% 1,
                 });
             } else {
-                log.writef(.debug, "Control: Enqueued 1 packet [{d}]", .{
+                log.writef(.info, "Control: Enqueued 1 packet [{d}]", .{
                     old_outbound_id,
                 });
             }
@@ -256,7 +265,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
                 if (self.sent_dates_ms.get(packet.packetId())) |sent| {
                     const elapsed_ms = if (now > sent) now - sent else 0;
                     if (resend_after_ms > 0 and elapsed_ms < @as(u64, @intCast(resend_after_ms))) {
-                        log.writef(.debug, "Control: Skip writing packet with packetId {d} (sent on {d}, {d} seconds ago < {d})", .{
+                        log.writef(.info, "Control: Skip writing packet with packetId {d} (sent on {d}, {d} seconds ago < {d})", .{
                             packet.packetId(),
                             sent,
                             elapsed_ms / std.time.ms_per_s,
@@ -266,7 +275,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
                     }
                 }
                 const raw = try self.serializer.serialize(self.allocator, packet);
-                log.write(.debug, "Control: Write control packet");
+                log.write(.info, "Control: Write control packet");
                 raw_packets.append(self.allocator, raw) catch |err| {
                     self.allocator.free(raw);
                     return err;
@@ -292,7 +301,7 @@ pub fn ControlChannel(comptime Serializer: type) type {
             );
             defer packet.deinit();
             const raw = try self.serializer.serialize(self.allocator, &packet);
-            log.write(.debug, "Control: Write ack packet");
+            log.write(.info, "Control: Write ack packet");
             return raw;
         }
 
@@ -303,6 +312,10 @@ pub fn ControlChannel(comptime Serializer: type) type {
         ) ReadAcksError!void {
             const local_session_id = self.sessionId() orelse return error.MissingSessionId;
             if (!std.mem.eql(u8, acks_remote_session_id, local_session_id)) {
+                log.writef(.fault, "Control: Ack session mismatch ({x} != {x}): SessionMismatch", .{
+                    acks_remote_session_id,
+                    local_session_id,
+                });
                 return error.SessionMismatch;
             }
 

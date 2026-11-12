@@ -139,7 +139,6 @@ pub const Session = struct {
     negotiation_timer: net.Timer,
     ping_timer: net.Timer,
     link_processor: *LinkProcessor,
-    dropped_packets: u64 = 0,
 
     pub const Init = struct {
         /// I/O strategy.
@@ -165,7 +164,7 @@ pub const Session = struct {
 
         var owned_configuration = init.configuration.clone(allocator) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
-            log.writef(.err, "Unable to clone configuration: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to clone configuration: {s}", .{@errorName(err)});
             return error.InvalidConfiguration;
         };
         errdefer owned_configuration.deinit(allocator);
@@ -188,7 +187,7 @@ pub const Session = struct {
             &owned_configuration,
         ) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
-            log.writef(.err, "Unable to create serializer: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to create serializer: {s}", .{@errorName(err)});
             return error.InvalidConfiguration;
         };
         const control_channel = try ControlChannel.create(allocator, init.prng, serializer);
@@ -201,7 +200,7 @@ pub const Session = struct {
             init.remote_endpoint.plainSocketType() == .tcp,
         ) catch |err| {
             if (err == error.OutOfMemory) return error.OutOfMemory;
-            log.writef(.err, "Unable to create link processor: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to create link processor: {s}", .{@errorName(err)});
             return error.InvalidConfiguration;
         };
         errdefer link_processor.destroy();
@@ -392,10 +391,6 @@ pub const Session = struct {
             },
             .active => |value| value,
         };
-        if (self.dropped_packets > 0) {
-            log.writef(.notice, "Session dropped {d} invalid packets", .{self.dropped_packets});
-            self.dropped_packets = 0;
-        }
         // Also cancel timers when stopping a session without prior shutdown.
         self.cancelTimers();
         const with_local_options = active.context.with_local_options;
@@ -406,13 +401,6 @@ pub const Session = struct {
     }
 
     // MARK: Lifecycle
-
-    fn logDroppedPacket(self: *Session, reason: anyerror) void {
-        self.dropped_packets +|= 1;
-        if (self.dropped_packets == 1) {
-            log.writef(.err, "Dropped invalid packet: {s}; further drops counted until session shutdown", .{@errorName(reason)});
-        }
-    }
 
     fn reportFailure(self: *Session, cause: SessionError) void {
         self.events.failed(self.events.ctx, cause);
@@ -460,23 +448,25 @@ pub const Session = struct {
         defer for (&grouped) |*list| list.deinit(self.allocator);
         for (processed.packets()) |packet| {
             if (packet.len == 0) {
-                self.logDroppedPacket(error.MissingOpcode);
+                log.write(.err, "Dropped malformed packet (missing opcode)");
                 continue;
             }
             const code_value = packet[0] >> 3;
             const code = PacketCode.fromRaw(code_value) orelse {
-                self.logDroppedPacket(error.UnknownOpcode);
+                log.writef(.err, "Dropped malformed packet (unknown code: {d})", .{
+                    code_value,
+                });
                 continue;
             };
             if (code == .dataV2 and packet.len <= openvpn_c.OpenVPNPacketPeerIdLength) {
-                self.logDroppedPacket(error.MissingPeerId);
+                log.write(.err, "Dropped malformed packet (missing peerId)");
                 continue;
             }
 
             if (code == .dataV1 or code == .dataV2) {
                 const key = packet[0] & 0b111;
                 if (context.dataChannel(key) == null) {
-                    self.logDroppedPacket(error.MissingDataChannel);
+                    log.writef(.err, "Data: Channel with key {d} not found", .{key});
                     continue;
                 }
                 try grouped[key].append(self.allocator, packet);
@@ -485,7 +475,7 @@ pub const Session = struct {
 
             try self.processDataPackets(context, &grouped);
             var parsed = self.control_channel.readInboundPacket(packet, 0) catch |err| {
-                self.logDroppedPacket(err);
+                log.writef(.err, "Dropped malformed packet: {s}", .{@errorName(err)});
                 continue;
             };
             defer parsed.deinit();

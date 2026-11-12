@@ -108,6 +108,7 @@ extension PartoutTunnel: TunnelStrategy {
     }
 
     public func sendMessage(_ message: Data, to profileId: Profile.ID) async throws -> Data? {
+        pp_log(ctx, .core, .info, "Send message to profile \(profileId)...")
         return try await strategy.sendMessage(message, to: profileId)
     }
 }
