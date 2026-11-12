@@ -73,7 +73,7 @@ pub export fn partout_version() callconv(.c) [*:0]const u8 {
 }
 
 /// Invalid values leave the current logging threshold unchanged.
-pub export fn partout_set_log_level(level: c_int) callconv(.c) void {
+pub export fn partout_log_set_level(level: c_int) callconv(.c) void {
     const typed: log.Level = switch (level) {
         0 => .fault,
         1 => .err,

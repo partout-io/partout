@@ -7,7 +7,7 @@
 # Initialization and logging
 _partout_version
 _partout_init
-_partout_set_log_level
+_partout_log_set_level
 _partout_log
 
 # Profile and module import/export

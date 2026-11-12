@@ -36,7 +36,7 @@ typedef struct {
 /* Configures process-wide logging. Keep logger_ctx alive while registered. */
 void partout_init(const partout_init_args *args);
 /* Set the maximum accepted severity after init (default: Debug). Invalid values are ignored. */
-void partout_set_log_level(int level);
+void partout_log_set_level(int level);
 
 /* File utilities. */
 char *partout_readfile(const char *rel_path, const char *parent);
