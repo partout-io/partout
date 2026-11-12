@@ -16,76 +16,76 @@ pub fn logConfiguration(
 ) void {
     if (is_local) {
         if (value.remotes) |remotes|
-            log.writef(.debug, "\tRemotes: {s}", .{remotes});
+            log.writef(.info, "\tRemotes: {s}", .{remotes});
     } else {
         if (value.ipv4) |ipv4| {
-            log.writef(.debug, "\tIPv4: {s}", .{ipv4});
+            log.writef(.info, "\tIPv4: {s}", .{ipv4});
         } else {
-            log.write(.debug, "\tIPv4: not configured");
+            log.write(.info, "\tIPv4: not configured");
         }
         if (value.ipv6) |ipv6| {
-            log.writef(.debug, "\tIPv6: {s}", .{ipv6});
+            log.writef(.info, "\tIPv6: {s}", .{ipv6});
         } else {
-            log.write(.debug, "\tIPv6: not configured");
+            log.write(.info, "\tIPv6: not configured");
         }
     }
     if (value.routes4) |routes|
-        log.writef(.debug, "\tRoutes (IPv4): {s}", .{routes});
+        log.writef(.info, "\tRoutes (IPv4): {s}", .{routes});
     if (value.routes6) |routes|
-        log.writef(.debug, "\tRoutes (IPv6): {s}", .{routes});
+        log.writef(.info, "\tRoutes (IPv6): {s}", .{routes});
 
     if (value.cipher) |cipher| {
-        log.writef(.debug, "\tCipher: {s}", .{cipher.raw()});
+        log.writef(.info, "\tCipher: {s}", .{cipher.raw()});
     } else if (is_local) {
-        log.writef(.debug, "\tCipher: {s}", .{
+        log.writef(.info, "\tCipher: {s}", .{
             configuration_mod.fallbackCipher(value).raw(),
         });
     }
     if (value.digest) |digest| {
-        log.writef(.debug, "\tDigest: {s}", .{digest.raw()});
+        log.writef(.info, "\tDigest: {s}", .{digest.raw()});
     } else if (is_local) {
-        log.writef(.debug, "\tDigest: {s}", .{
+        log.writef(.info, "\tDigest: {s}", .{
             configuration_mod.fallbackDigest(value).raw(),
         });
     }
     if (value.compression_framing) |framing| {
-        log.writef(.debug, "\tCompression framing: {s}", .{@tagName(framing)});
+        log.writef(.info, "\tCompression framing: {s}", .{@tagName(framing)});
     } else if (is_local) {
-        log.writef(.debug, "\tCompression framing: {s}", .{
+        log.writef(.info, "\tCompression framing: {s}", .{
             @tagName(configuration_mod.fallbackCompressionFraming(value)),
         });
     }
     if (value.compression_algorithm) |algorithm| {
-        log.writef(.debug, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
+        log.writef(.info, "\tCompression algorithm: {s}", .{@tagName(algorithm)});
     } else if (is_local) {
-        log.writef(.debug, "\tCompression algorithm: {s}", .{
+        log.writef(.info, "\tCompression algorithm: {s}", .{
             @tagName(configuration_mod.fallbackCompressionAlgorithm(value)),
         });
     }
 
     if (is_local) {
-        log.writef(.debug, "\tUsername authentication: {}", .{
+        log.writef(.info, "\tUsername authentication: {}", .{
             value.auth_user_pass orelse false,
         });
-        log.writef(.debug, "\tStatic challenge: {}", .{
+        log.writef(.info, "\tStatic challenge: {}", .{
             value.static_challenge orelse false,
         });
         log.write(
-            .debug,
+            .info,
             if (value.client_certificate != null)
                 "\tClient verification: enabled"
             else
                 "\tClient verification: disabled",
         );
         if (value.tls_wrap) |wrap| {
-            log.writef(.debug, "\tTLS wrapping: {s}", .{wrap.strategy.raw()});
+            log.writef(.info, "\tTLS wrapping: {s}", .{wrap.strategy.raw()});
         } else {
-            log.write(.debug, "\tTLS wrapping: disabled");
+            log.write(.info, "\tTLS wrapping: disabled");
         }
         if (value.tls_security_level) |level| {
-            log.writef(.debug, "\tTLS security level: {d}", .{level});
+            log.writef(.info, "\tTLS security level: {d}", .{level});
         } else {
-            log.write(.debug, "\tTLS security level: default");
+            log.write(.info, "\tTLS security level: default");
         }
     }
 
@@ -105,74 +105,74 @@ pub fn logConfiguration(
         is_local,
     );
     if (value.checks_eku orelse false) {
-        log.write(.debug, "\tServer EKU verification: enabled");
+        log.write(.info, "\tServer EKU verification: enabled");
     } else if (is_local) {
-        log.write(.debug, "\tServer EKU verification: disabled");
+        log.write(.info, "\tServer EKU verification: disabled");
     }
     if (value.checks_san_host orelse false) {
         if (value.san_host) |host|
             log.writef(
-                .debug,
+                .info,
                 "\tHost SAN verification: enabled ({s})",
                 .{log.sensitive(host)},
             )
         else
-            log.write(.debug, "\tHost SAN verification: enabled (-)");
+            log.write(.info, "\tHost SAN verification: enabled (-)");
     } else if (is_local) {
-        log.write(.debug, "\tHost SAN verification: disabled");
+        log.write(.info, "\tHost SAN verification: disabled");
     }
 
     if (value.randomize_endpoint orelse false)
-        log.write(.debug, "\tRandomize endpoint: true");
+        log.write(.info, "\tRandomize endpoint: true");
     if (value.randomize_hostnames orelse false)
-        log.write(.debug, "\tRandomize hostnames: true");
+        log.write(.info, "\tRandomize hostnames: true");
 
     if (value.routing_policies) |policies| {
-        log.writef(.debug, "\tGateway: {any}", .{policies});
+        log.writef(.info, "\tGateway: {any}", .{policies});
     } else if (is_local) {
-        log.write(.debug, "\tGateway: not configured");
+        log.write(.info, "\tGateway: not configured");
     }
 
     if (value.dns_servers) |servers| {
         if (servers.len > 0) {
-            log.writef(.debug, "\tDNS: {s}", .{servers});
+            log.writef(.info, "\tDNS: {s}", .{servers});
         } else if (is_local) {
-            log.write(.debug, "\tDNS: not configured");
+            log.write(.info, "\tDNS: not configured");
         }
     } else if (is_local) {
-        log.write(.debug, "\tDNS: not configured");
+        log.write(.info, "\tDNS: not configured");
     }
     if (value.dns_domain) |domain|
-        log.writef(.debug, "\tDNS domain: {s}", .{log.sensitive(domain)});
+        log.writef(.info, "\tDNS domain: {s}", .{log.sensitive(domain)});
     if (value.search_domains) |domains| {
         if (domains.len > 0)
-            log.writef(.debug, "\tSearch domains: {s}", .{domains});
+            log.writef(.info, "\tSearch domains: {s}", .{domains});
     }
 
     if (value.http_proxy) |proxy|
-        log.writef(.debug, "\tHTTP proxy: {s}", .{proxy});
+        log.writef(.info, "\tHTTP proxy: {s}", .{proxy});
     if (value.https_proxy) |proxy|
-        log.writef(.debug, "\tHTTPS proxy: {s}", .{proxy});
+        log.writef(.info, "\tHTTPS proxy: {s}", .{proxy});
     if (value.proxy_auto_configuration_url) |url|
-        log.writef(.debug, "\tPAC: {s}", .{log.sensitive(url)});
+        log.writef(.info, "\tPAC: {s}", .{log.sensitive(url)});
     if (value.proxy_bypass_domains) |domains| {
         if (domains.len > 0)
             log.writef(
-                .debug,
+                .info,
                 "\tProxy bypass domains: {s}",
                 .{domains},
             );
     }
 
     if (value.mtu) |mtu| {
-        log.writef(.debug, "\tMTU: {d}", .{mtu});
+        log.writef(.info, "\tMTU: {d}", .{mtu});
     } else if (is_local) {
-        log.write(.debug, "\tMTU: default");
+        log.write(.info, "\tMTU: default");
     }
     if (value.xor_method) |method|
-        log.writef(.debug, "\tXOR: {s}", .{@tagName(std.meta.activeTag(method))});
+        log.writef(.info, "\tXOR: {s}", .{@tagName(std.meta.activeTag(method))});
     if (value.no_pull_mask) |mask|
-        log.writef(.debug, "\tNot pulled: {any}", .{mask});
+        log.writef(.info, "\tNot pulled: {any}", .{mask});
 }
 
 pub fn logNegotiatedOptions(value: *const api.OpenVPNConfiguration) void {
@@ -196,11 +196,11 @@ fn logPositiveSeconds(
 ) void {
     if (value) |seconds| {
         if (seconds > 0) {
-            log.logTimeSeconds(.debug, prefix, seconds);
+            log.logTimeSeconds(.info, prefix, seconds);
             return;
         }
     }
-    if (print_never) log.write(.debug, prefix ++ "never");
+    if (print_never) log.write(.info, prefix ++ "never");
 }
 
 pub fn pushReply(
