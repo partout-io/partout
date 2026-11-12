@@ -99,5 +99,5 @@ private nonisolated func logger(
     guard let level = DebugLog.Level(rawValue: Int(level)),
           let message else { return }
     let profileId = profileId.flatMap { Profile.ID(uuidString: String(cString: $0)) }
-    pp_log_id(profileId, .abi, level, String(cString: message))
+    pp_log_id(profileId, .engine, level, String(cString: message))
 }
