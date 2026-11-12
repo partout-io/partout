@@ -19,6 +19,7 @@ import (
 	"runtime"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
@@ -32,6 +33,9 @@ type tunnelHandle struct {
 }
 
 var tunnelHandles = make(map[int32]tunnelHandle)
+
+// Process-wide stack dumps have no profile context.
+var signalLogger atomic.Pointer[CLogger]
 
 func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger) int32 {
 	err := dev.IpcSet(C.GoString(settings))
@@ -217,6 +221,7 @@ func newCLogger(level int, function unsafe.Pointer, profile string) CLogger {
 }
 
 func newDeviceLogger(function unsafe.Pointer, profile string) *device.Logger {
+	signalLogger.Store(&CLogger{function: function})
 	return &device.Logger{
 		Verbosef: newCLogger(0, function, profile).Printf,
 		Errorf:   newCLogger(1, function, profile).Printf,

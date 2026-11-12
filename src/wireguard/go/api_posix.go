@@ -29,7 +29,9 @@ func init() {
 			select {
 			case <-signals:
 				n := runtime.Stack(buf, true)
-				_, _ = os.Stderr.Write(buf[:n])
+				if logger := signalLogger.Load(); logger != nil {
+					logger.Printf("%s", buf[:n])
+				}
 			}
 		}
 	}()
