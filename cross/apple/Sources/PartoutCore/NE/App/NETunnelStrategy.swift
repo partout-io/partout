@@ -188,7 +188,7 @@ extension NETunnelStrategy {
 
 private extension NETunnelStrategy {
     func performSave(_ profile: Profile, forConnecting: Bool, options: [String: NSObject]?) async throws {
-        profile.log(.runtime, .notice, withPreamble: "Encoded profile:")
+        profile.log(.ne, .notice, withPreamble: "Encoded profile:")
 
         let proto = try coder.protocolConfiguration(from: profile)
 

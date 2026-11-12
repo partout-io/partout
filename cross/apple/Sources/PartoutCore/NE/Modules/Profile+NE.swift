@@ -7,13 +7,13 @@ import NetworkExtension
 extension Profile {
     public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
-            pp_log_g(.runtime, .error, "Unable to parse profile from NETunnelProviderProtocol")
+            pp_log_g(.ne, .error, "Unable to parse profile from NETunnelProviderProtocol")
             throw PartoutError(.decoding)
         }
         do {
             self = try decoder.profile(from: tunnelConfiguration)
         } catch {
-            pp_log_g(.runtime, .error, "Unable to decode and process profile: \(error)")
+            pp_log_g(.ne, .error, "Unable to decode and process profile: \(error)")
             throw error
         }
     }
