@@ -20,6 +20,7 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const StartTunnel = struct {
+    profile_id: ?core.api.UUID = null,
     tun: *net.TunWrapper,
     ifname: []const u8,
 
@@ -29,6 +30,7 @@ pub const StartTunnel = struct {
 };
 
 pub const StartTunnelPassive = struct {
+    profile_id: ?core.api.UUID = null,
     link: wireguard_c.wg_passive_link,
     tun: wireguard_c.wg_passive_tun,
     context: *anyopaque,
@@ -147,8 +149,11 @@ fn cTurnOn(
     start: StartTunnel,
 ) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    const context = log.currentContext();
-    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+    var profile_buffer: [36:0]u8 = @splat(0);
+    const profile_id: ?[*:0]const u8 = if (start.profile_id) |id| blk: {
+        @memcpy(&profile_buffer, &id);
+        break :blk &profile_buffer;
+    } else null;
 
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
@@ -169,11 +174,8 @@ fn cLog(
     message: [*c]const u8,
 ) callconv(.c) void {
     if (message == null) return;
-    const context: log.Context = if (profile_id != null) log.Context.init(profile_id[0..36].*) else .{};
-    const scope = context.enter();
-    defer scope.leave();
     const message_z: [*:0]const u8 = @ptrCast(message);
-    log.writeCString(if (level == 1) .err else .debug, message_z);
+    log.writeCStringWithProfile(@ptrCast(profile_id), if (level == 1) .err else .debug, message_z);
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {
@@ -228,8 +230,11 @@ fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
 
 fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, start: StartTunnelPassive) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    const context = log.currentContext();
-    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+    var profile_buffer: [36:0]u8 = @splat(0);
+    const profile_id: ?[*:0]const u8 = if (start.profile_id) |id| blk: {
+        @memcpy(&profile_buffer, &id);
+        break :blk &profile_buffer;
+    } else null;
     return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context, cLog, profile_id);
 }
 

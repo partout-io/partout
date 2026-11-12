@@ -165,7 +165,7 @@ pub const WireGuardAdapter = struct {
                 self.state = .awaiting_commit;
             },
             .passive => |*passive| {
-                passive.start = passive.io.transport(remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
+                passive.start = passive.io.transport(self.profile.id, remote.local_port, TunnelRemoteInfoBuilder.effectiveMTU(info));
                 try self.activate(allocator);
             },
         }
@@ -378,6 +378,7 @@ pub const WireGuardAdapter = struct {
         log.writef(.debug, "Start {s} wg-go backend", .{@tagName(self.transport)});
         const handle = (switch (self.transport) {
             .active => |active| self.backend.turnOn(allocator, wg_config, .{
+                .profile_id = self.profile.id,
                 .tun = active.tunnel.tunWrapper() orelse return error.CannotLocateTunnelFileDescriptor,
                 .ifname = self.module_id[0..],
             }),

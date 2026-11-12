@@ -204,6 +204,14 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
 
 /// Forwards a borrowed C string directly to the configured C logger.
 pub fn writeCString(level: Level, message: [*:0]const u8) void {
+    const context = current_context;
+    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+    writeCStringWithProfile(profile_id, level, message);
+}
+
+/// Forwards borrowed strings with explicit identity, without changing thread context.
+/// A null profile ID denotes a global record. Strings live through the callback.
+pub fn writeCStringWithProfile(profile_id: ?[*:0]const u8, level: Level, message: [*:0]const u8) void {
     mutex.lock();
     if (@backingInt(level) > @backingInt(max_level)) {
         mutex.unlock();
@@ -215,7 +223,7 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
     };
     const logger_ctx = external_logger_ctx;
     mutex.unlock();
-    dispatchCString(logger, logger_ctx, @backingInt(level), message);
+    logger(logger_ctx, profile_id, @backingInt(level), message);
 }
 
 /// Logs a profile using the structured layout of the legacy Apple runtime.

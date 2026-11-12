@@ -258,8 +258,9 @@ pub const PassiveIO = struct {
         return true;
     }
 
-    pub fn transport(self: *PassiveIO, port: u16, mtu: u32) backend.StartTunnelPassive {
+    pub fn transport(self: *PassiveIO, profile_id: ?core.api.UUID, port: u16, mtu: u32) backend.StartTunnelPassive {
         return .{
+            .profile_id = profile_id,
             .link = .{ .local_port = port, .read = readLink, .write = writeLink },
             .tun = .{ .mtu = mtu, .read = readTun, .write = writeTun },
             .context = self,

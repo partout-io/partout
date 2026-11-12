@@ -499,3 +499,19 @@ test "rejected severity does not invoke a formatter or callback" {
     logging.write(.debug, "enabled");
     try std.testing.expectEqualStrings("enabled", CapturingLogger.lastMessage());
 }
+
+test "explicit foreign profile overrides ambient context without changing it" {
+    logging.init(false, CapturingLogger.log, null);
+    defer logging.deinit();
+    const context = logging.Context.init("11111111-1111-1111-1111-111111111111".*);
+    const scope = context.enter();
+    defer scope.leave();
+    logging.writeCStringWithProfile("22222222-2222-2222-2222-222222222222", .info, "foreign");
+    try std.testing.expectEqualStrings("22222222-2222-2222-2222-222222222222", &(CapturingLogger.profile_id orelse return error.TestUnexpectedResult));
+    logging.writeCStringWithProfile(null, .info, "global");
+    try std.testing.expect(CapturingLogger.profile_id == null);
+    try std.testing.expectEqualDeep(context, logging.currentContext());
+    logging.setMaxLevel(.info);
+    logging.writeCStringWithProfile("22222222-2222-2222-2222-222222222222", .debug, "filtered");
+    try std.testing.expectEqualStrings("global", CapturingLogger.lastMessage());
+}
