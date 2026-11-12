@@ -2,7 +2,7 @@
 
 Include this directory as a module in the consuming application's Gradle build.
 The application supplies the Android and Kotlin plugin versions. For example,
-use Gradle 8.11.1, AGP 8.9.1, Kotlin 2.1.20, and JDK 17.
+use Gradle 9.8.0, AGP 9.2.1, Kotlin serialization plugin 2.3.21, and JDK 17.
 
 In the application's `settings.gradle.kts`:
 
@@ -14,10 +14,9 @@ pluginManagement {
         gradlePluginPortal()
     }
     plugins {
-        id("com.android.application") version "8.9.1"
-        id("com.android.library") version "8.9.1"
-        id("org.jetbrains.kotlin.android") version "2.1.20"
-        id("org.jetbrains.kotlin.plugin.serialization") version "2.1.20"
+        id("com.android.application") version "9.2.1"
+        id("com.android.library") version "9.2.1"
+        id("org.jetbrains.kotlin.plugin.serialization") version "2.3.21"
     }
 }
 dependencyResolutionManagement {
@@ -68,3 +67,5 @@ Gradle variant and ABI. Do not also copy these libraries into app jniLibs.
 This is a local project dependency; no publishing setup or Maven coordinates are
 provided. Gradle still uses repositories to resolve Android/Kotlin tooling and
 third-party dependencies.
+
+The module uses AGP 9 built-in Kotlin support.
