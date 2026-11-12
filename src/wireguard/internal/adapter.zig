@@ -290,6 +290,7 @@ pub const WireGuardAdapter = struct {
         allocator: std.mem.Allocator,
         is_reachable: bool,
     ) NetworkChangeResult {
+        log.writef(.debug, "Network change detected, reachable: {}", .{is_reachable});
         self.last_reachable = is_reachable;
 
         switch (self.state) {

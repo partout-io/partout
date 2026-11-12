@@ -28,7 +28,7 @@ final class PartoutTunnelController: Sendable {
         self.options = options
         self.environment = environment
 
-        networkMonitor = NetworkMonitor()
+        networkMonitor = NetworkMonitor(ctx)
 
         let networkEvents = networkMonitor.events
         Task { [weak self] in
