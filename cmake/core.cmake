@@ -115,7 +115,7 @@ set_target_properties(partout PROPERTIES
 )
 add_dependencies(partout partout-zig)
 add_library(Partout::Partout ALIAS partout)
-target_include_directories(partout INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+target_link_libraries(partout INTERFACE Partout::Headers)
 target_link_libraries(partout PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,${PARTOUT_ZIG_LIBRARY}>"
     ${PARTOUT_CORE_LIBRARIES}

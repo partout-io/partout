@@ -53,6 +53,11 @@ if(APPLE)
     endif()
 endif()
 
+# Public C ABI headers are available even when the native library is disabled.
+add_library(partout-headers INTERFACE)
+add_library(Partout::Headers ALIAS partout-headers)
+target_include_directories(partout-headers INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
 include("cmake/windows.cmake")
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")
