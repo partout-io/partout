@@ -28,8 +28,13 @@ pub const Level = enum(c_int) {
 /// Immutable identity copied across asynchronous execution boundaries.
 /// A scope is thread-local and must be restored before returning to a caller.
 pub const Context = struct {
-    profile_id: ?api.UUID = null,
-    module_id: ?api.UUID = null,
+    profile_prefix: ?[8]u8 = null,
+
+    pub fn init(profile_id: api.UUID) Context {
+        var prefix: [8]u8 = undefined;
+        for (profile_id[0..8], &prefix) |char, *out| out.* = std.ascii.toUpper(char);
+        return .{ .profile_prefix = prefix };
+    }
 
     pub fn enter(self: Context) Scope {
         const previous = current_context;
@@ -275,15 +280,12 @@ fn dispatchCString(
     message: [*:0]const u8,
 ) void {
     const context = current_context;
-    const profile_id = context.profile_id orelse {
+    const profile_prefix = context.profile_prefix orelse {
         logger(logger_ctx, level, message);
         return;
     };
     const allocator = std.heap.c_allocator;
-    const contextual = if (context.module_id) |module_id|
-        allocator.printSentinel("[profile={s} module={s}] {s}", .{ profile_id, module_id, message }, 0) catch return
-    else
-        allocator.printSentinel("[profile={s}] {s}", .{ profile_id, message }, 0) catch return;
+    const contextual = allocator.printSentinel("[{s}] {s}", .{ profile_prefix, message }, 0) catch return;
     defer allocator.free(contextual);
     logger(logger_ctx, level, contextual.ptr);
 }

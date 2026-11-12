@@ -1596,10 +1596,7 @@ const ConnectionDaemon = struct {
 //#region Error mapping
 
 fn logContext(profile: *const api.Profile) log.Context {
-    return .{
-        .profile_id = profile.id,
-        .module_id = if (activeConnectionModule(profile)) |module| module.id() else null,
-    };
+    return log.Context.init(profile.id);
 }
 
 fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {

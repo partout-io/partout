@@ -130,7 +130,7 @@ const WireGuardConnection = struct {
 
     fn onIOFailure(raw: *anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
-        const log_scope = (log.Context{ .profile_id = self.adapter.profile.id, .module_id = self.adapter.module_id }).enter();
+        const log_scope = log.Context.init(self.adapter.profile.id).enter();
         defer log_scope.leave();
         log.write(.err, "WireGuard native I/O failed");
         self.events.emit(.{ .failed = .{

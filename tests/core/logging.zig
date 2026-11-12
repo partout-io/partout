@@ -425,11 +425,10 @@ test "connection context is copied and nested scopes restore their caller" {
     logging.init(false, CapturingLogger.log, null);
     defer logging.deinit();
     const profile = "11111111-1111-1111-1111-111111111111".*;
-    const module = "22222222-2222-2222-2222-222222222222".*;
-    const context = logging.Context{ .profile_id = profile, .module_id = module };
+    const context = logging.Context.init(profile);
     const outer = context.enter();
     logging.write(.info, "connected");
-    try std.testing.expectEqualStrings("[profile=11111111-1111-1111-1111-111111111111 module=22222222-2222-2222-2222-222222222222] connected", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings("[11111111] connected", CapturingLogger.lastMessage());
     const inner = (logging.Context{}).enter();
     logging.write(.info, "global");
     try std.testing.expectEqualStrings("global", CapturingLogger.lastMessage());
@@ -439,20 +438,29 @@ test "connection context is copied and nested scopes restore their caller" {
     try std.testing.expectEqualDeep(logging.Context{}, logging.currentContext());
 }
 
+test "profile context uses the uppercase first UUID block" {
+    logging.init(false, CapturingLogger.log, null);
+    defer logging.deinit();
+    const scope = logging.Context.init("abcdef12-1111-1111-1111-111111111111".*).enter();
+    defer scope.leave();
+    logging.write(.info, "connected");
+    try std.testing.expectEqualStrings("[ABCDEF12] connected", CapturingLogger.lastMessage());
+}
+
 test "connection context does not leak into another thread" {
-    const outer = (logging.Context{ .profile_id = "11111111-1111-1111-1111-111111111111".* }).enter();
+    const outer = logging.Context.init("11111111-1111-1111-1111-111111111111".*).enter();
     defer outer.leave();
     var isolated = false;
     const worker = try std.Thread.spawn(.{}, struct {
         fn run(result: *bool) void {
-            result.* = logging.currentContext().profile_id == null;
-            const scope = (logging.Context{ .profile_id = "22222222-2222-2222-2222-222222222222".* }).enter();
+            result.* = logging.currentContext().profile_prefix == null;
+            const scope = logging.Context.init("22222222-2222-2222-2222-222222222222".*).enter();
             defer scope.leave();
         }
     }.run, .{&isolated});
     worker.join();
     try std.testing.expect(isolated);
-    try std.testing.expectEqualStrings("11111111-1111-1111-1111-111111111111", &logging.currentContext().profile_id.?);
+    try std.testing.expectEqualStrings("11111111", &logging.currentContext().profile_prefix.?);
 }
 
 test "rejected severity does not invoke a formatter or callback" {
