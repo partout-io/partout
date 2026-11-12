@@ -84,7 +84,7 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 }
 
 func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {
-	logger := &device.Logger{Verbosef: newCLogger(0).Printf, Errorf: newCLogger(1).Printf}
+	logger := &device.Logger{Verbosef: CLogger(0).Printf, Errorf: CLogger(1).Printf}
 	dev := device.NewDevice(tun, bind, logger)
 	closeDevice := func() {
 		if bind.host != nil {

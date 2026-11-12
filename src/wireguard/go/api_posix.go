@@ -1,10 +1,9 @@
-//go:build !windows
-
 /* SPDX-License-Identifier: MIT
  *
  * Copyright (C) 2026 Davide De Rosa. All Rights Reserved.
  */
 
+//go:build !windows
 package main
 
 // static void callLogger(void *func, void *ctx, int level, const char *msg);
@@ -31,11 +30,9 @@ func init() {
 			case <-signals:
 				n := runtime.Stack(buf, true)
 				buf[n] = 0
-				loggerMutex.RLock()
 				if uintptr(loggerFunc) != 0 {
-					C.callLogger(loggerFunc, nil, 0, (*C.char)(unsafe.Pointer(&buf[0])))
+					C.callLogger(loggerFunc, loggerCtx, 0, (*C.char)(unsafe.Pointer(&buf[0])))
 				}
-				loggerMutex.RUnlock()
 			}
 		}
 	}()
@@ -44,8 +41,8 @@ func init() {
 //export wgTurnOn
 func wgTurnOn(settings *C.char, tunFd int32) int32 {
 	logger := &device.Logger{
-		Verbosef: newCLogger(0).Printf,
-		Errorf:   newCLogger(1).Printf,
+		Verbosef: CLogger(0).Printf,
+		Errorf:   CLogger(1).Printf,
 	}
 	dupTunFd, err := unix.Dup(int(tunFd))
 	if err != nil {
