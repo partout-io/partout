@@ -49,7 +49,7 @@ The module builds arm64-v8a, requires API 24, and packages Kotlin,
 `libpartout-jni.so`, and the linked `libpartout.so`. Load the JNI library with:
 
 ```kotlin
-val wrapper = io.partout.PartoutWrapper("partout-jni")
+val wrapper = io.partout.PartoutWrapper()
 ```
 
 The application owns its VpnService, manifest declarations, VPN consent, and

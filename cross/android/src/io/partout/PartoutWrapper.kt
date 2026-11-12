@@ -29,13 +29,11 @@ interface PartoutWrapperProtocol {
     fun partoutDaemonStop()
 }
 
-class PartoutWrapper(
-    libraryName: String
-): PartoutWrapperProtocol {
+class PartoutWrapper: PartoutWrapperProtocol {
     init {
         runCatching {
-            // Name of the NDK .so without "lib" prefix or ".so"
-            System.loadLibrary(libraryName)
+            // JNI shared library built by this module's CMake target.
+            System.loadLibrary("partout-jni")
         }.onFailure {
             it.printStackTrace()
             error("Unable to load Partout JNI wrapper")
