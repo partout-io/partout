@@ -154,7 +154,6 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                         pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
-                    pp_log(ctx, .os, .debug, "NETunnelStrategy.activeProfiles -> \(activeProfiles.values.description)")
                     continuation.yield(activeProfiles)
                 }
                 continuation.finish()

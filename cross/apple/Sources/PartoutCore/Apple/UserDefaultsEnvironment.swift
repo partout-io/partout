@@ -26,7 +26,9 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
         let fullKey = key.rawKey(prefix: prefix)
         if let value {
             defaults.set(value, forKey: fullKey)
-            pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey))")
+            if key != TunnelEnvironmentKeys.dataCount.keyString {
+                pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey))")
+            }
         } else {
             defaults.removeObject(forKey: fullKey)
             pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.remove(\(fullKey))")
@@ -38,7 +40,9 @@ public final class UserDefaultsEnvironment: TunnelEnvironment, @unchecked Sendab
         do {
             let data = try JSONEncoder.shared().encode(value)
             defaults.set(data, forKey: fullKey)
-            pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey)) -> \(value)")
+            if key.keyString != TunnelEnvironmentKeys.dataCount.keyString {
+                pp_log_id(profileId, .core, .debug, "UserDefaultsEnvironment.set(\(fullKey))")
+            }
         } catch {
             pp_log_id(profileId, .core, .error, "Unable to set environment key: \(fullKey) -> \(error)")
         }

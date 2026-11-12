@@ -32,6 +32,7 @@ pub const Callback = ?Logger;
 
 var mutex: concurrency.Mutex = .{};
 var logs_private_data: bool = false;
+var max_level: Level = .debug;
 var external_logger_ctx: ?*anyopaque = null;
 var external_logger: Callback = null;
 
@@ -41,6 +42,10 @@ fn partoutLog(
     message: [*:0]const u8,
 ) callconv(.c) void {
     mutex.lock();
+    if (level > @backingInt(max_level)) {
+        mutex.unlock();
+        return;
+    }
     const logger = external_logger orelse {
         mutex.unlock();
         return;
@@ -65,6 +70,7 @@ pub fn init(
 ) void {
     mutex.lock();
     logs_private_data = private_data;
+    max_level = .debug;
     external_logger = logger;
     external_logger_ctx = logger_ctx;
     mutex.unlock();
@@ -77,8 +83,16 @@ pub fn deinit() void {
     mutex.lock();
     defer mutex.unlock();
     logs_private_data = false;
+    max_level = .debug;
     external_logger_ctx = null;
     external_logger = null;
+}
+
+/// Changes accepted severity without replacing callback ownership or privacy.
+pub fn setMaxLevel(level: Level) void {
+    mutex.lock();
+    defer mutex.unlock();
+    max_level = level;
 }
 
 /// Reports whether logging sensitive values is currently allowed.
@@ -105,6 +119,10 @@ pub fn sensitive(value: anytype) SensitiveValue(@TypeOf(value)) {
 /// The borrowed message remains valid for the duration of the callback.
 pub fn write(level: Level, message: [:0]const u8) void {
     mutex.lock();
+    if (@backingInt(level) > @backingInt(max_level)) {
+        mutex.unlock();
+        return;
+    }
     const logger = external_logger orelse {
         mutex.unlock();
         return;
@@ -116,13 +134,16 @@ pub fn write(level: Level, message: [:0]const u8) void {
 
 /// Formats and writes a core log message.
 ///
-/// Arguments with a registered logging representation are replaced with
-/// `redacted_value` unless private logging is enabled. Otherwise, their debug
-/// representation is substituted into the format arguments. Privacy-aware
-/// arguments therefore use the `{s}` format specifier.
+/// Registered models and sensitive values are replaced with `redacted_value`
+/// unless private logging is enabled. Adapted arguments use the `{s}` format
+/// specifier. Rejected levels return before allocating or formatting.
 pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
     mutex.lock();
     const private_data = logs_private_data;
+    if (@backingInt(level) > @backingInt(max_level)) {
+        mutex.unlock();
+        return;
+    }
     const logger = external_logger orelse {
         mutex.unlock();
         return;
@@ -144,6 +165,10 @@ pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
 /// Forwards a borrowed C string directly to the configured C logger.
 pub fn writeCString(level: Level, message: [*:0]const u8) void {
     mutex.lock();
+    if (@backingInt(level) > @backingInt(max_level)) {
+        mutex.unlock();
+        return;
+    }
     const logger = external_logger orelse {
         mutex.unlock();
         return;

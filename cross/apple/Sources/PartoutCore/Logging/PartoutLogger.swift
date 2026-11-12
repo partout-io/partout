@@ -40,6 +40,8 @@ public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
 
     private let localLogger: LocalLogger?
 
+    public let maxLevel: DebugLog.Level
+
     /// Enables logging of public network addresses (defaults to false).
     public let logsAddresses: Bool
 
@@ -58,6 +60,7 @@ public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
     fileprivate init(
         destinations: [LoggerCategory: LoggerDestination],
         localLogger: LocalLogger?,
+        maxLevel: DebugLog.Level,
         logsAddresses: Bool,
         logsModules: Bool,
         logsRawBytes: Bool,
@@ -66,6 +69,7 @@ public final class PartoutLogger: PartoutLoggerProtocol, Sendable {
     ) {
         self.destinations = destinations
         self.localLogger = localLogger
+        self.maxLevel = maxLevel
         self.logsAddresses = logsAddresses
         self.logsModules = logsModules
         self.logsRawBytes = logsRawBytes
@@ -99,6 +103,31 @@ extension PartoutLogger {
 }
 
 extension PartoutLogger {
+    /// Replaces the writer atomically while preserving allowed history and pending writes.
+    public static func setMaxLevel(_ level: DebugLog.Level) {
+        queue.sync {
+            guard globalLogger.maxLevel != level else { return }
+            let replacement = globalLogger.withMaxLevel(level)
+            if let previous = globalLogger.localLogger {
+                replacement.localLogger?.restart(from: previous)
+            }
+            globalLogger = replacement
+        }
+    }
+
+    func withMaxLevel(_ level: DebugLog.Level) -> PartoutLogger {
+        PartoutLogger(
+            destinations: destinations,
+            localLogger: localLogger?.withMaxLevel(level),
+            maxLevel: level,
+            logsAddresses: logsAddresses,
+            logsModules: logsModules,
+            logsRawBytes: logsRawBytes,
+            assertsMissingLoggingCategory: assertsMissingLoggingCategory,
+            willPrint: willPrint
+        )
+    }
+
     /// Registers a new ``PartoutLogger`` globally.
     public static func register(_ logger: PartoutLogger, preservingLog: Bool = true) {
         queue.sync {
@@ -127,6 +156,7 @@ extension PartoutLogger {
     }
 
     public func appendLog(_ level: DebugLog.Level, message: String) {
+        guard level <= maxLevel else { return }
         localLogger?.append(level, message: message)
     }
 
@@ -156,6 +186,8 @@ extension PartoutLogger {
         private var destinations: [LoggerCategory: LoggerDestination] = [:]
 
         public var localLogger: LocalLogger?
+
+        public var maxLevel: DebugLog.Level = .debug
 
         public var logsAddresses = false
 
@@ -189,6 +221,7 @@ extension PartoutLogger {
             PartoutLogger(
                 destinations: destinations,
                 localLogger: localLogger,
+                maxLevel: maxLevel,
                 logsAddresses: logsAddresses,
                 logsModules: logsModules,
                 logsRawBytes: logsRawBytes,

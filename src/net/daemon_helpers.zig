@@ -41,9 +41,9 @@ pub const ConnectionGate = struct {
     };
 
     const Submission = struct {
-        is_ready: bool,
         did_change: bool,
         state: State,
+        is_ready: bool,
         on_ready: ?OnReadyBlock,
 
         fn callAndReturn(self: *const Submission) bool {
@@ -179,9 +179,9 @@ pub const ConnectionGate = struct {
     fn submitLocked(self: *ConnectionGate, new_state: State) Submission {
         if (std.meta.eql(self.state, new_state)) {
             return .{
-                .is_ready = false,
                 .did_change = false,
                 .state = self.state,
+                .is_ready = false,
                 .on_ready = null,
             };
         }
@@ -189,9 +189,9 @@ pub const ConnectionGate = struct {
         // Call private non-locking version, self.isReady() WOULD DEADLOCK
         const is_ready = self.state.isReady();
         return .{
-            .is_ready = is_ready,
-            .did_change = true,
+            .did_change = self.observing,
             .state = self.state,
+            .is_ready = is_ready,
             .on_ready = if (is_ready) self.on_ready else null,
         };
     }

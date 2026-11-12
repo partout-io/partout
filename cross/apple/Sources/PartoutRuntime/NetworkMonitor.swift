@@ -24,6 +24,8 @@ final class NetworkMonitor: @unchecked Sendable {
 
     private var currentReachability: Bool
 
+    private var loggingEnabled = false
+
     private var previousReachability: Bool?
 
     private var previousPathPreference: NetworkPathPreference?
@@ -53,6 +55,16 @@ final class NetworkMonitor: @unchecked Sendable {
         }
     }
 
+    func setLoggingEnabled(_ enabled: Bool) {
+        monitorQueue.sync {
+            loggingEnabled = enabled
+            previousReachability = nil
+            if enabled {
+                pp_log(ctx, .runtime, .debug, "Current path: \(monitor.currentPath.debugDescription)")
+            }
+        }
+    }
+
     func start() {
         monitor.pathUpdateHandler = { [weak self] path in
             self?.handle(path)
@@ -65,8 +77,12 @@ private extension NetworkMonitor {
     func handle(_ path: NWPath) {
         let isReachable = path.isSatisfiable
         let didChangeReachability = isReachable != previousReachability
-        let level: DebugLog.Level = didChangeReachability ? .info : .debug
-        pp_log(ctx, .runtime, level, "Path updated: \(path.debugDescription)")
+        if loggingEnabled {
+            if didChangeReachability {
+                pp_log(ctx, .runtime, .info, "Network reachability: \(isReachable)")
+            }
+            pp_log(ctx, .runtime, .debug, "Path updated: \(path.debugDescription)")
+        }
 
         reachabilityLock.with {
             currentReachability = isReachable
@@ -85,7 +101,9 @@ private extension NetworkMonitor {
             return
         }
 
-        pp_log(ctx, .runtime, .notice, "Better network path detected")
+        if loggingEnabled {
+            pp_log(ctx, .runtime, .info, "Better network path detected")
+        }
         subject.send(.betterPath)
     }
 }

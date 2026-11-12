@@ -40,7 +40,13 @@ public final class PartoutProviderRuntime: Sendable {
             options: options,
             environment: environment
         )
-        messageHandler = DefaultMessageHandler(ctx, environment: environment)
+        let loggingLock = SemaphoreMutex()
+        messageHandler = DefaultMessageHandler(ctx, environment: environment) { level in
+            loggingLock.with {
+                PartoutLogger.setMaxLevel(level)
+                partout_log_set_level(Int32(level.rawValue))
+            }
+        }
         self.options = options
         self.logsPrivateData = logsPrivateData
         self.cacheDir = cacheDir
@@ -64,6 +70,7 @@ public final class PartoutProviderRuntime: Sendable {
         )
         pp_log(ctx, .runtime, .info, "Initialize Partout library")
         partout_init(&init_args)
+        partout_log_set_level(Int32(ctx.logger.maxLevel.rawValue))
 
         let profileJSON = try JSONEncoder.shared().encodeJSON(profile.asTaggedProfile)
         let loggedProfileJSON = profileJSON.debugDescription(withSensitiveData: logsPrivateData)
@@ -84,6 +91,7 @@ public final class PartoutProviderRuntime: Sendable {
                 }
             }
         )
+        controller.setNetworkLoggingEnabled(true)
         let result = profileJSON.withCString { profile in
             let cCacheDir = cacheDir?.withCString {
                 strdup($0)
@@ -116,6 +124,7 @@ public final class PartoutProviderRuntime: Sendable {
         case PartoutCompletionCodeOK:
             break
         default:
+            controller.setNetworkLoggingEnabled(false)
             pp_log(ctx, .runtime, .fault, "Unable to start runtime: result=\(cResult)")
             throw PartoutError(.invalidValue)
         }
@@ -129,6 +138,7 @@ public final class PartoutProviderRuntime: Sendable {
 
     public func stopTunnel() async {
         pp_log(ctx, .runtime, .notice, "Stop runtime")
+        controller.setNetworkLoggingEnabled(false)
         partout_daemon_stop()
     }
 

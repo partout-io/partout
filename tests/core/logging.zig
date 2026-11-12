@@ -419,3 +419,22 @@ test "writef recognizes generated sensitive models without generated methods" {
         "Module: {\"type\":\"DNS\"",
     ));
 }
+
+test "rejected severity does not invoke a formatter or callback" {
+    const Value = struct {
+        pub fn logging_formatter(_: std.mem.Allocator, _: @This()) ![]const u8 {
+            @panic("rejected formatter was evaluated");
+        }
+    };
+    logging.init(true, CapturingLogger.log, null);
+    defer logging.deinit();
+    logging.setMaxLevel(.info);
+    logging.write(.info, "retained");
+    logging.writef(.debug, "{s}", .{Value{}});
+    logging.write(.debug, "ignored");
+    logging.writeCString(.debug, "ignored");
+    try std.testing.expectEqualStrings("retained", CapturingLogger.lastMessage());
+    logging.setMaxLevel(.debug);
+    logging.write(.debug, "enabled");
+    try std.testing.expectEqualStrings("enabled", CapturingLogger.lastMessage());
+}

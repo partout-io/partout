@@ -26,8 +26,10 @@ public final class LocalLogger: @unchecked Sendable {
 
         public let maxSize: UInt64
 
+        /// Pending-write threshold and maximum retained live-history entries (at least one).
         public let maxBufferedLines: Int
 
+        /// Maximum age of archived files and retained live-history entries.
         public let maxAge: TimeInterval?
 
         public init(
@@ -55,6 +57,8 @@ public final class LocalLogger: @unchecked Sendable {
 
     private var lines: [DebugLog.Line]
 
+    private var history: [DebugLog.Line] = []
+
     private var isStopped = false
 
     init(
@@ -75,37 +79,60 @@ public final class LocalLogger: @unchecked Sendable {
         currentURL
     }
 
+    func withMaxLevel(_ maxLevel: DebugLog.Level) -> LocalLogger {
+        LocalLogger(
+            strategy: strategy,
+            url: currentURL,
+            options: .init(
+                maxLevel: maxLevel,
+                maxSize: options.maxSize,
+                maxBufferedLines: options.maxBufferedLines,
+                maxAge: options.maxAge
+            ),
+            mapper: mapper
+        )
+    }
+
     func restart(from logger: LocalLogger) {
-        let previousLines = logger.stop()
+        let previous = logger.stop()
         queue.sync {
-            lines = previousLines
+            lines = previous.pending.filter { $0.level <= options.maxLevel }
+            history = previous.history.filter { $0.level <= options.maxLevel }
+            trimHistory()
         }
     }
 
     func reset() throws {
         try queue.sync {
             lines.removeAll()
+            history.removeAll()
             try strategy.reset(at: currentURL)
         }
     }
 
     @discardableResult
-    func stop() -> [DebugLog.Line] {
+    func stop() -> (pending: [DebugLog.Line], history: [DebugLog.Line]) {
         queue.sync {
             isStopped = true
-            defer { lines.removeAll() }
-            return lines
+            defer {
+                lines.removeAll()
+                history.removeAll()
+            }
+            return (lines, history)
         }
     }
 
     func append(_ level: DebugLog.Level, message: String) {
         queue.sync {
-            guard !isStopped else { return }
-            lines.append(DebugLog.Line(
+            guard !isStopped, level <= options.maxLevel else { return }
+            let line = DebugLog.Line(
                 timestamp: Date(),
                 level: level,
                 message: message
-            ))
+            )
+            lines.append(line)
+            history.append(line)
+            trimHistory()
             if lines.count > options.maxBufferedLines {
                 unsafeSave()
             }
@@ -115,7 +142,8 @@ public final class LocalLogger: @unchecked Sendable {
     func currentLines(sinceLast: TimeInterval, maxLevel: DebugLog.Level) -> [DebugLog.Line] {
         queue.sync {
             let since = Date(timeIntervalSinceNow: -sinceLast)
-            return lines
+            trimHistory()
+            return history
                 .filter {
                     $0.timestamp >= since && $0.level <= maxLevel
                 }
@@ -150,54 +178,47 @@ extension LocalLogger.Strategy {
 // MARK: - Private API
 
 extension LocalLogger {
+    // Live history is independent of pending writes and bounded by count and age.
+    private func trimHistory() {
+        if let maxAge = options.maxAge {
+            let since = Date(timeIntervalSinceNow: -maxAge)
+            history.removeAll { $0.timestamp < since }
+        }
+        let limit = max(1, options.maxBufferedLines)
+        if history.count > limit {
+            history.removeFirst(history.count - limit)
+        }
+    }
+
     func unsafeSave() {
         guard !lines.isEmpty else {
             return
         }
 
-        // current size
-        let size = strategy.size(of: currentURL)
-
-        // split lines across current and next log
-        var linesToAppend = lines
-            .filter {
-                $0.level <= options.maxLevel
-            }
-            .map(mapper)
-
-        var nextSize = size
-        var indexOfLastLine: Int?
-        for pair in linesToAppend.enumerated() {
-            nextSize += UInt64(pair.element.count) + 1 // "\n"
-            if nextSize > options.maxSize {
-                break
-            }
-            indexOfLastLine = pair.offset
-        }
-
         do {
-            // current log can fit new lines
-            if indexOfLastLine == linesToAppend.count - 1 {
-                try strategy.append(lines: linesToAppend, to: currentURL)
-            } else {
-
-                // append old lines to current log
-                if let indexOfLastLine {
-                    let oldLines = Array(linesToAppend.prefix(indexOfLastLine))
-                    try strategy.rotate(url: currentURL, withLines: oldLines)
-                } else {
+            var size = strategy.size(of: currentURL)
+            while !lines.isEmpty {
+                var batch: [String] = []
+                var nextSize = size
+                for line in lines {
+                    let text = mapper(line)
+                    let byteCount = UInt64(text.utf8.count) + 1
+                    // Keep an oversized entry intact in its own file.
+                    if nextSize > 0 && (nextSize >= options.maxSize || byteCount > options.maxSize - nextSize) {
+                        break
+                    }
+                    batch.append(text)
+                    nextSize += byteCount
+                }
+                if batch.isEmpty {
                     try strategy.rotate(url: currentURL, withLines: nil)
+                    size = 0
+                    continue
                 }
-
-                // flush remaining lines to new log
-                if let indexOfLastLine {
-                    linesToAppend.removeSubrange(0..<indexOfLastLine)
-                }
-                try strategy.append(lines: linesToAppend, to: currentURL)
+                try strategy.append(lines: batch, to: currentURL)
+                lines.removeFirst(batch.count)
+                size = nextSize
             }
-
-            // reset buffer
-            lines.removeAll()
         } catch {
             NSLog("LocalLogger: Unable to save log to disk: \(error)")
         }
