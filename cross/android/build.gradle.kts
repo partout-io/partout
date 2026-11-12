@@ -6,7 +6,6 @@ plugins {
 android {
     namespace = "io.partout"
     compileSdk = 35
-    ndkVersion = "29.0.14206865"
 
     defaultConfig {
         minSdk = 24
@@ -24,7 +23,6 @@ android {
     externalNativeBuild {
         cmake {
             path = file("CMakeLists.txt")
-            version = "4.1.2"
         }
     }
     compileOptions {

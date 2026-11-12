@@ -40,10 +40,14 @@ dependencies {
 }
 ```
 
-Install Android SDK platform 35, NDK 29.0.14206865 and CMake 4.1.2, and put the
+Install Android SDK platform 35, the NDK selected by AGP, and CMake 3.28 or newer, and put the
 repository's supported Zig compiler (see `build.zig.zon`) on PATH before starting
 Gradle/Android Studio. Set the SDK location in the application's local.properties
 or ANDROID_HOME. Then run `./gradlew :partout:assembleDebug` from the app.
+
+Partout leaves the NDK version to AGP by default. The consuming build can configure
+the `:partout` module's `android.ndkVersion` directly when needed. The app module's
+own NDK setting is independent and is not inherited by Partout.
 
 The module builds arm64-v8a, requires API 24, and packages Kotlin,
 `libpartout-jni.so`, and the linked `libpartout.so`. Load the JNI library with:
