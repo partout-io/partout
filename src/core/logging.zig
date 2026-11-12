@@ -174,9 +174,8 @@ pub fn write(level: Level, message: [:0]const u8) void {
 
 /// Formats and writes a core log message.
 ///
-/// Registered models use compact public summaries. Sensitive values and explicit
-/// detail dumps are replaced with `redacted_value` unless private logging is
-/// enabled. Adapted arguments use the `{s}` format specifier. Rejected levels
+/// Registered models use compact public summaries, or full JSON with private
+/// logging enabled. Sensitive values are otherwise replaced with `redacted_value`. Adapted arguments use the `{s}` format specifier. Rejected levels
 /// return before allocating or invoking any formatting helpers.
 pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
     mutex.lock();
@@ -222,7 +221,7 @@ pub fn writeCString(level: Level, message: [*:0]const u8) void {
 /// Logs a profile using the structured layout of the legacy Apple runtime.
 pub fn writeProfile(level: Level, profile: *const api.Profile) void {
     writef(level, "\tID: {s}", .{profile.id});
-    writef(level, "\tName: {s}", .{sensitive(profile.name)});
+    writef(level, "\tName: {s}", .{profile.name});
     if (profile.behavior) |behavior| {
         writef(level, "\tBehavior: {any}", .{behavior});
     }
@@ -381,7 +380,7 @@ fn prepareArguments(
             if (!private_data and isSensitive(FieldType))
                 redacted_value
             else
-                try forLog(allocator, value)
+                try forLog(allocator, value, private_data)
         else
             value;
     }
@@ -445,32 +444,19 @@ fn isSensitive(comptime T: type) bool {
     };
 }
 
-/// Full model dumps are explicit and remain subject to the private-data policy.
-pub fn details(value: anytype) DetailValue(@TypeOf(value)) {
-    return .{ .value = value };
-}
-
-fn DetailValue(comptime T: type) type {
-    return struct {
-        value: T,
-        pub fn logging_formatter(allocator: std.mem.Allocator, wrapped: @This()) ![]const u8 {
-            return util.encodeJsonValue(allocator, wrapped.value);
-        }
-    };
-}
-
 fn forLog(
     allocator: std.mem.Allocator,
     value: anytype,
+    private_data: bool,
 ) ![]const u8 {
     const T = @TypeOf(value);
     const format = comptime logFormat(T) orelse
         @compileError("unsupported type passed to forLog()");
     return switch (format) {
         .declared => T.logging_formatter(allocator, value),
-        .model => |adapter| formatWithAdapter(allocator, value, adapter),
+        .model => |adapter| formatWithAdapter(allocator, value, adapter, private_data),
         .optional => if (value) |unwrapped|
-            forLog(allocator, unwrapped)
+            forLog(allocator, unwrapped, private_data)
         else
             "null",
         .array => switch (@typeInfo(T)) {
@@ -479,7 +465,7 @@ fn forLog(
             else => @compileError("array log format requires an array or pointer type"),
         },
         .dictionary => formatDictionary(allocator, &value),
-        .dereference => forLog(allocator, value.*),
+        .dereference => forLog(allocator, value.*, private_data),
     };
 }
 
@@ -487,6 +473,7 @@ fn formatWithAdapter(
     allocator: std.mem.Allocator,
     value: anytype,
     comptime adapter: ModelAdapter,
+    private_data: bool,
 ) ![]const u8 {
     return switch (adapter) {
         .raw => value.raw,
@@ -494,7 +481,7 @@ fn formatWithAdapter(
         .pem => value.pem,
         .hex => value.hexAlloc(allocator),
         .ip_settings => formatIPSettings(allocator, value),
-        .summary => models.summary(allocator, value),
+        .summary => if (private_data) util.encodeJsonValue(allocator, value) else models.summary(allocator, value),
         .json => util.encodeJsonValue(allocator, value),
     };
 }
@@ -504,7 +491,7 @@ fn formatExplicitSensitive(
     value: anytype,
 ) ![]const u8 {
     const T = @TypeOf(value);
-    if (comptime logFormat(T) != null) return forLog(allocator, value);
+    if (comptime logFormat(T) != null) return forLog(allocator, value, true);
     if (comptime isString(T)) return allocator.dupe(u8, value);
     return allocator.print("{any}", .{value});
 }
@@ -574,7 +561,7 @@ fn writeDebug(
     value: anytype,
 ) !void {
     if (comptime logFormat(@TypeOf(value)) != null) {
-        try writer.writeAll(try forLog(allocator, value));
+        try writer.writeAll(try forLog(allocator, value, true));
     } else if (comptime isString(@TypeOf(value))) {
         try writer.writeAll(value);
     } else {

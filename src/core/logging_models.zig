@@ -60,7 +60,7 @@ pub fn adapter(comptime T: type) ?Adapter {
 }
 
 /// Public summaries expose structure, never names, addresses, credentials or keys.
-/// Complete representations require logging.details() and private logging.
+/// Private logging uses complete JSON representations instead.
 pub fn summary(allocator: std.mem.Allocator, value: anytype) ![]const u8 {
     const T = @TypeOf(value);
     if (T == api.Profile) return allocator.print("Profile(id={s}, modules={d}, active={d})", .{ value.id, value.modules.len, value.active_modules_ids.len });
