@@ -932,7 +932,7 @@ const ConnectionDaemon = struct {
             log.write(.debug, "Ignore resume connection gate, daemon not started");
             return;
         }
-        log.write(.debug, "Resume connection gate now");
+        log.write(.info, "Resume connection gate now");
         _ = self.gate.setEnabled(true);
     }
 
@@ -1380,17 +1380,17 @@ const ConnectionDaemon = struct {
         }
         _ = self.connection orelse @panic("evaluateConnection but no connection");
         if (self.conn_request != null) {
-            log.write(.debug, "Ignore evaluation, another one pending");
+            log.write(.info, "Ignore evaluation, another one pending");
             return;
         }
 
         if (!force and !self.monitor.isReachable()) {
-            log.write(.debug, "Ignore evaluation, wait for reachable network");
+            log.write(.info, "Ignore evaluation, wait for reachable network");
             _ = self.gate.setEnabled(true);
             return;
         }
 
-        log.write(.debug, "Pause connection gate during reconnection");
+        log.write(.info, "Pause connection gate during reconnection");
         _ = self.gate.setEnabled(false);
 
         log.write(.notice, "Start connection");
@@ -1508,7 +1508,7 @@ const ConnectionDaemon = struct {
             return;
         }
         const delay_ms = self.daemon.options.reconnection_delay_ms;
-        log.writef(.debug, "Resume connection gate in {} milliseconds", .{delay_ms});
+        log.writef(.info, "Resume connection gate in {} milliseconds", .{delay_ms});
 
         // Contextually cancels the previous attempt
         self.looper.scheduleTimer(&self.resume_gate_timer, delay_ms, .{
