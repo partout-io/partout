@@ -81,18 +81,8 @@ fn partoutLog(
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void {
-    mutex.lock();
-    if (level > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    dispatchCString(logger, logger_ctx, level, message);
+    const target = loggerForLevel(level) orelse return;
+    target.writeCurrent(level, message);
 }
 
 comptime {
@@ -158,72 +148,39 @@ pub fn sensitive(value: anytype) SensitiveValue(@TypeOf(value)) {
 ///
 /// The borrowed message remains valid for the duration of the callback.
 pub fn write(level: Level, message: [:0]const u8) void {
-    mutex.lock();
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
+    writeCString(level, message.ptr);
 }
 
 /// Formats and writes a core log message.
 ///
 /// Registered models use compact public summaries, or full JSON with private
-/// logging enabled. Sensitive values are otherwise replaced with `redacted_value`. Adapted arguments use the `{s}` format specifier. Rejected levels
+/// logging enabled. Sensitive values are otherwise replaced with `redacted_value`.
+/// Adapted arguments use the `{s}` format specifier. Rejected levels
 /// return before allocating or invoking any formatting helpers.
 pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
-    mutex.lock();
-    const private_data = logs_private_data;
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
+    const target = loggerForLevel(@backingInt(level)) orelse return;
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     const prepared = prepareArguments(
         allocator,
         args,
-        private_data,
+        target.private_data,
     ) catch return;
     const message = allocator.printSentinel(fmt, prepared, 0) catch return;
-    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
+    target.writeCurrent(@backingInt(level), message.ptr);
 }
 
 /// Forwards a borrowed C string directly to the configured C logger.
 pub fn writeCString(level: Level, message: [*:0]const u8) void {
-    const context = current_context;
-    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
-    writeCStringWithProfile(profile_id, level, message);
+    partoutLog(@backingInt(level), message);
 }
 
 /// Forwards borrowed strings with explicit identity, without changing thread context.
 /// A null profile ID denotes a global record. Strings live through the callback.
 pub fn writeCStringWithProfile(profile_id: ?[*:0]const u8, level: Level, message: [*:0]const u8) void {
-    mutex.lock();
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    logger(logger_ctx, profile_id, @backingInt(level), message);
+    const target = loggerForLevel(@backingInt(level)) orelse return;
+    target.write(profile_id, @backingInt(level), message);
 }
 
 /// Logs a profile using the structured layout of the legacy Apple runtime.
@@ -273,24 +230,30 @@ pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
-fn dispatchSlice(
+// Snapshot callback ownership and privacy together, then release the lock before
+// formatting or invoking host code.
+const LogTarget = struct {
     logger: Logger,
-    logger_ctx: ?*anyopaque,
-    level: c_int,
-    message: [:0]const u8,
-) void {
-    dispatchCString(logger, logger_ctx, level, message.ptr);
-}
+    ctx: ?*anyopaque,
+    private_data: bool,
 
-fn dispatchCString(
-    logger: Logger,
-    logger_ctx: ?*anyopaque,
-    level: c_int,
-    message: [*:0]const u8,
-) void {
-    const context = current_context;
-    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
-    logger(logger_ctx, profile_id, level, message);
+    fn write(self: LogTarget, profile_id: ?[*:0]const u8, level: c_int, message: [*:0]const u8) void {
+        self.logger(self.ctx, profile_id, level, message);
+    }
+
+    fn writeCurrent(self: LogTarget, level: c_int, message: [*:0]const u8) void {
+        const context = current_context;
+        const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+        self.write(profile_id, level, message);
+    }
+};
+
+fn loggerForLevel(level: c_int) ?LogTarget {
+    mutex.lock();
+    defer mutex.unlock();
+    if (level > @backingInt(max_level)) return null;
+    const logger = external_logger orelse return null;
+    return .{ .logger = logger, .ctx = external_logger_ctx, .private_data = logs_private_data };
 }
 
 fn writeProfileModule(
