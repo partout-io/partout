@@ -7,13 +7,13 @@ import NetworkExtension
 extension Profile {
     public init(withNEProvider provider: NETunnelProvider, decoder: NEProtocolDecoder) throws {
         guard let tunnelConfiguration = provider.protocolConfiguration as? NETunnelProviderProtocol else {
-            pp_log_g(.core, .error, "Unable to parse profile from NETunnelProviderProtocol")
+            pp_log_g(.runtime, .error, "Unable to parse profile from NETunnelProviderProtocol")
             throw PartoutError(.decoding)
         }
         do {
             self = try decoder.profile(from: tunnelConfiguration)
         } catch {
-            pp_log_g(.core, .error, "Unable to decode and process profile: \(error)")
+            pp_log_g(.runtime, .error, "Unable to decode and process profile: \(error)")
             throw error
         }
     }
@@ -26,8 +26,8 @@ extension Profile {
         let tunnelRemoteAddress = info?.address?.rawValue ?? NEPacketTunnelNetworkSettings.fakeRemoteAddress
         var neSettings = NEPacketTunnelNetworkSettings(tunnelRemoteAddress: tunnelRemoteAddress)
 
-        pp_log(ctx, .os, .info, "Build NetworkExtension settings from Profile")
-        pp_log(ctx, .os, .info, "\tTunnel remote address: \(tunnelRemoteAddress.asSensitiveAddress(ctx))")
+        pp_log(ctx, .ne, .info, "Build NetworkExtension settings from Profile")
+        pp_log(ctx, .ne, .info, "\tTunnel remote address: \(tunnelRemoteAddress.asSensitiveAddress(ctx))")
 
         // 1. Gather active modules
 
@@ -52,10 +52,10 @@ extension Profile {
                 .debugDescription(withSensitiveData: ctx.logger.logsModules)
 
             if let applicableModule = $0 as? Module & NESettingsApplying {
-                pp_log(ctx, .os, .info, "\t+ \(type(of: $0)): \(moduleDescription)")
+                pp_log(ctx, .ne, .info, "\t+ \(type(of: $0)): \(moduleDescription)")
                 applicableModule.apply(ctx, to: &neSettings)
             } else {
-                pp_log(ctx, .os, .info, "\t- \(type(of: $0)): \(moduleDescription)")
+                pp_log(ctx, .ne, .info, "\t- \(type(of: $0)): \(moduleDescription)")
             }
         }
 
@@ -66,7 +66,7 @@ extension Profile {
             $0.hasSameDestination(as: .default())
         } ?? false
         let isGateway = isGatewayIPv4 || isGatewayIPv6
-        pp_log(ctx, .os, .info, "\tVPN is default gateway: \(isGateway)")
+        pp_log(ctx, .ne, .info, "\tVPN is default gateway: \(isGateway)")
 
         // 4. Configure DNS for non-connection profiles
 
@@ -80,17 +80,17 @@ extension Profile {
             if neSettings.ipv6Settings == nil {
                 neSettings.ipv6Settings = .fakeLoopback
             }
-            pp_log(ctx, .os, .info, "\tRoute DNS-only settings with empty matchDomains")
+            pp_log(ctx, .ne, .info, "\tRoute DNS-only settings with empty matchDomains")
         }
 
         // 5. Optionally enable DNS fallback if default gateway without DNS settings
 
         if isGateway, neSettings.dnsSettings == nil {
-            pp_log(ctx, .os, .info, "\tVPN is default gateway but has no DNS settings")
+            pp_log(ctx, .ne, .info, "\tVPN is default gateway but has no DNS settings")
 
             let dnsFallbackServers = options.dnsFallbackServers
             if !dnsFallbackServers.isEmpty {
-                pp_log(ctx, .os, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
+                pp_log(ctx, .ne, .info, "\tEnable DNS fallback: \(dnsFallbackServers)")
                 neSettings.dnsSettings = NEDNSSettings(servers: dnsFallbackServers)
             }
         }
@@ -105,9 +105,9 @@ extension Profile {
                 return
             }
             if routesThroughVPN {
-                pp_log(ctx, .os, .info, "\tRoute DNS inside the VPN")
+                pp_log(ctx, .ne, .info, "\tRoute DNS inside the VPN")
             } else {
-                pp_log(ctx, .os, .info, "\tRoute DNS outside the VPN")
+                pp_log(ctx, .ne, .info, "\tRoute DNS outside the VPN")
             }
             neSettings.dnsSettings?.servers.forEach {
                 guard let addr = Address(rawValue: $0) else { return }
@@ -120,10 +120,10 @@ extension Profile {
                         }
                         let route = NEIPv4Route(destinationAddress: addr, subnetMask: "255.255.255.255")
                         if routesThroughVPN {
-                            pp_log(ctx, .os, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
+                            pp_log(ctx, .ne, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
                             settings.includedRoutes = (settings.includedRoutes ?? []) + [route]
                         } else {
-                            pp_log(ctx, .os, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
+                            pp_log(ctx, .ne, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
                             settings.excludedRoutes = (settings.excludedRoutes ?? []) + [route]
                         }
                         neSettings.ipv4Settings = settings
@@ -133,10 +133,10 @@ extension Profile {
                         }
                         let route = NEIPv6Route(destinationAddress: addr, networkPrefixLength: 128)
                         if routesThroughVPN {
-                            pp_log(ctx, .os, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
+                            pp_log(ctx, .ne, .info, "\t\tInclude \(addr.asSensitiveAddress(ctx))")
                             settings.includedRoutes = (settings.includedRoutes ?? []) + [route]
                         } else {
-                            pp_log(ctx, .os, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
+                            pp_log(ctx, .ne, .info, "\t\tExclude \(addr.asSensitiveAddress(ctx))")
                             settings.excludedRoutes = (settings.excludedRoutes ?? []) + [route]
                         }
                         neSettings.ipv6Settings = settings

@@ -23,7 +23,7 @@ public final class PartoutTunnelObservable {
                     self?.snapshots = newSnapshots
                 }
             } catch {
-                pp_log_g(.core, .fault, "Unable to prepare tunnel: \(error)")
+                pp_log_g(.runtime, .fault, "Unable to prepare tunnel: \(error)")
             }
         }
     }

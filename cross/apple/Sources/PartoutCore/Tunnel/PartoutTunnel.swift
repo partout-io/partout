@@ -57,7 +57,7 @@ public actor PartoutTunnel {
 extension PartoutTunnel: TunnelStrategy {
     public func prepare(purge: Bool) async throws {
         observeObjects()
-        pp_log(ctx, .core, .info, "Prepare tunnel (purge: \(purge))...")
+        pp_log(ctx, .runtime, .info, "Prepare tunnel (purge: \(purge))...")
         try await strategy.prepare(purge: purge)
     }
 
@@ -71,22 +71,22 @@ extension PartoutTunnel: TunnelStrategy {
             try? await pendingInstall.value
         }
         guard !Task.isCancelled else {
-            pp_log(ctx, .core, .info, "Cancelled installation of profile \(profile.id)")
+            pp_log(ctx, .runtime, .info, "Cancelled installation of profile \(profile.id)")
             return
         }
         // Optionally pre-process profile
         let postProfile: Profile
         if let willInstall {
-            pp_log(ctx, .core, .info, "Pre-process profile \(profile.id) before installing")
+            pp_log(ctx, .runtime, .info, "Pre-process profile \(profile.id) before installing")
             postProfile = try await willInstall(profile)
         } else {
             postProfile = profile
         }
         pendingInstall = Task {
-            pp_log(ctx, .core, .info, "Install profile \(postProfile.id)...")
+            pp_log(ctx, .runtime, .info, "Install profile \(postProfile.id)...")
             try await strategy.install(postProfile, connect: connect, options: options)
             guard !Task.isCancelled else {
-                pp_log(ctx, .core, .info, "Cancelled installation of profile \(postProfile.id)")
+                pp_log(ctx, .runtime, .info, "Cancelled installation of profile \(postProfile.id)")
                 return
             }
         }
@@ -96,19 +96,19 @@ extension PartoutTunnel: TunnelStrategy {
 
     public func uninstall(profileId: Profile.ID) async throws {
         observeObjects()
-        pp_log(ctx, .core, .info, "Uninstall profile \(profileId)...")
+        pp_log(ctx, .runtime, .info, "Uninstall profile \(profileId)...")
         try await strategy.uninstall(profileId: profileId)
         environments.removeValue(forKey: profileId)
     }
 
     public func disconnect(from profileId: Profile.ID) async throws {
         observeObjects()
-        pp_log(ctx, .core, .info, "Disconnect profile \(profileId)...")
+        pp_log(ctx, .runtime, .info, "Disconnect profile \(profileId)...")
         try await strategy.disconnect(from: profileId)
     }
 
     public func sendMessage(_ message: Data, to profileId: Profile.ID) async throws -> Data? {
-        pp_log(ctx, .core, .debug, "Send message to profile \(profileId)...")
+        pp_log(ctx, .runtime, .debug, "Send message to profile \(profileId)...")
         return try await strategy.sendMessage(message, to: profileId)
     }
 }
@@ -177,7 +177,7 @@ private extension PartoutTunnel {
                 guard !Task.isCancelled else { break }
                 await self?.handleStrategySnapshots(snapshots)
             }
-            pp_log(ctx, .core, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
+            pp_log(ctx, .runtime, .debug, "Cancelled Tunnel.strategy.didUpdateActiveProfiles (observed)")
         })
         if let refreshInterval {
             subscriptions.append(Task { [weak self] in
@@ -187,7 +187,7 @@ private extension PartoutTunnel {
                     await self?.refreshSnapshotEnvironments()
                     try? await Task.sleep(milliseconds: refreshInterval)
                 }
-                pp_log(ctx, .core, .debug, "Cancelled Tunnel.timerSubscription")
+                pp_log(ctx, .runtime, .debug, "Cancelled Tunnel.timerSubscription")
             })
         }
         self.subscriptions = subscriptions
@@ -196,10 +196,10 @@ private extension PartoutTunnel {
     func handleStrategySnapshots(_ snapshots: [Profile.ID: TunnelSnapshot]) {
         for (id, snapshot) in snapshots {
             if let previous = strategySnapshots[id], snapshot.isEquivalentExceptDataCount(to: previous) { continue }
-            pp_log(ctx, .core, .info, "Tunnel \(id) state: \(snapshot.status.rawValue), onDemand=\(snapshot.onDemand)")
+            pp_log(ctx, .runtime, .info, "Tunnel \(id) state: \(snapshot.status.rawValue), onDemand=\(snapshot.onDemand)")
         }
         for id in strategySnapshots.keys where snapshots[id] == nil {
-            pp_log(ctx, .core, .info, "Tunnel \(id) removed")
+            pp_log(ctx, .runtime, .info, "Tunnel \(id) removed")
         }
         strategySnapshots = snapshots
         publishSnapshots()

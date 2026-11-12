@@ -41,9 +41,9 @@ struct LocalLoggerTests {
             evaluations += 1
             return "message"
         }
-        logger.log(.global, .core, .debug, message())
+        logger.log(.global, .runtime, .debug, message())
         #expect(evaluations == 0)
-        logger.log(.global, .core, .info, message())
+        logger.log(.global, .runtime, .info, message())
         #expect(evaluations == 1)
     }
 

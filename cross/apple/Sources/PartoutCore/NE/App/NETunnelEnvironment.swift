@@ -61,7 +61,7 @@ private extension NETunnelEnvironment {
                         latestEnvironment = environment
                     }
                 } catch {
-                    pp_log_id(profileId, .os, .error, "Unable to fetch NE environment for \(profileId): \(error)")
+                    pp_log_id(profileId, .ne, .error, "Unable to fetch NE environment for \(profileId): \(error)")
                 }
                 try? await Task.sleep(interval: interval)
             }

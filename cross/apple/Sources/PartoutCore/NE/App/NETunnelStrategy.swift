@@ -55,7 +55,7 @@ public actor NETunnelStrategy {
         preferences: NETunnelPreferences,
         fingerprint: @escaping @Sendable (Profile) -> String?
     ) {
-        pp_log(ctx, .os, .info, "NETunnelStrategy.init()")
+        pp_log(ctx, .ne, .info, "NETunnelStrategy.init()")
         self.ctx = ctx
         self.bundleIdentifier = bundleIdentifier
         self.source = source
@@ -151,7 +151,7 @@ extension NETunnelStrategy: TunnelObservableStrategy {
                         return
                     }
                     guard !Task.isCancelled else {
-                        pp_log(ctx, .os, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
+                        pp_log(ctx, .ne, .debug, "Cancelled NETunnelStrategy.didUpdateActiveProfiles")
                         break
                     }
                     continuation.yield(activeProfiles)
@@ -188,7 +188,7 @@ extension NETunnelStrategy {
 
 private extension NETunnelStrategy {
     func performSave(_ profile: Profile, forConnecting: Bool, options: [String: NSObject]?) async throws {
-        profile.log(.core, .notice, withPreamble: "Encoded profile:")
+        profile.log(.runtime, .notice, withPreamble: "Encoded profile:")
 
         let proto = try coder.protocolConfiguration(from: profile)
 
@@ -251,9 +251,9 @@ private extension NETunnelStrategy {
                 await strategy.performSourceEvent(event)
             }
         } catch is CancellationError {
-            pp_log(ctx, .os, .debug, "Cancelled source event")
+            pp_log(ctx, .ne, .debug, "Cancelled source event")
         } catch {
-            pp_log(ctx, .os, .error, "Unable to process source event: \(error)")
+            pp_log(ctx, .ne, .error, "Unable to process source event: \(error)")
         }
     }
 
@@ -269,12 +269,12 @@ private extension NETunnelStrategy {
     }
 
     func performSourceSnapshot(_ profiles: [Profile]) async {
-        pp_log(ctx, .os, .debug, "Reconcile source snapshot: \(profiles.map(\.id))")
+        pp_log(ctx, .ne, .debug, "Reconcile source snapshot: \(profiles.map(\.id))")
         var managers: [Profile.ID: NETunnelProviderManager]
         do {
             managers = try await reloadAllManagers()
         } catch {
-            pp_log(ctx, .os, .fault, "Unable to reload managers: \(error)")
+            pp_log(ctx, .ne, .fault, "Unable to reload managers: \(error)")
             return
         }
 
@@ -283,7 +283,7 @@ private extension NETunnelStrategy {
         managers = managers.filter {
             let profileId = $0.key
             guard profileIds.contains(profileId) else {
-                pp_log(ctx, .os, .debug, "Ignore manager (unowned id: \(profileId))")
+                pp_log(ctx, .ne, .debug, "Ignore manager (unowned id: \(profileId))")
                 return false
             }
             return true
@@ -292,7 +292,7 @@ private extension NETunnelStrategy {
         // Publish retained managers before saving so updates reuse them.
         allManagers = managers
 
-        pp_log(ctx, .os, .info, "Saving \(profiles.count) profiles...")
+        pp_log(ctx, .ne, .info, "Saving \(profiles.count) profiles...")
         let startDate = Date()
         var actuallySaved = 0
         for profile in profiles {
@@ -300,27 +300,27 @@ private extension NETunnelStrategy {
             // it truly requires an update by comparing fingerprints.
             if let manager = managers[profile.id], let fp = manager.fingerprint {
                 guard fp != fingerprint(profile) else {
-                    pp_log(ctx, .os, .debug, "Manager \(profile.id) is up-to-date (fingerprint matches)")
+                    pp_log(ctx, .ne, .debug, "Manager \(profile.id) is up-to-date (fingerprint matches)")
                     actuallySaved += 1
                     continue
                 }
             }
-            pp_log(ctx, .os, .info, "Manager \(profile.id) requires update (fingerprint differs)")
+            pp_log(ctx, .ne, .info, "Manager \(profile.id) requires update (fingerprint differs)")
             do {
                 try await performSave(profile, forConnecting: false, options: [:])
                 actuallySaved += 1
             } catch {
-                pp_log(ctx, .os, .error, "Unable to save profile \(profile.id): \(error)")
+                pp_log(ctx, .ne, .error, "Unable to save profile \(profile.id): \(error)")
             }
         }
         let elapsed = -startDate.timeIntervalSinceNow
-        pp_log(ctx, .os, .info, "Saved \(actuallySaved)/\(profiles.count) profiles in: \(elapsed)")
+        pp_log(ctx, .ne, .info, "Saved \(actuallySaved)/\(profiles.count) profiles in: \(elapsed)")
     }
 
     func performSourceChange(_ change: ProfilesEvent.Change) async {
         switch change {
         case .upsert(let profile):
-            pp_log(ctx, .os, .info, "Source upsert: \(profile.id)")
+            pp_log(ctx, .ne, .info, "Source upsert: \(profile.id)")
             do {
                 try await performSave(
                     profile,
@@ -328,14 +328,14 @@ private extension NETunnelStrategy {
                     options: [:]
                 )
             } catch {
-                pp_log(ctx, .os, .error, "Unable to save profile \(profile.id): \(error)")
+                pp_log(ctx, .ne, .error, "Unable to save profile \(profile.id): \(error)")
             }
         case .remove(let profileId):
-            pp_log(ctx, .os, .info, "Source remove: \(profileId)")
+            pp_log(ctx, .ne, .info, "Source remove: \(profileId)")
             do {
                 try await performRemove(profileId: profileId)
             } catch {
-                pp_log(ctx, .os, .error, "Unable to remove profile \(profileId): \(error)")
+                pp_log(ctx, .ne, .error, "Unable to remove profile \(profileId): \(error)")
             }
         }
     }
@@ -352,8 +352,8 @@ private extension NETunnelStrategy {
               let profileId = manager.tunnelProtocol?.profileId else {
             return
         }
-//        pp_log(ctx, .os, .debug, "NEVPNStatusDidChange: \(notification)")
-        pp_log(ctx, .os, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
+//        pp_log(ctx, .ne, .debug, "NEVPNStatusDidChange: \(notification)")
+        pp_log(ctx, .ne, .debug, "NEVPNStatus(\(profileId)) -> \(connection.status.rawValue)")
         let snapshot = NETunnelManagerSnapshot(manager: manager, profileId: profileId)
         Task { [weak self] in
             await self?.updateCurrentManagersIfNeeded(with: manager, snapshot: snapshot)
@@ -433,13 +433,13 @@ private extension NETunnelStrategy {
             return status != .inactive || manager.isOnDemandEnabled ? profileId : nil
         }
         for profileId in profileIds {
-            pp_log(ctx, .os, .notice, "Disconnect from \(profileId)...")
+            pp_log(ctx, .ne, .notice, "Disconnect from \(profileId)...")
             do {
                 try await performDisconnect(from: profileId)
             } catch {
-                pp_log(ctx, .os, .error, "Unable to disconnect from \(profileId): \(error)")
+                pp_log(ctx, .ne, .error, "Unable to disconnect from \(profileId): \(error)")
             }
-            pp_log(ctx, .os, .notice, "Disconnection of \(profileId) complete!")
+            pp_log(ctx, .ne, .notice, "Disconnection of \(profileId) complete!")
         }
     }
 }
@@ -514,24 +514,24 @@ private extension NETunnelStrategy {
 
     func reloadAllManagers() async throws -> [Profile.ID: NETunnelProviderManager] {
         let loadedManagers = try await preferences.loadAll()
-        pp_log(ctx, .os, .debug, "All managers (\(loadedManagers.count)): \(loadedManagers.compactMap(\.localizedDescription))")
+        pp_log(ctx, .ne, .debug, "All managers (\(loadedManagers.count)): \(loadedManagers.compactMap(\.localizedDescription))")
         var managers: [Profile.ID: NETunnelProviderManager] = [:]
         for manager in loadedManagers {
             guard manager.tunnelBundleIdentifier == bundleIdentifier else {
-                pp_log(ctx, .os, .debug, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
+                pp_log(ctx, .ne, .debug, "Ignore manager (different bundle: \(manager.tunnelBundleIdentifier.debugDescription))")
                 continue
             }
             guard let proto = manager.tunnelProtocol else {
-                pp_log(ctx, .os, .debug, "Ignore manager (wrong protocol type)")
+                pp_log(ctx, .ne, .debug, "Ignore manager (wrong protocol type)")
                 continue
             }
             guard let profileId = proto.profileId else {
-                pp_log(ctx, .os, .debug, "Discard manager (missing id)")
+                pp_log(ctx, .ne, .debug, "Discard manager (missing id)")
                 manager.removeFromPreferences(completionHandler: nil)
                 continue
             }
             guard coder.owns(proto, for: profileId) else {
-                pp_log(ctx, .os, .debug, "Ignore manager (different owner)")
+                pp_log(ctx, .ne, .debug, "Ignore manager (different owner)")
                 continue
             }
             managers[profileId] = manager
@@ -559,15 +559,15 @@ private extension NETunnelStrategy {
 
     func logManagers(_ managers: [Profile.ID: NETunnelProviderManager]) {
         if !managers.isEmpty {
-            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers:")
+            pp_log(ctx, .ne, .debug, "NETunnelStrategy.allManagers:")
         } else {
-            pp_log(ctx, .os, .debug, "NETunnelStrategy.allManagers: none")
+            pp_log(ctx, .ne, .debug, "NETunnelStrategy.allManagers: none")
         }
         managers.values.forEach {
             guard let profileId = $0.tunnelProtocol?.profileId else {
                 return
             }
-            pp_log(ctx, .os, .debug, "\t\($0.localizedDescription ?? "")(\(profileId)): isEnabled=\($0.isEnabled), isOnDemandEnabled=\($0.isOnDemandEnabled), status=\($0.connection.status), rank=\($0.rank)")
+            pp_log(ctx, .ne, .debug, "\t\($0.localizedDescription ?? "")(\(profileId)): isEnabled=\($0.isEnabled), isOnDemandEnabled=\($0.isOnDemandEnabled), status=\($0.connection.status), rank=\($0.rank)")
         }
     }
 }
