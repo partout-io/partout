@@ -16,7 +16,6 @@ import "C"
 import (
 	"fmt"
 	"math"
-	"runtime"
 	"runtime/debug"
 	"strings"
 	"sync/atomic"
@@ -212,36 +211,31 @@ type CLogger struct {
 	profile  []byte
 }
 
-func newCLogger(level int, function unsafe.Pointer, profile string) CLogger {
-	var owned []byte
-	if profile != "" {
-		owned = append([]byte(profile), 0)
-	}
-	return CLogger{level, function, owned}
-}
-
 func newDeviceLogger(function unsafe.Pointer, profile string) *device.Logger {
 	signalLogger.Store(&CLogger{function: function})
+	var profileID []byte
+	if profile != "" {
+		profileID = append([]byte(profile), 0)
+	}
 	return &device.Logger{
-		Verbosef: newCLogger(0, function, profile).Printf,
-		Errorf:   newCLogger(1, function, profile).Printf,
+		Verbosef: CLogger{level: 0, function: function, profile: profileID}.Printf,
+		Errorf:   CLogger{level: 1, function: function, profile: profileID}.Printf,
 	}
 }
 
 func (l CLogger) Printf(format string, args ...interface{}) {
-	if uintptr(l.function) == 0 {
+	if l.function == nil {
 		return
 	}
 	gomsg := fmt.Sprintf(format, args...)
 	cmsg := C.CString(gomsg)
-	msg := (*C.char)(unsafe.Pointer(cmsg))
+	defer C.free(unsafe.Pointer(cmsg))
 	var profile *C.char
 	if len(l.profile) != 0 {
 		profile = (*C.char)(unsafe.Pointer(&l.profile[0]))
 	}
-	C.callLogger(l.function, profile, C.int(l.level), msg)
-	runtime.KeepAlive(l.profile)
-	C.free(unsafe.Pointer(cmsg))
+	// C borrows this Go-owned buffer only for the synchronous callback.
+	C.callLogger(l.function, profile, C.int(l.level), cmsg)
 }
 
 func main() {}

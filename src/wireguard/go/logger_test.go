@@ -15,7 +15,7 @@ func TestDeviceLoggerOwnsProfile(t *testing.T) {
 		go func(profile string) {
 			defer workers.Done()
 			source := []byte(profile)
-			logger := newCLogger(0, nil, string(source))
+			logger := CLogger{profile: append([]byte(string(source)), 0)}
 			source[0] = 'X'
 			if string(logger.profile) != profile+"\x00" {
 				t.Error("logger did not retain its profile")
@@ -24,7 +24,8 @@ func TestDeviceLoggerOwnsProfile(t *testing.T) {
 		}(profile)
 	}
 	workers.Wait()
-	if logger := newCLogger(0, nil, ""); logger.profile != nil {
-		t.Fatal("global logger has profile")
+	newDeviceLogger(nil, "11111111-1111-1111-1111-111111111111")
+	if signalLogger.Load().profile != nil {
+		t.Fatal("signal logger has profile")
 	}
 }
