@@ -26,8 +26,10 @@ typedef enum {
     PartoutLogLevelInfo,
     PartoutLogLevelDebug
 } partout_log_level;
-/* The message is borrowed for the duration of the callback. */
-typedef void (*partout_logger_cb)(void *ctx, int level, const char *message);
+/* profile_id is a full UUID, or NULL for global records. message has no context
+ * prefix. Both strings are borrowed for the duration of the callback only.
+ * ctx is the caller-owned logger_ctx, independent of the record's profile. */
+typedef void (*partout_logger_cb)(void *ctx, const char *profile_id, int level, const char *message);
 typedef struct {
     bool logs_private_data;
     partout_logger_cb logger_fn;

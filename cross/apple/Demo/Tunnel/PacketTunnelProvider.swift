@@ -91,11 +91,13 @@ private extension PacketTunnelProvider {
 
 private nonisolated func logger(
     _ ctx: UnsafeMutableRawPointer?,
+    _ profileId: UnsafePointer<CChar>?,
     _ level: Int32,
     _ message: UnsafePointer<CChar>?
 ) {
     _ = ctx
     guard let level = DebugLog.Level(rawValue: Int(level)),
           let message else { return }
-    pp_log_g(.abi, level, String(cString: message))
+    let profileId = profileId.flatMap { Profile.ID(uuidString: String(cString: $0)) }
+    pp_log_id(profileId, .abi, level, String(cString: message))
 }

@@ -10,12 +10,15 @@ const logging = @import("source").core_logging;
 const CapturingLogger = struct {
     var message: [256]u8 = undefined;
     var message_len: usize = 0;
+    var profile_id: ?[36]u8 = null;
 
     fn reset() void {
         message_len = 0;
+        profile_id = null;
     }
 
-    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, raw_profile_id: ?[*:0]const u8, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+        profile_id = if (raw_profile_id) |id| id[0..36].* else null;
         const value = std.mem.span(raw_message);
         message_len = @min(value.len, message.len);
         @memcpy(message[0..message_len], value[0..message_len]);
@@ -35,7 +38,7 @@ const ReplacementLogger = struct {
         saw_secret = false;
     }
 
-    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: ?[*:0]const u8, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const message = std.mem.span(raw_message);
         saw_initialization = saw_initialization or std.mem.eql(
             u8,
@@ -61,7 +64,7 @@ const ProfileLogger = struct {
         saw_active_on_demand = false;
     }
 
-    fn log(_: ?*anyopaque, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: ?[*:0]const u8, _: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const message = std.mem.span(raw_message);
         saw_id = saw_id or std.mem.eql(
             u8,
@@ -106,14 +109,16 @@ test "logging is disabled without callback" {
     logging.write(.notice, "ignored");
 }
 
-test "external logger callback receives context and log messages" {
+test "external logger callback receives caller state and profile identity separately" {
     const TestLogger = struct {
         var called = false;
         var saw_level = false;
         var saw_message = false;
+        var saw_profile = false;
 
-        fn log(ctx: ?*anyopaque, level: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(ctx: ?*anyopaque, profile_id: ?[*:0]const u8, level: c_int, message: [*:0]const u8) callconv(.c) void {
             called = true;
+            saw_profile = if (profile_id) |id| std.mem.eql(u8, std.mem.span(id), "abcdef12-1111-1111-1111-111111111111") else false;
             const saw_context: *bool = @ptrCast(@alignCast(ctx.?));
             saw_context.* = true;
             saw_level = level == @backingInt(logging.Level.notice);
@@ -125,12 +130,15 @@ test "external logger callback receives context and log messages" {
     logging.init(false, TestLogger.log, &saw_context);
     defer logging.deinit();
 
+    const scope = logging.Context.init("abcdef12-1111-1111-1111-111111111111".*).enter();
+    defer scope.leave();
     logging.write(.notice, "hello");
 
     try std.testing.expect(TestLogger.called);
     try std.testing.expect(saw_context);
     try std.testing.expect(TestLogger.saw_level);
     try std.testing.expect(TestLogger.saw_message);
+    try std.testing.expect(TestLogger.saw_profile);
 }
 
 test "profile modules log active and inactive prefixes" {
@@ -174,7 +182,7 @@ test "sentinel log messages cross the C callback without copying" {
     const TestLogger = struct {
         var message_address: usize = 0;
 
-        fn log(_: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(_: ?*anyopaque, _: ?[*:0]const u8, _: c_int, message: [*:0]const u8) callconv(.c) void {
             message_address = @intFromPtr(message);
         }
     };
@@ -183,6 +191,8 @@ test "sentinel log messages cross the C callback without copying" {
     logging.init(false, TestLogger.log, null);
     defer logging.deinit();
 
+    const scope = logging.Context.init("abcdef12-1111-1111-1111-111111111111".*).enter();
+    defer scope.leave();
     logging.write(.notice, message);
 
     try std.testing.expectEqual(@intFromPtr(message.ptr), TestLogger.message_address);
@@ -192,7 +202,7 @@ test "C log messages are forwarded without scanning or copying" {
     const TestLogger = struct {
         var message_address: usize = 0;
 
-        fn log(_: ?*anyopaque, _: c_int, message: [*:0]const u8) callconv(.c) void {
+        fn log(_: ?*anyopaque, _: ?[*:0]const u8, _: c_int, message: [*:0]const u8) callconv(.c) void {
             message_address = @intFromPtr(message);
         }
     };
@@ -201,6 +211,8 @@ test "C log messages are forwarded without scanning or copying" {
     logging.init(false, TestLogger.log, null);
     defer logging.deinit();
 
+    const scope = logging.Context.init("abcdef12-1111-1111-1111-111111111111".*).enter();
+    defer scope.leave();
     logging.writeCString(.notice, message.ptr);
 
     try std.testing.expectEqual(@intFromPtr(message.ptr), TestLogger.message_address);
@@ -428,23 +440,31 @@ test "connection context is copied and nested scopes restore their caller" {
     const context = logging.Context.init(profile);
     const outer = context.enter();
     logging.write(.info, "connected");
-    try std.testing.expectEqualStrings("[11111111] connected", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings("connected", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings(&profile, &(CapturingLogger.profile_id orelse return error.TestUnexpectedResult));
     const inner = (logging.Context{}).enter();
     logging.write(.info, "global");
     try std.testing.expectEqualStrings("global", CapturingLogger.lastMessage());
+    try std.testing.expect(CapturingLogger.profile_id == null);
     inner.leave();
     try std.testing.expectEqualDeep(context, logging.currentContext());
     outer.leave();
     try std.testing.expectEqualDeep(logging.Context{}, logging.currentContext());
 }
 
-test "profile context uses the uppercase first UUID block" {
+test "callback receives full profile UUID separately from unprefixed messages" {
     logging.init(false, CapturingLogger.log, null);
     defer logging.deinit();
     const scope = logging.Context.init("abcdef12-1111-1111-1111-111111111111".*).enter();
     defer scope.leave();
     logging.write(.info, "connected");
-    try std.testing.expectEqualStrings("[ABCDEF12] connected", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings("connected", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings("abcdef12-1111-1111-1111-111111111111", &(CapturingLogger.profile_id orelse return error.TestUnexpectedResult));
+    logging.writef(.info, "Value: {d}", .{42});
+    try std.testing.expectEqualStrings("Value: 42", CapturingLogger.lastMessage());
+    logging.writeCString(.info, "foreign");
+    try std.testing.expectEqualStrings("foreign", CapturingLogger.lastMessage());
+    try std.testing.expectEqualStrings("abcdef12-1111-1111-1111-111111111111", &(CapturingLogger.profile_id orelse return error.TestUnexpectedResult));
 }
 
 test "connection context does not leak into another thread" {
@@ -453,14 +473,14 @@ test "connection context does not leak into another thread" {
     var isolated = false;
     const worker = try std.Thread.spawn(.{}, struct {
         fn run(result: *bool) void {
-            result.* = logging.currentContext().profile_prefix == null;
+            result.* = logging.currentContext().profile_id == null;
             const scope = logging.Context.init("22222222-2222-2222-2222-222222222222".*).enter();
             defer scope.leave();
         }
     }.run, .{&isolated});
     worker.join();
     try std.testing.expect(isolated);
-    try std.testing.expectEqualStrings("11111111", &logging.currentContext().profile_prefix.?);
+    try std.testing.expectEqualStrings("11111111-1111-1111-1111-111111111111", &logging.currentContext().profile_id.?);
 }
 
 test "rejected severity does not invoke a formatter or callback" {

@@ -28,12 +28,12 @@ pub const Level = enum(c_int) {
 /// Immutable identity copied across asynchronous execution boundaries.
 /// A scope is thread-local and must be restored before returning to a caller.
 pub const Context = struct {
-    profile_prefix: ?[8]u8 = null,
+    profile_id: ?[36:0]u8 = null,
 
     pub fn init(profile_id: api.UUID) Context {
-        var prefix: [8]u8 = undefined;
-        for (profile_id[0..8], &prefix) |char, *out| out.* = std.ascii.toUpper(char);
-        return .{ .profile_prefix = prefix };
+        var id: [36:0]u8 = @splat(0);
+        @memcpy(&id, &profile_id);
+        return .{ .profile_id = id };
     }
 
     pub fn enter(self: Context) Scope {
@@ -59,13 +59,15 @@ pub fn currentContext() Context {
 
 const Logger = *const fn (
     ctx: ?*anyopaque,
+    profile_id: ?[*:0]const u8,
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void;
 
 /// Logger callback registered by the host application.
 ///
-/// `message` must be a zero-terminated string.
+/// Profile UUID and unprefixed message are borrowed zero-terminated strings.
+/// A null profile UUID denotes a global record.
 pub const Callback = ?Logger;
 
 var mutex: concurrency.Mutex = .{};
@@ -280,14 +282,8 @@ fn dispatchCString(
     message: [*:0]const u8,
 ) void {
     const context = current_context;
-    const profile_prefix = context.profile_prefix orelse {
-        logger(logger_ctx, level, message);
-        return;
-    };
-    const allocator = std.heap.c_allocator;
-    const contextual = allocator.printSentinel("[{s}] {s}", .{ profile_prefix, message }, 0) catch return;
-    defer allocator.free(contextual);
-    logger(logger_ctx, level, contextual.ptr);
+    const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+    logger(logger_ctx, profile_id, level, message);
 }
 
 fn writeProfileModule(
