@@ -234,11 +234,11 @@ pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
 // formatting or invoking host code.
 const LogTarget = struct {
     logger: Logger,
-    ctx: ?*anyopaque,
+    logger_ctx: ?*anyopaque,
     private_data: bool,
 
     fn write(self: LogTarget, profile_id: ?[*:0]const u8, level: c_int, message: [*:0]const u8) void {
-        self.logger(self.ctx, profile_id, level, message);
+        self.logger(self.logger_ctx, profile_id, level, message);
     }
 
     fn writeCurrent(self: LogTarget, level: c_int, message: [*:0]const u8) void {
@@ -253,7 +253,7 @@ fn loggerForLevel(level: c_int) ?LogTarget {
     defer mutex.unlock();
     if (level > @backingInt(max_level)) return null;
     const logger = external_logger orelse return null;
-    return .{ .logger = logger, .ctx = external_logger_ctx, .private_data = logs_private_data };
+    return .{ .logger = logger, .logger_ctx = external_logger_ctx, .private_data = logs_private_data };
 }
 
 fn writeProfileModule(
