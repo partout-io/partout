@@ -32,6 +32,7 @@ project(":partout").projectDir = file("../partout/cross/android")
 Merge these declarations into existing settings and use consistent plugin
 versions throughout the build. Adjust the checkout path for your app.
 Set `android.useAndroidX=true` in the application's `gradle.properties`.
+
 In `app/build.gradle.kts`:
 
 ```kotlin
@@ -40,7 +41,8 @@ dependencies {
 }
 ```
 
-Install Android SDK platform 35, the NDK selected by AGP, and CMake 3.28 or newer, and put the
+Install Android SDK platform 36, the NDK selected by AGP, and CMake 3.28 or newer,
+and put the
 repository's supported Zig compiler (see `build.zig.zon`) on PATH before starting
 Gradle/Android Studio. Set the SDK location in the application's local.properties
 or ANDROID_HOME. Then run `./gradlew :partout:assembleDebug` from the app.
