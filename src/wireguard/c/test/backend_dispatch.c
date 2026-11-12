@@ -6,22 +6,30 @@
 #include "wireguard/backend.h"
 #include "wg_go/wg_go.h"
 
+static void test_logger(const char *profile, int level, const char *message) {
+    (void)profile; (void)level; (void)message;
+}
+static const char *test_profile = "abcdef12-1111-1111-1111-111111111111";
+
 static unsigned native_off, passive_off, native_config, passive_config;
 static unsigned native_bump, roaming, keepalives;
 
 void pp_clog_v(pp_log_level level, const char *fmt, ...) { (void)level; (void)fmt; }
 const char *wgVersion(void) { return "test"; }
-void wgSetLogger(void *ctx, logger_fn_t logger) { (void)ctx; (void)logger; }
 #ifdef _WIN32
-int wgTurnOn(const char *settings, const char *ifname) { (void)ifname;
+int wgTurnOn(const char *settings, const char *ifname, logger_fn_t logger, const char *profile_id) { (void)ifname;
 #else
-int wgTurnOn(const char *settings, int32_t fd) { (void)fd;
+int wgTurnOn(const char *settings, int32_t fd, logger_fn_t logger, const char *profile_id) { (void)fd;
 #endif
+    assert(logger == test_logger);
+    assert(strcmp(profile_id, test_profile) == 0);
     return strcmp(settings, "fail") == 0 ? -1 : 7;
 }
 int32_t wgTurnOnWithPassiveIO(const char *settings, const wg_passive_link *link,
-    const wg_passive_tun *tun, void *ctx) {
+    const wg_passive_tun *tun, void *ctx, logger_fn_t logger, const char *profile_id) {
     (void)link; (void)tun; (void)ctx;
+    assert(logger == test_logger);
+    assert(strcmp(profile_id, test_profile) == 0);
     return strcmp(settings, "fail") == 0 ? -1 : 7;
 }
 void wgTurnOff(int handle) { assert(handle == 7); ++native_off; }
@@ -46,9 +54,9 @@ int wgGetSocketV6(int handle) { assert(handle == 7); return 4; }
 
 static int start_native(const char *settings) {
 #if PARTOUT_WINDOWS
-    return pp_wg_turn_on(settings, "test");
+    return pp_wg_turn_on(settings, "test", test_logger, test_profile);
 #else
-    return pp_wg_turn_on(settings, -1);
+    return pp_wg_turn_on(settings, -1, test_logger, test_profile);
 #endif
 }
 
@@ -64,14 +72,14 @@ static void exercise(const char *mode) {
 int main(void) {
     assert(start_native("") == 7);
     current_mode = "native";
-    assert(pp_wg_turn_on_passive("fail", NULL, NULL, NULL) == -1);
+    assert(pp_wg_turn_on_passive("fail", NULL, NULL, NULL, test_logger, test_profile) == -1);
     exercise("native"); // Failed opposite-mode startup must not change dispatch.
     pp_wg_turn_off(7);
     assert(native_off == 1 && passive_off == 0);
     assert(native_config == 1 && passive_config == 0 && native_bump == 2);
     assert(roaming == 1 && keepalives == 1);
 
-    assert(pp_wg_turn_on_passive("", NULL, NULL, NULL) == 7);
+    assert(pp_wg_turn_on_passive("", NULL, NULL, NULL, test_logger, test_profile) == 7);
     current_mode = "passive";
     assert(start_native("fail") == -1);
     exercise("passive"); // Common operations use the original ABI in both modes.

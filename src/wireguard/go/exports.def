@@ -1,6 +1,5 @@
 LIBRARY wg-go.dll
 EXPORTS
-wgSetLogger
 wgTurnOn
 wgGetSocketV4
 wgGetSocketV6

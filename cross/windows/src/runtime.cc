@@ -111,7 +111,7 @@ struct VpnChannelRuntime::Impl {
         try {
             if (init_args.logger_fn) {
                 const auto text = to_string(hstring{message});
-                init_args.logger_fn(init_args.logger_ctx, level, text.c_str());
+                init_args.logger_fn(init_args.logger_ctx, nullptr, level, text.c_str());
             }
         } catch (...) {}
     }

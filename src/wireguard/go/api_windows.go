@@ -13,17 +13,15 @@ import (
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 	"golang.zx2c4.com/wireguard/tun"
+	"unsafe"
 )
 
 func init() {
 }
 
 //export wgTurnOn
-func wgTurnOn(settings *C.char, uuid *C.char) int32 {
-	logger := &device.Logger{
-		Verbosef: CLogger(0).Printf,
-		Errorf:   CLogger(1).Printf,
-	}
+func wgTurnOn(settings *C.char, uuid *C.char, loggerFn unsafe.Pointer, profile *C.char) int32 {
+	logger := newDeviceLogger(loggerFn, C.GoString(profile))
 	uuidString := C.GoString(uuid)
 	guidString := fmt.Sprintf("{%s}", uuidString)
 	guid, err := windows.GUIDFromString(guidString)
@@ -44,5 +42,9 @@ func wgTurnOn(settings *C.char, uuid *C.char) int32 {
 		dev.Close()
 		return -1
 	}
-	return wgTurnOnDevice(settings, dev, logger)
+	handle := wgTurnOnDevice(settings, dev, logger)
+	if handle < 0 {
+		dev.Close()
+	}
+	return handle
 }

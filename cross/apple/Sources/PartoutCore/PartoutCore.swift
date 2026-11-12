@@ -10,12 +10,14 @@ public enum PartoutCore {
 }
 
 extension LoggerCategory: CaseIterable {
-    public static let abi = Self(rawValue: "abi")
+    /// Records emitted by the shared Zig engine.
     public static let core = Self(rawValue: "core")
-    public static let os = Self(rawValue: "os")
+    /// NetworkExtension integration in PartoutCore/NE.
+    public static let ne = Self(rawValue: "ne")
+    /// Platform runtime integration outside PartoutCore/NE.
     public static let runtime = Self(rawValue: "runtime")
 
-    public static let allCases: [LoggerCategory] = [.abi, .core, .os, .runtime]
+    public static let allCases: [LoggerCategory] = [.core, .ne, .runtime]
 }
 
 // MARK: Profile

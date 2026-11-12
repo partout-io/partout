@@ -114,6 +114,8 @@ pub const Daemon = struct {
         original_profile: *const api.Profile,
         context: Context,
     ) Error!*Daemon {
+        const log_scope = logContext(original_profile).enter();
+        defer log_scope.leave();
         log.write(.notice, "Using daemon");
         var profile = try original_profile.clone(allocator);
         errdefer profile.deinit(allocator);
@@ -146,6 +148,8 @@ pub const Daemon = struct {
     }
 
     pub fn destroy(self: *Daemon) void {
+        const log_scope = logContext(&self.profile).enter();
+        defer log_scope.leave();
         log.write(.debug, "Deinit daemon");
         if (self.state != .initial and self.state != .stopped)
             @panic("Daemon.destroy() requires an initial or fully stopped daemon");
@@ -167,6 +171,8 @@ pub const Daemon = struct {
     }
 
     pub fn start(self: *const Daemon) Error!void {
+        const log_scope = logContext(&self.profile).enter();
+        defer log_scope.leave();
         return switch (self.implementation) {
             .settings => |settings| settings.start(),
             .connection => |connection| connection.start(),
@@ -174,6 +180,8 @@ pub const Daemon = struct {
     }
 
     pub fn hold(self: *const Daemon) void {
+        const log_scope = logContext(&self.profile).enter();
+        defer log_scope.leave();
         switch (self.implementation) {
             .settings => |settings| settings.hold(),
             .connection => |connection| connection.hold(),
@@ -181,6 +189,8 @@ pub const Daemon = struct {
     }
 
     pub fn stop(self: *const Daemon) void {
+        const log_scope = logContext(&self.profile).enter();
+        defer log_scope.leave();
         switch (self.implementation) {
             .settings => |settings| settings.stop(),
             .connection => |connection| connection.stop(),
@@ -603,6 +613,8 @@ const ConnectionDaemon = struct {
     // the platform and would otherwise deadlock with that lock held.
     fn onReachability(ctx: ?*anyopaque, reachability: io.ReachabilityInfo) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        const log_scope = logContext(&self.daemon.profile).enter();
+        defer log_scope.leave();
         self.schedule(.{ .onReachability = reachability }) catch |err| {
             log.writef(.err, "Unable to enqueue reachability: {s}", .{@errorName(err)});
         };
@@ -612,6 +624,8 @@ const ConnectionDaemon = struct {
     // whose locks must be released before calling back into the controller.
     fn onBetterPath(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
+        const log_scope = logContext(&self.daemon.profile).enter();
+        defer log_scope.leave();
         self.schedule(.onBetterPath) catch |err| {
             log.writef(.err, "Unable to enqueue better path: {s}", .{@errorName(err)});
         };
@@ -807,7 +821,7 @@ const ConnectionDaemon = struct {
         switch (event) {
             .established => |success| {
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
@@ -907,7 +921,7 @@ const ConnectionDaemon = struct {
 
     fn handleResumeGate(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
+            log.write(.debug, "Ignore resume connection gate, daemon not started");
             return;
         }
         log.write(.info, "Resume connection gate now");
@@ -1075,7 +1089,10 @@ const ConnectionDaemon = struct {
         }
     };
 
+    // Establish context once for the actor, including its packet and timer callbacks.
     fn run(self: *ConnectionDaemon) void {
+        const log_scope = logContext(&self.daemon.profile).enter();
+        defer log_scope.leave();
         self.jobs_mutex.lock();
         var running = self.is_running;
         self.actor_id = std.Thread.getCurrentId();
@@ -1339,12 +1356,12 @@ const ConnectionDaemon = struct {
 
     fn evaluateConnection(self: *ConnectionDaemon, force: bool) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore evaluation, daemon not started");
+            log.write(.debug, "Ignore evaluation, daemon not started");
             return;
         }
         _ = self.connection orelse @panic("evaluateConnection but no connection");
         if (self.conn_request != null) {
-            log.write(.debug, "Ignore evaluation, another one pending");
+            log.write(.info, "Ignore evaluation, another one pending");
             return;
         }
 
@@ -1468,7 +1485,7 @@ const ConnectionDaemon = struct {
 
     fn scheduleResumeGate(self: *ConnectionDaemon) void {
         if (self.daemon.state != .started) {
-            log.write(.info, "Ignore resume connection gate, daemon not started");
+            log.write(.debug, "Ignore resume connection gate, daemon not started");
             return;
         }
         const delay_ms = self.daemon.options.reconnection_delay_ms;
@@ -1558,6 +1575,10 @@ const ConnectionDaemon = struct {
 };
 
 //#region Error mapping
+
+fn logContext(profile: *const api.Profile) log.Context {
+    return log.Context.init(profile.id);
+}
 
 fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
     return switch (err) {

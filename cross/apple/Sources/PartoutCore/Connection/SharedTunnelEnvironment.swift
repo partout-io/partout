@@ -33,7 +33,7 @@ public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendab
             do {
                 try values.encode(value, forKey: key.keyString)
             } catch {
-                pp_log_id(profileId, .core, .error, "Unable to encode environment key '\(key.keyString)': \(error)")
+                pp_log_id(profileId, .runtime, .error, "Unable to encode environment key '\(key.keyString)': \(error)")
             }
         }
     }
@@ -43,7 +43,7 @@ public final class SharedTunnelEnvironment: TunnelEnvironment, @unchecked Sendab
             do {
                 return try values.decode(T.self, forKey: key.keyString)
             } catch {
-                pp_log_id(profileId, .core, .error, "Unable to decode environment key '\(key.keyString)': \(error)")
+                pp_log_id(profileId, .runtime, .error, "Unable to decode environment key '\(key.keyString)': \(error)")
                 return nil
             }
         }

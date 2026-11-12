@@ -130,6 +130,8 @@ const WireGuardConnection = struct {
 
     fn onIOFailure(raw: *anyopaque) void {
         const self: *WireGuardConnection = @ptrCast(@alignCast(raw));
+        const log_scope = log.Context.init(self.adapter.profile.id).enter();
+        defer log_scope.leave();
         log.write(.err, "WireGuard native I/O failed");
         self.events.emit(.{ .failed = .{
             .err_pair = .{ .code = .ioFailure },
@@ -558,10 +560,10 @@ fn activationError(err: WireGuardAdapter.ActivationError) net.ConnectionStartErr
             );
         },
         error.DNSResolutionFailure, error.InvalidEndpoint => {
-            log.write(.fault, "DNS resolution failed");
+            log.write(.err, "DNS resolution failed");
         },
         error.CouldNotStartBackend => {
-            log.write(.fault, "Starting tunnel backend failed");
+            log.write(.err, "Starting tunnel backend failed");
         },
         else => {
             // Adapter activation errors are the local diagnostic signal. The

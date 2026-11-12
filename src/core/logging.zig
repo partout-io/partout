@@ -9,25 +9,65 @@ const build_options = @import("build_options");
 const api = @import("api.zig");
 const concurrency = @import("concurrency.zig");
 const util = @import("util.zig");
+const models = @import("logging_models.zig");
 
 /// Log severity values exposed through the C ABI.
 pub const Level = enum(c_int) {
+    /// Broken invariant or failure of the logging/runtime subsystem.
     fault = 0,
+    /// An operation failed; include the cause and owning connection.
     err = 1,
+    /// Connection lifecycle milestones and concise negotiated summaries.
     notice = 2,
+    /// Useful state transitions during normal operation.
     info = 3,
+    /// Protocol traces and detailed diagnostics; never routine counters.
     debug = 4,
 };
 
+/// Immutable identity copied across asynchronous execution boundaries.
+/// A scope is thread-local and must be restored before returning to a caller.
+pub const Context = struct {
+    profile_id: ?[36:0]u8 = null,
+
+    pub fn init(profile_id: api.UUID) Context {
+        var id: [36:0]u8 = @splat(0);
+        @memcpy(&id, &profile_id);
+        return .{ .profile_id = id };
+    }
+
+    pub fn enter(self: Context) Scope {
+        const previous = current_context;
+        current_context = self;
+        return .{ .previous = previous };
+    }
+};
+
+pub const Scope = struct {
+    previous: Context,
+
+    pub fn leave(self: Scope) void {
+        current_context = self.previous;
+    }
+};
+
+threadlocal var current_context: Context = .{};
+
+pub fn currentContext() Context {
+    return current_context;
+}
+
 const Logger = *const fn (
     ctx: ?*anyopaque,
+    profile_id: ?[*:0]const u8,
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void;
 
 /// Logger callback registered by the host application.
 ///
-/// `message` must be a zero-terminated string.
+/// Profile UUID and unprefixed message are borrowed zero-terminated strings.
+/// A null profile UUID denotes a global record.
 pub const Callback = ?Logger;
 
 var mutex: concurrency.Mutex = .{};
@@ -41,18 +81,8 @@ fn partoutLog(
     level: c_int,
     message: [*:0]const u8,
 ) callconv(.c) void {
-    mutex.lock();
-    if (level > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    dispatchCString(logger, logger_ctx, level, message);
+    const target = loggerForLevel(level) orelse return;
+    target.writeCurrent(level, message);
 }
 
 comptime {
@@ -118,64 +148,39 @@ pub fn sensitive(value: anytype) SensitiveValue(@TypeOf(value)) {
 ///
 /// The borrowed message remains valid for the duration of the callback.
 pub fn write(level: Level, message: [:0]const u8) void {
-    mutex.lock();
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
+    writeCString(level, message.ptr);
 }
 
 /// Formats and writes a core log message.
 ///
-/// Registered models and sensitive values are replaced with `redacted_value`
-/// unless private logging is enabled. Adapted arguments use the `{s}` format
-/// specifier. Rejected levels return before allocating or formatting.
+/// Registered models use compact public summaries, or full JSON with private
+/// logging enabled. Sensitive values are otherwise replaced with `redacted_value`.
+/// Adapted arguments use the `{s}` format specifier. Rejected levels
+/// return before allocating or invoking any formatting helpers.
 pub fn writef(level: Level, comptime fmt: []const u8, args: anytype) void {
-    mutex.lock();
-    const private_data = logs_private_data;
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
+    const target = loggerForLevel(@backingInt(level)) orelse return;
     var arena = std.heap.ArenaAllocator.init(std.heap.c_allocator);
     defer arena.deinit();
     const allocator = arena.allocator();
     const prepared = prepareArguments(
         allocator,
         args,
-        private_data,
+        target.private_data,
     ) catch return;
     const message = allocator.printSentinel(fmt, prepared, 0) catch return;
-    dispatchSlice(logger, logger_ctx, @backingInt(level), message);
+    target.writeCurrent(@backingInt(level), message.ptr);
 }
 
 /// Forwards a borrowed C string directly to the configured C logger.
 pub fn writeCString(level: Level, message: [*:0]const u8) void {
-    mutex.lock();
-    if (@backingInt(level) > @backingInt(max_level)) {
-        mutex.unlock();
-        return;
-    }
-    const logger = external_logger orelse {
-        mutex.unlock();
-        return;
-    };
-    const logger_ctx = external_logger_ctx;
-    mutex.unlock();
-    dispatchCString(logger, logger_ctx, @backingInt(level), message);
+    partoutLog(@backingInt(level), message);
+}
+
+/// Forwards borrowed strings with explicit identity, without changing thread context.
+/// A null profile ID denotes a global record. Strings live through the callback.
+pub fn writeCStringWithProfile(profile_id: ?[*:0]const u8, level: Level, message: [*:0]const u8) void {
+    const target = loggerForLevel(@backingInt(level)) orelse return;
+    target.write(profile_id, @backingInt(level), message);
 }
 
 /// Logs a profile using the structured layout of the legacy Apple runtime.
@@ -225,22 +230,30 @@ pub fn writefAndFailDebug(comptime fmt: []const u8, args: anytype) void {
     }
 }
 
-fn dispatchSlice(
+// Snapshot callback ownership and privacy together, then release the lock before
+// formatting or invoking host code.
+const LogTarget = struct {
     logger: Logger,
     logger_ctx: ?*anyopaque,
-    level: c_int,
-    message: [:0]const u8,
-) void {
-    dispatchCString(logger, logger_ctx, level, message.ptr);
-}
+    private_data: bool,
 
-fn dispatchCString(
-    logger: Logger,
-    logger_ctx: ?*anyopaque,
-    level: c_int,
-    message: [*:0]const u8,
-) void {
-    logger(logger_ctx, level, message);
+    fn write(self: LogTarget, profile_id: ?[*:0]const u8, level: c_int, message: [*:0]const u8) void {
+        self.logger(self.logger_ctx, profile_id, level, message);
+    }
+
+    fn writeCurrent(self: LogTarget, level: c_int, message: [*:0]const u8) void {
+        const context = current_context;
+        const profile_id: ?[*:0]const u8 = if (context.profile_id) |*id| id else null;
+        self.write(profile_id, level, message);
+    }
+};
+
+fn loggerForLevel(level: c_int) ?LogTarget {
+    mutex.lock();
+    defer mutex.unlock();
+    if (level > @backingInt(max_level)) return null;
+    const logger = external_logger orelse return null;
+    return .{ .logger = logger, .logger_ctx = external_logger_ctx, .private_data = logs_private_data };
 }
 
 fn writeProfileModule(
@@ -313,14 +326,7 @@ fn SensitiveValue(comptime T: type) type {
     };
 }
 
-const ModelAdapter = enum {
-    raw,
-    raw_alloc,
-    pem,
-    hex,
-    ip_settings,
-    json,
-};
+const ModelAdapter = models.Adapter;
 
 const LogFormat = union(enum) {
     declared,
@@ -329,43 +335,6 @@ const LogFormat = union(enum) {
     array,
     dictionary,
     dereference,
-};
-
-// API models cannot retroactively declare a logging formatter. Keep their
-// type identity and representation together in this comptime adapter registry.
-const model_adapters = .{
-    .{ api.Address, ModelAdapter.raw },
-    .{ api.Endpoint, ModelAdapter.raw_alloc },
-    .{ api.ExtendedEndpoint, ModelAdapter.raw_alloc },
-    .{ api.OpenVPNCryptoContainer, ModelAdapter.pem },
-    .{ api.SecureData, ModelAdapter.hex },
-    .{ api.Subnet, ModelAdapter.raw_alloc },
-    .{ api.WireGuardKey, ModelAdapter.raw },
-    .{ api.IPSettings, ModelAdapter.ip_settings },
-    .{ api.DNSModule, ModelAdapter.json },
-    .{ api.DNSModuleProtocolType, ModelAdapter.json },
-    .{ api.DNSModuleProtocolTypeHttps, ModelAdapter.json },
-    .{ api.DNSModuleProtocolTypeTls, ModelAdapter.json },
-    .{ api.HTTPProxyModule, ModelAdapter.json },
-    .{ api.IPModule, ModelAdapter.json },
-    .{ api.OnDemandModule, ModelAdapter.json },
-    .{ api.OpenVPNConfiguration, ModelAdapter.json },
-    .{ api.OpenVPNCredentials, ModelAdapter.json },
-    .{ api.OpenVPNModule, ModelAdapter.json },
-    .{ api.OpenVPNObfuscationMethod, ModelAdapter.json },
-    .{ api.OpenVPNObfuscationMethodObfuscate, ModelAdapter.json },
-    .{ api.OpenVPNObfuscationMethodXormask, ModelAdapter.json },
-    .{ api.OpenVPNStaticKey, ModelAdapter.json },
-    .{ api.OpenVPNTLSWrap, ModelAdapter.json },
-    .{ api.Profile, ModelAdapter.json },
-    .{ api.Route, ModelAdapter.json },
-    .{ api.TaggedModule, ModelAdapter.json },
-    .{ api.TunnelControllerOptions, ModelAdapter.json },
-    .{ api.TunnelRemoteInfoWrapper, ModelAdapter.json },
-    .{ api.WireGuardConfiguration, ModelAdapter.json },
-    .{ api.WireGuardLocalInterface, ModelAdapter.json },
-    .{ api.WireGuardModule, ModelAdapter.json },
-    .{ api.WireGuardRemoteInterface, ModelAdapter.json },
 };
 
 fn prepareArguments(
@@ -379,10 +348,10 @@ fn prepareArguments(
     inline for (args_info.field_names, args_info.field_types) |name, FieldType| {
         const value = @field(args, name);
         @field(prepared, name) = if (comptime logFormat(FieldType) != null)
-            if (private_data)
-                try forLog(allocator, value)
-            else
+            if (!private_data and isSensitive(FieldType))
                 redacted_value
+            else
+                try forLog(allocator, value, private_data)
         else
             value;
     }
@@ -414,7 +383,7 @@ fn runtimeType(comptime T: type) type {
 
 fn logFormat(comptime T: type) ?LogFormat {
     if (std.meta.hasFn(T, "logging_formatter")) return .declared;
-    if (findModelAdapter(T)) |adapter| return .{ .model = adapter };
+    if (models.adapter(T)) |adapter| return .{ .model = adapter };
     return switch (@typeInfo(T)) {
         .optional => |optional| if (logFormat(optional.child) != null)
             .optional
@@ -437,18 +406,28 @@ fn logFormat(comptime T: type) ?LogFormat {
     };
 }
 
+fn isSensitive(comptime T: type) bool {
+    if (models.adapter(T)) |adapter| return adapter != .summary;
+    return switch (@typeInfo(T)) {
+        .optional => |info| isSensitive(info.child),
+        .pointer => |info| if (info.size == .one) isSensitive(info.child) else true,
+        else => true,
+    };
+}
+
 fn forLog(
     allocator: std.mem.Allocator,
     value: anytype,
+    private_data: bool,
 ) ![]const u8 {
     const T = @TypeOf(value);
     const format = comptime logFormat(T) orelse
         @compileError("unsupported type passed to forLog()");
     return switch (format) {
         .declared => T.logging_formatter(allocator, value),
-        .model => |adapter| formatWithAdapter(allocator, value, adapter),
+        .model => |adapter| formatWithAdapter(allocator, value, adapter, private_data),
         .optional => if (value) |unwrapped|
-            forLog(allocator, unwrapped)
+            forLog(allocator, unwrapped, private_data)
         else
             "null",
         .array => switch (@typeInfo(T)) {
@@ -457,21 +436,15 @@ fn forLog(
             else => @compileError("array log format requires an array or pointer type"),
         },
         .dictionary => formatDictionary(allocator, &value),
-        .dereference => forLog(allocator, value.*),
+        .dereference => forLog(allocator, value.*, private_data),
     };
-}
-
-fn findModelAdapter(comptime T: type) ?ModelAdapter {
-    inline for (model_adapters) |adapter| {
-        if (T == adapter[0]) return adapter[1];
-    }
-    return null;
 }
 
 fn formatWithAdapter(
     allocator: std.mem.Allocator,
     value: anytype,
     comptime adapter: ModelAdapter,
+    private_data: bool,
 ) ![]const u8 {
     return switch (adapter) {
         .raw => value.raw,
@@ -479,6 +452,7 @@ fn formatWithAdapter(
         .pem => value.pem,
         .hex => value.hexAlloc(allocator),
         .ip_settings => formatIPSettings(allocator, value),
+        .summary => if (private_data) util.encodeJsonValue(allocator, value) else models.summary(allocator, value),
         .json => util.encodeJsonValue(allocator, value),
     };
 }
@@ -488,7 +462,7 @@ fn formatExplicitSensitive(
     value: anytype,
 ) ![]const u8 {
     const T = @TypeOf(value);
-    if (comptime logFormat(T) != null) return forLog(allocator, value);
+    if (comptime logFormat(T) != null) return forLog(allocator, value, true);
     if (comptime isString(T)) return allocator.dupe(u8, value);
     return allocator.print("{any}", .{value});
 }
@@ -558,7 +532,7 @@ fn writeDebug(
     value: anytype,
 ) !void {
     if (comptime logFormat(@TypeOf(value)) != null) {
-        try writer.writeAll(try forLog(allocator, value));
+        try writer.writeAll(try forLog(allocator, value, true));
     } else if (comptime isString(@TypeOf(value))) {
         try writer.writeAll(value);
     } else {

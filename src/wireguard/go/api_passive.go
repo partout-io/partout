@@ -50,7 +50,7 @@ func lookupPassiveBackend(handle int32) (passiveBackend, bool) {
 }
 
 //export wgTurnOnWithPassiveIO
-func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_passive_tun, context unsafe.Pointer) int32 {
+func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_passive_tun, context unsafe.Pointer, loggerFn unsafe.Pointer, profile *C.char) int32 {
 	if settings == nil || tun == nil || tun.read == nil || tun.write == nil || tun.mtu == 0 || tun.mtu > passiveMaxDatagram {
 		return -1
 	}
@@ -80,11 +80,10 @@ func wgTurnOnWithPassiveIO(settings *C.char, link *C.wg_passive_link, tun *C.wg_
 				return C.wg_passive_tun_write(tunIO.write, context, batch, count, request)
 			})
 		})
-	return turnOnPassiveDevice(C.GoString(settings), passive_bind, passive_tun)
+	return turnOnPassiveDevice(C.GoString(settings), passive_bind, passive_tun, newDeviceLogger(loggerFn, C.GoString(profile)))
 }
 
-func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun) int32 {
-	logger := &device.Logger{Verbosef: CLogger(0).Printf, Errorf: CLogger(1).Printf}
+func turnOnPassiveDevice(settings string, bind *passiveBind, tun *passiveTun, logger *device.Logger) int32 {
 	dev := device.NewDevice(tun, bind, logger)
 	closeDevice := func() {
 		if bind.host != nil {

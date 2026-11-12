@@ -65,27 +65,27 @@ static void test_borrowed_io(void) {
     borrowed_probe p = {.mutex = PTHREAD_MUTEX_INITIALIZER};
     wg_passive_link link = {.local_port = 51820, .read = borrow_link, .write = borrow_write};
     wg_passive_tun tun = {.mtu = 1400, .read = borrow_tun, .write = borrow_write_tun};
-    assert(wgTurnOnWithPassiveIO(NULL, &link, &tun, &p) == -1);
-    assert(wgTurnOnWithPassiveIO("", &link, NULL, &p) == -1);
+    assert(wgTurnOnWithPassiveIO(NULL, &link, &tun, &p, NULL, NULL) == -1);
+    assert(wgTurnOnWithPassiveIO("", &link, NULL, &p, NULL, NULL) == -1);
     wg_passive_link invalid_link = link;
     invalid_link.read = NULL;
-    assert(wgTurnOnWithPassiveIO("", &invalid_link, &tun, &p) == -1);
+    assert(wgTurnOnWithPassiveIO("", &invalid_link, &tun, &p, NULL, NULL) == -1);
     invalid_link = link;
     invalid_link.write = NULL;
-    assert(wgTurnOnWithPassiveIO("", &invalid_link, &tun, &p) == -1);
+    assert(wgTurnOnWithPassiveIO("", &invalid_link, &tun, &p, NULL, NULL) == -1);
     wg_passive_tun invalid_tun = tun;
     invalid_tun.read = NULL;
-    assert(wgTurnOnWithPassiveIO("", &link, &invalid_tun, &p) == -1);
+    assert(wgTurnOnWithPassiveIO("", &link, &invalid_tun, &p, NULL, NULL) == -1);
     invalid_tun = tun;
     invalid_tun.write = NULL;
-    assert(wgTurnOnWithPassiveIO("", &link, &invalid_tun, &p) == -1);
+    assert(wgTurnOnWithPassiveIO("", &link, &invalid_tun, &p, NULL, NULL) == -1);
     // Failed startup must not leave host requests waiting for a looper.
-    assert(wgTurnOnWithPassiveIO("listen_port=1234\n", &link, &tun, &p) == -1);
+    assert(wgTurnOnWithPassiveIO("listen_port=1234\n", &link, &tun, &p, NULL, NULL) == -1);
     assert(p.read_requests[0] == 0 && p.read_requests[1] == 0 && p.write_request == 0);
     int32_t handle = wgTurnOnWithPassiveIO(
         "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
         "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
-        "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.2/32\n", &link, &tun, &p);
+        "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.2/32\n", &link, &tun, &p, NULL, NULL);
     assert(handle >= 0);
     char *config = wgGetConfig(handle);
     assert(config != NULL && strstr(config, "listen_port=51820") != NULL);
@@ -143,7 +143,7 @@ static void *start_keepalive(void *raw) {
     p->handle = wgTurnOnWithPassiveIO(
         "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
         "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
-        "endpoint=127.0.0.1:51821\npersistent_keepalive_interval=25\n", &link, &tun, &p->io);
+        "endpoint=127.0.0.1:51821\npersistent_keepalive_interval=25\n", &link, &tun, &p->io, NULL, NULL);
     return NULL;
 }
 static void test_keepalive_startup(int cancel) {
@@ -232,7 +232,7 @@ static void test_direct_io(void) {
         "private_key=0101010101010101010101010101010101010101010101010101010101010101\n"
         "public_key=0900000000000000000000000000000000000000000000000000000000000000\n"
         "endpoint=127.0.0.1:51821\nallowed_ip=10.0.0.0/24\npersistent_keepalive_interval=25\n",
-        &link, &tun, &p);
+        &link, &tun, &p, NULL, NULL);
     assert(handle >= 0);
     int ready = 0;
     for (int i = 0; i < 3000 && !ready; ++i) {

@@ -18,7 +18,7 @@ const CapturingLogger = struct {
     var message: [256]u8 = undefined;
     var message_len: usize = 0;
 
-    fn log(_: ?*anyopaque, new_level: c_int, raw_message: [*:0]const u8) callconv(.c) void {
+    fn log(_: ?*anyopaque, _: ?[*:0]const u8, new_level: c_int, raw_message: [*:0]const u8) callconv(.c) void {
         const value = std.mem.span(raw_message);
         level = new_level;
         message_len = @min(value.len, message.len);

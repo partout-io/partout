@@ -14,7 +14,7 @@
 #define PARTOUT_JNI_CB(e, c) PARTOUT_CB(abi_completion_proxy, abi_handler_create(e, c))
 static void daemon_bindings_free(partout_daemon_bindings *b);
 
-static void android_logger(void *ctx, int level, const char *message) {
+static void android_logger(void *ctx, const char *profile_id, int level, const char *message) {
     const char *tag = ctx ? (const char *)ctx : "Partout";
     int android_level = 0;
     switch (level) {
@@ -34,7 +34,11 @@ static void android_logger(void *ctx, int level, const char *message) {
             android_level = ANDROID_LOG_FATAL;
             break;
     }
-    __android_log_print(android_level, tag, "%s", message);
+    if (profile_id) {
+        __android_log_print(android_level, tag, "[%s] %s", profile_id, message);
+    } else {
+        __android_log_print(android_level, tag, "%s", message);
+    }
 }
 
 JNIEXPORT void JNICALL

@@ -449,7 +449,7 @@ test "unconnected UDP falls back to IPv4 and connected sockets are attempted onc
 
 test "inactive platform monitoring updates state without logging" {
     const Capture = struct {
-        fn log(raw: ?*anyopaque, _: c_int, _: [*:0]const u8) callconv(.c) void {
+        fn log(raw: ?*anyopaque, _: ?[*:0]const u8, _: c_int, _: [*:0]const u8) callconv(.c) void {
             const count: *usize = @ptrCast(@alignCast(raw orelse return));
             count.* += 1;
         }

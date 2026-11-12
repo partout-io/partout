@@ -14,14 +14,14 @@ extension OnDemandModule {
                 if let rule = cellularRule() {
                     rules.append(rule)
                 } else {
-                    pp_log(ctx, .os, .info, "Not adding rule for NEOnDemandRuleInterfaceType.cellular (not compatible)")
+                    pp_log(ctx, .ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.cellular (not compatible)")
                 }
             }
             if Self.supportsEthernet, withEthernetNetwork {
                 if let rule = ethernetRule() {
                     rules.append(rule)
                 } else {
-                    pp_log(ctx, .os, .info, "Not adding rule for NEOnDemandRuleInterfaceType.ethernet (not compatible)")
+                    pp_log(ctx, .ne, .info, "Not adding rule for NEOnDemandRuleInterfaceType.ethernet (not compatible)")
                 }
             }
             let SSIDs = Array(withSSIDs.filter { $1 }.keys)
@@ -33,9 +33,9 @@ extension OnDemandModule {
         // IMPORTANT: Append fallback rule last
         rules.append(globalRule())
 
-        pp_log(ctx, .os, .info, "On-demand rules:")
+        pp_log(ctx, .ne, .info, "On-demand rules:")
         rules.forEach {
-            pp_log(ctx, .os, .info, "\($0)")
+            pp_log(ctx, .ne, .info, "\($0)")
         }
         return rules
     }

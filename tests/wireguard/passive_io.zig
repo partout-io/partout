@@ -67,7 +67,7 @@ test "WireGuard passive UDP preserves multiple peer sources and reply destinatio
     endpoint.address[0] = 127;
     endpoint.address[3] = 1;
     endpoint.port = (try socket.linkDescriptor().localAddress()).port;
-    const transport = receiver.transport(endpoint.port, 1400);
+    const transport = receiver.transport(null, endpoint.port, 1400);
     var previous_port: u16 = 0;
     // Repeat peer 0 from a new bind while the receiver remains attached.
     // This exercises endpoint roaming without a fixed receive-source mapping.
@@ -82,7 +82,7 @@ test "WireGuard passive UDP preserves multiple peer sources and reply destinatio
         }
         peer.replaceLink(peer_socket.linkDescriptor());
         const port = (try peer_socket.linkDescriptor().localAddress()).port;
-        const peer_transport = peer.transport(port, 1400);
+        const peer_transport = peer.transport(null, port, 1400);
         const data = [_]u8{ @intCast(index), 42 };
         var completion: Completion = .{};
         const outgoing = [_]c.wg_packet{.{ .data = &data, .size = data.len }};
@@ -130,7 +130,7 @@ const ReadRequest = struct {
     result: *Completion,
     status: i32 = 99,
     fn run(self: *ReadRequest) void {
-        const transport = self.passive.transport(51820, 1400);
+        const transport = self.passive.transport(null, 51820, 1400);
         const read = if (self.side == .link) transport.link.read else transport.tun.read;
         self.status = read.?(transport.context, self.packets, 1, self.result.token());
     }
@@ -162,7 +162,7 @@ test "WireGuard passive initial transport allocation failure stays closed and re
     var bytes: [32]u8 = undefined;
     var packets = [_]c.wg_read_packet{.{ .data = &bytes, .capacity = bytes.len }};
     var completion = Completion{};
-    const callbacks = passive.transport(51820, 1400);
+    const callbacks = passive.transport(null, 51820, 1400);
     try std.testing.expectEqual(c.WG_IO_OK, callbacks.link.read.?(callbacks.context, &packets, 1, completion.token()));
     try std.testing.expectEqual(c.WG_IO_CLOSED, completion.status);
     try std.testing.expectEqual(@as(usize, 1), failure.calls);
@@ -274,7 +274,7 @@ test "POSIX passive write retries preserve the completed prefix and release read
     var tun = PosixPacketIO{ .block_after = 1 };
     passive.replaceLink(link.descriptor());
     passive.replaceTun(tun.descriptor());
-    const transport = passive.transport(51820, 1400);
+    const transport = passive.transport(null, 51820, 1400);
     const packets = [_]c.wg_packet{ .{ .data = "one", .size = 3 }, .{ .data = "two", .size = 3 } };
     var result = Completion{};
     try std.testing.expectEqual(c.WG_IO_OK, transport.tun.write.?(transport.context, &packets, packets.len, result.token()));
@@ -301,7 +301,7 @@ test "POSIX passive receive and short write failures report once" {
         var tun = PosixPacketIO{ .read_error = read_error, .short_write = !read_error };
         passive.replaceLink(link.descriptor());
         passive.replaceTun(tun.descriptor());
-        const transport = passive.transport(51820, 1400);
+        const transport = passive.transport(null, 51820, 1400);
         var result = Completion{};
         if (read_error) {
             var bytes: [32]u8 = undefined;
@@ -389,7 +389,7 @@ test "WireGuard passive queued reads preserve batching and discard oversized pac
     var packets: [3]c.wg_read_packet = undefined;
     for (&packets, &buffers) |*packet, *buffer| packet.* = .{ .data = buffer, .capacity = buffer.len };
     var result = Completion{};
-    const transport = passive.transport(51820, 1400);
+    const transport = passive.transport(null, 51820, 1400);
     try std.testing.expectEqual(c.WG_IO_OK, transport.tun.read.?(transport.context, &packets, packets.len, result.token()));
     try std.testing.expectEqual(c.WG_IO_OK, result.status);
     try std.testing.expectEqual(@as(u32, 2), result.count);

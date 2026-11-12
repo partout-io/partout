@@ -7,9 +7,9 @@ package main
 
 // #include <stdlib.h>
 // #include <sys/types.h>
-// static void callLogger(void *func, void *ctx, int level, const char *msg)
+// static void callLogger(void *func, const char *profile, int level, const char *msg)
 // {
-// 	((void(*)(void *, int, const char *))func)(ctx, level, msg);
+// 	((void(*)(const char *, int, const char *))func)(profile, level, msg);
 // }
 import "C"
 
@@ -18,15 +18,13 @@ import (
 	"math"
 	"runtime/debug"
 	"strings"
+	"sync/atomic"
 	"time"
 	"unsafe"
 
 	"golang.zx2c4.com/wireguard/conn"
 	"golang.zx2c4.com/wireguard/device"
 )
-
-var loggerFunc unsafe.Pointer
-var loggerCtx unsafe.Pointer
 
 type tunnelHandle struct {
 	*device.Device
@@ -35,11 +33,8 @@ type tunnelHandle struct {
 
 var tunnelHandles = make(map[int32]tunnelHandle)
 
-//export wgSetLogger
-func wgSetLogger(context, loggerFn uintptr) {
-	loggerCtx = unsafe.Pointer(context)
-	loggerFunc = unsafe.Pointer(loggerFn)
-}
+// Process-wide stack dumps have no profile context.
+var signalLogger atomic.Pointer[CLogger]
 
 func wgTurnOnDevice(settings *C.char, dev *device.Device, logger *device.Logger) int32 {
 	err := dev.IpcSet(C.GoString(settings))
@@ -210,17 +205,37 @@ func wgVersion() *C.char {
 	return C.CString("unknown")
 }
 
-type CLogger int
+type CLogger struct {
+	level    int
+	function unsafe.Pointer
+	profile  []byte
+}
+
+func newDeviceLogger(function unsafe.Pointer, profile string) *device.Logger {
+	signalLogger.Store(&CLogger{function: function})
+	var profileID []byte
+	if profile != "" {
+		profileID = append([]byte(profile), 0)
+	}
+	return &device.Logger{
+		Verbosef: CLogger{level: 0, function: function, profile: profileID}.Printf,
+		Errorf:   CLogger{level: 1, function: function, profile: profileID}.Printf,
+	}
+}
 
 func (l CLogger) Printf(format string, args ...interface{}) {
-	if uintptr(loggerFunc) == 0 {
+	if l.function == nil {
 		return
 	}
 	gomsg := fmt.Sprintf(format, args...)
 	cmsg := C.CString(gomsg)
-	msg := (*C.char)(unsafe.Pointer(cmsg))
-	C.callLogger(loggerFunc, loggerCtx, C.int(l), msg)
-	C.free(unsafe.Pointer(cmsg))
+	defer C.free(unsafe.Pointer(cmsg))
+	var profile *C.char
+	if len(l.profile) != 0 {
+		profile = (*C.char)(unsafe.Pointer(&l.profile[0]))
+	}
+	// C borrows this Go-owned buffer only for the synchronous callback.
+	C.callLogger(l.function, profile, C.int(l.level), cmsg)
 }
 
 func main() {}

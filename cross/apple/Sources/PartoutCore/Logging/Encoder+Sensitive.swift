@@ -38,7 +38,7 @@ extension Encodable {
             let encoded = try encoder.encode(self)
             return String(data: encoded, encoding: .utf8)
         } catch {
-            pp_log(ctx, .core, .error, "Unable to translate self to JSON: \(error)")
+            pp_log(ctx, .runtime, .error, "Unable to translate self to JSON: \(error)")
             return nil
         }
     }

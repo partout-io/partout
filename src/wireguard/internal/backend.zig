@@ -20,6 +20,7 @@ pub const Error = std.mem.Allocator.Error || error{
 };
 
 pub const StartTunnel = struct {
+    profile_id: ?core.api.UUID = null,
     tun: *net.TunWrapper,
     ifname: []const u8,
 
@@ -29,6 +30,7 @@ pub const StartTunnel = struct {
 };
 
 pub const StartTunnelPassive = struct {
+    profile_id: ?core.api.UUID = null,
     link: wireguard_c.wg_passive_link,
     tun: wireguard_c.wg_passive_tun,
     context: *anyopaque,
@@ -147,7 +149,11 @@ fn cTurnOn(
     start: StartTunnel,
 ) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    wireguard_c.pp_wg_set_logger(cLog, null);
+    var profile_buffer: [36:0]u8 = @splat(0);
+    const profile_id: ?[*:0]const u8 = if (start.profile_id) |id| blk: {
+        @memcpy(&profile_buffer, &id);
+        break :blk &profile_buffer;
+    } else null;
 
     if (@import("builtin").os.tag == .windows) {
         // wireguard-go on Windows opens its own adapter by interface name;
@@ -155,21 +161,21 @@ fn cTurnOn(
         var c_ifname: util.TemporaryCString = .{};
         try c_ifname.init(allocator, start.ifname);
         defer c_ifname.deinit();
-        return wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr());
+        return wireguard_c.pp_wg_turn_on(settings.ptr, c_ifname.ptr(), cLog, profile_id);
     }
 
     const fd = start.descriptor() orelse return error.CannotLocateTunnelFileDescriptor;
-    return wireguard_c.pp_wg_turn_on(settings.ptr, fd);
+    return wireguard_c.pp_wg_turn_on(settings.ptr, fd, cLog, profile_id);
 }
 
 fn cLog(
-    _: ?*anyopaque,
+    profile_id: [*c]const u8,
     level: c_int,
     message: [*c]const u8,
 ) callconv(.c) void {
     if (message == null) return;
     const message_z: [*:0]const u8 = @ptrCast(message);
-    log.writeCString(if (level == 1) .err else .debug, message_z);
+    log.writeCStringWithProfile(@ptrCast(profile_id), if (level == 1) .err else .debug, message_z);
 }
 
 fn cTurnOff(_: ?*anyopaque, handle: i32) void {
@@ -224,8 +230,12 @@ fn cDisableRoaming(_: ?*anyopaque, handle: i32) void {
 
 fn cTurnOnPassive(_: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, start: StartTunnelPassive) Error!i32 {
     if (wireguard_c.pp_wg_init() != 0) return error.BackendUnavailable;
-    wireguard_c.pp_wg_set_logger(cLog, null);
-    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context);
+    var profile_buffer: [36:0]u8 = @splat(0);
+    const profile_id: ?[*:0]const u8 = if (start.profile_id) |id| blk: {
+        @memcpy(&profile_buffer, &id);
+        break :blk &profile_buffer;
+    } else null;
+    return wireguard_c.pp_wg_turn_on_passive(settings.ptr, &start.link, &start.tun, start.context, cLog, profile_id);
 }
 
 fn cSendKeepalives(_: ?*anyopaque, handle: i32) void {

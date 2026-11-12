@@ -335,9 +335,9 @@ const OpenVPNConnection = struct {
             remote_endpoint.type.raw(),
             remote_endpoint.address.port,
         });
-        log.write(.notice, "Local options:");
+        log.write(.info, "Local options:");
         openvpn_log.logConfiguration(&self.configuration, true);
-        log.write(.notice, "Remote options:");
+        log.write(.info, "Remote options:");
         openvpn_log.logConfiguration(remote_options, false);
         self.reportServerConfiguration(remote_options);
 

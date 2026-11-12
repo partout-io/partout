@@ -130,7 +130,7 @@ const PlainSerializer = struct {
         const code = PacketCode.fromRaw(data[offset] >> 3) orelse return error.UnknownCode;
         const key = data[offset] & 0b111;
         offset += openvpn_c.OpenVPNPacketOpcodeLength;
-        log.writef(.info, "Control: Try read packet with code {s} and key {d}", .{
+        log.writef(.debug, "Control: Try read packet with code {s} and key {d}", .{
             @tagName(code),
             key,
         });
@@ -280,10 +280,7 @@ const AuthSerializer = struct {
         if (!crypto_c.pp_crypto_verify(self.cbc, swapped.ptr, swapped.len, &crypto_error_code)) {
             return ffi.errorForCryptoErrorCode(crypto_error_code);
         }
-        return self.plain.deserialize(allocator, swapped, self.auth_length, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
-            return err;
-        };
+        return self.plain.deserialize(allocator, swapped, self.auth_length, null);
     }
 };
 
@@ -426,10 +423,7 @@ const CryptSerializer = struct {
             @panic("OpenVPN crypto backend returned plaintext larger than its destination buffer");
         if (total < decrypted.len) decrypted = try allocator.realloc(decrypted, total);
         defer allocator.free(decrypted);
-        return self.plain.deserialize(allocator, decrypted, 0, null) catch |err| {
-            log.writef(.fault, "Control: Channel failure: {s}", .{@errorName(err)});
-            return err;
-        };
+        return self.plain.deserialize(allocator, decrypted, 0, null);
     }
 };
 

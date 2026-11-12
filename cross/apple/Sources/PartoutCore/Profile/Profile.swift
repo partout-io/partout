@@ -154,7 +154,7 @@ extension Profile.Builder {
                     try lhs.checkCompatible(with: rhs, activeIds: activeModulesIds)
                     try rhs.checkCompatible(with: lhs, activeIds: activeModulesIds)
                 } catch {
-                    pp_log_id(id, .core, .error, "Modules are incompatible: \(lhs), \(rhs)")
+                    pp_log_id(id, .runtime, .error, "Modules are incompatible: \(lhs), \(rhs)")
                     throw error
                 }
             }
