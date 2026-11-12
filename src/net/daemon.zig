@@ -513,8 +513,6 @@ const ConnectionDaemon = struct {
     // Failure notifications may also arrive on background workers.
     fn onConnectionEvent(ctx: *anyopaque, event: ConnectionEvent) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         switch (event) {
             .established => |success| {
                 // Own the borrowed metadata across the deferred hop.
@@ -590,8 +588,6 @@ const ConnectionDaemon = struct {
     // Invoked by ConnectionWorker upon complete setup.
     fn onConnectionPrepared(raw: *anyopaque, context: *anyopaque, setup: ConnectionSetup) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(raw));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const job: *Job = @ptrCast(@alignCast(context));
         job.* = .{ .message = .{ .setupConnection = setup }, .owned = true };
         self.enqueue(job) catch {
@@ -605,8 +601,6 @@ const ConnectionDaemon = struct {
     // because a ready transition may start a connection and attach I/O.
     fn onResumeGate(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         self.schedule(.resumeGate) catch |err| {
             log.writef(.err, "Unable to resume connection gate: {s}", .{@errorName(err)});
             self.daemon.requestCancellation(null, true);
@@ -642,8 +636,6 @@ const ConnectionDaemon = struct {
         if (builtin.os.tag != .windows) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const receipt = attachment.makeReceipt(bytes, length, source, code) orelse return false;
         var receipt_copy = receipt;
         receipt_copy.bytes = self.daemon.allocator.dupe(u8, receipt.bytes) catch {
@@ -942,16 +934,12 @@ const ConnectionDaemon = struct {
     // - gate.updateReachability()
     fn handleNetworkReady(ctx: ?*anyopaque) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         log.write(.notice, "Network is ready, start connection");
         self.evaluateConnection(false);
     }
 
     fn isReachable(ctx: ?*const anyopaque) bool {
         const self: *const ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         return self.monitor.isReachable();
     }
 
@@ -1002,32 +990,24 @@ const ConnectionDaemon = struct {
 
     fn onLinkRead(ctx: ?*anyopaque, packets: io.Packets, sources: ?[]const io.SocketAddress) !io.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const conn = self.connection orelse @panic("onLinkRead but no connection");
         return conn.submitPackets(.link, packets, sources);
     }
 
     fn onLinkFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const conn = self.connection orelse @panic("onLinkFailure but no connection");
         conn.ioFailed(.link, failure);
     }
 
     fn onTunnelRead(ctx: ?*anyopaque, packets: io.Packets, _: ?[]const io.SocketAddress) !io.ReadAction {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const conn = self.connection orelse @panic("onTunnelRead but no connection");
         return conn.submitPackets(.tun, packets, null);
     }
 
     fn onTunnelFailure(ctx: ?*anyopaque, failure: io.Failure) void {
         const self: *ConnectionDaemon = @ptrCast(@alignCast(ctx.?));
-        const log_scope = logContext(&self.daemon.profile).enter();
-        defer log_scope.leave();
         const conn = self.connection orelse @panic("onTunnelFailure but no connection");
         conn.ioFailed(.tun, failure);
     }
@@ -1109,6 +1089,7 @@ const ConnectionDaemon = struct {
         }
     };
 
+    // Establish context once for the actor, including its packet and timer callbacks.
     fn run(self: *ConnectionDaemon) void {
         const log_scope = logContext(&self.daemon.profile).enter();
         defer log_scope.leave();
