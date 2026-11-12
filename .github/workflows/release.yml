@@ -62,7 +62,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
-          go-version: 1.24
+          go-version: '1.25'
           cache-dependency-path: src/**/go.sum
 
       - name: Build XCFramework
