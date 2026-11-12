@@ -323,7 +323,7 @@ const SettingsDaemon = struct {
         const daemon = self.daemon;
         try daemon.beginStart();
         var maybe_info = buildSettingsOnlyTunnelInfo(daemon.allocator, &daemon.profile) catch |err| {
-            log.writef(.err, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to build settings-only daemon: {s}", .{@errorName(err)});
             const code = daemon.handleStartError(err);
             daemon.requestCancellation(.{ .code = code }, false);
             return;
@@ -331,7 +331,7 @@ const SettingsDaemon = struct {
         if (maybe_info) |*info| {
             defer info.deinit(daemon.allocator);
             const tun = daemon.controller.setTunnelSettings(info.*) catch |err| {
-                log.writef(.err, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
+                log.writef(.fault, "Unable to set settings-only tunnel: {s}", .{@errorName(err)});
                 const code = daemon.handleStartError(err);
                 daemon.requestCancellation(.{ .code = code }, false);
                 return;
@@ -821,7 +821,7 @@ const ConnectionDaemon = struct {
         switch (event) {
             .established => |success| {
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
@@ -1426,7 +1426,7 @@ const ConnectionDaemon = struct {
     fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
         const connection = self.connection orelse @panic("createConnectionTun but no connection");
         const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
-            log.writef(.err, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
             return error.TunNotAvailable;
         };
         errdefer tunnel.destroy();
@@ -1467,7 +1467,7 @@ const ConnectionDaemon = struct {
                 defer owned.info.deinit(self.daemon.allocator);
                 // Complete startup before yielding to queued reachability events.
                 self.handleConnectionEstablished(success) catch |err| {
-                    log.writef(.err, "Unable to establish connection: {s}", .{@errorName(err)});
+                    log.writef(.fault, "Unable to establish connection: {s}", .{@errorName(err)});
                     self.handleConnectionFailed(.{
                         .err_pair = .{ .code = partoutCodeForDaemonStartError(err) },
                         .disposition = .reconnect,
@@ -1501,7 +1501,7 @@ const ConnectionDaemon = struct {
             // before the gate can start another attempt.
             self.looper.cancelTimer(&self.resume_gate_timer);
             self.schedule(.resumeGate) catch |schedule_err| {
-                log.writef(.err, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
+                log.writef(.fault, "Unable to enqueue resume connection gate: {s}", .{@errorName(schedule_err)});
                 self.daemon.requestCancellation(null, true);
             };
         };

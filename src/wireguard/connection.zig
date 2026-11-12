@@ -279,7 +279,7 @@ const WireGuardConnection = struct {
         self: *WireGuardConnection,
         err: net.SubmissionError,
     ) void {
-        log.writef(.err, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
+        log.writef(.fault, "Unable to schedule backend restart retry: {s}", .{@errorName(err)});
 
         // The daemon owns shutdown and finalization after a terminal event.
         self.events.emit(.{ .failed = .{
@@ -555,7 +555,7 @@ fn activationError(err: WireGuardAdapter.ActivationError) net.ConnectionStartErr
     switch (err) {
         error.CannotLocateTunnelFileDescriptor => {
             log.write(
-                .err,
+                .fault,
                 "Starting tunnel failed: could not determine file descriptor",
             );
         },
@@ -569,7 +569,7 @@ fn activationError(err: WireGuardAdapter.ActivationError) net.ConnectionStartErr
             // Adapter activation errors are the local diagnostic signal. The
             // generic connection contract deliberately exposes no WireGuard-
             // specific categories, so log the concrete error before erasing it.
-            log.writef(.err, "Unable to start adapter: {s}", .{@errorName(err)});
+            log.writef(.fault, "Unable to start adapter: {s}", .{@errorName(err)});
         },
     }
     return switch (err) {

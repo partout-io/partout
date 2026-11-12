@@ -531,7 +531,7 @@ fn loggingDataPathErrorFromNative(native: openvpn_c.openvpn_dp_error) DataPath.P
         },
         openvpn_c.OpenVPNDataPathErrorNone => error.DataPathFailure,
         else => {
-            log.writef(.err, "Unable to process packet (data path): {d}", .{native.dp_code});
+            log.writef(.fault, "Unable to process packet (data path): {d}", .{native.dp_code});
             return error.DataPathFailure;
         },
     };

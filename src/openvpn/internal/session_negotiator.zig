@@ -429,7 +429,7 @@ pub const Negotiator = struct {
                     @panic("Cannot start the TLS handshake without an owned TLS session");
                 try tls.start();
                 const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-                    log.writef(.err, "TLS.connect: Failed pulling ciphertext: {s}", .{
+                    log.writef(.fault, "TLS.connect: Failed pulling ciphertext: {s}", .{
                         @errorName(err),
                     });
                     return err;
@@ -688,7 +688,7 @@ pub const Negotiator = struct {
         tls: *TLSWrapper,
     ) !bool {
         const ciphertext = tls.pullCipherText(self.allocator) catch |err| {
-            log.writef(.err, "TLS: Failed pulling ciphertext: {s}", .{
+            log.writef(.fault, "TLS: Failed pulling ciphertext: {s}", .{
                 @errorName(err),
             });
             return err;
