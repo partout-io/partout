@@ -15,9 +15,11 @@ android {
             abiFilters += listOf("arm64-v8a")
         }
     }
-    sourceSets["main"].apply {
-        java.srcDirs("src")
-        manifest.srcFile("AndroidManifest.xml")
+    sourceSets {
+        getByName("main") {
+            kotlin.directories += "src"
+            manifest.srcFile("AndroidManifest.xml")
+        }
     }
     externalNativeBuild {
         cmake {
@@ -36,8 +38,8 @@ kotlin {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.15.0")
+    implementation("androidx.core:core-ktx:1.16.0")
     api("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
-    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.10.0")
 }
