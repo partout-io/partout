@@ -79,7 +79,7 @@ elseif(TARGET partout-models-impl)
 endif()
 
 include(CMakePackageConfigHelpers)
-set(partout_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/Partout")
+set(partout_package_dir "${CMAKE_INSTALL_LIBDIR}/cmake/partout")
 configure_package_config_file("${CMAKE_CURRENT_LIST_DIR}/PartoutConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
     INSTALL_DESTINATION "${partout_package_dir}")
