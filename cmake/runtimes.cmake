@@ -13,8 +13,12 @@ if(TARGET partout-windows-backend)
         cross/windows/src/platform.cc
     )
     add_library(Partout::WindowsRuntime ALIAS partout-bindings)
-    target_include_directories(partout-bindings PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE src)
+    target_include_directories(partout-bindings
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
+            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        PRIVATE src
+    )
     target_compile_features(partout-bindings PUBLIC cxx_std_20)
     target_compile_definitions(partout-bindings PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINDOWS_USE_DLL)
     target_compile_options(partout-bindings PRIVATE /EHsc /permissive- /W4)
@@ -25,8 +29,10 @@ if(TARGET partout-windows-backend)
     )
     target_link_libraries(partout-bindings
         PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
-        PRIVATE "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
-            "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>" ole32
+        PRIVATE
+            "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
+            "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>"
+            ole32
     )
 
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
@@ -87,7 +93,11 @@ elseif(UNIX)
         cross/posix/tun.c
     )
     add_library(Partout::PosixRuntime ALIAS partout-posix-runtime)
-    target_include_directories(partout-posix-runtime PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/posix/include>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>" PRIVATE src)
+    target_include_directories(partout-posix-runtime
+        PUBLIC
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/posix/include>"
+            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
+        PRIVATE src
+    )
     target_link_libraries(partout-posix-runtime PUBLIC Partout::Partout)
 endif()
