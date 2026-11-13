@@ -18,6 +18,10 @@ internal class HTTPProxyModuleApplying(
     private val module: HTTPProxyModule
 ): VpnServiceApplying {
     override fun apply(logTag: String, builder: VpnService.Builder, logsPrivateData: Boolean): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            Log.i(logTag, "HTTP Proxy: setHttpProxy is unavailable before API 29, skipping")
+            return false
+        }
         val endpoint = module.proxyEndpoint
         if (endpoint == null) {
             if (module.pacURL != null) {
@@ -25,7 +29,8 @@ internal class HTTPProxyModuleApplying(
             } else {
                 Log.i(logTag, "HTTP Proxy: no proxy configured")
             }
-            return false
+            builder.setHttpProxy(null)
+            return true
         }
 
         if (module.hasProxyConflict) {
@@ -35,10 +40,6 @@ internal class HTTPProxyModuleApplying(
             )
         }
         val (host, port) = endpoint.asHostPort()
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            Log.i(logTag, "HTTP Proxy: setHttpProxy is unavailable before API 29, skipping")
-            return false
-        }
         val proxyInfo = ProxyInfo.buildDirectProxy(host, port, module.bypassDomains.toMutableList())
         val proxy = "$host:$port".sensitiveDescription(logsPrivateData)
         val bypass = module.bypassDomains.joinToString().sensitiveDescription(logsPrivateData)
