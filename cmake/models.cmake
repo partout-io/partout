@@ -58,8 +58,10 @@ if(partout_models_dll)
 endif()
 target_compile_features(partout-models-impl PUBLIC cxx_std_17)
 target_compile_definitions(partout-models-impl PUBLIC NOMINMAX)
-target_include_directories(partout-models-impl SYSTEM PUBLIC "${PARTOUT_MODELS_INCLUDE}")
-target_link_libraries(partout-models-impl PUBLIC nlohmann_json::nlohmann_json)
+target_include_directories(partout-models-impl SYSTEM PUBLIC "$<BUILD_INTERFACE:${PARTOUT_MODELS_INCLUDE}>"
+    "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+target_link_libraries(partout-models-impl PUBLIC "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
+    "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>")
 
 # Windows SDK consumers use the DLL's model exports. The implementation archive
 # is only a build input; linking it into consumers would duplicate those symbols.
@@ -68,8 +70,11 @@ if(partout_models_dll)
     add_library(Partout::Models ALIAS partout-models-interface)
     target_compile_features(partout-models-interface INTERFACE cxx_std_17)
     target_compile_definitions(partout-models-interface INTERFACE NOMINMAX)
-    target_include_directories(partout-models-interface SYSTEM INTERFACE "${PARTOUT_MODELS_INCLUDE}")
-    target_link_libraries(partout-models-interface INTERFACE partout-windows-backend nlohmann_json::nlohmann_json)
+    target_include_directories(partout-models-interface SYSTEM INTERFACE "$<BUILD_INTERFACE:${PARTOUT_MODELS_INCLUDE}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_link_libraries(partout-models-interface INTERFACE partout-windows-backend
+        "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
+        "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>")
 else()
     add_library(Partout::Models ALIAS partout-models-impl)
 endif()

@@ -1,0 +1,8 @@
+@PACKAGE_INIT@
+
+include(CMakeFindDependencyMacro)
+if(@PARTOUT_PACKAGE_MODELS@)
+    find_dependency(nlohmann_json 3.12 CONFIG)
+endif()
+include("${CMAKE_CURRENT_LIST_DIR}/PartoutTargets.cmake")
+check_required_components(Partout)
