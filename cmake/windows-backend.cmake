@@ -35,7 +35,7 @@ target_include_directories(partout-windows-backend PUBLIC "$<BUILD_INTERFACE:${C
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 if(PP_BUILD_LIBRARY)
     set_target_properties(partout-windows-backend PROPERTIES
-        OUTPUT_NAME partout-runtime
+        OUTPUT_NAME partout-windows-backend
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
         RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
         ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"

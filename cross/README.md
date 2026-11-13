@@ -23,7 +23,7 @@ The POSIX runtime provides `partout_tun_open` for Linux/macOS devices and passes
   the extraction does not add those capabilities.
 * Windows: `Partout::WindowsRuntime` supplies the plugin runtime and callback table.
   Its static library links separately from the core. The backend and C++ models
-  are compiled into `partout-runtime.dll`; `partout.dll` exports only the Zig/C ABI. `Partout::Models` supplies model headers and
+  are compiled into `partout-windows-backend.dll`; `partout.dll` exports only the Zig/C ABI. `Partout::Models` supplies model headers and
   the Windows DLL import library, without a second model implementation library. These
   C++ exports require matching compiler, CRT, and model versions.
 
