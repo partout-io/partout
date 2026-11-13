@@ -88,5 +88,6 @@ cc -shared -fPIC -D__ANDROID__ -Wno-incompatible-pointer-types \
     "$repo_root/cross/android/native/jni.c" \
     "$repo_root/cross/android/tests/controller_bindings.c" \
     -o "$work_dir/controller-bindings.so"
-java -Xcheck:jni -cp "$work_dir/classes:$kotlin_home/lib/kotlin-stdlib.jar" \
+java --enable-native-access=ALL-UNNAMED -Xcheck:jni \
+    -cp "$work_dir/classes:$kotlin_home/lib/kotlin-stdlib.jar" \
     io.partout.ControllerBindingsTest "$work_dir/controller-bindings.so"
