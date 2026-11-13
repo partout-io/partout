@@ -7,7 +7,7 @@ package io.partout.extensions
 import io.partout.models.OpenVPNCredentials
 import io.partout.models.OpenVPNCredentialsOTPMethod
 import io.partout.models.OpenVPNModule
-import android.util.Base64
+import kotlin.io.encoding.Base64
 
 val OpenVPNModule.isInteractive: Boolean
     get() {
@@ -33,8 +33,8 @@ fun OpenVPNCredentialsOTPMethod.encodedPassword(
         OpenVPNCredentialsOTPMethod.none -> password
         OpenVPNCredentialsOTPMethod.append -> password + otp
         OpenVPNCredentialsOTPMethod.encode -> {
-            val base64Password = Base64.encodeToString(password.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
-            val base64OTP = Base64.encodeToString(otp.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
+            val base64Password = Base64.encode(password.toByteArray(Charsets.UTF_8))
+            val base64OTP = Base64.encode(otp.toByteArray(Charsets.UTF_8))
             "SCRV1:$base64Password:$base64OTP"
         }
     }
