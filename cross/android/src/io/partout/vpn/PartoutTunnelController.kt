@@ -13,7 +13,6 @@ import io.partout.extensions.modulesForTunnelSettings
 import io.partout.extensions.effectiveDNSModule
 import io.partout.extensions.effectiveIPModule
 import io.partout.extensions.isDefaultGateway
-import io.partout.extensions.VpnSubnet
 import io.partout.logSensitiveError
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
@@ -123,18 +122,11 @@ internal class PartoutTunnelController(
 
         // Apply modules to VPN builder
         val modules = info.modulesForTunnelSettings
-        val effectiveDNS = modules.filterIsInstance<TaggedModuleDNS>()
-            .map { it.value }
-            .effectiveDNSModule()
+        val dnsModules = modules.filterIsInstance<TaggedModuleDNS>().map { it.value }
+        val effectiveDNS = dnsModules.effectiveDNSModule()
         val effectiveIP = modules.filterIsInstance<TaggedModuleIP>().map { it.value }.effectiveIPModule()
-        modules.forEach {
-            when (it) {
-                is TaggedModuleOnDemand -> {
-                    OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                }
-
-                else -> {}
-            }
+        modules.filterIsInstance<TaggedModuleOnDemand>().forEach {
+            OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
         }
         // Each NE proxy module replaces the whole configuration, including an empty
         // module. Apply only the last one to the fresh builder: Android's setter
@@ -148,22 +140,15 @@ internal class PartoutTunnelController(
         val appliedDnsSettings = effectiveDNS?.let {
             DNSModuleApplying(it.copy(routesThroughVPN = null)).apply(logTag, builder, logsPrivateData)
         } ?: false
-        if (!appliedDnsSettings && effectiveIP?.isDefaultGateway == true && options.dnsFallbackServers.isNotEmpty()) {
-            options.dnsFallbackServers.addDNSServers(logTag, builder)
+        val dnsServers = if (appliedDnsSettings) {
+            effectiveDNS.servers
+        } else if (effectiveIP?.isDefaultGateway == true) {
+            options.dnsFallbackServers.also { it.addDNSServers(logTag, builder) }
+        } else {
+            emptyList()
         }
-        // NE applies every explicit DNS routing policy to the final server list.
-        modules.filterIsInstance<TaggedModuleDNS>().forEach { tagged ->
-            val routed = tagged.value.routesThroughVPN ?: return@forEach
-            effectiveDNS?.servers?.forEach serverLoop@ { server ->
-                val subnet = VpnSubnet.parse(server) ?: return@serverLoop
-                if (routed) {
-                    builder.addRoute(subnet)
-                } else {
-                    builder.tryExcludeRoute(subnet)?.let {
-                        Log.i(logTag, "DNS: Unable to exclude server route: $it")
-                    }
-                }
-            }
+        dnsModules.forEach {
+            it.applyServerRoutes(logTag, builder, dnsServers, effectiveIP)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")

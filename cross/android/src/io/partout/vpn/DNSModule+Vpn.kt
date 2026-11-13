@@ -6,8 +6,10 @@ package io.partout.vpn
 
 import android.net.VpnService
 import android.util.Log
+import java.net.Inet6Address
 import io.partout.extensions.VpnSubnet
 import io.partout.extensions.unsupportedProtocolName
+import io.partout.models.IPModule
 import io.partout.models.DNSModule
 import io.partout.sensitiveDescription
 
@@ -108,5 +110,29 @@ internal fun List<String>.addDNSServers(
         }
         Log.i(logTag, "DNS: Fallback server: ${route.cidr}")
         builder.addDnsServer(route)
+    }
+}
+
+// Apply routing policies to the committed servers, including fallback DNS.
+internal fun DNSModule.applyServerRoutes(
+    logTag: String,
+    builder: VpnService.Builder,
+    servers: List<String>,
+    ip: IPModule?
+) {
+    val routed = routesThroughVPN ?: return
+    servers.forEach { server ->
+        val subnet = VpnSubnet.parse(server) ?: return@forEach
+        val isIPv6 = subnet.address is Inet6Address
+        if (isIPv6 && ip?.ipv6 == null || !isIPv6 && ip?.ipv4 == null) return@forEach
+        val hostRoute = subnet.copy(prefixLength = if (isIPv6) 128 else 32)
+        val failure = if (routed) {
+            runCatching { builder.addRoute(hostRoute) }.exceptionOrNull()
+        } else {
+            builder.tryExcludeRoute(hostRoute)
+        }
+        if (failure != null) {
+            Log.i(logTag, "DNS: Unable to apply server route: $failure")
+        }
     }
 }
