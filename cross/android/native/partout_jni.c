@@ -91,6 +91,42 @@ Java_io_partout_PartoutWrapper_partoutImportProfile(
     return j_json;
 }
 
+JNIEXPORT jstring JNICALL
+Java_io_partout_PartoutWrapper_partoutImportModule(
+        JNIEnv *env,
+        jobject thiz,
+        jstring text,
+        jstring context
+) {
+    (void)thiz;
+    const char *jni_text = (*env)->GetStringUTFChars(env, text, NULL);
+    if (!jni_text) return NULL;
+    const char *jni_context = context ? (*env)->GetStringUTFChars(env, context, NULL) : NULL;
+    if (context && !jni_context) {
+        (*env)->ReleaseStringUTFChars(env, text, jni_text);
+        return NULL;
+    }
+    char *json = partout_import_module(jni_text, jni_context);
+    (*env)->ReleaseStringUTFChars(env, text, jni_text);
+    if (jni_context) (*env)->ReleaseStringUTFChars(env, context, jni_context);
+
+    jstring j_json = json ? (*env)->NewStringUTF(env, json) : NULL;
+    free(json);
+    return j_json;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_partout_PartoutWrapper_partoutExportModule(JNIEnv *env, jobject thiz, jstring module) {
+    (void)thiz;
+    const char *input = (*env)->GetStringUTFChars(env, module, NULL);
+    if (!input) return NULL;
+    char *output = partout_export_module(input);
+    (*env)->ReleaseStringUTFChars(env, module, input);
+    jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
+    free(output);
+    return result;
+}
+
 JNIEXPORT jint JNICALL
 Java_io_partout_PartoutWrapper_partoutDaemonStart(
         JNIEnv *env,
@@ -133,6 +169,13 @@ Java_io_partout_PartoutWrapper_partoutDaemonStart(
 }
 
 JNIEXPORT void JNICALL
+Java_io_partout_PartoutWrapper_partoutDaemonHold(JNIEnv *env, jobject thiz) {
+    (void)env;
+    (void)thiz;
+    partout_daemon_hold();
+}
+
+JNIEXPORT void JNICALL
 Java_io_partout_PartoutWrapper_partoutDaemonStop(
         JNIEnv *env,
         jobject thiz
@@ -141,6 +184,28 @@ Java_io_partout_PartoutWrapper_partoutDaemonStop(
     (void)thiz;
     partout_daemon_stop();
 }
+
+JNIEXPORT jstring JNICALL
+Java_io_partout_PartoutWrapper_partoutWireGuardGenKey(JNIEnv *env, jobject thiz) {
+    (void)thiz;
+    char *output = partout_wireguard_genkey();
+    jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
+    free(output);
+    return result;
+}
+
+JNIEXPORT jstring JNICALL
+Java_io_partout_PartoutWrapper_partoutWireGuardPubKey(JNIEnv *env, jobject thiz, jstring key) {
+    (void)thiz;
+    const char *input = (*env)->GetStringUTFChars(env, key, NULL);
+    if (!input) return NULL;
+    char *output = partout_wireguard_pubkey(input);
+    (*env)->ReleaseStringUTFChars(env, key, input);
+    jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
+    free(output);
+    return result;
+}
+
 
 void daemon_bindings_free(partout_daemon_bindings *b) {
     PP_JNI_ATTACH_OR_RETURN_VOID(env);
