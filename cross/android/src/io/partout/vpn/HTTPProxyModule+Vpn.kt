@@ -29,8 +29,7 @@ internal class HTTPProxyModuleApplying(
             } else {
                 Log.i(logTag, "HTTP Proxy: no proxy configured")
             }
-            builder.setHttpProxy(null)
-            return true
+            return false
         }
 
         if (module.hasProxyConflict) {

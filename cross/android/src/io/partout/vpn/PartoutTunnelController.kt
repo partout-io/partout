@@ -129,16 +129,18 @@ internal class PartoutTunnelController(
         val effectiveIP = modules.filterIsInstance<TaggedModuleIP>().map { it.value }.effectiveIPModule()
         modules.forEach {
             when (it) {
-                is TaggedModuleHTTPProxy -> {
-                    HTTPProxyModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                }
-
                 is TaggedModuleOnDemand -> {
                     OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
                 }
 
                 else -> {}
             }
+        }
+        // Each NE proxy module replaces the whole configuration, including an empty
+        // module. Apply only the last one to the fresh builder: Android's setter
+        // does not accept null, and unsupported configurations must leave it unset.
+        modules.filterIsInstance<TaggedModuleHTTPProxy>().lastOrNull()?.let {
+            HTTPProxyModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
         }
         val appliedAddressSettings = effectiveIP?.let {
             IPModuleApplying(it).apply(logTag, builder, logsPrivateData)
