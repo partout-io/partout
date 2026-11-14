@@ -67,10 +67,17 @@ add_dependency "$maven_central" org/jetbrains/kotlinx/kotlinx-serialization-json
 "$kotlinc" \
     "$repo_root/cross/android/src" \
     "$repo_root/cross/android/tests/ControllerBindingsTest.kt" \
+    "$repo_root/cross/android/tests/DNSSettingsTest.kt" \
+    "$repo_root/cross/android/tests/IPSettingsTest.kt" \
     -classpath "$classpath" \
     -Xplugin="$serialization_plugin" \
     -jvm-target 21 \
     -d "$work_dir/classes"
+
+# Execute the settings resolvers on the host JVM.
+for test in DNSSettingsTest IPSettingsTest; do
+    java -cp "$work_dir/classes:$classpath:$kotlin_home/lib/kotlin-stdlib.jar" "io.partout.$test"
+done
 
 # Execute the production C -> Kotlin bindings on the host JVM.
 jni_java_home=${JAVA_HOME:-$(java -XshowSettings:properties -version 2>&1 | sed -n 's/^[[:space:]]*java.home = //p')}

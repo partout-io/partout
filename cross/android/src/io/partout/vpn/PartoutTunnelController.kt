@@ -6,10 +6,15 @@ package io.partout.vpn
 
 import android.net.Network
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.NativeTunnelControllerJNI
 import io.partout.extensions.modulesForTunnelSettings
+import io.partout.extensions.effectiveDNSRouting
+import io.partout.extensions.effectiveDNSModule
+import io.partout.extensions.effectiveIPModule
+import io.partout.extensions.isDefaultGateway
 import io.partout.logSensitiveError
 import io.partout.models.TaggedModuleDNS
 import io.partout.models.TaggedModuleHTTPProxy
@@ -118,33 +123,37 @@ internal class PartoutTunnelController(
         }
 
         // Apply modules to VPN builder
-        var appliedAddressSettings = false
-        var appliedDnsSettings = false
-        info.modulesForTunnelSettings.forEach {
-            when (it) {
-                is TaggedModuleDNS -> {
-                    appliedDnsSettings = DNSModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                            || appliedDnsSettings
-                }
-
-                is TaggedModuleIP -> {
-                    appliedAddressSettings = IPModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                            || appliedAddressSettings
-                }
-
-                is TaggedModuleHTTPProxy -> {
-                    HTTPProxyModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                }
-
-                is TaggedModuleOnDemand -> {
-                    OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
-                }
-
-                else -> {}
-            }
+        val modules = info.modulesForTunnelSettings
+        val dnsModules = modules.filterIsInstance<TaggedModuleDNS>().map { it.value }
+        val effectiveDNS = dnsModules.effectiveDNSModule()
+        val effectiveIP = modules.filterIsInstance<TaggedModuleIP>().map { it.value }.effectiveIPModule()
+        modules.filterIsInstance<TaggedModuleOnDemand>().forEach {
+            OnDemandModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
         }
-        if (!appliedDnsSettings && options.dnsFallbackServers.isNotEmpty()) {
-            options.dnsFallbackServers.addDNSServers(logTag, builder)
+        // Each NE proxy module replaces the whole configuration, including an empty
+        // module. Apply only the last one to the fresh builder: Android's setter
+        // does not accept null, and unsupported configurations must leave it unset.
+        modules.filterIsInstance<TaggedModuleHTTPProxy>().lastOrNull()?.let {
+            HTTPProxyModuleApplying(it.value).apply(logTag, builder, logsPrivateData)
+        }
+        val appliedAddressSettings = effectiveIP?.let {
+            IPModuleApplying(it).apply(logTag, builder, logsPrivateData)
+        } ?: false
+        val appliedDnsSettings = effectiveDNS?.let {
+            DNSModuleApplying(it).apply(logTag, builder, logsPrivateData)
+        } ?: false
+        val dnsServers = if (appliedDnsSettings) {
+            effectiveDNS.servers
+        } else if (effectiveIP?.isDefaultGateway == true) {
+            options.dnsFallbackServers.also { it.addDNSServers(logTag, builder) }
+        } else {
+            emptyList()
+        }
+        val dnsRouting = dnsModules.effectiveDNSRouting(
+            supportsExclusions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        )
+        dnsRouting?.let {
+            applyDNSServerRoutes(logTag, builder, dnsServers, effectiveIP, routed = it)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")

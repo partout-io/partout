@@ -5,9 +5,13 @@
 package io.partout.vpn
 
 import android.net.VpnService
+import android.os.Build
 import android.util.Log
+import java.net.Inet6Address
 import io.partout.extensions.VpnSubnet
+import io.partout.extensions.excludesHostRoute
 import io.partout.extensions.unsupportedProtocolName
+import io.partout.models.IPModule
 import io.partout.models.DNSModule
 import io.partout.sensitiveDescription
 
@@ -37,7 +41,6 @@ private fun DNSModule.applyServers(
         return addServers(
             logTag,
             builder,
-            routed = routesThroughVPN == true,
             logsPrivateData = logsPrivateData
         )
     }
@@ -48,7 +51,6 @@ private fun DNSModule.applyServers(
     return addServers(
         logTag,
         builder,
-        routed = routesThroughVPN == true,
         logsPrivateData = logsPrivateData
     )
 }
@@ -70,10 +72,9 @@ private fun DNSModule.addSearchDomains(
     }
 }
 
-internal fun DNSModule.addServers(
+private fun DNSModule.addServers(
     logTag: String,
     builder: VpnService.Builder,
-    routed: Boolean,
     logsPrivateData: Boolean
 ): Boolean {
     var addedServers = false
@@ -86,12 +87,7 @@ internal fun DNSModule.addServers(
         Log.i(logTag, "DNS: Server: ${route.cidr.sensitiveDescription(logsPrivateData)}")
         builder.addDnsServer(route)
         addedServers = true
-        when {
-            routed -> {
-                Log.i(logTag, "DNS: Route server through VPN: ${route.cidr.sensitiveDescription(logsPrivateData)}")
-                builder.addRoute(route)
-            }
-        }
+
     }
     return addedServers
 }
@@ -108,5 +104,36 @@ internal fun List<String>.addDNSServers(
         }
         Log.i(logTag, "DNS: Fallback server: ${route.cidr}")
         builder.addDnsServer(route)
+    }
+}
+
+// Apply routing policies to the committed servers, including fallback DNS.
+internal fun applyDNSServerRoutes(
+    logTag: String,
+    builder: VpnService.Builder,
+    servers: List<String>,
+    ip: IPModule?,
+    routed: Boolean
+) {
+    servers.forEach { server ->
+        val subnet = VpnSubnet.parse(server) ?: return@forEach
+        val isIPv6 = subnet.address is Inet6Address
+        if (isIPv6 && ip?.ipv6 == null || !isIPv6 && ip?.ipv4 == null) return@forEach
+        val hostRoute = subnet.copy(prefixLength = if (isIPv6) 128 else 32)
+        // Android addRoute would replace an existing exclusion for this host.
+        if (routed && ip?.excludesHostRoute(
+                hostRoute,
+                supportsExclusions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+            ) == true) {
+            return@forEach
+        }
+        val failure = if (routed) {
+            runCatching { builder.addRoute(hostRoute) }.exceptionOrNull()
+        } else {
+            builder.tryExcludeRoute(hostRoute)
+        }
+        if (failure != null) {
+            Log.i(logTag, "DNS: Unable to apply server route: $failure")
+        }
     }
 }
