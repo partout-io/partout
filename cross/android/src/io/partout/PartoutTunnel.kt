@@ -66,6 +66,7 @@ class PartoutTunnel(
             override fun handleMessage(msg: Message) {
                 when (msg.what) {
                     PartoutVpnServiceRuntime.MSG_GET_STATUS -> {
+                        onPolicy(msg.data)
                         val snapshotJSON = msg.data.getString(PartoutVpnServiceRuntime.MSG_KEY_JSON)
                         if (snapshotJSON == null) {
                             _state.update {
@@ -127,6 +128,7 @@ class PartoutTunnel(
                 if (intent?.action != PartoutVpnServiceRuntime.ACTION_SNAPSHOT) {
                     return
                 }
+                intent.extras?.let(::onPolicy)
                 intent.getStringExtra(PartoutVpnServiceRuntime.EXTRA_SNAPSHOT_JSON)?.let {
                     onSnapshotJSON(it)
                 }
@@ -172,6 +174,10 @@ class PartoutTunnel(
     }
 
     fun connect(profile: TaggedProfile, onIntent: (Intent) -> Unit = { _ -> }, completion: (Int) -> Unit) {
+        if (state.value.policy.alwaysOn == true && state.value.snapshots.values.any { it.isEnabled }) {
+            completion(ERROR_SYSTEM_MANAGED)
+            return
+        }
         val permissionIntent = VpnService.prepare(appContext)
         if (permissionIntent != null) {
             pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
@@ -184,6 +190,10 @@ class PartoutTunnel(
     }
 
     fun disconnect(profileId: String, forget: Boolean = false, completion: (Int) -> Unit) {
+        if (state.value.policy.alwaysOn == true) {
+            completion(ERROR_SYSTEM_MANAGED)
+            return
+        }
         pendingPermission?.completion?.invoke(ERROR_PERMISSION_DENIED)
         pendingPermission = null
         stopVpnService(profileId, forget)
@@ -254,6 +264,7 @@ class PartoutTunnel(
     //region Internals
     private fun startVpnService(profile: TaggedProfile, onIntent: (Intent) -> Unit) {
         val startIntent = Intent(appContext, vpnServiceClass).apply {
+            putExtra(VpnPolicy.EXTRA_APP_START, true)
             putExtra(PartoutVpnServiceRuntime.EXTRA_PROFILE_JSON, json.encodeToString(profile))
             onIntent(this)
         }
@@ -266,12 +277,22 @@ class PartoutTunnel(
 
     private fun stopVpnService(profileId: String, forget: Boolean) {
         val stopIntent = Intent(appContext, vpnServiceClass).apply {
+            putExtra(VpnPolicy.EXTRA_APP_START, true)
             action = PartoutVpnServiceRuntime.ACTION_STOP_VPN
             if (forget) {
                 putExtra(PartoutVpnServiceRuntime.EXTRA_FORGET_ID, profileId)
             }
         }
         appContext.startService(stopIntent)
+    }
+
+    private fun onPolicy(bundle: Bundle) {
+        _state.update {
+            it.copy(policy = VpnPolicy(
+                if (bundle.containsKey(VpnPolicy.EXTRA_ALWAYS_ON)) bundle.getBoolean(VpnPolicy.EXTRA_ALWAYS_ON) else it.policy.alwaysOn,
+                if (bundle.containsKey(VpnPolicy.EXTRA_LOCKDOWN)) bundle.getBoolean(VpnPolicy.EXTRA_LOCKDOWN) else it.policy.lockdown
+            ))
+        }
     }
 
     private fun onSnapshotJSON(snapshotJSON: String) {
@@ -296,6 +317,7 @@ class PartoutTunnel(
     companion object {
         const val ERROR_NONE = 0
         const val ERROR_PERMISSION_DENIED = -1
+        const val ERROR_SYSTEM_MANAGED = -2
 
         private val json = Json {
             ignoreUnknownKeys = true
@@ -304,6 +326,7 @@ class PartoutTunnel(
 
     data class State(
         val snapshots: Map<String, TunnelSnapshot> = emptyMap(),
+        val policy: VpnPolicy = VpnPolicy(),
         val revision: Long = 0L
     )
 

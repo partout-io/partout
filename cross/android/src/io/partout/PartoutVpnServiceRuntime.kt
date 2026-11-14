@@ -48,13 +48,32 @@ class PartoutVpnServiceRuntime(
     private var isPartoutInitialized = false
     private var isRunning = false
     private var activeProfileId: String? = null
+    private val policyStore = service.getSharedPreferences("partout-vpn-policy", 0)
+    @Volatile var policy = VpnPolicy(
+        alwaysOn = if (policyStore.contains(VpnPolicy.EXTRA_ALWAYS_ON))
+            policyStore.getBoolean(VpnPolicy.EXTRA_ALWAYS_ON, false) else null
+    )
+        private set
+
+    fun refreshPolicy(intent: Intent? = null) {
+        val updated = VpnPolicy.read(service, policy, intent)
+        engine.onPolicy(updated)
+        if (updated == policy) return
+        policy = updated
+        policy.alwaysOn?.let { policyStore.edit().putBoolean(VpnPolicy.EXTRA_ALWAYS_ON, it).apply() }
+        service.sendBroadcast(Intent(ACTION_SNAPSHOT).apply {
+            setPackage(service.packageName)
+            policy.alwaysOn?.let { putExtra(VpnPolicy.EXTRA_ALWAYS_ON, it) }
+            policy.lockdown?.let { putExtra(VpnPolicy.EXTRA_LOCKDOWN, it) }
+        })
+    }
     private var logsPrivateData = false
 
     // C/JNI controller
     private var controller: PartoutTunnelController? = null
 
     // Deliver snapshots with mutex
-    private val snapshotEmitter = SnapshotEmitter(logTag, service)
+    private val snapshotEmitter = SnapshotEmitter(logTag, service) { policy.alwaysOn == true }
 
     init {
         serviceScope.launch {
@@ -74,8 +93,10 @@ class PartoutVpnServiceRuntime(
     @Suppress("UNUSED_PARAMETER")
     fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(logTag, "PartoutVpnServiceRuntime.onStartCommand()")
+        refreshPolicy(intent)
         when (intent?.action) {
             ACTION_STOP_VPN -> {
+                if (policy.alwaysOn == true) return Service.START_STICKY
                 disconnect(intent)
                 return Service.START_NOT_STICKY
             }
@@ -94,12 +115,19 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.d(logTag, "PartoutVpnServiceRuntime.onRevoke()")
+        policy = VpnPolicy(alwaysOn = false)
+        policyStore.edit().clear().apply()
         disconnect(null, wasRevoked = true)
     }
     //endregion
 
     //region Actions (Service)
     private fun connect(intent: Intent?) = launchCommand {
+        refreshPolicy(intent)
+        if (isRunning && intent?.getStringExtra(EXTRA_PROFILE_JSON).isNullOrBlank()) {
+            return@launchCommand
+        }
+        if (isRunning && policy.alwaysOn == true) return@launchCommand
         logsPrivateData = false
         val profileJSON = runCatching {
             loadOrPersistProfile(intent)
@@ -181,8 +209,9 @@ class PartoutVpnServiceRuntime(
     }
 
     override fun onSnapshot(snapshot: TunnelSnapshot) {
-        if (snapshotEmitter.emit(snapshot)) {
-            engine.onSnapshot(snapshot)
+        val enriched = snapshot.copy(onDemand = policy.alwaysOn == true)
+        if (snapshotEmitter.emit(enriched)) {
+            engine.onSnapshot(enriched)
         }
     }
 
@@ -201,6 +230,7 @@ class PartoutVpnServiceRuntime(
             return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
+        decodeProfileId(json)
         runCatching {
             engine.writeLastProfile(json)
         }.onFailure {
@@ -242,6 +272,8 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun disconnect(intent: Intent?, wasRevoked: Boolean = false) = launchCommand {
+        refreshPolicy()
+        if (!wasRevoked && policy.alwaysOn == true) return@launchCommand
         val forgetId = intent?.getStringExtra(EXTRA_FORGET_ID)
         if (forgetId != null) {
             engine.deleteLastProfile(forgetId)
@@ -272,7 +304,8 @@ class PartoutVpnServiceRuntime(
     //region Snapshots
     private class SnapshotEmitter(
         private val logTag: String,
-        private val service: Service
+        private val service: Service,
+        private val isAlwaysOn: () -> Boolean
     ) {
         private val lock = Any()
         private var isAccepting = false
@@ -315,7 +348,7 @@ class PartoutVpnServiceRuntime(
                 TunnelSnapshot(
                     id = profileId,
                     isEnabled = false,
-                    onDemand = false,
+                    onDemand = isAlwaysOn(),
                     status = TunnelStatus.inactive
                 )
             )
@@ -348,7 +381,7 @@ class PartoutVpnServiceRuntime(
             id,
             false,
             TunnelStatus.inactive,
-            false,
+            isAlwaysOn(),
             environment
         )
     }
@@ -391,11 +424,14 @@ class PartoutVpnServiceRuntime(
     )
 
     private fun replySnapshot(client: Messenger) {
+        refreshPolicy()
         val snapshotJSON = snapshotEmitter.latest()?.let {
-            json.encodeToString(it)
+            json.encodeToString(it.copy(onDemand = policy.alwaysOn == true))
         }
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
             data = Bundle().apply {
+                policy.alwaysOn?.let { putBoolean(VpnPolicy.EXTRA_ALWAYS_ON, it) }
+                policy.lockdown?.let { putBoolean(VpnPolicy.EXTRA_LOCKDOWN, it) }
                 snapshotJSON?.let {
                     putString(MSG_KEY_JSON, it)
                 }
@@ -446,6 +482,7 @@ class PartoutVpnServiceRuntime(
         suspend fun writeLastProfile(json: String)
         suspend fun deleteLastProfile(id: String)
         fun onSnapshot(snapshot: TunnelSnapshot)
+        fun onPolicy(policy: VpnPolicy) {}
         fun onServiceStopped(wasRevoked: Boolean) {}
     }
     //endregion
