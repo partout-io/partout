@@ -102,6 +102,7 @@ class PartoutVpnServiceRuntime(
         refreshPolicy(intent)
         when (intent?.action) {
             ACTION_STOP_VPN -> {
+                // Android owns the lifecycle of an Always-on VPN; ignore app stop requests.
                 if (policy.alwaysOn == true) return Service.START_STICKY
                 disconnect(intent)
                 return Service.START_NOT_STICKY
@@ -128,10 +129,12 @@ class PartoutVpnServiceRuntime(
     //region Actions (Service)
     private fun connect(intent: Intent?) = launchCommand {
         refreshPolicy(intent)
-        if (isRunning && intent?.getStringExtra(EXTRA_PROFILE_JSON).isNullOrBlank()) {
-            return@launchCommand
+        if (isRunning) {
+            // Android and the boot receiver may both request restoration of the same tunnel.
+            if (intent?.getStringExtra(EXTRA_PROFILE_JSON).isNullOrBlank()) return@launchCommand
+            // Replacing the profile would disconnect the system-managed tunnel.
+            if (policy.alwaysOn == true) return@launchCommand
         }
-        if (isRunning && policy.alwaysOn == true) return@launchCommand
         logsPrivateData = false
         val profileJSON = runCatching {
             loadOrPersistProfile(intent)
@@ -233,6 +236,7 @@ class PartoutVpnServiceRuntime(
             return engine.readLastProfile()
         }
         Log.i(logTag, "Profile from VPN start intent, persisting it")
+        // Reject malformed profiles before overwriting the saved restoration profile.
         decodeProfileId(json)
         runCatching {
             engine.writeLastProfile(json)
@@ -282,8 +286,9 @@ class PartoutVpnServiceRuntime(
             }
         } else {
             refreshPolicy()
+            // Recheck queued app requests; system revocation must always allow cleanup.
+            if (policy.alwaysOn == true) return@launchCommand
         }
-        if (!wasRevoked && policy.alwaysOn == true) return@launchCommand
         val forgetId = intent?.getStringExtra(EXTRA_FORGET_ID)
         if (forgetId != null) {
             engine.deleteLastProfile(forgetId)
