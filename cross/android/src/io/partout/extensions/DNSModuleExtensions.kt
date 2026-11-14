@@ -38,3 +38,16 @@ internal val DNSModule.unsupportedProtocolName: String?
         is DNSModuleProtocolTypetls -> "DoT"
         else -> null
     }
+
+/** Exclusions take precedence, except on Android versions that cannot apply them. */
+internal fun Iterable<DNSModule>.effectiveDNSRouting(supportsExclusions: Boolean): Boolean? {
+    var routing: Boolean? = null
+    for (module in this) {
+        when (module.routesThroughVPN) {
+            false -> if (supportsExclusions) return false
+            true -> routing = true
+            null -> {}
+        }
+    }
+    return routing
+}

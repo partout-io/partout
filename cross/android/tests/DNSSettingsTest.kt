@@ -3,6 +3,7 @@
 
 package io.partout
 
+import io.partout.extensions.effectiveDNSRouting
 import io.partout.extensions.effectiveDNSModule
 import io.partout.models.DNSModule
 import io.partout.models.DNSModuleProtocolTypecleartext
@@ -44,6 +45,17 @@ object DNSSettingsTest {
         check(listOf(vpn, encrypted).effectiveDNSModule() == encrypted)
         check(listOf(encrypted, inheriting).effectiveDNSModule()?.protocolType === encrypted.protocolType)
         check(listOf(vpn, profile, inheriting).effectiveDNSModule()?.servers == profile.servers)
-        println("DNS replacement and inheritance passed")
+        val included = vpn.copy(routesThroughVPN = true)
+        val excluded = profile.copy(routesThroughVPN = false)
+        for (ordered in listOf(listOf(included, excluded), listOf(excluded, included))) {
+            check(ordered.effectiveDNSRouting(supportsExclusions = true) == false)
+            check(ordered.effectiveDNSRouting(supportsExclusions = false) == true)
+        }
+        check(listOf(included, profile).effectiveDNSRouting(true) == true)
+        check(listOf(excluded, profile).effectiveDNSRouting(true) == false)
+        check(listOf(excluded).effectiveDNSRouting(false) == null)
+        check(listOf(profile).effectiveDNSRouting(true) == null)
+        check(emptyList<DNSModule>().effectiveDNSRouting(true) == null)
+        println("DNS replacement, inheritance, and routing precedence passed")
     }
 }

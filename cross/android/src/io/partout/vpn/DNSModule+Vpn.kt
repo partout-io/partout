@@ -114,13 +114,13 @@ internal fun List<String>.addDNSServers(
 }
 
 // Apply routing policies to the committed servers, including fallback DNS.
-internal fun DNSModule.applyServerRoutes(
+internal fun applyDNSServerRoutes(
     logTag: String,
     builder: VpnService.Builder,
     servers: List<String>,
-    ip: IPModule?
+    ip: IPModule?,
+    routed: Boolean
 ) {
-    val routed = routesThroughVPN ?: return
     servers.forEach { server ->
         val subnet = VpnSubnet.parse(server) ?: return@forEach
         val isIPv6 = subnet.address is Inet6Address

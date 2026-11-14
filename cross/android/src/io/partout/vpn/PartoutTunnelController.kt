@@ -6,10 +6,12 @@ package io.partout.vpn
 
 import android.net.Network
 import android.net.VpnService
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import io.partout.NativeTunnelControllerJNI
 import io.partout.extensions.modulesForTunnelSettings
+import io.partout.extensions.effectiveDNSRouting
 import io.partout.extensions.effectiveDNSModule
 import io.partout.extensions.effectiveIPModule
 import io.partout.extensions.isDefaultGateway
@@ -147,8 +149,11 @@ internal class PartoutTunnelController(
         } else {
             emptyList()
         }
-        dnsModules.forEach {
-            it.applyServerRoutes(logTag, builder, dnsServers, effectiveIP)
+        val dnsRouting = dnsModules.effectiveDNSRouting(
+            supportsExclusions = Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+        )
+        dnsRouting?.let {
+            applyDNSServerRoutes(logTag, builder, dnsServers, effectiveIP, routed = it)
         }
         if (!appliedAddressSettings) {
             Log.e(logTag, "Unable to set interface address")
