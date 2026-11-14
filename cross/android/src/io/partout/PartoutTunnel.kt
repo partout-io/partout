@@ -300,6 +300,7 @@ class PartoutTunnel(
         runCatching {
             json.decodeFromString<TunnelSnapshot>(snapshotJSON)
         }.onSuccess { snapshot ->
+            val previous = state.value.snapshots[snapshot.id]
             if (logsSnapshots) {
                 Log.d(logTag, "Snapshot received: $snapshot")
             }
@@ -308,6 +309,11 @@ class PartoutTunnel(
                     snapshots = mapOf(snapshot.id to snapshot),
                     revision = it.revision + 1
                 )
+            }
+            // Policy may become available only after the VPN starts. Refresh on
+            // lifecycle changes, not on every traffic-counter update.
+            if (previous?.status != snapshot.status || previous.isEnabled != snapshot.isEnabled) {
+                requestSnapshot()
             }
         }.onFailure {
             Log.e(logTag, "Unable to decode snapshot", it)
