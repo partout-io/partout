@@ -6,6 +6,7 @@ package io.partout.extensions
 import io.partout.models.IPModule
 import io.partout.models.IPSettings
 import io.partout.models.Route
+import java.net.Inet6Address
 
 internal fun Iterable<IPModule>.effectiveIPModule(): IPModule? {
     var current: IPModule? = null
@@ -41,3 +42,11 @@ private fun Route.isDefault(family: VpnAddressFamily): Boolean =
 internal val IPModule.isDefaultGateway: Boolean
     get() = ipv4?.includedRoutes?.any { it.isDefault(VpnAddressFamily.IPv4) } == true ||
         ipv6?.includedRoutes?.any { it.isDefault(VpnAddressFamily.IPv6) } == true
+
+internal fun IPModule.excludesHostRoute(hostRoute: VpnSubnet, supportsExclusions: Boolean): Boolean {
+    if (!supportsExclusions) return false
+    val family = if (hostRoute.address is Inet6Address) VpnAddressFamily.IPv6 else VpnAddressFamily.IPv4
+    if (hostRoute.prefixLength != family.maxPrefixLength) return false
+    val settings = if (family == VpnAddressFamily.IPv6) ipv6 else ipv4
+    return settings?.excludedRoutes?.any { it.destinationPrefix(family) == hostRoute } == true
+}

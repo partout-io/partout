@@ -140,7 +140,7 @@ internal class PartoutTunnelController(
             IPModuleApplying(it).apply(logTag, builder, logsPrivateData)
         } ?: false
         val appliedDnsSettings = effectiveDNS?.let {
-            DNSModuleApplying(it.copy(routesThroughVPN = null)).apply(logTag, builder, logsPrivateData)
+            DNSModuleApplying(it).apply(logTag, builder, logsPrivateData)
         } ?: false
         val dnsServers = if (appliedDnsSettings) {
             effectiveDNS.servers
