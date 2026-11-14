@@ -57,7 +57,10 @@ class PartoutVpnServiceRuntime(
         private set
 
     fun refreshPolicy(intent: Intent? = null) {
-        val updated = VpnPolicy.read(service, policy, intent)
+        updatePolicy(VpnPolicy.read(service, policy, intent))
+    }
+
+    private fun updatePolicy(updated: VpnPolicy) {
         engine.onPolicy(updated)
         if (updated == policy) return
         policy = updated
@@ -118,10 +121,6 @@ class PartoutVpnServiceRuntime(
 
     fun onRevoke() {
         Log.d(logTag, "PartoutVpnServiceRuntime.onRevoke()")
-        policy = VpnPolicy(alwaysOn = false)
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            engine.writeLegacyAlwaysOn(null)
-        }
         disconnect(null, wasRevoked = true)
     }
     //endregion
@@ -276,7 +275,14 @@ class PartoutVpnServiceRuntime(
     }
 
     private fun disconnect(intent: Intent?, wasRevoked: Boolean = false) = launchCommand {
-        refreshPolicy()
+        if (wasRevoked) {
+            updatePolicy(VpnPolicy(alwaysOn = false, lockdown = false))
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                engine.writeLegacyAlwaysOn(null)
+            }
+        } else {
+            refreshPolicy()
+        }
         if (!wasRevoked && policy.alwaysOn == true) return@launchCommand
         val forgetId = intent?.getStringExtra(EXTRA_FORGET_ID)
         if (forgetId != null) {
