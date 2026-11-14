@@ -7,7 +7,6 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
-import android.os.Build
 import io.partout.vpn.VpnPolicy
 import android.os.Bundle
 import android.os.Handler
@@ -50,10 +49,7 @@ class PartoutVpnServiceRuntime(
     private var isPartoutInitialized = false
     private var isRunning = false
     private var activeProfileId: String? = null
-    @Volatile var policy = VpnPolicy(
-        alwaysOn = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
-            engine.readLegacyAlwaysOn() else null
-    )
+    @Volatile var policy = VpnPolicy()
         private set
 
     fun refreshPolicy(intent: Intent? = null) {
@@ -64,9 +60,6 @@ class PartoutVpnServiceRuntime(
         engine.onPolicy(updated)
         if (updated == policy) return
         policy = updated
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            engine.writeLegacyAlwaysOn(policy.alwaysOn)
-        }
         service.sendBroadcast(Intent(ACTION_SNAPSHOT).apply {
             setPackage(service.packageName)
             policy.alwaysOn?.let { putExtra(VpnPolicy.EXTRA_ALWAYS_ON, it) }
@@ -281,9 +274,6 @@ class PartoutVpnServiceRuntime(
     private fun disconnect(intent: Intent?, wasRevoked: Boolean = false) = launchCommand {
         if (wasRevoked) {
             updatePolicy(VpnPolicy(alwaysOn = false, lockdown = false))
-            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-                engine.writeLegacyAlwaysOn(null)
-            }
         } else {
             refreshPolicy()
             // Recheck queued app requests; system revocation must always allow cleanup.
@@ -487,8 +477,6 @@ class PartoutVpnServiceRuntime(
     )
 
     interface Engine {
-        fun readLegacyAlwaysOn(): Boolean?
-        fun writeLegacyAlwaysOn(value: Boolean?)
         suspend fun prepareStart(
             version: String,
             intent: Intent?,
