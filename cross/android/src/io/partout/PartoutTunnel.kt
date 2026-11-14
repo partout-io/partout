@@ -11,6 +11,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.ServiceConnection
 import android.net.VpnService
+import io.partout.vpn.VpnPolicy
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder

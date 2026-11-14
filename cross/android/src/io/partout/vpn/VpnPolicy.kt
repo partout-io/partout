@@ -2,11 +2,12 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-package io.partout
+package io.partout.vpn
 
 import android.content.Intent
 import android.net.VpnService
 import android.os.Build
+import io.partout.PartoutVpnServiceRuntime
 
 data class VpnPolicy(
     val alwaysOn: Boolean? = null,
