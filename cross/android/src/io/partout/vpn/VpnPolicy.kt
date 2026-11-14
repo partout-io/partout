@@ -23,15 +23,15 @@ data class VpnPolicy(
         const val EXTRA_LOCKDOWN = "io.partout.extra.LOCKDOWN"
 
         fun read(service: VpnService, previous: VpnPolicy, intent: Intent? = null): VpnPolicy {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                return VpnPolicy(service.isAlwaysOn, service.isLockdownEnabled)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+                // Null intents also occur during ordinary sticky recreation.
+                return previous.afterLegacyStart(
+                    intent != null,
+                    intent?.getBooleanExtra(EXTRA_APP_START, false) == true,
+                    intent?.action == PartoutVpnServiceRuntime.ACTION_STOP_VPN
+                )
             }
-            // Null intents also occur during ordinary sticky recreation.
-            return previous.afterLegacyStart(
-                intent != null,
-                intent?.getBooleanExtra(EXTRA_APP_START, false) == true,
-                intent?.action == PartoutVpnServiceRuntime.ACTION_STOP_VPN
-            )
+            return VpnPolicy(service.isAlwaysOn, service.isLockdownEnabled)
         }
     }
 }

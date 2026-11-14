@@ -13,6 +13,7 @@
 ## Kotlin
 
 - Never use fully qualified entities. Import the parent package, then use the entity unprefixed. The only exception is for disambiguation.
+- When a function depends on API availability, make recent API the main path. Early exit when unavailable.
 
 ## C++
 
