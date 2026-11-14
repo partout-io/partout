@@ -7,6 +7,7 @@ package io.partout
 import android.app.Service
 import android.content.Intent
 import android.net.VpnService
+import android.os.Build
 import io.partout.vpn.VpnPolicy
 import android.os.Bundle
 import android.os.Handler
@@ -49,10 +50,9 @@ class PartoutVpnServiceRuntime(
     private var isPartoutInitialized = false
     private var isRunning = false
     private var activeProfileId: String? = null
-    private val policyStore = service.getSharedPreferences("partout-vpn-policy", 0)
     @Volatile var policy = VpnPolicy(
-        alwaysOn = if (policyStore.contains(VpnPolicy.EXTRA_ALWAYS_ON))
-            policyStore.getBoolean(VpnPolicy.EXTRA_ALWAYS_ON, false) else null
+        alwaysOn = if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q)
+            engine.readLegacyAlwaysOn() else null
     )
         private set
 
@@ -61,7 +61,9 @@ class PartoutVpnServiceRuntime(
         engine.onPolicy(updated)
         if (updated == policy) return
         policy = updated
-        policy.alwaysOn?.let { policyStore.edit().putBoolean(VpnPolicy.EXTRA_ALWAYS_ON, it).apply() }
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            engine.writeLegacyAlwaysOn(policy.alwaysOn)
+        }
         service.sendBroadcast(Intent(ACTION_SNAPSHOT).apply {
             setPackage(service.packageName)
             policy.alwaysOn?.let { putExtra(VpnPolicy.EXTRA_ALWAYS_ON, it) }
@@ -117,7 +119,9 @@ class PartoutVpnServiceRuntime(
     fun onRevoke() {
         Log.d(logTag, "PartoutVpnServiceRuntime.onRevoke()")
         policy = VpnPolicy(alwaysOn = false)
-        policyStore.edit().clear().apply()
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            engine.writeLegacyAlwaysOn(null)
+        }
         disconnect(null, wasRevoked = true)
     }
     //endregion
@@ -472,6 +476,8 @@ class PartoutVpnServiceRuntime(
     )
 
     interface Engine {
+        fun readLegacyAlwaysOn(): Boolean?
+        fun writeLegacyAlwaysOn(value: Boolean?)
         suspend fun prepareStart(
             version: String,
             intent: Intent?,
