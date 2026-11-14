@@ -74,7 +74,7 @@ class PartoutVpnServiceRuntime(
     private var controller: PartoutTunnelController? = null
 
     // Deliver snapshots with mutex
-    private val snapshotEmitter = SnapshotEmitter(logTag, service) { policy.alwaysOn == true }
+    private val snapshotEmitter = SnapshotEmitter(logTag, service)
 
     init {
         serviceScope.launch {
@@ -210,9 +210,8 @@ class PartoutVpnServiceRuntime(
     }
 
     override fun onSnapshot(snapshot: TunnelSnapshot) {
-        val enriched = snapshot.copy(onDemand = policy.alwaysOn == true)
-        if (snapshotEmitter.emit(enriched)) {
-            engine.onSnapshot(enriched)
+        if (snapshotEmitter.emit(snapshot)) {
+            engine.onSnapshot(snapshot)
         }
     }
 
@@ -305,8 +304,7 @@ class PartoutVpnServiceRuntime(
     //region Snapshots
     private class SnapshotEmitter(
         private val logTag: String,
-        private val service: Service,
-        private val isAlwaysOn: () -> Boolean
+        private val service: Service
     ) {
         private val lock = Any()
         private var isAccepting = false
@@ -349,7 +347,7 @@ class PartoutVpnServiceRuntime(
                 TunnelSnapshot(
                     id = profileId,
                     isEnabled = false,
-                    onDemand = isAlwaysOn(),
+                    onDemand = false,
                     status = TunnelStatus.inactive
                 )
             )
@@ -382,7 +380,7 @@ class PartoutVpnServiceRuntime(
             id,
             false,
             TunnelStatus.inactive,
-            isAlwaysOn(),
+            false,
             environment
         )
     }
@@ -427,7 +425,7 @@ class PartoutVpnServiceRuntime(
     private fun replySnapshot(client: Messenger) {
         refreshPolicy()
         val snapshotJSON = snapshotEmitter.latest()?.let {
-            json.encodeToString(it.copy(onDemand = policy.alwaysOn == true))
+            json.encodeToString(it)
         }
         val msg = Message.obtain(null, MSG_GET_STATUS).apply {
             data = Bundle().apply {
