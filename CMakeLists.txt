@@ -7,7 +7,7 @@ project(Partout LANGUAGES C)
 include(GNUInstallDirs)
 
 set(partout_models_default OFF)
-if(WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID))
+if(WIN32 OR (UNIX AND NOT ANDROID))
     set(partout_models_default ON)
 endif()
 
