@@ -10,13 +10,9 @@
 
 _The easiest way to build cross-platform tunnel apps_.
 
-Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, plus Swift and Kotlin for the OS bindings. It provides VPN functionality through the [Network Extension][apple-ne] framework on Apple platforms, through [VpnService][android-vpnservice] on Android, and it partially works on Windows and Linux.
+Partout (French: /paʁtu/) is a tunnel library that uses Zig and C at its core, plus Swift and Kotlin for the OS bindings. It provides VPN functionality through the [Network Extension][apple-ne] framework on Apple platforms, through [VpnService][android-vpnservice] on Android, and it partially works on Windows and Linux. Windows has an experimental plug-in backend with packet I/O based on WinRT/C++.
 
 Partout is the backbone of [Passepartout][passepartout].
-
-Windows has an experimental [Windows VPN plug-in backend](cross/windows/README.md)
-with OpenVPN and WireGuard packet I/O. See its README for build requirements,
-transport ownership and current limitations.
 
 ## Usage
 
