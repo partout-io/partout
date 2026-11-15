@@ -60,9 +60,12 @@ foreach(target IN ITEMS partout-windows-backend partout-models-impl)
     if(NOT target STREQUAL "partout-models-impl")
         target_compile_options(${target} PRIVATE /W4)
     endif()
-    # AppContainer consumers use a CRT without the /RTC helpers.
-    set_target_properties(${target} PROPERTIES
-        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-        MSVC_RUNTIME_CHECKS ""
-    )
+    if(PP_BUILD_LIBRARY)
+        # AppContainer DLLs use a CRT without the /RTC helpers. Static builds
+        # inherit the caller's runtime and checks to match their final executable.
+        set_target_properties(${target} PROPERTIES
+            MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+            MSVC_RUNTIME_CHECKS ""
+        )
+    endif()
 endforeach()
