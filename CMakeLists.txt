@@ -39,6 +39,9 @@ set(PP_BUILD_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/bin/${PLATFORM_NAME}-${ARCH_NAM
     CACHE PATH "Build output directory")
 file(TO_CMAKE_PATH "${PP_BUILD_OUTPUT}" PP_BUILD_OUTPUT)
 
+# Distribute as SDK only if built as top level project.
+set(partout_install_sdk ${PROJECT_IS_TOP_LEVEL})
+
 # Resolve the Apple SDK once for both Zig and the Go bridge.
 if(APPLE)
     if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")

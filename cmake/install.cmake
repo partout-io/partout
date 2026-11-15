@@ -1,17 +1,19 @@
 include(GNUInstallDirs)
 
+set(partout_install_sdk_export)
+if(partout_install_sdk)
+    set(partout_install_sdk_export EXPORT PartoutTargets)
+endif()
+
 if(WIN32)
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_BINDIR}")
 else()
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
 if(TARGET partout-windows-backend)
     set_target_properties(partout-windows-backend PROPERTIES EXPORT_NAME WindowsBackend)
-    install(TARGETS partout-windows-backend EXPORT PartoutTargets
+    install(TARGETS partout-windows-backend ${partout_install_sdk_export}
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     if(PP_BUILD_LIBRARY)
@@ -20,17 +22,9 @@ if(TARGET partout-windows-backend)
             CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
     endif()
 endif()
-if(TARGET partout-bindings)
-    set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WindowsRuntime)
-    install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    )
-endif()
-
 if(PP_BUILD_LIBRARY)
     set_target_properties(partout PROPERTIES EXPORT_NAME Partout)
-    install(TARGETS partout EXPORT PartoutTargets
+    install(TARGETS partout ${partout_install_sdk_export}
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
@@ -49,6 +43,22 @@ if(WIN32 AND PP_BUILD_LIBRARY)
         DESTINATION "${PARTOUT_RUNTIME_INSTALL_DESTINATION}"
         CONFIGURATIONS Debug RelWithDebInfo
         OPTIONAL
+    )
+endif()
+
+# App installations need shared runtimes, but not the development SDK.
+if(NOT partout_install_sdk)
+    return()
+endif()
+
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
+    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
+)
+if(TARGET partout-bindings)
+    set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WindowsRuntime)
+    install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif()
 

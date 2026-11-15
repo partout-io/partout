@@ -29,10 +29,7 @@ if(TARGET partout-windows-backend)
     )
     target_link_libraries(partout-bindings
         PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
-        PRIVATE
-            "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
-            "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>"
-            ole32
+        PRIVATE ole32
     )
 
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
