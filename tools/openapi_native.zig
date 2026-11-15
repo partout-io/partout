@@ -149,14 +149,14 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
             .kotlin => try files.append(a, .{ .name = try c.fmt("{s}.kt", .{n}), .contents = try kotlin(c, s) }),
             .cpp => {
                 try files.append(a, .{ .name = try c.fmt("{s}.h", .{n}), .contents = try cppHeader(c, s) });
-                if (s.variants.items.len == 0) try files.append(a, .{ .name = try c.fmt("{s}.cpp", .{n}), .contents = try cppSource(c, s) });
+                if (s.variants.items.len == 0) try files.append(a, .{ .name = try c.fmt("{s}.cc", .{n}), .contents = try cppSource(c, s) });
             },
             .zig => unreachable,
         }
     }
     if (language == .cpp and options.external.len == 0) {
         try files.append(a, .{ .name = "Helpers.h", .contents = @embedFile("openapi_templates/Helpers.h") });
-        try files.append(a, .{ .name = "Helpers.cpp", .contents = @embedFile("openapi_templates/Helpers.cpp") });
+        try files.append(a, .{ .name = "Helpers.cc", .contents = @embedFile("openapi_templates/Helpers.cc") });
     }
     // Render and check every filename before touching the destination.
     for (files.items, 0..) |f, i| {

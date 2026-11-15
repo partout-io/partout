@@ -5,6 +5,9 @@ The first native-backend revision reproduces the checked-in 65 Swift files,
 69 Kotlin files, and 136 C++ files byte for byte. No generated model changed in
 this migration. The existing Zig interface and output remain unchanged.
 
+C++ output uses `.h` headers and `.cc` sources, including `Helpers.cc`.
+The `cpp` language selector is unchanged.
+
 ## Analysis and migration boundary
 
 Sharing the schema reader removes Java, OpenAPI Generator, Python, Perl, and

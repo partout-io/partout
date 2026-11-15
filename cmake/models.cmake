@@ -35,7 +35,7 @@ foreach(header IN LISTS partout_model_headers)
 endforeach()
 configure_file("${PARTOUT_MODELS_ROOT}/json.h" "${PARTOUT_MODELS_INCLUDE}/partout/json.h" COPYONLY)
 
-file(GLOB partout_model_sources CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.cpp")
+file(GLOB partout_model_sources CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.cc")
 if(partout_models_dll)
     file(CONFIGURE OUTPUT "${PARTOUT_MODELS_INCLUDE}/partout/export.h" CONTENT
 "#pragma once
