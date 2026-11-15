@@ -50,11 +50,11 @@ test "crypto function table follows the selected backend" {
 
     if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_OPENSSL")) {
         const openssl = try api.cryptoFunctionTable(.openssl);
-        try std.testing.expectEqualStrings("openssl", std.mem.span(openssl.name));
+        try std.testing.expectEqualStrings("OpenSSL", std.mem.span(openssl.name));
     }
     if (@hasDecl(crypto_c, "PARTOUT_CRYPTO_MBEDTLS")) {
         const mbedtls = try api.cryptoFunctionTable(.mbedtls);
-        try std.testing.expectEqualStrings("mbed", std.mem.span(mbedtls.name));
+        try std.testing.expectEqualStrings("MbedTLS", std.mem.span(mbedtls.name));
         if (supports_native_crypto_backend) {
             const native = try api.cryptoFunctionTable(.native);
             const expected_name = if (builtin.os.tag == .windows) "BCrypt" else "CommonCrypto";

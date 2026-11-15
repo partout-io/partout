@@ -891,7 +891,7 @@ failure:
 
 pp_crypto_fnt pp_crypto_fnt_mbedtls(void) {
     pp_crypto_fnt table = {
-        .name = "mbed",
+        .name = "MbedTLS",
 
         .enc = {
             .init_seed = pp_mbed_crypto_init_seed,

@@ -1254,7 +1254,7 @@ failure:
 
 pp_crypto_fnt pp_crypto_fnt_openssl(void) {
     pp_crypto_fnt table = {
-        .name = "openssl",
+        .name = "OpenSSL",
 
         .enc = {
             .init_seed = pp_openssl_crypto_init_seed,
