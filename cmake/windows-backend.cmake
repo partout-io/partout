@@ -1,6 +1,5 @@
 # The Windows backend uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
 # separately from Zig's portable C sources; consumers opt in when needed.
-option(PP_BUILD_WINDOWS "Build the Windows VPN channel bridge" OFF)
 if(NOT PP_BUILD_WINDOWS)
     return()
 endif()
@@ -11,9 +10,6 @@ endif()
 if(NOT WIN32 OR NOT MSVC)
     message(FATAL_ERROR "PP_BUILD_WINDOWS requires MSVC and the Windows SDK")
 endif()
-
-enable_language(CXX)
-include("${CMAKE_CURRENT_LIST_DIR}/models.cmake")
 
 # The native backend cannot include Partout headers. Keep it independently
 # compilable; runtime.cc and platform.cc integrate with Partout's APIs.

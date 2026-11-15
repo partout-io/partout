@@ -6,7 +6,14 @@ endif()
 project(Partout LANGUAGES C)
 include(GNUInstallDirs)
 
+set(partout_models_default OFF)
+if(WIN32 OR (UNIX AND NOT APPLE AND NOT ANDROID))
+    set(partout_models_default ON)
+endif()
+
 option(PP_BUILD_LIBRARY "Build the Partout library" ON)
+option(PP_BUILD_MODELS "Build the portable C++ models" ${partout_models_default})
+option(PP_BUILD_WINDOWS "Build the Windows VPN channel bridge" ${WIN32})
 option(PP_BUILD_USE_OPENSSL "Enable the OpenSSL backend" OFF)
 option(PP_BUILD_USE_MBEDTLS "Enable the MbedTLS backend" OFF)
 option(PP_BUILD_USE_OPENVPN "Enable OpenVPN" OFF)
@@ -64,6 +71,10 @@ target_include_directories(partout-headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
+if(PP_BUILD_MODELS OR PP_BUILD_WINDOWS)
+    enable_language(CXX)
+    include("cmake/models.cmake")
+endif()
 include("cmake/windows-backend.cmake")
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")
