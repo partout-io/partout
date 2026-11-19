@@ -164,9 +164,9 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built static Windows backend library.", false);
     const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_path != null);
     const use_wintun = b.option(bool, "wintun", "Use Winsock/Wintun with the readiness looper on Windows.") orelse false;
+    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built static Windows backend library.", false);
     const wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false);
     if (target.result.os.tag == .windows and !use_winrt and !use_wintun)
         std.debug.panic("Windows builds require either -Dwinrt=true or -Dwintun=true", .{});
