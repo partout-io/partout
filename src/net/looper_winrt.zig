@@ -12,7 +12,7 @@ const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const c = ffi.io;
 
-pub const WindowsLooper = struct {
+pub const WinRTLooper = struct {
     const Scheduled = struct {
         id: u64,
         deadline: u64,
@@ -40,10 +40,10 @@ pub const WindowsLooper = struct {
     max_read_count: usize,
     stopped: bool,
 
-    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
-        if (!build_options.windows) return error.MuxFailure;
+    pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WinRTLooper {
+        if (!build_options.winrt) return error.MuxFailure;
         const mux = options.mux orelse return error.MuxFailure;
-        const self = try allocator.create(WindowsLooper);
+        const self = try allocator.create(WinRTLooper);
         self.* = .{
             .allocator = allocator,
             .mux = mux,
@@ -62,17 +62,17 @@ pub const WindowsLooper = struct {
         return self;
     }
 
-    pub fn destroy(self: *WindowsLooper) void {
+    pub fn destroy(self: *WinRTLooper) void {
         self.stop() catch unreachable;
         self.mutex.deinit();
         self.allocator.destroy(self);
     }
 
-    pub fn canReceivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) bool {
+    pub fn canReceivePackets(self: *WinRTLooper, receipt: helpers.PacketReceipt) bool {
         return self.attachments[@backingInt(receipt.side)].canReceivePackets(receipt);
     }
 
-    pub fn receivePackets(self: *WindowsLooper, receipt: helpers.PacketReceipt) void {
+    pub fn receivePackets(self: *WinRTLooper, receipt: helpers.PacketReceipt) void {
         const attachment = &self.attachments[@backingInt(receipt.side)];
         if (attachment.generation != receipt.generation) return;
         const arguments = attachment.arguments orelse return;
@@ -97,7 +97,7 @@ pub const WindowsLooper = struct {
         attachment.setReading(receipt.generation, action == .keep);
     }
 
-    pub fn loopOnce(self: *WindowsLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
+    pub fn loopOnce(self: *WinRTLooper, max_wait_ms: ?u32, failure: *?io.Failure) bool {
         failure.* = null;
         if (self.stopped) return false;
         const deadline = self.nextWaitDeadline(max_wait_ms);
@@ -113,7 +113,7 @@ pub const WindowsLooper = struct {
         return self.dispatchExpiredTimers();
     }
 
-    fn nextWaitDeadline(self: *const WindowsLooper, max_wait_ms: ?u32) ?u64 {
+    fn nextWaitDeadline(self: *const WinRTLooper, max_wait_ms: ?u32) ?u64 {
         var deadline: ?u64 = if (max_wait_ms) |ms| core.concurrency.deadlineAfterMs(core.monotonicNs(), ms) else null;
         var timer = self.timers.head;
         while (timer) |node| : (timer = node.next) deadline = @min(deadline orelse node.deadline, node.deadline);
@@ -134,7 +134,7 @@ pub const WindowsLooper = struct {
         return core.monotonicNs() >= until;
     }
 
-    fn dispatchExpiredTimers(self: *WindowsLooper) bool {
+    fn dispatchExpiredTimers(self: *WinRTLooper) bool {
         const now = core.monotonicNs();
         var timer = self.timers.head;
         while (timer) |node| : (timer = node.next) node.ready = node.deadline <= now;
@@ -147,7 +147,7 @@ pub const WindowsLooper = struct {
         return true;
     }
 
-    pub fn scheduleTimer(self: *WindowsLooper, token: *io.Timer, delay_ms: u64, task: io.TimedTask) helpers.SubmissionError!void {
+    pub fn scheduleTimer(self: *WinRTLooper, token: *io.Timer, delay_ms: u64, task: io.TimedTask) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const node = try self.allocator.create(Scheduled);
         node.* = .{
@@ -164,20 +164,20 @@ pub const WindowsLooper = struct {
         token.id = node.id;
     }
 
-    pub fn cancelTimer(self: *WindowsLooper, token: *io.Timer) void {
+    pub fn cancelTimer(self: *WinRTLooper, token: *io.Timer) void {
         const id = token.id orelse return;
         if (self.timers.removeWhere(id, Scheduled.hasId)) |node| self.allocator.destroy(node);
         token.id = null;
     }
 
-    pub fn stop(self: *WindowsLooper) helpers.StopError!void {
+    pub fn stop(self: *WinRTLooper) helpers.StopError!void {
         self.stopped = true;
         while (self.timers.take()) |node| self.allocator.destroy(node);
         try self.detach(.link);
         try self.detach(.tun);
     }
 
-    pub fn attach(self: *WindowsLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
+    pub fn attach(self: *WinRTLooper, arguments: helpers.AttachArguments) helpers.AttachError!void {
         if (self.max_read_count == 0) return error.InvalidBuffers;
         if (self.on_receive == null) return error.LooperUnavailable;
         if (self.stopped) return error.LooperUnavailable;
@@ -202,7 +202,7 @@ pub const WindowsLooper = struct {
         }
     }
 
-    pub fn detach(self: *WindowsLooper, side: io.Side) helpers.DetachError!void {
+    pub fn detach(self: *WinRTLooper, side: io.Side) helpers.DetachError!void {
         const attachment = &self.attachments[@backingInt(side)];
         self.mutex.lock();
         const arguments = attachment.arguments orelse {
@@ -218,11 +218,11 @@ pub const WindowsLooper = struct {
         _ = c.pp_mux_wake(self.mux);
     }
 
-    pub fn isAttached(self: *const WindowsLooper, side: io.Side) bool {
+    pub fn isAttached(self: *const WinRTLooper, side: io.Side) bool {
         return self.attachments[@backingInt(side)].arguments != null;
     }
 
-    pub fn resumeReading(self: *WindowsLooper, side: io.Side) helpers.SubmissionError!void {
+    pub fn resumeReading(self: *WinRTLooper, side: io.Side) helpers.SubmissionError!void {
         if (self.stopped) return error.LooperUnavailable;
         const attachment = &self.attachments[@backingInt(side)];
         const arguments = attachment.arguments orelse return error.LooperUnavailable;
@@ -235,7 +235,7 @@ pub const WindowsLooper = struct {
         _ = c.pp_mux_wake(self.mux);
     }
 
-    pub fn write(self: *WindowsLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
+    pub fn write(self: *WinRTLooper, packets: io.Packets, side: io.Side, destination: ?io.SocketAddress) helpers.WriteError!void {
         if (packets.len == 0) return;
         if (self.stopped) return error.LooperUnavailable;
         const attachment = &self.attachments[@backingInt(side)];
@@ -252,18 +252,18 @@ pub const WindowsLooper = struct {
         }
     }
 
-    pub fn flushWrites(_: *WindowsLooper, _: io.Side) helpers.DetachError!?io.Failure {
+    pub fn flushWrites(_: *WinRTLooper, _: io.Side) helpers.DetachError!?io.Failure {
         return null;
     }
 
     pub const Attachment = struct {
-        owner: *WindowsLooper,
+        owner: *WinRTLooper,
         side: io.Side,
         generation: u64,
         reading: bool,
         arguments: ?helpers.AttachArguments,
 
-        fn init(owner: *WindowsLooper, side: io.Side) Attachment {
+        fn init(owner: *WinRTLooper, side: io.Side) Attachment {
             return .{
                 .owner = owner,
                 .side = side,

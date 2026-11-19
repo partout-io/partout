@@ -6,10 +6,11 @@
 
 const common = @import("io_common.zig");
 const builtin = @import("builtin");
-const windows = @import("io_windows.zig");
+const build_options = @import("build_options");
+const winrt = @import("io_winrt.zig");
 const posix = @import("io_posix.zig");
 const ffi = @import("../c/exports.zig");
-const backend = if (builtin.os.tag == .windows) windows else posix;
+const backend = if (builtin.os.tag == .windows and !build_options.wintun) winrt else posix;
 
 pub const testing = common.testing;
 

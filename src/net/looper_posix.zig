@@ -171,7 +171,7 @@ pub const PosixLooper = struct {
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
-        if (descriptor.fd < 0 or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
+        if (!io_c.pp_fd_is_valid(descriptor.fd) or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
             (descriptor.io.isUnconnected() and side != .link)) return error.MuxFailure;
         for (self.attachments) |other| {
             if (other) |attachment| if (attachment.fd == descriptor.fd) return error.MuxFailure;

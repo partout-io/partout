@@ -11,10 +11,10 @@ namespace Partout {
 class RuntimeLoop;
 }
 
-typedef Partout::RuntimeLoop *windows_loop;
+typedef Partout::RuntimeLoop *winrt_loop;
 extern "C" {
 #else
-typedef struct __windows_loop_struct *windows_loop;
+typedef struct __winrt_loop_struct *winrt_loop;
 #endif
 
 /* Native I/O C ABI. No Windows socket or TUN objects cross this interface.
@@ -24,13 +24,13 @@ typedef struct {
     uint32_t scope_id;
     uint16_t port;
     uint8_t family;
-} windows_address;
+} winrt_address;
 
 enum {
     WindowsEOF = 1
 };
 
-typedef bool (*windows_receive)(void *, const uint8_t *, size_t, const windows_address *, int32_t);
+typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_address *, int32_t);
 
 /* Owned transport capability, shared by daemon and passive consumers.
  * subscribe(NULL) drains borrowed callback contexts. Writes copy into a Windows
@@ -39,49 +39,49 @@ typedef bool (*windows_receive)(void *, const uint8_t *, size_t, const windows_a
  * Lifecycle and writes are owner-serialized; receive callbacks must not reenter.
  * Callbacks run on native producers and only enqueue daemon messages or feed the passive adapter.
  */
-typedef struct windows_transport windows_transport;
+typedef struct winrt_transport winrt_transport;
 
-struct windows_transport {
+struct winrt_transport {
     void *context;
     void (*release)(void *);
-    bool (*subscribe)(void *, windows_receive, void *);
+    bool (*subscribe)(void *, winrt_receive, void *);
     bool (*resume)(void *);
     void (*stop)(void *);
-    int32_t (*write)(void *, const uint8_t *, size_t, const windows_address *);
-    bool (*local_address)(void *, windows_address *);
+    int32_t (*write)(void *, const uint8_t *, size_t, const winrt_address *);
+    bool (*local_address)(void *, winrt_address *);
     bool unconnected;
 };
 
-typedef bool (*windows_configure)(void *, uintptr_t);
+typedef bool (*winrt_configure)(void *, uintptr_t);
 
 typedef struct {
     bool tcp;
     bool unconnected;
     bool dual_stack;
     int timeout_ms;
-    windows_configure configure;
+    winrt_configure configure;
     void *context;
-} windows_connect_options;
+} winrt_connect_options;
 
 /* Creates, configures and opens a link in one operation. configure receives a
  * temporary native policy token; it must not retain or dereference that token.
  * Borrows the active runtime's loop; fails if no runtime is active. The owner
  * must outlive all transports and drain their queued destruction. */
-PARTOUT_WINDOWS_API windows_transport *windows_connect(const char *host, uint16_t port,
-                                                       const windows_connect_options *options);
+PARTOUT_WINRT_API winrt_transport *winrt_connect(const char *host, uint16_t port,
+                                                       const winrt_connect_options *options);
 
 /* Explicit owner API for standalone native consumers and tests. Only one loop
  * may be active. VpnChannelRuntime owns its loop directly in C++.
  * Before free: stop producers, drain preparation, release every transport and
  * drain teardown. Never free a borrowed handle or free on the worker itself. */
-PARTOUT_WINDOWS_API windows_loop windows_loop_create(void);
-PARTOUT_WINDOWS_API void windows_loop_free(windows_loop);
+PARTOUT_WINRT_API winrt_loop winrt_loop_create(void);
+PARTOUT_WINRT_API void winrt_loop_free(winrt_loop);
 /* Borrowed lookup: the runtime owner must outlive every user of this handle. */
-PARTOUT_WINDOWS_API windows_loop windows_loop_current(void);
+PARTOUT_WINRT_API winrt_loop winrt_loop_current(void);
 /* Accepted work executes once on the runtime worker. Drain is a barrier for
  * previously submitted commands; callers must first quiesce their producers. */
-PARTOUT_WINDOWS_API bool windows_loop_submit(windows_loop, void (*execute)(void *), void *context);
-PARTOUT_WINDOWS_API void windows_loop_drain(windows_loop);
+PARTOUT_WINRT_API bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
+PARTOUT_WINRT_API void winrt_loop_drain(winrt_loop);
 #ifdef __cplusplus
 }
 #endif

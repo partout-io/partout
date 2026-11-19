@@ -20,13 +20,17 @@ typedef struct __partout_tun_struct *pp_tun;
 pp_tun _Nullable pp_tun_wrap_fd(int fd, bool owned);
 #endif
 
-#if !PARTOUT_WINDOWS
+#if !PARTOUT_WINDOWS || PARTOUT_WINTUN
 /* Platform-specific implementations. */
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len);
 int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 
 /* Return the file descriptor. Check result with pp_fd_is_valid(). */
 pp_fd pp_tun_get_watch_fd(const pp_tun tun);
+#endif
+
+#if PARTOUT_WINTUN
+pp_tun _Nullable pp_tun_open(const char *uuid);
 #endif
 
 /* Free the wrapper and release its owned native resources. */

@@ -5,7 +5,7 @@
 #include "tun.h"
 #include "windows/log.h"
 
-#include "partout_windows.h"
+#include "partout_winrt.h"
 
 namespace Partout {
 partout_controller_functions ControllerFunctions() {
@@ -19,7 +19,7 @@ partout_controller_functions ControllerFunctions() {
             return;
         }
         controller->Monitor().Start([callbacks = *delegate](bool reachable, bool changed) {
-            windows_log(WindowsLogInfo,
+            winrt_log(WindowsLogInfo,
                         "Partout: physical network changed: reachable=%s, refresh=%s",
                         reachable ? "true" : "false", changed ? "true" : "false");
             const partout_reachability info{reachable};
@@ -41,7 +41,7 @@ partout_controller_functions ControllerFunctions() {
                 return reinterpret_cast<partout_tun>(Partout::ABI::WrapTun(loop, std::move(tun)));
             });
         } catch (...) {
-            windows_log(WindowsLogError, "Partout: channel open failed: HRESULT=0x%08x",
+            winrt_log(WindowsLogError, "Partout: channel open failed: HRESULT=0x%08x",
                         static_cast<unsigned>(winrt::to_hresult().value));
             return nullptr;
         }
@@ -54,7 +54,7 @@ partout_controller_functions ControllerFunctions() {
     };
     functions.clear_tunnel = [](void *raw, bool kill_switch) {
         // FIXME: ###, Implement kill switch support.
-        if (kill_switch) windows_log(WindowsLogNotice, "Partout: kill switch not implemented");
+        if (kill_switch) winrt_log(WindowsLogNotice, "Partout: kill switch not implemented");
         if (auto controller = static_cast<Partout::TunnelController *>(raw)) controller->Close();
     };
     functions.cancel_tunnel = [](void *, const char *) {

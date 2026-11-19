@@ -44,7 +44,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
             socket_ = &socket;
         }
     } catch (...) {
-        windows_log(WindowsLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
+        winrt_log(WindowsLogError, "Partout::TunnelController: associate failed: HRESULT=0x%08x",
                     static_cast<unsigned int>(to_hresult().value));
         return false;
     }
@@ -78,7 +78,7 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
     }
     idle_transport_ = idle;
     transport_ = idle;
-    windows_log(WindowsLogDebug, "Partout::TunnelController: idle UDP transport ready");
+    winrt_log(WindowsLogDebug, "Partout::TunnelController: idle UDP transport ready");
 }
 
 std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
@@ -108,7 +108,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
             transport_);
         started_ = true;
         socket_ = nullptr; // TakeOver's receiver retains the socket state.
-        windows_log(WindowsLogInfo,
+        winrt_log(WindowsLogInfo,
                     "Partout::TunnelController: channel opened: ipv4=%u, ipv6=%u, mtu=%u",
                     settings.IPv4().Size(), settings.IPv6().Size(), settings.MTU());
     }
@@ -140,7 +140,7 @@ void TunnelController::Close() noexcept {
             state_->channel.Stop();
             started_ = false;
         } catch (...) {
-            windows_log(WindowsLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
+            winrt_log(WindowsLogError, "Partout::TunnelController: close failed: HRESULT=0x%08x",
                         static_cast<unsigned int>(to_hresult().value));
         }
         Tun::State::Counters counters;
@@ -148,7 +148,7 @@ void TunnelController::Close() noexcept {
             std::lock_guard lock(state_->receive_mutex);
             counters = state_->counters;
         }
-        windows_log(WindowsLogInfo,
+        winrt_log(WindowsLogInfo,
                     "Partout::TunnelController: packet totals: tun_read=%llu, tun_dropped=%llu, "
                     "link_send=%llu, link_send_failed=%llu, link_read=%llu, tun_write=%llu, "
                     "tun_write_failed=%llu",

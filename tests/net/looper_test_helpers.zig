@@ -26,7 +26,7 @@ pub const Mailbox = struct {
     };
 
     pub fn bind(self: *Mailbox) void {
-        if (builtin.os.tag == .windows) {
+        if (builtin.os.tag == .windows and !source.wintun_enabled) {
             self.looper.impl.on_receive = receive;
             self.looper.impl.receive_context = self;
         }

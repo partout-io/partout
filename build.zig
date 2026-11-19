@@ -85,7 +85,9 @@ const BuildConfig = struct {
     libc_installation: ?std.zig.LibCInstallation,
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
-    windows: bool,
+    winrt: bool,
+    wintun: bool,
+    wintun_include: ?[]const u8,
     openvpn: bool,
     wireguard: bool,
     options: *std.Build.Step.Options,
@@ -162,13 +164,22 @@ pub fn build(b: *std.Build) void {
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
-    const windows_path = pathOption(b, "windows-lib", "MSVC-built static Windows backend library.", false);
-    const use_windows = b.option(bool, "windows", "Enable the Windows backend (Windows MSVC only).") orelse (windows_path != null);
-    if (!use_windows and windows_path != null)
-        std.debug.panic("-Dwindows-lib cannot be combined with -Dwindows=false", .{});
-    if (use_windows and (target.result.os.tag != .windows or target.result.abi != .msvc))
+    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built static Windows backend library.", false);
+    const use_wintun = b.option(bool, "wintun", "Use Winsock/Wintun with the readiness looper on Windows.") orelse false;
+    const wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false);
+    if (use_wintun and target.result.os.tag != .windows)
+        std.debug.panic("Wintun requires a Windows target", .{});
+    const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_path != null);
+    if (use_wintun and use_winrt)
+        std.debug.panic("Wintun and the WinRT VPN channel backend are mutually exclusive", .{});
+    if (use_wintun and wintun_include == null)
+        std.debug.panic("Wintun requires -Dwintun-include", .{});
+    build_options.addOption(bool, "wintun", use_wintun);
+    if (!use_winrt and winrt_path != null)
+        std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
+    if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
         std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
-    build_options.addOption(bool, "windows", use_windows);
+    build_options.addOption(bool, "winrt", use_winrt);
 
     const libc_file = pathOption(b, "libc-file", "Path to the target libc installation file.", false);
     const config = BuildConfig{
@@ -178,7 +189,9 @@ pub fn build(b: *std.Build) void {
         .libc_installation = parseLibCInstallation(b, target, libc_file),
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
-        .windows = use_windows,
+        .winrt = use_winrt,
+        .wintun = use_wintun,
+        .wintun_include = wintun_include,
         .openvpn = use_openvpn,
         .wireguard = use_wireguard,
         .options = build_options,
@@ -211,17 +224,17 @@ pub fn build(b: *std.Build) void {
     });
     if (libc_file) |path| unit_tests.setLibCFile(.{ .cwd_relative = path });
     linkTestLibraries(test_module, b, config, &unit_tests.step);
-    if (use_windows) {
+    if (use_winrt) {
         // Tests link the MSVC backend; the core archive only needs its headers.
         unit_tests.linkage = .dynamic;
-        if (windows_path) |path| {
+        if (winrt_path) |path| {
             test_module.addObjectFile(.{ .cwd_relative = path });
         } else if (builtin.os.tag == .windows) {
-            const backend = addWindowsBuild(b, target, optimize);
+            const backend = addWinRTBuild(b, target, optimize);
             test_module.addObjectFile(backend.library);
             unit_tests.step.dependOn(backend.step);
         } else {
-            unit_tests.step.dependOn(&b.addFail("Windows tests require a Windows host or -Dwindows-lib").step);
+            unit_tests.step.dependOn(&b.addFail("Windows tests require a Windows host or -Dwinrt-lib").step);
         }
         test_module.linkSystemLibrary("windowsapp", .{});
         test_module.linkSystemLibrary("runtimeobject", .{});
@@ -256,7 +269,7 @@ pub fn build(b: *std.Build) void {
 }
 
 // CMake builds the static Windows backend with MSVC.
-fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) struct {
+fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.lang.Optimize) struct {
     library: std.Build.LazyPath,
     step: *std.Build.Step,
 } {
@@ -271,7 +284,7 @@ fn addWindowsBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: st
     configure.addDirectoryArg(b.path("."));
     configure.addArg("-B");
     const directory = configure.addOutputDirectoryArg("windows");
-    configure.addArgs(&.{ "-DPP_BUILD_WINDOWS=ON", "-DPP_BUILD_LIBRARY=OFF" });
+    configure.addArgs(&.{ "-DPP_BUILD_WINRT=ON", "-DPP_BUILD_LIBRARY=OFF" });
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
@@ -425,7 +438,7 @@ fn createPartoutModule(
 
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
-            addCSourceFiles(module, &.{"src/c/portable/tun_windows.c"});
+            addCSourceFiles(module, &.{if (config.wintun) "src/c/portable/tun_wintun.c" else "src/c/portable/tun_winrt.c"});
         }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
@@ -515,6 +528,8 @@ fn configureCHeadersAndMacros(
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
         consumer.addSystemIncludePath(b.path("src/wireguard/go/include"));
     }
+    if (config.wintun) consumer.addIncludePath(b.path("cross/wintun/include"));
+    if (config.wintun_include) |path| consumer.addSystemIncludePath(.{ .cwd_relative = path });
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);
     addLibCHeaderPaths(consumer, config.libc_installation);
@@ -525,7 +540,8 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINDOWS_RUNTIME", if (config.windows) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINTUN", if (config.wintun) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINRT_RUNTIME", if (config.winrt) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,

@@ -10,13 +10,13 @@
 namespace Partout {
 namespace {
 
-std::atomic<windows_log_callback> logger{nullptr};
+std::atomic<winrt_log_callback> logger{nullptr};
 
-void SetLogger(windows_log_callback callback) noexcept {
+void SetLogger(winrt_log_callback callback) noexcept {
     logger.store(callback);
 }
 
-void Log(windows_log_level level, const char *format, va_list args) noexcept {
+void Log(winrt_log_level level, const char *format, va_list args) noexcept {
     if (!format) return;
     va_list copy;
     va_copy(copy, args);
@@ -43,11 +43,11 @@ void Log(windows_log_level level, const char *format, va_list args) noexcept {
 
 extern "C" {
 
-void windows_set_logger(windows_log_callback callback) {
+void winrt_set_logger(winrt_log_callback callback) {
     Partout::SetLogger(callback);
 }
 
-void windows_log(windows_log_level level, const char *format, ...) {
+void winrt_log(winrt_log_level level, const char *format, ...) {
     va_list args;
     va_start(args, format);
     Partout::Log(level, format, args);

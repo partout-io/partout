@@ -1,14 +1,14 @@
 # The Windows backend uses MSVC's C++ runtime and Windows SDK projections. Build this bridge
 # separately from Zig's portable C sources; consumers opt in when needed.
-if(NOT PP_BUILD_WINDOWS)
+if(NOT PP_BUILD_WINRT)
     return()
 endif()
 
 if(CMAKE_VERSION VERSION_LESS 4.0)
-    message(FATAL_ERROR "PP_BUILD_WINDOWS requires CMake 4.0 or newer")
+    message(FATAL_ERROR "PP_BUILD_WINRT requires CMake 4.0 or newer")
 endif()
 if(NOT WIN32 OR NOT MSVC)
-    message(FATAL_ERROR "PP_BUILD_WINDOWS requires MSVC and the Windows SDK")
+    message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
 endif()
 
 # The native backend cannot include Partout headers. Keep it independently
@@ -38,7 +38,7 @@ if(PP_BUILD_LIBRARY)
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
     )
     target_compile_definitions(partout-windows-backend PRIVATE
-        PARTOUT_WINDOWS_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
+        PARTOUT_WINRT_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
 endif()
 target_link_libraries(partout-windows-backend
     PUBLIC windowsapp runtimeobject ws2_32 iphlpapi

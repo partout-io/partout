@@ -7,7 +7,7 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
-#include "partout_windows.h"
+#include "partout_winrt.h"
 #include "tunnel_profile.h"
 #include "tunnel_internal.h"
 #include "partout/models/TaggedProfile.h"
@@ -175,7 +175,7 @@ auto WithAgent(const char *operation, Action action) {
 
 Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
     if (serverUri_.empty()) throw std::invalid_argument("The server URI is empty.");
-    windows_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
+    winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
 }
 
 std::optional<VpnManagementConnectionStatus> ReadTunnelConnectionStatus(

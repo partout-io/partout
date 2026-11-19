@@ -11,7 +11,7 @@ const connection = @import("connection.zig");
 const io = @import("io.zig");
 const resolver_mod = @import("resolver.zig");
 const sandbox = @import("sandbox.zig");
-const windows = @import("connection_worker_windows.zig");
+const winrt = @import("connection_worker_winrt.zig");
 
 const api = core.api;
 const log = core.logging;
@@ -55,8 +55,8 @@ pub const ConnectionWorker = struct {
         request: Request,
         completion_context: *anyopaque,
     };
-    const Executor = if (builtin.os.tag == .windows and build_options.windows)
-        windows.Executor(Self, Work, execute)
+    const Executor = if (builtin.os.tag == .windows and build_options.winrt)
+        winrt.Executor(Self, Work, execute)
     else
         core.actor.Actor(Self, null, Work, error{}, execute);
 

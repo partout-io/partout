@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! POSIX socket implementation. Selected by io.zig on non-Windows platforms.
+//! Readiness-driven socket/TUN I/O for POSIX platforms and Windows Wintun.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -105,7 +105,7 @@ pub const POSIXInterface = union(enum) {
     /// The lock is reacquired before returning; no wrapper access occurs while waiting.
     pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: *core.Mutex) Error!bool {
         const fd = switch (self) {
-            .mock => -1,
+            .mock => if (builtin.os.tag == .windows) @as(FileDescriptor, null) else @as(FileDescriptor, -1),
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
         };
         return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
@@ -279,6 +279,11 @@ pub const SocketWrapper = struct {
     fn datagramError(writing: bool) Error {
         // Truncation and per-destination errors (including asynchronous ICMP)
         // do not invalidate a shared UDP socket or its other peers.
+        if (builtin.os.tag == .windows) return switch (io_c.pp_socket_last_error_binding()) {
+            io_c.WSAEMSGSIZE, io_c.WSAENETUNREACH, io_c.WSAEHOSTUNREACH, io_c.WSAECONNREFUSED, io_c.WSAEAFNOSUPPORT => error.DatagramDropped,
+            io_c.WSAEINVAL => if (writing) error.DatagramDropped else error.LibcFailure,
+            else => error.LibcFailure,
+        };
         return switch (io_c.pp_socket_last_error_binding()) {
             @backingInt(std.c.E.MSGSIZE),
             @backingInt(std.c.E.NETUNREACH),
@@ -377,7 +382,7 @@ pub const TunWrapper = struct {
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
         const fd = self.muxDescriptor() orelse return error.LibcFailure;
-        if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
+        if (builtin.os.tag != .windows and io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{
             .fd = fd,
             .io = self.nativeIO(),

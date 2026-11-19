@@ -9,18 +9,19 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const looper_posix = @import("looper_posix.zig");
-const looper_windows = @import("looper_windows.zig");
+const looper_winrt = @import("looper_winrt.zig");
 
 pub const testing_helpers = if (builtin.is_test) helpers else void;
 pub const SubmissionError = helpers.SubmissionError;
 
 pub const Looper = struct {
-    pub const Impl = if (builtin.os.tag == .windows)
-        looper_windows.WindowsLooper
+    pub const Impl = if (builtin.os.tag == .windows and !build_options.wintun)
+        looper_winrt.WinRTLooper
     else
         looper_posix.PosixLooper;
 
@@ -70,12 +71,12 @@ pub const Looper = struct {
     }
 
     pub fn canReceivePackets(self: *Looper, receipt: PacketReceipt) bool {
-        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(receipt);
+        if (builtin.os.tag == .windows and !build_options.wintun) return self.impl.canReceivePackets(receipt);
         return true;
     }
 
     pub fn receivePackets(self: *Looper, receipt: PacketReceipt) void {
-        if (builtin.os.tag == .windows) self.impl.receivePackets(receipt);
+        if (builtin.os.tag == .windows and !build_options.wintun) self.impl.receivePackets(receipt);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

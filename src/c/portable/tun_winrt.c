@@ -4,13 +4,13 @@
 #include "portable/tun.h"
 
 #if PARTOUT_WINDOWS
-#if PARTOUT_WINDOWS_RUNTIME
+#if PARTOUT_WINRT_RUNTIME
 #include "windows/abi.h"
 #endif
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
-#if PARTOUT_WINDOWS_RUNTIME
-    windows_transport *transport = (windows_transport *)tun;
+#if PARTOUT_WINRT_RUNTIME
+    winrt_transport *transport = (winrt_transport *)tun;
     transport->release(transport->context);
 #else
     pp_free(tun);

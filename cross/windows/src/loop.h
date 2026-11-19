@@ -16,18 +16,18 @@ namespace Partout {
 // (or WireGuard's passive adapter); this class never dispatches protocol code.
 class RuntimeLoop {
 public:
-    PARTOUT_WINDOWS_API RuntimeLoop();
-    PARTOUT_WINDOWS_API ~RuntimeLoop();
+    PARTOUT_WINRT_API RuntimeLoop();
+    PARTOUT_WINRT_API ~RuntimeLoop();
     RuntimeLoop(const RuntimeLoop &) = delete;
     RuntimeLoop &operator=(const RuntimeLoop &) = delete;
 
     // Borrowed process runtime. Its owner must quiesce all users before destruction.
     // Only one runtime may be active, matching the daemon's process-wide lifetime.
-    PARTOUT_WINDOWS_API static RuntimeLoop *Current();
-    PARTOUT_WINDOWS_API bool IsWorker() const;
+    PARTOUT_WINRT_API static RuntimeLoop *Current();
+    PARTOUT_WINRT_API bool IsWorker() const;
     // Queue a command without waiting for its completion.
-    PARTOUT_WINDOWS_API void Schedule(std::function<void()> command);
-    PARTOUT_WINDOWS_API void Drain();
+    PARTOUT_WINRT_API void Schedule(std::function<void()> command);
+    PARTOUT_WINRT_API void Drain();
 
     // Run inline on the worker, otherwise wait for the result. Setup and lifecycle
     // barriers only; packet writes and resumes use Schedule.

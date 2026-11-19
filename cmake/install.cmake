@@ -57,7 +57,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
 if(TARGET partout-bindings)
     set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WindowsRuntime)
     install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_windows.h"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif()

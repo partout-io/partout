@@ -45,7 +45,7 @@ class Tun {
 
 public:
     explicit Tun(State &state);
-    PARTOUT_WINDOWS_API ~Tun() noexcept;
+    PARTOUT_WINRT_API ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
@@ -70,8 +70,8 @@ private:
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
-    PARTOUT_WINDOWS_API TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    PARTOUT_WINDOWS_API ~TunnelController();
+    PARTOUT_WINRT_API TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    PARTOUT_WINRT_API ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
@@ -85,10 +85,10 @@ public:
         return monitor_;
     }
 
-    PARTOUT_WINDOWS_API std::unique_ptr<Tun> Open(const char *info_json);
-    PARTOUT_WINDOWS_API void Close() noexcept;
-    PARTOUT_WINDOWS_API void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
-    PARTOUT_WINDOWS_API void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+    PARTOUT_WINRT_API std::unique_ptr<Tun> Open(const char *info_json);
+    PARTOUT_WINRT_API void Close() noexcept;
+    PARTOUT_WINRT_API void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
+    PARTOUT_WINRT_API void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);

@@ -76,8 +76,8 @@ pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) ca
     const args = args_pointer orelse return;
     const level = std.enums.fromInt(log.Level, args.log_level) orelse .debug;
     log.init(level, args.logs_private_data, args.logger_fn, args.logger_ctx);
-    if (comptime builtin.os.tag == .windows and build_options.windows) {
-        ffi.io.windows_set_logger(nativeLogger);
+    if (comptime builtin.os.tag == .windows and build_options.winrt) {
+        ffi.io.winrt_set_logger(nativeLogger);
     }
 }
 
