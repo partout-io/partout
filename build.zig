@@ -86,6 +86,7 @@ const BuildConfig = struct {
     apple_sdk_path: ?[]const u8,
     vendors: Vendors,
     winrt: bool,
+    winrt_lib: ?[]const u8,
     wintun: bool,
     wintun_include: ?[]const u8,
     openvpn: bool,
@@ -161,25 +162,27 @@ pub fn build(b: *std.Build) void {
     else
         null;
 
-    const build_options = b.addOptions();
-    build_options.addOption(bool, "openvpn", use_openvpn);
-    build_options.addOption(bool, "wireguard", use_wireguard);
-    const winrt_path = pathOption(b, "winrt-lib", "MSVC-built static Windows backend library.", false);
-    const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_path != null);
+    const winrt_lib = pathOption(b, "winrt-lib", "MSVC-built static WinRT backend library.", false);
+    const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_lib != null);
     const use_wintun = b.option(bool, "wintun", "Use Winsock/Wintun with the readiness looper on Windows.") orelse false;
     const wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false);
+
     if (target.result.os.tag == .windows and !use_winrt and !use_wintun)
         std.debug.panic("Windows builds require either -Dwinrt=true or -Dwintun=true", .{});
     if (use_winrt and use_wintun)
         std.debug.panic("The WinRT VPN channel backend and Wintun are mutually exclusive", .{});
-    if (!use_winrt and winrt_path != null)
+    if (!use_winrt and winrt_lib != null)
         std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
     if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
-        std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
+        std.debug.panic("The WinRT backend requires a Windows MSVC target", .{});
     if (use_wintun and target.result.os.tag != .windows)
         std.debug.panic("Wintun requires a Windows target", .{});
     if (use_wintun and wintun_include == null)
         std.debug.panic("Wintun requires -Dwintun-include", .{});
+
+    const build_options = b.addOptions();
+    build_options.addOption(bool, "openvpn", use_openvpn);
+    build_options.addOption(bool, "wireguard", use_wireguard);
     build_options.addOption(bool, "winrt", use_winrt);
     build_options.addOption(bool, "wintun", use_wintun);
 
@@ -192,6 +195,7 @@ pub fn build(b: *std.Build) void {
         .apple_sdk_path = apple_sdk_path,
         .vendors = vendors,
         .winrt = use_winrt,
+        .winrt_lib = winrt_lib,
         .wintun = use_wintun,
         .wintun_include = wintun_include,
         .openvpn = use_openvpn,
@@ -226,13 +230,13 @@ pub fn build(b: *std.Build) void {
     });
     if (libc_file) |path| unit_tests.setLibCFile(.{ .cwd_relative = path });
     linkTestLibraries(test_module, b, config, &unit_tests.step);
-    if (use_winrt) {
+    if (config.winrt) {
         // Tests link the MSVC backend; the core archive only needs its headers.
         unit_tests.linkage = .dynamic;
-        if (winrt_path) |path| {
+        if (config.winrt_lib) |path| {
             test_module.addObjectFile(.{ .cwd_relative = path });
         } else if (builtin.os.tag == .windows) {
-            const backend = addWinRTBuild(b, target, optimize);
+            const backend = addWinRTBuild(b, config.target, config.optimize);
             test_module.addObjectFile(backend.library);
             unit_tests.step.dependOn(backend.step);
         } else {
