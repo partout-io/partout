@@ -46,6 +46,10 @@ if(WIN32 AND PP_BUILD_LIBRARY)
     )
 endif()
 
+if(PP_BUILD_WINTUN AND PP_BUILD_LIBRARY)
+    install(FILES "${WINTUN_DIR}/wintun.dll" DESTINATION "${CMAKE_INSTALL_BINDIR}")
+endif()
+
 # App installations need shared runtimes, but not the development SDK.
 if(NOT partout_install_sdk)
     return()
@@ -97,3 +101,9 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
     DESTINATION "${partout_package_dir}")
 install(EXPORT PartoutTargets NAMESPACE Partout::
     DESTINATION "${partout_package_dir}")
+
+if(TARGET partout-wintun-runtime)
+    set_target_properties(partout-wintun-runtime PROPERTIES EXPORT_NAME WintunRuntime)
+    install(TARGETS partout-wintun-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+    install(FILES cross/wintun/include/partout_wintun.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()

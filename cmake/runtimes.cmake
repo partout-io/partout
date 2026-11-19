@@ -71,6 +71,13 @@ if(TARGET partout-windows-backend)
             add_test(NAME partout-${test} COMMAND partout-${test}-test)
         endforeach()
     endif()
+elseif(PP_BUILD_WINTUN)
+    add_library(partout-wintun-runtime STATIC cross/wintun/controller.c)
+    add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
+    target_include_directories(partout-wintun-runtime PUBLIC
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/wintun/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout)
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
         cross/android/native/controller.c

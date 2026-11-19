@@ -206,3 +206,20 @@ Website: [partout.io][partout]
 [credits-wireguard-go]: https://github.com/wireguard/wireguard-go
 
 [about-twitter]: https://twitter.com/keeshux
+
+### Windows Wintun deployment
+
+Configure CMake with `-DPP_BUILD_WINTUN=ON -DPP_BUILD_WINRT=OFF` to
+select the historical Winsock/Wintun implementation and POSIXLooper. The default
+Windows build continues to use the VPN channel backend and WinRTLooper.
+The two backends are mutually exclusive.
+
+This option restores the pinned Wintun 0.14.1 dependency and deploys `wintun.dll`
+beside `partout.dll`. Link `Partout::WintunRuntime` and use
+`partout_wintun_controller_functions()` from `partout_wintun.h` for the historical
+adapter-only controller. Routes, DNS, and other host network settings remain
+unimplemented.
+
+For direct Zig builds, pass `-Dwintun=true -Dwintun-include=/path/to/wintun/include`
+with a Windows target, and deploy the matching architecture's `wintun.dll`
+beside the application.

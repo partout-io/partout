@@ -92,6 +92,8 @@ endif()
 
 if(PP_BUILD_WINRT)
     list(APPEND PARTOUT_ZIG_ARGS -Dwinrt=true)
+elseif(PP_BUILD_WINTUN)
+    list(APPEND PARTOUT_ZIG_ARGS -Dwintun=true "-Dwintun-include=${WINTUN_DIR}")
 endif()
 # Zig compiles the static core; CMake owns the final shared library.
 find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
@@ -175,4 +177,10 @@ elseif(NOT APPLE)
         "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map"
     )
     set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+endif()
+
+if(PP_BUILD_WINTUN)
+    target_link_options(partout PRIVATE "LINKER:/EXPORT:partout_wintun_open")
+    add_custom_command(TARGET partout POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DIR}/wintun.dll" "$<TARGET_FILE_DIR:partout>")
 endif()
