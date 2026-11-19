@@ -279,22 +279,31 @@ pub const SocketWrapper = struct {
     fn datagramError(writing: bool) Error {
         // Truncation and per-destination errors (including asynchronous ICMP)
         // do not invalidate a shared UDP socket or its other peers.
-        if (builtin.os.tag == .windows) return switch (io_c.pp_socket_last_error_binding()) {
-            io_c.WSAEMSGSIZE, io_c.WSAENETUNREACH, io_c.WSAEHOSTUNREACH, io_c.WSAECONNREFUSED, io_c.WSAEAFNOSUPPORT => error.DatagramDropped,
-            io_c.WSAEINVAL => if (writing) error.DatagramDropped else error.LibcFailure,
-            else => error.LibcFailure,
-        };
-        return switch (io_c.pp_socket_last_error_binding()) {
-            @backingInt(std.c.E.MSGSIZE),
-            @backingInt(std.c.E.NETUNREACH),
-            @backingInt(std.c.E.HOSTUNREACH),
-            @backingInt(std.c.E.CONNREFUSED),
-            @backingInt(std.c.E.AFNOSUPPORT),
-            => error.DatagramDropped,
-            // macOS reports a destination/socket family mismatch as EINVAL.
-            @backingInt(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
-            else => error.LibcFailure,
-        };
+        const code = io_c.pp_socket_last_error_binding();
+        if (builtin.os.tag == .windows) {
+            return switch (code) {
+                io_c.WSAEMSGSIZE,
+                io_c.WSAENETUNREACH,
+                io_c.WSAEHOSTUNREACH,
+                io_c.WSAECONNREFUSED,
+                io_c.WSAEAFNOSUPPORT,
+                => error.DatagramDropped,
+                io_c.WSAEINVAL => if (writing) error.DatagramDropped else error.LibcFailure,
+                else => error.LibcFailure,
+            };
+        } else {
+            return switch (code) {
+                @backingInt(std.c.E.MSGSIZE),
+                @backingInt(std.c.E.NETUNREACH),
+                @backingInt(std.c.E.HOSTUNREACH),
+                @backingInt(std.c.E.CONNREFUSED),
+                @backingInt(std.c.E.AFNOSUPPORT),
+                => error.DatagramDropped,
+                // macOS reports a destination/socket family mismatch as EINVAL.
+                @backingInt(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
+                else => error.LibcFailure,
+            };
+        }
     }
 
     fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
