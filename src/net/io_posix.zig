@@ -105,7 +105,7 @@ pub const POSIXInterface = union(enum) {
     /// The lock is reacquired before returning; no wrapper access occurs while waiting.
     pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: *core.Mutex) Error!bool {
         const fd = switch (self) {
-            .mock => if (builtin.os.tag == .windows) @as(FileDescriptor, null) else @as(FileDescriptor, -1),
+            .mock => io_c.pp_fd_invalid(),
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
         };
         return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
