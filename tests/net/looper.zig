@@ -26,10 +26,6 @@ const TimerProbe = struct {
 
 test "looper runs and cancels timers on its caller" {
     try std.testing.expectError(error.MuxFailure, Looper.init(std.testing.allocator, .{ .mux = null }));
-    // Windows dispatch is supplied by the optional native runtime archive.
-    if (builtin.os.tag == .windows and !source.winrt_enabled and !source.wintun_enabled) {
-        return;
-    }
     const mux = source.ffi.io.pp_mux_create(2) orelse return error.MuxCreationFailed;
     defer source.ffi.io.pp_mux_free(mux);
     var looper = try Looper.init(std.testing.allocator, .{

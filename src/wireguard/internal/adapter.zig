@@ -4,7 +4,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 
 const core = @import("../../core/exports.zig");
 const net = @import("../../net/exports.zig");
@@ -49,7 +48,7 @@ pub const WireGuardAdapter = struct {
     last_reachable: bool = false,
     transport: Transport,
 
-    pub const default_daemon_io: net.Connection.DaemonIO = if (builtin.os.tag == .windows and !build_options.wintun) .link else .none;
+    pub const default_daemon_io: net.Connection.DaemonIO = if (net.uses_winrt) .link else .none;
 
     /// Owns mode-specific resources; State tracks their lifecycle.
     const Transport = union(enum) {

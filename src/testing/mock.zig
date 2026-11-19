@@ -3,8 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
-const builtin = @import("builtin");
-const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
 
 const core = @import("../core/exports.zig");
@@ -258,7 +256,7 @@ fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) ne
 
 /// Settings-only tests use an explicit inert native capability on Windows.
 pub fn createTun(allocator: std.mem.Allocator) std.mem.Allocator.Error!*net.TunWrapper {
-    if (builtin.os.tag != .windows or build_options.wintun) return net.TunWrapper.create(allocator, null);
+    if (!net.uses_winrt) return net.TunWrapper.create(allocator, null);
     const Native = struct {
         fn release(_: ?*anyopaque) callconv(.c) void {}
         fn subscribe(_: ?*anyopaque, _: ffi.io.winrt_receive, _: ?*anyopaque) callconv(.c) bool {

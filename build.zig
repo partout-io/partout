@@ -165,21 +165,23 @@ pub fn build(b: *std.Build) void {
     build_options.addOption(bool, "openvpn", use_openvpn);
     build_options.addOption(bool, "wireguard", use_wireguard);
     const winrt_path = pathOption(b, "winrt-lib", "MSVC-built static Windows backend library.", false);
+    const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_path != null);
     const use_wintun = b.option(bool, "wintun", "Use Winsock/Wintun with the readiness looper on Windows.") orelse false;
     const wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false);
-    if (use_wintun and target.result.os.tag != .windows)
-        std.debug.panic("Wintun requires a Windows target", .{});
-    const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_path != null);
-    if (use_wintun and use_winrt)
-        std.debug.panic("Wintun and the WinRT VPN channel backend are mutually exclusive", .{});
-    if (use_wintun and wintun_include == null)
-        std.debug.panic("Wintun requires -Dwintun-include", .{});
-    build_options.addOption(bool, "wintun", use_wintun);
+    if (target.result.os.tag == .windows and !use_winrt and !use_wintun)
+        std.debug.panic("Windows builds require either -Dwinrt=true or -Dwintun=true", .{});
+    if (use_winrt and use_wintun)
+        std.debug.panic("The WinRT VPN channel backend and Wintun are mutually exclusive", .{});
     if (!use_winrt and winrt_path != null)
         std.debug.panic("-Dwinrt-lib cannot be combined with -Dwinrt=false", .{});
     if (use_winrt and (target.result.os.tag != .windows or target.result.abi != .msvc))
         std.debug.panic("The Windows backend requires a Windows MSVC target", .{});
+    if (use_wintun and target.result.os.tag != .windows)
+        std.debug.panic("Wintun requires a Windows target", .{});
+    if (use_wintun and wintun_include == null)
+        std.debug.panic("Wintun requires -Dwintun-include", .{});
     build_options.addOption(bool, "winrt", use_winrt);
+    build_options.addOption(bool, "wintun", use_wintun);
 
     const libc_file = pathOption(b, "libc-file", "Path to the target libc installation file.", false);
     const config = BuildConfig{
@@ -438,7 +440,7 @@ fn createPartoutModule(
 
     if (add_c_sources) {
         if (config.target.result.os.tag == .windows) {
-            addCSourceFiles(module, &.{if (config.wintun) "src/c/portable/tun_wintun.c" else "src/c/portable/tun_winrt.c"});
+            addCSourceFiles(module, &.{if (config.winrt) "src/c/portable/tun_winrt.c" else "src/c/portable/tun_wintun.c"});
         }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
@@ -540,8 +542,8 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINTUN", if (config.wintun) "1" else "0");
     addCMacro(consumer, "PARTOUT_WINRT_RUNTIME", if (config.winrt) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINTUN", if (config.wintun) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
         consumer,

@@ -43,6 +43,7 @@ pub const Failure = io.Failure;
 pub const FileDescriptor = io.FileDescriptor;
 pub const LinkDescriptor = io.LinkDescriptor;
 pub const Looper = looper.Looper;
+pub const uses_winrt = io.uses_winrt;
 pub const NetworkMonitor = sandbox.NetworkMonitor;
 pub const Packets = io.Packets;
 pub const CallbackTransport = io.CallbackTransport;

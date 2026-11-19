@@ -15,7 +15,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
@@ -634,7 +633,7 @@ const ConnectionDaemon = struct {
 
     /// Copy borrowed input into the mailbox; protocol callbacks run on the actor.
     fn onPacketsReceived(raw: ?*anyopaque, bytes: [*c]const u8, length: usize, source: [*c]const io.SocketAddress, code: i32) callconv(.c) bool {
-        if (builtin.os.tag != .windows or build_options.wintun) return false;
+        if (!io.uses_winrt) return false;
         const attachment: *Looper.Impl.Attachment = @ptrCast(@alignCast(raw.?));
         const self: *ConnectionDaemon = @ptrCast(@alignCast(attachment.owner.receive_context.?));
         const receipt = attachment.makeReceipt(bytes, length, source, code) orelse return false;
