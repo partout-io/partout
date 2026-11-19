@@ -23,7 +23,7 @@ test "Session declarations are semantically analyzed" {
 }
 
 test "Session uses externally supplied I/O callbacks" {
-    // WinRTLooper does not implement caller-driven I/O yet.
+    // WindowsLooper does not implement caller-driven I/O yet.
     if (builtin.os.tag == .windows) return error.SkipZigTest;
     const Callbacks = struct {
         fn established(

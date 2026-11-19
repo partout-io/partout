@@ -14,14 +14,14 @@ const build_options = @import("build_options");
 const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const looper_posix = @import("looper_posix.zig");
-const looper_winrt = @import("looper_winrt.zig");
+const looper_windows = @import("looper_windows.zig");
 
 pub const testing_helpers = if (builtin.is_test) helpers else void;
 pub const SubmissionError = helpers.SubmissionError;
 
 pub const Looper = struct {
     pub const Impl = if (builtin.os.tag == .windows and !build_options.wintun)
-        looper_winrt.WinRTLooper
+        looper_windows.WindowsLooper
     else
         looper_posix.PosixLooper;
 
