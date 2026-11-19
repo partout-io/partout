@@ -519,7 +519,7 @@ fn configureCHeadersAndMacros(
     consumer.addIncludePath(b.path("src/c/portable/include"));
     consumer.addIncludePath(b.path("src/c/crypto/include"));
     if (config.target.result.os.tag == .windows) {
-        consumer.addIncludePath(b.path("cross/windows/include"));
+        consumer.addIncludePath(b.path("cross/windows/winrt/include"));
     }
     if (config.openvpn) {
         consumer.addIncludePath(b.path("src/openvpn/c/include"));
@@ -528,7 +528,7 @@ fn configureCHeadersAndMacros(
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
         consumer.addSystemIncludePath(b.path("src/wireguard/go/include"));
     }
-    if (config.wintun) consumer.addIncludePath(b.path("cross/wintun/include"));
+    if (config.wintun) consumer.addIncludePath(b.path("cross/windows/wintun/include"));
     if (config.wintun_include) |path| consumer.addSystemIncludePath(.{ .cwd_relative = path });
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);

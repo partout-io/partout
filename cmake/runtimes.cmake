@@ -8,14 +8,14 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        cross/windows/src/tunnel.cc
-        cross/windows/src/runtime.cc
-        cross/windows/src/platform.cc
+        cross/windows/winrt/src/tunnel.cc
+        cross/windows/winrt/src/runtime.cc
+        cross/windows/winrt/src/platform.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
         PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/winrt/include>"
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         PRIVATE src
     )
@@ -61,7 +61,7 @@ if(TARGET partout-winrt-backend)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
         foreach(test IN ITEMS tunnel tunnel_profile)
             add_executable(partout-${test}-test tests/c/windows/${test}.cc)
-            target_include_directories(partout-${test}-test PRIVATE cross/windows/src)
+            target_include_directories(partout-${test}-test PRIVATE cross/windows/winrt/src)
             target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
             set_target_properties(partout-${test}-test PROPERTIES
                 MSVC_RUNTIME_LIBRARY MultiThreadedDLL
@@ -72,10 +72,10 @@ if(TARGET partout-winrt-backend)
         endforeach()
     endif()
 elseif(PP_BUILD_WINTUN)
-    add_library(partout-wintun-runtime STATIC cross/wintun/controller.c)
+    add_library(partout-wintun-runtime STATIC cross/windows/wintun/controller.c)
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/wintun/include>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/wintun/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout)
 elseif(ANDROID)
