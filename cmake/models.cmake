@@ -80,7 +80,7 @@ if(partout_models_dll)
         "$<BUILD_INTERFACE:${PARTOUT_MODELS_INCLUDE}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
-    target_link_libraries(partout-models-interface INTERFACE partout-windows-backend
+    target_link_libraries(partout-models-interface INTERFACE partout-winrt-backend
         "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
         "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>"
     )

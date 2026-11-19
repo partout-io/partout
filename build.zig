@@ -288,10 +288,10 @@ fn addWinRTBuild(b: *std.Build, target: std.Build.ResolvedTarget, optimize: std.
     configure.has_side_effects = true;
     const compile = b.addSystemCommand(&.{ "cmake", "--build" });
     compile.addDirectoryArg(directory);
-    compile.addArgs(&.{ "--config", configuration, "--target", "partout-windows-backend" });
+    compile.addArgs(&.{ "--config", configuration, "--target", "partout-winrt-backend" });
     compile.has_side_effects = true;
     return .{
-        .library = directory.path(b, b.fmt("{s}/partout-windows-backend.lib", .{configuration})),
+        .library = directory.path(b, b.fmt("{s}/partout-winrt-backend.lib", .{configuration})),
         .step = &compile.step,
     };
 }

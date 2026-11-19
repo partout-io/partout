@@ -6,13 +6,13 @@ if(NOT PP_BUILD_LIBRARY)
 endif()
 
 # Native integration layers consume the public core ABI.
-if(TARGET partout-windows-backend)
+if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
         cross/windows/src/tunnel.cc
         cross/windows/src/runtime.cc
         cross/windows/src/platform.cc
     )
-    add_library(Partout::WindowsRuntime ALIAS partout-bindings)
+    add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
         PUBLIC
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
@@ -41,10 +41,10 @@ if(TARGET partout-windows-backend)
             MSVC_RUNTIME_LIBRARY MultiThreadedDLL
             MSVC_RUNTIME_CHECKS ""
         )
-        target_link_libraries(partout-runtime-link-test PRIVATE Partout::WindowsRuntime)
+        target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
         add_custom_command(TARGET partout-runtime-link-test POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-windows-backend>"
+                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"
                 "$<TARGET_FILE_DIR:partout-runtime-link-test>"
         )
         foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
@@ -57,7 +57,7 @@ if(TARGET partout-windows-backend)
         add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
             "-DLINKER=${CMAKE_LINKER}"
             "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
-            "-DBACKEND=$<TARGET_FILE:partout-windows-backend>"
+            "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
         foreach(test IN ITEMS tunnel tunnel_profile)
             add_executable(partout-${test}-test tests/c/windows/${test}.cc)
@@ -67,7 +67,7 @@ if(TARGET partout-windows-backend)
                 MSVC_RUNTIME_LIBRARY MultiThreadedDLL
                 MSVC_RUNTIME_CHECKS ""
             )
-            target_link_libraries(partout-${test}-test PRIVATE Partout::WindowsRuntime)
+            target_link_libraries(partout-${test}-test PRIVATE Partout::WinRTRuntime)
             add_test(NAME partout-${test} COMMAND partout-${test}-test)
         endforeach()
     endif()

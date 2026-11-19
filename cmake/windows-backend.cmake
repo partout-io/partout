@@ -17,7 +17,7 @@ set(partout_backend_type STATIC)
 if(PP_BUILD_LIBRARY)
     set(partout_backend_type SHARED)
 endif()
-add_library(partout-windows-backend ${partout_backend_type}
+add_library(partout-winrt-backend ${partout_backend_type}
     cross/windows/src/abi.cc
     cross/windows/src/controller.cc
     cross/windows/src/loop.cc
@@ -27,20 +27,20 @@ add_library(partout-windows-backend ${partout_backend_type}
     cross/windows/src/tun_settings.cc
     cross/windows/src/log.cc
 )
-target_include_directories(partout-windows-backend PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
+target_include_directories(partout-winrt-backend PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 if(PP_BUILD_LIBRARY)
-    set_target_properties(partout-windows-backend PROPERTIES
-        OUTPUT_NAME partout-windows-backend
+    set_target_properties(partout-winrt-backend PROPERTIES
+        OUTPUT_NAME partout-winrt-backend
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
         RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
         ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
     )
-    target_compile_definitions(partout-windows-backend PRIVATE
+    target_compile_definitions(partout-winrt-backend PRIVATE
         PARTOUT_WINRT_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
 endif()
-target_link_libraries(partout-windows-backend
+target_link_libraries(partout-winrt-backend
     PUBLIC windowsapp runtimeobject ws2_32 iphlpapi
     PRIVATE "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
         "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>" ole32
@@ -48,12 +48,12 @@ target_link_libraries(partout-windows-backend
 
 # Include every model implementation in the DLL exports and keep the standalone
 # backend archive self-contained for Zig tests.
-target_sources(partout-windows-backend PRIVATE $<TARGET_OBJECTS:partout-models-impl>)
-target_link_libraries(partout-windows-backend PRIVATE "$<BUILD_INTERFACE:partout-models-impl>")
+target_sources(partout-winrt-backend PRIVATE $<TARGET_OBJECTS:partout-models-impl>)
+target_link_libraries(partout-winrt-backend PRIVATE "$<BUILD_INTERFACE:partout-models-impl>")
 # Generated model implementations do not follow our warning policy.
 target_compile_options(partout-models-impl PRIVATE /w)
 
-foreach(target IN ITEMS partout-windows-backend partout-models-impl)
+foreach(target IN ITEMS partout-winrt-backend partout-models-impl)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_definitions(${target} PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
     target_compile_options(${target} PRIVATE /EHsc /permissive-)

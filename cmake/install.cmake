@@ -11,13 +11,13 @@ else()
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-if(TARGET partout-windows-backend)
-    set_target_properties(partout-windows-backend PROPERTIES EXPORT_NAME WindowsBackend)
-    install(TARGETS partout-windows-backend ${partout_install_sdk_export}
+if(TARGET partout-winrt-backend)
+    set_target_properties(partout-winrt-backend PROPERTIES EXPORT_NAME WinRTBackend)
+    install(TARGETS partout-winrt-backend ${partout_install_sdk_export}
         ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
     if(PP_BUILD_LIBRARY)
-        install(FILES "$<TARGET_PDB_FILE:partout-windows-backend>"
+        install(FILES "$<TARGET_PDB_FILE:partout-winrt-backend>"
             DESTINATION "${CMAKE_INSTALL_BINDIR}"
             CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
     endif()
@@ -59,7 +59,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 if(TARGET partout-bindings)
-    set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WindowsRuntime)
+    set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WinRTRuntime)
     install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
