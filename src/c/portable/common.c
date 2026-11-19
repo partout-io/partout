@@ -205,7 +205,13 @@ void pp_panic(const char *message) {
 
 
 
-#if !PARTOUT_WINDOWS
+#if PARTOUT_WINDOWS
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    (void)fd;
+    (void)original_flags;
+    return 0;
+}
+#else
 #include <fcntl.h>
 
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {

@@ -125,9 +125,10 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     return fd != -1;
 }
 
-int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
-
 #endif
+
+/* No-op on Windows; original_flags is left unchanged. */
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 
 int pp_io_last_error_binding(void);
 

@@ -391,7 +391,7 @@ pub const TunWrapper = struct {
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
         const fd = self.muxDescriptor() orelse return error.LibcFailure;
-        if (builtin.os.tag != .windows and io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
+        if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{
             .fd = fd,
             .io = self.nativeIO(),
