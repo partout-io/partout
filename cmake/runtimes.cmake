@@ -77,7 +77,9 @@ elseif(PP_BUILD_WINTUN)
     target_include_directories(partout-wintun-runtime PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/wintun/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout)
+    target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
+    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE ole32)
+    set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
         cross/android/native/controller.c
@@ -94,7 +96,6 @@ elseif(ANDROID)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
         cross/posix/controller.c
-        cross/posix/tun.c
     )
     add_library(Partout::PosixRuntime ALIAS partout-posix-runtime)
     target_include_directories(partout-posix-runtime

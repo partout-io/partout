@@ -380,7 +380,7 @@ pub const WireGuardAdapter = struct {
             .active => |active| self.backend.turnOn(allocator, wg_config, .{
                 .profile_id = self.profile.id,
                 .tun = active.tunnel.tunWrapper() orelse return error.CannotLocateTunnelFileDescriptor,
-                .ifname = self.module_id[0..],
+                .ifname = self.profile.id[0..],
             }),
             .passive => |*passive| blk: {
                 passive.io.activate();

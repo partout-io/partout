@@ -390,6 +390,10 @@ pub const TunWrapper = struct {
     }
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
+        // Active wg-go on Wintun needs a settings commit, but owns its device.
+        if (build_options.wintun and self.tun == null) {
+            return .{ .fd = io_c.pp_fd_invalid(), .io = self.nativeIO() };
+        }
         const fd = self.muxDescriptor() orelse return error.LibcFailure;
         if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{

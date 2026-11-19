@@ -53,32 +53,6 @@ FILE *pp_fopen(const char *filename, const char *mode) {
 #endif
 }
 
-void pp_clog_v(pp_log_level level, const char *fmt, ...) {
-#if !PARTOUT_WINDOWS
-    const int saved_errno = errno;
-#endif
-    va_list args;
-    va_start(args, fmt);
-    const int formatted_len = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
-    if (formatted_len < 0) {
-#if !PARTOUT_WINDOWS
-        errno = saved_errno;
-#endif
-        return;
-    }
-    const size_t msg_len = (size_t)formatted_len + 1;
-    char *msg = pp_alloc(msg_len);
-    va_start(args, fmt);
-    vsnprintf(msg, msg_len, fmt, args);
-    va_end(args);
-    partout_log(level, msg);
-    pp_free(msg);
-#if !PARTOUT_WINDOWS
-    errno = saved_errno;
-#endif
-}
-
 char *pp_file_read(const char *rel_path, const char *parent) {
     char *abs_path = NULL;
     FILE *file = NULL;

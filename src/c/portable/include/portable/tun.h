@@ -29,10 +29,6 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len);
 pp_fd pp_tun_get_watch_fd(const pp_tun tun);
 #endif
 
-#if PARTOUT_WINTUN
-pp_tun _Nullable pp_tun_open(const char *uuid);
-#endif
-
 /* Free the wrapper and release its owned native resources. */
 void pp_tun_free(pp_tun tun);
 

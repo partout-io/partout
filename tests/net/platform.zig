@@ -6,6 +6,7 @@ const std = @import("std");
 const hooks = @import("../controller_hooks.zig");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
+const source = @import("source");
 const winrt_enabled = @import("source").winrt_enabled;
 
 const core = @import("source").core;
@@ -26,6 +27,7 @@ const socketOptions = platform_source.testing.socketOptions;
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
     received_module_id: bool = false,
+    received_profile_id: bool = false,
     environment_set_calls: usize = 0,
     environment_remove_calls: usize = 0,
     received_environment_key: bool = false,
@@ -34,13 +36,14 @@ const TunnelCommitRecorder = struct {
 
 fn recordSetTunnel(
     ref: ?*anyopaque,
-    _: [*c]const u8,
+    uuid: [*c]const u8,
     info_json: [*c]const u8,
 ) callconv(.c) io_c.pp_tun {
     const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return null));
     if (info_json == null) return null;
     const json = std.mem.span(info_json);
     recorder.calls += 1;
+    recorder.received_profile_id = uuid != null and std.mem.eql(u8, std.mem.span(uuid), "22222222-2222-4222-8222-222222222222");
     recorder.received_module_id = std.mem.indexOf(
         u8,
         json,
@@ -84,12 +87,14 @@ test "platform reports unavailable tunnel after committing settings" {
     try std.testing.expectError(
         error.TunNotAvailable,
         platform.tunnelController().setTunnelSettings(.{
+            .profile = .{ .id = "22222222-2222-4222-8222-222222222222".* },
             .original_module_id = "11111111-1111-4111-8111-111111111111".*,
         }),
     );
 
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
     try std.testing.expect(recorder.received_module_id);
+    try std.testing.expect(recorder.received_profile_id);
 }
 
 test "platform forwards environment values and removals" {
@@ -296,7 +301,6 @@ test "platform records better path notifications" {
 test "settings-only daemons release owned TUN descriptors" {
     const builtin = @import("builtin");
     if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
-    const source = @import("source");
     const mock = source.mock;
     const libc = struct {
         extern "c" fn close(fd: c_int) c_int;
@@ -464,4 +468,32 @@ test "inactive platform monitoring updates state without logging" {
     platform_source.testing.notifyBetterPath(&platform);
     try std.testing.expect(platform.networkMonitor().isReachable());
     try std.testing.expectEqual(@as(usize, 0), count);
+}
+
+test "platform infers backend-owned TUN only for Wintun WireGuard" {
+    var recorder = TunnelCommitRecorder{};
+    var platform = try Platform.init(platformOptions(&recorder));
+    defer platform.deinit();
+    const module_id = "11111111-1111-4111-8111-111111111111".*;
+    const modules = [_]api.TaggedModule{.{ .WireGuard = .{ .id = module_id } }};
+    const info = api.TunnelRemoteInfoWrapper{
+        .profile = .{ .id = "22222222-2222-4222-8222-222222222222".*, .modules = &modules },
+        .original_module_id = module_id,
+    };
+    if (!source.wintun_enabled) {
+        try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(info));
+        return;
+    }
+    const tun = try platform.tunnelController().setTunnelSettings(info);
+    defer tun.destroy();
+    const descriptor = try tun.tunDescriptor();
+    try std.testing.expect(!io_c.pp_fd_is_valid(descriptor.fd));
+    try std.testing.expect(tun.tun == null);
+    try std.testing.expect(recorder.received_profile_id);
+    try std.testing.expectEqual(@as(usize, 1), recorder.calls);
+
+    // An unrelated WireGuard module must not bypass the device requirement.
+    var other_info = info;
+    other_info.original_module_id = "22222222-2222-4222-8222-222222222222".*;
+    try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(other_info));
 }

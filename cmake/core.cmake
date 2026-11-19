@@ -162,7 +162,6 @@ if(WIN32)
     if(PP_BUILD_WINRT)
         target_link_libraries(partout PRIVATE partout-winrt-backend)
     elseif(PP_BUILD_WINTUN)
-        target_link_options(partout PRIVATE "LINKER:/EXPORT:partout_wintun_open")
         add_custom_command(TARGET partout POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different "${WINTUN_DIR}/wintun.dll" "$<TARGET_FILE_DIR:partout>")
     endif()

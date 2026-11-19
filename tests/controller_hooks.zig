@@ -6,11 +6,15 @@ const source = @import("source");
 const c = source.abi_helpers.partout_c;
 const io = source.ffi.io;
 const Platform = source.net_platform.Platform;
-extern "c" fn partout_tun_open(uuid: [*c]const u8) c.partout_tun;
+extern "c" fn partout_posix_controller_functions() c.partout_controller_functions;
 
 fn setDelegate(_: ?*anyopaque, _: [*c]const c.partout_controller_delegate) callconv(.c) void {}
-fn setTunnel(_: ?*anyopaque, uuid: [*c]const u8, _: [*c]const u8) callconv(.c) c.partout_tun {
-    if (comptime builtin.os.tag != .windows) return partout_tun_open(uuid);
+fn setTunnel(ctx: ?*anyopaque, uuid: [*c]const u8, json: [*c]const u8) callconv(.c) c.partout_tun {
+    if (comptime builtin.os.tag != .windows) {
+        const controller = partout_posix_controller_functions();
+        const set_tunnel = controller.set_tunnel orelse return null;
+        return set_tunnel(ctx, uuid, json);
+    }
     return null;
 }
 fn report(_: ?*anyopaque, _: [*c]const u8) callconv(.c) void {}
