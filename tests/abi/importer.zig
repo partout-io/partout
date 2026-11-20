@@ -336,6 +336,100 @@ test "profile import export returns normalized success and failure payloads" {
     );
 }
 
+test "profile import ABI overrides IDs in raw and enveloped output" {
+    const id = "12345678-1234-1234-1234-123456789abc";
+    const replacement_id = "ABCDEF01-2345-6789-ABCD-EF0123456789";
+    const raw = partout.partout_import_profile_raw(valid_wireguard_profile, id, "Imported WireGuard") orelse
+        return error.TestUnexpectedResult;
+    defer std.heap.c_allocator.free(std.mem.span(raw));
+
+    var profile = try api.Profile.parse(std.testing.allocator, std.mem.span(raw));
+    defer profile.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings(id, &profile.id);
+    try std.testing.expectEqualStrings("Imported WireGuard", profile.name);
+    try std.testing.expect(conn.activeConnectionModule(&profile) != null);
+
+    try expectImportEnvelope(
+        partout.partout_import_profile(valid_wireguard_profile, id, null),
+        null,
+        "id",
+        id,
+    );
+    try expectImportEnvelope(partout.partout_import_profile(raw, replacement_id, null), null, "id", replacement_id);
+    const overridden = partout.partout_import_profile_raw(raw, replacement_id, null) orelse
+        return error.TestUnexpectedResult;
+    defer std.heap.c_allocator.free(std.mem.span(overridden));
+    var overridden_profile = try api.Profile.parse(std.testing.allocator, std.mem.span(overridden));
+    defer overridden_profile.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings(replacement_id, &overridden_profile.id);
+}
+
+test "profile import ABI preserves generated and imported IDs without an override" {
+    const raw = partout.partout_import_profile_raw(valid_wireguard_profile, null, null) orelse
+        return error.TestUnexpectedResult;
+    defer std.heap.c_allocator.free(std.mem.span(raw));
+    var profile = try api.Profile.parse(std.testing.allocator, std.mem.span(raw));
+    defer profile.deinit(std.testing.allocator);
+    try std.testing.expect(core.isGeneratedId(&profile.id));
+
+    const preserved = partout.partout_import_profile_raw(raw, null, null) orelse
+        return error.TestUnexpectedResult;
+    defer std.heap.c_allocator.free(std.mem.span(preserved));
+    var preserved_profile = try api.Profile.parse(std.testing.allocator, std.mem.span(preserved));
+    defer preserved_profile.deinit(std.testing.allocator);
+    try std.testing.expectEqualStrings(&profile.id, &preserved_profile.id);
+    try expectImportEnvelope(partout.partout_import_profile(raw, null, null), null, "id", &profile.id);
+}
+
+test "profile import ABI rejects invalid UUID overrides" {
+    const invalid_ids = [_][:0]const u8{
+        "",
+        "not-a-uuid",
+        "12345678-1234-1234-1234-123456789ab",
+        "12345678_1234-1234-1234-123456789abc",
+        "12345678-1234-1234-1234-123456789abg",
+    };
+    for (invalid_ids) |id| {
+        try std.testing.expect(partout.partout_import_profile_raw(valid_wireguard_profile, id.ptr, null) == null);
+        try expectImportEnvelope(
+            partout.partout_import_profile(valid_wireguard_profile, id.ptr, null),
+            .decoding,
+            null,
+            null,
+        );
+    }
+}
+
+test "raw profile import returns null on missing or invalid input" {
+    try std.testing.expect(partout.partout_import_profile_raw(null, null, null) == null);
+    for ([_][:0]const u8{ invalid_wireguard_profile, invalid_openvpn_profile, encrypted_openvpn_profile, "{}" }) |text| {
+        try std.testing.expect(partout.partout_import_profile_raw(text.ptr, null, null) == null);
+    }
+}
+
+test "raw module import returns TaggedModule JSON with optional context" {
+    for ([_]?[*:0]const u8{ null, "{\"type\":\"WireGuard\"}" }) |context| {
+        const raw = partout.partout_import_module_raw(valid_wireguard_profile, context) orelse
+            return error.TestUnexpectedResult;
+        defer std.heap.c_allocator.free(std.mem.span(raw));
+        var module = try api.TaggedModule.parse(std.testing.allocator, std.mem.span(raw));
+        defer module.deinit(std.testing.allocator);
+        const exported = partout.partout_export_module(raw) orelse return error.TestUnexpectedResult;
+        defer std.heap.c_allocator.free(std.mem.span(exported));
+        try std.testing.expectEqualStrings(serialized_wireguard_profile, std.mem.span(exported));
+    }
+}
+
+test "raw module import returns null on invalid input or context" {
+    try std.testing.expect(partout.partout_import_module_raw(null, null) == null);
+    for ([_][:0]const u8{ invalid_wireguard_profile, invalid_openvpn_profile, encrypted_openvpn_profile, "{}" }) |text| {
+        try std.testing.expect(partout.partout_import_module_raw(text.ptr, null) == null);
+    }
+    for ([_][:0]const u8{ "not JSON", "{}", "{\"type\":\"OpenVPN\"}" }) |context| {
+        try std.testing.expect(partout.partout_import_module_raw(valid_wireguard_profile, context.ptr) == null);
+    }
+}
+
 test "module import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
         partout.partout_import_module(valid_wireguard_profile, null),
