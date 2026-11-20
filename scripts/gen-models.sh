@@ -17,7 +17,8 @@ while [[ $# -gt 0 ]]; do
         *) positional+=("$1"); shift ;;
     esac
 done
-set -- "${positional[@]}"
+# Bash 3.2 treats empty arrays as unset under nounset.
+set -- ${positional[@]+"${positional[@]}"}
 if [[ $# -lt 4 || $# -gt 6 ]]; then
     echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports] [swift_prefix] [--update-golden manifest.json]" >&2
     exit 1
@@ -54,14 +55,13 @@ cleanup() {
     rm -rf "$staging"
 }
 trap cleanup EXIT
-golden_args=()
+set -- "$input" "$staging/models" --language "$language" --package "$package" \
+    --external "$extra_imports" --swift-prefix "$swift_prefix"
 if [[ -n $golden_path ]]; then
     cp "$golden_path" "$staging/golden.json"
-    golden_args=(--update-golden "$staging/golden.json")
+    set -- "$@" --update-golden "$staging/golden.json"
 fi
-zig run "$script_dir/../tools/openapi_codegen.zig" -- \
-    "$input" "$staging/models" --language "$language" --package "$package" \
-    --external "$extra_imports" --swift-prefix "$swift_prefix" "${golden_args[@]}"
+zig run "$script_dir/../tools/openapi_codegen.zig" -- "$@"
 if [[ -e "$destination" ]]; then
     mv "$destination" "$staging/previous"
 fi
