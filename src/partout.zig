@@ -76,8 +76,8 @@ pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) ca
     const args = args_pointer orelse return;
     const level = std.enums.fromInt(log.Level, args.log_level) orelse .debug;
     log.init(level, args.logs_private_data, args.logger_fn, args.logger_ctx);
-    if (comptime builtin.os.tag == .windows and build_options.windows) {
-        ffi.io.windows_set_logger(nativeLogger);
+    if (comptime builtin.os.tag == .windows and build_options.winrt) {
+        ffi.io.winrt_set_logger(nativeLogger);
     }
 }
 
@@ -229,6 +229,11 @@ pub export fn partout_daemon_hold() callconv(.c) void {
 pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
     if (comptime @hasDecl(ffi.io, "pp_tun_wrap_fd")) return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
     return null;
+}
+
+pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+    if (callbacks == null) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
 }
 
 pub export fn partout_daemon_stop() callconv(.c) void {

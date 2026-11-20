@@ -302,7 +302,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     const allocator = std.heap.c_allocator;
 
     var c_uuid: util.TemporaryCString = .{};
-    try c_uuid.init(allocator, info.original_module_id[0..]);
+    try c_uuid.init(allocator, info.profile.id[0..]);
     defer c_uuid.deinit();
     const c_info = try core.util.encodeJsonValueZ(allocator, info);
     defer allocator.free(c_info);
@@ -310,10 +310,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     log.write(.debug, "Platform: Set tunnel");
     const set_tunnel = self.fnt.set_tunnel orelse
         @panic("Platform function table has no set_tunnel callback");
-    const maybe_tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr);
-    const tun = maybe_tun orelse {
-        return error.TunNotAvailable;
-    };
+    const tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr) orelse return error.TunNotAvailable;
     errdefer io_c.pp_tun_free(tun);
     return TunWrapper.create(allocator, tun);
 }

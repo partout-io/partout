@@ -6,10 +6,14 @@
 
 const common = @import("io_common.zig");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const windows = @import("io_windows.zig");
 const posix = @import("io_posix.zig");
 const ffi = @import("../c/exports.zig");
-const backend = if (builtin.os.tag == .windows) windows else posix;
+/// Select callback I/O when the WinRT backend is enabled.
+/// Wintun uses readiness-driven POSIX I/O, even on Windows.
+pub const uses_winrt = builtin.os.tag == .windows and build_options.winrt;
+const backend = if (uses_winrt) windows else posix;
 
 pub const testing = common.testing;
 

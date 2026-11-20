@@ -11,6 +11,7 @@
 #endif
 
 #include "portable/common.h"
+#include "partout.h"
 #if PARTOUT_WINDOWS
 #include "portable/io_windows.h"
 #else
@@ -27,9 +28,9 @@
 #include <sys/stat.h>
 #endif
 
-const int PPIOErrorWouldBlock   = -11;
-const int PPIOErrorNoBufs       = -12;
-const int PPIOErrorNoSpace      = -13;
+const int PPIOErrorWouldBlock   = PartoutIOWouldBlock;
+const int PPIOErrorNoBufs       = PartoutIONoBufs;
+const int PPIOErrorNoSpace      = PartoutIONoSpace;
 
 char *pp_dup(const char *str) {
 #if PARTOUT_WINDOWS
@@ -50,32 +51,6 @@ FILE *pp_fopen(const char *filename, const char *mode) {
     return fopen_s(&file, filename, mode) == 0 ? file : NULL;
 #else
     return fopen(filename, mode);
-#endif
-}
-
-void pp_clog_v(pp_log_level level, const char *fmt, ...) {
-#if !PARTOUT_WINDOWS
-    const int saved_errno = errno;
-#endif
-    va_list args;
-    va_start(args, fmt);
-    const int formatted_len = vsnprintf(NULL, 0, fmt, args);
-    va_end(args);
-    if (formatted_len < 0) {
-#if !PARTOUT_WINDOWS
-        errno = saved_errno;
-#endif
-        return;
-    }
-    const size_t msg_len = (size_t)formatted_len + 1;
-    char *msg = pp_alloc(msg_len);
-    va_start(args, fmt);
-    vsnprintf(msg, msg_len, fmt, args);
-    va_end(args);
-    partout_log(level, msg);
-    pp_free(msg);
-#if !PARTOUT_WINDOWS
-    errno = saved_errno;
 #endif
 }
 
@@ -205,7 +180,13 @@ void pp_panic(const char *message) {
 
 
 
-#if !PARTOUT_WINDOWS
+#if PARTOUT_WINDOWS
+int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {
+    (void)fd;
+    (void)original_flags;
+    return 0;
+}
+#else
 #include <fcntl.h>
 
 int pp_fd_set_nonblocking(pp_fd fd, int *original_flags) {

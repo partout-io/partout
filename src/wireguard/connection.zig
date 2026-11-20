@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 const std = @import("std");
+const build_options = @import("build_options");
 
 const core = @import("../core/exports.zig");
 const net = @import("../net/exports.zig");
@@ -448,6 +449,11 @@ fn cloneSubnet(
     };
 }
 
+fn requiresTunnelSetup(ptr: *anyopaque) bool {
+    const self: *const WireGuardConnection = @ptrCast(@alignCast(ptr));
+    return !(build_options.wintun and self.adapter.daemonIO() == .none);
+}
+
 fn start(ptr: *anyopaque, remote: net.RemoteDescriptor) net.ConnectionStartError!net.Connection.StartResult {
     const self: *WireGuardConnection = @ptrCast(@alignCast(ptr));
     return self.start(remote);
@@ -464,6 +470,7 @@ fn rebind(ptr: *anyopaque, remote: net.RemoteDescriptor, tun: ?net.TunDescriptor
 }
 
 const wireguard_connection_vtable = net.Connection.VTable{
+    .requires_tunnel_setup = requiresTunnelSetup,
     .start = start,
     .commit = commit,
     .rebind = rebind,

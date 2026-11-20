@@ -98,7 +98,7 @@ void TunSettings::ApplyDNS(const Models::DNSModule &settings) {
         domains.Append(VpnDomainNameInfo{to_hstring(*settings.domainName),
                                          VpnDomainNameType::Suffix, servers, proxies});
     if (!names.empty() && policy != Models::DNSModuleDomainPolicy::match)
-        windows_log(
+        winrt_log(
             WindowsLogNotice,
             "Partout::TunSettings: DNS search suffixes unsupported; DNS resolution rules applied");
 }

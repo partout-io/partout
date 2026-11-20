@@ -48,7 +48,7 @@ pub const WireGuardAdapter = struct {
     last_reachable: bool = false,
     transport: Transport,
 
-    pub const default_daemon_io: net.Connection.DaemonIO = if (builtin.os.tag == .windows) .link else .none;
+    pub const default_daemon_io: net.Connection.DaemonIO = if (net.uses_winrt) .link else .none;
 
     /// Owns mode-specific resources; State tracks their lifecycle.
     const Transport = union(enum) {
@@ -380,7 +380,7 @@ pub const WireGuardAdapter = struct {
             .active => |active| self.backend.turnOn(allocator, wg_config, .{
                 .profile_id = self.profile.id,
                 .tun = active.tunnel.tunWrapper() orelse return error.CannotLocateTunnelFileDescriptor,
-                .ifname = self.module_id[0..],
+                .ifname = self.profile.id[0..],
             }),
             .passive => |*passive| blk: {
                 passive.io.activate();

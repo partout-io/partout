@@ -6,7 +6,8 @@ const std = @import("std");
 const hooks = @import("../controller_hooks.zig");
 const NativeRuntime = @import("../native_runtime.zig").NativeRuntime;
 const platform_target = @import("builtin");
-const windows_enabled = @import("source").windows_enabled;
+const source = @import("source");
+const winrt_enabled = @import("source").winrt_enabled;
 
 const core = @import("source").core;
 const io = @import("source").net_io;
@@ -26,6 +27,7 @@ const socketOptions = platform_source.testing.socketOptions;
 const TunnelCommitRecorder = struct {
     calls: usize = 0,
     received_module_id: bool = false,
+    received_profile_id: bool = false,
     environment_set_calls: usize = 0,
     environment_remove_calls: usize = 0,
     received_environment_key: bool = false,
@@ -34,13 +36,14 @@ const TunnelCommitRecorder = struct {
 
 fn recordSetTunnel(
     ref: ?*anyopaque,
-    _: [*c]const u8,
+    uuid: [*c]const u8,
     info_json: [*c]const u8,
 ) callconv(.c) io_c.pp_tun {
     const recorder: *TunnelCommitRecorder = @ptrCast(@alignCast(ref orelse return null));
     if (info_json == null) return null;
     const json = std.mem.span(info_json);
     recorder.calls += 1;
+    recorder.received_profile_id = uuid != null and std.mem.eql(u8, std.mem.span(uuid), "22222222-2222-4222-8222-222222222222");
     recorder.received_module_id = std.mem.indexOf(
         u8,
         json,
@@ -84,12 +87,14 @@ test "platform reports unavailable tunnel after committing settings" {
     try std.testing.expectError(
         error.TunNotAvailable,
         platform.tunnelController().setTunnelSettings(.{
+            .profile = .{ .id = "22222222-2222-4222-8222-222222222222".* },
             .original_module_id = "11111111-1111-4111-8111-111111111111".*,
         }),
     );
 
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
     try std.testing.expect(recorder.received_module_id);
+    try std.testing.expect(recorder.received_profile_id);
 }
 
 test "platform forwards environment values and removals" {
@@ -227,7 +232,7 @@ test "socket creation and existing descriptors share independent platform policy
 test "Windows configuration callback receives a native policy token and can reject open" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (platform_target.os.tag != .windows or !windows_enabled) return error.SkipZigTest;
+    if (platform_target.os.tag != .windows or !winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         calls: usize = 0,
         descriptor: SocketDescriptor = 0,
@@ -296,27 +301,24 @@ test "platform records better path notifications" {
 test "settings-only daemons release owned TUN descriptors" {
     const builtin = @import("builtin");
     if (comptime builtin.os.tag == .windows) return error.SkipZigTest;
-    const source = @import("source");
     const mock = source.mock;
     const libc = struct {
         extern "c" fn close(fd: c_int) c_int;
     };
-    // Match portable TUN storage on POSIX. A pipe exercises ownership without
-    // requiring privileges to create a real TUN device.
-    const NativeTun = extern struct {
-        fd: c_int,
-        owned: bool = !platform_target.abi.isAndroid(),
+    const native_tun = struct {
+        extern "c" fn partout_tun_wrap_fd(fd: c_int, owned: bool) io_c.pp_tun;
     };
     const Controller = struct {
         mock: mock.MockTunnelController = .{},
-        native: *NativeTun,
+        native: io_c.pp_tun,
         handed_out: bool = false,
 
         fn setTunnel(raw: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) source.net.TunnelController.Error!*io.TunWrapper {
             const base: *mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
             const self: *@This() = @fieldParentPtr("mock", base);
+            const wrapper = try io.TunWrapper.create(std.testing.allocator, self.native);
             self.handed_out = true;
-            return io.TunWrapper.create(std.testing.allocator, @ptrCast(self.native));
+            return wrapper;
         }
     };
     const allocator = std.testing.allocator;
@@ -333,11 +335,12 @@ test "settings-only daemons release owned TUN descriptors" {
         defer if (read_fd_open) {
             _ = libc.close(fds[0]);
         };
-        const native = try std.heap.c_allocator.create(NativeTun);
-        native.* = .{ .fd = fds[0] };
+        const owned = !platform_target.abi.isAndroid();
+        const native = native_tun.partout_tun_wrap_fd(fds[0], owned) orelse return error.OutOfMemory;
         var controller = Controller{ .native = native };
         defer if (!controller.handed_out) {
-            std.heap.c_allocator.destroy(native);
+            io_c.pp_tun_free(native);
+            if (owned) read_fd_open = false;
         };
         var vtable = controller.mock.interface().vtable.*;
         vtable.set_tunnel_settings = Controller.setTunnel;
@@ -362,7 +365,11 @@ test "settings-only daemons release owned TUN descriptors" {
             try std.testing.expect(read_fd_open);
         } else {
             // Free the leaked allocation if this regression is reintroduced.
-            if (read_fd_open) std.heap.c_allocator.destroy(native);
+            if (read_fd_open) {
+                io_c.pp_tun_free(native);
+                read_fd_open = false;
+                return error.TestUnexpectedResult;
+            }
             try std.testing.expect(!read_fd_open);
         }
     }
@@ -464,4 +471,19 @@ test "inactive platform monitoring updates state without logging" {
     platform_source.testing.notifyBetterPath(&platform);
     try std.testing.expect(platform.networkMonitor().isReachable());
     try std.testing.expectEqual(@as(usize, 0), count);
+}
+
+test "platform requires a controller TUN even for WireGuard" {
+    var recorder = TunnelCommitRecorder{};
+    var platform = try Platform.init(platformOptions(&recorder));
+    defer platform.deinit();
+    const module_id = "11111111-1111-4111-8111-111111111111".*;
+    const modules = [_]api.TaggedModule{.{ .WireGuard = .{ .id = module_id } }};
+    const info = api.TunnelRemoteInfoWrapper{
+        .profile = .{ .id = "22222222-2222-4222-8222-222222222222".*, .modules = &modules },
+        .original_module_id = module_id,
+    };
+    try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(info));
+    try std.testing.expect(recorder.received_profile_id);
+    try std.testing.expectEqual(@as(usize, 1), recorder.calls);
 }

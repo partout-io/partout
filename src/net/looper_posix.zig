@@ -18,6 +18,7 @@ const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
 const io_c = ffi.io;
+const log = core.logging;
 
 pub const PosixLooper = struct {
     const retry_delay_ms = 10;
@@ -171,12 +172,28 @@ pub const PosixLooper = struct {
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
-        if (descriptor.fd < 0 or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
-            (descriptor.io.isUnconnected() and side != .link)) return error.MuxFailure;
-        for (self.attachments) |other| {
-            if (other) |attachment| if (attachment.fd == descriptor.fd) return error.MuxFailure;
+        if (!io_c.pp_fd_is_valid(descriptor.fd)) {
+            log.write(.err, "PosixLooper.attach: Invalid descriptor");
+            return error.MuxFailure;
         }
-        if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) return error.MuxFailure;
+        if (descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux)) {
+            log.write(.err, "PosixLooper.attach: Descriptor conflicts with mux wake source");
+            return error.MuxFailure;
+        }
+        if (descriptor.io.isUnconnected() and side != .link) {
+            log.write(.err, "PosixLooper.attach: Unconnected socket requires the link side");
+            return error.MuxFailure;
+        }
+        for (self.attachments) |other| {
+            if (other) |attachment| if (attachment.fd == descriptor.fd) {
+                log.write(.err, "PosixLooper.attach: Descriptor already attached");
+                return error.MuxFailure;
+            };
+        }
+        if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) {
+            log.write(.err, "PosixLooper.attach: Failed to add descriptor to mux");
+            return error.MuxFailure;
+        }
         errdefer _ = io_c.pp_mux_delete(self.options.mux, descriptor.fd);
         slot.* = try Attachment.create(self.allocator, side, descriptor, arguments, self.options.max_read_count, buffer_size);
     }
@@ -284,6 +301,10 @@ pub const PosixLooper = struct {
             if (attachment.read_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (attachment.write_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (attachment.write_ready and attachment.write_retry == null) deadline_ns = now_ns;
+            attachment.native_io.setEventMask(
+                attachment.reading and attachment.read_retry == null,
+                attachment.write_queue.pending() != null and attachment.write_retry == null,
+            ) catch return attachment.native_io.lastErrorCode();
             _ = io_c.pp_mux_set_read(self.options.mux, attachment.fd, attachment.reading and attachment.read_retry == null);
             _ = io_c.pp_mux_set_write(self.options.mux, attachment.fd, attachment.write_queue.pending() != null and attachment.write_retry == null);
         }
@@ -291,6 +312,12 @@ pub const PosixLooper = struct {
         const timeout_ms: c_int = if (deadline_ns == std.math.maxInt(u64)) -1 else @intCast(@min(std.math.maxInt(c_int), remaining_ns / std.time.ns_per_ms + @intFromBool(remaining_ns % std.time.ns_per_ms != 0)));
         var code: c_int = 0;
         if (io_c.pp_mux_wait(self.options.mux, timeout_ms, &code) < 0) return code;
+        for (self.attachments) |maybe_attachment| {
+            const attachment = maybe_attachment orelse continue;
+            if (attachment.read_ready or attachment.write_ready) {
+                attachment.native_io.resetEvents() catch return attachment.native_io.lastErrorCode();
+            }
+        }
         return null;
     }
 

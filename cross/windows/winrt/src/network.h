@@ -12,13 +12,13 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile();
 
 class NetworkMonitor {
 public:
-    PARTOUT_WINDOWS_API NetworkMonitor();
-    PARTOUT_WINDOWS_API ~NetworkMonitor();
+    PARTOUT_WINRT_API NetworkMonitor();
+    PARTOUT_WINRT_API ~NetworkMonitor();
 
     // Callback arguments are (reachable, path_changed). The initial snapshot
     // reports path_changed=false; duplicate snapshots do not invoke the callback.
-    PARTOUT_WINDOWS_API void Start(std::function<void(bool, bool)> notify);
-    PARTOUT_WINDOWS_API void Stop();
+    PARTOUT_WINRT_API void Start(std::function<void(bool, bool)> notify);
+    PARTOUT_WINRT_API void Stop();
 
 private:
     struct State;

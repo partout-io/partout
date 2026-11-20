@@ -22,6 +22,63 @@ const api = core.api;
 const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
+test "daemon follows the connection tunnel setup requirement" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const Probe = struct {
+        required: bool,
+        created: bool = false,
+        failure: ?anyerror = null,
+
+        fn skipSetup(_: *anyopaque) bool {
+            return false;
+        }
+
+        fn run(owner: anytype, self: *@This()) daemon.Error!void {
+            var vtable = FailingStartConnection.vtable;
+            if (!self.required) vtable.requires_tunnel_setup = skipSetup;
+            owner.connection = .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
+            defer owner.connection = null;
+            var descriptor = daemon.testing.createConnectionTun(owner, .{
+                .profile = owner.daemon.profile,
+                .original_module_id = owner.module.id(),
+            }) catch |err| {
+                self.failure = err;
+                return;
+            };
+            defer descriptor.cleanup();
+            self.created = descriptor.tunWrapper() != null;
+        }
+    };
+    const allocator = std.testing.allocator;
+    var registry = try net.ConnectionRegistry.init(allocator, &.{});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller = mock_mod.MockTunnelController{ .set_tunnel_settings_error = error.TunNotAvailable };
+    var monitor = mock_mod.MockNetworkMonitor{};
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{},
+    });
+    defer sut.destroy();
+    for ([_]bool{ true, false }) |required| {
+        if (!required and !source.wintun_enabled) continue;
+        var probe = Probe{ .required = required };
+        const before = controller.set_tunnel_settings_count;
+        try daemon.testing.onLoop(sut.implementation.connection, &probe, Probe.run);
+        try std.testing.expectEqual(!required, probe.created);
+        try std.testing.expectEqual(@as(?anyerror, if (required) error.TunNotAvailable else null), probe.failure);
+        try std.testing.expectEqual(before + @intFromBool(required), controller.set_tunnel_settings_count);
+    }
+}
+
 test "daemon terminates and cancels after terminal looper failure" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
@@ -297,7 +354,7 @@ test "daemon dispatches controls to actor and owns queued establishment metadata
 test "daemon preserves settings-only failure and hold behavior" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Recorder = struct {
         caller_thread: std.Thread.Id,
         callbacks_on_caller: bool = true,
@@ -1685,7 +1742,7 @@ fn waitForExit(owner: anytype) !void {
 test "stop waits for terminal submission failure before immediate destruction" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         entered: std.atomic.Value(bool) = .init(false),
         released: std.atomic.Value(bool) = .init(false),
@@ -2224,7 +2281,7 @@ test "connection worker rolls back endpoint and thread allocations" {
 test "daemon yields to timers between mailbox batches on every platform" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         connection: FailingStartConnection = .{},
         writer: net.ConnectionWriter = undefined,
@@ -2299,12 +2356,12 @@ test "daemon yields to timers between mailbox batches on every platform" {
 test "Windows native input preserves mailbox behavior and submission OOM terminates the actor" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (comptime builtin.os.tag != .windows or !source.windows_enabled) return error.SkipZigTest;
+    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const Probe = struct {
-        callback: c.windows_receive = null,
+        callback: c.winrt_receive = null,
         callback_context: ?*anyopaque = null,
-        capability: c.windows_transport = undefined,
+        capability: c.winrt_transport = undefined,
         actor: std.Thread.Id = 0,
         reads: usize = 0,
         failures: usize = 0,
@@ -2317,7 +2374,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         measure_timer: bool = false,
         reads_at_timer: ?usize = null,
 
-        fn subscribe(raw: ?*anyopaque, callback: c.windows_receive, context: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.callback = callback;
             self.callback_context = context;
@@ -2332,10 +2389,10 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.windows_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
             return 0;
         }
-        fn address(_: ?*anyopaque, _: [*c]c.windows_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
             return false;
         }
 

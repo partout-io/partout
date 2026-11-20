@@ -12,6 +12,7 @@ struct __pp_socket_struct {
     bool unconnected;
     bool dual_stack;
     pp_fd handle;
+    long event_mask;
 };
 
 typedef int os_socklen_t;
@@ -106,6 +107,7 @@ static inline bool local_init_socket(pp_socket sock) {
         sock->handle = WSA_INVALID_EVENT;
         return false;
     }
+    sock->event_mask = FD_READ | FD_WRITE | FD_CLOSE;
     return true;
 }
 
@@ -139,3 +141,32 @@ int pp_socket_set_nonblocking(pp_socket_fd fd) {
     return 0;
 }
 
+bool pp_socket_set_event_mask(pp_socket sock, bool read, bool write) {
+    if (!local_is_valid_socket(sock)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    long events = (read || write) ? FD_CLOSE : 0;
+    if (read) events |= FD_READ;
+    if (write) events |= FD_WRITE;
+    if (events == sock->event_mask) return true;
+    if (WSAEventSelect(sock->fd, sock->handle, events) == SOCKET_ERROR) {
+        local_print_error("WSAEventSelect()");
+        return false;
+    }
+    sock->event_mask = events;
+    return true;
+}
+
+bool pp_socket_reset_events(pp_socket sock) {
+    if (!local_is_valid_socket(sock)) {
+        local_set_not_socket_error();
+        return false;
+    }
+    WSANETWORKEVENTS events;
+    if (WSAEnumNetworkEvents(sock->fd, sock->handle, &events) == SOCKET_ERROR) {
+        local_print_error("WSAEnumNetworkEvents()");
+        return false;
+    }
+    return true;
+}

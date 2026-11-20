@@ -13,18 +13,18 @@ typedef enum {
     WindowsLogNotice,
     WindowsLogInfo,
     WindowsLogDebug
-} windows_log_level;
+} winrt_log_level;
 
 /* Messages are borrowed until callback return. Callbacks may run concurrently. */
-typedef void (*windows_log_callback)(windows_log_level level, const char *message);
+typedef void (*winrt_log_callback)(winrt_log_level level, const char *message);
 
 /* Replace the process-wide sink atomically. Null uses OutputDebugString.
  * Replacement does not drain calls; keep the old sink valid until they return. */
-PARTOUT_WINDOWS_API void windows_set_logger(windows_log_callback callback);
+PARTOUT_WINRT_API void winrt_set_logger(winrt_log_callback callback);
 
 /* Format and deliver a message. Null formats, formatting failures and exceptions
  * are discarded; diagnostics never propagate exceptions to the caller. */
-PARTOUT_WINDOWS_API void windows_log(windows_log_level level, const char *format, ...);
+PARTOUT_WINRT_API void winrt_log(winrt_log_level level, const char *format, ...);
 
 #ifdef __cplusplus
 }

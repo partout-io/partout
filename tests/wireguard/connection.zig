@@ -184,7 +184,7 @@ test "WireGuard connection parses runtime data count" {
 test "WireGuard connection erases backend activation errors at the generic boundary" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .fail_turn_on_number = 1 };
@@ -220,7 +220,7 @@ test "WireGuard connection erases backend activation errors at the generic bound
 test "WireGuard connection preserves allocator errors at the generic boundary" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{ .out_of_memory_turn_on_number = 1 };
@@ -256,7 +256,7 @@ const OwnedDescriptor = struct {
     cleanups: usize = 0,
 
     fn descriptor(self: *@This()) io.LinkDescriptor {
-        return .{ .fd = -1, .io = .{ .mock = .{ .ptr = self, .vtable = &vtable } } };
+        return .{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .mock = .{ .ptr = self, .vtable = &vtable } } };
     }
     fn cleanup(raw: *anyopaque) void {
         const self: *@This() = @ptrCast(@alignCast(raw));
@@ -282,7 +282,7 @@ const OwnedDescriptor = struct {
 test "WireGuard data timer runs on its owner and cancels before stop" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -343,7 +343,7 @@ test "WireGuard data timer runs on its owner and cancels before stop" {
 test "WireGuard connection resolves hostname endpoints through sandbox resolver" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -540,7 +540,7 @@ test "WireGuard delegates current-network address mapping to DNSResolver" {
 test "WireGuard connection handles network monitor events" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
 
     var fake_backend = FakeBackend{};
@@ -1161,7 +1161,7 @@ fn expectEstablished(result: conn.Connection.StartResult) !void {
 test "WireGuard backend dispatches the passive startup payload separately" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows and !source.windows_enabled) return error.SkipZigTest;
+    if (builtin.os.tag == .windows and !source.winrt_enabled) return error.SkipZigTest;
     const Probe = struct {
         fn turnOn(raw: ?*anyopaque, _: std.mem.Allocator, settings: [:0]const u8, tunnel: backend_mod.StartTunnelPassive) backend_mod.Error!i32 {
             const called: *bool = @ptrCast(@alignCast(raw.?));
@@ -1361,7 +1361,7 @@ test "WireGuard none mode resolves hostnames before establishment and resets unc
 test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();
-    if (builtin.os.tag == .windows) return error.SkipZigTest;
+    if (source.winrt_enabled) return error.SkipZigTest;
     const allocator = std.testing.allocator;
     var fake_backend = FakeBackend{};
     defer fake_backend.deinit(allocator);
@@ -1399,7 +1399,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var owned = OwnedDescriptor{};
     const tun = try io.TunWrapper.create(allocator, null);
     tun.test_descriptor = owned.descriptor();
-    try created.commit(.{ .fd = -1, .io = .{ .tun = tun } });
+    try created.commit(.{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .tun = tun } });
     try std.testing.expectEqual(@as(usize, 1), factory.configure_sockets_count);
     try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
     const sut = connection.testing.adapter(created);
@@ -1425,7 +1425,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     const failed_tun = try io.TunWrapper.create(allocator, null);
     failed_tun.test_descriptor = failed_owned.descriptor();
     factory.fail_configure_sockets = true;
-    try std.testing.expect(try created.rebind(.{}, .{ .fd = -1, .io = .{ .tun = failed_tun } }));
+    try std.testing.expect(try created.rebind(.{}, .{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .tun = failed_tun } }));
     try std.testing.expectEqual(@as(usize, 1), failed_owned.cleanups);
     try std.testing.expectEqual(@as(usize, 0), owned.cleanups);
     factory.fail_configure_sockets = false;
@@ -1436,7 +1436,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var replacement_owned = OwnedDescriptor{};
     const replacement = try io.TunWrapper.create(allocator, null);
     replacement.test_descriptor = replacement_owned.descriptor();
-    try std.testing.expect(try created.rebind(.{}, .{ .fd = -1, .io = .{ .tun = replacement } }));
+    try std.testing.expect(try created.rebind(.{}, .{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .tun = replacement } }));
     try std.testing.expectEqual(@as(usize, 1), owned.cleanups);
     try std.testing.expectEqual(@as(usize, 3), fake_backend.turn_on_count);
     try std.testing.expectEqual(@as(usize, 0), recorder.rebind_count);
@@ -1452,7 +1452,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     const rejected_tun = try io.TunWrapper.create(allocator, null);
     rejected_tun.test_descriptor = rejected.descriptor();
     factory.fail_configure_sockets = true;
-    try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = -1, .io = .{ .tun = rejected_tun } }));
+    try std.testing.expectError(error.UnableToStart, created.commit(.{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .tun = rejected_tun } }));
     try std.testing.expectEqual(@as(usize, 4), fake_backend.turn_off_count);
     try std.testing.expectEqual(@as(usize, 1), rejected.cleanups);
     created.stop();
@@ -1464,7 +1464,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
     var final_owned = OwnedDescriptor{};
     const final_tun = try io.TunWrapper.create(allocator, null);
     final_tun.test_descriptor = final_owned.descriptor();
-    try created.commit(.{ .fd = -1, .io = .{ .tun = final_tun } });
+    try created.commit(.{ .fd = source.ffi.io.pp_fd_invalid(), .io = .{ .tun = final_tun } });
     created.networkChange(.{ .reachable = false });
     created.networkChange(.{ .reachable = true });
     // Destruction before recommit still owns and releases the retained TUN.
@@ -1476,7 +1476,7 @@ test "WireGuard none mode owns committed TUN and refreshes backend sockets" {
 
 fn fakeActiveTurnOn(raw: ?*anyopaque, allocator: std.mem.Allocator, settings: [:0]const u8, start: backend_mod.StartTunnel) backend_mod.Error!i32 {
     const self: *FakeBackend = @ptrCast(@alignCast(raw.?));
-    std.testing.expectEqualStrings("33333333-3333-4333-8333-333333333333", start.ifname) catch unreachable;
+    std.testing.expectEqualStrings("00000000-0000-4000-8000-000000000000", start.ifname) catch unreachable;
     self.turn_on_count += 1;
     if (self.last_settings) |value| allocator.free(value);
     self.last_settings = try allocator.dupe(u8, settings);
@@ -1536,4 +1536,46 @@ fn waitForRetry(environment: *TimerEnvironment, backend: *FakeBackend, expected:
         if (core.monotonicNs() >= deadline) return error.Timeout;
         try std.testing.expect(try loop_helpers.poll(&environment.looper, 10));
     }
+}
+
+test "WireGuard requests tunnel setup except for active Wintun" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const allocator = std.testing.allocator;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer profile.deinit(allocator);
+    const module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
+    var environment: TimerEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    var backend = FakeBackend{};
+    defer backend.deinit(allocator);
+    var recorder = EventRecorder{};
+    for ([_]conn.Connection.DaemonIO{ .none, .link }) |mode| {
+        const created = try connection.testing.createConnection(allocator, backend.backend(), mode, module, .{
+            .profile = &profile,
+            .events = recorder.events(),
+            .resolver = mock.noopDNSResolver(),
+            .factory = mock.noopSocketFactory(),
+            .writer = environment.writer(),
+        });
+        defer created.destroy();
+        try std.testing.expectEqual(mode, created.daemon_io);
+        try std.testing.expectEqual(mode == .link or !source.wintun_enabled, created.requiresTunnelSetup());
+    }
+}
+
+test "Wintun defaults to active WireGuard startup without a native TUN" {
+    if (!source.wintun_enabled) return error.SkipZigTest;
+    try std.testing.expectEqual(.none, adapter.WireGuardAdapter.default_daemon_io);
+    const tun = try io.TunWrapper.create(std.testing.allocator, null);
+    defer tun.destroy();
+    const descriptor = try tun.tunDescriptor();
+    try std.testing.expect(descriptor.tunWrapper() == tun);
+    const start = backend_mod.StartTunnel{ .tun = tun, .ifname = "test" };
+    try std.testing.expect(start.descriptor() == null);
 }

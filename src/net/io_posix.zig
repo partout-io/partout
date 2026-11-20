@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-//! POSIX socket implementation. Selected by io.zig on non-Windows platforms.
+//! Readiness-driven socket/TUN I/O for POSIX platforms and Windows Wintun.
 
 const std = @import("std");
 const builtin = @import("builtin");
@@ -105,10 +105,21 @@ pub const POSIXInterface = union(enum) {
     /// The lock is reacquired before returning; no wrapper access occurs while waiting.
     pub fn waitForReadiness(self: POSIXInterface, writing: bool, waiter: *io.Waiter, io_lock: *core.Mutex) Error!bool {
         const fd = switch (self) {
-            .mock => -1,
+            .mock => io_c.pp_fd_invalid(),
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
         };
-        return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
+        try self.setEventMask(!writing, writing);
+        const ready = waiter.wait(fd, writing, io_lock) catch return error.LibcFailure;
+        if (ready) try self.resetEvents();
+        return ready;
+    }
+
+    pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
+        if (self == .socket and !io_c.pp_socket_set_event_mask(self.socket.socket, readable, writable)) return error.LibcFailure;
+    }
+
+    pub fn resetEvents(self: POSIXInterface) Error!void {
+        if (self == .socket and !io_c.pp_socket_reset_events(self.socket.socket)) return error.LibcFailure;
     }
 
     pub fn read(self: POSIXInterface, buf: []u8) Error!?usize {
@@ -279,17 +290,31 @@ pub const SocketWrapper = struct {
     fn datagramError(writing: bool) Error {
         // Truncation and per-destination errors (including asynchronous ICMP)
         // do not invalidate a shared UDP socket or its other peers.
-        return switch (io_c.pp_socket_last_error_binding()) {
-            @backingInt(std.c.E.MSGSIZE),
-            @backingInt(std.c.E.NETUNREACH),
-            @backingInt(std.c.E.HOSTUNREACH),
-            @backingInt(std.c.E.CONNREFUSED),
-            @backingInt(std.c.E.AFNOSUPPORT),
-            => error.DatagramDropped,
-            // macOS reports a destination/socket family mismatch as EINVAL.
-            @backingInt(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
-            else => error.LibcFailure,
-        };
+        const code = io_c.pp_socket_last_error_binding();
+        if (builtin.os.tag == .windows) {
+            return switch (code) {
+                io_c.WSAEMSGSIZE,
+                io_c.WSAENETUNREACH,
+                io_c.WSAEHOSTUNREACH,
+                io_c.WSAECONNREFUSED,
+                io_c.WSAEAFNOSUPPORT,
+                => error.DatagramDropped,
+                io_c.WSAEINVAL => if (writing) error.DatagramDropped else error.LibcFailure,
+                else => error.LibcFailure,
+            };
+        } else {
+            return switch (code) {
+                @backingInt(std.c.E.MSGSIZE),
+                @backingInt(std.c.E.NETUNREACH),
+                @backingInt(std.c.E.HOSTUNREACH),
+                @backingInt(std.c.E.CONNREFUSED),
+                @backingInt(std.c.E.AFNOSUPPORT),
+                => error.DatagramDropped,
+                // macOS reports a destination/socket family mismatch as EINVAL.
+                @backingInt(std.c.E.INVAL) => if (writing) error.DatagramDropped else error.LibcFailure,
+                else => error.LibcFailure,
+            };
+        }
     }
 
     fn localAddress(self: *const SocketWrapper) !io.SocketAddress {
@@ -376,6 +401,12 @@ pub const TunWrapper = struct {
     }
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
+        // The daemon creates an empty wrapper when requiresTunnelSetup() is false:
+        // currently active WireGuard on Wintun, where the backend owns the device.
+        // Test mocks also use null TUNs, but may supply their own descriptor.
+        if (self.tun == null and (!builtin.is_test or self.test_descriptor == null)) {
+            return .{ .fd = io_c.pp_fd_invalid(), .io = self.nativeIO() };
+        }
         const fd = self.muxDescriptor() orelse return error.LibcFailure;
         if (io_c.pp_fd_set_nonblocking(fd, null) != 0) return error.LibcFailure;
         return .{

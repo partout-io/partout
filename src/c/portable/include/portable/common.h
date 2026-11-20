@@ -8,6 +8,8 @@
 #include "conditionals.h"
 
 #include <assert.h>
+#include <errno.h>
+#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -35,8 +37,6 @@ void pp_clog(pp_log_level level, const char *message) {
     partout_log(level, message);
 }
 
-void pp_clog_v(pp_log_level level, const char *fmt, ...);
-
 /* Use inline rather than #define to make available to Swift. */
 
 static inline
@@ -59,6 +59,34 @@ static inline
 void pp_free(void *_Nullable ptr) {
     if (!ptr) return;
     free(ptr);
+}
+
+/* Header-local so controller libraries share formatting without a private DLL export. */
+static inline
+void pp_clog_v(pp_log_level level, const char *fmt, ...) {
+#if !PARTOUT_WINDOWS
+    const int saved_errno = errno;
+#endif
+    va_list args;
+    va_start(args, fmt);
+    const int formatted_len = vsnprintf(NULL, 0, fmt, args);
+    va_end(args);
+    if (formatted_len < 0) {
+#if !PARTOUT_WINDOWS
+        errno = saved_errno;
+#endif
+        return;
+    }
+    const size_t msg_len = (size_t)formatted_len + 1;
+    char *msg = pp_alloc(msg_len);
+    va_start(args, fmt);
+    vsnprintf(msg, msg_len, fmt, args);
+    va_end(args);
+    partout_log(level, msg);
+    pp_free(msg);
+#if !PARTOUT_WINDOWS
+    errno = saved_errno;
+#endif
 }
 
 static inline
@@ -108,8 +136,9 @@ static inline pp_fd pp_fd_invalid(void) {
     return ((pp_fd)(void *)0);
 }
 
+/* Reject both NULL and INVALID_HANDLE_VALUE. */
 static inline bool pp_fd_is_valid(pp_fd fd) {
-    return (intptr_t)fd != -1;
+    return fd && (intptr_t)fd != -1;
 }
 
 #else
@@ -125,9 +154,10 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
     return fd != -1;
 }
 
-int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
-
 #endif
+
+/* No-op on Windows; original_flags is left unchanged. */
+int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 
 int pp_io_last_error_binding(void);
 

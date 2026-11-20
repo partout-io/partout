@@ -79,6 +79,30 @@ typedef struct __partout_tun_struct *partout_tun;
  * Failure leaves the descriptor with the caller. */
 partout_tun partout_tun_wrap_fd(int fd, bool owned);
 
+/* Packet callback results: nonnegative byte count, or a negative error.
+ * Other failures return -1 and preserve the platform's native last error. */
+typedef enum {
+    PartoutIOWouldBlock = -11,
+    PartoutIONoBufs = -12,
+    PartoutIONoSpace = -13
+} partout_io_result;
+
+/* Nonblocking packet I/O uses raw IP packets without platform headers. */
+typedef struct {
+    int (*read)(void *ctx, uint8_t *dst, size_t len);
+    int (*write)(void *ctx, const uint8_t *src, size_t len);
+    void (*close)(void *ctx);
+    /* Native readiness fd, or a Windows wait HANDLE cast to intptr_t. */
+    intptr_t (*watch)(void *ctx);
+} partout_tun_callbacks;
+
+/* Wraps an existing device context; does not create a device.
+ * All callbacks are required and copied. On success, close(ctx) is called
+ * exactly once on release; on failure, ownership remains with the caller.
+ * Callback code must remain loaded until release. Supported by readiness
+ * backends (POSIX and Windows/Wintun); returns NULL on WinRT. */
+partout_tun partout_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks);
+
 typedef struct {
     bool reachable;
 #if defined(__ANDROID__)

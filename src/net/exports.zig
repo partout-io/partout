@@ -66,3 +66,4 @@ pub const TunWrapper = io.TunWrapper;
 pub const Waiter = io.Waiter;
 
 pub const canChangeStatus = conn.canChangeStatus;
+pub const uses_winrt = io.uses_winrt;

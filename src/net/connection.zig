@@ -187,7 +187,7 @@ pub const Connection = struct {
 
     pub const DaemonIO = enum {
         /// The connection/backend creates sockets and performs all packet I/O.
-        /// The daemon creates TUN and transfers it through commit().
+        /// The daemon creates TUN when required and transfers it through commit().
         none,
         /// The daemon creates sockets and TUN, then transfers them to the connection.
         link,
@@ -215,6 +215,12 @@ pub const Connection = struct {
     pub const Events = events_mod.ConnectionEvents;
 
     pub const VTable = struct {
+        /// Whether the daemon must apply tunnel settings through the controller.
+        requires_tunnel_setup: *const fn (*anyopaque) bool = struct {
+            fn call(_: *anyopaque) bool {
+                return true;
+            }
+        }.call,
         /// Null selects an unconnected UDP socket and skips endpoint resolution.
         endpoints: *const fn (*anyopaque) ?[]const api.ExtendedEndpoint = struct {
             fn call(_: *anyopaque) ?[]const api.ExtendedEndpoint {
@@ -268,6 +274,10 @@ pub const Connection = struct {
         /// Destroys this object. This is the very last step of the lifecycle.
         destroy: *const fn (*anyopaque) void,
     };
+
+    pub fn requiresTunnelSetup(self: Connection) bool {
+        return self.vtable.requires_tunnel_setup(self.ptr);
+    }
 
     pub fn endpoints(self: Connection) ?[]const api.ExtendedEndpoint {
         return self.vtable.endpoints(self.ptr);

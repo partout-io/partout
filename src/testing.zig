@@ -2,7 +2,6 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-const builtin = @import("builtin");
 const openvpn_auth = @import("openvpn/internal/auth.zig");
 const openvpn_configuration = @import("openvpn/internal/configuration.zig");
 const openvpn_constants = @import("openvpn/internal/constants.zig");
@@ -56,13 +55,14 @@ pub const net_daemon = @import("net/daemon.zig");
 pub const net_daemon_helpers = @import("net/daemon_helpers.zig");
 pub const net_io_common = @import("net/io_common.zig");
 pub const net_io = @import("net/io.zig");
-pub const net_io_posix = if (builtin.os.tag == .windows) struct {} else io_posix_module;
-pub const net_looper_posix = if (builtin.os.tag == .windows) struct {} else looper_posix_module;
+pub const net_io_posix = if (net_io.uses_winrt) struct {} else io_posix_module;
+pub const net_looper_posix = if (net_io.uses_winrt) struct {} else looper_posix_module;
 pub const net_looper = @import("net/looper.zig");
 pub const net_sandbox = @import("net/sandbox.zig");
 pub const net_platform = @import("net/platform.zig");
 pub const net_resolver = @import("net/resolver.zig");
-pub const windows_enabled = build_options.windows;
+pub const winrt_enabled = build_options.winrt;
+pub const wintun_enabled = build_options.wintun;
 pub const openvpn_enabled = build_options.openvpn;
 pub const openvpn_connection = if (openvpn_enabled) openvpn_connection_module else struct {};
 pub const openvpn_exports = if (openvpn_enabled) openvpn_exports_module else struct {};

@@ -13,7 +13,7 @@ endif()
 get_filename_component(PARTOUT_MODELS_ROOT "${CMAKE_CURRENT_LIST_DIR}/../cross/cpp" ABSOLUTE)
 set(PARTOUT_MODELS_INCLUDE "${CMAKE_CURRENT_BINARY_DIR}/partout-models/include")
 set(partout_models_dll OFF)
-if(WIN32 AND PP_BUILD_WINDOWS AND PP_BUILD_LIBRARY)
+if(WIN32 AND PP_BUILD_WINRT AND PP_BUILD_LIBRARY)
     set(partout_models_dll ON)
 endif()
 file(GLOB partout_model_headers CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.h")
@@ -80,7 +80,7 @@ if(partout_models_dll)
         "$<BUILD_INTERFACE:${PARTOUT_MODELS_INCLUDE}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
     )
-    target_link_libraries(partout-models-interface INTERFACE partout-windows-backend
+    target_link_libraries(partout-models-interface INTERFACE partout-winrt-backend
         "$<BUILD_INTERFACE:nlohmann_json::nlohmann_json>"
         "$<INSTALL_INTERFACE:nlohmann_json::nlohmann_json>"
     )

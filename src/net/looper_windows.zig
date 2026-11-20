@@ -41,7 +41,7 @@ pub const WindowsLooper = struct {
     stopped: bool,
 
     pub fn create(allocator: std.mem.Allocator, options: helpers.Options) helpers.InitError!*WindowsLooper {
-        if (!build_options.windows) return error.MuxFailure;
+        if (!build_options.winrt) return error.MuxFailure;
         const mux = options.mux orelse return error.MuxFailure;
         const self = try allocator.create(WindowsLooper);
         self.* = .{

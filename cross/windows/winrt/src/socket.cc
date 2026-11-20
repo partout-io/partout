@@ -108,9 +108,9 @@ struct Socket::State {
         }
         if (!callback || (paused && !error)) return;
         if (error == SocketEOF) {
-            windows_log(WindowsLogInfo, "Partout::Socket: TCP peer closed the connection");
+            winrt_log(WindowsLogInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
-            windows_log(WindowsLogError,
+            winrt_log(WindowsLogError,
                         "Partout::Socket: I/O failed: HRESULT=0x%08x, channel_owned=%s",
                         static_cast<unsigned int>(error), channel_owned ? "true" : "false");
         }
@@ -134,7 +134,7 @@ Socket::~Socket() noexcept {
     SetOnReceive({});
     if (adapter_) {
         std::lock_guard lock(state_->mutex);
-        windows_log(WindowsLogInfo,
+        winrt_log(WindowsLogInfo,
                     "Partout::Socket: independent UDP totals: received=%llu, sent=%llu",
                     state_->received, state_->sent);
     }
@@ -201,7 +201,7 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
             if (adapter_) {
                 if (!ipv4_wildcard && !ipv6_wildcard) throw hresult_invalid_argument();
                 datagram_.BindServiceNameAsync(local_service, adapter_).get();
-                windows_log(WindowsLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
+                winrt_log(WindowsLogDebug, "Partout::Socket: UDP bound: port=%ls, adapter=%ls",
                             datagram_.Information().LocalPort().c_str(),
                             to_hstring(adapter_.NetworkAdapterId()).c_str());
             } else if (ipv4_wildcard || (options->dual_stack && ipv6_wildcard)) {
@@ -216,7 +216,7 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
             WaitForConnect(stream_.ConnectAsync(host, service, SocketProtectionLevel::PlainSocket),
                            options->timeout_ms);
         }
-        windows_log(WindowsLogDebug,
+        winrt_log(WindowsLogDebug,
                     "Partout::Socket: opened: protocol=%s, endpoint=%s:%u, mode=%s, dual_stack=%s",
                     datagram_ ? "UDP" : "TCP", hostname, static_cast<unsigned int>(port),
                     unconnected_ ? "unconnected" : "connected",
@@ -225,12 +225,12 @@ bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *
         // Conversion allocates; diagnostics must not throw across the C ABI.
         try {
             const auto message = to_string(error.message());
-            windows_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
+            winrt_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x (%s)",
                         static_cast<unsigned int>(error.code().value), message.c_str());
         } catch (...) {}
         return false;
     } catch (...) {
-        windows_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
+        winrt_log(WindowsLogError, "Partout::Socket: open failed: HRESULT=0x%08x",
                     static_cast<unsigned int>(to_hresult().value));
         return false;
     }
@@ -386,7 +386,7 @@ int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
         }
     } catch (...) {
         const auto error = to_hresult().value;
-        windows_log(WindowsLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
+        winrt_log(WindowsLogError, "Partout::Socket: write failed: HRESULT=0x%08x, length=%zu",
                     static_cast<unsigned int>(error), static_cast<size_t>(length));
         return error;
     }

@@ -19,7 +19,7 @@ pub const testing_helpers = if (builtin.is_test) helpers else void;
 pub const SubmissionError = helpers.SubmissionError;
 
 pub const Looper = struct {
-    pub const Impl = if (builtin.os.tag == .windows)
+    pub const Impl = if (io.uses_winrt)
         looper_windows.WindowsLooper
     else
         looper_posix.PosixLooper;
@@ -70,12 +70,12 @@ pub const Looper = struct {
     }
 
     pub fn canReceivePackets(self: *Looper, receipt: PacketReceipt) bool {
-        if (builtin.os.tag == .windows) return self.impl.canReceivePackets(receipt);
+        if (io.uses_winrt) return self.impl.canReceivePackets(receipt);
         return true;
     }
 
     pub fn receivePackets(self: *Looper, receipt: PacketReceipt) void {
-        if (builtin.os.tag == .windows) self.impl.receivePackets(receipt);
+        if (io.uses_winrt) self.impl.receivePackets(receipt);
     }
 
     /// Attempts queued writes once without running protocol callbacks or waiting.

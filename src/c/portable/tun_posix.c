@@ -18,22 +18,13 @@
 #include "portable/endian.h"
 #endif
 
-struct __partout_tun_struct {
+struct posix_tun_context {
     pp_fd fd;
     bool owned;
 };
 
-pp_tun pp_tun_wrap_fd(int fd, bool owned) {
-    if (fd < 0) return NULL;
-    pp_tun tun = malloc(sizeof(*tun));
-    if (!tun) return NULL;
-    tun->fd = fd;
-    tun->owned = owned;
-    return tun;
-}
-
-void pp_tun_free(pp_tun tun) {
-    if (!tun) return;
+static void close_tun(void *ctx) {
+    struct posix_tun_context *tun = ctx;
     if (tun->owned && tun->fd >= 0) close(tun->fd);
     pp_free(tun);
 }
@@ -41,7 +32,7 @@ void pp_tun_free(pp_tun tun) {
 #if PARTOUT_APPLE
 /* The first 4 bits of a local packet identify the IP family. */
 static inline
-uint32_t pp_tun_proto_for(uint8_t byte) {
+uint32_t tun_proto_for(uint8_t byte) {
     const uint8_t header = (byte & 0xf0) >> 4;
     switch (header) {
         case 4:
@@ -53,10 +44,10 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
             return 0;
     }
 }
-
 #endif
 
-int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
+static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
+    const struct posix_tun_context *tun = ctx;
     if (!tun || tun->fd < 0) return -1;
     if (!dst || dst_len == 0) return -1;
 #if PARTOUT_APPLE
@@ -85,11 +76,12 @@ int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t dst_len) {
 #endif
 }
 
-int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
+static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
+    const struct posix_tun_context *tun = ctx;
     if (!tun || tun->fd < 0) return -1;
     if (!src || src_len == 0) return -1;
 #if PARTOUT_APPLE
-    const uint32_t proto_byte = pp_tun_proto_for(*src);
+    const uint32_t proto_byte = tun_proto_for(*src);
     if (proto_byte == 0) return -1;
     const uint32_t pi = pp_endian_htonl(proto_byte);
     const size_t pi_len = sizeof(pi);
@@ -114,9 +106,27 @@ int pp_tun_write(const pp_tun tun, const uint8_t *src, size_t src_len) {
 #endif
 }
 
-pp_fd pp_tun_get_watch_fd(const pp_tun tun) {
+static intptr_t watch_tun(void *ctx) {
+    const struct posix_tun_context *tun = ctx;
     if (!tun) return -1;
     return tun->fd;
+}
+
+pp_tun pp_tun_wrap_fd(int fd, bool owned) {
+    if (fd < 0) return NULL;
+    struct posix_tun_context *ctx = malloc(sizeof(*ctx));
+    if (!ctx) return NULL;
+    ctx->fd = fd;
+    ctx->owned = owned;
+    const partout_tun_callbacks callbacks = {
+        .read = read_tun,
+        .write = write_tun,
+        .close = close_tun,
+        .watch = watch_tun,
+    };
+    pp_tun tun = pp_tun_wrap_callbacks(ctx, &callbacks);
+    if (!tun) free(ctx); // The caller retains fd on failure.
+    return tun;
 }
 
 #endif
