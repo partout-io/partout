@@ -473,7 +473,7 @@ test "inactive platform monitoring updates state without logging" {
     try std.testing.expectEqual(@as(usize, 0), count);
 }
 
-test "platform infers backend-owned TUN only for Wintun WireGuard" {
+test "platform requires a controller TUN even for WireGuard" {
     var recorder = TunnelCommitRecorder{};
     var platform = try Platform.init(platformOptions(&recorder));
     defer platform.deinit();
@@ -483,20 +483,7 @@ test "platform infers backend-owned TUN only for Wintun WireGuard" {
         .profile = .{ .id = "22222222-2222-4222-8222-222222222222".*, .modules = &modules },
         .original_module_id = module_id,
     };
-    if (!source.wintun_enabled) {
-        try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(info));
-        return;
-    }
-    const tun = try platform.tunnelController().setTunnelSettings(info);
-    defer tun.destroy();
-    const descriptor = try tun.tunDescriptor();
-    try std.testing.expect(!io_c.pp_fd_is_valid(descriptor.fd));
-    try std.testing.expect(tun.tun == null);
+    try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(info));
     try std.testing.expect(recorder.received_profile_id);
     try std.testing.expectEqual(@as(usize, 1), recorder.calls);
-
-    // An unrelated WireGuard module must not bypass the device requirement.
-    var other_info = info;
-    other_info.original_module_id = "22222222-2222-4222-8222-222222222222".*;
-    try std.testing.expectError(error.TunNotAvailable, platform.tunnelController().setTunnelSettings(other_info));
 }

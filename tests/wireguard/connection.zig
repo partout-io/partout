@@ -1538,6 +1538,37 @@ fn waitForRetry(environment: *TimerEnvironment, backend: *FakeBackend, expected:
     }
 }
 
+test "WireGuard requests tunnel setup except for active Wintun" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const allocator = std.testing.allocator;
+    var profile = try api.Profile.parse(allocator,
+        \\{"version":2,"id":"00000000-0000-4000-8000-000000000000","name":"WireGuard","modules":[
+        \\{"type":"WireGuard","value":{"id":"33333333-3333-4333-8333-333333333333","configuration":{"interface":{"privateKey":"SMy9zR0KUgqYqZ0pcyL3sJmJkmNkU8PA5mnr9nh3zUs=","addresses":["10.0.0.2/24"]},"peers":[]}}}
+        \\],"activeModulesIds":["33333333-3333-4333-8333-333333333333"]}
+    );
+    defer profile.deinit(allocator);
+    const module = conn.activeConnectionModule(&profile) orelse return error.TestUnexpectedResult;
+    var environment: TimerEnvironment = undefined;
+    try environment.init(allocator);
+    defer environment.deinit();
+    var backend = FakeBackend{};
+    defer backend.deinit(allocator);
+    var recorder = EventRecorder{};
+    for ([_]conn.Connection.DaemonIO{ .none, .link }) |mode| {
+        const created = try connection.testing.createConnection(allocator, backend.backend(), mode, module, .{
+            .profile = &profile,
+            .events = recorder.events(),
+            .resolver = mock.noopDNSResolver(),
+            .factory = mock.noopSocketFactory(),
+            .writer = environment.writer(),
+        });
+        defer created.destroy();
+        try std.testing.expectEqual(mode, created.daemon_io);
+        try std.testing.expectEqual(mode == .link or !source.wintun_enabled, created.requiresTunnelSetup());
+    }
+}
+
 test "Wintun defaults to active WireGuard startup without a native TUN" {
     if (!source.wintun_enabled) return error.SkipZigTest;
     try std.testing.expectEqual(.none, adapter.WireGuardAdapter.default_daemon_io);

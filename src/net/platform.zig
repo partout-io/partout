@@ -4,7 +4,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 
 const platform_mod = @This();
 const ffi = @import("../c/exports.zig");
@@ -298,17 +297,6 @@ const platform_tunnel_controller_vtable = TunnelController.VTable{
     .cancel_tunnel_connection = ctrlCancelTunnelConnection,
 };
 
-// Active WireGuard on Wintun creates its own adapter; all other paths
-// require the device returned by the controller.
-fn requiresVirtualDevice(info: api.TunnelRemoteInfoWrapper) bool {
-    if (!build_options.wintun) return true;
-    for (info.profile.modules) |module| {
-        if (module != .WireGuard) continue;
-        if (std.mem.eql(u8, &module.WireGuard.id, &info.original_module_id)) return false;
-    }
-    return true;
-}
-
 fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) TunnelController.Error!*TunWrapper {
     const self: *Platform = @ptrCast(@alignCast(ptr.?));
     const allocator = std.heap.c_allocator;
@@ -322,15 +310,7 @@ fn ctrlSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) Tu
     log.write(.debug, "Platform: Set tunnel");
     const set_tunnel = self.fnt.set_tunnel orelse
         @panic("Platform function table has no set_tunnel callback");
-    const maybe_tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr);
-    if (!requiresVirtualDevice(info)) {
-        // wg-go creates its own adapter. Release the controller device first.
-        if (maybe_tun) |tun| io_c.pp_tun_free(tun);
-        return TunWrapper.create(allocator, null);
-    }
-    const tun = maybe_tun orelse {
-        return error.TunNotAvailable;
-    };
+    const tun = set_tunnel(self.ref, c_uuid.ptr(), c_info.ptr) orelse return error.TunNotAvailable;
     errdefer io_c.pp_tun_free(tun);
     return TunWrapper.create(allocator, tun);
 }

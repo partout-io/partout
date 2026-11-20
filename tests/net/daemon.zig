@@ -22,6 +22,63 @@ const api = core.api;
 const Daemon = daemon.Daemon;
 const ConnectionGate = daemon_helpers.ConnectionGate;
 
+test "daemon follows the connection tunnel setup requirement" {
+    const native_runtime = try NativeRuntime.init();
+    defer native_runtime.deinit();
+    const Probe = struct {
+        required: bool,
+        created: bool = false,
+        failure: ?anyerror = null,
+
+        fn skipSetup(_: *anyopaque) bool {
+            return false;
+        }
+
+        fn run(owner: anytype, self: *@This()) daemon.Error!void {
+            var vtable = FailingStartConnection.vtable;
+            if (!self.required) vtable.requires_tunnel_setup = skipSetup;
+            owner.connection = .{ .ptr = self, .vtable = &vtable, .daemon_io = .none };
+            defer owner.connection = null;
+            var descriptor = daemon.testing.createConnectionTun(owner, .{
+                .profile = owner.daemon.profile,
+                .original_module_id = owner.module.id(),
+            }) catch |err| {
+                self.failure = err;
+                return;
+            };
+            defer descriptor.cleanup();
+            self.created = descriptor.tunWrapper() != null;
+        }
+    };
+    const allocator = std.testing.allocator;
+    var registry = try net.ConnectionRegistry.init(allocator, &.{});
+    defer registry.deinit(allocator);
+    var profile = try api.Profile.parse(allocator, mock_mod.connectionProfileJson());
+    defer profile.deinit(allocator);
+    var controller = mock_mod.MockTunnelController{ .set_tunnel_settings_error = error.TunNotAvailable };
+    var monitor = mock_mod.MockNetworkMonitor{};
+    const sut = try Daemon.create(allocator, &profile, .{
+        .objects = .{
+            .registry = &registry,
+            .controller = controller.interface(),
+            .resolver = mock_mod.noopDNSResolver(),
+            .factory = mock_mod.noopSocketFactory(),
+            .monitor = monitor.interface(),
+        },
+        .options = .{},
+    });
+    defer sut.destroy();
+    for ([_]bool{ true, false }) |required| {
+        if (!required and !source.wintun_enabled) continue;
+        var probe = Probe{ .required = required };
+        const before = controller.set_tunnel_settings_count;
+        try daemon.testing.onLoop(sut.implementation.connection, &probe, Probe.run);
+        try std.testing.expectEqual(!required, probe.created);
+        try std.testing.expectEqual(@as(?anyerror, if (required) error.TunNotAvailable else null), probe.failure);
+        try std.testing.expectEqual(before + @intFromBool(required), controller.set_tunnel_settings_count);
+    }
+}
+
 test "daemon terminates and cancels after terminal looper failure" {
     const native_runtime = try NativeRuntime.init();
     defer native_runtime.deinit();

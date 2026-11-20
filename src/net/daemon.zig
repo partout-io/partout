@@ -1425,10 +1425,13 @@ const ConnectionDaemon = struct {
     // Return connection-owned TUN, or a borrowed descriptor after looper attachment.
     fn createConnectionTun(self: *ConnectionDaemon, info: api.TunnelRemoteInfoWrapper) StartError!io.TunDescriptor {
         const connection = self.connection orelse @panic("createConnectionTun but no connection");
-        const tunnel = self.daemon.controller.setTunnelSettings(info) catch |err| {
-            log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
-            return error.TunNotAvailable;
-        };
+        const tunnel = if (connection.requiresTunnelSetup())
+            self.daemon.controller.setTunnelSettings(info) catch |err| {
+                log.writef(.fault, "Unable to establish tunnel settings: {s}", .{@errorName(err)});
+                return error.TunNotAvailable;
+            }
+        else
+            try io.TunWrapper.create(self.daemon.allocator, null);
         errdefer tunnel.destroy();
         const descriptor = tunnel.tunDescriptor() catch return error.TunNotAvailable;
         if (connection.daemon_io == .looper) {
@@ -1625,6 +1628,7 @@ pub const testing = struct {
     pub const isCurrentThread = ConnectionDaemon.isCurrentThread;
     pub const codeForDaemonStartError = partoutCodeForDaemonStartError;
     pub const codeForLooperFailure = partoutCodeForLooperFailure;
+    pub const createConnectionTun = ConnectionDaemon.createConnectionTun;
 
     pub fn shutdown(owner: anytype) void {
         owner.shutdown();
