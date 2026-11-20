@@ -11,7 +11,9 @@ _partout_log
 
 # Profile and module import/export
 _partout_import_profile
+_partout_import_profile_raw
 _partout_import_module
+_partout_import_module_raw
 _partout_export_module
 
 # Daemon lifecycle

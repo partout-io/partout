@@ -311,25 +311,25 @@ test "ABI importer preserves parsing without a sub-code" {
 
 test "profile import export returns normalized success and failure payloads" {
     try expectImportEnvelope(
-        partout.partout_import_profile(valid_wireguard_profile, "Imported WireGuard"),
+        partout.partout_import_profile(valid_wireguard_profile, null, "Imported WireGuard"),
         null,
         "name",
         "Imported WireGuard",
     );
     try expectImportEnvelope(
-        partout.partout_import_profile(invalid_wireguard_profile, null),
+        partout.partout_import_profile(invalid_wireguard_profile, null, null),
         .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
-        partout.partout_import_profile(invalid_openvpn_profile, null),
+        partout.partout_import_profile(invalid_openvpn_profile, null, null),
         .parsing,
         null,
         null,
     );
     try expectImportEnvelope(
-        partout.partout_import_profile(encrypted_openvpn_profile, null),
+        partout.partout_import_profile(encrypted_openvpn_profile, null, null),
         .parsing,
         null,
         null,
