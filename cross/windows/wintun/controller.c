@@ -79,7 +79,7 @@ static partout_tun open_tun(const char *uuid) {
 #undef LOAD_FUNCTION
 
     const int len = MultiByteToWideChar(CP_UTF8, 0, uuid, -1, NULL, 0);
-    if (len == 0) {
+    if (len != 37) {
         pp_clog_v(PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
         goto failure;
     }
@@ -88,8 +88,14 @@ static partout_tun open_tun(const char *uuid) {
         pp_clog_v(PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
         goto failure;
     }
+    wchar_t guid_string[39] = L"{";
+    memcpy(guid_string + 1, name, 36 * sizeof(*name));
+    guid_string[37] = L'}';
     GUID guid;
-    if (FAILED(CLSIDFromString(name, &guid))) ZeroMemory(&guid, sizeof(guid));
+    if (FAILED(CLSIDFromString(guid_string, &guid))) {
+        pp_clog(PPLogLevelFault, "tun_windows: create(), invalid profile UUID");
+        goto failure;
+    }
     tun->adapter = create_adapter(name, L"Partout", &guid);
     if (!tun->adapter) {
         pp_clog_v(PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
