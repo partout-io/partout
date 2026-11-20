@@ -173,13 +173,16 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
-    const golden = if (options.golden_path) |path| try renderGolden(a, io, path, language, files.items) else null;
+    const golden: ?File = if (options.golden_path) |path| .{
+        .name = path,
+        .contents = try renderGolden(a, io, path, language, files.items),
+    } else null;
     try cwd.createDirPath(io, directory);
     for (files.items) |f| {
         try cwd.writeFile(io, .{ .sub_path = try c.fmt("{s}/{s}", .{ directory, f.name }), .data = f.contents });
     }
-    if (options.golden_path) |path| {
-        try cwd.writeFile(io, .{ .sub_path = path, .data = golden orelse unreachable });
+    if (golden) |file| {
+        try cwd.writeFile(io, .{ .sub_path = file.name, .data = file.contents });
     }
 }
 

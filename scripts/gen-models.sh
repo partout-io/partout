@@ -17,12 +17,11 @@ while [[ $# -gt 0 ]]; do
         *) positional+=("$1"); shift ;;
     esac
 done
-# Bash 3.2 treats empty arrays as unset under nounset.
-set -- ${positional[@]+"${positional[@]}"}
-if [[ $# -lt 4 || $# -gt 6 ]]; then
+if [[ ${#positional[@]} -lt 4 || ${#positional[@]} -gt 6 ]]; then
     echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports] [swift_prefix] [--update-golden manifest.json]" >&2
     exit 1
 fi
+set -- "${positional[@]}"
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
 input=$1
 language=$2

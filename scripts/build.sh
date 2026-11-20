@@ -36,10 +36,17 @@ done
 root_dir="$script_dir"/..
 pushd $root_dir
 
+generate_model_files() {
+    if [[ $update_golden == 1 ]]; then
+        set -- "$@" --update-golden tests/codegen/golden.json
+    fi
+    scripts/gen-models.sh "$@"
+}
+
 generate_swift_models() {
     local openapi=$1
 
-    scripts/gen-models.sh $openapi swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore "${golden_args[@]}"
+    generate_model_files "$openapi" swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
 }
 
 generate_kotlin_models() {
@@ -48,7 +55,7 @@ generate_kotlin_models() {
     local models=cross
     local tmpmodels=cross-models
 
-    scripts/gen-models.sh $openapi kotlin $tmpmodels $package "${golden_args[@]}"
+    generate_model_files "$openapi" kotlin "$tmpmodels" "$package"
     rm -rf $models/android/src/io/partout/models
     mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/src/io/partout
     rm -rf $tmpmodels
@@ -57,16 +64,12 @@ generate_kotlin_models() {
 generate_cpp_models() {
     local openapi=$1
 
-    scripts/gen-models.sh "$openapi" cpp cross/cpp/models Partout.Models "${golden_args[@]}"
+    generate_model_files "$openapi" cpp cross/cpp/models Partout.Models
 }
 
 generate_models() {
     local language=${1:-all}
     local openapi=scripts/openapi.yaml
-    local golden_args=()
-    if [[ $update_golden == 1 ]]; then
-        golden_args=(--update-golden tests/codegen/golden.json)
-    fi
 
     case $language in
         all)
