@@ -18,6 +18,7 @@ const helpers = @import("looper_helpers.zig");
 const io = @import("io.zig");
 const io_posix = @import("io_posix.zig");
 const io_c = ffi.io;
+const log = core.logging;
 
 pub const PosixLooper = struct {
     const retry_delay_ms = 10;
@@ -171,12 +172,28 @@ pub const PosixLooper = struct {
         const descriptor = switch (arguments.pair) {
             inline else => |value| value,
         };
-        if (!io_c.pp_fd_is_valid(descriptor.fd) or descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux) or
-            (descriptor.io.isUnconnected() and side != .link)) return error.MuxFailure;
-        for (self.attachments) |other| {
-            if (other) |attachment| if (attachment.fd == descriptor.fd) return error.MuxFailure;
+        if (!io_c.pp_fd_is_valid(descriptor.fd)) {
+            log.write(.err, "PosixLooper.attach: Invalid descriptor");
+            return error.MuxFailure;
         }
-        if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) return error.MuxFailure;
+        if (descriptor.fd == io_c.pp_mux_wake_descriptor(self.options.mux)) {
+            log.write(.err, "PosixLooper.attach: Descriptor conflicts with mux wake source");
+            return error.MuxFailure;
+        }
+        if (descriptor.io.isUnconnected() and side != .link) {
+            log.write(.err, "PosixLooper.attach: Unconnected socket requires the link side");
+            return error.MuxFailure;
+        }
+        for (self.attachments) |other| {
+            if (other) |attachment| if (attachment.fd == descriptor.fd) {
+                log.write(.err, "PosixLooper.attach: Descriptor already attached");
+                return error.MuxFailure;
+            };
+        }
+        if (!io_c.pp_mux_add(self.options.mux, descriptor.fd)) {
+            log.write(.err, "PosixLooper.attach: Failed to add descriptor to mux");
+            return error.MuxFailure;
+        }
         errdefer _ = io_c.pp_mux_delete(self.options.mux, descriptor.fd);
         slot.* = try Attachment.create(self.allocator, side, descriptor, arguments, self.options.max_read_count, buffer_size);
     }

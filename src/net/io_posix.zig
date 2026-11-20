@@ -401,6 +401,8 @@ pub const TunWrapper = struct {
     }
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
+        // An empty wrapper has no device to watch or configure as nonblocking.
+        // Test wrappers may still supply a descriptor without a native TUN.
         if (self.tun == null and (!builtin.is_test or self.test_descriptor == null)) {
             return .{ .fd = io_c.pp_fd_invalid(), .io = self.nativeIO() };
         }
