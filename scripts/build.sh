@@ -20,7 +20,8 @@ EOF
     print_common_help
     cat <<EOF
   -gen-models [all|swift|kotlin|cpp]
-                                 Generate OpenAPI models (Java; C++ also requires Python 3)
+                                 Generate OpenAPI models with Zig
+  --update-golden                Update golden hashes with -gen-models
   -config Debug|Release          Set the CMake build type
 EOF
 }
@@ -35,10 +36,17 @@ done
 root_dir="$script_dir"/..
 pushd $root_dir
 
+generate_model_files() {
+    if [[ $update_golden == 1 ]]; then
+        set -- "$@" --update-golden tests/codegen/golden.json
+    fi
+    scripts/gen-models.sh "$@"
+}
+
 generate_swift_models() {
     local openapi=$1
 
-    scripts/gen-models.sh $openapi swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+    generate_model_files "$openapi" swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
 }
 
 generate_kotlin_models() {
@@ -47,7 +55,7 @@ generate_kotlin_models() {
     local models=cross
     local tmpmodels=cross-models
 
-    scripts/gen-models.sh $openapi kotlin $tmpmodels $package
+    generate_model_files "$openapi" kotlin "$tmpmodels" "$package"
     rm -rf $models/android/src/io/partout/models
     mv $tmpmodels/src/main/kotlin/io/partout/models $models/android/src/io/partout
     rm -rf $tmpmodels
@@ -56,7 +64,7 @@ generate_kotlin_models() {
 generate_cpp_models() {
     local openapi=$1
 
-    scripts/gen-models.sh "$openapi" cpp cross/cpp/models Partout.Models
+    generate_model_files "$openapi" cpp cross/cpp/models Partout.Models
 }
 
 generate_models() {
@@ -107,6 +115,10 @@ while [[ $# -gt 0 ]]; do
                 gen_models_language=$2
                 shift
             fi
+            shift
+            ;;
+        --update-golden)
+            update_golden=1
             shift
             ;;
         -config)
@@ -201,6 +213,10 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 set -- "${positional_args[@]}"
+if [[ $update_golden == 1 && $gen_models != 1 ]]; then
+    echo "--update-golden requires -gen-models" >&2
+    exit 1
+fi
 
 # Crypto
 if [[ $crypto_selected == 1 ]]; then

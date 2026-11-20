@@ -4,7 +4,11 @@ const std = @import("std");
 const api = @import("openapi_codegen.zig");
 
 pub const Language = enum { zig, swift, kotlin, cpp };
-pub const Options = struct { external: []const u8 = "", swift_prefix: []const u8 = "" };
+pub const Options = struct {
+    external: []const u8 = "",
+    swift_prefix: []const u8 = "",
+    golden_path: ?[]const u8 = null,
+};
 const File = struct { name: []const u8, contents: []const u8 };
 const Context = struct {
     a: std.mem.Allocator,
@@ -164,11 +168,47 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
             if (std.ascii.eqlIgnoreCase(f.name, previous.name)) return error.FilenameCollision;
         }
     }
+    for (files.items) |*f| {
+        if (language == .cpp and options.external.len != 0) f.contents = try externalCpp(c, f.contents);
+    }
     const cwd = std.Io.Dir.cwd();
+    // Validate the existing baseline before writing any output.
+    const golden: ?File = if (options.golden_path) |path| .{
+        .name = path,
+        .contents = try renderGolden(a, io, path, language, files.items),
+    } else null;
     try cwd.createDirPath(io, directory);
     for (files.items) |f| {
-        try cwd.writeFile(io, .{ .sub_path = try c.fmt("{s}/{s}", .{ directory, f.name }), .data = if (language == .cpp and options.external.len != 0) try externalCpp(c, f.contents) else f.contents });
+        try cwd.writeFile(io, .{ .sub_path = try c.fmt("{s}/{s}", .{ directory, f.name }), .data = f.contents });
     }
+    if (golden) |file| {
+        try cwd.writeFile(io, .{ .sub_path = file.name, .data = file.contents });
+    }
+}
+
+fn renderGolden(a: std.mem.Allocator, io: std.Io, path: []const u8, language: Language, files: []File) ![]const u8 {
+    const contents = try std.Io.Dir.cwd().readFileAlloc(io, path, a, .limited(4 * 1024 * 1024));
+    const parsed = try std.json.parseFromSlice(std.json.Value, a, contents, .{});
+    var root = parsed.value;
+    if (root != .object) return error.InvalidGoldenManifest;
+    const previous = root.object.get(@tagName(language)) orelse return error.MissingGoldenLanguage;
+    if (previous != .object) return error.InvalidGoldenManifest;
+
+    std.mem.sort(File, files, {}, struct {
+        fn lessThan(_: void, lhs: File, rhs: File) bool {
+            return std.mem.lessThan(u8, lhs.name, rhs.name);
+        }
+    }.lessThan);
+    var hashes: std.json.ObjectMap = .{};
+    for (files) |file| {
+        var digest: [std.crypto.hash.sha2.Sha256.digest_length]u8 = undefined;
+        std.crypto.hash.sha2.Sha256.hash(file.contents, &digest, .{});
+        const hex = std.fmt.bytesToHex(digest, .lower);
+        try hashes.put(a, file.name, .{ .string = try a.dupe(u8, &hex) });
+    }
+    try root.object.put(a, @tagName(language), .{ .object = hashes });
+    const json = try std.json.Stringify.valueAlloc(a, root, .{ .whitespace = .indent_2 });
+    return std.fmt.allocPrint(a, "{s}\n", .{json});
 }
 
 fn swift(c: Context, s: api.Schema) ![]const u8 {

@@ -48,6 +48,8 @@ scripts/build.sh -gen-models all
 scripts/build.sh -gen-models swift
 scripts/build.sh -gen-models kotlin
 scripts/build.sh -gen-models cpp
+# Intentional schema or generator changes (review and commit both diffs):
+scripts/build.sh -gen-models all --update-golden
 ```
 
 The public wrapper preserves the Kotlin package directory layout. It renders
@@ -69,6 +71,15 @@ The wrapper accepts optional external schema names as its fifth argument and a
 Swift model prefix as its sixth. The executable exposes `--external` and
 `--swift-prefix` for the same settings. External types use Partout imports and
 C++ namespaces; generated types use the requested package.
+
+Both the executable and public wrapper accept `--update-golden <manifest.json>`
+for native languages. The manifest must already exist and contain the selected
+language's object. The generator replaces that object's filename/SHA-256 entries
+with hashes of the rendered bytes, removing stale entries and preserving other
+languages. Output uses sorted filenames, two-space indentation, and LF endings.
+The build command supplies `tests/codegen/golden.json` automatically. Ordinary
+generation and CI checks never update the baseline. The wrapper stages the
+manifest alongside the models; invalid schemas or manifests leave both untouched.
 
 Use the wrapper when replacing an existing model directory. The executable
 renders and validates all files before writing but does not remove unrelated
@@ -116,7 +127,7 @@ job. It verifies:
 
 The hashes are a review guard, not a substitute for serialization tests. For an
 intentional schema/API change, review the generated diff and update only the
-corresponding manifest entries in the same change. Never regenerate the manifest
+corresponding manifest entries with `--update-golden` in the same change. Never regenerate the manifest
 merely to make an unexplained failure pass. The portable C++ serialization tests
 remain in `tests/c/windows/models.cc`; Apple and Android retain their existing
 language test suites.

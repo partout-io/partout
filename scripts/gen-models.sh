@@ -1,10 +1,27 @@
 #!/bin/bash
 set -euo pipefail
 
-if [[ $# -lt 4 || $# -gt 6 ]]; then
-    echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports] [swift_prefix]" >&2
+golden_path=
+positional=()
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --update-golden)
+            if [[ -z ${2:-} || $2 == -* || -n $golden_path ]]; then
+                echo "--update-golden requires one manifest path" >&2
+                exit 1
+            fi
+            golden_path=$2
+            shift 2
+            ;;
+        --*) echo "Unknown option: $1" >&2; exit 1 ;;
+        *) positional+=("$1"); shift ;;
+    esac
+done
+if [[ ${#positional[@]} -lt 4 || ${#positional[@]} -gt 6 ]]; then
+    echo "Usage: $0 <openapi> <language:swift|kotlin|cpp> <models_dir> <package_name> [extra_imports] [swift_prefix] [--update-golden manifest.json]" >&2
     exit 1
 fi
+set -- "${positional[@]}"
 script_dir=$(cd "$(dirname "$0")" && pwd -P)
 input=$1
 language=$2
@@ -37,10 +54,17 @@ cleanup() {
     rm -rf "$staging"
 }
 trap cleanup EXIT
-zig run "$script_dir/../tools/openapi_codegen.zig" -- \
-    "$input" "$staging/models" --language "$language" --package "$package" \
+set -- "$input" "$staging/models" --language "$language" --package "$package" \
     --external "$extra_imports" --swift-prefix "$swift_prefix"
+if [[ -n $golden_path ]]; then
+    cp "$golden_path" "$staging/golden.json"
+    set -- "$@" --update-golden "$staging/golden.json"
+fi
+zig run "$script_dir/../tools/openapi_codegen.zig" -- "$@"
 if [[ -e "$destination" ]]; then
     mv "$destination" "$staging/previous"
 fi
 mv "$staging/models" "$destination"
+if [[ -n $golden_path ]]; then
+    mv "$staging/golden.json" "$golden_path"
+fi
