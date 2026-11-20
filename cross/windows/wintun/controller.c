@@ -47,7 +47,7 @@ static partout_tun open_tun(const char *uuid) {
     HMODULE wintun = LoadLibraryExA("wintun.dll", NULL,
         LOAD_LIBRARY_SEARCH_APPLICATION_DIR | LOAD_LIBRARY_SEARCH_SYSTEM32);
     if (!wintun) {
-        pp_clog_v(PPLogLevelFault, "tun_windows: create(), LoadLibraryExA(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "tun_wintun: create(), LoadLibraryExA(): %lu", GetLastError());
         return NULL;
     }
 
@@ -80,12 +80,12 @@ static partout_tun open_tun(const char *uuid) {
 
     const int len = MultiByteToWideChar(CP_UTF8, 0, uuid, -1, NULL, 0);
     if (len != 37) {
-        pp_clog_v(PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
+        pp_clog_v(PPLogLevelFault, "tun_wintun: create(), wstring_from_string()");
         goto failure;
     }
     name = pp_alloc(len * sizeof(*name));
     if (!MultiByteToWideChar(CP_UTF8, 0, uuid, -1, name, len)) {
-        pp_clog_v(PPLogLevelFault, "tun_windows: create(), wstring_from_string()");
+        pp_clog_v(PPLogLevelFault, "tun_wintun: create(), wstring_from_string()");
         goto failure;
     }
     wchar_t guid_string[39] = L"{";
@@ -93,23 +93,23 @@ static partout_tun open_tun(const char *uuid) {
     guid_string[37] = L'}';
     GUID guid;
     if (FAILED(CLSIDFromString(guid_string, &guid))) {
-        pp_clog(PPLogLevelFault, "tun_windows: create(), invalid profile UUID");
+        pp_clog(PPLogLevelFault, "tun_wintun: create(), invalid profile UUID");
         goto failure;
     }
     tun->adapter = create_adapter(name, L"Partout", &guid);
     if (!tun->adapter) {
-        pp_clog_v(PPLogLevelFault, "tun_windows: create(), WintunCreateAdapter(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "tun_wintun: create(), WintunCreateAdapter(): %lu", GetLastError());
         goto failure;
     }
     const DWORD version = get_running_driver_version();
-    pp_clog_v(PPLogLevelInfo, "tun_windows: Wintun v%lu.%lu loaded",
+    pp_clog_v(PPLogLevelInfo, "tun_wintun: Wintun v%lu.%lu loaded",
         (version >> 16) & 0xff, (version >> 0) & 0xff);
     tun->session = start_session(tun->adapter, WINTUN_MAX_RING_CAPACITY);
     if (!tun->session) {
-        pp_clog_v(PPLogLevelFault, "tun_windows: create(), WintunStartSession(): %lu", GetLastError());
+        pp_clog_v(PPLogLevelFault, "tun_wintun: create(), WintunStartSession(): %lu", GetLastError());
         goto failure;
     }
-    pp_clog_v(PPLogLevelInfo, "tun_windows: Created wintun device %ls", name);
+    pp_clog_v(PPLogLevelInfo, "tun_wintun: Created wintun device %ls", name);
     partout_tun wrapped = partout_tun_wrap_callbacks(tun, &tun_callbacks);
     if (!wrapped) goto failure;
     free(name);
@@ -144,7 +144,7 @@ static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
         if (err == ERROR_NO_MORE_ITEMS) {
             return PartoutIOWouldBlock;
         }
-        pp_clog_v(PPLogLevelFault, "tun_windows: read(), %lu", err);
+        pp_clog_v(PPLogLevelFault, "tun_wintun: read(), %lu", err);
         return -1;
     }
     if (dst_len < packet_len) {
@@ -170,7 +170,7 @@ static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
         if (err == ERROR_BUFFER_OVERFLOW) {
             return PartoutIONoBufs;
         }
-        pp_clog_v(PPLogLevelFault, "tun_windows: write(), %lu", err);
+        pp_clog_v(PPLogLevelFault, "tun_wintun: write(), %lu", err);
         return -1;
     }
     memcpy(packet, src, src_len);
