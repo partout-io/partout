@@ -401,8 +401,9 @@ pub const TunWrapper = struct {
     }
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
-        // An empty wrapper has no device to watch or configure as nonblocking.
-        // Test wrappers may still supply a descriptor without a native TUN.
+        // The daemon creates an empty wrapper when requiresTunnelSetup() is false:
+        // currently active WireGuard on Wintun, where the backend owns the device.
+        // Test mocks also use null TUNs, but may supply their own descriptor.
         if (self.tun == null and (!builtin.is_test or self.test_descriptor == null)) {
             return .{ .fd = io_c.pp_fd_invalid(), .io = self.nativeIO() };
         }
