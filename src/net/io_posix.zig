@@ -108,7 +108,18 @@ pub const POSIXInterface = union(enum) {
             .mock => io_c.pp_fd_invalid(),
             inline else => |wrapper| wrapper.muxDescriptor() orelse return error.LibcFailure,
         };
-        return waiter.wait(fd, writing, io_lock) catch error.LibcFailure;
+        try self.setEventMask(!writing, writing);
+        const ready = waiter.wait(fd, writing, io_lock) catch return error.LibcFailure;
+        if (ready) try self.resetEvents();
+        return ready;
+    }
+
+    pub fn setEventMask(self: POSIXInterface, readable: bool, writable: bool) Error!void {
+        if (self == .socket and !io_c.pp_socket_set_event_mask(self.socket.socket, readable, writable)) return error.LibcFailure;
+    }
+
+    pub fn resetEvents(self: POSIXInterface) Error!void {
+        if (self == .socket and !io_c.pp_socket_reset_events(self.socket.socket)) return error.LibcFailure;
     }
 
     pub fn read(self: POSIXInterface, buf: []u8) Error!?usize {

@@ -284,6 +284,10 @@ pub const PosixLooper = struct {
             if (attachment.read_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (attachment.write_retry) |ns| deadline_ns = @min(deadline_ns, ns);
             if (attachment.write_ready and attachment.write_retry == null) deadline_ns = now_ns;
+            attachment.native_io.setEventMask(
+                attachment.reading and attachment.read_retry == null,
+                attachment.write_queue.pending() != null and attachment.write_retry == null,
+            ) catch return attachment.native_io.lastErrorCode();
             _ = io_c.pp_mux_set_read(self.options.mux, attachment.fd, attachment.reading and attachment.read_retry == null);
             _ = io_c.pp_mux_set_write(self.options.mux, attachment.fd, attachment.write_queue.pending() != null and attachment.write_retry == null);
         }
@@ -291,6 +295,12 @@ pub const PosixLooper = struct {
         const timeout_ms: c_int = if (deadline_ns == std.math.maxInt(u64)) -1 else @intCast(@min(std.math.maxInt(c_int), remaining_ns / std.time.ns_per_ms + @intFromBool(remaining_ns % std.time.ns_per_ms != 0)));
         var code: c_int = 0;
         if (io_c.pp_mux_wait(self.options.mux, timeout_ms, &code) < 0) return code;
+        for (self.attachments) |maybe_attachment| {
+            const attachment = maybe_attachment orelse continue;
+            if (attachment.read_ready or attachment.write_ready) {
+                attachment.native_io.resetEvents() catch return attachment.native_io.lastErrorCode();
+            }
+        }
         return null;
     }
 
