@@ -31,7 +31,7 @@ static inline void local_print_error(const char *msg) {
 }
 
 static inline bool local_platform_init(void) {
-    return true;
+    return pp_io_init() == 0;
 }
 
 static inline pp_socket_fd local_invalid_fd(void) {

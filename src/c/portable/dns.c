@@ -48,10 +48,8 @@ int pp_dns_resolve(const char *hostname,
                    const pp_reachability *reachability,
                    pp_dns_result *result) {
     *result = NULL;
-#if PARTOUT_WINDOWS
-    const int init_status = pp_winsock_init();
+    const int init_status = pp_io_init();
     if (init_status != 0) return init_status;
-#endif
     struct addrinfo hints;
     struct addrinfo *native_result = NULL;
     pp_zero(&hints, sizeof(hints));

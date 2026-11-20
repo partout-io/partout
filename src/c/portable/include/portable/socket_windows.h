@@ -26,7 +26,7 @@ static inline void local_print_error(const char *msg) {
 }
 
 static inline bool local_platform_init(void) {
-    const int status = pp_winsock_init();
+    const int status = pp_io_init();
     if (status != 0) {
         WSASetLastError(status);
         local_print_error("WSAStartup()");

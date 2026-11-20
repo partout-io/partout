@@ -25,14 +25,17 @@ static BOOL CALLBACK initialize_winsock(PINIT_ONCE once, PVOID parameter, PVOID 
     return *status == 0;
 }
 
-int pp_winsock_init(void) {
+#endif
+
+int pp_io_init(void) {
+#if PARTOUT_WINDOWS
     int status = 0;
     if (!InitOnceExecuteOnce(&winsock_once, initialize_winsock, &status, NULL)) {
         return status ? status : WSASYSNOTREADY;
     }
+#endif
     return 0;
 }
-#endif
 #if PARTOUT_WINDOWS
 #include "portable/io_windows.h"
 #else

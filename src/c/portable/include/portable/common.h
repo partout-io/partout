@@ -16,10 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if PARTOUT_WINDOWS
-/* Initialize Winsock once for the lifetime of the core. Returns a WSA error or zero. */
-int pp_winsock_init(void);
-#endif
+/* Initialize platform I/O for the lifetime of the core. No-op on POSIX.
+ * Returns zero on success or a platform error code on failure. */
+int pp_io_init(void);
 
 #ifdef __clang__
 #pragma clang assume_nonnull begin
