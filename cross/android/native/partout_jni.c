@@ -82,7 +82,7 @@ Java_io_partout_PartoutWrapper_partoutImportProfile(
     (void)thiz;
     const char *jni_text = (*env)->GetStringUTFChars(env, text, NULL);
     const char *jni_name = name ? (*env)->GetStringUTFChars(env, name, NULL) : NULL;
-    char *json = partout_import_profile(jni_text, jni_name);
+    char *json = partout_import_profile(jni_text, NULL, jni_name);
     (*env)->ReleaseStringUTFChars(env, text, jni_text);
     if (jni_name) (*env)->ReleaseStringUTFChars(env, name, jni_name);
 

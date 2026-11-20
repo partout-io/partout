@@ -89,73 +89,101 @@ fn nativeLogger(level: c_int, message: [*c]const u8) callconv(.c) void {
 
 pub export fn partout_import_profile(
     c_text: ?[*:0]const u8,
+    c_profile_id: ?[*:0]const u8,
     c_name: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
 
-    var importer = abi.Importer.init(allocator) catch
-        return abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null);
-    defer importer.deinit(allocator);
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
     const import_context = core.ImportContext.init(&parse_error_info, null);
-
-    const profile_json = importer.importProfile(
-        allocator,
-        util.borrowedCString(text_ptr),
-        if (c_name) |name| util.borrowedCString(name) else null,
-        import_context,
-    ) catch |err|
+    const profile_json = importProfile(text_ptr, c_profile_id, c_name, import_context) catch |err|
         return abi.importErrorPayloadAllocZ(allocator, err, import_context);
 
     return abi.successPayloadAllocZ(allocator, profile_json.ptr);
 }
 
-pub export fn partout_import_module(
+pub export fn partout_import_profile_raw(
     c_text: ?[*:0]const u8,
-    c_context: ?[*:0]const u8,
+    c_profile_id: ?[*:0]const u8,
+    c_name: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
+    const import_context = core.ImportContext.init(null, null);
+    const profile_json = importProfile(text_ptr, c_profile_id, c_name, import_context) catch return null;
+    return profile_json.ptr;
+}
 
-    var importer = abi.Importer.init(allocator) catch
-        return abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null);
+fn importProfile(
+    text_ptr: [*:0]const u8,
+    c_profile_id: ?[*:0]const u8,
+    c_name: ?[*:0]const u8,
+    import_context: core.ImportContext,
+) abi.ImportAndEncodeError![:0]u8 {
+    const profile_id = if (c_profile_id) |id|
+        core.parseId(util.borrowedCString(id)) orelse return error.InvalidProfile
+    else
+        null;
+    var importer = try abi.Importer.init(allocator);
     defer importer.deinit(allocator);
+    var profile = try importer.registry.importProfile(
+        allocator,
+        util.borrowedCString(text_ptr),
+        if (c_name) |name| util.borrowedCString(name) else null,
+        import_context,
+    );
+    defer profile.deinit(allocator);
+    if (profile_id) |id| profile.id = id;
+    return api.encodeProfileZ(allocator, &profile);
+}
+
+pub export fn partout_import_module(
+    c_text: ?[*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    const text_ptr = c_text orelse return null;
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
+    const import_context = core.ImportContext.init(&parse_error_info, null);
+    const module_json = importModule(text_ptr, c_module_import_context, &parse_error_info) catch |err| return switch (err) {
+        error.InvalidContext => abi.errorPayloadAllocZ(allocator, .{ .code = .decoding }, null),
+        else => |import_error| abi.importErrorPayloadAllocZ(allocator, import_error, import_context),
+    };
+    return abi.successPayloadAllocZ(allocator, module_json.ptr);
+}
 
+pub export fn partout_import_module_raw(
+    c_text: ?[*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    const text_ptr = c_text orelse return null;
+    const module_json = importModule(text_ptr, c_module_import_context, null) catch return null;
+    return module_json.ptr;
+}
+
+fn importModule(
+    text_ptr: [*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
+    parse_error_info: ?*api.ParseErrorInfo,
+) (abi.ImportAndEncodeError || error{InvalidContext})![:0]u8 {
+    var importer = try abi.Importer.init(allocator);
+    defer importer.deinit(allocator);
     var module_context: ?api.ModuleImportContext = null;
     defer if (module_context) |*context| context.deinit(allocator);
-    if (c_context) |context_ptr| {
+    if (c_module_import_context) |context_ptr| {
         module_context = api.ModuleImportContext.parse(
             allocator,
             util.borrowedCString(context_ptr),
         ) catch |err| return switch (err) {
-            error.OutOfMemory => abi.errorPayloadAllocZ(allocator, .{ .code = .outOfMemory }, null),
-            else => abi.errorPayloadAllocZ(allocator, .{ .code = .decoding }, null),
+            error.OutOfMemory => error.OutOfMemory,
+            else => error.InvalidContext,
         };
     }
-
-    const module_json = if (module_context) |*context|
-        importer.importModuleWithContext(
-            allocator,
-            util.borrowedCString(text_ptr),
-            context,
-            &parse_error_info,
-        ) catch |err| return abi.importErrorPayloadAllocZ(
-            allocator,
-            err,
-            core.ImportContext.init(&parse_error_info, null),
-        )
-    else blk: {
-        const import_context = core.ImportContext.init(&parse_error_info, null);
-        break :blk importer.importModule(
-            allocator,
-            util.borrowedCString(text_ptr),
-            import_context,
-        ) catch |err| return abi.importErrorPayloadAllocZ(allocator, err, import_context);
-    };
-
-    return abi.successPayloadAllocZ(allocator, module_json.ptr);
+    if (module_context) |*context| {
+        return importer.importModuleWithContext(allocator, util.borrowedCString(text_ptr), context, parse_error_info);
+    }
+    const import_context = core.ImportContext.init(parse_error_info, null);
+    return importer.importModule(allocator, util.borrowedCString(text_ptr), import_context);
 }
 
 pub export fn partout_export_module(

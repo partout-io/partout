@@ -27,7 +27,7 @@ public final class PartoutRuntime: Sendable {
     }
 
     public func importProfile(from text: String, name: String?) throws -> Profile {
-        guard let cJSON = partout_import_profile(text, name) else {
+        guard let cJSON = partout_import_profile(text, nil, name) else {
             throw PartoutError(.decoding)
         }
         defer { free(cJSON) }

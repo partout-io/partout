@@ -40,9 +40,6 @@ typedef struct {
 /* Configures process-wide logging. Keep logger_ctx alive while registered. */
 void partout_init(const partout_init_args *args);
 
-/* File utilities. */
-char *partout_readfile(const char *rel_path, const char *parent);
-
 /* Daemon startup result codes. */
 typedef enum {
     PartoutCompletionCodeOK         = 0,
@@ -53,10 +50,19 @@ typedef enum {
 
 /* Import functions return an ABIEnvelope JSON string containing a result or error.
  * The caller must free the returned string. NULL means no result was produced. */
-/* Imports a profile with an optional name. */
-char *partout_import_profile(const char *text, const char *name);
+/* Imports a profile with an optional name and UUID override. NULL profile_id
+ * preserves the imported or generated ID. An invalid UUID returns an error envelope. */
+char *partout_import_profile(const char *text, const char *profile_id, const char *name);
+/* Imports a profile with an optional name, returning profile JSON directly.
+ * A non-NULL profile_id overrides the imported ID and must be a valid UUID.
+ * NULL preserves the imported or generated ID. The caller must free the
+ * returned string. NULL indicates failure, including an invalid profile_id. */
+char *partout_import_profile_raw(const char *text, const char *profile_id, const char *name);
 /* Imports a module. context_json is an optional ModuleImportContext JSON string. */
 char *partout_import_module(const char *text, const char *context_json);
+/* Imports a module, returning TaggedModule JSON directly or NULL on failure.
+ * context_json is optional. The caller must free the returned string. */
+char *partout_import_module_raw(const char *text, const char *context_json);
 /* Serializes TaggedModule JSON to its native format, or returns NULL on failure.
  * The caller must free the returned string. */
 char *partout_export_module(const char *module_json);
