@@ -108,6 +108,13 @@ add_custom_target(partout-zig ALL
 )
 set_source_files_properties("${PARTOUT_ZIG_LIBRARY}" PROPERTIES GENERATED TRUE)
 add_library(partout SHARED "${PARTOUT_ZIG_LIBRARY}")
+if(MSVC)
+    # Visual Studio needs a compiled source to run the DLL linker.
+    set(partout_link_source "${CMAKE_CURRENT_BINARY_DIR}/PartoutLink.c")
+    file(CONFIGURE OUTPUT "${partout_link_source}"
+        CONTENT "typedef int PartoutLink;\n" @ONLY)
+    target_sources(partout PRIVATE "${partout_link_source}")
+endif()
 set_target_properties(partout PROPERTIES
     LINKER_LANGUAGE C
     LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"

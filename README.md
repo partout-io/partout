@@ -46,8 +46,7 @@ Dependencies are resolved from installed CMake packages first.
 Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During
 cross-compilation, supply packages built for the target platform; host packages
 are not searched implicitly. If a package is unavailable, set
-`PP_BUILD_VENDOR_PREBUILT_URL` to download the matching prebuilt archive. Existing
-Apple XCFrameworks can be supplied through `PP_BUILD_APPLE_PREBUILTS`.
+`PP_BUILD_VENDOR_PREBUILT_URL` to download the matching prebuilt archive.
 Downloaded packages and Apple slices are consumed in place, without copying them
 into the build output. These workflows work directly with CMake, including
 `add_subdirectory()`, without running a preparation script.

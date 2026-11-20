@@ -99,7 +99,7 @@ elseif(UNIX)
     add_library(partout-posix-runtime STATIC
         cross/posix/controller.c
     )
-    add_library(Partout::PosixRuntime ALIAS partout-posix-runtime)
+    add_library(Partout::POSIXRuntime ALIAS partout-posix-runtime)
     target_include_directories(partout-posix-runtime
         PUBLIC
             "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/posix/include>"
@@ -108,3 +108,17 @@ elseif(UNIX)
     )
     target_link_libraries(partout-posix-runtime PUBLIC Partout::Partout)
 endif()
+
+# Desktop consumers link the runtime selected by the platform configuration.
+if(TARGET Partout::WinRTRuntime)
+    set(partout_selected_runtime Partout::WinRTRuntime)
+elseif(TARGET Partout::WintunRuntime)
+    set(partout_selected_runtime Partout::WintunRuntime)
+elseif(TARGET Partout::POSIXRuntime)
+    set(partout_selected_runtime Partout::POSIXRuntime)
+else()
+    return()
+endif()
+add_library(partout-runtime INTERFACE)
+add_library(Partout::Runtime ALIAS partout-runtime)
+target_link_libraries(partout-runtime INTERFACE ${partout_selected_runtime})
