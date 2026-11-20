@@ -224,7 +224,7 @@ pub fn build(b: *std.Build) void {
         if (config.wintun_include) |path| {
             test_module.addIncludePath(b.path("cross/windows/wintun/include"));
             test_module.addSystemIncludePath(.{ .cwd_relative = path });
-            addCSourceFiles(test_module, &.{ "cross/windows/wintun/controller.c", "cross/windows/wintun/tun.c" });
+            addCSourceFiles(test_module, &.{"cross/windows/wintun/controller.c"});
         }
     }
     test_module.addImport("source", test_source_module);

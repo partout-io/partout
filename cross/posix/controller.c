@@ -24,9 +24,7 @@
 #define PARTOUT_IO_RETRY(result, operation) \
     do { result = (operation); } while (result < 0 && errno == EINTR)
 
-static partout_tun set_tunnel(void *ctx, const char *uuid, const char *json) {
-    (void)ctx;
-    (void)json;
+static partout_tun open_tun(const char *uuid) {
     if (!uuid) return NULL;
 #if defined(__APPLE__) && TARGET_OS_OSX
     const int fd = socket(PF_SYSTEM, SOCK_DGRAM, SYSPROTO_CONTROL);
@@ -62,6 +60,12 @@ failure:
     close(fd);
     return NULL;
 #endif
+}
+
+static partout_tun set_tunnel(void *ctx, const char *uuid, const char *json) {
+    (void)ctx;
+    (void)json;
+    return open_tun(uuid);
 }
 
 static void set_delegate(void *ctx, const partout_controller_delegate *delegate) {

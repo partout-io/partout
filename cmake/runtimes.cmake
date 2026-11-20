@@ -74,7 +74,6 @@ if(TARGET partout-winrt-backend)
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
         cross/windows/wintun/controller.c
-        cross/windows/wintun/tun.c
     )
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
