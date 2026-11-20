@@ -172,21 +172,32 @@ int pp_mux_wait(pp_mux mux, int timeout_ms, int *error_code) {
     }
 
     const int index = (int)(ret - WAIT_OBJECT_0);
-    const pp_fd fd = mux->handles[index];
-    if (fd == mux->wake_event) {
+    if (mux->handles[index] == mux->wake_event) {
         ResetEvent(mux->wake_event);
         return 1;
     }
 
-    const struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
-    if (!tracked) return 1;
-    if (tracked->read && mux->on_readable) {
-        mux->on_readable(mux->read_ctx, fd);
+    /* Visit each remaining handle once so a busy socket cannot starve TUN. */
+    int num = 0;
+    for (int i = index; i < handles_count; ++i) {
+        const pp_fd fd = mux->handles[i];
+        const DWORD ready = i == index ? WAIT_OBJECT_0 : WaitForSingleObject(fd, 0);
+        if (ready == WAIT_TIMEOUT) continue;
+        if (ready != WAIT_OBJECT_0) {
+            if (error_code) *error_code = (int)(ready == WAIT_FAILED ? GetLastError() : ready);
+            return -1;
+        }
+        ++num;
+        const struct pp_mux_entry *tracked = pp_mux_entry_find(mux, fd);
+        if (!tracked) continue;
+        if (tracked->read && mux->on_readable) {
+            mux->on_readable(mux->read_ctx, fd);
+        }
+        if (tracked->write && mux->on_writable) {
+            mux->on_writable(mux->write_ctx, fd);
+        }
     }
-    if (tracked->write && mux->on_writable) {
-        mux->on_writable(mux->write_ctx, fd);
-    }
-    return 1;
+    return num;
 }
 
 int pp_mux_wait_once(pp_fd fd, bool writing, pp_fd wake_fd) {
