@@ -136,8 +136,9 @@ static inline pp_fd pp_fd_invalid(void) {
     return ((pp_fd)(void *)0);
 }
 
+/* Reject both NULL and INVALID_HANDLE_VALUE. */
 static inline bool pp_fd_is_valid(pp_fd fd) {
-    return (intptr_t)fd != -1;
+    return fd && (intptr_t)fd != -1;
 }
 
 #else
