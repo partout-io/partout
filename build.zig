@@ -548,7 +548,7 @@ fn configureCHeadersAndMacros(
         addCMacro(consumer, "PARTOUT_CRYPTO_MBEDTLS", "1");
     }
     addCMacro(consumer, "PARTOUT_OPENVPN", if (config.openvpn) "1" else "0");
-    addCMacro(consumer, "PARTOUT_WINRT_RUNTIME", if (config.winrt) "1" else "0");
+    addCMacro(consumer, "PARTOUT_WINRT", if (config.winrt) "1" else "0");
     addCMacro(consumer, "PARTOUT_WINTUN", if (config.wintun) "1" else "0");
     addCMacro(consumer, "PARTOUT_WIREGUARD", if (config.wireguard) "1" else "0");
     addCMacro(
