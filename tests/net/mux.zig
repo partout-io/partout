@@ -115,4 +115,22 @@ test "Wintun socket hooks consume readiness and restore paused reads" {
     try std.testing.expect(io_c.pp_mux_wait(mux, 1000, null) > 0);
     try std.testing.expectEqual(@as(usize, 3), probe.reads);
     try std.testing.expect(!probe.failed);
+
+    // Leave a socket backlog after each bounded read. TUN must still be serviced
+    // in the same wait, and the socket must not be dispatched repeatedly.
+    const Native = struct {
+        extern "kernel32" fn WaitForSingleObject(io_c.pp_fd, u32) callconv(.winapi) u32;
+    };
+    for (0..8) |_| {
+        try std.testing.expectEqual(@as(c_int, 1), io_c.pp_socket_write(server, "x", 1, &client_address));
+    }
+    for (0..4) |i| {
+        // Ensure LINK is signaled before making TUN ready; no timing assumptions.
+        try std.testing.expectEqual(@as(u32, 0), Native.WaitForSingleObject(fd, 1000));
+        try std.testing.expect(io_c.pp_mux_wake(tun));
+        try std.testing.expectEqual(@as(c_int, 2), io_c.pp_mux_wait(mux, 1000, null));
+        try std.testing.expectEqual(@as(usize, 4) + i, probe.reads);
+        try std.testing.expectEqual(@as(usize, 2) + i, probe.tun_reads);
+        try std.testing.expect(!probe.failed);
+    }
 }
