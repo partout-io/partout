@@ -56,7 +56,9 @@ test "POSIX interface dispatches to owned sockets and tunnels" {
     const tun = try io_posix.TunWrapper.create(std.testing.allocator, null);
     const native_socket = socket.linkDescriptor().io;
     defer native_socket.cleanup();
-    try std.testing.expectError(error.LibcFailure, tun.tunDescriptor());
+    const descriptor = try tun.tunDescriptor();
+    try std.testing.expectEqual(io_c.pp_fd_invalid(), descriptor.fd);
+    try std.testing.expect(descriptor.tunWrapper() == tun);
     const native_tun = io_posix.POSIXInterface{ .tun = tun };
     defer tun.destroy();
     try std.testing.expect(native_tun.tun == tun);

@@ -6,7 +6,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");
@@ -391,8 +390,7 @@ pub const TunWrapper = struct {
     }
 
     pub fn tunDescriptor(self: *TunWrapper) !TunDescriptor {
-        // Active wg-go on Wintun needs a settings commit, but owns its device.
-        if (build_options.wintun and self.tun == null) {
+        if (self.tun == null and (!builtin.is_test or self.test_descriptor == null)) {
             return .{ .fd = io_c.pp_fd_invalid(), .io = self.nativeIO() };
         }
         const fd = self.muxDescriptor() orelse return error.LibcFailure;
