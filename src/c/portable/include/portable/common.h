@@ -16,7 +16,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __clang__
 #pragma clang assume_nonnull begin
+#endif
 
 /* Logging counterpart of Swift pp_log. */
 
@@ -116,7 +118,9 @@ uint32_t pp_time_unix_seconds(void);
 /* Report a fatal Zig error without pulling in Zig's default I/O backend. */
 void pp_panic(const char *message);
 
+#ifdef __clang__
 #pragma clang assume_nonnull end
+#endif
 
 /* Syscalls. */
 
@@ -124,7 +128,9 @@ extern const int PPIOErrorWouldBlock;
 extern const int PPIOErrorNoBufs;
 extern const int PPIOErrorNoSpace;
 
+#ifdef __clang__
 #pragma clang assume_nonnull begin
+#endif
 
 #if PARTOUT_WINDOWS
 
@@ -159,6 +165,12 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
 /* No-op on Windows; original_flags is left unchanged. */
 int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
 
+/* Initialize platform I/O for the lifetime of the core.
+ * Returns zero on success or a platform error code on failure. */
+int pp_io_init(void);
+
 int pp_io_last_error_binding(void);
 
+#ifdef __clang__
 #pragma clang assume_nonnull end
+#endif

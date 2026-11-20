@@ -26,14 +26,11 @@ static inline void local_print_error(const char *msg) {
 }
 
 static inline bool local_platform_init(void) {
-    static int wsa_initialized = 0;
-    if (!wsa_initialized) {
-        WSADATA wsa;
-        if (WSAStartup(MAKEWORD(2, 2), &wsa) != 0) {
-            local_print_error("WSAStartup()");
-            return false;
-        }
-        wsa_initialized = 1;
+    const int status = pp_io_init();
+    if (status != 0) {
+        WSASetLastError(status);
+        local_print_error("WSAStartup()");
+        return false;
     }
     return true;
 }

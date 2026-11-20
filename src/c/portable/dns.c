@@ -47,6 +47,9 @@ int pp_dns_resolve(const char *hostname,
                    bool all_addresses,
                    const pp_reachability *reachability,
                    pp_dns_result *result) {
+    *result = NULL;
+    const int init_status = pp_io_init();
+    if (init_status != 0) return init_status;
     struct addrinfo hints;
     struct addrinfo *native_result = NULL;
     pp_zero(&hints, sizeof(hints));
