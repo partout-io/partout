@@ -13,23 +13,28 @@ static void set_delegate(void *ctx, const partout_controller_delegate *delegate)
     (void)ctx;
     (void)delegate;
 }
+
 static void report_snapshot(void *ctx, const char *json) {
     (void)ctx;
     (void)json;
 }
+
 static void set_environment(void *ctx, const char *key, const char *json) {
     (void)ctx;
     (void)key;
     (void)json;
 }
+
 static void clear_tunnel(void *ctx, bool kill_switch) {
     (void)ctx;
     (void)kill_switch;
 }
+
 static void cancel_tunnel(void *ctx, const char *code) {
     (void)ctx;
     (void)code;
 }
+
 static bool configure_sockets(void *ctx, const partout_reachability *info,
                                const partout_socket_descriptor *fds, size_t count) {
     (void)ctx;
@@ -38,6 +43,7 @@ static bool configure_sockets(void *ctx, const partout_reachability *info,
     (void)count;
     return true;
 }
+
 partout_controller_functions partout_wintun_controller_functions(void) {
     const partout_controller_functions functions = {
         .set_delegate = set_delegate,
