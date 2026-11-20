@@ -138,21 +138,21 @@ fn importProfile(
 
 pub export fn partout_import_module_raw(
     c_text: ?[*:0]const u8,
-    c_context: ?[*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
-    const module_json = importModule(text_ptr, c_context, null) catch return null;
+    const module_json = importModule(text_ptr, c_module_import_context, null) catch return null;
     return module_json.ptr;
 }
 
 pub export fn partout_import_module(
     c_text: ?[*:0]const u8,
-    c_context: ?[*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
 ) callconv(.c) ?[*:0]u8 {
     const text_ptr = c_text orelse return null;
     var parse_error_info: api.ParseErrorInfo = .{};
     defer parse_error_info.deinit(allocator);
-    const module_json = importModule(text_ptr, c_context, &parse_error_info) catch |err| return switch (err) {
+    const module_json = importModule(text_ptr, c_module_import_context, &parse_error_info) catch |err| return switch (err) {
         error.InvalidContext => abi.errorPayloadAllocZ(allocator, .{ .code = .decoding }, null),
         else => |import_error| abi.importErrorPayloadAllocZ(allocator, import_error, core.ImportContext.init(&parse_error_info, null)),
     };
@@ -161,14 +161,14 @@ pub export fn partout_import_module(
 
 fn importModule(
     text_ptr: [*:0]const u8,
-    c_context: ?[*:0]const u8,
+    c_module_import_context: ?[*:0]const u8,
     parse_error_info: ?*api.ParseErrorInfo,
 ) (abi.ImportAndEncodeError || error{InvalidContext})![:0]u8 {
     var importer = try abi.Importer.init(allocator);
     defer importer.deinit(allocator);
     var module_context: ?api.ModuleImportContext = null;
     defer if (module_context) |*context| context.deinit(allocator);
-    if (c_context) |context_ptr| {
+    if (c_module_import_context) |context_ptr| {
         module_context = api.ModuleImportContext.parse(
             allocator,
             util.borrowedCString(context_ptr),
