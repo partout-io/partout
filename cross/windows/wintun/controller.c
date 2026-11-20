@@ -4,7 +4,15 @@
 #include <winsock2.h>
 #include <Windows.h>
 #include <wintun.h>
+#if defined(_MSC_VER) && !defined(__clang__)
+#define _Nullable
+#define _Nonnull
+#endif
 #include "portable/common.h"
+#if defined(_MSC_VER) && !defined(__clang__)
+#undef _Nonnull
+#undef _Nullable
+#endif
 #include <objbase.h>
 #include <stdlib.h>
 
