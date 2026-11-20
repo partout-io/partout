@@ -133,6 +133,8 @@ pub fn main(init: std.process.Init) !void {
             options.external = args.next() orelse return error.MissingExternal;
         } else if (std.mem.eql(u8, arg, "--swift-prefix")) {
             options.swift_prefix = args.next() orelse return error.MissingPrefix;
+        } else if (std.mem.eql(u8, arg, "--update-golden")) {
+            options.golden_path = args.next() orelse return error.MissingGoldenPath;
         } else if (std.mem.eql(u8, arg, "--exclude")) {
             exclusions = try parseSchemaExclusions(allocator, args.next() orelse {
                 try usage();
@@ -146,6 +148,7 @@ pub fn main(init: std.process.Init) !void {
         }
     }
 
+    if (language == .zig and options.golden_path != null) return error.ZigGoldenUnsupported;
     const cwd = std.Io.Dir.cwd();
     const input = try readFileAlloc(cwd, init.io, allocator, input_path);
     defer allocator.free(input);
@@ -183,6 +186,7 @@ fn usage() WriterError!void {
         \\usage: zig run tools/openapi_codegen.zig -- <openapi.yaml> <output> [--exclude SchemaA,SchemaB]
         \\       [--language zig|swift|kotlin|cpp] [--package package.name]
         \\       [--external SchemaA,SchemaB] [--swift-prefix Prefix]
+        \\       [--update-golden manifest.json]
         \\
     );
 }

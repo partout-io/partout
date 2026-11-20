@@ -63,6 +63,20 @@ def main():
             extension = {'swift': 'swift', 'kotlin': 'kt', 'cpp': 'h'}[language]
             assert 'regressionProbe' in (mutated / ('ABIEnvelope.' + extension)).read_text()
             assert snapshot(mutated) != actual
+            manifest = tmp / 'golden.json'
+            manifest.write_text(json.dumps(golden), encoding='utf-8')
+            run(str(binary), str(schema_file), str(mutated), '--language', language,
+                '--update-golden', str(manifest), cwd=tmp)
+            updated = json.loads(manifest.read_text())
+            assert updated[language] == snapshot(mutated), 'golden does not hash rendered output'
+            for other in MODELS:
+                if other != language:
+                    assert updated[other] == golden[other], 'unselected golden changed'
+            before = manifest.read_bytes()
+            assert b'\r' not in before and before.endswith(b'\n')
+            run(str(binary), str(schema_file), str(mutated), '--language', language,
+                '--update-golden', str(manifest), cwd=tmp)
+            assert manifest.read_bytes() == before, 'golden update is not repeatable'
             schema_file.write_text(schema)
 
             # Reordering schema declarations must not change files or their contents.
@@ -107,11 +121,27 @@ def main():
             (models / 'stale-file').write_text('stale')
             run(*command, cwd=tmp)
             assert snapshot(models) == golden[language], 'stale generated file survived'
+            manifest = tmp / 'wrapper-golden.json'
+            baseline = {key: {'stale-file': 'old-hash'} for key in MODELS}
+            manifest.write_text(json.dumps(baseline), encoding='utf-8')
+            run(*command, cwd=tmp)
+            assert json.loads(manifest.read_text()) == baseline, 'implicit golden update'
+            command += ['--update-golden', str(manifest)]
+            run(*command, cwd=tmp)
+            baseline[language] = golden[language]
+            assert json.loads(manifest.read_text()) == baseline, 'wrapper golden update differs'
+            before = manifest.read_bytes()
             schema_file.write_text(schema.replace('          type: boolean', '          type: imaginary', 1))
             failed = subprocess.run(command, cwd=tmp, capture_output=True)
             assert failed.returncode != 0
             assert snapshot(models) == golden[language], 'wrapper lost last good models'
+            assert manifest.read_bytes() == before, 'failed wrapper changed golden'
             schema_file.write_text(schema)
+            manifest.write_text('invalid JSON', encoding='utf-8')
+            failed = subprocess.run(command, cwd=tmp, capture_output=True)
+            assert failed.returncode != 0
+            assert manifest.read_text() == 'invalid JSON'
+            assert snapshot(models) == golden[language], 'invalid manifest changed models'
     print('Parity, repeatability, schema sensitivity and failure safety passed.', flush=True)
 
 

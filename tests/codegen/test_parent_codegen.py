@@ -75,6 +75,10 @@ def main():
             run(*command, cwd=tmp, env={**os.environ, 'PATH': str(banned) + os.pathsep + os.environ['PATH']})
             models = wrapper_target / 'src/main/kotlin/com/algoritmico/passepartout/models' if lang == 'kotlin' else wrapper_target
             assert snapshot(models) == golden[lang], f'{lang}: wrapper differs'
+            manifest = tmp / 'parent-golden.json'
+            manifest.write_text(json.dumps(golden), encoding='utf-8')
+            run(*command, '--update-golden', str(manifest), cwd=tmp)
+            assert json.loads(manifest.read_text()) == golden, f'{lang}: parent golden update differs'
             print(f'Parent {lang}: {len(golden[lang])} files match; repeatability and schema checks passed.', flush=True)
 
 
