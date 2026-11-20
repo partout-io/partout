@@ -32,7 +32,7 @@ static void close_tun(void *ctx) {
 #if PARTOUT_APPLE
 /* The first 4 bits of a local packet identify the IP family. */
 static inline
-uint32_t pp_tun_proto_for(uint8_t byte) {
+uint32_t tun_proto_for(uint8_t byte) {
     const uint8_t header = (byte & 0xf0) >> 4;
     switch (header) {
         case 4:
@@ -44,7 +44,6 @@ uint32_t pp_tun_proto_for(uint8_t byte) {
             return 0;
     }
 }
-
 #endif
 
 static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
@@ -82,7 +81,7 @@ static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
     if (!tun || tun->fd < 0) return -1;
     if (!src || src_len == 0) return -1;
 #if PARTOUT_APPLE
-    const uint32_t proto_byte = pp_tun_proto_for(*src);
+    const uint32_t proto_byte = tun_proto_for(*src);
     if (proto_byte == 0) return -1;
     const uint32_t pi = pp_endian_htonl(proto_byte);
     const size_t pi_len = sizeof(pi);

@@ -21,68 +21,10 @@ struct wintun_context {
     WINTUN_SEND_PACKET_FUNC *send_packet;
 };
 
-static void close_tun(void *ctx) {
-    struct wintun_context *tun = ctx;
-    if (!tun) return;
-    if (tun->session) tun->end_session(tun->session);
-    if (tun->adapter) tun->close_adapter(tun->adapter);
-    FreeLibrary(tun->library);
-    pp_free(tun);
-}
-
-static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
-    const struct wintun_context *tun = ctx;
-    if (!tun || !tun->session) {
-        SetLastError(ERROR_INVALID_HANDLE);
-        return -1;
-    }
-    if (!dst || dst_len == 0) return -1;
-    DWORD packet_len;
-    BYTE *packet = tun->receive_packet(tun->session, &packet_len);
-    if (!packet) {
-        const DWORD err = GetLastError();
-        if (err == ERROR_NO_MORE_ITEMS) {
-            return PartoutIOWouldBlock;
-        }
-        pp_clog_v(PPLogLevelFault, "tun_windows: read(), %lu", err);
-        return -1;
-    }
-    if (dst_len < packet_len) {
-        tun->release_receive_packet(tun->session, packet);
-        SetLastError(ERROR_INSUFFICIENT_BUFFER);
-        return -1;
-    }
-    memcpy(dst, packet, packet_len);
-    tun->release_receive_packet(tun->session, packet);
-    return (int)packet_len;
-}
-
-static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
-    const struct wintun_context *tun = ctx;
-    if (!tun || !tun->session) {
-        SetLastError(ERROR_INVALID_HANDLE);
-        return -1;
-    }
-    if (!src || src_len == 0) return -1;
-    BYTE *packet = tun->allocate_send_packet(tun->session, src_len);
-    if (!packet) {
-        const DWORD err = GetLastError();
-        if (err == ERROR_BUFFER_OVERFLOW) {
-            return PartoutIONoBufs;
-        }
-        pp_clog_v(PPLogLevelFault, "tun_windows: write(), %lu", err);
-        return -1;
-    }
-    memcpy(packet, src, src_len);
-    tun->send_packet(tun->session, packet);
-    return (int)src_len;
-}
-
-static intptr_t watch_tun(void *ctx) {
-    const struct wintun_context *tun = ctx;
-    if (!tun || !tun->session) return (intptr_t)INVALID_HANDLE_VALUE;
-    return (intptr_t)tun->get_read_wait_event(tun->session);
-}
+static void close_tun(void *ctx);
+static int read_tun(void *ctx, uint8_t *dst, size_t dst_len);
+static int write_tun(void *ctx, const uint8_t *src, size_t src_len);
+static intptr_t watch_tun(void *ctx);
 
 static const partout_tun_callbacks tun_callbacks = {
     .read = read_tun,
@@ -163,6 +105,69 @@ failure:
     free(name);
     close_tun(tun);
     return NULL;
+}
+
+static void close_tun(void *ctx) {
+    struct wintun_context *tun = ctx;
+    if (!tun) return;
+    if (tun->session) tun->end_session(tun->session);
+    if (tun->adapter) tun->close_adapter(tun->adapter);
+    FreeLibrary(tun->library);
+    pp_free(tun);
+}
+
+static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
+    const struct wintun_context *tun = ctx;
+    if (!tun || !tun->session) {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return -1;
+    }
+    if (!dst || dst_len == 0) return -1;
+    DWORD packet_len;
+    BYTE *packet = tun->receive_packet(tun->session, &packet_len);
+    if (!packet) {
+        const DWORD err = GetLastError();
+        if (err == ERROR_NO_MORE_ITEMS) {
+            return PartoutIOWouldBlock;
+        }
+        pp_clog_v(PPLogLevelFault, "tun_windows: read(), %lu", err);
+        return -1;
+    }
+    if (dst_len < packet_len) {
+        tun->release_receive_packet(tun->session, packet);
+        SetLastError(ERROR_INSUFFICIENT_BUFFER);
+        return -1;
+    }
+    memcpy(dst, packet, packet_len);
+    tun->release_receive_packet(tun->session, packet);
+    return (int)packet_len;
+}
+
+static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
+    const struct wintun_context *tun = ctx;
+    if (!tun || !tun->session) {
+        SetLastError(ERROR_INVALID_HANDLE);
+        return -1;
+    }
+    if (!src || src_len == 0) return -1;
+    BYTE *packet = tun->allocate_send_packet(tun->session, src_len);
+    if (!packet) {
+        const DWORD err = GetLastError();
+        if (err == ERROR_BUFFER_OVERFLOW) {
+            return PartoutIONoBufs;
+        }
+        pp_clog_v(PPLogLevelFault, "tun_windows: write(), %lu", err);
+        return -1;
+    }
+    memcpy(packet, src, src_len);
+    tun->send_packet(tun->session, packet);
+    return (int)src_len;
+}
+
+static intptr_t watch_tun(void *ctx) {
+    const struct wintun_context *tun = ctx;
+    if (!tun || !tun->session) return (intptr_t)INVALID_HANDLE_VALUE;
+    return (intptr_t)tun->get_read_wait_event(tun->session);
 }
 
 static partout_tun set_tunnel(void *ctx, const char *uuid, const char *json) {
