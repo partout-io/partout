@@ -36,10 +36,7 @@ targets: [
 
 ### CMake
 
-CMake orchestrates the complete native build. It resolves the selected vendors,
-builds the Go bridge when WireGuard is enabled, and invokes Zig with feature settings
-and header paths. Zig always builds a static core archive. CMake links that
-archive and the selected backends into the final shared library on every platform.
+CMake builds the native shared library and its selected backends.
 Native runtime targets link against `Partout::Partout`.
 
 Dependencies are resolved from installed CMake packages first.
@@ -47,9 +44,7 @@ Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. Dur
 cross-compilation, supply packages built for the target platform; host packages
 are not searched implicitly. If a package is unavailable, set
 `PP_BUILD_VENDOR_PREBUILT_URL` to download the matching prebuilt archive.
-Downloaded packages and Apple slices are consumed in place, without copying them
-into the build output. These workflows work directly with CMake, including
-`add_subdirectory()`, without running a preparation script.
+These workflows support direct CMake builds, including `add_subdirectory()`.
 
 #### Requirements
 
@@ -61,9 +56,7 @@ into the build output. These workflows work directly with CMake, including
 
 Crypto dependencies come from system libraries or artifacts published by the [prebuilts][github-prebuilts] project.
 
-WireGuard builds require Go. CMake builds the local bridge in `src/wireguard/go`
-with the `partout-wg-go` target and passes its include and library directories to
-Zig. Windows uses `zig cc`; other platforms use the configured C compiler.
+WireGuard builds also require Go.
 
 #### Build
 
@@ -96,13 +89,6 @@ architecture of macOS, iOS, tvOS, and their simulators. It then packages those
 libraries and matching debug symbols into `PartoutNative.xcframework`. Omit
 `--full` to build only the active Xcode or host slice. `--crypto openssl,mbedtls`
 selects crypto backends (both by default); WireGuard is always enabled.
-
-Each Apple CMake configuration builds one `CMAKE_OSX_ARCHITECTURES` value.
-`PP_BUILD_APPLE_PREBUILTS` selects a local directory containing the vendor
-XCFrameworks and bypasses system libraries. CMake selects the matching platform
-slice. `PP_BUILD_APPLE_INSTALL_NAME` controls the linked library's install name;
-the packaging script sets it to `@rpath/PartoutNative.framework/PartoutNative`.
-
 
 For example, this will build Partout for release with a dependency on OpenSSL:
 
