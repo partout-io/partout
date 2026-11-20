@@ -11,6 +11,7 @@
 #endif
 
 #include "portable/common.h"
+#include "partout.h"
 #if PARTOUT_WINDOWS
 #include "portable/io_windows.h"
 #else
@@ -27,9 +28,9 @@
 #include <sys/stat.h>
 #endif
 
-const int PPIOErrorWouldBlock   = -11;
-const int PPIOErrorNoBufs       = -12;
-const int PPIOErrorNoSpace      = -13;
+const int PPIOErrorWouldBlock   = PartoutIOWouldBlock;
+const int PPIOErrorNoBufs       = PartoutIONoBufs;
+const int PPIOErrorNoSpace      = PartoutIONoSpace;
 
 char *pp_dup(const char *str) {
 #if PARTOUT_WINDOWS

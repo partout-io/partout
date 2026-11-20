@@ -226,14 +226,14 @@ test "callback TUN copies callbacks and owns context only after successful wrapp
         closes: usize = 0,
         writes: usize = 0,
         fn read(_: ?*anyopaque, dst: [*c]u8, len: usize) callconv(.c) c_int {
-            if (len < 3) return io_c.PartoutTunWouldBlock;
+            if (len < 3) return io_c.PartoutIOWouldBlock;
             @memcpy(dst[0..3], "tun");
             return 3;
         }
         fn write(raw: ?*anyopaque, _: [*c]const u8, len: usize) callconv(.c) c_int {
             const self: *@This() = @ptrCast(@alignCast(raw orelse unreachable));
             self.writes += 1;
-            return if (len == 3) 3 else io_c.PartoutTunNoBufs;
+            return if (len == 3) 3 else io_c.PartoutIONoBufs;
         }
         fn close(raw: ?*anyopaque) callconv(.c) void {
             const self: *@This() = @ptrCast(@alignCast(raw orelse unreachable));

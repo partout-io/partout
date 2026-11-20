@@ -82,10 +82,10 @@ partout_tun partout_tun_wrap_fd(int fd, bool owned);
 /* Packet callback results: nonnegative byte count, or a negative error.
  * Other failures return -1 and preserve the platform's native last error. */
 typedef enum {
-    PartoutTunWouldBlock = -11,
-    PartoutTunNoBufs = -12,
-    PartoutTunNoSpace = -13
-} partout_tun_result;
+    PartoutIOWouldBlock = -11,
+    PartoutIONoBufs = -12,
+    PartoutIONoSpace = -13
+} partout_io_result;
 
 /* Nonblocking packet I/O uses raw IP packets without platform headers. */
 typedef struct {

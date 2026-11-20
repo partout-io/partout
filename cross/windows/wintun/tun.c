@@ -42,7 +42,7 @@ static int read_tun(void *ctx, uint8_t *dst, size_t dst_len) {
     if (!packet) {
         const DWORD err = GetLastError();
         if (err == ERROR_NO_MORE_ITEMS) {
-            return PartoutTunWouldBlock;
+            return PartoutIOWouldBlock;
         }
         pp_clog_v(PPLogLevelFault, "tun_windows: read(), %lu", err);
         return -1;
@@ -68,7 +68,7 @@ static int write_tun(void *ctx, const uint8_t *src, size_t src_len) {
     if (!packet) {
         const DWORD err = GetLastError();
         if (err == ERROR_BUFFER_OVERFLOW) {
-            return PartoutTunNoBufs;
+            return PartoutIONoBufs;
         }
         pp_clog_v(PPLogLevelFault, "tun_windows: write(), %lu", err);
         return -1;
