@@ -6,6 +6,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
+const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
 const core = @import("../core/exports.zig");
 const io = @import("io_common.zig");

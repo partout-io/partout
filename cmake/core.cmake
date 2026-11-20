@@ -93,7 +93,7 @@ endif()
 if(PP_BUILD_WINRT)
     list(APPEND PARTOUT_ZIG_ARGS -Dwinrt=true)
 elseif(PP_BUILD_WINTUN)
-    list(APPEND PARTOUT_ZIG_ARGS -Dwintun=true "-Dwintun-include=${WINTUN_DIR}")
+    list(APPEND PARTOUT_ZIG_ARGS -Dwintun=true)
 endif()
 # Zig compiles the static core; CMake owns the final shared library.
 find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)

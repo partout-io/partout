@@ -165,7 +165,7 @@ pub fn build(b: *std.Build) void {
     const winrt_lib = pathOption(b, "winrt-lib", "MSVC-built static WinRT backend library.", false);
     const use_winrt = b.option(bool, "winrt", "Enable the WinRT backend (Windows MSVC only).") orelse (winrt_lib != null);
     const use_wintun = b.option(bool, "wintun", "Use Winsock/Wintun with the readiness looper on Windows.") orelse false;
-    const wintun_include = pathOption(b, "wintun-include", "Wintun headers search path.", false);
+    const wintun_include = pathOption(b, "wintun-include", "Optional Wintun SDK headers for compiling controller tests.", false);
 
     if (target.result.os.tag == .windows and !use_winrt and !use_wintun)
         std.debug.panic("Windows builds require either -Dwinrt=true or -Dwintun=true", .{});
@@ -177,8 +177,6 @@ pub fn build(b: *std.Build) void {
         std.debug.panic("The WinRT backend requires a Windows MSVC target", .{});
     if (use_wintun and target.result.os.tag != .windows)
         std.debug.panic("Wintun requires a Windows target", .{});
-    if (use_wintun and wintun_include == null)
-        std.debug.panic("Wintun requires -Dwintun-include", .{});
 
     const build_options = b.addOptions();
     build_options.addOption(bool, "openvpn", use_openvpn);
@@ -223,7 +221,11 @@ pub fn build(b: *std.Build) void {
         test_module.addIncludePath(b.path("cross/posix/include"));
         addCSourceFiles(test_module, &.{"cross/posix/controller.c"});
     } else if (config.wintun) {
-        addCSourceFiles(test_module, &.{"cross/windows/wintun/controller.c"});
+        if (config.wintun_include) |path| {
+            test_module.addIncludePath(b.path("cross/windows/wintun/include"));
+            test_module.addSystemIncludePath(.{ .cwd_relative = path });
+            addCSourceFiles(test_module, &.{ "cross/windows/wintun/controller.c", "cross/windows/wintun/tun.c" });
+        }
     }
     test_module.addImport("source", test_source_module);
 
@@ -445,8 +447,10 @@ fn createPartoutModule(
     c_bindings.addImports(module);
 
     if (add_c_sources) {
-        if (config.target.result.os.tag == .windows) {
-            addCSourceFiles(module, &.{if (config.winrt) "src/c/portable/tun_winrt.c" else "src/c/portable/tun_wintun.c"});
+        if (config.winrt) {
+            addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
+        } else {
+            addCSourceFiles(module, &.{"src/c/portable/tun_callbacks.c"});
         }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
@@ -536,8 +540,6 @@ fn configureCHeadersAndMacros(
         consumer.addIncludePath(b.path("src/wireguard/c/include"));
         consumer.addSystemIncludePath(b.path("src/wireguard/go/include"));
     }
-    if (config.wintun) consumer.addIncludePath(b.path("cross/windows/wintun/include"));
-    if (config.wintun_include) |path| consumer.addSystemIncludePath(.{ .cwd_relative = path });
     addVendorIncludePaths(consumer, b, config);
     addAppleSDKHeaderPaths(consumer, b, config.apple_sdk_path);
     addLibCHeaderPaths(consumer, config.libc_installation);

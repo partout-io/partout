@@ -21,6 +21,7 @@ _partout_daemon_stop
 
 # TUN descriptors
 _partout_tun_wrap_fd
+_partout_tun_wrap_callbacks
 
 # WireGuard keys
 _partout_wireguard_genkey

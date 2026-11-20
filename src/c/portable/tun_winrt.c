@@ -17,3 +17,10 @@ void pp_tun_free(pp_tun tun) {
 #endif
 }
 #endif
+
+// WinRT handles are push transports, not readiness-driven TUN devices.
+pp_tun pp_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks) {
+    (void)ctx;
+    (void)callbacks;
+    return NULL;
+}

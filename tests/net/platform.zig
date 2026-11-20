@@ -305,22 +305,20 @@ test "settings-only daemons release owned TUN descriptors" {
     const libc = struct {
         extern "c" fn close(fd: c_int) c_int;
     };
-    // Match portable TUN storage on POSIX. A pipe exercises ownership without
-    // requiring privileges to create a real TUN device.
-    const NativeTun = extern struct {
-        fd: c_int,
-        owned: bool = !platform_target.abi.isAndroid(),
+    const native_tun = struct {
+        extern "c" fn partout_tun_wrap_fd(fd: c_int, owned: bool) io_c.pp_tun;
     };
     const Controller = struct {
         mock: mock.MockTunnelController = .{},
-        native: *NativeTun,
+        native: io_c.pp_tun,
         handed_out: bool = false,
 
         fn setTunnel(raw: ?*anyopaque, _: api.TunnelRemoteInfoWrapper) source.net.TunnelController.Error!*io.TunWrapper {
             const base: *mock.MockTunnelController = @ptrCast(@alignCast(raw.?));
             const self: *@This() = @fieldParentPtr("mock", base);
+            const wrapper = try io.TunWrapper.create(std.testing.allocator, self.native);
             self.handed_out = true;
-            return io.TunWrapper.create(std.testing.allocator, @ptrCast(self.native));
+            return wrapper;
         }
     };
     const allocator = std.testing.allocator;
@@ -337,11 +335,12 @@ test "settings-only daemons release owned TUN descriptors" {
         defer if (read_fd_open) {
             _ = libc.close(fds[0]);
         };
-        const native = try std.heap.c_allocator.create(NativeTun);
-        native.* = .{ .fd = fds[0] };
+        const owned = !platform_target.abi.isAndroid();
+        const native = native_tun.partout_tun_wrap_fd(fds[0], owned) orelse return error.OutOfMemory;
         var controller = Controller{ .native = native };
         defer if (!controller.handed_out) {
-            std.heap.c_allocator.destroy(native);
+            io_c.pp_tun_free(native);
+            if (owned) read_fd_open = false;
         };
         var vtable = controller.mock.interface().vtable.*;
         vtable.set_tunnel_settings = Controller.setTunnel;
@@ -366,7 +365,11 @@ test "settings-only daemons release owned TUN descriptors" {
             try std.testing.expect(read_fd_open);
         } else {
             // Free the leaked allocation if this regression is reintroduced.
-            if (read_fd_open) std.heap.c_allocator.destroy(native);
+            if (read_fd_open) {
+                io_c.pp_tun_free(native);
+                read_fd_open = false;
+                return error.TestUnexpectedResult;
+            }
             try std.testing.expect(!read_fd_open);
         }
     }

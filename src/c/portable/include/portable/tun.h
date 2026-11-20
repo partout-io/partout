@@ -10,6 +10,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include "portable/common.h"
+#include "partout.h"
 
 #pragma clang assume_nonnull begin
 
@@ -19,6 +20,8 @@ typedef struct __partout_tun_struct *pp_tun;
 #if PARTOUT_APPLE || PARTOUT_ANDROID || PARTOUT_LINUX
 pp_tun _Nullable pp_tun_wrap_fd(int fd, bool owned);
 #endif
+
+pp_tun _Nullable pp_tun_wrap_callbacks(void *_Nullable ctx, const partout_tun_callbacks *callbacks);
 
 #if !PARTOUT_WINDOWS || PARTOUT_WINTUN
 /* Platform-specific implementations. */

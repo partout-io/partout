@@ -231,6 +231,11 @@ pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c
     return null;
 }
 
+pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+    if (callbacks == null) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
+}
+
 pub export fn partout_daemon_stop() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     const is_daemon = runtime.options.is_daemon;
