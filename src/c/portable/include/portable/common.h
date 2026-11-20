@@ -16,10 +16,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* Initialize platform I/O for the lifetime of the core. No-op on POSIX.
- * Returns zero on success or a platform error code on failure. */
-int pp_io_init(void);
-
 #ifdef __clang__
 #pragma clang assume_nonnull begin
 #endif
@@ -168,6 +164,10 @@ static inline bool pp_fd_is_valid(pp_fd fd) {
 
 /* No-op on Windows; original_flags is left unchanged. */
 int pp_fd_set_nonblocking(pp_fd fd, int *_Nullable original_flags);
+
+/* Initialize platform I/O for the lifetime of the core.
+ * Returns zero on success or a platform error code on failure. */
+int pp_io_init(void);
 
 int pp_io_last_error_binding(void);
 
