@@ -7,11 +7,32 @@
 #include "portable/conditionals.h"
 
 #if PARTOUT_WINDOWS
+#include <WinSock2.h>
 #include <Windows.h>
 #endif
 
 #include "portable/common.h"
 #include "partout.h"
+#if PARTOUT_WINDOWS
+static INIT_ONCE winsock_once = INIT_ONCE_STATIC_INIT;
+
+static BOOL CALLBACK initialize_winsock(PINIT_ONCE once, PVOID parameter, PVOID *context) {
+    (void)once;
+    (void)context;
+    WSADATA data;
+    int *status = parameter;
+    *status = WSAStartup(MAKEWORD(2, 2), &data);
+    return *status == 0;
+}
+
+int pp_winsock_init(void) {
+    int status = 0;
+    if (!InitOnceExecuteOnce(&winsock_once, initialize_winsock, &status, NULL)) {
+        return status ? status : WSASYSNOTREADY;
+    }
+    return 0;
+}
+#endif
 #if PARTOUT_WINDOWS
 #include "portable/io_windows.h"
 #else
