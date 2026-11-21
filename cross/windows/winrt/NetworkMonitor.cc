@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0
 #include <winsock2.h>
 #include <ws2ipdef.h>
-#include "network.h"
-#include "network_internal.h"
+#include "NetworkMonitor.h"
+#include "NetworkInternal.h"
 #include <windows.h>
 #include <ipifcons.h>
 #include <iphlpapi.h>

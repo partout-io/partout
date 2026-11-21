@@ -11,8 +11,8 @@
 #include <string>
 #include <string_view>
 #include "partout_winrt.h"
-#include "tun.h"
-#include "loop.h"
+#include "Tun.h"
+#include "RuntimeLoop.h"
 
 #include <partout/models/ConnectionStatus.h>
 

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "loop.h"
+#include "RuntimeLoop.h"
 #include "windows/log.h"
 #include <winrt/base.h>
 #include <stdexcept>

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "../../../cross/windows/winrt/tun_settings.h"
+#include "../../../cross/windows/winrt/TunSettings.h"
 #include <nlohmann/json.hpp>
 #include <cassert>
 #include <cstdio>

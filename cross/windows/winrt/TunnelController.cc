@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "tun_settings.h"
+#include "TunSettings.h"
 #include <windows.h>
-#include "tun.h"
-#include "loop.h"
-#include "socket.h"
+#include "Tun.h"
+#include "RuntimeLoop.h"
+#include "Socket.h"
 #include "windows/log.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>

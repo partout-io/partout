@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "../../../cross/windows/winrt/network.h"
-#include "../../../cross/windows/winrt/network_internal.h"
+#include "../../../cross/windows/winrt/NetworkMonitor.h"
+#include "../../../cross/windows/winrt/NetworkInternal.h"
 #include <cassert>
 #include <array>
 

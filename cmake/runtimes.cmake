@@ -8,9 +8,9 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        cross/windows/winrt/tunnel.cc
-        cross/windows/winrt/runtime.cc
-        cross/windows/winrt/platform.cc
+        cross/windows/winrt/Tunnel.cc
+        cross/windows/winrt/VpnChannelRuntime.cc
+        cross/windows/winrt/Platform.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings

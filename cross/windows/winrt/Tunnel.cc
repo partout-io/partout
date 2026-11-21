@@ -8,8 +8,8 @@
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include "partout_winrt.h"
-#include "tunnel_profile.h"
-#include "tunnel_internal.h"
+#include "TunnelProfile.h"
+#include "TunnelInternal.h"
 #include "partout/models/TaggedProfile.h"
 #include "partout/models/TunnelSnapshot.h"
 #include "windows/log.h"

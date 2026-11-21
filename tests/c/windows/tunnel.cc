@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#include "tunnel_internal.h"
+#include "TunnelInternal.h"
 #include <cassert>
 #include <limits>
 
