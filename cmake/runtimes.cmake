@@ -35,7 +35,7 @@ if(TARGET partout-winrt-backend)
     option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
     if(PP_TEST_RUNTIME_LINK)
         enable_testing()
-        add_executable(partout-runtime-link-test tests/c/windows/runtime_link.cc)
+        add_executable(partout-runtime-link-test tests/c/windows/winrt/RuntimeLinkTests.cc)
         target_compile_options(partout-runtime-link-test PRIVATE /EHsc)
         set_target_properties(partout-runtime-link-test PROPERTIES
             MSVC_RUNTIME_LIBRARY MultiThreadedDLL
@@ -58,9 +58,11 @@ if(TARGET partout-winrt-backend)
             "-DLINKER=${CMAKE_LINKER}"
             "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
             "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
-        foreach(test IN ITEMS tunnel tunnel_profile)
-            add_executable(partout-${test}-test tests/c/windows/${test}.cc)
+            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/winrt/exports.cmake")
+        set(winrt_tests tunnel tunnel_profile)
+        set(winrt_test_sources TunnelTests TunnelProfileTests)
+        foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
+            add_executable(partout-${test}-test tests/c/windows/winrt/${source}.cc)
             target_include_directories(partout-${test}-test PRIVATE cross/windows/winrt)
             target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
             set_target_properties(partout-${test}-test PROPERTIES
