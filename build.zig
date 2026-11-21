@@ -220,12 +220,6 @@ pub fn build(b: *std.Build) void {
     if (target.result.os.tag != .windows) {
         test_module.addIncludePath(b.path("cross/posix/include"));
         addCSourceFiles(test_module, &.{"cross/posix/controller.c"});
-    } else if (config.wintun) {
-        if (config.wintun_include) |path| {
-            test_module.addIncludePath(b.path("cross/windows/wintun/include"));
-            test_module.addSystemIncludePath(.{ .cwd_relative = path });
-            addCSourceFiles(test_module, &.{"cross/windows/wintun/controller.c"});
-        }
     }
     test_module.addImport("source", test_source_module);
 

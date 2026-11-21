@@ -46,6 +46,21 @@ jobs:
         if: runner.os == 'Windows'
         shell: pwsh
         run: ctest --test-dir .cmake -C Release --output-on-failure --no-tests=error
+      - name: Build Wintun runtime tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          cmake -G "Ninja Multi-Config" -S . -B .cmake-wintun `
+            -DPP_BUILD_WINRT=OFF -DPP_BUILD_WINTUN=ON `
+            -DPP_BUILD_MODELS=ON -DPP_TEST_WINTUN_RUNTIME=ON `
+            -DPP_BUILD_OUTPUT="$env:GITHUB_WORKSPACE/.cmake-wintun/out"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build .cmake-wintun --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run Wintun runtime tests
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir .cmake-wintun -C Release --output-on-failure --no-tests=error
       - name: Build with CMake (no vendors)
         if: runner.os == 'Linux'
         shell: bash

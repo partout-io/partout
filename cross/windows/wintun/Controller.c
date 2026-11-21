@@ -4,6 +4,7 @@
 #include <winsock2.h>
 #include <Windows.h>
 #include <wintun.h>
+#include "NetworkSettings.h"
 #if defined(_MSC_VER) && !defined(__clang__)
 #define _Nullable
 #define _Nonnull
@@ -41,7 +42,7 @@ static const partout_tun_callbacks tun_callbacks = {
     .watch = watch_tun,
 };
 
-static partout_tun open_tun(const char *uuid) {
+static partout_tun open_tun(void *settings, const char *uuid, const char *json) {
     if (!uuid) return NULL;
     // Keep the DLL loaded while any returned handle can still be in use.
     HMODULE wintun = LoadLibraryExA("wintun.dll", NULL,
@@ -58,6 +59,7 @@ static partout_tun open_tun(const char *uuid) {
     }
     tun->library = wintun;
     WINTUN_CREATE_ADAPTER_FUNC *create_adapter;
+    WINTUN_GET_ADAPTER_LUID_FUNC *get_adapter_luid;
     WINTUN_START_SESSION_FUNC *start_session;
     WINTUN_GET_RUNNING_DRIVER_VERSION_FUNC *get_running_driver_version;
     wchar_t *name = NULL;
@@ -67,6 +69,7 @@ static partout_tun open_tun(const char *uuid) {
         if (!destination) goto failure; \
     } while (0)
     LOAD_FUNCTION(create_adapter, "WintunCreateAdapter");
+    LOAD_FUNCTION(get_adapter_luid, "WintunGetAdapterLUID");
     LOAD_FUNCTION(start_session, "WintunStartSession");
     LOAD_FUNCTION(get_running_driver_version, "WintunGetRunningDriverVersion");
     LOAD_FUNCTION(tun->close_adapter, "WintunCloseAdapter");
@@ -110,8 +113,14 @@ static partout_tun open_tun(const char *uuid) {
         goto failure;
     }
     pp_clog_v(PPLogLevelInfo, "tun_wintun: Created wintun device %ls", name);
+    NET_LUID luid;
+    get_adapter_luid(tun->adapter, &luid);
+    if (!NetworkSettingsApply(settings, luid, json)) goto failure;
     partout_tun wrapped = partout_tun_wrap_callbacks(tun, &tun_callbacks);
-    if (!wrapped) goto failure;
+    if (!wrapped) {
+        NetworkSettingsClear(settings);
+        goto failure;
+    }
     free(name);
     return wrapped;
 
@@ -185,14 +194,14 @@ static intptr_t watch_tun(void *ctx) {
 }
 
 static partout_tun set_tunnel(void *ctx, const char *uuid, const char *json) {
-    (void)ctx;
-    (void)json;
-    return open_tun(uuid);
+    if (!ctx) return NULL;
+    return open_tun(ctx, uuid, json);
 }
 
 static void set_delegate(void *ctx, const partout_controller_delegate *delegate) {
-    (void)ctx;
-    (void)delegate;
+    if (!delegate || !delegate->on_reachability) return;
+    const partout_reachability info = { .reachable = NetworkSettingsReachable(ctx) };
+    delegate->on_reachability(delegate->ctx, &info);
 }
 
 static void report_snapshot(void *ctx, const char *json) {
@@ -207,22 +216,19 @@ static void set_environment(void *ctx, const char *key, const char *json) {
 }
 
 static void clear_tunnel(void *ctx, bool kill_switch) {
-    (void)ctx;
-    (void)kill_switch;
+    if (kill_switch) pp_clog(PPLogLevelError, "Wintun kill switch is not implemented");
+    NetworkSettingsClear(ctx);
 }
 
 static void cancel_tunnel(void *ctx, const char *code) {
-    (void)ctx;
     (void)code;
+    NetworkSettingsClear(ctx);
 }
 
 static bool configure_sockets(void *ctx, const partout_reachability *info,
                                const partout_socket_descriptor *fds, size_t count) {
-    (void)ctx;
     (void)info;
-    (void)fds;
-    (void)count;
-    return true;
+    return NetworkSettingsConfigureSockets(ctx, fds, count);
 }
 
 partout_controller_functions partout_wintun_controller_functions(void) {
@@ -236,4 +242,19 @@ partout_controller_functions partout_wintun_controller_functions(void) {
         .configure_sockets = configure_sockets
     };
     return functions;
+}
+
+static void release_bindings(partout_daemon_bindings *bindings) {
+    NetworkSettingsDestroy(bindings->controller);
+    bindings->controller = NULL;
+}
+
+bool partout_wintun_bindings_init(partout_daemon_bindings *bindings) {
+    if (!bindings) return false;
+    void *context = NetworkSettingsCreate();
+    if (!context) return false;
+    bindings->controller = context;
+    bindings->controller_functions = partout_wintun_controller_functions();
+    bindings->release = release_bindings;
+    return true;
 }
