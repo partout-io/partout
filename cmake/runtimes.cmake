@@ -39,15 +39,23 @@ if(TARGET partout-winrt-backend)
     endif()
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
-        cross/windows/wintun/controller.c
+        cross/windows/wintun/Controller.c
+        cross/windows/wintun/NetworkSettings.cc
     )
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/wintun/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
-    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE ole32)
+    target_compile_definitions(partout-wintun-runtime PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_options(partout-wintun-runtime PRIVATE /EHsc)
+    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE Partout::Models ole32 iphlpapi ws2_32)
     set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    option(PP_TEST_WINTUN_RUNTIME "Test Wintun settings with fake Windows APIs" OFF)
+    if(PP_TEST_WINTUN_RUNTIME)
+        enable_testing()
+        add_subdirectory(tests/c/windows/wintun)
+    endif()
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
         cross/android/native/controller.c

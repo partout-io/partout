@@ -80,7 +80,7 @@ target_include_directories(partout-headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-if(PP_BUILD_MODELS OR PP_BUILD_WINRT)
+if(PP_BUILD_MODELS OR PP_BUILD_WINRT OR PP_BUILD_WINTUN)
     enable_language(CXX)
     include("cmake/models.cmake")
 endif()
