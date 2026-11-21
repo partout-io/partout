@@ -32,8 +32,8 @@ if(TARGET partout-winrt-backend)
         PRIVATE ole32
     )
 
-    option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
-    if(PP_TEST_RUNTIME_LINK)
+    option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
+    if(PP_TEST_WINRT_RUNTIME)
         enable_testing()
         add_subdirectory(tests/c/windows/winrt)
     endif()
