@@ -8,9 +8,9 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        cross/windows/winrt/src/tunnel.cc
-        cross/windows/winrt/src/runtime.cc
-        cross/windows/winrt/src/platform.cc
+        cross/windows/winrt/tunnel.cc
+        cross/windows/winrt/runtime.cc
+        cross/windows/winrt/platform.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
@@ -61,7 +61,7 @@ if(TARGET partout-winrt-backend)
             -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
         foreach(test IN ITEMS tunnel tunnel_profile)
             add_executable(partout-${test}-test tests/c/windows/${test}.cc)
-            target_include_directories(partout-${test}-test PRIVATE cross/windows/winrt/src)
+            target_include_directories(partout-${test}-test PRIVATE cross/windows/winrt)
             target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
             set_target_properties(partout-${test}-test PROPERTIES
                 MSVC_RUNTIME_LIBRARY MultiThreadedDLL
