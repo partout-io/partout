@@ -33,12 +33,37 @@ jobs:
       - name: Build with CMake (no vendors)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/build.ps1 -gen -install $env:INSTALL_DIR
+        run: |
+          cmake -G "Ninja Multi-Config" -S . -B .cmake `
+            -DCMAKE_INSTALL_PREFIX="$env:INSTALL_DIR" `
+            -DPP_BUILD_WINRT=ON -DPP_TEST_WINRT_RUNTIME=ON
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build .cmake --config Release --parallel 2
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --install .cmake --config Release
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Run full WinRT test suite
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: ctest --test-dir .cmake -C Release --output-on-failure --no-tests=error
       - name: Build with CMake (no vendors)
         if: runner.os == 'Linux'
         shell: bash
         run: |
-          ./scripts/build.sh -gen -install "$INSTALL_DIR"
+          cmake -G Ninja -S . -B .cmake -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DPP_BUILD_MODELS=ON
+          cmake --build .cmake --parallel 2
+          cmake --install .cmake
+      - name: Configure C++ model tests
+        shell: bash
+        run: >-
+          cmake -S tests/c/models -B .cmake-model-tests
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/$INSTALL_DIR"
+      - name: Build C++ model tests
+        run: cmake --build .cmake-model-tests --config Release --parallel 2
+      - name: Run C++ model tests
+        run: ctest --test-dir .cmake-model-tests -C Release --output-on-failure --no-tests=error
       - name: Verify output
         if: runner.os == 'Windows'
         shell: pwsh
@@ -47,3 +72,15 @@ jobs:
         if: runner.os == 'Linux'
         shell: bash
         run: ./ci/verify-linux.sh "$INSTALL_DIR"
+      - name: Configure installed SDK consumer
+        shell: bash
+        run: >-
+          cmake -S tests/c/sdk -B .cmake-sdk-consumer
+          -DCMAKE_BUILD_TYPE=Release
+          -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/$INSTALL_DIR"
+          -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
+          -DCMAKE_FIND_USE_SYSTEM_PACKAGE_REGISTRY=OFF
+      - name: Build installed SDK consumer
+        run: cmake --build .cmake-sdk-consumer --config Release --parallel 2
+      - name: Run installed SDK consumer
+        run: ctest --test-dir .cmake-sdk-consumer -C Release --output-on-failure --no-tests=error
