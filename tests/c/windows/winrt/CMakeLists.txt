@@ -25,8 +25,8 @@ add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
     "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/exports.cmake")
-set(winrt_tests tunnel tunnel_profile)
-set(winrt_test_sources TunnelTests TunnelProfileTests)
+set(winrt_tests log network tun_settings tunnel tunnel_profile)
+set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests TunnelTests TunnelProfileTests)
 foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
     add_executable(partout-${test}-test ${source}.cc)
     target_include_directories(partout-${test}-test PRIVATE "${PROJECT_SOURCE_DIR}/cross/windows/winrt")
@@ -36,5 +36,16 @@ foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
         MSVC_RUNTIME_CHECKS ""
     )
     target_link_libraries(partout-${test}-test PRIVATE Partout::WinRTRuntime)
+    add_custom_command(TARGET partout-${test}-test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:partout-${test}-test>
+            $<TARGET_FILE_DIR:partout-${test}-test>
+        COMMAND_EXPAND_LISTS)
     add_test(NAME partout-${test} COMMAND partout-${test}-test)
 endforeach()
+
+# Exercise private implementations without adding them to the backend DLL exports.
+target_sources(partout-network-test PRIVATE
+    "${PROJECT_SOURCE_DIR}/cross/windows/winrt/NetworkMonitor.cc")
+target_sources(partout-tun_settings-test PRIVATE
+    "${PROJECT_SOURCE_DIR}/cross/windows/winrt/TunSettings.cc")
