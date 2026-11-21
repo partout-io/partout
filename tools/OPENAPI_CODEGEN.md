@@ -129,7 +129,7 @@ The hashes are a review guard, not a substitute for serialization tests. For an
 intentional schema/API change, review the generated diff and update only the
 corresponding manifest entries with `--update-golden` in the same change. Never regenerate the manifest
 merely to make an unexplained failure pass. The portable C++ serialization tests
-remain in `tests/c/windows/ModelsTests.cc`; Apple and Android retain their existing
+remain in `tests/c/models/ModelsTests.cc`; Apple and Android retain their existing
 language test suites.
 
 ## Retained quirks: remove after parity
