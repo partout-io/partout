@@ -4,9 +4,9 @@
 #pragma once
 #include "windows/export.h"
 
-#include "io_types.h"
-#include "socket.h"
-#include "network.h"
+#include "IOTypes.h"
+#include "Socket.h"
+#include "NetworkMonitor.h"
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Vpn.h>
 #include <winrt/Windows.Networking.Sockets.h>

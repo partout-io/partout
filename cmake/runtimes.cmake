@@ -8,9 +8,9 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        cross/windows/winrt/src/tunnel.cc
-        cross/windows/winrt/src/runtime.cc
-        cross/windows/winrt/src/platform.cc
+        cross/windows/winrt/Tunnel.cc
+        cross/windows/winrt/VpnChannelRuntime.cc
+        cross/windows/winrt/Platform.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
@@ -32,44 +32,10 @@ if(TARGET partout-winrt-backend)
         PRIVATE ole32
     )
 
-    option(PP_TEST_RUNTIME_LINK "Test the separately linked Windows runtime" OFF)
-    if(PP_TEST_RUNTIME_LINK)
+    option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
+    if(PP_TEST_WINRT_RUNTIME)
         enable_testing()
-        add_executable(partout-runtime-link-test tests/c/windows/runtime_link.cc)
-        target_compile_options(partout-runtime-link-test PRIVATE /EHsc)
-        set_target_properties(partout-runtime-link-test PROPERTIES
-            MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-            MSVC_RUNTIME_CHECKS ""
-        )
-        target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
-        add_custom_command(TARGET partout-runtime-link-test POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"
-                "$<TARGET_FILE_DIR:partout-runtime-link-test>"
-        )
-        foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
-            add_custom_command(TARGET partout-runtime-link-test POST_BUILD
-                COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                    "$<TARGET_FILE:${runtime}>"
-                    "$<TARGET_FILE_DIR:partout-runtime-link-test>")
-        endforeach()
-        add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
-        add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
-            "-DLINKER=${CMAKE_LINKER}"
-            "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
-            "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
-            -P "${CMAKE_CURRENT_SOURCE_DIR}/tests/c/windows/exports.cmake")
-        foreach(test IN ITEMS tunnel tunnel_profile)
-            add_executable(partout-${test}-test tests/c/windows/${test}.cc)
-            target_include_directories(partout-${test}-test PRIVATE cross/windows/winrt/src)
-            target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
-            set_target_properties(partout-${test}-test PROPERTIES
-                MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-                MSVC_RUNTIME_CHECKS ""
-            )
-            target_link_libraries(partout-${test}-test PRIVATE Partout::WinRTRuntime)
-            add_test(NAME partout-${test} COMMAND partout-${test}-test)
-        endforeach()
+        add_subdirectory(tests/c/windows/winrt)
     endif()
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC

@@ -1,10 +1,10 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include <winsock2.h>
-#include "abi.h"
-#include "loop.h"
-#include "socket.h"
-#include "tun.h"
+#include "ABI.h"
+#include "RuntimeLoop.h"
+#include "Socket.h"
+#include "Tun.h"
 #include <algorithm>
 #include <cstring>
 #include <optional>

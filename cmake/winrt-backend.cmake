@@ -12,20 +12,20 @@ if(NOT WIN32 OR NOT MSVC)
 endif()
 
 # The native backend cannot include Partout headers. Keep it independently
-# compilable; runtime.cc and platform.cc integrate with Partout's APIs.
+# compilable; VpnChannelRuntime.cc and Platform.cc integrate with Partout's APIs.
 set(partout_backend_type STATIC)
 if(PP_BUILD_LIBRARY)
     set(partout_backend_type SHARED)
 endif()
 add_library(partout-winrt-backend ${partout_backend_type}
-    cross/windows/winrt/src/abi.cc
-    cross/windows/winrt/src/controller.cc
-    cross/windows/winrt/src/loop.cc
-    cross/windows/winrt/src/network.cc
-    cross/windows/winrt/src/socket.cc
-    cross/windows/winrt/src/tun.cc
-    cross/windows/winrt/src/tun_settings.cc
-    cross/windows/winrt/src/log.cc
+    cross/windows/winrt/ABI.cc
+    cross/windows/winrt/TunnelController.cc
+    cross/windows/winrt/RuntimeLoop.cc
+    cross/windows/winrt/NetworkMonitor.cc
+    cross/windows/winrt/Socket.cc
+    cross/windows/winrt/Tun.cc
+    cross/windows/winrt/TunSettings.cc
+    cross/windows/winrt/Log.cc
 )
 target_include_directories(partout-winrt-backend PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/winrt/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")

@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "abi.h"
-#include "loop.h"
-#include "tun.h"
+#include "ABI.h"
+#include "RuntimeLoop.h"
+#include "Tun.h"
 #include "windows/log.h"
 
 #include "partout_winrt.h"

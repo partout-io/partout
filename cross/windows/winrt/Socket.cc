@@ -6,7 +6,7 @@
 #include <ws2tcpip.h>
 #include <windows.h>
 
-#include "socket.h"
+#include "Socket.h"
 #include "windows/log.h"
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
