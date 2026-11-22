@@ -18,6 +18,7 @@
 #ifndef OpenVpnRoutingPolicy_H_
 #define OpenVpnRoutingPolicy_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -37,6 +38,9 @@ struct  OpenVpnRoutingPolicy
     };
 
     OpenVpnRoutingPolicy::eOpenVpnRoutingPolicy value = OpenVpnRoutingPolicy::eOpenVpnRoutingPolicy::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const OpenVpnRoutingPolicy& other) const;
     bool operator!=(const OpenVpnRoutingPolicy& other) const;
@@ -58,8 +62,8 @@ struct  OpenVpnRoutingPolicy
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnRoutingPolicy FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnRoutingPolicy FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnRoutingPolicy& o);

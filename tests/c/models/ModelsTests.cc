@@ -6,6 +6,8 @@
 #include "../../../cross/cpp/models/DataCount.h"
 #include "../../../cross/cpp/models/ModuleImportContext.h"
 #include "../../../cross/cpp/models/OpenVpnObfuscationMethod.h"
+#include "../../../cross/cpp/models/OpenVpnCipher.h"
+#include "../../../cross/cpp/models/OpenVpnDigest.h"
 #include "../../../cross/cpp/models/TunnelRemoteInfoWrapper.h"
 #include <cassert>
 #include <cstdio>
@@ -42,7 +44,51 @@ void ExpectAlternative(const char *source) {
 }
 
 int main() {
+    // The public value API preserves unknown fields, nulls, arrays, and copy isolation.
+    auto document = Json::Parse(R"({"unknown":{"nested":[null,1,"two"]},"enabled":false})");
+    auto copy = document;
+    copy.Set("enabled", true);
+    assert(!document.At("enabled").Get<bool>());
+    assert(copy.At("enabled").Get<bool>());
+    assert(!document.Find("missing"));
+    assert(document.Value("missing", 42) == 42);
+    const auto nested = document.At("unknown").At("nested").Elements();
+    assert(nested.size() == 3 && nested[0].IsNull());
+    assert(nested[1].Get<int>() == 1 && nested[2].Get<std::string>() == "two");
+    assert(Json::Parse(document.Encode()) == document);
+    auto defaults = Json{{"enabled", true}, {"count", 10}};
+    defaults.Merge(document);
+    assert(defaults.At("count").Get<int>() == 10);
+    assert(defaults.At("unknown") == document.At("unknown"));
+    auto array = Json::Array();
+    array.Append(document);
+    assert(array.Elements().front() == document);
+    bool wrappedError = false;
+    try {
+        (void)Json::Parse("{");
+    } catch (const Json::Error &) {
+        wrappedError = true;
+    }
+    assert(wrappedError);
+    ExpectFailure([] { (void)Json(1.5).Get<int>(); });
+    ExpectFailure([] { (void)Json(-1).Get<unsigned>(); });
+    ExpectFailure([] { (void)Json::Parse("{}").At("missing"); });
+    ExpectFailure([] { (void)Json::Parse("null").Elements(); });
+    ExpectFailure([] { (void)Json::Parse("[]").Members(); });
+    const auto typed = ConnectionStatus::FromJson(Json("connected"));
+    assert(typed.ToJson().Get<std::string>() == "connected");
+
     ExpectRoundTrip<ConnectionStatus>("connected");
+    // Presentation receives canonical tokens without depending on JSON values.
+    for (const auto *token : {"AES-128-CBC", "AES-192-CBC", "AES-256-CBC",
+                              "AES-128-GCM", "AES-192-GCM", "AES-256-GCM"}) {
+        assert(OpenVpnCipher::FromJson(token).ToString() == token);
+    }
+    for (const auto *token : {"SHA1", "SHA224", "SHA256", "SHA384", "SHA512"}) {
+        assert(OpenVpnDigest::FromJson(token).ToString() == token);
+    }
+    ExpectFailure([] { (void)OpenVpnCipher{}.ToString(); });
+    ExpectFailure([] { (void)OpenVpnDigest{static_cast<OpenVpnDigest::eOpenVpnDigest>(-1)}.ToString(); });
     // The daemon's callback sends a raw token, not a quoted JSON string.
     static_assert(noexcept(TryReadStringEnum<ConnectionStatus>(nullptr)));
     for (const auto &test : {
@@ -166,7 +212,7 @@ int main() {
     for (const auto &payload : json::array({json::object(), json::array({1, 2}), "text", 7, true, nullptr})) {
         const json envelope = {{"payload", payload}};
         const auto value = ExpectRoundTrip<ABIEnvelope>(envelope);
-        assert(value.payload && *value.payload == payload);
+        assert(value.payload && json(*value.payload) == payload);
     }
     std::puts("C++ generated discriminator and optional-field tests passed");
 }

@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnRoutingPolicy::ToJson() const
+::Partout::Models::Json OpenVpnRoutingPolicy::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVpnRoutingPolicy OpenVpnRoutingPolicy::FromJson(const nlohmann::json& j)
+OpenVpnRoutingPolicy OpenVpnRoutingPolicy::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVpnRoutingPolicy o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnRoutingPolicy>();
 }
 
 void OpenVpnRoutingPolicy::Validate() const
@@ -68,6 +64,15 @@ bool OpenVpnRoutingPolicy::operator==(const OpenVpnRoutingPolicy& other) const
 bool OpenVpnRoutingPolicy::operator!=(const OpenVpnRoutingPolicy& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnRoutingPolicy::ToString() const {
+    switch (value) {
+        case OpenVpnRoutingPolicy::IPv4: return "IPv4";
+        case OpenVpnRoutingPolicy::IPv6: return "IPv6";
+        case OpenVpnRoutingPolicy::blockLocal: return "blockLocal";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnRoutingPolicy& o)

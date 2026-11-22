@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OnDemandModulePolicy::ToJson() const
+::Partout::Models::Json OnDemandModulePolicy::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OnDemandModulePolicy OnDemandModulePolicy::FromJson(const nlohmann::json& j)
+OnDemandModulePolicy OnDemandModulePolicy::FromJson(const ::Partout::Models::Json& j)
 {
-    OnDemandModulePolicy o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OnDemandModulePolicy>();
 }
 
 void OnDemandModulePolicy::Validate() const
@@ -68,6 +64,15 @@ bool OnDemandModulePolicy::operator==(const OnDemandModulePolicy& other) const
 bool OnDemandModulePolicy::operator!=(const OnDemandModulePolicy& other) const
 {
     return !(*this == other);
+}
+
+std::string OnDemandModulePolicy::ToString() const {
+    switch (value) {
+        case OnDemandModulePolicy::any: return "any";
+        case OnDemandModulePolicy::including: return "including";
+        case OnDemandModulePolicy::excluding: return "excluding";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OnDemandModulePolicy& o)

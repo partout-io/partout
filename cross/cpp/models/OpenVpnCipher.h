@@ -18,6 +18,7 @@
 #ifndef OpenVpnCipher_H_
 #define OpenVpnCipher_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -41,6 +42,9 @@ struct  OpenVpnCipher
 
     OpenVpnCipher::eOpenVpnCipher value = OpenVpnCipher::eOpenVpnCipher::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const OpenVpnCipher& other) const;
     bool operator!=(const OpenVpnCipher& other) const;
 
@@ -61,8 +65,8 @@ struct  OpenVpnCipher
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnCipher FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnCipher FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCipher& o);

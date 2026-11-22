@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json CryptoBackend::ToJson() const
+::Partout::Models::Json CryptoBackend::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-CryptoBackend CryptoBackend::FromJson(const nlohmann::json& j)
+CryptoBackend CryptoBackend::FromJson(const ::Partout::Models::Json& j)
 {
-    CryptoBackend o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<CryptoBackend>();
 }
 
 void CryptoBackend::Validate() const

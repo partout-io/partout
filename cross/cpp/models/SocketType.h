@@ -18,6 +18,7 @@
 #ifndef SocketType_H_
 #define SocketType_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -36,6 +37,9 @@ struct  SocketType
     };
 
     SocketType::eSocketType value = SocketType::eSocketType::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const SocketType& other) const;
     bool operator!=(const SocketType& other) const;
@@ -57,8 +61,8 @@ struct  SocketType
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static SocketType FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static SocketType FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const SocketType& o);

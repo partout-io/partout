@@ -21,3 +21,8 @@
 - Use PascalCase for all methods, public and private.
 - Do not compress blocks, as in no text after curly braces or multiple semicolon-separated lines. However, one-liner like `if (condition) return;` are acceptable as long as they are not too long.
 - Empty blocks in curly braces are fine (`{}`).
+
+- Keep JSON library knowledge inside model codec implementations and the shared
+  `Partout::Models::Json` wrapper. Consumer code must use model APIs and the wrapper,
+  including its error type, rather than nlohmann types or operations. Change generated
+  model APIs through the shared generator, never by editing generated files.

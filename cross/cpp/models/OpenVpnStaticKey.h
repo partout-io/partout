@@ -52,8 +52,8 @@ struct  OpenVpnStaticKey
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnStaticKey FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnStaticKey FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnStaticKey& o);

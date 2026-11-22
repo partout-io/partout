@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TunnelRemoteInfoWrapper::ToJson() const
+::Partout::Models::Json TunnelRemoteInfoWrapper::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-TunnelRemoteInfoWrapper TunnelRemoteInfoWrapper::FromJson(const nlohmann::json& j)
+TunnelRemoteInfoWrapper TunnelRemoteInfoWrapper::FromJson(const ::Partout::Models::Json& j)
 {
-    TunnelRemoteInfoWrapper o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TunnelRemoteInfoWrapper>();
 }
 
 void TunnelRemoteInfoWrapper::Validate() const

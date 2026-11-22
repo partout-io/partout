@@ -58,8 +58,8 @@ struct  OpenVpnCompressionAlgorithm
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnCompressionAlgorithm FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnCompressionAlgorithm FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCompressionAlgorithm& o);

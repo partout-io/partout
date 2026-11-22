@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TaggedModuleDns::ToJson() const
+::Partout::Models::Json TaggedModuleDns::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-TaggedModuleDns TaggedModuleDns::FromJson(const nlohmann::json& j)
+TaggedModuleDns TaggedModuleDns::FromJson(const ::Partout::Models::Json& j)
 {
-    TaggedModuleDns o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TaggedModuleDns>();
 }
 
 void TaggedModuleDns::Validate() const

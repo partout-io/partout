@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVPNErrorCode::ToJson() const
+::Partout::Models::Json OpenVPNErrorCode::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVPNErrorCode OpenVPNErrorCode::FromJson(const nlohmann::json& j)
+OpenVPNErrorCode OpenVPNErrorCode::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVPNErrorCode o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVPNErrorCode>();
 }
 
 void OpenVPNErrorCode::Validate() const
@@ -68,6 +64,24 @@ bool OpenVPNErrorCode::operator==(const OpenVPNErrorCode& other) const
 bool OpenVPNErrorCode::operator!=(const OpenVPNErrorCode& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVPNErrorCode::ToString() const {
+    switch (value) {
+        case OpenVPNErrorCode::compressionMismatch: return "compressionMismatch";
+        case OpenVPNErrorCode::connectionFailure: return "connectionFailure";
+        case OpenVPNErrorCode::noRouting: return "noRouting";
+        case OpenVPNErrorCode::otpRequired: return "otpRequired";
+        case OpenVPNErrorCode::passphraseRequired: return "passphraseRequired";
+        case OpenVPNErrorCode::recoverableAuthentication: return "recoverableAuthentication";
+        case OpenVPNErrorCode::serverShutdown: return "serverShutdown";
+        case OpenVPNErrorCode::tlsFailure: return "tlsFailure";
+        case OpenVPNErrorCode::unableToDecrypt: return "unableToDecrypt";
+        case OpenVPNErrorCode::unsupportedAlgorithm: return "unsupportedAlgorithm";
+        case OpenVPNErrorCode::unsupportedCompression: return "unsupportedCompression";
+        case OpenVPNErrorCode::unsupportedOption: return "unsupportedOption";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVPNErrorCode& o)

@@ -18,6 +18,7 @@
 #ifndef OpenVpnCredentialsOTPMethod_H_
 #define OpenVpnCredentialsOTPMethod_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -37,6 +38,9 @@ struct  OpenVpnCredentialsOTPMethod
     };
 
     OpenVpnCredentialsOTPMethod::eOpenVpnCredentialsOTPMethod value = OpenVpnCredentialsOTPMethod::eOpenVpnCredentialsOTPMethod::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const OpenVpnCredentialsOTPMethod& other) const;
     bool operator!=(const OpenVpnCredentialsOTPMethod& other) const;
@@ -58,8 +62,8 @@ struct  OpenVpnCredentialsOTPMethod
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnCredentialsOTPMethod FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnCredentialsOTPMethod FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCredentialsOTPMethod& o);

@@ -18,6 +18,7 @@
 #ifndef DNSProtocol_H_
 #define DNSProtocol_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -37,6 +38,9 @@ struct  DNSProtocol
     };
 
     DNSProtocol::eDNSProtocol value = DNSProtocol::eDNSProtocol::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const DNSProtocol& other) const;
     bool operator!=(const DNSProtocol& other) const;
@@ -58,8 +62,8 @@ struct  DNSProtocol
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static DNSProtocol FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static DNSProtocol FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const DNSProtocol& o);

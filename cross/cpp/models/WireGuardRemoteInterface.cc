@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json WireGuardRemoteInterface::ToJson() const
+::Partout::Models::Json WireGuardRemoteInterface::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-WireGuardRemoteInterface WireGuardRemoteInterface::FromJson(const nlohmann::json& j)
+WireGuardRemoteInterface WireGuardRemoteInterface::FromJson(const ::Partout::Models::Json& j)
 {
-    WireGuardRemoteInterface o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<WireGuardRemoteInterface>();
 }
 
 void WireGuardRemoteInterface::Validate() const

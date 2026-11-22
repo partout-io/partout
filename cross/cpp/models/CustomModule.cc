@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json CustomModule::ToJson() const
+::Partout::Models::Json CustomModule::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-CustomModule CustomModule::FromJson(const nlohmann::json& j)
+CustomModule CustomModule::FromJson(const ::Partout::Models::Json& j)
 {
-    CustomModule o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<CustomModule>();
 }
 
 void CustomModule::Validate() const

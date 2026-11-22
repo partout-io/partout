@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnCredentialsOTPMethod::ToJson() const
+::Partout::Models::Json OpenVpnCredentialsOTPMethod::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVpnCredentialsOTPMethod OpenVpnCredentialsOTPMethod::FromJson(const nlohmann::json& j)
+OpenVpnCredentialsOTPMethod OpenVpnCredentialsOTPMethod::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVpnCredentialsOTPMethod o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnCredentialsOTPMethod>();
 }
 
 void OpenVpnCredentialsOTPMethod::Validate() const
@@ -68,6 +64,15 @@ bool OpenVpnCredentialsOTPMethod::operator==(const OpenVpnCredentialsOTPMethod& 
 bool OpenVpnCredentialsOTPMethod::operator!=(const OpenVpnCredentialsOTPMethod& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnCredentialsOTPMethod::ToString() const {
+    switch (value) {
+        case OpenVpnCredentialsOTPMethod::none: return "none";
+        case OpenVpnCredentialsOTPMethod::append: return "append";
+        case OpenVpnCredentialsOTPMethod::encode: return "encode";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnCredentialsOTPMethod& o)

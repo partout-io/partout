@@ -18,6 +18,7 @@
 #ifndef DNSModuleDomainPolicy_H_
 #define DNSModuleDomainPolicy_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -36,6 +37,9 @@ struct  DNSModuleDomainPolicy
     };
 
     DNSModuleDomainPolicy::eDNSModuleDomainPolicy value = DNSModuleDomainPolicy::eDNSModuleDomainPolicy::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const DNSModuleDomainPolicy& other) const;
     bool operator!=(const DNSModuleDomainPolicy& other) const;
@@ -57,8 +61,8 @@ struct  DNSModuleDomainPolicy
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static DNSModuleDomainPolicy FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static DNSModuleDomainPolicy FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const DNSModuleDomainPolicy& o);

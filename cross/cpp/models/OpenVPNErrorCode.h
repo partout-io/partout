@@ -18,6 +18,7 @@
 #ifndef OpenVPNErrorCode_H_
 #define OpenVPNErrorCode_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -47,6 +48,9 @@ struct  OpenVPNErrorCode
 
     OpenVPNErrorCode::eOpenVPNErrorCode value = OpenVPNErrorCode::eOpenVPNErrorCode::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const OpenVPNErrorCode& other) const;
     bool operator!=(const OpenVPNErrorCode& other) const;
 
@@ -67,8 +71,8 @@ struct  OpenVPNErrorCode
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVPNErrorCode FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVPNErrorCode FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVPNErrorCode& o);

@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnObfuscationMethodObfuscate::ToJson() const
+::Partout::Models::Json OpenVpnObfuscationMethodObfuscate::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVpnObfuscationMethodObfuscate OpenVpnObfuscationMethodObfuscate::FromJson(const nlohmann::json& j)
+OpenVpnObfuscationMethodObfuscate OpenVpnObfuscationMethodObfuscate::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVpnObfuscationMethodObfuscate o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnObfuscationMethodObfuscate>();
 }
 
 void OpenVpnObfuscationMethodObfuscate::Validate() const

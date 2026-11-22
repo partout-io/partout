@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json DataCount::ToJson() const
+::Partout::Models::Json DataCount::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-DataCount DataCount::FromJson(const nlohmann::json& j)
+DataCount DataCount::FromJson(const ::Partout::Models::Json& j)
 {
-    DataCount o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<DataCount>();
 }
 
 void DataCount::Validate() const

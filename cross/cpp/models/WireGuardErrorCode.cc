@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json WireGuardErrorCode::ToJson() const
+::Partout::Models::Json WireGuardErrorCode::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-WireGuardErrorCode WireGuardErrorCode::FromJson(const nlohmann::json& j)
+WireGuardErrorCode WireGuardErrorCode::FromJson(const ::Partout::Models::Json& j)
 {
-    WireGuardErrorCode o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<WireGuardErrorCode>();
 }
 
 void WireGuardErrorCode::Validate() const
@@ -68,6 +64,31 @@ bool WireGuardErrorCode::operator==(const WireGuardErrorCode& other) const
 bool WireGuardErrorCode::operator!=(const WireGuardErrorCode& other) const
 {
     return !(*this == other);
+}
+
+std::string WireGuardErrorCode::ToString() const {
+    switch (value) {
+        case WireGuardErrorCode::emptyPeers: return "emptyPeers";
+        case WireGuardErrorCode::interfaceHasInvalidAddress: return "interfaceHasInvalidAddress";
+        case WireGuardErrorCode::interfaceHasInvalidDNS: return "interfaceHasInvalidDNS";
+        case WireGuardErrorCode::interfaceHasInvalidListenPort: return "interfaceHasInvalidListenPort";
+        case WireGuardErrorCode::interfaceHasInvalidMTU: return "interfaceHasInvalidMTU";
+        case WireGuardErrorCode::interfaceHasInvalidPrivateKey: return "interfaceHasInvalidPrivateKey";
+        case WireGuardErrorCode::interfaceHasNoPrivateKey: return "interfaceHasNoPrivateKey";
+        case WireGuardErrorCode::interfaceHasUnrecognizedKey: return "interfaceHasUnrecognizedKey";
+        case WireGuardErrorCode::multipleEntriesForKey: return "multipleEntriesForKey";
+        case WireGuardErrorCode::multipleInterfaces: return "multipleInterfaces";
+        case WireGuardErrorCode::multiplePeersWithSamePublicKey: return "multiplePeersWithSamePublicKey";
+        case WireGuardErrorCode::noInterface: return "noInterface";
+        case WireGuardErrorCode::peerHasInvalidAllowedIP: return "peerHasInvalidAllowedIP";
+        case WireGuardErrorCode::peerHasInvalidEndpoint: return "peerHasInvalidEndpoint";
+        case WireGuardErrorCode::peerHasInvalidPersistentKeepAlive: return "peerHasInvalidPersistentKeepAlive";
+        case WireGuardErrorCode::peerHasInvalidPreSharedKey: return "peerHasInvalidPreSharedKey";
+        case WireGuardErrorCode::peerHasInvalidPublicKey: return "peerHasInvalidPublicKey";
+        case WireGuardErrorCode::peerHasNoPublicKey: return "peerHasNoPublicKey";
+        case WireGuardErrorCode::peerHasUnrecognizedKey: return "peerHasUnrecognizedKey";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const WireGuardErrorCode& o)

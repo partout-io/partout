@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TaggedModuleOpenVpn::ToJson() const
+::Partout::Models::Json TaggedModuleOpenVpn::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-TaggedModuleOpenVpn TaggedModuleOpenVpn::FromJson(const nlohmann::json& j)
+TaggedModuleOpenVpn TaggedModuleOpenVpn::FromJson(const ::Partout::Models::Json& j)
 {
-    TaggedModuleOpenVpn o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TaggedModuleOpenVpn>();
 }
 
 void TaggedModuleOpenVpn::Validate() const

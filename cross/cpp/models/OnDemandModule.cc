@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OnDemandModule::ToJson() const
+::Partout::Models::Json OnDemandModule::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OnDemandModule OnDemandModule::FromJson(const nlohmann::json& j)
+OnDemandModule OnDemandModule::FromJson(const ::Partout::Models::Json& j)
 {
-    OnDemandModule o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OnDemandModule>();
 }
 
 void OnDemandModule::Validate() const

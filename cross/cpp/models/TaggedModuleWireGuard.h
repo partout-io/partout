@@ -51,8 +51,8 @@ struct  TaggedModuleWireGuard
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TaggedModuleWireGuard FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static TaggedModuleWireGuard FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedModuleWireGuard& o);

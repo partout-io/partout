@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json ConnectionStatus::ToJson() const
+::Partout::Models::Json ConnectionStatus::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-ConnectionStatus ConnectionStatus::FromJson(const nlohmann::json& j)
+ConnectionStatus ConnectionStatus::FromJson(const ::Partout::Models::Json& j)
 {
-    ConnectionStatus o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<ConnectionStatus>();
 }
 
 void ConnectionStatus::Validate() const
@@ -68,6 +64,16 @@ bool ConnectionStatus::operator==(const ConnectionStatus& other) const
 bool ConnectionStatus::operator!=(const ConnectionStatus& other) const
 {
     return !(*this == other);
+}
+
+std::string ConnectionStatus::ToString() const {
+    switch (value) {
+        case ConnectionStatus::disconnected: return "disconnected";
+        case ConnectionStatus::connecting: return "connecting";
+        case ConnectionStatus::connected: return "connected";
+        case ConnectionStatus::disconnecting: return "disconnecting";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const ConnectionStatus& o)

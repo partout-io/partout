@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnPullMask::ToJson() const
+::Partout::Models::Json OpenVpnPullMask::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVpnPullMask OpenVpnPullMask::FromJson(const nlohmann::json& j)
+OpenVpnPullMask OpenVpnPullMask::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVpnPullMask o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnPullMask>();
 }
 
 void OpenVpnPullMask::Validate() const
@@ -68,6 +64,15 @@ bool OpenVpnPullMask::operator==(const OpenVpnPullMask& other) const
 bool OpenVpnPullMask::operator!=(const OpenVpnPullMask& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnPullMask::ToString() const {
+    switch (value) {
+        case OpenVpnPullMask::routes: return "routes";
+        case OpenVpnPullMask::dns: return "dns";
+        case OpenVpnPullMask::proxy: return "proxy";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnPullMask& o)

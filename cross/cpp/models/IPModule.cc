@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json IPModule::ToJson() const
+::Partout::Models::Json IPModule::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-IPModule IPModule::FromJson(const nlohmann::json& j)
+IPModule IPModule::FromJson(const ::Partout::Models::Json& j)
 {
-    IPModule o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<IPModule>();
 }
 
 void IPModule::Validate() const

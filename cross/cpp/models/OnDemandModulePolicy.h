@@ -18,6 +18,7 @@
 #ifndef OnDemandModulePolicy_H_
 #define OnDemandModulePolicy_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -37,6 +38,9 @@ struct  OnDemandModulePolicy
     };
 
     OnDemandModulePolicy::eOnDemandModulePolicy value = OnDemandModulePolicy::eOnDemandModulePolicy::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const OnDemandModulePolicy& other) const;
     bool operator!=(const OnDemandModulePolicy& other) const;
@@ -58,8 +62,8 @@ struct  OnDemandModulePolicy
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OnDemandModulePolicy FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OnDemandModulePolicy FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OnDemandModulePolicy& o);

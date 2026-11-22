@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json DNSModuleDomainPolicy::ToJson() const
+::Partout::Models::Json DNSModuleDomainPolicy::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-DNSModuleDomainPolicy DNSModuleDomainPolicy::FromJson(const nlohmann::json& j)
+DNSModuleDomainPolicy DNSModuleDomainPolicy::FromJson(const ::Partout::Models::Json& j)
 {
-    DNSModuleDomainPolicy o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<DNSModuleDomainPolicy>();
 }
 
 void DNSModuleDomainPolicy::Validate() const
@@ -68,6 +64,14 @@ bool DNSModuleDomainPolicy::operator==(const DNSModuleDomainPolicy& other) const
 bool DNSModuleDomainPolicy::operator!=(const DNSModuleDomainPolicy& other) const
 {
     return !(*this == other);
+}
+
+std::string DNSModuleDomainPolicy::ToString() const {
+    switch (value) {
+        case DNSModuleDomainPolicy::match: return "match";
+        case DNSModuleDomainPolicy::matchAndSearch: return "matchAndSearch";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const DNSModuleDomainPolicy& o)

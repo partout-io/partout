@@ -49,8 +49,8 @@ struct  ModuleImportContextWireGuard
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static ModuleImportContextWireGuard FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static ModuleImportContextWireGuard FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ModuleImportContextWireGuard& o);

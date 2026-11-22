@@ -18,6 +18,7 @@
 #ifndef OpenVpnTLSWrapStrategy_H_
 #define OpenVpnTLSWrapStrategy_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -37,6 +38,9 @@ struct  OpenVpnTLSWrapStrategy
     };
 
     OpenVpnTLSWrapStrategy::eOpenVpnTLSWrapStrategy value = OpenVpnTLSWrapStrategy::eOpenVpnTLSWrapStrategy::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const OpenVpnTLSWrapStrategy& other) const;
     bool operator!=(const OpenVpnTLSWrapStrategy& other) const;
@@ -58,8 +62,8 @@ struct  OpenVpnTLSWrapStrategy
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnTLSWrapStrategy FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static OpenVpnTLSWrapStrategy FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnTLSWrapStrategy& o);

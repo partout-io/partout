@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json Route::ToJson() const
+::Partout::Models::Json Route::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-Route Route::FromJson(const nlohmann::json& j)
+Route Route::FromJson(const ::Partout::Models::Json& j)
 {
-    Route o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<Route>();
 }
 
 void Route::Validate() const

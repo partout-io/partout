@@ -52,8 +52,8 @@ struct  PartoutErrorPair
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static PartoutErrorPair FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static PartoutErrorPair FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const PartoutErrorPair& o);

@@ -63,7 +63,7 @@ const Context = struct {
                     if (eq(raw, "UInt16") or eq(raw, "UInt32") or eq(raw, "UInt64")) return c.fmt("Model{s}", .{raw});
                     if (swiftManual(raw)) return c.name(raw);
                 }
-                if (eq(raw, "JSONValue")) return if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "nlohmann::json";
+                if (eq(raw, "JSONValue")) return if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Models::Json";
                 const schema = c.doc.schema(raw) orelse return error.UnknownReference;
                 if (schema.enum_values.items.len != 0 or schema.properties.items.len != 0 or schema.variants.items.len != 0) {
                     const n = try c.name(raw);
@@ -99,7 +99,7 @@ const Context = struct {
                 .boolean => if (c.language == .cpp) "bool" else if (c.language == .kotlin) "kotlin.Boolean" else "Bool",
                 .object => return error.UnsupportedObject,
             },
-            .raw_json => return if (c.language == .swift) "JSON" else if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "nlohmann::json",
+            .raw_json => return if (c.language == .swift) "JSON" else if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Models::Json",
             .none => return error.MissingType,
         }
     }
@@ -401,7 +401,8 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
-    return replace(c.a, named, "Partout::Models", c.package);
+    const result = try replace(c.a, named, "Partout::Models", c.package);
+    return replace(c.a, result, try c.fmt("{s}::Json", .{c.package}), "::Partout::Models::Json");
 }
 
 fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
@@ -425,6 +426,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     while (imports.items.len > capacity * 3 / 4) capacity *= 2;
     std.mem.sort([]const u8, imports.items, capacity, importLess);
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
+    if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
     try w.writeAll("#include \"../json.h\"\n");
     var optional = false;
     for (s.properties.items) |p| {
@@ -450,6 +452,8 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
         }
         try w.writeByte('\n');
     }
+    if (is_enum and !eq(s.typ orelse "", "integer"))
+        try w.writeAll("    // Canonical schema token, independent of the JSON representation.\n    std::string ToString() const;\n\n");
     try w.writeAll(try template(c, @embedFile("openapi_templates/cpp-header-tail.txt"), n));
     return cppWhitespace(c, out.written());
 }
@@ -478,7 +482,7 @@ fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8
             const t = try c.typ(spec, null, false);
             if (eq(t, "std::string")) {
                 try appendUnique(c.a, imports, "#include <string>");
-            } else if (eq(t, "nlohmann::json")) {
+            } else if (eq(t, "::Partout::Models::Json")) {
                 // PARITY: the legacy pipeline emits a duplicate JSON include.
                 try appendUnique(c.a, imports, "#include <nlohmann/json.hpp>");
             } else if (std.mem.startsWith(u8, t, c.package)) {
@@ -517,7 +521,15 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
         if (s.properties.items.len == 0) try w.writeAll("true");
         try w.writeAll(";\n");
     }
-    try w.print("}}\n\nbool {s}::operator!=(const {s}& other) const\n{{\n    return !(*this == other);\n}}\n\nvoid to_json(nlohmann::json& j, const {s}& o)\n{{\n", .{ n, n, n });
+    try w.print("}}\n\nbool {s}::operator!=(const {s}& other) const\n{{\n    return !(*this == other);\n}}\n", .{ n, n });
+    if (is_enum and !numeric) {
+        try w.print("\nstd::string {s}::ToString() const {{\n    switch (value) {{\n", .{n});
+        for (s.enum_values.items, 0..) |v, i|
+            try w.print("        case {s}::{s}: return {s};\n", .{ n, s.enum_names.items[i], try literal(c, v, false) });
+        try w.writeAll("        default: throw std::invalid_argument(\"Invalid string enum value\");\n    }\n}\n");
+    }
+
+    try w.print("\nvoid to_json(nlohmann::json& j, const {s}& o)\n{{\n", .{n});
     for (s.properties.items) |p| {
         if (p.constant) |constant| try w.print("    if (o.{s} != {s}) throw std::invalid_argument(\"Invalid constant field {s} in {s}\");\n", .{ try field(c, p.name), try literal(c, constant, false), p.name, n });
     }
@@ -558,7 +570,7 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
                 try w.print("    ReadJsonValue(j.at(\"{s}\"), parsed.{s});\n\n", .{ p.name, f });
             } else {
                 const t = try propertyType(c, p);
-                if (eq(t, "nlohmann::json")) {
+                if (eq(t, "::Partout::Models::Json")) {
                     try w.print("\n    if (j.find(\"{s}\") != j.end()) {{\n", .{p.name});
                 } else {
                     try w.print("\n    if (j.find(\"{s}\") != j.end() && !j.at(\"{s}\").is_null()) {{\n", .{ p.name, p.name });

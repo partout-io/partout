@@ -18,6 +18,7 @@
 #ifndef TunnelStatus_H_
 #define TunnelStatus_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -39,6 +40,9 @@ struct  TunnelStatus
 
     TunnelStatus::eTunnelStatus value = TunnelStatus::eTunnelStatus::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const TunnelStatus& other) const;
     bool operator!=(const TunnelStatus& other) const;
 
@@ -59,8 +63,8 @@ struct  TunnelStatus
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TunnelStatus FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static TunnelStatus FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TunnelStatus& o);

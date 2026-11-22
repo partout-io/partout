@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnTLSWrap::ToJson() const
+::Partout::Models::Json OpenVpnTLSWrap::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVpnTLSWrap OpenVpnTLSWrap::FromJson(const nlohmann::json& j)
+OpenVpnTLSWrap OpenVpnTLSWrap::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVpnTLSWrap o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnTLSWrap>();
 }
 
 void OpenVpnTLSWrap::Validate() const

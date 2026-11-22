@@ -38,7 +38,7 @@ struct  TaggedProfile
     std::vector<Partout::Models::TaggedModule> modules;
     std::vector<std::string> activeModulesIds;
     std::optional<Partout::Models::ProfileBehavior> behavior;
-    std::optional<nlohmann::json> userInfo;
+    std::optional<::Partout::Models::Json> userInfo;
 
     bool operator==(const TaggedProfile& other) const;
     bool operator!=(const TaggedProfile& other) const;
@@ -60,8 +60,8 @@ struct  TaggedProfile
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TaggedProfile FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static TaggedProfile FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedProfile& o);

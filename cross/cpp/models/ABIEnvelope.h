@@ -30,7 +30,7 @@ struct  ABIEnvelope
 {
 
     std::optional<Partout::Models::PartoutErrorCode> code;
-    std::optional<nlohmann::json> payload;
+    std::optional<::Partout::Models::Json> payload;
 
     bool operator==(const ABIEnvelope& other) const;
     bool operator!=(const ABIEnvelope& other) const;
@@ -52,8 +52,8 @@ struct  ABIEnvelope
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static ABIEnvelope FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static ABIEnvelope FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ABIEnvelope& o);

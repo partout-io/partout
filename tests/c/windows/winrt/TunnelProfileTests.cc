@@ -16,11 +16,11 @@ int main() {
     const XmlDocument document;
     const auto root = document.CreateElement(L"PartoutProfile");
     root.SetAttribute(L"version", L"1");
-    root.InnerText(winrt::to_hstring(profile.ToJson().dump()));
+    root.InnerText(winrt::to_hstring(profile.ToJson().Encode()));
     document.AppendChild(root);
     assert(Partout::DecodeTunnelProfileId(document.GetXml()) == profile.id);
     profile.name = "Renamed";
-    root.InnerText(winrt::to_hstring(profile.ToJson().dump()));
+    root.InnerText(winrt::to_hstring(profile.ToJson().Encode()));
     const auto details = document.CreateElement(L"ConnectionDetails");
     details.InnerText(L"Windows metadata is not profile JSON");
     root.AppendChild(details);

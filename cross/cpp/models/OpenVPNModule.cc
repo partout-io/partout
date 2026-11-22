@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVPNModule::ToJson() const
+::Partout::Models::Json OpenVPNModule::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-OpenVPNModule OpenVPNModule::FromJson(const nlohmann::json& j)
+OpenVPNModule OpenVPNModule::FromJson(const ::Partout::Models::Json& j)
 {
-    OpenVPNModule o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVPNModule>();
 }
 
 void OpenVPNModule::Validate() const

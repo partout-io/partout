@@ -18,6 +18,7 @@
 #ifndef IPSocketType_H_
 #define IPSocketType_H_
 
+#include <string>
 #include "../json.h"
 
 namespace Partout::Models
@@ -41,6 +42,9 @@ struct  IPSocketType
 
     IPSocketType::eIPSocketType value = IPSocketType::eIPSocketType::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const IPSocketType& other) const;
     bool operator!=(const IPSocketType& other) const;
 
@@ -61,8 +65,8 @@ struct  IPSocketType
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static IPSocketType FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static IPSocketType FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const IPSocketType& o);

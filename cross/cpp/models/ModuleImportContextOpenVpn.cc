@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json ModuleImportContextOpenVpn::ToJson() const
+::Partout::Models::Json ModuleImportContextOpenVpn::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Models::Json(*this);
 }
 
-ModuleImportContextOpenVpn ModuleImportContextOpenVpn::FromJson(const nlohmann::json& j)
+ModuleImportContextOpenVpn ModuleImportContextOpenVpn::FromJson(const ::Partout::Models::Json& j)
 {
-    ModuleImportContextOpenVpn o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<ModuleImportContextOpenVpn>();
 }
 
 void ModuleImportContextOpenVpn::Validate() const

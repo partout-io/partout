@@ -29,7 +29,7 @@ struct  CustomModule
 {
 
     Partout::Models::ModuleType innerType;
-    nlohmann::json json;
+    ::Partout::Models::Json json;
 
     bool operator==(const CustomModule& other) const;
     bool operator!=(const CustomModule& other) const;
@@ -51,8 +51,8 @@ struct  CustomModule
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static CustomModule FromJson(const nlohmann::json& j);
+    ::Partout::Models::Json ToJson() const;
+    static CustomModule FromJson(const ::Partout::Models::Json& j);
 };
 
  void to_json(nlohmann::json& j, const CustomModule& o);
