@@ -65,10 +65,10 @@ add_dependency "$maven_central" org/jetbrains/kotlinx/kotlinx-serialization-core
 add_dependency "$maven_central" org/jetbrains/kotlinx/kotlinx-serialization-json-jvm/1.10.0/kotlinx-serialization-json-jvm-1.10.0.jar
 
 "$kotlinc" \
-    "$repo_root/cross/android/src" \
-    "$repo_root/cross/android/tests/ControllerBindingsTest.kt" \
-    "$repo_root/cross/android/tests/DNSSettingsTest.kt" \
-    "$repo_root/cross/android/tests/IPSettingsTest.kt" \
+    "$repo_root/runtimes/android/src" \
+    "$repo_root/runtimes/android/tests/ControllerBindingsTest.kt" \
+    "$repo_root/runtimes/android/tests/DNSSettingsTest.kt" \
+    "$repo_root/runtimes/android/tests/IPSettingsTest.kt" \
     -classpath "$classpath" \
     -Xplugin="$serialization_plugin" \
     -jvm-target 21 \
@@ -89,11 +89,11 @@ esac
 # Android exposes AttachCurrentThread with JNIEnv**, while host JDKs use void**.
 cc -shared -fPIC -D__ANDROID__ -Wno-incompatible-pointer-types \
     -I"$jni_java_home/include" -I"$jni_java_home/include/$jni_platform" \
-    -I"$repo_root/cross/android/tests/host" -I"$repo_root/src" \
-    -I"$repo_root/cross/android/native" \
-    "$repo_root/cross/android/native/controller.c" \
-    "$repo_root/cross/android/native/jni.c" \
-    "$repo_root/cross/android/tests/controller_bindings.c" \
+    -I"$repo_root/runtimes/android/tests/host" -I"$repo_root/src" \
+    -I"$repo_root/runtimes/android/native" \
+    "$repo_root/runtimes/android/native/controller.c" \
+    "$repo_root/runtimes/android/native/jni.c" \
+    "$repo_root/runtimes/android/tests/controller_bindings.c" \
     -o "$work_dir/controller-bindings.so"
 java --enable-native-access=ALL-UNNAMED -Xcheck:jni \
     -cp "$work_dir/classes:$kotlin_home/lib/kotlin-stdlib.jar" \

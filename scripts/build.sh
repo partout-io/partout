@@ -46,14 +46,14 @@ generate_model_files() {
 generate_swift_models() {
     local openapi=$1
 
-    generate_model_files "$openapi" swift cross/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
+    generate_model_files "$openapi" swift runtimes/apple/Sources/PartoutCore/OpenAPI/Codegen PartoutCore
 }
 
 generate_kotlin_models() {
     local openapi=$1
     local package=io.partout.models
-    local models=cross
-    local tmpmodels=cross-models
+    local models=runtimes
+    local tmpmodels=runtimes-models
 
     generate_model_files "$openapi" kotlin "$tmpmodels" "$package"
     rm -rf $models/android/src/io/partout/models
@@ -64,7 +64,7 @@ generate_kotlin_models() {
 generate_cpp_models() {
     local openapi=$1
 
-    generate_model_files "$openapi" cpp cross/cpp/models Partout.Models
+    generate_model_files "$openapi" cpp runtimes/cpp/models Partout.Models
 }
 
 generate_models() {

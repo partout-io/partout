@@ -42,7 +42,7 @@ jobs:
             src/version.zig)
           swift_version=$(sed -nE \
             's/^[[:space:]]*public static let version = "([0-9A-Za-z.+-]+)"$/\1/p' \
-            cross/apple/Sources/PartoutCore/Version.swift)
+            runtimes/apple/Sources/PartoutCore/Version.swift)
 
           test -n "$zig_version"
           test "$zig_version" = "$swift_version"

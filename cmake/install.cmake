@@ -61,7 +61,7 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
 if(TARGET partout-bindings)
     set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WinRTRuntime)
     install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/cross/windows/winrt/include/partout_winrt.h"
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include/partout_winrt.h"
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
     )
 endif()
@@ -69,7 +69,7 @@ endif()
 if(TARGET partout-posix-runtime)
     set_target_properties(partout-posix-runtime PROPERTIES EXPORT_NAME POSIXRuntime)
     install(TARGETS partout-posix-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES cross/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(FILES runtimes/posix/include/partout_posix.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()
 
 if(TARGET partout-models-impl)
@@ -110,5 +110,5 @@ install(EXPORT PartoutTargets NAMESPACE Partout::
 if(TARGET partout-wintun-runtime)
     set_target_properties(partout-wintun-runtime PROPERTIES EXPORT_NAME WintunRuntime)
     install(TARGETS partout-wintun-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES cross/windows/wintun/include/partout_wintun.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(FILES runtimes/windows/wintun/include/partout_wintun.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
 endif()

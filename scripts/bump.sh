@@ -14,7 +14,7 @@ version="${1:-}"
 
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 zig_constants="$root/src/version.zig"
-swift_constants="$root/cross/apple/Sources/PartoutCore/Version.swift"
+swift_constants="$root/runtimes/apple/Sources/PartoutCore/Version.swift"
 
 zig_pattern='^pub const number = "[^"]+";$'
 if [[ $(grep -Ec "$zig_pattern" "$zig_constants") -ne 1 ]]; then

@@ -4,7 +4,7 @@ project(PartoutModelTests LANGUAGES CXX)
 # Platform-independent model decoding tests.
 find_package(nlohmann_json CONFIG REQUIRED)
 get_filename_component(PARTOUT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_ROOT}/cross/cpp/models/*.cc")
+file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_ROOT}/runtimes/cpp/models/*.cc")
 add_executable(partout-models-test ModelsTests.cc ${model_sources})
 target_compile_features(partout-models-test PRIVATE cxx_std_17)
 target_compile_definitions(partout-models-test PRIVATE NOMINMAX)

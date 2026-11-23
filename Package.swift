@@ -28,15 +28,15 @@ let package = Package(
         .target(
             name: "Partout",
             dependencies: ["PartoutCore"],
-            path: "cross/apple/Sources/Partout"
+            path: "runtimes/apple/Sources/Partout"
         ),
         .target(
             name: "PartoutCore",
-            path: "cross/apple/Sources/PartoutCore"
+            path: "runtimes/apple/Sources/PartoutCore"
         ),
         .target(
             name: "PartoutNative_C",
-            path: "cross/apple/Sources/PartoutNative_C"
+            path: "runtimes/apple/Sources/PartoutNative_C"
         ),
         .target(
             name: "PartoutRuntime",
@@ -44,17 +44,17 @@ let package = Package(
                 "PartoutCore",
                 "PartoutNative_C"
             ],
-            path: "cross/apple/Sources/PartoutRuntime"
+            path: "runtimes/apple/Sources/PartoutRuntime"
         ),
         .testTarget(
             name: "PartoutTests",
             dependencies: ["PartoutCore"],
-            path: "cross/apple/Tests/PartoutTests"
+            path: "runtimes/apple/Tests/PartoutTests"
         )
 //        .testTarget(
 //            name: "PartoutRuntimeTests",
 //            dependencies: ["PartoutRuntime"],
-//            path: "cross/apple/Tests/PartoutRuntimeTests"
+//            path: "runtimes/apple/Tests/PartoutRuntimeTests"
 //        )
     ],
     swiftLanguageModes: [.v6]
