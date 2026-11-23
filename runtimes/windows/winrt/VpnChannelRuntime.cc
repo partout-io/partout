@@ -246,6 +246,7 @@ VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
     : impl_(std::make_unique<Impl>(channel, profile, init_args, options, std::move(controllerOptions))) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
+
 void VpnChannelRuntime::Cancel() noexcept {
     impl_->canceled.store(true);
     std::scoped_lock lock(impl_->startup_mutex);

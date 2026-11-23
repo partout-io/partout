@@ -23,7 +23,9 @@ public:
         std::string &error
     );
     static std::optional<Models::TunnelSnapshotEnvironment> InterfaceEnvironment(const MIB_IF_ROW2 &row);
+
     explicit WinRTTunnelStrategy(const std::string &serverUri);
+
     std::vector<Models::TunnelSnapshot> Fetch() override;
     std::map<std::string, std::string> ObservationErrors() const override;
     void Save(const Models::TaggedProfile &profile) override;

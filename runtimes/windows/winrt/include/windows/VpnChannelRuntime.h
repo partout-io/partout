@@ -22,9 +22,9 @@ public:
         const partout_daemon_options &options,
         Models::TunnelControllerOptions controllerOptions = {}
     );
-    ~VpnChannelRuntime();
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
+    ~VpnChannelRuntime();
 
     void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
