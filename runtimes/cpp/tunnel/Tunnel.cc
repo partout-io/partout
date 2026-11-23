@@ -7,8 +7,6 @@
 #include <stdexcept>
 
 namespace Partout {
-Tunnel::Tunnel(const std::string &serverUri) : Tunnel(TunnelStrategies::MakeNative(serverUri)) {}
-
 void Tunnel::Cancel() noexcept {
     canceled_.store(true);
     strategy_->Cancel();

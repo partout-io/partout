@@ -7,7 +7,7 @@ set_target_properties(partout-runtime-link-test PROPERTIES
     MSVC_RUNTIME_LIBRARY MultiThreadedDLL
     MSVC_RUNTIME_CHECKS ""
 )
-target_link_libraries(partout-runtime-link-test PRIVATE Partout::CppRuntime)
+target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"

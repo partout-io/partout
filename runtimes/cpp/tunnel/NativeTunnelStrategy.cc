@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#include "TunnelStrategy.h"
+#include "Tunnel.h"
 
 namespace {
 class UnavailableTunnelStrategy final : public Partout::TunnelStrategy {
@@ -37,3 +37,5 @@ private:
 std::unique_ptr<Partout::TunnelStrategy> Partout::TunnelStrategies::MakeNative(const std::string &) {
     return std::make_unique<UnavailableTunnelStrategy>();
 }
+
+Partout::Tunnel::Tunnel(const std::string &serverUri) : Tunnel(TunnelStrategies::MakeNative(serverUri)) {}

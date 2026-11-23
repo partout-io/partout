@@ -57,11 +57,9 @@ if(TARGET partout-winrt-backend)
         MSVC_RUNTIME_CHECKS ""
     )
     target_link_libraries(partout-bindings
-        PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Partout Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32
     )
-
-    target_link_libraries(partout-cpp-runtime PUBLIC Partout::WinRTRuntime)
 
     option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
     if(PP_TEST_WINRT_RUNTIME)
