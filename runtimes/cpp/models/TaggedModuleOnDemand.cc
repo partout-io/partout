@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/TaggedModuleOnDemand.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/TaggedModuleOnDemand.h>
 
 namespace Partout::Models
 {

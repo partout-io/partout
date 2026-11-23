@@ -49,8 +49,11 @@ def main():
             run(str(binary), str(schema_file), str(second), '--language', language,
                 cwd=ROOT, env={**os.environ, 'TZ': 'Pacific/Honolulu', 'LC_ALL': 'C'})
             if language == 'cpp':
-                for header in first.rglob('*.h'):
-                    assert header.read_text().count('#include <partout/Json.h>') <= 1, header
+                for source in first.rglob('*'):
+                    if source.suffix not in ('.h', '.cc'):
+                        continue
+                    includes = [line for line in source.read_text().splitlines() if line.startswith('#include ')]
+                    assert includes == sorted(set(includes)), source
             actual = snapshot(first)
             assert actual == snapshot(second), f'{language}: nondeterministic output'
             expected = snapshot(models)

@@ -18,10 +18,10 @@
 #ifndef Helpers_H_
 #define Helpers_H_
 
-#include <partout/Export.h>
 #include <cstdint>
 #include <ctime>
 #include <map>
+#include <partout/Export.h>
 #include <set>
 #include <sstream>
 #include <string>

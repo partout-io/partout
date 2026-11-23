@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/OpenVpnCredentialsOTPMethod.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/OpenVpnCredentialsOTPMethod.h>
 
 namespace Partout::Models
 {

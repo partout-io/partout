@@ -171,7 +171,7 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     for (files.items) |*f| {
         if (language == .cpp and options.external.len != 0) f.contents = try externalCpp(c, f.contents);
         if (language == .cpp and options.external.len == 0 and std.mem.endsWith(u8, f.name, ".h") and !std.mem.eql(u8, f.name, "Helpers.h")) {
-            f.contents = try c.fmt("#include <partout/Export.h>\n{s}", .{f.contents});
+            f.contents = try replace(a, f.contents, "#include \"../Json.h\"", "#include <partout/Export.h>\n#include \"../Json.h\"");
         }
     }
     if (language == .cpp and options.external.len == 0) {
@@ -184,6 +184,9 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
             }
             f.name = try c.fmt("{s}/{s}", .{ if (std.mem.endsWith(u8, f.name, ".h")) "include/partout/models" else "models", f.name });
         }
+    }
+    if (language == .cpp) {
+        for (files.items) |*f| f.contents = try cppIncludes(c, f.contents);
     }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
@@ -438,10 +441,6 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
             try cppImports(c, map_value, &imports);
         } else try cppImports(c, p.spec, &imports);
     };
-    // PARITY: old HashSet iteration order. Replace with lexical imports after parity.
-    var capacity: u32 = 16;
-    while (imports.items.len > capacity * 3 / 4) capacity *= 2;
-    std.mem.sort([]const u8, imports.items, capacity, importLess);
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
     if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
     try w.writeAll("#include \"../Json.h\"\n");
@@ -475,16 +474,36 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     return cppWhitespace(c, out.written());
 }
 
-fn javaHash(raw: []const u8) u32 {
-    var h: u32 = 0;
-    for (raw) |ch| h = h *% 31 +% ch;
-    return h ^ (h >> 16);
+// Generated includes are unconditional and precede declarations.
+fn cppIncludes(c: Context, source: []const u8) ![]const u8 {
+    var includes: std.ArrayList([]const u8) = .empty;
+    var lines = std.mem.splitScalar(u8, source, '\n');
+    while (lines.next()) |line| {
+        if (std.mem.startsWith(u8, line, "#include ")) try appendUnique(c.a, &includes, line);
+    }
+    std.mem.sort([]const u8, includes.items, {}, less);
+    var out: std.Io.Writer.Allocating = .init(c.a);
+    var emitted = false;
+    lines = std.mem.splitScalar(u8, source, '\n');
+    var first = true;
+    while (lines.next()) |line| {
+        if (std.mem.startsWith(u8, line, "#include ")) {
+            if (emitted) continue;
+            emitted = true;
+            for (includes.items) |include| {
+                if (!first) try out.writer.writeByte('\n');
+                try out.writer.writeAll(include);
+                first = false;
+            }
+        } else {
+            if (!first) try out.writer.writeByte('\n');
+            try out.writer.writeAll(line);
+            first = false;
+        }
+    }
+    return out.written();
 }
-fn importLess(capacity: u32, a: []const u8, b: []const u8) bool {
-    const ah = javaHash(a) & (capacity - 1);
-    const bh = javaHash(b) & (capacity - 1);
-    return if (ah == bh) less({}, a, b) else ah < bh;
-}
+
 fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8)) anyerror!void {
     switch (spec) {
         .array => |child| {

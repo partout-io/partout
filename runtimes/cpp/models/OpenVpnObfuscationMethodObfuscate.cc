@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/OpenVpnObfuscationMethodObfuscate.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/OpenVpnObfuscationMethodObfuscate.h>
 
 namespace Partout::Models
 {

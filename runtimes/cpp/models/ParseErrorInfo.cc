@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/ParseErrorInfo.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/ParseErrorInfo.h>
 
 namespace Partout::Models
 {

@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/TunnelControllerOptions.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/TunnelControllerOptions.h>
 
 namespace Partout::Models
 {

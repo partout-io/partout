@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/PartoutErrorCode.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/PartoutErrorCode.h>
 
 namespace Partout::Models
 {

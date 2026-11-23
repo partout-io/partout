@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/WireGuardModule.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/WireGuardModule.h>
 
 namespace Partout::Models
 {

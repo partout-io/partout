@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/OpenVpnRoutingPolicy.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/OpenVpnRoutingPolicy.h>
 
 namespace Partout::Models
 {

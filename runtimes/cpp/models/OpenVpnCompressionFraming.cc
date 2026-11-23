@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/OpenVpnCompressionFraming.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/OpenVpnCompressionFraming.h>
 
 namespace Partout::Models
 {

@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/OpenVpnTLSWrap.h>
 #include <partout/models/Helpers.h>
+#include <partout/models/OpenVpnTLSWrap.h>
 
 namespace Partout::Models
 {
