@@ -70,7 +70,7 @@ if(TARGET partout-winrt-backend)
     endif()
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
-        runtimes/windows/wintun/controller.c
+        runtimes/windows/wintun/platform.c
     )
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
@@ -81,7 +81,7 @@ elseif(PP_BUILD_WINTUN)
     set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
-        runtimes/android/native/controller.c
+        runtimes/android/native/platform.c
         runtimes/android/native/jni.c
         runtimes/android/native/partout_jni.c
     )
@@ -94,7 +94,7 @@ elseif(ANDROID)
     target_link_libraries(partout-android-runtime PUBLIC Partout::Partout android log)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
-        runtimes/posix/controller.c
+        runtimes/posix/platform.c
     )
     add_library(Partout::POSIXRuntime ALIAS partout-posix-runtime)
     target_include_directories(partout-posix-runtime

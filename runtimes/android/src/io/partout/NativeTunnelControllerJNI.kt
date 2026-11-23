@@ -8,7 +8,7 @@ package io.partout
 Three layers are involved in this:
 - PartoutVpnServiceRuntime.kt
 - PartoutTunnelController.kt
-- NativeTunnelController.swift (+ native/controller.c)
+- NativeTunnelController.swift (+ native/platform.c)
 
 Where:
 - PartoutVpnServiceRuntime owns PartoutTunnelController and forwards its JNI ref to PartoutWrapper

@@ -91,7 +91,7 @@ cc -shared -fPIC -D__ANDROID__ -Wno-incompatible-pointer-types \
     -I"$jni_java_home/include" -I"$jni_java_home/include/$jni_platform" \
     -I"$repo_root/runtimes/android/tests/host" -I"$repo_root/src" \
     -I"$repo_root/runtimes/android/native" \
-    "$repo_root/runtimes/android/native/controller.c" \
+    "$repo_root/runtimes/android/native/platform.c" \
     "$repo_root/runtimes/android/native/jni.c" \
     "$repo_root/runtimes/android/tests/controller_bindings.c" \
     -o "$work_dir/controller-bindings.so"
