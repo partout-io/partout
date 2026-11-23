@@ -18,14 +18,17 @@
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Vpn.h>
+#include <winrt/Windows.Security.Credentials.h>
 #include <chrono>
 #include <stdexcept>
 #include <sstream>
 #include <iomanip>
 #include <limits>
+#include <thread>
 
 namespace Partout {
 namespace {
+thread_local const std::atomic_bool *cancellation = nullptr;
 struct Apartment {
     Apartment() {
         // WinRT activation factories are cached across workers. Keep their MTA
@@ -52,11 +55,16 @@ std::runtime_error WindowsError(const char *operation, winrt::hresult code) {
 }
 
 template<typename Operation>
-auto Await(const char *name, const Operation &operation) {
+auto Await(const char *name, const Operation &operation,
+           std::chrono::seconds timeout = std::chrono::seconds(60)) {
     try {
-        if (operation.wait_for(std::chrono::seconds(60)) == winrt::Windows::Foundation::AsyncStatus::Started) {
-            operation.Cancel();
-            throw std::runtime_error(std::string(name) + " timed out.");
+        const auto deadline = std::chrono::steady_clock::now() + timeout;
+        while (operation.Status() == winrt::Windows::Foundation::AsyncStatus::Started) {
+            if ((cancellation && cancellation->load()) || std::chrono::steady_clock::now() >= deadline) {
+                operation.Cancel();
+                throw std::runtime_error(std::string(name) + " canceled or timed out.");
+            }
+            std::this_thread::sleep_for(std::chrono::milliseconds(20));
         }
         return operation.get();
     } catch (const winrt::hresult_error &error) {
@@ -116,9 +124,17 @@ std::optional<Models::TunnelSnapshotEnvironment> Environment(const winrt::Window
 }
 
 template<typename Action>
-auto WithAgent(const char *operation, Action action) {
+auto WithAgent(const std::atomic_bool &canceled, const char *operation, Action action) {
     try {
+        if (canceled.load()) throw std::runtime_error("VPN management canceled.");
         Apartment apartment;
+        struct CancellationScope {
+            const std::atomic_bool *previous = cancellation;
+            ~CancellationScope() {
+                cancellation = previous;
+            }
+        } scope;
+        cancellation = &canceled;
         return action(winrt::Windows::Networking::Vpn::VpnManagementAgent{});
     } catch (const winrt::hresult_error &error) {
         // WinRT messages can echo custom configuration. Report only stage/code.
@@ -186,6 +202,10 @@ Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
     winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
 }
 
+void Tunnel::Cancel() noexcept {
+    canceled_.store(true);
+}
+
 std::optional<VpnManagementConnectionStatus> ReadTunnelConnectionStatus(
     const std::function<VpnManagementConnectionStatus()> &read, std::string &error) {
     error.clear();
@@ -198,7 +218,7 @@ std::optional<VpnManagementConnectionStatus> ReadTunnelConnectionStatus(
 }
 
 std::vector<Models::TunnelSnapshot> Tunnel::Fetch(std::map<std::string, std::string> *errors) {
-    return WithAgent("Fetch profiles", [&](const auto &agent) {
+    return WithAgent(canceled_, "Fetch profiles", [&](const auto &agent) {
         std::vector<Models::TunnelSnapshot> result;
         std::map<std::string, std::string> failures;
         for (const auto &owned : OwnedProfiles(agent)) {
@@ -232,7 +252,7 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch(std::map<std::string, std::str
 void Tunnel::Save(const Models::TaggedProfile &profile) {
     if (profile.id.empty()) throw std::invalid_argument("The profile ID is empty.");
     if (profile.name.empty()) throw std::invalid_argument("The profile name is empty.");
-    WithAgent("Save profile", [&](const auto &agent) {
+    WithAgent(canceled_, "Save profile", [&](const auto &agent) {
         const auto name = winrt::to_hstring(profile.name);
         VpnPlugInProfile existing{nullptr};
         std::vector<VpnPlugInProfile> previousNames;
@@ -289,15 +309,28 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
 }
 
 void Tunnel::Connect(const std::string &id) {
-    WithAgent("Connect profile", [&](const auto &agent) {
+    WithAgent(canceled_, "Connect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
-        Check("Connect VPN profile", Await("Connect VPN profile", agent.ConnectProfileAsync(profile)));
+        // Allow the native credential prompt and subsequent engine startup.
+        Check("Connect VPN profile", Await("Connect VPN profile", agent.ConnectProfileAsync(profile),
+                                           std::chrono::seconds(120)));
+    });
+}
+
+void Tunnel::Connect(const std::string &id, const std::string &username, const std::string &password) {
+    WithAgent(canceled_, "Connect profile", [&](const auto &agent) {
+        const auto profile = Find(agent, id);
+        if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
+        const winrt::Windows::Security::Credentials::PasswordCredential credentials(
+            profile.ProfileName(), winrt::to_hstring(username), winrt::to_hstring(password));
+        Check("Connect VPN profile", Await("Connect VPN profile",
+            agent.ConnectProfileWithPasswordCredentialAsync(profile, credentials), std::chrono::seconds(120)));
     });
 }
 
 void Tunnel::Disconnect(const std::string &id) {
-    WithAgent("Disconnect profile", [&](const auto &agent) {
+    WithAgent(canceled_, "Disconnect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
         if (!profile || profile.ConnectionStatus() == VpnManagementConnectionStatus::Disconnected) return;
         Check("Disconnect VPN profile", Await("Disconnect VPN profile", agent.DisconnectProfileAsync(profile)));
@@ -305,7 +338,7 @@ void Tunnel::Disconnect(const std::string &id) {
 }
 
 void Tunnel::Remove(const std::string &id) {
-    WithAgent("Remove profile", [&](const auto &agent) {
+    WithAgent(canceled_, "Remove profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
         if (!profile) return;
         if (profile.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)

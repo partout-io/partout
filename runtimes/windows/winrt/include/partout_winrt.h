@@ -3,10 +3,12 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include <partout/models/TunnelControllerOptions.h>
 #include "partout.h"
 
 #if defined(_WIN32) && defined(__cplusplus)
 #include <memory>
+#include <atomic>
 #include <map>
 #include <string>
 #include <vector>
@@ -31,10 +33,15 @@ public:
     std::vector<Models::TunnelSnapshot> Fetch(std::map<std::string, std::string> *errors = nullptr);
     void Save(const Models::TaggedProfile &profile);
     void Connect(const std::string &id);
+    // Connection-only credentials, never saved to the VPN registration.
+    void Connect(const std::string &id, const std::string &username, const std::string &password);
     void Disconnect(const std::string &id);
     void Remove(const std::string &id);
+    // Permanently cancel management before joining its worker; leaves active VPNs running.
+    void Cancel() noexcept;
 private:
     std::string serverUri_;
+    std::atomic_bool canceled_{false};
 };
 
 // One runtime per channel. Callbacks must be serialized by the consumer.
@@ -42,15 +49,19 @@ private:
 // remain valid while registered with Partout's process-wide logger.
 class VpnChannelRuntime {
 public:
+    // Runtime preferences shared with the Apple and Android controllers.
     VpnChannelRuntime(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                       const char *profile, const partout_init_args &init_args,
-                      const partout_daemon_options &options);
+                      const partout_daemon_options &options,
+                      Models::TunnelControllerOptions controllerOptions = {});
     ~VpnChannelRuntime();
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;
 
     void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    // Wakes startup; may run concurrently with Connect. Teardown stays serialized.
+    void Cancel() noexcept;
     void GetKeepAlivePayload(winrt::Windows::Networking::Vpn::VpnChannel const &channel,
                              winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet);
     void

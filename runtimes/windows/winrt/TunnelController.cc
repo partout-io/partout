@@ -20,8 +20,9 @@ using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
 
-TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
-    : loop_(loop), state_(std::make_unique<Tun::State>(channel)) {}
+TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel,
+                                   Models::TunnelControllerOptions controllerOptions)
+    : loop_(loop), controllerOptions_(std::move(controllerOptions)), state_(std::make_unique<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
     monitor_.Stop();
@@ -85,7 +86,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
     auto tun = std::make_unique<Tun>(*state_);
     if (!started_) {
-        const TunSettings settings{info_json};
+        const TunSettings settings{info_json, controllerOptions_};
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {

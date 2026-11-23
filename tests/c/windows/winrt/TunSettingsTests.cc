@@ -8,14 +8,14 @@
 using Partout::TunSettings;
 
 // Add common ABI metadata while retaining invalid payloads for error tests.
-TunSettings Settings(const char *json) {
+TunSettings Settings(const char *json, Partout::Models::TunnelControllerOptions options = {}) {
     if (!json) return TunSettings(nullptr);
     auto info = nlohmann::json::parse(json);
     info["profile"] = {{"id", "profile"}, {"name", "Test"},
         {"modules", nlohmann::json::array()}, {"activeModulesIds", nlohmann::json::array()}};
     info["originalModuleId"] = "vpn";
     const auto encoded = info.dump();
-    return TunSettings(encoded.c_str());
+    return TunSettings(encoded.c_str(), std::move(options));
 }
 
 int main() try {
@@ -72,6 +72,15 @@ int main() try {
         R"({"modules":[{"type":"IP","value":{"id":"ip","ipv4":{"includedRoutes":[],"excludedRoutes":[],"subnets":["10.8.0.2"]},"mtu":0}}]})";
     assert(Settings(automatic).MTU() == 1400);
     assert(Settings(automatic).MaxFrame() == 1500);
+    assert(Settings(automatic).Domains().DomainNameList().Size() == 0);
+    const auto fallback = Settings(automatic, {{"1.1.1.1", "1.0.0.1"}, false});
+    assert(fallback.Domains().DomainNameList().Size() == 1);
+    assert(fallback.Domains().DomainNameList().GetAt(0).DnsServers().Size() == 2);
+    const auto explicitDNS = Settings(R"({"modules":[
+        {"type":"IP","value":{"id":"ip","ipv4":{"includedRoutes":[],"excludedRoutes":[],"subnets":["10.8.0.2"]}}},
+        {"type":"DNS","value":{"id":"dns","protocolType":{"type":"cleartext"},"servers":["10.8.0.1"]}}
+    ]})", {{"1.1.1.1"}, false});
+    assert(explicitDNS.Domains().DomainNameList().GetAt(0).DnsServers().GetAt(0).CanonicalName() == L"10.8.0.1");
 
     // Multiple IP modules accumulate addresses and routes; zero preserves an explicit MTU.
     const auto combined = Settings(R"({"modules":[

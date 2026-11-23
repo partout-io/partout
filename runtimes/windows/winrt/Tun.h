@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include <partout/models/TunnelControllerOptions.h>
 #include "windows/export.h"
 
 #include "IOTypes.h"
@@ -70,7 +71,8 @@ private:
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
-    PARTOUT_WINRT_API TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel);
+    PARTOUT_WINRT_API TunnelController(RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+                                         Models::TunnelControllerOptions controllerOptions = {});
     PARTOUT_WINRT_API ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
@@ -93,6 +95,7 @@ public:
 private:
     void AssociateUnconnected(Socket &socket);
     RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
+    Models::TunnelControllerOptions controllerOptions_;
     NetworkMonitor monitor_;
 
     // Handles and socket writers are drained before controller destruction.
