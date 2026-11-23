@@ -218,13 +218,13 @@ pub fn build(b: *std.Build) void {
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     if (target.result.os.tag != .windows) {
-        test_module.addIncludePath(b.path("cross/posix/include"));
-        addCSourceFiles(test_module, &.{"cross/posix/controller.c"});
+        test_module.addIncludePath(b.path("runtimes/posix/include"));
+        addCSourceFiles(test_module, &.{"runtimes/posix/controller.c"});
     } else if (config.wintun) {
         if (config.wintun_include) |path| {
-            test_module.addIncludePath(b.path("cross/windows/wintun/include"));
+            test_module.addIncludePath(b.path("runtimes/windows/wintun/include"));
             test_module.addSystemIncludePath(.{ .cwd_relative = path });
-            addCSourceFiles(test_module, &.{"cross/windows/wintun/controller.c"});
+            addCSourceFiles(test_module, &.{"runtimes/windows/wintun/controller.c"});
         }
     }
     test_module.addImport("source", test_source_module);
@@ -526,7 +526,7 @@ fn configureCHeadersAndMacros(
     consumer.addIncludePath(b.path("src/c/portable/include"));
     consumer.addIncludePath(b.path("src/c/crypto/include"));
     if (config.target.result.os.tag == .windows) {
-        consumer.addIncludePath(b.path("cross/windows/winrt/include"));
+        consumer.addIncludePath(b.path("runtimes/windows/winrt/include"));
     }
     if (config.openvpn) {
         consumer.addIncludePath(b.path("src/openvpn/c/include"));

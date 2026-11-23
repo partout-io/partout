@@ -29,7 +29,7 @@ set(winrt_tests log network tun_settings tunnel tunnel_profile)
 set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests TunnelTests TunnelProfileTests)
 foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
     add_executable(partout-${test}-test ${source}.cc)
-    target_include_directories(partout-${test}-test PRIVATE "${PROJECT_SOURCE_DIR}/cross/windows/winrt")
+    target_include_directories(partout-${test}-test PRIVATE "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt")
     target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
     set_target_properties(partout-${test}-test PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
@@ -46,6 +46,6 @@ endforeach()
 
 # Exercise private implementations without adding them to the backend DLL exports.
 target_sources(partout-network-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/cross/windows/winrt/NetworkMonitor.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/NetworkMonitor.cc")
 target_sources(partout-tun_settings-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/cross/windows/winrt/TunSettings.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/TunSettings.cc")

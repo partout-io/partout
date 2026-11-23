@@ -10,9 +10,9 @@ import tempfile
 
 ROOT = Path(__file__).resolve().parents[2]
 MODELS = {
-    'swift': ROOT / 'cross/apple/Sources/PartoutCore/OpenAPI/Codegen',
-    'kotlin': ROOT / 'cross/android/src/io/partout/models',
-    'cpp': ROOT / 'cross/cpp/models',
+    'swift': ROOT / 'runtimes/apple/Sources/PartoutCore/OpenAPI/Codegen',
+    'kotlin': ROOT / 'runtimes/android/src/io/partout/models',
+    'cpp': ROOT / 'runtimes/cpp/models',
 }
 
 
