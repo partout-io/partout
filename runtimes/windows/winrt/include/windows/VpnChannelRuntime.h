@@ -17,7 +17,8 @@ public:
     // Runtime preferences shared with the Apple and Android controllers.
     VpnChannelRuntime(
         winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-        const char *profile, const partout_init_args &init_args,
+        const char *profile,
+        const partout_init_args &init_args,
         const partout_daemon_options &options,
         Models::TunnelControllerOptions controllerOptions = {}
     );

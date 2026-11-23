@@ -238,9 +238,11 @@ struct VpnChannelRuntime::Impl {
     }
 };
 
-VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel, const char *profile,
+VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
+                                     const char *profile,
                                      const partout_init_args &init_args,
-                                     const partout_daemon_options &options, Models::TunnelControllerOptions controllerOptions)
+                                     const partout_daemon_options &options,
+                                     Models::TunnelControllerOptions controllerOptions)
     : impl_(std::make_unique<Impl>(channel, profile, init_args, options, std::move(controllerOptions))) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
