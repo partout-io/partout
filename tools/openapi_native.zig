@@ -170,13 +170,9 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     }
     for (files.items) |*f| {
         if (language == .cpp and options.external.len != 0) f.contents = try externalCpp(c, f.contents);
-        if (language == .cpp and options.external.len == 0 and std.mem.endsWith(u8, f.name, ".h") and !std.mem.eql(u8, f.name, "Helpers.h")) {
-            f.contents = try replace(a, f.contents, "#include \"../Json.h\"", "#include <partout/Export.h>\n#include \"../Json.h\"");
-        }
     }
     if (language == .cpp and options.external.len == 0) {
         for (files.items) |*f| {
-            f.contents = try replace(a, f.contents, "#include \"../Json.h\"", "#include <partout/Json.h>");
             for (files.items) |dependency| {
                 const name = std.fs.path.basename(dependency.name);
                 if (!std.mem.endsWith(u8, name, ".h")) continue;
@@ -425,6 +421,11 @@ fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     return replace(c.a, result, "@JSON_TYPE@", "::Partout::Json");
 }
 
+fn cppModelIncludes(c: Context, w: *std.Io.Writer) !void {
+    if (c.options.external.len == 0) try w.writeAll("#include <partout/Export.h>\n");
+    try w.writeAll("#include <partout/Json.h>\n");
+}
+
 fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     if (s.variants.items.len != 0) return cppUnion(c, s);
     var out: std.Io.Writer.Allocating = .init(c.a);
@@ -443,7 +444,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     };
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
     if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
-    try w.writeAll("#include \"../Json.h\"\n");
+    try cppModelIncludes(c, w);
     var optional = false;
     for (s.properties.items) |p| {
         if (!required(s, p.name)) optional = true;
@@ -640,7 +641,7 @@ fn cppArrayValidation(c: Context, s: api.Schema, p: api.Property, w: *std.Io.Wri
 }
 
 fn cppWhitespace(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include <nlohmann/json.hpp>", "#include \"../Json.h\"");
+    var result = source;
     while (std.mem.indexOf(u8, result, "\n\n\n") != null) result = try replace(c.a, result, "\n\n\n", "\n\n");
     return result;
 }
@@ -657,6 +658,7 @@ fn cppUnion(c: Context, s: api.Schema) ![]const u8 {
         }
     }.lessVariant);
     try w.writeAll(@embedFile("openapi_templates/cpp-union-prefix.txt"));
+    try cppModelIncludes(c, w);
     if (c.options.external.len != 0) {
         // PARITY: the parent's legacy union backend retains dependencies of all children.
         var dependencies: std.ArrayList([]const u8) = .empty;
@@ -860,8 +862,7 @@ fn swiftPrefixedBody(c: Context, s: api.Schema, n: []const u8, w: *std.Io.Writer
 }
 
 fn externalCpp(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include \"../Json.h\"", "#include <partout/Json.h>");
-    result = try replace(c.a, result, "#include \"Helpers.h\"", "#include <partout/models/Helpers.h>");
+    var result = try replace(c.a, source, "#include \"Helpers.h\"", "#include <partout/models/Helpers.h>");
     var names = std.mem.splitScalar(u8, c.options.external, ',');
     while (names.next()) |raw| {
         const n = std.mem.trim(u8, raw, " ");
