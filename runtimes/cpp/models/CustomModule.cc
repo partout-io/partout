@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "CustomModule.h"
-#include "Helpers.h"
+#include <partout/models/CustomModule.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

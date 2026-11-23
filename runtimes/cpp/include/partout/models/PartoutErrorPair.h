@@ -20,8 +20,8 @@
 #define PartoutErrorPair_H_
 
 #include <string>
-#include "PartoutErrorCode.h"
-#include "../Json.h"
+#include <partout/models/PartoutErrorCode.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

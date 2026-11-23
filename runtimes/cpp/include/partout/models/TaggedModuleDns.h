@@ -19,9 +19,9 @@
 #ifndef TaggedModuleDns_H_
 #define TaggedModuleDns_H_
 
-#include "DNSModule.h"
+#include <partout/models/DNSModule.h>
 #include <string>
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

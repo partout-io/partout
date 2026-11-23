@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnConfiguration.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnConfiguration.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

@@ -9,7 +9,7 @@
 * https://openapi-generator.tech
 * Do not edit the class manually.
 */
-#include "Helpers.h"
+#include <partout/models/Helpers.h>
 #include <regex>
 
 namespace Partout::Helpers

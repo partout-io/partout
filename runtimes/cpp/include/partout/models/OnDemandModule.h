@@ -19,12 +19,12 @@
 #ifndef OnDemandModule_H_
 #define OnDemandModule_H_
 
-#include "OnDemandModuleOtherNetwork.h"
-#include "OnDemandModulePolicy.h"
+#include <partout/models/OnDemandModuleOtherNetwork.h>
+#include <partout/models/OnDemandModulePolicy.h>
 #include <string>
 #include <map>
 #include <vector>
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

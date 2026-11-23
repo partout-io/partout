@@ -20,8 +20,8 @@
 #define TaggedModuleIp_H_
 
 #include <string>
-#include "IPModule.h"
-#include "../Json.h"
+#include <partout/models/IPModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

@@ -7,11 +7,11 @@
 
 #pragma once
 // System headers
-#include "../Json.h"
+#include <partout/Json.h>
 #include <variant>
 #include <string>
-#include "ModuleImportContextOpenVpn.h"
-#include "ModuleImportContextWireGuard.h"
+#include <partout/models/ModuleImportContextOpenVpn.h>
+#include <partout/models/ModuleImportContextWireGuard.h>
 
 namespace Partout::Models {
 

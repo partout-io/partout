@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "CryptoBackend.h"
-#include "Helpers.h"
+#include <partout/models/CryptoBackend.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

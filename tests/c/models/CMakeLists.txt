@@ -7,8 +7,7 @@ get_filename_component(PARTOUT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOL
 file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_ROOT}/runtimes/cpp/models/*.cc")
 add_executable(partout-models-test ModelsTests.cc ${model_sources})
 target_include_directories(partout-models-test PRIVATE
-    "${PARTOUT_ROOT}/runtimes/cpp/include"
-    "${PARTOUT_ROOT}/runtimes/cpp/include/partout/models")
+    "${PARTOUT_ROOT}/runtimes/cpp/include")
 target_compile_features(partout-models-test PRIVATE cxx_std_17)
 target_compile_definitions(partout-models-test PRIVATE NOMINMAX)
 target_link_libraries(partout-models-test PRIVATE nlohmann_json::nlohmann_json)

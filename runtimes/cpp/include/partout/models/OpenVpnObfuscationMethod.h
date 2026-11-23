@@ -7,13 +7,13 @@
 
 #pragma once
 // System headers
-#include "../Json.h"
+#include <partout/Json.h>
 #include <variant>
 #include <string>
-#include "OpenVpnObfuscationMethodObfuscate.h"
-#include "OpenVpnObfuscationMethodReverse.h"
-#include "OpenVpnObfuscationMethodXormask.h"
-#include "OpenVpnObfuscationMethodXorptrpos.h"
+#include <partout/models/OpenVpnObfuscationMethodObfuscate.h>
+#include <partout/models/OpenVpnObfuscationMethodReverse.h>
+#include <partout/models/OpenVpnObfuscationMethodXormask.h>
+#include <partout/models/OpenVpnObfuscationMethodXorptrpos.h>
 
 namespace Partout::Models {
 

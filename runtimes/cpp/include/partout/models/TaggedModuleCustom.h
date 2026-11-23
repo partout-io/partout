@@ -20,8 +20,8 @@
 #define TaggedModuleCustom_H_
 
 #include <string>
-#include "CustomModule.h"
-#include "../Json.h"
+#include <partout/models/CustomModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

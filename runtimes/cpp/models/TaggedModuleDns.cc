@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "TaggedModuleDns.h"
-#include "Helpers.h"
+#include <partout/models/TaggedModuleDns.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

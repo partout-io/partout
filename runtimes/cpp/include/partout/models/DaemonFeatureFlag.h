@@ -19,7 +19,7 @@
 #ifndef DaemonFeatureFlag_H_
 #define DaemonFeatureFlag_H_
 
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

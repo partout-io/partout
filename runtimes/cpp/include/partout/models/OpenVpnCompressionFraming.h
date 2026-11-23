@@ -19,7 +19,7 @@
 #ifndef OpenVpnCompressionFraming_H_
 #define OpenVpnCompressionFraming_H_
 
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

@@ -7,12 +7,12 @@
 
 #pragma once
 // System headers
-#include "../Json.h"
+#include <partout/Json.h>
 #include <variant>
 #include <string>
-#include "DNSModuleProtocolTypeCleartext.h"
-#include "DNSModuleProtocolTypeHttps.h"
-#include "DNSModuleProtocolTypeTls.h"
+#include <partout/models/DNSModuleProtocolTypeCleartext.h>
+#include <partout/models/DNSModuleProtocolTypeHttps.h>
+#include <partout/models/DNSModuleProtocolTypeTls.h>
 
 namespace Partout::Models {
 

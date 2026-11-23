@@ -20,9 +20,9 @@
 #define TunnelSnapshotEnvironment_H_
 
 #include <string>
-#include "ConnectionStatus.h"
-#include "DataCount.h"
-#include "../Json.h"
+#include <partout/models/ConnectionStatus.h>
+#include <partout/models/DataCount.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

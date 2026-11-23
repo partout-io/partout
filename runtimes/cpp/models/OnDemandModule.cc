@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "OnDemandModule.h"
-#include "Helpers.h"
+#include <partout/models/OnDemandModule.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

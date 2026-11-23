@@ -20,7 +20,7 @@
 #define OnDemandModulePolicy_H_
 
 #include <string>
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

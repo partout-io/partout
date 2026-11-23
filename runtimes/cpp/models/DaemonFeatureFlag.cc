@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "DaemonFeatureFlag.h"
-#include "Helpers.h"
+#include <partout/models/DaemonFeatureFlag.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

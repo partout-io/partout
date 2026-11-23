@@ -174,6 +174,17 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
             f.contents = try c.fmt("#include <partout/Export.h>\n{s}", .{f.contents});
         }
     }
+    if (language == .cpp and options.external.len == 0) {
+        for (files.items) |*f| {
+            f.contents = try replace(a, f.contents, "#include \"../Json.h\"", "#include <partout/Json.h>");
+            for (files.items) |dependency| {
+                const name = std.fs.path.basename(dependency.name);
+                if (!std.mem.endsWith(u8, name, ".h")) continue;
+                f.contents = try replace(a, f.contents, try c.fmt("#include \"{s}\"", .{name}), try c.fmt("#include <partout/models/{s}>", .{name}));
+            }
+            f.name = try c.fmt("{s}/{s}", .{ if (std.mem.endsWith(u8, f.name, ".h")) "include/partout/models" else "models", f.name });
+        }
+    }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
     const golden: ?File = if (options.golden_path) |path| .{
@@ -182,7 +193,9 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     } else null;
     try cwd.createDirPath(io, directory);
     for (files.items) |f| {
-        try cwd.writeFile(io, .{ .sub_path = try c.fmt("{s}/{s}", .{ directory, f.name }), .data = f.contents });
+        const path = try c.fmt("{s}/{s}", .{ directory, f.name });
+        try cwd.createDirPath(io, std.fs.path.dirname(path) orelse directory);
+        try cwd.writeFile(io, .{ .sub_path = path, .data = f.contents });
     }
     if (golden) |file| {
         try cwd.writeFile(io, .{ .sub_path = file.name, .data = file.contents });

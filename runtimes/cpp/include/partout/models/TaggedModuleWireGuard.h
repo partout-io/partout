@@ -20,8 +20,8 @@
 #define TaggedModuleWireGuard_H_
 
 #include <string>
-#include "WireGuardModule.h"
-#include "../Json.h"
+#include <partout/models/WireGuardModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "DNSModule.h"
-#include "Helpers.h"
+#include <partout/models/DNSModule.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

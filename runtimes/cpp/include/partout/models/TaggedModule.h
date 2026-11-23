@@ -7,17 +7,17 @@
 
 #pragma once
 // System headers
-#include "../Json.h"
+#include <partout/Json.h>
 #include <variant>
 #include <string>
-#include "TaggedModuleCustom.h"
-#include "TaggedModuleDns.h"
-#include "TaggedModuleHTTPProxy.h"
-#include "TaggedModuleIp.h"
-#include "TaggedModuleOnDemand.h"
-#include "TaggedModuleOpenVpn.h"
-#include "TaggedModuleWireGuard.h"
-#include "WireGuardModule.h"
+#include <partout/models/TaggedModuleCustom.h>
+#include <partout/models/TaggedModuleDns.h>
+#include <partout/models/TaggedModuleHTTPProxy.h>
+#include <partout/models/TaggedModuleIp.h>
+#include <partout/models/TaggedModuleOnDemand.h>
+#include <partout/models/TaggedModuleOpenVpn.h>
+#include <partout/models/TaggedModuleWireGuard.h>
+#include <partout/models/WireGuardModule.h>
 
 namespace Partout::Models {
 

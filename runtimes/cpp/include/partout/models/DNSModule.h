@@ -20,10 +20,10 @@
 #define DNSModule_H_
 
 #include <string>
-#include "DNSModuleDomainPolicy.h"
+#include <partout/models/DNSModuleDomainPolicy.h>
 #include <vector>
-#include "DNSModuleProtocolType.h"
-#include "../Json.h"
+#include <partout/models/DNSModuleProtocolType.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

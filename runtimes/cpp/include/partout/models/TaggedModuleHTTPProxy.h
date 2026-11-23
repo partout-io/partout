@@ -20,8 +20,8 @@
 #define TaggedModuleHTTPProxy_H_
 
 #include <string>
-#include "HTTPProxyModule.h"
-#include "../Json.h"
+#include <partout/models/HTTPProxyModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

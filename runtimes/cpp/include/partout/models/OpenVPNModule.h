@@ -19,10 +19,10 @@
 #ifndef OpenVPNModule_H_
 #define OpenVPNModule_H_
 
-#include "OpenVpnConfiguration.h"
-#include "OpenVpnCredentials.h"
+#include <partout/models/OpenVpnConfiguration.h>
+#include <partout/models/OpenVpnCredentials.h>
 #include <string>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "TunnelStatus.h"
-#include "Helpers.h"
+#include <partout/models/TunnelStatus.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

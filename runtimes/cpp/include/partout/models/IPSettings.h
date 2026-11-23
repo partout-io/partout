@@ -21,8 +21,8 @@
 
 #include <string>
 #include <vector>
-#include "Route.h"
-#include "../Json.h"
+#include <partout/models/Route.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

@@ -20,8 +20,8 @@
 #define WireGuardModule_H_
 
 #include <string>
-#include "WireGuardConfiguration.h"
-#include "../Json.h"
+#include <partout/models/WireGuardConfiguration.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

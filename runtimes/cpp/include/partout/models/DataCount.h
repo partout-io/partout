@@ -19,7 +19,7 @@
 #ifndef DataCount_H_
 #define DataCount_H_
 
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

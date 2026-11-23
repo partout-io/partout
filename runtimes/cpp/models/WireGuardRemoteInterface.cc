@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "WireGuardRemoteInterface.h"
-#include "Helpers.h"
+#include <partout/models/WireGuardRemoteInterface.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

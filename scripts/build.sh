@@ -64,10 +64,7 @@ generate_kotlin_models() {
 generate_cpp_models() {
     local openapi=$1
 
-    generate_model_files "$openapi" cpp runtimes/cpp/models Partout.Models
-    mkdir -p runtimes/cpp/include/partout/models
-    rm -f runtimes/cpp/include/partout/models/*.h
-    mv runtimes/cpp/models/*.h runtimes/cpp/include/partout/models/
+    generate_model_files "$openapi" cpp runtimes/cpp Partout.Models
 }
 
 generate_models() {

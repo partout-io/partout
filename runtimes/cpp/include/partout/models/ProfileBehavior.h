@@ -19,7 +19,7 @@
 #ifndef ProfileBehavior_H_
 #define ProfileBehavior_H_
 
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

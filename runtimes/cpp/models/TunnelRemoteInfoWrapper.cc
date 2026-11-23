@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "TunnelRemoteInfoWrapper.h"
-#include "Helpers.h"
+#include <partout/models/TunnelRemoteInfoWrapper.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

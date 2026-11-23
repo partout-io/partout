@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnObfuscationMethodXorptrpos.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnObfuscationMethodXorptrpos.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

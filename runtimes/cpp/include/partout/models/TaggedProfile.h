@@ -19,12 +19,12 @@
 #ifndef TaggedProfile_H_
 #define TaggedProfile_H_
 
-#include "../Json.h"
-#include "TaggedModule.h"
+#include <partout/Json.h>
+#include <partout/models/TaggedModule.h>
 #include <string>
-#include "ProfileBehavior.h"
+#include <partout/models/ProfileBehavior.h>
 #include <vector>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

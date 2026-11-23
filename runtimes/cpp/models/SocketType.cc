@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "SocketType.h"
-#include "Helpers.h"
+#include <partout/models/SocketType.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

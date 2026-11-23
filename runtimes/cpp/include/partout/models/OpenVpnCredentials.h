@@ -20,8 +20,8 @@
 #define OpenVpnCredentials_H_
 
 #include <string>
-#include "OpenVpnCredentialsOTPMethod.h"
-#include "../Json.h"
+#include <partout/models/OpenVpnCredentialsOTPMethod.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

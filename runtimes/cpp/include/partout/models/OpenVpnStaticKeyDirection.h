@@ -19,7 +19,7 @@
 #ifndef OpenVpnStaticKeyDirection_H_
 #define OpenVpnStaticKeyDirection_H_
 
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

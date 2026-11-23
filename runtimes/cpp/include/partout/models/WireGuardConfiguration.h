@@ -19,10 +19,10 @@
 #ifndef WireGuardConfiguration_H_
 #define WireGuardConfiguration_H_
 
-#include "WireGuardRemoteInterface.h"
-#include "WireGuardLocalInterface.h"
+#include <partout/models/WireGuardRemoteInterface.h>
+#include <partout/models/WireGuardLocalInterface.h>
 #include <vector>
-#include "../Json.h"
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

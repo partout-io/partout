@@ -19,10 +19,10 @@
 #ifndef OpenVpnTLSWrap_H_
 #define OpenVpnTLSWrap_H_
 
-#include "OpenVpnStaticKey.h"
-#include "OpenVpnTLSWrapStrategy.h"
+#include <partout/models/OpenVpnStaticKey.h>
+#include <partout/models/OpenVpnTLSWrapStrategy.h>
 #include <string>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

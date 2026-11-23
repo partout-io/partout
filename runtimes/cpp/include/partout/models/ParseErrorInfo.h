@@ -20,9 +20,9 @@
 #define ParseErrorInfo_H_
 
 #include <string>
-#include "ModuleType.h"
+#include <partout/models/ModuleType.h>
 #include <vector>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

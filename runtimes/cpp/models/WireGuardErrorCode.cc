@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "WireGuardErrorCode.h"
-#include "Helpers.h"
+#include <partout/models/WireGuardErrorCode.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

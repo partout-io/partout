@@ -20,8 +20,8 @@
 #define OpenVpnStaticKey_H_
 
 #include <string>
-#include "OpenVpnStaticKeyDirection.h"
-#include "../Json.h"
+#include <partout/models/OpenVpnStaticKeyDirection.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

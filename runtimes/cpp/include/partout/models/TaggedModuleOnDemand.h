@@ -20,8 +20,8 @@
 #define TaggedModuleOnDemand_H_
 
 #include <string>
-#include "OnDemandModule.h"
-#include "../Json.h"
+#include <partout/models/OnDemandModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

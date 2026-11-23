@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnStaticKeyDirection.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnStaticKeyDirection.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

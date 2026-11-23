@@ -19,19 +19,19 @@
 #ifndef OpenVpnConfiguration_H_
 #define OpenVpnConfiguration_H_
 
-#include "IPSettings.h"
-#include "OpenVpnCompressionAlgorithm.h"
-#include "OpenVpnCompressionFraming.h"
-#include "OpenVpnDigest.h"
+#include <partout/models/IPSettings.h>
+#include <partout/models/OpenVpnCompressionAlgorithm.h>
+#include <partout/models/OpenVpnCompressionFraming.h>
+#include <partout/models/OpenVpnDigest.h>
 #include <string>
-#include "OpenVpnCipher.h"
-#include "OpenVpnPullMask.h"
-#include "OpenVpnTLSWrap.h"
-#include "OpenVpnObfuscationMethod.h"
+#include <partout/models/OpenVpnCipher.h>
+#include <partout/models/OpenVpnPullMask.h>
+#include <partout/models/OpenVpnTLSWrap.h>
+#include <partout/models/OpenVpnObfuscationMethod.h>
 #include <vector>
-#include "OpenVpnRoutingPolicy.h"
-#include "Route.h"
-#include "../Json.h"
+#include <partout/models/OpenVpnRoutingPolicy.h>
+#include <partout/models/Route.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

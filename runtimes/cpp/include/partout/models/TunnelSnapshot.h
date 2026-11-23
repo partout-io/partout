@@ -20,9 +20,9 @@
 #define TunnelSnapshot_H_
 
 #include <string>
-#include "TunnelSnapshotEnvironment.h"
-#include "TunnelStatus.h"
-#include "../Json.h"
+#include <partout/models/TunnelSnapshotEnvironment.h>
+#include <partout/models/TunnelStatus.h>
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

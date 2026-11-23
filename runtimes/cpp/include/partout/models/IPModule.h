@@ -19,9 +19,9 @@
 #ifndef IPModule_H_
 #define IPModule_H_
 
-#include "IPSettings.h"
+#include <partout/models/IPSettings.h>
 #include <string>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models

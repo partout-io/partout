@@ -20,8 +20,8 @@
 #define TaggedModuleOpenVpn_H_
 
 #include <string>
-#include "OpenVPNModule.h"
-#include "../Json.h"
+#include <partout/models/OpenVPNModule.h>
+#include <partout/Json.h>
 
 namespace Partout::Models
 {

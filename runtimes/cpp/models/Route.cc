@@ -10,8 +10,8 @@
 * Do not edit the class manually.
 */
 
-#include "Route.h"
-#include "Helpers.h"
+#include <partout/models/Route.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

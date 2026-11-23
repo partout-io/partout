@@ -19,10 +19,10 @@
 #ifndef WireGuardLocalInterface_H_
 #define WireGuardLocalInterface_H_
 
-#include "DNSModule.h"
+#include <partout/models/DNSModule.h>
 #include <string>
 #include <vector>
-#include "../Json.h"
+#include <partout/Json.h>
 #include <optional>
 
 namespace Partout::Models
