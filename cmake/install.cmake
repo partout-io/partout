@@ -92,6 +92,11 @@ elseif(TARGET partout-models-impl)
     set(PARTOUT_PACKAGE_MODELS ON)
 endif()
 
+if(TARGET partout-cpp-runtime)
+    set_target_properties(partout-cpp-runtime PROPERTIES EXPORT_NAME CppRuntime)
+    install(TARGETS partout-cpp-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
+
 if(TARGET partout-runtime)
     set_target_properties(partout-runtime PROPERTIES EXPORT_NAME Runtime)
     install(TARGETS partout-runtime EXPORT PartoutTargets)

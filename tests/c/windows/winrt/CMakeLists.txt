@@ -7,7 +7,7 @@ set_target_properties(partout-runtime-link-test PROPERTIES
     MSVC_RUNTIME_LIBRARY MultiThreadedDLL
     MSVC_RUNTIME_CHECKS ""
 )
-target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
+target_link_libraries(partout-runtime-link-test PRIVATE Partout::CppRuntime)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"
@@ -25,8 +25,8 @@ add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
     "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/exports.cmake")
-set(winrt_tests log network tun_settings tunnel tunnel_profile interactive_credentials)
-set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests TunnelTests TunnelProfileTests InteractiveCredentialsTests)
+set(winrt_tests log network tun_settings tunnel tunnel_profile)
+set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests TunnelTests TunnelProfileTests)
 foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
     add_executable(partout-${test}-test ${source}.cc)
     target_include_directories(partout-${test}-test PRIVATE "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt")

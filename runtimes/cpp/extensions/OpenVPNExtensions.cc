@@ -1,30 +1,21 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
-#include "InteractiveCredentials.h"
+#include "OpenVPNExtensions.h"
 #include <algorithm>
 #include <stdexcept>
-#include <winrt/Windows.Security.Cryptography.h>
-#include <winrt/Windows.Storage.Streams.h>
 
-namespace Partout {
 namespace {
 bool IsBlank(const std::string &value) {
     return value.find_first_not_of(" \t\r\n") == std::string::npos;
 }
-
-std::string Base64(const std::string &value) {
-    using winrt::Windows::Security::Cryptography::CryptographicBuffer;
-    const auto bytes = winrt::array_view<const uint8_t>(
-        reinterpret_cast<const uint8_t *>(value.data()),
-        reinterpret_cast<const uint8_t *>(value.data() + value.size()));
-    return winrt::to_string(CryptographicBuffer::EncodeToBase64String(
-        CryptographicBuffer::CreateFromByteArray(bytes)));
-}
 }
 
-Models::TaggedProfile PrepareInteractiveProfile(
-    const Models::TaggedProfile &profile, const CredentialPrompt &prompt) {
+using namespace Partout;
+
+Models::TaggedProfile Partout::OpenVPN::PrepareInteractiveProfile(
+    const Models::TaggedProfile &profile, const CredentialPrompt &prompt
+) {
     using Method = Models::OpenVpnCredentialsOTPMethod;
     auto prepared = profile;
     for (auto &tagged : prepared.modules) {
@@ -43,28 +34,23 @@ Models::TaggedProfile PrepareInteractiveProfile(
 
         const auto method = saved ? saved->otpMethod.value : Method::none;
         const bool needsOTP = method != Method::none;
-        auto entered = prompt(needsOTP);
+        const auto response = prompt(needsOTP);
+        Models::OpenVpnCredentials entered{};
+        entered.username = response.username;
+        entered.password = response.password;
         if (IsBlank(entered.username) || (needsOTP && IsBlank(entered.password))) {
             throw std::invalid_argument("Incomplete interactive credentials");
         }
+        entered.otpMethod.value = method;
         if (needsOTP) {
-            const auto password = saved ? saved->password : std::string{};
-            switch (method) {
-            case Method::append:
-                entered.password = password + entered.password;
-                break;
-            case Method::encode:
-                entered.password = "SCRV1:" + Base64(password) + ":" + Base64(entered.password);
-                break;
-            default:
+            if (method != Method::append && method != Method::encode)
                 throw std::invalid_argument("Unsupported OTP method");
-            }
+            // The OpenVPN session applies append/SCRV1 encoding once, at authentication.
+            entered.otp = std::move(entered.password);
+            entered.password = saved->password;
         }
-        entered.otpMethod.value = Method::none;
-        entered.otp.reset();
         module.credentials = std::move(entered);
         return prepared;
     }
     return prepared;
-}
 }

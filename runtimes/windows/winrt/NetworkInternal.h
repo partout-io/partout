@@ -6,9 +6,9 @@
 #include <functional>
 #include <optional>
 
-namespace Partout {
+namespace Partout::Network {
 // Adapter identity matters even when reachability remains true during a handoff.
-struct NetworkPath {
+struct Path {
     winrt::guid adapter{};
     bool reachable = false;
     bool initialized = false;
@@ -17,15 +17,16 @@ struct NetworkPath {
 };
 
 // A default route outranks a local-only path; lower combined metrics win.
-struct NetworkPreference {
+struct Preference {
     uint32_t connectivity = 0;
     std::optional<uint64_t> metric;
 
-    bool IsBetterThan(const NetworkPreference &other) const;
+    bool IsBetterThan(const Preference &other) const;
 };
 
 // A missing preference excludes an unusable profile from selection.
 std::optional<size_t>
-SelectPhysicalNetwork(size_t count,
-                      const std::function<std::optional<NetworkPreference>(size_t)> &preference);
-} // namespace Partout
+SelectPhysical(
+    size_t count, const std::function<std::optional<Preference>(size_t)> &preference
+);
+} // namespace Partout::Network

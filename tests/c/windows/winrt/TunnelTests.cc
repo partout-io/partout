@@ -7,22 +7,22 @@
 #include <limits>
 
 int main() {
-    assert(Partout::TunnelProfileNamesEqual(L"Office", L"Office"));
-    assert(Partout::TunnelProfileNamesEqual(L"Office", L"office"));
-    assert(Partout::TunnelProfileNamesEqual(L"office", L"OFFICE"));
-    assert(Partout::TunnelProfileNamesEqual(L"B\u00fcro", L"B\u00dcRO"));
-    assert(!Partout::TunnelProfileNamesEqual(L"Office", L"Home"));
-    assert(!Partout::TunnelProfileNamesEqual(L"Office", L"Office 2"));
+    assert(Partout::WinRT::Profiles::NamesEqual(L"Office", L"Office"));
+    assert(Partout::WinRT::Profiles::NamesEqual(L"Office", L"office"));
+    assert(Partout::WinRT::Profiles::NamesEqual(L"office", L"OFFICE"));
+    assert(Partout::WinRT::Profiles::NamesEqual(L"B\u00fcro", L"B\u00dcRO"));
+    assert(!Partout::WinRT::Profiles::NamesEqual(L"Office", L"Home"));
+    assert(!Partout::WinRT::Profiles::NamesEqual(L"Office", L"Office 2"));
 
     using Status = winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus;
     std::string error;
-    auto status = Partout::ReadTunnelConnectionStatus([]() -> Status {
+    auto status = Partout::WinRT::Tunnels::ReadConnectionStatus([]() -> Status {
         throw winrt::hresult_error(E_HANDLE);
     }, error);
     assert(!status && error.find("80070006") != std::string::npos);
-    status = Partout::ReadTunnelConnectionStatus([] { return Status::Connected; }, error);
+    status = Partout::WinRT::Tunnels::ReadConnectionStatus([] { return Status::Connected; }, error);
     assert(status == Status::Connected && error.empty());
-    status = Partout::ReadTunnelConnectionStatus([]() -> Status {
+    status = Partout::WinRT::Tunnels::ReadConnectionStatus([]() -> Status {
         throw winrt::hresult_error(E_ACCESSDENIED);
     }, error);
     assert(!status && error.find("80070005") != std::string::npos);
@@ -32,20 +32,20 @@ int main() {
     row.OperStatus = IfOperStatusUp;
     row.InOctets = 5ULL * 1024 * 1024 * 1024;
     row.OutOctets = 7ULL * 1024 * 1024 * 1024;
-    auto environment = Partout::TunnelInterfaceEnvironment(row);
+    auto environment = Partout::WinRT::Tunnels::InterfaceEnvironment(row);
     assert(environment && environment->dataCount.received == row.InOctets);
     assert(environment->dataCount.sent == row.OutOctets);
     row.InOctets = 0;
     row.OutOctets = 0;
-    environment = Partout::TunnelInterfaceEnvironment(row);
+    environment = Partout::WinRT::Tunnels::InterfaceEnvironment(row);
     assert(environment && environment->dataCount.received == 0 && environment->dataCount.sent == 0);
     row.Type = IF_TYPE_ETHERNET_CSMACD;
-    assert(!Partout::TunnelInterfaceEnvironment(row));
+    assert(!Partout::WinRT::Tunnels::InterfaceEnvironment(row));
     row.Type = IF_TYPE_TUNNEL;
-    assert(Partout::TunnelInterfaceEnvironment(row));
+    assert(Partout::WinRT::Tunnels::InterfaceEnvironment(row));
     row.OperStatus = IfOperStatusDown;
-    assert(!Partout::TunnelInterfaceEnvironment(row));
+    assert(!Partout::WinRT::Tunnels::InterfaceEnvironment(row));
     row.OperStatus = IfOperStatusUp;
     row.InOctets = std::numeric_limits<ULONG64>::max();
-    assert(!Partout::TunnelInterfaceEnvironment(row));
+    assert(!Partout::WinRT::Tunnels::InterfaceEnvironment(row));
 }

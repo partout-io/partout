@@ -27,6 +27,11 @@
   implementations. Use explicit qualification inside helpers where needed.
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.
 - Use PascalCase for all methods, public and private.
+- Use namespaces to express a function's domain instead of embedding domain or
+  protocol names in long function names. For example, use
+  `Partout::OpenVPN::PrepareInteractiveProfile`, not
+  `Partout::PrepareOpenVPNInteractiveProfile`. Keep related helper types in the
+  same namespace without repeating its name (for example, `OpenVPN::CredentialPrompt`).
 - Use four spaces per indentation level, never tabs. Do not add indentation for
   named or anonymous namespaces, `extern "C"` linkage wrappers, or `__cplusplus`
   compatibility guards; keep their contents at the surrounding indentation level.
@@ -35,6 +40,9 @@
   and indent members one level further. For wrapped parameter lists,
   align continuation parameters with the first parameter or place all parameters
   on separate lines indented one level; never leave stale alignment after edits.
+- When a function parameter or call argument list spans multiple lines, put its
+  closing `)` on a new line aligned with the start of the declaration or call.
+  Keep trailing syntax such as `;`, `const`, or `{` after that `)`.
 - Do not compress blocks, as in no text after curly braces or multiple semicolon-separated lines. However, one-liner like `if (condition) return;` are acceptable as long as they are not too long.
 - Empty blocks in curly braces are fine (`{}`).
 - Add a blank line only between adjacent function, type, or namespace definitions,

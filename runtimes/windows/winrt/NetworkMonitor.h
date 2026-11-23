@@ -8,7 +8,10 @@
 #include <memory>
 
 namespace Partout {
+namespace Network {
 winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile();
+}
+
 
 class NetworkMonitor {
 public:

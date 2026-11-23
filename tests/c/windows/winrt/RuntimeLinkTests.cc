@@ -5,6 +5,9 @@
 
 int main() {
     if (!partout_version() || std::strlen(partout_version()) == 0) return 1;
+    // Construction and cancellation do not alter VPN registrations.
+    Partout::Tunnel tunnel("https://localhost");
+    tunnel.Cancel();
     try {
         // Resolves runtime methods against the separate core/backend libraries.
         // Rejects an absent channel before touching OS VPN configuration.

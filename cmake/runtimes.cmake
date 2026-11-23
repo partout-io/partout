@@ -1,6 +1,35 @@
 # SPDX-FileCopyrightText: 2026 Davide De Rosa
 # SPDX-License-Identifier: GPL-3.0
 
+if(TARGET Partout::Models)
+    # Portable C++ lifecycle API and replaceable native mechanisms.
+    foreach(header tunnel/Tunnel.h tunnel/TunnelStrategy.h)
+        configure_file("${PARTOUT_MODELS_ROOT}/${header}" "${PARTOUT_MODELS_INCLUDE}/partout/${header}" COPYONLY)
+    endforeach()
+    add_library(partout-cpp-runtime STATIC "${PARTOUT_MODELS_ROOT}/tunnel/Tunnel.cc")
+    add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
+    target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
+    target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
+    if(NOT (WIN32 AND PP_BUILD_WINRT AND PP_BUILD_LIBRARY))
+        target_sources(partout-cpp-runtime PRIVATE "${PARTOUT_MODELS_ROOT}/tunnel/NativeTunnelStrategy.cc")
+    endif()
+    if(MSVC)
+        target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
+        if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
+            set_target_properties(partout-cpp-runtime PROPERTIES
+                MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+                MSVC_RUNTIME_CHECKS ""
+            )
+        endif()
+    endif()
+endif()
+
+option(PP_TEST_CPP_RUNTIME "Test the portable C++ tunnel lifecycle" OFF)
+if(PP_TEST_CPP_RUNTIME AND TARGET partout-cpp-runtime)
+    enable_testing()
+    add_subdirectory(tests/cpp)
+endif()
+
 if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
@@ -8,8 +37,7 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        runtimes/windows/winrt/Tunnel.cc
-        runtimes/windows/winrt/InteractiveCredentials.cc
+        runtimes/windows/winrt/WinRTTunnelStrategy.cc
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/Platform.cc
     )
@@ -32,6 +60,8 @@ if(TARGET partout-winrt-backend)
         PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32
     )
+
+    target_link_libraries(partout-cpp-runtime PUBLIC Partout::WinRTRuntime)
 
     option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
     if(PP_TEST_WINRT_RUNTIME)
@@ -89,3 +119,6 @@ endif()
 add_library(partout-runtime INTERFACE)
 add_library(Partout::Runtime ALIAS partout-runtime)
 target_link_libraries(partout-runtime INTERFACE ${partout_selected_runtime})
+if(TARGET partout-cpp-runtime)
+    target_link_libraries(partout-runtime INTERFACE Partout::CppRuntime)
+endif()

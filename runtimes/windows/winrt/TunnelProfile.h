@@ -7,6 +7,6 @@
 #include <optional>
 #include <string>
 
-namespace Partout {
-std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml);
+namespace Partout::WinRT::Profiles {
+std::optional<std::string> DecodeId(const winrt::hstring &xml);
 }

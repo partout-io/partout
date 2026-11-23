@@ -1,4 +1,4 @@
-# Portable generated models, independent of the Windows bridge.
+# Portable models and extensions.
 include_guard(GLOBAL)
 if(NOT TARGET nlohmann_json::nlohmann_json)
     include(FetchContent)
@@ -33,6 +33,9 @@ foreach(header IN LISTS partout_model_headers)
         configure_file("${header}" "${PARTOUT_MODELS_INCLUDE}/partout/models/${name}" COPYONLY)
     endif()
 endforeach()
+foreach(header extensions/OpenVPNExtensions.h tunnel/TunnelCredentials.h)
+    configure_file("${PARTOUT_MODELS_ROOT}/${header}" "${PARTOUT_MODELS_INCLUDE}/partout/${header}" COPYONLY)
+endforeach()
 configure_file("${PARTOUT_MODELS_ROOT}/Json.h" "${PARTOUT_MODELS_INCLUDE}/partout/Json.h" COPYONLY)
 
 file(GLOB partout_model_sources CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.cc")
@@ -53,9 +56,19 @@ if(partout_models_dll)
         list(APPEND model_build_sources "${copy}")
     endforeach()
     set(partout_model_sources ${model_build_sources})
+else()
+    file(CONFIGURE OUTPUT "${PARTOUT_MODELS_INCLUDE}/partout/export.h" CONTENT
+"#pragma once
+#define PARTOUT_MODELS_API
+" @ONLY NEWLINE_STYLE LF)
 endif()
-add_library(partout-models-impl STATIC ${partout_model_sources})
+add_library(partout-models-impl STATIC ${partout_model_sources}
+    "${PARTOUT_MODELS_ROOT}/extensions/OpenVPNExtensions.cc")
 set_target_properties(partout-models-impl PROPERTIES UNITY_BUILD ON)
+# Extensions consume staged public headers; keep them separate from generated
+# unity sources, which include their source-tree model headers.
+set_source_files_properties("${PARTOUT_MODELS_ROOT}/extensions/OpenVPNExtensions.cc"
+    PROPERTIES SKIP_UNITY_BUILD_INCLUSION ON)
 if(partout_models_dll)
     target_compile_definitions(partout-models-impl PRIVATE PARTOUT_MODELS_BUILD_DLL)
 endif()

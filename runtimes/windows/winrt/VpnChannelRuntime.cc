@@ -13,7 +13,7 @@
 #include <thread>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Security.Credentials.h>
-#include "InteractiveCredentials.h"
+#include <partout/extensions/OpenVPNExtensions.h>
 #include "partout_winrt.h"
 #include "Tun.h"
 #include "RuntimeLoop.h"
@@ -157,8 +157,8 @@ struct VpnChannelRuntime::Impl {
         Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
-            const auto prepared = PrepareInteractiveProfile(
-                Models::TaggedProfile::FromJson(nlohmann::json::parse(profile)),
+            const auto prepared = OpenVPN::PrepareInteractiveProfile(
+                Models::TaggedProfile::FromJson(Json::Parse(profile)),
                 [this](bool needsOTP) {
                     using winrt::Windows::Foundation::AsyncStatus;
                     if (canceled.load()) throw hresult_canceled();
@@ -182,12 +182,12 @@ struct VpnChannelRuntime::Impl {
                     if (!result) throw hresult_canceled();
                     const auto passkey = result.PasskeyCredential();
                     if (!passkey) throw hresult_canceled();
-                    Models::OpenVpnCredentials credentials{};
+                    TunnelCredentials credentials{};
                     credentials.username = to_string(passkey.UserName());
                     credentials.password = to_string(passkey.Password());
-                    credentials.otpMethod.value = Models::OpenVpnCredentialsOTPMethod::none;
                     return credentials;
-                });
+                }
+            );
             if (canceled.load()) throw hresult_canceled();
             // Neither the registration nor the stored profile receives these credentials.
             const auto connectionProfile = prepared.ToJson().Encode();

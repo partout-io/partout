@@ -18,16 +18,16 @@ int main() {
     root.SetAttribute(L"version", L"1");
     root.InnerText(winrt::to_hstring(profile.ToJson().Encode()));
     document.AppendChild(root);
-    assert(Partout::DecodeTunnelProfileId(document.GetXml()) == profile.id);
+    assert(Partout::WinRT::Profiles::DecodeId(document.GetXml()) == profile.id);
     profile.name = "Renamed";
     root.InnerText(winrt::to_hstring(profile.ToJson().Encode()));
     const auto details = document.CreateElement(L"ConnectionDetails");
     details.InnerText(L"Windows metadata is not profile JSON");
     root.AppendChild(details);
-    assert(Partout::DecodeTunnelProfileId(document.GetXml()) == profile.id);
+    assert(Partout::WinRT::Profiles::DecodeId(document.GetXml()) == profile.id);
     root.SetAttribute(L"version", L"2");
-    assert(!Partout::DecodeTunnelProfileId(document.GetXml()));
-    assert(!Partout::DecodeTunnelProfileId(L"malformed"));
-    assert(!Partout::DecodeTunnelProfileId(L"<PartoutProfile version='1'>{}</PartoutProfile>"));
-    assert(!Partout::DecodeTunnelProfileId(L"<!DOCTYPE x [<!ENTITY a 'secret'>]><PartoutProfile version='1'>&a;</PartoutProfile>"));
+    assert(!Partout::WinRT::Profiles::DecodeId(document.GetXml()));
+    assert(!Partout::WinRT::Profiles::DecodeId(L"malformed"));
+    assert(!Partout::WinRT::Profiles::DecodeId(L"<PartoutProfile version='1'>{}</PartoutProfile>"));
+    assert(!Partout::WinRT::Profiles::DecodeId(L"<!DOCTYPE x [<!ENTITY a 'secret'>]><PartoutProfile version='1'>&a;</PartoutProfile>"));
 }

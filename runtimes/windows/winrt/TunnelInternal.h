@@ -14,9 +14,15 @@
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
-bool TunnelProfileNamesEqual(const winrt::hstring &left, const winrt::hstring &right);
-std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadTunnelConnectionStatus(
+namespace WinRT::Profiles {
+bool NamesEqual(const winrt::hstring &left, const winrt::hstring &right);
+}
+
+namespace WinRT::Tunnels {
+std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadConnectionStatus(
     const std::function<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus()> &read,
-    std::string &error);
-std::optional<Models::TunnelSnapshotEnvironment> TunnelInterfaceEnvironment(const MIB_IF_ROW2 &row);
+    std::string &error
+);
+std::optional<Models::TunnelSnapshotEnvironment> InterfaceEnvironment(const MIB_IF_ROW2 &row);
+}
 }
