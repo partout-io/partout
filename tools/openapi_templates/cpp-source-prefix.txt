@@ -1,5 +1,3 @@
-#include "@NAME@.h"
-#include "Helpers.h"
 
 namespace Partout::Models
 {

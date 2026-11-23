@@ -19,8 +19,7 @@
 #define OpenVpnTLSWrap_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OpenVpnStaticKey.h>
 #include <partout/models/OpenVpnTLSWrapStrategy.h>
 #include <string>

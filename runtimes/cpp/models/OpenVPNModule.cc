@@ -10,7 +10,6 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/Helpers.h>
 #include <partout/models/OpenVPNModule.h>
 
 namespace Partout::Models

@@ -18,8 +18,7 @@
 #ifndef TunnelControllerOptions_H_
 #define TunnelControllerOptions_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <string>
 #include <vector>
 

@@ -19,8 +19,7 @@
 #define OpenVpnCredentials_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OpenVpnCredentialsOTPMethod.h>
 #include <string>
 

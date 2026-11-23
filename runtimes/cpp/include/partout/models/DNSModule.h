@@ -19,10 +19,9 @@
 #define DNSModule_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
 #include <partout/models/DNSModuleDomainPolicy.h>
 #include <partout/models/DNSModuleProtocolType.h>
+#include <partout/models/Helpers.h>
 #include <string>
 #include <vector>
 

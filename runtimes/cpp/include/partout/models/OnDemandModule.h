@@ -19,8 +19,7 @@
 #define OnDemandModule_H_
 
 #include <map>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OnDemandModuleOtherNetwork.h>
 #include <partout/models/OnDemandModulePolicy.h>
 #include <string>

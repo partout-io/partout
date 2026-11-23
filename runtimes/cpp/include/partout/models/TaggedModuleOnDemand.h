@@ -18,8 +18,7 @@
 #ifndef TaggedModuleOnDemand_H_
 #define TaggedModuleOnDemand_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OnDemandModule.h>
 #include <string>
 

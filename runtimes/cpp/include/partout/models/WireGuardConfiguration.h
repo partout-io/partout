@@ -18,8 +18,7 @@
 #ifndef WireGuardConfiguration_H_
 #define WireGuardConfiguration_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/WireGuardLocalInterface.h>
 #include <partout/models/WireGuardRemoteInterface.h>
 #include <vector>

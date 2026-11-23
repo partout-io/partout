@@ -18,8 +18,7 @@
 #ifndef TaggedModuleOpenVpn_H_
 #define TaggedModuleOpenVpn_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OpenVPNModule.h>
 #include <string>
 

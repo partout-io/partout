@@ -6,8 +6,7 @@
 
 #pragma once
 // System headers
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OpenVpnObfuscationMethodObfuscate.h>
 #include <partout/models/OpenVpnObfuscationMethodReverse.h>
 #include <partout/models/OpenVpnObfuscationMethodXormask.h>

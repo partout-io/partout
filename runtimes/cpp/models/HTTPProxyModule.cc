@@ -11,7 +11,6 @@
 */
 
 #include <partout/models/HTTPProxyModule.h>
-#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

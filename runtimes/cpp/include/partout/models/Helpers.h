@@ -21,11 +21,12 @@
 #include <cstdint>
 #include <ctime>
 #include <map>
-#include <partout/Export.h>
 #include <set>
 #include <sstream>
 #include <string>
 #include <vector>
+#include <partout/Export.h>
+#include <partout/Json.h>
 
 namespace Partout::Helpers
 {

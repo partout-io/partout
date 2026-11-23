@@ -18,9 +18,8 @@
 #ifndef TaggedModuleHTTPProxy_H_
 #define TaggedModuleHTTPProxy_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
 #include <partout/models/HTTPProxyModule.h>
+#include <partout/models/Helpers.h>
 #include <string>
 
 namespace Partout::Models

@@ -18,9 +18,8 @@
 #ifndef TaggedModuleDns_H_
 #define TaggedModuleDns_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
 #include <partout/models/DNSModule.h>
+#include <partout/models/Helpers.h>
 #include <string>
 
 namespace Partout::Models

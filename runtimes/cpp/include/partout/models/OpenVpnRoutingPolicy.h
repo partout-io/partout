@@ -18,8 +18,7 @@
 #ifndef OpenVpnRoutingPolicy_H_
 #define OpenVpnRoutingPolicy_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <string>
 
 namespace Partout::Models

@@ -19,10 +19,9 @@
 #define TunnelSnapshotEnvironment_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
 #include <partout/models/ConnectionStatus.h>
 #include <partout/models/DataCount.h>
+#include <partout/models/Helpers.h>
 #include <string>
 
 namespace Partout::Models

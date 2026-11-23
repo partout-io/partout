@@ -11,7 +11,6 @@
 */
 
 #include <partout/models/DNSModuleProtocolTypeHttps.h>
-#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

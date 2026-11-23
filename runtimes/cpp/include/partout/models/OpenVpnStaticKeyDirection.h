@@ -18,8 +18,7 @@
 #ifndef OpenVpnStaticKeyDirection_H_
 #define OpenVpnStaticKeyDirection_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

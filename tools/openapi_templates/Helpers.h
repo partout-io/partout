@@ -19,6 +19,7 @@
 #define Helpers_H_
 
 #include <partout/Export.h>
+#include <partout/Json.h>
 #include <cstdint>
 #include <ctime>
 #include <map>

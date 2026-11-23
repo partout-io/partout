@@ -19,8 +19,7 @@
 #define TunnelRemoteInfoWrapper_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/TaggedModule.h>
 #include <partout/models/TaggedProfile.h>
 #include <string>

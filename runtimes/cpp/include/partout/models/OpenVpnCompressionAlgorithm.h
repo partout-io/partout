@@ -18,8 +18,7 @@
 #ifndef OpenVpnCompressionAlgorithm_H_
 #define OpenVpnCompressionAlgorithm_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

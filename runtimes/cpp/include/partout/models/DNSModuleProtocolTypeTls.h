@@ -18,8 +18,7 @@
 #ifndef DNSModuleProtocolTypeTls_H_
 #define DNSModuleProtocolTypeTls_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <string>
 
 namespace Partout::Models

@@ -18,8 +18,7 @@
 #ifndef IPSettings_H_
 #define IPSettings_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/Route.h>
 #include <string>
 #include <vector>

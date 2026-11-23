@@ -6,8 +6,7 @@
 
 #pragma once
 // System headers
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/TaggedModuleCustom.h>
 #include <partout/models/TaggedModuleDns.h>
 #include <partout/models/TaggedModuleHTTPProxy.h>

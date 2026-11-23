@@ -18,8 +18,7 @@
 #ifndef TaggedModuleWireGuard_H_
 #define TaggedModuleWireGuard_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/WireGuardModule.h>
 #include <string>
 

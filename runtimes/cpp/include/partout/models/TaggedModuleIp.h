@@ -18,8 +18,7 @@
 #ifndef TaggedModuleIp_H_
 #define TaggedModuleIp_H_
 
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/IPModule.h>
 #include <string>
 

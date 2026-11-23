@@ -19,8 +19,7 @@
 #define ProfileBehavior_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 
 namespace Partout::Models
 {

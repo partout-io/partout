@@ -10,7 +10,6 @@
 * Do not edit the class manually.
 */
 
-#include <partout/models/Helpers.h>
 #include <partout/models/TaggedProfile.h>
 
 namespace Partout::Models

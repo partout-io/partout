@@ -6,11 +6,10 @@
 
 #pragma once
 // System headers
-#include <partout/Export.h>
-#include <partout/Json.h>
 #include <partout/models/DNSModuleProtocolTypeCleartext.h>
 #include <partout/models/DNSModuleProtocolTypeHttps.h>
 #include <partout/models/DNSModuleProtocolTypeTls.h>
+#include <partout/models/Helpers.h>
 #include <string>
 #include <variant>
 

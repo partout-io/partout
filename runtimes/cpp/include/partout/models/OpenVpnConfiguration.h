@@ -19,8 +19,7 @@
 #define OpenVpnConfiguration_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/IPSettings.h>
 #include <partout/models/OpenVpnCipher.h>
 #include <partout/models/OpenVpnCompressionAlgorithm.h>

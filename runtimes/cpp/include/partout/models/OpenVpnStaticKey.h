@@ -19,8 +19,7 @@
 #define OpenVpnStaticKey_H_
 
 #include <optional>
-#include <partout/Export.h>
-#include <partout/Json.h>
+#include <partout/models/Helpers.h>
 #include <partout/models/OpenVpnStaticKeyDirection.h>
 #include <string>
 
