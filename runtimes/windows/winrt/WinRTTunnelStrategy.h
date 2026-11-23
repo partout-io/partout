@@ -12,6 +12,7 @@
 namespace Partout {
 class WinRTTunnelStrategy final : public TunnelStrategy {
 public:
+    static std::optional<std::string> DecodeId(const winrt::hstring &xml);
     explicit WinRTTunnelStrategy(const std::string &serverUri);
     std::vector<Models::TunnelSnapshot> Fetch() override;
     std::map<std::string, std::string> ObservationErrors() const override;
@@ -26,8 +27,4 @@ private:
     std::atomic_bool canceled_{false};
     std::map<std::string, std::string> observationErrors_;
 };
-}
-
-namespace Partout::WinRT::Profiles {
-std::optional<std::string> DecodeId(const winrt::hstring &xml);
 }

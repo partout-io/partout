@@ -102,7 +102,7 @@ std::vector<OwnedProfile> OwnedProfiles(const winrt::Windows::Networking::Vpn::V
     for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
         const auto profile = item.try_as<winrt::Windows::Networking::Vpn::VpnPlugInProfile>();
         if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
-        if (const auto id = WinRT::Profiles::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
+        if (const auto id = WinRTTunnelStrategy::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
     }
     return result;
 }
@@ -150,7 +150,7 @@ bool WinRT::Profiles::NamesEqual(const winrt::hstring &left, const winrt::hstrin
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
 
-std::optional<std::string> WinRT::Profiles::DecodeId(const winrt::hstring &xml) {
+std::optional<std::string> WinRTTunnelStrategy::DecodeId(const winrt::hstring &xml) {
     // The display name is editable and is never the profile identity.
     try {
         if (xml.empty() || xml.size() > 1024 * 1024) return std::nullopt;
@@ -284,7 +284,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
                 continue;
             const auto plugin = other.try_as<VpnPlugInProfile>();
             if (!plugin || plugin.VpnPluginPackageFamilyName() != Family() ||
-                WinRT::Profiles::DecodeId(plugin.CustomConfiguration()) != profile.id)
+                WinRTTunnelStrategy::DecodeId(plugin.CustomConfiguration()) != profile.id)
                 throw std::runtime_error("Another Windows VPN profile already uses this name.");
         }
         auto target = existing ? existing : VpnPlugInProfile{};
