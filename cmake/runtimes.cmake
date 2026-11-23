@@ -3,10 +3,7 @@
 
 if(TARGET Partout::Models)
     # Portable C++ lifecycle API and replaceable native mechanisms.
-    foreach(header tunnel/Tunnel.h tunnel/TunnelStrategy.h)
-        configure_file("${PARTOUT_MODELS_ROOT}/${header}" "${PARTOUT_MODELS_INCLUDE}/partout/${header}" COPYONLY)
-    endforeach()
-    add_library(partout-cpp-runtime STATIC "${PARTOUT_MODELS_ROOT}/tunnel/Tunnel.cc")
+    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/Tunnel.cc")
     add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
     target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
     target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)

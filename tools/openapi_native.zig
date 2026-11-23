@@ -170,6 +170,9 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     }
     for (files.items) |*f| {
         if (language == .cpp and options.external.len != 0) f.contents = try externalCpp(c, f.contents);
+        if (language == .cpp and options.external.len == 0 and std.mem.endsWith(u8, f.name, ".h") and !std.mem.eql(u8, f.name, "Helpers.h")) {
+            f.contents = try c.fmt("#include <partout/Export.h>\n{s}", .{f.contents});
+        }
     }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
@@ -401,7 +404,8 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
-    const result = try replace(c.a, named, "Partout::Models", c.package);
+    var result = try replace(c.a, named, "Partout::Models", c.package);
+    result = try replace(c.a, result, "@EXPORT@", if (c.options.external.len == 0) "PARTOUT_MODELS_API " else "");
     return replace(c.a, result, "@JSON_TYPE@", "::Partout::Json");
 }
 

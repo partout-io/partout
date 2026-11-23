@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 
-#include "OpenVPNExtensions.h"
+#include <partout/extensions/OpenVPNExtensions.h>
 #include <algorithm>
 #include <stdexcept>
 

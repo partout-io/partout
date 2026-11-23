@@ -18,6 +18,7 @@
 #ifndef Helpers_H_
 #define Helpers_H_
 
+#include <partout/Export.h>
 #include <cstdint>
 #include <ctime>
 #include <map>
@@ -41,12 +42,12 @@ namespace Partout::Helpers
     /// <summary>
     /// Validate a string against the full-date definition of RFC 3339, section 5.6.
     /// </summary>
-    bool validateRfc3339_date(const std::string& str);
+    PARTOUT_MODELS_API bool validateRfc3339_date(const std::string& str);
 
     /// <summary>
     /// Validate a string against the date-time definition of RFC 3339, section 5.6.
     /// </summary>
-    bool validateRfc3339_date_time(const std::string& str);
+    PARTOUT_MODELS_API bool validateRfc3339_date_time(const std::string& str);
 
     namespace sfinae_helpers
     {

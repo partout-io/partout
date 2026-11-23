@@ -50,7 +50,10 @@ def main():
                 cwd=ROOT, env={**os.environ, 'TZ': 'Pacific/Honolulu', 'LC_ALL': 'C'})
             actual = snapshot(first)
             assert actual == snapshot(second), f'{language}: nondeterministic output'
-            assert actual == snapshot(models), f'{language}: checked-in model drift'
+            expected = snapshot(models)
+            if language == 'cpp':
+                expected.update(snapshot(ROOT / 'runtimes/cpp/include/partout/models'))
+            assert actual == expected, f'{language}: checked-in model drift'
             assert actual == golden[language], f'{language}: golden compatibility drift'
             print(f'{language}: {len(actual)} files match byte for byte', flush=True)
 
