@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include <chrono>
 #include "partout.h"
 #include <partout/models/TunnelControllerOptions.h>
 #include <memory>
@@ -14,6 +15,13 @@ namespace Partout {
 // remain valid while registered with Partout's process-wide logger.
 class VpnChannelRuntime {
 public:
+    // Maximum wait for the started tunnel engine to report a connected state.
+    static constexpr auto StartupTimeout = std::chrono::seconds(30);
+    // Maximum time allowed for the user to complete an interactive credential prompt.
+    static constexpr auto CredentialPromptTimeout = std::chrono::seconds(60);
+    // Delay between checks for credential completion, cancellation, or timeout.
+    static constexpr auto AsyncPollInterval = std::chrono::milliseconds(20);
+
     // Runtime preferences shared with the Apple and Android controllers.
     VpnChannelRuntime(
         winrt::Windows::Networking::Vpn::VpnChannel const &channel,

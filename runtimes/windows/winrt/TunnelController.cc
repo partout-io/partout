@@ -68,7 +68,7 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
         // only to satisfy the framework; application destinations use independent UDP sockets.
         // TEST-NET-1 avoids DNS and any dependency on a real server.
         const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
-        if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
+        if (connect.wait_for(TunnelController::TransportSetupTimeout) == AsyncStatus::Started) {
             connect.Cancel();
             throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }

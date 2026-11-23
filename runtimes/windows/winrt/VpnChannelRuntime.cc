@@ -80,7 +80,7 @@ struct VpnChannelRuntime::Impl {
 
     void WaitForConnection() {
         std::unique_lock lock(startup_mutex);
-        const bool completed = startup_changed.wait_for(lock, std::chrono::seconds(30), [this] {
+        const bool completed = startup_changed.wait_for(lock, VpnChannelRuntime::StartupTimeout, [this] {
             return StartupCompleteLocked();
         });
         if (!completed) {
@@ -165,7 +165,7 @@ struct VpnChannelRuntime::Impl {
                     const auto type = needsOTP ? VpnCredentialType::UsernameOtpPin :
                         VpnCredentialType::UsernamePassword;
                     const auto operation = channel.RequestCredentialsAsync(type);
-                    const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(60);
+                    const auto deadline = std::chrono::steady_clock::now() + VpnChannelRuntime::CredentialPromptTimeout;
                     while (operation.Status() == AsyncStatus::Started) {
                         if (canceled.load()) {
                             operation.Cancel();
@@ -175,7 +175,7 @@ struct VpnChannelRuntime::Impl {
                             operation.Cancel();
                             throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
                         }
-                        std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                        std::this_thread::sleep_for(VpnChannelRuntime::AsyncPollInterval);
                     }
                     if (canceled.load()) throw hresult_canceled();
                     const auto result = operation.GetResults();

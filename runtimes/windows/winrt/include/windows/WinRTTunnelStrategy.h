@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include <chrono>
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <netioapi.h>
@@ -16,6 +17,13 @@
 namespace Partout {
 class WinRTTunnelStrategy final : public TunnelStrategy {
 public:
+    // Maximum wait for a connect request, including credentials and engine startup.
+    static constexpr auto ConnectRequestTimeout = std::chrono::seconds(120);
+    // Default wait for native management operations, such as enumeration or disconnection.
+    static constexpr auto ManagementOperationTimeout = std::chrono::seconds(60);
+    // Delay between checks for asynchronous completion, cancellation, or timeout.
+    static constexpr auto AsyncPollInterval = std::chrono::milliseconds(20);
+
     static std::optional<std::string> DecodeId(const winrt::hstring &xml);
     static bool NamesEqual(const winrt::hstring &left, const winrt::hstring &right);
     static std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadConnectionStatus(

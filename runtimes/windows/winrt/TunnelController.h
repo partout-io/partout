@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
+#include <chrono>
 #include "Tun.h"
 #include "NetworkMonitor.h"
 #include <partout/models/TunnelControllerOptions.h>
@@ -15,6 +16,9 @@ class RuntimeLoop;
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
 public:
+    // Maximum wait to establish the transport required before tunnel startup.
+    static constexpr auto TransportSetupTimeout = std::chrono::seconds(5);
+
     PARTOUT_WINRT_API TunnelController(
         RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel,
         Models::TunnelControllerOptions controllerOptions = {}

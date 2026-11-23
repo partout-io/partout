@@ -54,7 +54,8 @@ std::runtime_error WindowsError(const char *operation, winrt::hresult code) {
 
 template<typename Operation>
 auto Await(const char *name, const Operation &operation,
-           std::chrono::seconds timeout = std::chrono::seconds(60)) {
+           std::chrono::seconds timeout = WinRTTunnelStrategy::ManagementOperationTimeout
+) {
     try {
         const auto deadline = std::chrono::steady_clock::now() + timeout;
         while (operation.Status() == winrt::Windows::Foundation::AsyncStatus::Started) {
@@ -62,7 +63,7 @@ auto Await(const char *name, const Operation &operation,
                 operation.Cancel();
                 throw std::runtime_error(std::string(name) + " canceled or timed out.");
             }
-            std::this_thread::sleep_for(std::chrono::milliseconds(20));
+            std::this_thread::sleep_for(WinRTTunnelStrategy::AsyncPollInterval);
         }
         return operation.get();
     } catch (const winrt::hresult_error &error) {
@@ -310,8 +311,11 @@ void WinRTTunnelStrategy::Connect(const std::string &id) {
         const auto profile = Find(agent, id);
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
         // Allow the native credential prompt and subsequent engine startup.
-        Check("Connect VPN profile", Await("Connect VPN profile", agent.ConnectProfileAsync(profile),
-                                           std::chrono::seconds(120)));
+        Check("Connect VPN profile",
+            Await("Connect VPN profile", agent.ConnectProfileAsync(profile),
+                WinRTTunnelStrategy::ConnectRequestTimeout
+            )
+        );
     });
 }
 
@@ -323,8 +327,12 @@ void WinRTTunnelStrategy::ConnectWithCredentials(const std::string &id, const Tu
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
         const winrt::Windows::Security::Credentials::PasswordCredential passwordCredential(
             profile.ProfileName(), winrt::to_hstring(username), winrt::to_hstring(password));
-        Check("Connect VPN profile", Await("Connect VPN profile",
-            agent.ConnectProfileWithPasswordCredentialAsync(profile, passwordCredential), std::chrono::seconds(120)));
+        Check("Connect VPN profile",
+            Await("Connect VPN profile",
+                agent.ConnectProfileWithPasswordCredentialAsync(profile, passwordCredential),
+                WinRTTunnelStrategy::ConnectRequestTimeout
+            )
+        );
     });
 }
 

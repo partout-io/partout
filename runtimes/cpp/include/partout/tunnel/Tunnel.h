@@ -13,9 +13,12 @@ namespace Partout {
 // the same runtime models as the Apple and Android tunnel facades.
 class Tunnel {
 public:
+    // Default wait for each observed disconnect/connect phase when switching tunnels.
+    static constexpr auto HandoverTimeout = std::chrono::seconds(60);
+
     // Call from a serialized background executor. Cancel may run concurrently.
     explicit Tunnel(std::unique_ptr<TunnelStrategy> strategy,
-                    std::chrono::milliseconds handoverTimeout = std::chrono::seconds(60)
+                    std::chrono::milliseconds handoverTimeout = HandoverTimeout
     );
     // Advance pending activation when polling on the owning executor.
     void Advance();
