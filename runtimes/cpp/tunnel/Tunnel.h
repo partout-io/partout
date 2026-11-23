@@ -14,7 +14,6 @@ namespace Partout {
 class Tunnel {
 public:
     // Call from a serialized background executor. Cancel may run concurrently.
-    // Windows requires an absolute placeholder URI and consumer package identity.
     // Actual endpoints come from the installed profile.
     explicit Tunnel(const std::string &serverUri);
     explicit Tunnel(std::unique_ptr<TunnelStrategy> strategy,
