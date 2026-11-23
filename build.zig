@@ -218,11 +218,11 @@ pub fn build(b: *std.Build) void {
     const test_source_module = createPartoutModule(b, config, c_bindings, "src/testing.zig", false);
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     if (target.result.os.tag != .windows) {
-        test_module.addIncludePath(b.path("runtimes/posix/include"));
+        test_module.addIncludePath(b.path("runtimes/include"));
         addCSourceFiles(test_module, &.{"runtimes/posix/controller.c"});
     } else if (config.wintun) {
         if (config.wintun_include) |path| {
-            test_module.addIncludePath(b.path("runtimes/windows/wintun/include"));
+            test_module.addIncludePath(b.path("runtimes/include"));
             test_module.addSystemIncludePath(.{ .cwd_relative = path });
             addCSourceFiles(test_module, &.{"runtimes/windows/wintun/controller.c"});
         }

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "partout_wintun.h"
+#include "partout_platform.h"
 #include <winsock2.h>
 #include <Windows.h>
 #include <wintun.h>
@@ -225,7 +225,7 @@ static bool configure_sockets(void *ctx, const partout_reachability *info,
     return true;
 }
 
-partout_controller_functions partout_wintun_controller_functions(void) {
+static partout_controller_functions controller_functions(void) {
     const partout_controller_functions functions = {
         .set_delegate = set_delegate,
         .set_tunnel = set_tunnel,
@@ -236,4 +236,12 @@ partout_controller_functions partout_wintun_controller_functions(void) {
         .configure_sockets = configure_sockets
     };
     return functions;
+}
+
+bool partout_platform_bindings_init(partout_daemon_bindings *bindings) {
+    if (!bindings) return false;
+    bindings->controller = NULL;
+    bindings->controller_functions = controller_functions();
+    bindings->release = NULL;
+    return true;
 }

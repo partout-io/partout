@@ -43,7 +43,7 @@ elseif(PP_BUILD_WINTUN)
     )
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/wintun/include>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
     target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE ole32)
@@ -68,7 +68,7 @@ elseif(UNIX)
     add_library(Partout::POSIXRuntime ALIAS partout-posix-runtime)
     target_include_directories(partout-posix-runtime
         PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/posix/include>"
+            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/include>"
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         PRIVATE src
     )

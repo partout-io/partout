@@ -4,7 +4,7 @@
 #ifdef _WIN32
 #include <partout_winrt.h>
 #else
-#include <partout_posix.h>
+#include <partout_platform.h>
 #endif
 
 int main() {
@@ -19,7 +19,10 @@ int main() {
         return 0;
     }
 #else
-    const auto functions = partout_posix_controller_functions();
-    return functions.set_tunnel ? 0 : 2;
+    partout_daemon_bindings bindings = {};
+    if (!partout_platform_bindings_init(&bindings)) return 2;
+    const bool has_tunnel = bindings.controller_functions.set_tunnel != nullptr;
+    if (bindings.release) bindings.release(&bindings);
+    return has_tunnel ? 0 : 2;
 #endif
 }
