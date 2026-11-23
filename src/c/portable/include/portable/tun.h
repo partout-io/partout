@@ -17,11 +17,12 @@
 /* Opaque tun device. */
 typedef struct __partout_tun_struct *pp_tun;
 
+#if !PARTOUT_WINDOWS || PARTOUT_WINTUN
+
+/* Ownership and I/O wrappers. */
 #if PARTOUT_APPLE || PARTOUT_ANDROID || PARTOUT_LINUX
 pp_tun _Nullable pp_tun_wrap_fd(int fd, bool owned);
 #endif
-
-#if !PARTOUT_WINDOWS || PARTOUT_WINTUN
 pp_tun _Nullable pp_tun_wrap_callbacks(void *_Nullable ctx, const partout_tun_callbacks *callbacks);
 
 /* Platform-specific implementations. */

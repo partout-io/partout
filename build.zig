@@ -447,11 +447,6 @@ fn createPartoutModule(
     c_bindings.addImports(module);
 
     if (add_c_sources) {
-        if (config.winrt) {
-            addCSourceFiles(module, &.{"src/c/portable/tun_winrt.c"});
-        } else {
-            addCSourceFiles(module, &.{"src/c/portable/tun_callbacks.c"});
-        }
         addCSources(module, config.openvpn, config.wireguard);
         addCryptoCSources(module, config);
     }
@@ -754,7 +749,7 @@ fn addCSources(module: *std.Build.Module, use_openvpn: bool, use_wireguard: bool
         "src/c/portable/network.c",
         "src/c/portable/prng.c",
         "src/c/portable/socket.c",
-        "src/c/portable/tun_posix.c",
+        "src/c/portable/tun.c",
         "src/c/portable/zd.c",
     });
 
