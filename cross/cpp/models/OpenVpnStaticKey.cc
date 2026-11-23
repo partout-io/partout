@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnStaticKey::ToJson() const
+::Partout::Json OpenVpnStaticKey::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnStaticKey OpenVpnStaticKey::FromJson(const ::Partout::Models::Json& j)
+OpenVpnStaticKey OpenVpnStaticKey::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnStaticKey>();
 }

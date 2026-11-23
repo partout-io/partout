@@ -19,7 +19,7 @@
 #define DNSModuleProtocolTypeCleartext_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -49,8 +49,8 @@ struct  DNSModuleProtocolTypeCleartext
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static DNSModuleProtocolTypeCleartext FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static DNSModuleProtocolTypeCleartext FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const DNSModuleProtocolTypeCleartext& o);

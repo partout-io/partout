@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OnDemandModule::ToJson() const
+::Partout::Json OnDemandModule::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OnDemandModule OnDemandModule::FromJson(const ::Partout::Models::Json& j)
+OnDemandModule OnDemandModule::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OnDemandModule>();
 }

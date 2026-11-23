@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json WireGuardConfiguration::ToJson() const
+::Partout::Json WireGuardConfiguration::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-WireGuardConfiguration WireGuardConfiguration::FromJson(const ::Partout::Models::Json& j)
+WireGuardConfiguration WireGuardConfiguration::FromJson(const ::Partout::Json& j)
 {
     return j.Get<WireGuardConfiguration>();
 }

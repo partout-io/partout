@@ -33,7 +33,7 @@ foreach(header IN LISTS partout_model_headers)
         configure_file("${header}" "${PARTOUT_MODELS_INCLUDE}/partout/models/${name}" COPYONLY)
     endif()
 endforeach()
-configure_file("${PARTOUT_MODELS_ROOT}/json.h" "${PARTOUT_MODELS_INCLUDE}/partout/json.h" COPYONLY)
+configure_file("${PARTOUT_MODELS_ROOT}/Json.h" "${PARTOUT_MODELS_INCLUDE}/partout/Json.h" COPYONLY)
 
 file(GLOB partout_model_sources CONFIGURE_DEPENDS "${PARTOUT_MODELS_ROOT}/models/*.cc")
 if(partout_models_dll)

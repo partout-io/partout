@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json HTTPProxyModule::ToJson() const
+::Partout::Json HTTPProxyModule::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-HTTPProxyModule HTTPProxyModule::FromJson(const ::Partout::Models::Json& j)
+HTTPProxyModule HTTPProxyModule::FromJson(const ::Partout::Json& j)
 {
     return j.Get<HTTPProxyModule>();
 }

@@ -18,12 +18,12 @@
 #ifndef TaggedProfile_H_
 #define TaggedProfile_H_
 
-#include "../json.h"
+#include "../Json.h"
 #include "TaggedModule.h"
 #include <string>
 #include "ProfileBehavior.h"
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -38,7 +38,7 @@ struct  TaggedProfile
     std::vector<Partout::Models::TaggedModule> modules;
     std::vector<std::string> activeModulesIds;
     std::optional<Partout::Models::ProfileBehavior> behavior;
-    std::optional<::Partout::Models::Json> userInfo;
+    std::optional<::Partout::Json> userInfo;
 
     bool operator==(const TaggedProfile& other) const;
     bool operator!=(const TaggedProfile& other) const;
@@ -60,8 +60,8 @@ struct  TaggedProfile
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static TaggedProfile FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static TaggedProfile FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedProfile& o);

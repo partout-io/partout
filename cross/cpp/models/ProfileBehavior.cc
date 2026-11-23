@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ProfileBehavior::ToJson() const
+::Partout::Json ProfileBehavior::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ProfileBehavior ProfileBehavior::FromJson(const ::Partout::Models::Json& j)
+ProfileBehavior ProfileBehavior::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ProfileBehavior>();
 }

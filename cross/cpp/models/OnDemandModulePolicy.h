@@ -19,7 +19,7 @@
 #define OnDemandModulePolicy_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -62,8 +62,8 @@ struct  OnDemandModulePolicy
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OnDemandModulePolicy FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OnDemandModulePolicy FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OnDemandModulePolicy& o);

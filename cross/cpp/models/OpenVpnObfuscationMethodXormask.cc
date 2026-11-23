@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnObfuscationMethodXormask::ToJson() const
+::Partout::Json OpenVpnObfuscationMethodXormask::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnObfuscationMethodXormask OpenVpnObfuscationMethodXormask::FromJson(const ::Partout::Models::Json& j)
+OpenVpnObfuscationMethodXormask OpenVpnObfuscationMethodXormask::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnObfuscationMethodXormask>();
 }

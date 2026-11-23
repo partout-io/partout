@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnCipher::ToJson() const
+::Partout::Json OpenVpnCipher::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCipher OpenVpnCipher::FromJson(const ::Partout::Models::Json& j)
+OpenVpnCipher OpenVpnCipher::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnCipher>();
 }

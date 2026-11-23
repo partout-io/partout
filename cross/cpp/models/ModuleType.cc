@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ModuleType::ToJson() const
+::Partout::Json ModuleType::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ModuleType ModuleType::FromJson(const ::Partout::Models::Json& j)
+ModuleType ModuleType::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ModuleType>();
 }

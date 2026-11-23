@@ -18,9 +18,9 @@
 #ifndef CustomModule_H_
 #define CustomModule_H_
 
-#include "../json.h"
+#include "../Json.h"
 #include "ModuleType.h"
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -29,7 +29,7 @@ struct  CustomModule
 {
 
     Partout::Models::ModuleType innerType;
-    ::Partout::Models::Json json;
+    ::Partout::Json json;
 
     bool operator==(const CustomModule& other) const;
     bool operator!=(const CustomModule& other) const;
@@ -51,8 +51,8 @@ struct  CustomModule
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static CustomModule FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static CustomModule FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const CustomModule& o);

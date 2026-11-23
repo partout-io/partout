@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json DNSProtocol::ToJson() const
+::Partout::Json DNSProtocol::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-DNSProtocol DNSProtocol::FromJson(const ::Partout::Models::Json& j)
+DNSProtocol DNSProtocol::FromJson(const ::Partout::Json& j)
 {
     return j.Get<DNSProtocol>();
 }

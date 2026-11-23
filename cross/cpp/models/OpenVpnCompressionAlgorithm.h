@@ -18,7 +18,7 @@
 #ifndef OpenVpnCompressionAlgorithm_H_
 #define OpenVpnCompressionAlgorithm_H_
 
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -58,8 +58,8 @@ struct  OpenVpnCompressionAlgorithm
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OpenVpnCompressionAlgorithm FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnCompressionAlgorithm FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCompressionAlgorithm& o);

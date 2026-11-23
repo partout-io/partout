@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVPNModule::ToJson() const
+::Partout::Json OpenVPNModule::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVPNModule OpenVPNModule::FromJson(const ::Partout::Models::Json& j)
+OpenVPNModule OpenVPNModule::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVPNModule>();
 }

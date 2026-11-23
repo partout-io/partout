@@ -19,7 +19,7 @@
 #define Route_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -51,8 +51,8 @@ struct  Route
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static Route FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static Route FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const Route& o);

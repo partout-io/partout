@@ -20,7 +20,7 @@
 
 #include "IPSettings.h"
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -54,8 +54,8 @@ struct  IPModule
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static IPModule FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static IPModule FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const IPModule& o);

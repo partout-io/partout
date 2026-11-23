@@ -63,7 +63,7 @@ const Context = struct {
                     if (eq(raw, "UInt16") or eq(raw, "UInt32") or eq(raw, "UInt64")) return c.fmt("Model{s}", .{raw});
                     if (swiftManual(raw)) return c.name(raw);
                 }
-                if (eq(raw, "JSONValue")) return if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Models::Json";
+                if (eq(raw, "JSONValue")) return if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Json";
                 const schema = c.doc.schema(raw) orelse return error.UnknownReference;
                 if (schema.enum_values.items.len != 0 or schema.properties.items.len != 0 or schema.variants.items.len != 0) {
                     const n = try c.name(raw);
@@ -99,7 +99,7 @@ const Context = struct {
                 .boolean => if (c.language == .cpp) "bool" else if (c.language == .kotlin) "kotlin.Boolean" else "Bool",
                 .object => return error.UnsupportedObject,
             },
-            .raw_json => return if (c.language == .swift) "JSON" else if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Models::Json",
+            .raw_json => return if (c.language == .swift) "JSON" else if (c.language == .kotlin) "kotlinx.serialization.json.JsonElement" else "::Partout::Json",
             .none => return error.MissingType,
         }
     }
@@ -402,7 +402,7 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
     const result = try replace(c.a, named, "Partout::Models", c.package);
-    return replace(c.a, result, "@JSON_TYPE@", "::Partout::Models::Json");
+    return replace(c.a, result, "@JSON_TYPE@", "::Partout::Json");
 }
 
 fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
@@ -427,7 +427,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     std.mem.sort([]const u8, imports.items, capacity, importLess);
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
     if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
-    try w.writeAll("#include \"../json.h\"\n");
+    try w.writeAll("#include \"../Json.h\"\n");
     var optional = false;
     for (s.properties.items) |p| {
         if (!required(s, p.name)) optional = true;
@@ -482,7 +482,7 @@ fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8
             const t = try c.typ(spec, null, false);
             if (eq(t, "std::string")) {
                 try appendUnique(c.a, imports, "#include <string>");
-            } else if (eq(t, "::Partout::Models::Json")) {
+            } else if (eq(t, "::Partout::Json")) {
                 // PARITY: the legacy pipeline emits a duplicate JSON include.
                 try appendUnique(c.a, imports, "#include <nlohmann/json.hpp>");
             } else if (std.mem.startsWith(u8, t, c.package)) {
@@ -570,7 +570,7 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
                 try w.print("    ReadJsonValue(j.at(\"{s}\"), parsed.{s});\n\n", .{ p.name, f });
             } else {
                 const t = try propertyType(c, p);
-                if (eq(t, "::Partout::Models::Json")) {
+                if (eq(t, "::Partout::Json")) {
                     try w.print("\n    if (j.find(\"{s}\") != j.end()) {{\n", .{p.name});
                 } else {
                     try w.print("\n    if (j.find(\"{s}\") != j.end() && !j.at(\"{s}\").is_null()) {{\n", .{ p.name, p.name });
@@ -607,7 +607,7 @@ fn cppArrayValidation(c: Context, s: api.Schema, p: api.Property, w: *std.Io.Wri
 }
 
 fn cppWhitespace(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include <nlohmann/json.hpp>", "#include \"../json.h\"");
+    var result = try replace(c.a, source, "#include <nlohmann/json.hpp>", "#include \"../Json.h\"");
     while (std.mem.indexOf(u8, result, "\n\n\n") != null) result = try replace(c.a, result, "\n\n\n", "\n\n");
     return result;
 }
@@ -827,7 +827,7 @@ fn swiftPrefixedBody(c: Context, s: api.Schema, n: []const u8, w: *std.Io.Writer
 }
 
 fn externalCpp(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include \"../json.h\"", "#include <partout/json.h>");
+    var result = try replace(c.a, source, "#include \"../Json.h\"", "#include <partout/Json.h>");
     result = try replace(c.a, result, "#include \"Helpers.h\"", "#include <partout/models/Helpers.h>");
     var names = std.mem.splitScalar(u8, c.options.external, ',');
     while (names.next()) |raw| {

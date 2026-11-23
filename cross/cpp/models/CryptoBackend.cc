@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json CryptoBackend::ToJson() const
+::Partout::Json CryptoBackend::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-CryptoBackend CryptoBackend::FromJson(const ::Partout::Models::Json& j)
+CryptoBackend CryptoBackend::FromJson(const ::Partout::Json& j)
 {
     return j.Get<CryptoBackend>();
 }

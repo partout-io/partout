@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json DataCount::ToJson() const
+::Partout::Json DataCount::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-DataCount DataCount::FromJson(const ::Partout::Models::Json& j)
+DataCount DataCount::FromJson(const ::Partout::Json& j)
 {
     return j.Get<DataCount>();
 }

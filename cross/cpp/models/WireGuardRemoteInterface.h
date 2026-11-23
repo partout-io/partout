@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -55,8 +55,8 @@ struct  WireGuardRemoteInterface
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static WireGuardRemoteInterface FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static WireGuardRemoteInterface FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const WireGuardRemoteInterface& o);

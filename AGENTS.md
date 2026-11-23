@@ -23,6 +23,6 @@
 - Empty blocks in curly braces are fine (`{}`).
 
 - Keep JSON library knowledge inside model codec implementations and the shared
-  `Partout::Models::Json` wrapper. Consumer code must use model APIs and the wrapper,
+  `Partout::Json` wrapper. Consumer code must use model APIs and the wrapper,
   including its error type, rather than nlohmann types or operations. Change generated
   model APIs through the shared generator, never by editing generated files.

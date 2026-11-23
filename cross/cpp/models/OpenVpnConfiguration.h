@@ -30,7 +30,7 @@
 #include <vector>
 #include "OpenVpnRoutingPolicy.h"
 #include "Route.h"
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -101,8 +101,8 @@ struct  OpenVpnConfiguration
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OpenVpnConfiguration FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnConfiguration FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnConfiguration& o);

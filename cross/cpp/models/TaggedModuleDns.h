@@ -20,7 +20,7 @@
 
 #include "DNSModule.h"
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -51,8 +51,8 @@ struct  TaggedModuleDns
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static TaggedModuleDns FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static TaggedModuleDns FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedModuleDns& o);

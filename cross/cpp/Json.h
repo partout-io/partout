@@ -14,7 +14,7 @@
 #include <variant>
 #include <utility>
 
-namespace Partout::Models {
+namespace Partout {
 
 // Application-facing JSON value. The backend and its exceptions stay behind this API.
 class Json {
@@ -137,6 +137,8 @@ private:
     }
 };
 
+namespace Models {
+
 // C ABI string enums arrive as unquoted tokens, rather than JSON documents.
 // Keep invalid input and decoding failures inside the noexcept callback boundary.
 template <typename T> std::optional<T> TryReadStringEnum(const char *token) noexcept {
@@ -184,13 +186,17 @@ template <typename T> void ReadJsonValue(const nlohmann::json &json, T &value) {
     }
 }
 
+} // namespace Models
+
 template<typename T> T Json::Get() const {
     return TranslateErrors([&] {
         T result{};
-        ReadJsonValue(value_, result);
+        Models::ReadJsonValue(value_, result);
         return result;
     });
 }
+
+namespace Models {
 
 template <typename T>
 bool ValidateModel(const T &value, std::stringstream &errors, const std::string &path) {
@@ -208,3 +214,5 @@ bool ValidateModel(const std::variant<T...> &value, std::stringstream &errors,
 }
 
 } // namespace Partout::Models
+
+} // namespace Partout

@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json TunnelRemoteInfoWrapper::ToJson() const
+::Partout::Json TunnelRemoteInfoWrapper::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-TunnelRemoteInfoWrapper TunnelRemoteInfoWrapper::FromJson(const ::Partout::Models::Json& j)
+TunnelRemoteInfoWrapper TunnelRemoteInfoWrapper::FromJson(const ::Partout::Json& j)
 {
     return j.Get<TunnelRemoteInfoWrapper>();
 }

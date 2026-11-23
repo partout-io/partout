@@ -19,7 +19,7 @@
 #define OpenVpnCipher_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -65,8 +65,8 @@ struct  OpenVpnCipher
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OpenVpnCipher FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnCipher FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCipher& o);

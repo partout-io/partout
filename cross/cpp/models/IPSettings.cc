@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json IPSettings::ToJson() const
+::Partout::Json IPSettings::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-IPSettings IPSettings::FromJson(const ::Partout::Models::Json& j)
+IPSettings IPSettings::FromJson(const ::Partout::Json& j)
 {
     return j.Get<IPSettings>();
 }

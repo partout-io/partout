@@ -18,7 +18,7 @@ namespace Partout {
 TunSettings::TunSettings(const char *json) {
     if (!json) throw hresult_invalid_argument(L"Missing negotiated tunnel settings");
     try {
-        const auto info = Models::TunnelRemoteInfoWrapper::FromJson(Models::Json::Parse(json));
+        const auto info = Models::TunnelRemoteInfoWrapper::FromJson(Json::Parse(json));
         if (info.modules) {
             for (const auto &entry : *info.modules) {
                 if (const auto *ip = std::get_if<Models::TaggedModuleIp>(&entry))
@@ -27,7 +27,7 @@ TunSettings::TunSettings(const char *json) {
                     ApplyDNS(dns->value);
             }
         }
-    } catch (const Models::Json::Error &) {
+    } catch (const Json::Error &) {
         throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");
     } catch (const std::logic_error &) {
         throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");

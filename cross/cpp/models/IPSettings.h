@@ -21,7 +21,7 @@
 #include <string>
 #include <vector>
 #include "Route.h"
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -53,8 +53,8 @@ struct  IPSettings
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static IPSettings FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static IPSettings FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const IPSettings& o);

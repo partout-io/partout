@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json WireGuardLocalInterface::ToJson() const
+::Partout::Json WireGuardLocalInterface::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-WireGuardLocalInterface WireGuardLocalInterface::FromJson(const ::Partout::Models::Json& j)
+WireGuardLocalInterface WireGuardLocalInterface::FromJson(const ::Partout::Json& j)
 {
     return j.Get<WireGuardLocalInterface>();
 }

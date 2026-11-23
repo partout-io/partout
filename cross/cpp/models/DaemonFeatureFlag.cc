@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json DaemonFeatureFlag::ToJson() const
+::Partout::Json DaemonFeatureFlag::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-DaemonFeatureFlag DaemonFeatureFlag::FromJson(const ::Partout::Models::Json& j)
+DaemonFeatureFlag DaemonFeatureFlag::FromJson(const ::Partout::Json& j)
 {
     return j.Get<DaemonFeatureFlag>();
 }

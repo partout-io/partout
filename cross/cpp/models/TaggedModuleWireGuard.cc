@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json TaggedModuleWireGuard::ToJson() const
+::Partout::Json TaggedModuleWireGuard::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-TaggedModuleWireGuard TaggedModuleWireGuard::FromJson(const ::Partout::Models::Json& j)
+TaggedModuleWireGuard TaggedModuleWireGuard::FromJson(const ::Partout::Json& j)
 {
     return j.Get<TaggedModuleWireGuard>();
 }

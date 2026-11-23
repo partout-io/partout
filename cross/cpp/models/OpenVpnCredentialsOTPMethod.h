@@ -19,7 +19,7 @@
 #define OpenVpnCredentialsOTPMethod_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -62,8 +62,8 @@ struct  OpenVpnCredentialsOTPMethod
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OpenVpnCredentialsOTPMethod FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnCredentialsOTPMethod FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCredentialsOTPMethod& o);

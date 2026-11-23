@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json IPSocketType::ToJson() const
+::Partout::Json IPSocketType::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-IPSocketType IPSocketType::FromJson(const ::Partout::Models::Json& j)
+IPSocketType IPSocketType::FromJson(const ::Partout::Json& j)
 {
     return j.Get<IPSocketType>();
 }

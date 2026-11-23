@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ModuleImportContextOpenVpn::ToJson() const
+::Partout::Json ModuleImportContextOpenVpn::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ModuleImportContextOpenVpn ModuleImportContextOpenVpn::FromJson(const ::Partout::Models::Json& j)
+ModuleImportContextOpenVpn ModuleImportContextOpenVpn::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ModuleImportContextOpenVpn>();
 }

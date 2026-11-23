@@ -22,7 +22,7 @@
 #include "TaggedProfile.h"
 #include <string>
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -56,8 +56,8 @@ struct  TunnelRemoteInfoWrapper
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static TunnelRemoteInfoWrapper FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static TunnelRemoteInfoWrapper FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TunnelRemoteInfoWrapper& o);

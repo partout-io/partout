@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OnDemandModuleOtherNetwork::ToJson() const
+::Partout::Json OnDemandModuleOtherNetwork::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OnDemandModuleOtherNetwork OnDemandModuleOtherNetwork::FromJson(const ::Partout::Models::Json& j)
+OnDemandModuleOtherNetwork OnDemandModuleOtherNetwork::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OnDemandModuleOtherNetwork>();
 }

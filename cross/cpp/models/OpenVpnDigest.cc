@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnDigest::ToJson() const
+::Partout::Json OpenVpnDigest::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnDigest OpenVpnDigest::FromJson(const ::Partout::Models::Json& j)
+OpenVpnDigest OpenVpnDigest::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnDigest>();
 }

@@ -14,7 +14,7 @@ Unset or invalid enum values throw `std::invalid_argument`; numeric enums do not
 expose this string-token API.
 
 C++ model `ToJson()`/`FromJson()` and opaque JSON properties use the shared
-`Partout::Models::Json` value wrapper. It owns parsing, encoding, checked value
+`Partout::Json` value wrapper, declared in `<partout/Json.h>`. It owns parsing, encoding, checked value
 conversion, object/array operations, and JSON-library exception translation.
 Generated backend codecs retain nlohmann ADL functions internally; application
 code uses the wrapper without depending on those functions or backend types.

@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnStaticKeyDirection::ToJson() const
+::Partout::Json OpenVpnStaticKeyDirection::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnStaticKeyDirection OpenVpnStaticKeyDirection::FromJson(const ::Partout::Models::Json& j)
+OpenVpnStaticKeyDirection OpenVpnStaticKeyDirection::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnStaticKeyDirection>();
 }

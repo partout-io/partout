@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json TaggedModuleDns::ToJson() const
+::Partout::Json TaggedModuleDns::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-TaggedModuleDns TaggedModuleDns::FromJson(const ::Partout::Models::Json& j)
+TaggedModuleDns TaggedModuleDns::FromJson(const ::Partout::Json& j)
 {
     return j.Get<TaggedModuleDns>();
 }

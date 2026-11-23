@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ABIEnvelope::ToJson() const
+::Partout::Json ABIEnvelope::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ABIEnvelope ABIEnvelope::FromJson(const ::Partout::Models::Json& j)
+ABIEnvelope ABIEnvelope::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ABIEnvelope>();
 }
@@ -82,7 +82,7 @@ void from_json(const nlohmann::json& j, ABIEnvelope& o)
     }
 
     if (j.find("payload") != j.end()) {
-        ::Partout::Models::Json temporary_payload;
+        ::Partout::Json temporary_payload;
         ReadJsonValue(j.at("payload"), temporary_payload);
         parsed.payload = std::move(temporary_payload);
     }

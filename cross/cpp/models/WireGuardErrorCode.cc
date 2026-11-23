@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json WireGuardErrorCode::ToJson() const
+::Partout::Json WireGuardErrorCode::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-WireGuardErrorCode WireGuardErrorCode::FromJson(const ::Partout::Models::Json& j)
+WireGuardErrorCode WireGuardErrorCode::FromJson(const ::Partout::Json& j)
 {
     return j.Get<WireGuardErrorCode>();
 }

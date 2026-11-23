@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json Route::ToJson() const
+::Partout::Json Route::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-Route Route::FromJson(const ::Partout::Models::Json& j)
+Route Route::FromJson(const ::Partout::Json& j)
 {
     return j.Get<Route>();
 }

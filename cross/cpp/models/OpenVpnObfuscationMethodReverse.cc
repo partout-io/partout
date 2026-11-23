@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnObfuscationMethodReverse::ToJson() const
+::Partout::Json OpenVpnObfuscationMethodReverse::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnObfuscationMethodReverse OpenVpnObfuscationMethodReverse::FromJson(const ::Partout::Models::Json& j)
+OpenVpnObfuscationMethodReverse OpenVpnObfuscationMethodReverse::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnObfuscationMethodReverse>();
 }

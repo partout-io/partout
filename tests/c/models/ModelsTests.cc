@@ -14,6 +14,7 @@
 #include <utility>
 
 using namespace Partout::Models;
+using Partout::Json;
 using nlohmann::json;
 
 template<typename T>

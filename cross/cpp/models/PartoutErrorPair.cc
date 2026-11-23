@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json PartoutErrorPair::ToJson() const
+::Partout::Json PartoutErrorPair::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-PartoutErrorPair PartoutErrorPair::FromJson(const ::Partout::Models::Json& j)
+PartoutErrorPair PartoutErrorPair::FromJson(const ::Partout::Json& j)
 {
     return j.Get<PartoutErrorPair>();
 }

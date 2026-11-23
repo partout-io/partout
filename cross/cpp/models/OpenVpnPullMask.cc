@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnPullMask::ToJson() const
+::Partout::Json OpenVpnPullMask::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnPullMask OpenVpnPullMask::FromJson(const ::Partout::Models::Json& j)
+OpenVpnPullMask OpenVpnPullMask::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnPullMask>();
 }

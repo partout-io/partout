@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVPNErrorCode::ToJson() const
+::Partout::Json OpenVPNErrorCode::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVPNErrorCode OpenVPNErrorCode::FromJson(const ::Partout::Models::Json& j)
+OpenVPNErrorCode OpenVPNErrorCode::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVPNErrorCode>();
 }

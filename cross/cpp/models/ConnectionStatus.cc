@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ConnectionStatus::ToJson() const
+::Partout::Json ConnectionStatus::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ConnectionStatus ConnectionStatus::FromJson(const ::Partout::Models::Json& j)
+ConnectionStatus ConnectionStatus::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ConnectionStatus>();
 }

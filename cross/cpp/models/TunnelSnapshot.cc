@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json TunnelSnapshot::ToJson() const
+::Partout::Json TunnelSnapshot::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-TunnelSnapshot TunnelSnapshot::FromJson(const ::Partout::Models::Json& j)
+TunnelSnapshot TunnelSnapshot::FromJson(const ::Partout::Json& j)
 {
     return j.Get<TunnelSnapshot>();
 }

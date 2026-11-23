@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnRoutingPolicy::ToJson() const
+::Partout::Json OpenVpnRoutingPolicy::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnRoutingPolicy OpenVpnRoutingPolicy::FromJson(const ::Partout::Models::Json& j)
+OpenVpnRoutingPolicy OpenVpnRoutingPolicy::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnRoutingPolicy>();
 }

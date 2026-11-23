@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json CustomModule::ToJson() const
+::Partout::Json CustomModule::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-CustomModule CustomModule::FromJson(const ::Partout::Models::Json& j)
+CustomModule CustomModule::FromJson(const ::Partout::Json& j)
 {
     return j.Get<CustomModule>();
 }

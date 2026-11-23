@@ -18,7 +18,7 @@
 #ifndef ProfileBehavior_H_
 #define ProfileBehavior_H_
 
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -50,8 +50,8 @@ struct  ProfileBehavior
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static ProfileBehavior FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static ProfileBehavior FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ProfileBehavior& o);

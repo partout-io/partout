@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnCredentialsOTPMethod::ToJson() const
+::Partout::Json OpenVpnCredentialsOTPMethod::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCredentialsOTPMethod OpenVpnCredentialsOTPMethod::FromJson(const ::Partout::Models::Json& j)
+OpenVpnCredentialsOTPMethod OpenVpnCredentialsOTPMethod::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnCredentialsOTPMethod>();
 }

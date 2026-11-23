@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnCompressionAlgorithm::ToJson() const
+::Partout::Json OpenVpnCompressionAlgorithm::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCompressionAlgorithm OpenVpnCompressionAlgorithm::FromJson(const ::Partout::Models::Json& j)
+OpenVpnCompressionAlgorithm OpenVpnCompressionAlgorithm::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnCompressionAlgorithm>();
 }

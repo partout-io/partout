@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OnDemandModulePolicy::ToJson() const
+::Partout::Json OnDemandModulePolicy::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OnDemandModulePolicy OnDemandModulePolicy::FromJson(const ::Partout::Models::Json& j)
+OnDemandModulePolicy OnDemandModulePolicy::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OnDemandModulePolicy>();
 }

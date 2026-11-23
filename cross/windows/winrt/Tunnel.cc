@@ -110,7 +110,7 @@ std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml) {
                 return std::nullopt;
             }
         }
-        const auto decoded = Models::TaggedProfile::FromJson(Models::Json::Parse(winrt::to_string(json)));
+        const auto decoded = Models::TaggedProfile::FromJson(Json::Parse(winrt::to_string(json)));
         if (decoded.id.empty()) return std::nullopt;
         return decoded.id;
     } catch (...) {
@@ -242,7 +242,7 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         root.SetAttribute(L"version", L"1");
         try {
             root.InnerText(winrt::to_hstring(profile.ToJson().Encode()));
-        } catch (const Models::Json::Error &) {
+        } catch (const Json::Error &) {
             throw std::runtime_error("Unable to encode the VPN profile.");
         }
         document.AppendChild(root);

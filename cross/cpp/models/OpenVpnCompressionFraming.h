@@ -18,7 +18,7 @@
 #ifndef OpenVpnCompressionFraming_H_
 #define OpenVpnCompressionFraming_H_
 
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -59,8 +59,8 @@ struct  OpenVpnCompressionFraming
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    ::Partout::Models::Json ToJson() const;
-    static OpenVpnCompressionFraming FromJson(const ::Partout::Models::Json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnCompressionFraming FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCompressionFraming& o);

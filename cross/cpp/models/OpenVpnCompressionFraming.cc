@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json OpenVpnCompressionFraming::ToJson() const
+::Partout::Json OpenVpnCompressionFraming::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCompressionFraming OpenVpnCompressionFraming::FromJson(const ::Partout::Models::Json& j)
+OpenVpnCompressionFraming OpenVpnCompressionFraming::FromJson(const ::Partout::Json& j)
 {
     return j.Get<OpenVpnCompressionFraming>();
 }

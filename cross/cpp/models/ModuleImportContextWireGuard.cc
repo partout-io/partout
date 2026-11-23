@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ModuleImportContextWireGuard::ToJson() const
+::Partout::Json ModuleImportContextWireGuard::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ModuleImportContextWireGuard ModuleImportContextWireGuard::FromJson(const ::Partout::Models::Json& j)
+ModuleImportContextWireGuard ModuleImportContextWireGuard::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ModuleImportContextWireGuard>();
 }

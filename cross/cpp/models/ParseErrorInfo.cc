@@ -16,12 +16,12 @@
 namespace Partout::Models
 {
 
-::Partout::Models::Json ParseErrorInfo::ToJson() const
+::Partout::Json ParseErrorInfo::ToJson() const
 {
-    return ::Partout::Models::Json(*this);
+    return ::Partout::Json(*this);
 }
 
-ParseErrorInfo ParseErrorInfo::FromJson(const ::Partout::Models::Json& j)
+ParseErrorInfo ParseErrorInfo::FromJson(const ::Partout::Json& j)
 {
     return j.Get<ParseErrorInfo>();
 }
