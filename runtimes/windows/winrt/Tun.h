@@ -5,7 +5,7 @@
 #include <partout/models/TunnelControllerOptions.h>
 #include "windows/export.h"
 
-#include "IOTypes.h"
+#include <partout/IOTypes.h>
 #include "Socket.h"
 #include "NetworkMonitor.h"
 #include <winrt/Windows.Networking.Connectivity.h>
