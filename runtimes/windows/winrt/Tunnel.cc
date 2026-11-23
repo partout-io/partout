@@ -26,8 +26,6 @@
 
 namespace Partout {
 namespace {
-using namespace winrt::Windows::Networking::Vpn;
-using namespace winrt::Windows::Foundation;
 struct Apartment {
     Apartment() {
         // WinRT activation factories are cached across workers. Keep their MTA
@@ -40,6 +38,7 @@ struct Apartment {
         (void)processApartment;
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
     }
+
     ~Apartment() {
         winrt::uninit_apartment();
     }
@@ -51,10 +50,11 @@ std::runtime_error WindowsError(const char *operation, winrt::hresult code) {
             << std::setw(8) << std::setfill('0') << static_cast<unsigned>(code.value) << ").";
     return std::runtime_error(message.str());
 }
+
 template<typename Operation>
 auto Await(const char *name, const Operation &operation) {
     try {
-        if (operation.wait_for(std::chrono::seconds(60)) == AsyncStatus::Started) {
+        if (operation.wait_for(std::chrono::seconds(60)) == winrt::Windows::Foundation::AsyncStatus::Started) {
             operation.Cancel();
             throw std::runtime_error(std::string(name) + " timed out.");
         }
@@ -63,11 +63,13 @@ auto Await(const char *name, const Operation &operation) {
         throw WindowsError(name, error.code());
     }
 }
-void Check(const char *operation, VpnManagementErrorStatus status) {
-    if (status != VpnManagementErrorStatus::Ok)
+
+void Check(const char *operation, winrt::Windows::Networking::Vpn::VpnManagementErrorStatus status) {
+    if (status != winrt::Windows::Networking::Vpn::VpnManagementErrorStatus::Ok)
         throw std::runtime_error(std::string(operation) + " rejected (VpnManagementErrorStatus=" +
                                  std::to_string(static_cast<int>(status)) + ").");
 }
+
 winrt::hstring Family() {
     UINT32 length = 0;
     auto result = GetCurrentPackageFamilyName(&length, nullptr);
@@ -80,10 +82,58 @@ winrt::hstring Family() {
     family.resize(length - 1);
     return winrt::hstring(family);
 }
+
+struct OwnedProfile {
+    winrt::Windows::Networking::Vpn::VpnPlugInProfile profile;
+    std::string id;
+};
+
+std::vector<OwnedProfile> OwnedProfiles(const winrt::Windows::Networking::Vpn::VpnManagementAgent &agent) {
+    const auto family = Family();
+    std::vector<OwnedProfile> result;
+    for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
+        const auto profile = item.try_as<winrt::Windows::Networking::Vpn::VpnPlugInProfile>();
+        if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
+        if (const auto id = DecodeTunnelProfileId(profile.CustomConfiguration())) result.push_back({profile, *id});
+    }
+    return result;
+}
+
+winrt::Windows::Networking::Vpn::VpnPlugInProfile Find(const winrt::Windows::Networking::Vpn::VpnManagementAgent &agent, const std::string &id) {
+    for (const auto &profile : OwnedProfiles(agent)) {
+        if (profile.id == id) return profile.profile;
+    }
+    return nullptr;
+}
+
+std::optional<Models::TunnelSnapshotEnvironment> Environment(const winrt::Windows::Networking::Vpn::VpnPlugInProfile &profile) {
+    // VpnManagementAgent has no counters. Resolve only this VPN's interface;
+    // never substitute physical-adapter or machine-wide traffic.
+    MIB_IF_ROW2 row{};
+    if (ConvertInterfaceAliasToLuid(profile.ProfileName().c_str(), &row.InterfaceLuid) != NO_ERROR ||
+        GetIfEntry2(&row) != NO_ERROR) return std::nullopt;
+    return TunnelInterfaceEnvironment(row);
+}
+
+template<typename Action>
+auto WithAgent(const char *operation, Action action) {
+    try {
+        Apartment apartment;
+        return action(winrt::Windows::Networking::Vpn::VpnManagementAgent{});
+    } catch (const winrt::hresult_error &error) {
+        // WinRT messages can echo custom configuration. Report only stage/code.
+        throw WindowsError(operation, error.code());
+    }
+}
 } // namespace
+
+using namespace winrt::Windows::Networking::Vpn;
+using namespace winrt::Windows::Foundation;
+
 bool TunnelProfileNamesEqual(const winrt::hstring &left, const winrt::hstring &right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
+
 std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml) {
     // The display name is editable and is never the profile identity.
     try {
@@ -118,36 +168,7 @@ std::optional<std::string> DecodeTunnelProfileId(const winrt::hstring &xml) {
         return std::nullopt;
     }
 }
-namespace {
-struct OwnedProfile {
-    VpnPlugInProfile profile;
-    std::string id;
-};
-std::vector<OwnedProfile> OwnedProfiles(const VpnManagementAgent &agent) {
-    const auto family = Family();
-    std::vector<OwnedProfile> result;
-    for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
-        const auto profile = item.try_as<VpnPlugInProfile>();
-        if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
-        if (const auto id = DecodeTunnelProfileId(profile.CustomConfiguration())) result.push_back({profile, *id});
-    }
-    return result;
-}
-VpnPlugInProfile Find(const VpnManagementAgent &agent, const std::string &id) {
-    for (const auto &profile : OwnedProfiles(agent)) {
-        if (profile.id == id) return profile.profile;
-    }
-    return nullptr;
-}
-std::optional<Models::TunnelSnapshotEnvironment> Environment(const VpnPlugInProfile &profile) {
-    // VpnManagementAgent has no counters. Resolve only this VPN's interface;
-    // never substitute physical-adapter or machine-wide traffic.
-    MIB_IF_ROW2 row{};
-    if (ConvertInterfaceAliasToLuid(profile.ProfileName().c_str(), &row.InterfaceLuid) != NO_ERROR ||
-        GetIfEntry2(&row) != NO_ERROR) return std::nullopt;
-    return TunnelInterfaceEnvironment(row);
-}
-} // namespace
+
 std::optional<Models::TunnelSnapshotEnvironment> TunnelInterfaceEnvironment(const MIB_IF_ROW2 &row) {
     if (row.OperStatus != IfOperStatusUp || (row.Type != IF_TYPE_PPP && row.Type != IF_TYPE_TUNNEL))
         return std::nullopt;
@@ -159,19 +180,6 @@ std::optional<Models::TunnelSnapshotEnvironment> TunnelInterfaceEnvironment(cons
     environment.dataCount.sent = static_cast<int64_t>(row.OutOctets);
     return environment;
 }
-namespace {
-template<typename Action>
-auto WithAgent(const char *operation, Action action) {
-    try {
-        Apartment apartment;
-        return action(VpnManagementAgent{});
-    } catch (const winrt::hresult_error &error) {
-        // WinRT messages can echo custom configuration. Report only stage/code.
-        throw WindowsError(operation, error.code());
-    }
-}
-
-} // namespace
 
 Tunnel::Tunnel(const std::string &serverUri) : serverUri_(serverUri) {
     if (serverUri_.empty()) throw std::invalid_argument("The server URI is empty.");
@@ -220,6 +228,7 @@ std::vector<Models::TunnelSnapshot> Tunnel::Fetch(std::map<std::string, std::str
         return result;
     });
 }
+
 void Tunnel::Save(const Models::TaggedProfile &profile) {
     if (profile.id.empty()) throw std::invalid_argument("The profile ID is empty.");
     if (profile.name.empty()) throw std::invalid_argument("The profile name is empty.");
@@ -278,6 +287,7 @@ void Tunnel::Save(const Models::TaggedProfile &profile) {
         }
     });
 }
+
 void Tunnel::Connect(const std::string &id) {
     WithAgent("Connect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
@@ -285,6 +295,7 @@ void Tunnel::Connect(const std::string &id) {
         Check("Connect VPN profile", Await("Connect VPN profile", agent.ConnectProfileAsync(profile)));
     });
 }
+
 void Tunnel::Disconnect(const std::string &id) {
     WithAgent("Disconnect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
@@ -292,6 +303,7 @@ void Tunnel::Disconnect(const std::string &id) {
         Check("Disconnect VPN profile", Await("Disconnect VPN profile", agent.DisconnectProfileAsync(profile)));
     });
 }
+
 void Tunnel::Remove(const std::string &id) {
     WithAgent("Remove profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);

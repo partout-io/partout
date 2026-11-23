@@ -13,28 +13,6 @@
 #include <utility>
 
 namespace Partout {
-bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
-    if (metric == other.metric) return connectivity > other.connectivity;
-    return metric && (!other.metric || *metric < *other.metric);
-}
-
-// A missing preference excludes an unusable profile from selection.
-std::optional<size_t>
-SelectPhysicalNetwork(size_t count,
-                      const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
-    std::optional<size_t> selected;
-    NetworkPreference best{};
-    for (size_t i = 0; i < count; ++i) {
-        const auto candidate = preference(i);
-        if (!candidate) continue;
-        if (!selected || candidate->IsBetterThan(best)) {
-            selected = i;
-            best = *candidate;
-        }
-    }
-    return selected;
-}
-
 namespace {
 std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
                                            const MIB_IPFORWARD_TABLE2 *routes) {
@@ -59,6 +37,28 @@ std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
     return best;
 }
 } // namespace
+
+bool NetworkPreference::IsBetterThan(const NetworkPreference &other) const {
+    if (metric == other.metric) return connectivity > other.connectivity;
+    return metric && (!other.metric || *metric < *other.metric);
+}
+
+// A missing preference excludes an unusable profile from selection.
+std::optional<size_t>
+SelectPhysicalNetwork(size_t count,
+                      const std::function<std::optional<NetworkPreference>(size_t)> &preference) {
+    std::optional<size_t> selected;
+    NetworkPreference best{};
+    for (size_t i = 0; i < count; ++i) {
+        const auto candidate = preference(i);
+        if (!candidate) continue;
+        if (!selected || candidate->IsBetterThan(best)) {
+            selected = i;
+            best = *candidate;
+        }
+    }
+    return selected;
+}
 
 bool NetworkPath::Update(winrt::guid id, bool available) {
     if (initialized && available == reachable && id == adapter) return false;

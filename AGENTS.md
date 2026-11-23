@@ -21,11 +21,26 @@
 
 ## C++
 
+- Order `.cc` content after includes consistently: anonymous namespace helpers,
+  then file-level `using` directives, then Partout entity implementations. Keep
+  helpers together rather than interleaving anonymous namespace blocks with
+  implementations. Use explicit qualification inside helpers where needed.
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.
 - Use PascalCase for all methods, public and private.
+- Use four spaces per indentation level, never tabs. Do not add indentation for
+  named or anonymous namespaces, `extern "C"` linkage wrappers, or `__cplusplus`
+  compatibility guards; keep their contents at the surrounding indentation level.
+  Indent function, class, and control-flow bodies normally. Align closing braces
+  with their opening declaration. Align access labels with the class declaration
+  and indent members one level further. For wrapped parameter lists,
+  align continuation parameters with the first parameter or place all parameters
+  on separate lines indented one level; never leave stale alignment after edits.
 - Do not compress blocks, as in no text after curly braces or multiple semicolon-separated lines. However, one-liner like `if (condition) return;` are acceptable as long as they are not too long.
 - Empty blocks in curly braces are fine (`{}`).
-
+- Add a blank line only between adjacent function, type, or namespace definitions,
+  including inline member definitions. Do not add blank lines solely because a
+  block ends with a closing brace; this rule does not apply between statements,
+  control-flow blocks, or nested closing braces.
 - Keep JSON library knowledge inside model codec implementations and the shared
   `Partout::Json` wrapper. Consumer code must use model APIs and the wrapper,
   including its error type, rather than nlohmann types or operations. Change generated

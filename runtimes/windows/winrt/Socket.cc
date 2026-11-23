@@ -19,25 +19,20 @@
 #include <mutex>
 #include <string>
 
-using namespace winrt;
-using namespace winrt::Windows::Foundation;
-using namespace winrt::Windows::Networking;
-using namespace winrt::Windows::Networking::Sockets;
-using namespace winrt::Windows::Storage::Streams;
-
 namespace Partout {
 namespace {
-void WaitForConnect(IAsyncAction const &action, int timeout_ms) {
-    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == AsyncStatus::Started) {
+void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms) {
+    if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == winrt::Windows::Foundation::AsyncStatus::Started) {
         action.Cancel();
-        throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Windows socket connect timed out");
+        throw winrt::hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Windows socket connect timed out");
     }
     action.GetResults();
 }
 
-SocketAddress ParseAddress(HostName const &host, hstring const &port) {
-    if (!host || (host.Type() != HostNameType::Ipv4 && host.Type() != HostNameType::Ipv6))
-        throw hresult_invalid_argument();
+SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host, winrt::hstring const &port) {
+    if (!host || (host.Type() != winrt::Windows::Networking::HostNameType::Ipv4 &&
+                  host.Type() != winrt::Windows::Networking::HostNameType::Ipv6))
+        throw winrt::hresult_invalid_argument();
     SocketAddress result{};
     auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
@@ -45,16 +40,22 @@ SocketAddress ParseAddress(HostName const &host, hstring const &port) {
         result.scope_id = static_cast<uint32_t>(std::stoul(text.substr(zone + 1)));
         text.resize(zone);
     }
-    const bool ipv4 = host.Type() == HostNameType::Ipv4;
+    const bool ipv4 = host.Type() == winrt::Windows::Networking::HostNameType::Ipv4;
     result.family = ipv4 ? 4 : 6;
     if (InetPtonW(ipv4 ? AF_INET : AF_INET6, text.c_str(), result.address) != 1)
-        throw hresult_invalid_argument();
+        throw winrt::hresult_invalid_argument();
     const auto number = std::stoul(std::wstring(port));
-    if (number > UINT16_MAX) throw hresult_invalid_argument();
+    if (number > UINT16_MAX) throw winrt::hresult_invalid_argument();
     result.port = static_cast<uint16_t>(number);
     return result;
 }
 } // namespace
+
+using namespace winrt;
+using namespace winrt::Windows::Foundation;
+using namespace winrt::Windows::Networking;
+using namespace winrt::Windows::Networking::Sockets;
+using namespace winrt::Windows::Storage::Streams;
 
 // Outstanding reads and writes retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
