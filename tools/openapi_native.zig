@@ -402,7 +402,7 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
     const result = try replace(c.a, named, "Partout::Models", c.package);
-    return replace(c.a, result, try c.fmt("{s}::Json", .{c.package}), "::Partout::Models::Json");
+    return replace(c.a, result, "@JSON_TYPE@", "::Partout::Models::Json");
 }
 
 fn cppHeader(c: Context, s: api.Schema) ![]const u8 {

@@ -18,8 +18,8 @@
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    Partout::Models::Json ToJson() const;
-    static @NAME@ FromJson(const Partout::Models::Json& j);
+    @JSON_TYPE@ ToJson() const;
+    static @NAME@ FromJson(const @JSON_TYPE@& j);
 };
 
  void to_json(nlohmann::json& j, const @NAME@& o);

@@ -4,12 +4,12 @@
 namespace Partout::Models
 {
 
-Partout::Models::Json @NAME@::ToJson() const
+@JSON_TYPE@ @NAME@::ToJson() const
 {
-    return Partout::Models::Json(*this);
+    return @JSON_TYPE@(*this);
 }
 
-@NAME@ @NAME@::FromJson(const Partout::Models::Json& j)
+@NAME@ @NAME@::FromJson(const @JSON_TYPE@& j)
 {
     return j.Get<@NAME@>();
 }

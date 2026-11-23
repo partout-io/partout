@@ -70,6 +70,22 @@ int main() {
         wrappedError = true;
     }
     assert(wrappedError);
+    const auto expectJsonError = [](auto operation) {
+        bool caught = false;
+        try {
+            operation();
+        } catch (const Json::Error &) {
+            caught = true;
+        }
+        assert(caught);
+    };
+    expectJsonError([] { (void)Json(1).At("missing"); });
+    expectJsonError([] { (void)Json("text").Get<bool>(); });
+    expectJsonError([] { Json(1).Set("key", true); });
+    expectJsonError([] { Json(1).Append(true); });
+    expectJsonError([] { Json(1).Merge(Json{{"key", true}}); });
+    expectJsonError([] { (void)Json(std::string(1, '\xff')).Encode(); });
+
     ExpectFailure([] { (void)Json(1.5).Get<int>(); });
     ExpectFailure([] { (void)Json(-1).Get<unsigned>(); });
     ExpectFailure([] { (void)Json::Parse("{}").At("missing"); });

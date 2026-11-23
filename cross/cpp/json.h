@@ -12,11 +12,20 @@
 #include <string>
 #include <type_traits>
 #include <variant>
+#include <utility>
 
 namespace Partout::Models {
 
 // Application-facing JSON value. The backend and its exceptions stay behind this API.
 class Json {
+    template<typename Operation>
+    static auto TranslateErrors(Operation operation) -> decltype(operation()) {
+        try {
+            return operation();
+        } catch (const nlohmann::json::exception &error) {
+            throw Error(error.what());
+        }
+    }
 public:
     class Error : public std::runtime_error {
     public:
@@ -25,32 +34,26 @@ public:
     Json() = default;
     template<typename T, std::enable_if_t<!std::is_same_v<std::decay_t<T>, nlohmann::json>, int> = 0>
     Json(const T &value) {
-        try {
+        TranslateErrors([&] {
             value_ = value;
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     Json(std::initializer_list<std::pair<const std::string, Json>> members) {
         value_ = nlohmann::json::object();
         for (const auto &member : members) value_[member.first] = member.second.value_;
     }
     static Json Parse(const std::string &text) {
-        try {
+        return TranslateErrors([&] {
             return Json(nlohmann::json::parse(text));
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     static Json Array() {
         return Json(nlohmann::json::array());
     }
     std::string Encode() const {
-        try {
+        return TranslateErrors([&] {
             return value_.dump();
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     template<typename T> T Get() const;
     bool IsNull() const {
@@ -75,11 +78,9 @@ public:
         return value_.size();
     }
     Json At(const std::string &key) const {
-        try {
+        return TranslateErrors([&] {
             return Json(value_.at(key));
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     std::optional<Json> Find(const std::string &key) const {
         const auto found = value_.find(key);
@@ -92,29 +93,24 @@ public:
         return found ? found->Get<T>() : fallback;
     }
     void Set(const std::string &key, const Json &value) {
-        try {
+        TranslateErrors([&] {
             value_[key] = value.value_;
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     void Append(const Json &value) {
-        try {
+        TranslateErrors([&] {
             value_.push_back(value.value_);
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     void Merge(const Json &value) {
-        try {
+        TranslateErrors([&] {
             value_.update(value.value_);
-        } catch (const nlohmann::json::exception &error) {
-            throw Error(error.what());
-        }
+        });
     }
     std::vector<Json> Elements() const {
         if (!IsArray()) throw Error("Expected JSON array");
         std::vector<Json> result;
+        result.reserve(value_.size());
         for (const auto &value : value_) result.push_back(Json(value));
         return result;
     }
@@ -131,7 +127,7 @@ public:
         return !(*this == other);
     }
 private:
-    explicit Json(const nlohmann::json &value) : value_(value) {}
+    explicit Json(nlohmann::json value) : value_(std::move(value)) {}
     nlohmann::json value_;
     friend void to_json(nlohmann::json &json, const Json &value) {
         json = value.value_;
@@ -146,7 +142,7 @@ private:
 template <typename T> std::optional<T> TryReadStringEnum(const char *token) noexcept {
     if (!token) return std::nullopt;
     try {
-        return T::FromJson(nlohmann::json(token));
+        return T::FromJson(Json(token));
     } catch (...) {
         return std::nullopt;
     }
@@ -189,13 +185,11 @@ template <typename T> void ReadJsonValue(const nlohmann::json &json, T &value) {
 }
 
 template<typename T> T Json::Get() const {
-    try {
+    return TranslateErrors([&] {
         T result{};
         ReadJsonValue(value_, result);
         return result;
-    } catch (const nlohmann::json::exception &error) {
-        throw Error(error.what());
-    }
+    });
 }
 
 template <typename T>
