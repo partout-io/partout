@@ -125,7 +125,7 @@ pp_tun pp_tun_wrap_fd(int fd, bool owned) {
         .watch = watch_tun,
     };
     pp_tun tun = pp_tun_wrap_callbacks(ctx, &callbacks);
-    if (!tun) free(ctx); // The caller retains fd on failure.
+    if (!tun) pp_free(ctx); // The caller retains fd on failure.
     return tun;
 }
 

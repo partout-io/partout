@@ -15,6 +15,10 @@
 - Never use fully qualified entities. Import the parent package, then use the entity unprefixed. The only exception is for disambiguation.
 - When a function depends on API availability, make recent API the main path. Early exit when unavailable.
 
+## C and C++
+
+- Use `pp_free()` instead of direct `free()` calls wherever the Partout allocation helpers are available. Keep direct `free()` only inside the helper implementation or standalone code without those helpers.
+
 ## C++
 
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.

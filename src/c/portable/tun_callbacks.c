@@ -19,7 +19,7 @@ pp_tun pp_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks) 
 void pp_tun_free(pp_tun tun) {
     if (!tun) return;
     tun->callbacks.close(tun->ctx);
-    free(tun);
+    pp_free(tun);
 }
 
 int pp_tun_read(const pp_tun tun, uint8_t *dst, size_t len) {

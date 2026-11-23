@@ -112,11 +112,11 @@ static partout_tun open_tun(const char *uuid) {
     pp_clog_v(PPLogLevelInfo, "tun_wintun: Created wintun device %ls", name);
     partout_tun wrapped = partout_tun_wrap_callbacks(tun, &tun_callbacks);
     if (!wrapped) goto failure;
-    free(name);
+    pp_free(name);
     return wrapped;
 
 failure:
-    free(name);
+    pp_free(name);
     close_tun(tun);
     return NULL;
 }
