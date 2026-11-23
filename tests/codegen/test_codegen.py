@@ -48,6 +48,9 @@ def main():
             # A different working directory, locale, timezone and output path must not matter.
             run(str(binary), str(schema_file), str(second), '--language', language,
                 cwd=ROOT, env={**os.environ, 'TZ': 'Pacific/Honolulu', 'LC_ALL': 'C'})
+            if language == 'kotlin':
+                for source in first.glob('*.kt'):
+                    assert '#include' not in source.read_text(), source
             if language == 'cpp':
                 for source in first.rglob('*'):
                     if source.suffix not in ('.h', '.cc'):

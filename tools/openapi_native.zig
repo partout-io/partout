@@ -305,7 +305,6 @@ fn kotlin(c: Context, s: api.Schema) ![]const u8 {
             }
         }
     }
-    try w.writeAll("#include <partout/models/Helpers.h>\n");
     var imports: std.ArrayList([]const u8) = .empty;
     for (props.items) |p| try kotlinImports(c, p.map_value orelse p.spec, &imports);
     if (s.parent) |parent| try appendUnique(c.a, &imports, try c.fmt("{s}.{s}", .{ c.package, try c.name(parent) }));
