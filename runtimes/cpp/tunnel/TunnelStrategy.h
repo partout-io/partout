@@ -32,8 +32,4 @@ public:
     virtual void Cancel() noexcept {}
 };
 
-// Selects the native backend; unsupported platforms report unavailable control.
-namespace TunnelStrategies {
-std::unique_ptr<TunnelStrategy> MakeNative(const std::string &serverUri);
-}
 }

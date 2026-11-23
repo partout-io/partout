@@ -8,7 +8,6 @@
 #include <iphlpapi.h>
 #include <netioapi.h>
 #include "WinRTTunnelStrategy.h"
-#include "partout/tunnel/Tunnel.h"
 #include "partout/models/TaggedProfile.h"
 #include "partout/models/TunnelSnapshot.h"
 #include "windows/log.h"
@@ -349,11 +348,5 @@ void WinRTTunnelStrategy::Remove(const std::string &id) {
 
 std::map<std::string, std::string> WinRTTunnelStrategy::ObservationErrors() const {
     return observationErrors_;
-}
-
-Tunnel::Tunnel(const std::string &serverUri) : Tunnel(TunnelStrategies::MakeNative(serverUri)) {}
-
-std::unique_ptr<TunnelStrategy> TunnelStrategies::MakeNative(const std::string &serverUri) {
-    return std::make_unique<WinRTTunnelStrategy>(serverUri);
 }
 }

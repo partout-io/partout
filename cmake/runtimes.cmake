@@ -10,9 +10,6 @@ if(TARGET Partout::Models)
     add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
     target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
     target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
-    if(NOT (WIN32 AND PP_BUILD_WINRT AND PP_BUILD_LIBRARY))
-        target_sources(partout-cpp-runtime PRIVATE "${PARTOUT_MODELS_ROOT}/tunnel/NativeTunnelStrategy.cc")
-    endif()
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
         if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
@@ -37,9 +34,10 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        runtimes/windows/winrt/WinRTTunnelStrategy.cc
-        runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/Platform.cc
+        runtimes/windows/winrt/Tunnel.cc
+        runtimes/windows/winrt/VpnChannelRuntime.cc
+        runtimes/windows/winrt/WinRTTunnelStrategy.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
