@@ -119,8 +119,6 @@ order is emulated directly, independent of the host or Java runtime.
 ```sh
 zig test tools/openapi_codegen.zig
 python3 tests/codegen/test_codegen.py
-# When the parent repository is available:
-python3 tests/codegen/test_parent_codegen.py ..
 ```
 
 The Python check uses only the standard library and Zig. CI runs it in the Zig
