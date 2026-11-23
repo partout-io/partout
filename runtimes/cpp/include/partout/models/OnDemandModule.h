@@ -18,11 +18,11 @@
 #ifndef OnDemandModule_H_
 #define OnDemandModule_H_
 
-#include <map>
 #include <partout/models/Helpers.h>
-#include <partout/models/OnDemandModuleOtherNetwork.h>
-#include <partout/models/OnDemandModulePolicy.h>
 #include <string>
+#include <partout/models/OnDemandModulePolicy.h>
+#include <map>
+#include <partout/models/OnDemandModuleOtherNetwork.h>
 #include <vector>
 
 namespace Partout::Models

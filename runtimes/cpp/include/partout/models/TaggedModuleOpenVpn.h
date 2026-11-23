@@ -19,8 +19,8 @@
 #define TaggedModuleOpenVpn_H_
 
 #include <partout/models/Helpers.h>
-#include <partout/models/OpenVPNModule.h>
 #include <string>
+#include <partout/models/OpenVPNModule.h>
 
 namespace Partout::Models
 {

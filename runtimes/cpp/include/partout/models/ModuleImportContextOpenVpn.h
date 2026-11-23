@@ -18,9 +18,9 @@
 #ifndef ModuleImportContextOpenVpn_H_
 #define ModuleImportContextOpenVpn_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
 #include <string>
+#include <optional>
 
 namespace Partout::Models
 {

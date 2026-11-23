@@ -18,10 +18,10 @@
 #ifndef WireGuardModule_H_
 #define WireGuardModule_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/WireGuardConfiguration.h>
 #include <string>
+#include <partout/models/WireGuardConfiguration.h>
+#include <optional>
 
 namespace Partout::Models
 {

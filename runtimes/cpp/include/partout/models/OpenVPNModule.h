@@ -18,11 +18,11 @@
 #ifndef OpenVPNModule_H_
 #define OpenVPNModule_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
+#include <string>
 #include <partout/models/OpenVpnConfiguration.h>
 #include <partout/models/OpenVpnCredentials.h>
-#include <string>
+#include <optional>
 
 namespace Partout::Models
 {

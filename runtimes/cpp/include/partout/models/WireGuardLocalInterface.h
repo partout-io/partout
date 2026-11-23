@@ -18,11 +18,11 @@
 #ifndef WireGuardLocalInterface_H_
 #define WireGuardLocalInterface_H_
 
-#include <optional>
-#include <partout/models/DNSModule.h>
 #include <partout/models/Helpers.h>
 #include <string>
 #include <vector>
+#include <partout/models/DNSModule.h>
+#include <optional>
 
 namespace Partout::Models
 {

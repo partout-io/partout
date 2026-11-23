@@ -18,9 +18,9 @@
 #ifndef TaggedModuleHTTPProxy_H_
 #define TaggedModuleHTTPProxy_H_
 
-#include <partout/models/HTTPProxyModule.h>
 #include <partout/models/Helpers.h>
 #include <string>
+#include <partout/models/HTTPProxyModule.h>
 
 namespace Partout::Models
 {

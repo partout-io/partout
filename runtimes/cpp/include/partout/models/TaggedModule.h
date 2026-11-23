@@ -5,8 +5,10 @@
 */
 
 #pragma once
-// System headers
 #include <partout/models/Helpers.h>
+// System headers
+#include <variant>
+#include <string>
 #include <partout/models/TaggedModuleCustom.h>
 #include <partout/models/TaggedModuleDns.h>
 #include <partout/models/TaggedModuleHTTPProxy.h>
@@ -15,8 +17,6 @@
 #include <partout/models/TaggedModuleOpenVpn.h>
 #include <partout/models/TaggedModuleWireGuard.h>
 #include <partout/models/WireGuardModule.h>
-#include <string>
-#include <variant>
 
 namespace Partout::Models {
 

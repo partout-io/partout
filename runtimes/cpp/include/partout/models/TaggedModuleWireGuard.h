@@ -19,8 +19,8 @@
 #define TaggedModuleWireGuard_H_
 
 #include <partout/models/Helpers.h>
-#include <partout/models/WireGuardModule.h>
 #include <string>
+#include <partout/models/WireGuardModule.h>
 
 namespace Partout::Models
 {

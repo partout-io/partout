@@ -18,11 +18,11 @@
 #ifndef TunnelSnapshotEnvironment_H_
 #define TunnelSnapshotEnvironment_H_
 
-#include <optional>
+#include <partout/models/Helpers.h>
 #include <partout/models/ConnectionStatus.h>
 #include <partout/models/DataCount.h>
-#include <partout/models/Helpers.h>
 #include <string>
+#include <optional>
 
 namespace Partout::Models
 {

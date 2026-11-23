@@ -5,14 +5,14 @@
 */
 
 #pragma once
-// System headers
 #include <partout/models/Helpers.h>
+// System headers
+#include <variant>
+#include <string>
 #include <partout/models/OpenVpnObfuscationMethodObfuscate.h>
 #include <partout/models/OpenVpnObfuscationMethodReverse.h>
 #include <partout/models/OpenVpnObfuscationMethodXormask.h>
 #include <partout/models/OpenVpnObfuscationMethodXorptrpos.h>
-#include <string>
-#include <variant>
 
 namespace Partout::Models {
 

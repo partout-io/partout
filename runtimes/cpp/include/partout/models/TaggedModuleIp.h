@@ -19,8 +19,8 @@
 #define TaggedModuleIp_H_
 
 #include <partout/models/Helpers.h>
-#include <partout/models/IPModule.h>
 #include <string>
+#include <partout/models/IPModule.h>
 
 namespace Partout::Models
 {

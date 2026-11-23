@@ -18,10 +18,10 @@
 #ifndef WireGuardRemoteInterface_H_
 #define WireGuardRemoteInterface_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace Partout::Models
 {

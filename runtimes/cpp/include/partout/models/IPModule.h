@@ -18,10 +18,10 @@
 #ifndef IPModule_H_
 #define IPModule_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/IPSettings.h>
 #include <string>
+#include <partout/models/IPSettings.h>
+#include <optional>
 
 namespace Partout::Models
 {

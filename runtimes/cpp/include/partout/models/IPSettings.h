@@ -19,9 +19,9 @@
 #define IPSettings_H_
 
 #include <partout/models/Helpers.h>
-#include <partout/models/Route.h>
 #include <string>
 #include <vector>
+#include <partout/models/Route.h>
 
 namespace Partout::Models
 {

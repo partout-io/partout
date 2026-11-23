@@ -18,11 +18,11 @@
 #ifndef OpenVpnTLSWrap_H_
 #define OpenVpnTLSWrap_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/OpenVpnStaticKey.h>
 #include <partout/models/OpenVpnTLSWrapStrategy.h>
+#include <partout/models/OpenVpnStaticKey.h>
 #include <string>
+#include <optional>
 
 namespace Partout::Models
 {

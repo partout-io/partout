@@ -18,10 +18,10 @@
 #ifndef PartoutErrorPair_H_
 #define PartoutErrorPair_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
 #include <partout/models/PartoutErrorCode.h>
 #include <string>
+#include <optional>
 
 namespace Partout::Models
 {

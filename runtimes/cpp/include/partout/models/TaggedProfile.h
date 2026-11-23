@@ -18,12 +18,12 @@
 #ifndef TaggedProfile_H_
 #define TaggedProfile_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/ProfileBehavior.h>
-#include <partout/models/TaggedModule.h>
 #include <string>
+#include <partout/models/TaggedModule.h>
 #include <vector>
+#include <partout/models/ProfileBehavior.h>
+#include <optional>
 
 namespace Partout::Models
 {

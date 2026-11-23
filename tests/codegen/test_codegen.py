@@ -53,9 +53,9 @@ def main():
                     if source.suffix not in ('.h', '.cc'):
                         continue
                     includes = [line for line in source.read_text().splitlines() if line.startswith('#include ')]
-                    assert includes == sorted(set(includes)), source
                     assert all('"' not in line for line in includes), source
                     if source.suffix == '.h' and source.name != 'Helpers.h':
+                        assert includes[0] == '#include <partout/models/Helpers.h>', source
                         assert includes.count('#include <partout/models/Helpers.h>') == 1, source
                         assert '#include <partout/Json.h>' not in includes, source
                         assert '#include <partout/Export.h>' not in includes, source

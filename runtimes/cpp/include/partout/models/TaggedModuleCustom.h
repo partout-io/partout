@@ -18,9 +18,9 @@
 #ifndef TaggedModuleCustom_H_
 #define TaggedModuleCustom_H_
 
-#include <partout/models/CustomModule.h>
 #include <partout/models/Helpers.h>
 #include <string>
+#include <partout/models/CustomModule.h>
 
 namespace Partout::Models
 {

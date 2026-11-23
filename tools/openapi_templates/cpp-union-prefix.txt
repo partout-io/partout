@@ -5,6 +5,7 @@
 */
 
 #pragma once
+#include <partout/models/Helpers.h>
 // System headers
 #include <variant>
 #include <string>

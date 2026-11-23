@@ -5,13 +5,13 @@
 */
 
 #pragma once
+#include <partout/models/Helpers.h>
 // System headers
+#include <variant>
+#include <string>
 #include <partout/models/DNSModuleProtocolTypeCleartext.h>
 #include <partout/models/DNSModuleProtocolTypeHttps.h>
 #include <partout/models/DNSModuleProtocolTypeTls.h>
-#include <partout/models/Helpers.h>
-#include <string>
-#include <variant>
 
 namespace Partout::Models {
 

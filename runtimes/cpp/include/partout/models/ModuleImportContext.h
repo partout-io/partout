@@ -5,12 +5,12 @@
 */
 
 #pragma once
-// System headers
 #include <partout/models/Helpers.h>
+// System headers
+#include <variant>
+#include <string>
 #include <partout/models/ModuleImportContextOpenVpn.h>
 #include <partout/models/ModuleImportContextWireGuard.h>
-#include <string>
-#include <variant>
 
 namespace Partout::Models {
 

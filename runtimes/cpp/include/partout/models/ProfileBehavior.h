@@ -18,8 +18,8 @@
 #ifndef ProfileBehavior_H_
 #define ProfileBehavior_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
+#include <optional>
 
 namespace Partout::Models
 {

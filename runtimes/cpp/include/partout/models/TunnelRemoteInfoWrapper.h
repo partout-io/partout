@@ -18,12 +18,12 @@
 #ifndef TunnelRemoteInfoWrapper_H_
 #define TunnelRemoteInfoWrapper_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/TaggedModule.h>
 #include <partout/models/TaggedProfile.h>
 #include <string>
+#include <partout/models/TaggedModule.h>
 #include <vector>
+#include <optional>
 
 namespace Partout::Models
 {

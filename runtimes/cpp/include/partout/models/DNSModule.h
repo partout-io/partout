@@ -18,12 +18,12 @@
 #ifndef DNSModule_H_
 #define DNSModule_H_
 
-#include <optional>
-#include <partout/models/DNSModuleDomainPolicy.h>
-#include <partout/models/DNSModuleProtocolType.h>
 #include <partout/models/Helpers.h>
 #include <string>
+#include <partout/models/DNSModuleProtocolType.h>
 #include <vector>
+#include <partout/models/DNSModuleDomainPolicy.h>
+#include <optional>
 
 namespace Partout::Models
 {

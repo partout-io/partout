@@ -18,10 +18,10 @@
 #ifndef OpenVpnCredentials_H_
 #define OpenVpnCredentials_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/OpenVpnCredentialsOTPMethod.h>
 #include <string>
+#include <partout/models/OpenVpnCredentialsOTPMethod.h>
+#include <optional>
 
 namespace Partout::Models
 {

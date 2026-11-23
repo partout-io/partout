@@ -18,10 +18,10 @@
 #ifndef HTTPProxyModule_H_
 #define HTTPProxyModule_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
 #include <string>
 #include <vector>
+#include <optional>
 
 namespace Partout::Models
 {

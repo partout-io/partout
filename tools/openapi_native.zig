@@ -176,9 +176,6 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
             f.name = try c.fmt("{s}/{s}", .{ if (std.mem.endsWith(u8, f.name, ".h")) "include/partout/models" else "models", f.name });
         }
     }
-    if (language == .cpp) {
-        for (files.items) |*f| f.contents = try cppIncludes(c, f.contents);
-    }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
     const golden: ?File = if (options.golden_path) |path| .{
@@ -308,6 +305,7 @@ fn kotlin(c: Context, s: api.Schema) ![]const u8 {
             }
         }
     }
+    try w.writeAll("#include <partout/models/Helpers.h>\n");
     var imports: std.ArrayList([]const u8) = .empty;
     for (props.items) |p| try kotlinImports(c, p.map_value orelse p.spec, &imports);
     if (s.parent) |parent| try appendUnique(c.a, &imports, try c.fmt("{s}.{s}", .{ c.package, try c.name(parent) }));
@@ -429,6 +427,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     const is_enum = s.enum_values.items.len != 0;
     try w.writeAll(@embedFile("openapi_templates/cpp-banner.txt"));
     try w.print("/*\n * {s}.h\n *\n *{s}{s}\n */\n\n#ifndef {s}_H_\n#define {s}_H_\n\n", .{ n, if (s.description.len != 0) " " else "", try html(c, s.description), n, n });
+    try w.writeAll("#include <partout/models/Helpers.h>\n");
     var imports: std.ArrayList([]const u8) = .empty;
     if (!is_enum) for (s.properties.items) |p| {
         if (p.map_value) |map_value| {
@@ -439,7 +438,6 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     };
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
     if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
-    try w.writeAll("#include <partout/models/Helpers.h>\n");
     var optional = false;
     for (s.properties.items) |p| {
         if (!required(s, p.name)) optional = true;
@@ -468,36 +466,6 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
         try w.writeAll("    // Canonical schema token, independent of the JSON representation.\n    std::string ToString() const;\n\n");
     try w.writeAll(try template(c, @embedFile("openapi_templates/cpp-header-tail.txt"), n));
     return cppWhitespace(c, out.written());
-}
-
-// Generated includes are unconditional and precede declarations.
-fn cppIncludes(c: Context, source: []const u8) ![]const u8 {
-    var includes: std.ArrayList([]const u8) = .empty;
-    var lines = std.mem.splitScalar(u8, source, '\n');
-    while (lines.next()) |line| {
-        if (std.mem.startsWith(u8, line, "#include ")) try appendUnique(c.a, &includes, line);
-    }
-    std.mem.sort([]const u8, includes.items, {}, less);
-    var out: std.Io.Writer.Allocating = .init(c.a);
-    var emitted = false;
-    lines = std.mem.splitScalar(u8, source, '\n');
-    var first = true;
-    while (lines.next()) |line| {
-        if (std.mem.startsWith(u8, line, "#include ")) {
-            if (emitted) continue;
-            emitted = true;
-            for (includes.items) |include| {
-                if (!first) try out.writer.writeByte('\n');
-                try out.writer.writeAll(include);
-                first = false;
-            }
-        } else {
-            if (!first) try out.writer.writeByte('\n');
-            try out.writer.writeAll(line);
-            first = false;
-        }
-    }
-    return out.written();
 }
 
 fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8)) anyerror!void {
@@ -654,7 +622,6 @@ fn cppUnion(c: Context, s: api.Schema) ![]const u8 {
         }
     }.lessVariant);
     try w.writeAll(@embedFile("openapi_templates/cpp-union-prefix.txt"));
-    try w.writeAll("#include <partout/models/Helpers.h>\n");
     if (c.options.external.len != 0) {
         // PARITY: the parent's legacy union backend retains dependencies of all children.
         var dependencies: std.ArrayList([]const u8) = .empty;
@@ -672,7 +639,6 @@ fn cppUnion(c: Context, s: api.Schema) ![]const u8 {
             }
         }
         if (has_array) try w.writeAll("#include <vector>\n");
-        std.mem.sort([]const u8, dependencies.items, {}, less);
         for (dependencies.items) |dep| try w.print("{s}\n", .{try cppModelInclude(c, dep)});
     } else for (variants) |v| try w.print("{s}\n", .{try cppModelInclude(c, try c.name(v.schema))});
     // PARITY: httplib leaked imports from the last discriminator child into its parent.

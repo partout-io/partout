@@ -19,8 +19,8 @@
 #define TaggedModuleOnDemand_H_
 
 #include <partout/models/Helpers.h>
-#include <partout/models/OnDemandModule.h>
 #include <string>
+#include <partout/models/OnDemandModule.h>
 
 namespace Partout::Models
 {

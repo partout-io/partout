@@ -18,10 +18,10 @@
 #ifndef OpenVpnStaticKey_H_
 #define OpenVpnStaticKey_H_
 
-#include <optional>
 #include <partout/models/Helpers.h>
-#include <partout/models/OpenVpnStaticKeyDirection.h>
 #include <string>
+#include <partout/models/OpenVpnStaticKeyDirection.h>
+#include <optional>
 
 namespace Partout::Models
 {

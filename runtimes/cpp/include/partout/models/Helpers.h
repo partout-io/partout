@@ -18,6 +18,8 @@
 #ifndef Helpers_H_
 #define Helpers_H_
 
+#include <partout/Export.h>
+#include <partout/Json.h>
 #include <cstdint>
 #include <ctime>
 #include <map>
@@ -25,8 +27,6 @@
 #include <sstream>
 #include <string>
 #include <vector>
-#include <partout/Export.h>
-#include <partout/Json.h>
 
 namespace Partout::Helpers
 {
