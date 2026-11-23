@@ -14,8 +14,6 @@ namespace Partout {
 class Tunnel {
 public:
     // Call from a serialized background executor. Cancel may run concurrently.
-    // Actual endpoints come from the installed profile.
-    explicit Tunnel(const std::string &serverUri);
     explicit Tunnel(std::unique_ptr<TunnelStrategy> strategy,
                     std::chrono::milliseconds handoverTimeout = std::chrono::seconds(60)
     );

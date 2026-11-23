@@ -32,7 +32,6 @@ endif()
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
         runtimes/windows/winrt/Platform.cc
-        runtimes/windows/winrt/Tunnel.cc
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/WinRTTunnelStrategy.cc
     )

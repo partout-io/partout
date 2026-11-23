@@ -7,7 +7,7 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
-#include "WinRTTunnelStrategy.h"
+#include "windows/WinRTTunnelStrategy.h"
 #include "partout/models/TaggedProfile.h"
 #include "partout/models/TunnelSnapshot.h"
 #include "windows/log.h"

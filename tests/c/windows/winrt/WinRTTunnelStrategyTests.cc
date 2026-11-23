@@ -2,7 +2,7 @@
 //
 // SPDX-License-Identifier: GPL-3.0
 
-#include "WinRTTunnelStrategy.h"
+#include "windows/WinRTTunnelStrategy.h"
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <cassert>
 #include <limits>
