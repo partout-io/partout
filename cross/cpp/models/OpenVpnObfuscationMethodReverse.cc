@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnObfuscationMethodReverse::ToJson() const
+::Partout::Json OpenVpnObfuscationMethodReverse::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnObfuscationMethodReverse OpenVpnObfuscationMethodReverse::FromJson(const nlohmann::json& j)
+OpenVpnObfuscationMethodReverse OpenVpnObfuscationMethodReverse::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnObfuscationMethodReverse o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnObfuscationMethodReverse>();
 }
 
 void OpenVpnObfuscationMethodReverse::Validate() const

@@ -19,7 +19,7 @@
 #define OpenVpnObfuscationMethodXorptrpos_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -49,8 +49,8 @@ struct  OpenVpnObfuscationMethodXorptrpos
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnObfuscationMethodXorptrpos FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnObfuscationMethodXorptrpos FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnObfuscationMethodXorptrpos& o);

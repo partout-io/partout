@@ -19,7 +19,7 @@
 #define DNSModuleProtocolTypeTls_H_
 
 #include <string>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -50,8 +50,8 @@ struct  DNSModuleProtocolTypeTls
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static DNSModuleProtocolTypeTls FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static DNSModuleProtocolTypeTls FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const DNSModuleProtocolTypeTls& o);

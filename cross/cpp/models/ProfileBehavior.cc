@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json ProfileBehavior::ToJson() const
+::Partout::Json ProfileBehavior::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-ProfileBehavior ProfileBehavior::FromJson(const nlohmann::json& j)
+ProfileBehavior ProfileBehavior::FromJson(const ::Partout::Json& j)
 {
-    ProfileBehavior o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<ProfileBehavior>();
 }
 
 void ProfileBehavior::Validate() const

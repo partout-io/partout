@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json ParseErrorInfo::ToJson() const
+::Partout::Json ParseErrorInfo::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-ParseErrorInfo ParseErrorInfo::FromJson(const nlohmann::json& j)
+ParseErrorInfo ParseErrorInfo::FromJson(const ::Partout::Json& j)
 {
-    ParseErrorInfo o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<ParseErrorInfo>();
 }
 
 void ParseErrorInfo::Validate() const

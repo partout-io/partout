@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json DNSModuleProtocolTypeTls::ToJson() const
+::Partout::Json DNSModuleProtocolTypeTls::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-DNSModuleProtocolTypeTls DNSModuleProtocolTypeTls::FromJson(const nlohmann::json& j)
+DNSModuleProtocolTypeTls DNSModuleProtocolTypeTls::FromJson(const ::Partout::Json& j)
 {
-    DNSModuleProtocolTypeTls o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<DNSModuleProtocolTypeTls>();
 }
 
 void DNSModuleProtocolTypeTls::Validate() const

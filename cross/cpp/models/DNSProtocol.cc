@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json DNSProtocol::ToJson() const
+::Partout::Json DNSProtocol::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-DNSProtocol DNSProtocol::FromJson(const nlohmann::json& j)
+DNSProtocol DNSProtocol::FromJson(const ::Partout::Json& j)
 {
-    DNSProtocol o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<DNSProtocol>();
 }
 
 void DNSProtocol::Validate() const
@@ -68,6 +64,15 @@ bool DNSProtocol::operator==(const DNSProtocol& other) const
 bool DNSProtocol::operator!=(const DNSProtocol& other) const
 {
     return !(*this == other);
+}
+
+std::string DNSProtocol::ToString() const {
+    switch (value) {
+        case DNSProtocol::cleartext: return "cleartext";
+        case DNSProtocol::https: return "https";
+        case DNSProtocol::tls: return "tls";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const DNSProtocol& o)

@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OnDemandModuleOtherNetwork::ToJson() const
+::Partout::Json OnDemandModuleOtherNetwork::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OnDemandModuleOtherNetwork OnDemandModuleOtherNetwork::FromJson(const nlohmann::json& j)
+OnDemandModuleOtherNetwork OnDemandModuleOtherNetwork::FromJson(const ::Partout::Json& j)
 {
-    OnDemandModuleOtherNetwork o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OnDemandModuleOtherNetwork>();
 }
 
 void OnDemandModuleOtherNetwork::Validate() const
@@ -68,6 +64,14 @@ bool OnDemandModuleOtherNetwork::operator==(const OnDemandModuleOtherNetwork& ot
 bool OnDemandModuleOtherNetwork::operator!=(const OnDemandModuleOtherNetwork& other) const
 {
     return !(*this == other);
+}
+
+std::string OnDemandModuleOtherNetwork::ToString() const {
+    switch (value) {
+        case OnDemandModuleOtherNetwork::mobile: return "mobile";
+        case OnDemandModuleOtherNetwork::ethernet: return "ethernet";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OnDemandModuleOtherNetwork& o)

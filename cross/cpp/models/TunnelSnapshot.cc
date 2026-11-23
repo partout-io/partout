@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TunnelSnapshot::ToJson() const
+::Partout::Json TunnelSnapshot::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-TunnelSnapshot TunnelSnapshot::FromJson(const nlohmann::json& j)
+TunnelSnapshot TunnelSnapshot::FromJson(const ::Partout::Json& j)
 {
-    TunnelSnapshot o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TunnelSnapshot>();
 }
 
 void TunnelSnapshot::Validate() const

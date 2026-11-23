@@ -18,7 +18,8 @@
 #ifndef OnDemandModuleOtherNetwork_H_
 #define OnDemandModuleOtherNetwork_H_
 
-#include "../json.h"
+#include <string>
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -36,6 +37,9 @@ struct  OnDemandModuleOtherNetwork
     };
 
     OnDemandModuleOtherNetwork::eOnDemandModuleOtherNetwork value = OnDemandModuleOtherNetwork::eOnDemandModuleOtherNetwork::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const OnDemandModuleOtherNetwork& other) const;
     bool operator!=(const OnDemandModuleOtherNetwork& other) const;
@@ -57,8 +61,8 @@ struct  OnDemandModuleOtherNetwork
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OnDemandModuleOtherNetwork FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static OnDemandModuleOtherNetwork FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OnDemandModuleOtherNetwork& o);

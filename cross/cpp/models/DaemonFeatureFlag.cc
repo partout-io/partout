@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json DaemonFeatureFlag::ToJson() const
+::Partout::Json DaemonFeatureFlag::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-DaemonFeatureFlag DaemonFeatureFlag::FromJson(const nlohmann::json& j)
+DaemonFeatureFlag DaemonFeatureFlag::FromJson(const ::Partout::Json& j)
 {
-    DaemonFeatureFlag o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<DaemonFeatureFlag>();
 }
 
 void DaemonFeatureFlag::Validate() const

@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnDigest::ToJson() const
+::Partout::Json OpenVpnDigest::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnDigest OpenVpnDigest::FromJson(const nlohmann::json& j)
+OpenVpnDigest OpenVpnDigest::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnDigest o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnDigest>();
 }
 
 void OpenVpnDigest::Validate() const
@@ -68,6 +64,17 @@ bool OpenVpnDigest::operator==(const OpenVpnDigest& other) const
 bool OpenVpnDigest::operator!=(const OpenVpnDigest& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnDigest::ToString() const {
+    switch (value) {
+        case OpenVpnDigest::sha1: return "SHA1";
+        case OpenVpnDigest::sha224: return "SHA224";
+        case OpenVpnDigest::sha256: return "SHA256";
+        case OpenVpnDigest::sha384: return "SHA384";
+        case OpenVpnDigest::sha512: return "SHA512";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnDigest& o)

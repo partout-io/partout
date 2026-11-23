@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json PartoutErrorPair::ToJson() const
+::Partout::Json PartoutErrorPair::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-PartoutErrorPair PartoutErrorPair::FromJson(const nlohmann::json& j)
+PartoutErrorPair PartoutErrorPair::FromJson(const ::Partout::Json& j)
 {
-    PartoutErrorPair o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<PartoutErrorPair>();
 }
 
 void PartoutErrorPair::Validate() const

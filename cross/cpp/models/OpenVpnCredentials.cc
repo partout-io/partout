@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnCredentials::ToJson() const
+::Partout::Json OpenVpnCredentials::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCredentials OpenVpnCredentials::FromJson(const nlohmann::json& j)
+OpenVpnCredentials OpenVpnCredentials::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnCredentials o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnCredentials>();
 }
 
 void OpenVpnCredentials::Validate() const

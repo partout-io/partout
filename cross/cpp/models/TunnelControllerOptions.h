@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -51,8 +51,8 @@ struct  TunnelControllerOptions
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TunnelControllerOptions FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static TunnelControllerOptions FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TunnelControllerOptions& o);

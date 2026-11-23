@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TunnelStatus::ToJson() const
+::Partout::Json TunnelStatus::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-TunnelStatus TunnelStatus::FromJson(const nlohmann::json& j)
+TunnelStatus TunnelStatus::FromJson(const ::Partout::Json& j)
 {
-    TunnelStatus o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TunnelStatus>();
 }
 
 void TunnelStatus::Validate() const
@@ -68,6 +64,16 @@ bool TunnelStatus::operator==(const TunnelStatus& other) const
 bool TunnelStatus::operator!=(const TunnelStatus& other) const
 {
     return !(*this == other);
+}
+
+std::string TunnelStatus::ToString() const {
+    switch (value) {
+        case TunnelStatus::inactive: return "inactive";
+        case TunnelStatus::activating: return "activating";
+        case TunnelStatus::active: return "active";
+        case TunnelStatus::deactivating: return "deactivating";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const TunnelStatus& o)

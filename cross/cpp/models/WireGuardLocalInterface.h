@@ -21,7 +21,7 @@
 #include "DNSModule.h"
 #include <string>
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -56,8 +56,8 @@ struct  WireGuardLocalInterface
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static WireGuardLocalInterface FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static WireGuardLocalInterface FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const WireGuardLocalInterface& o);

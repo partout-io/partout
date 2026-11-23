@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnObfuscationMethodXorptrpos::ToJson() const
+::Partout::Json OpenVpnObfuscationMethodXorptrpos::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnObfuscationMethodXorptrpos OpenVpnObfuscationMethodXorptrpos::FromJson(const nlohmann::json& j)
+OpenVpnObfuscationMethodXorptrpos OpenVpnObfuscationMethodXorptrpos::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnObfuscationMethodXorptrpos o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnObfuscationMethodXorptrpos>();
 }
 
 void OpenVpnObfuscationMethodXorptrpos::Validate() const

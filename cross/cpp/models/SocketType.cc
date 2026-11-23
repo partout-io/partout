@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json SocketType::ToJson() const
+::Partout::Json SocketType::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-SocketType SocketType::FromJson(const nlohmann::json& j)
+SocketType SocketType::FromJson(const ::Partout::Json& j)
 {
-    SocketType o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<SocketType>();
 }
 
 void SocketType::Validate() const
@@ -68,6 +64,14 @@ bool SocketType::operator==(const SocketType& other) const
 bool SocketType::operator!=(const SocketType& other) const
 {
     return !(*this == other);
+}
+
+std::string SocketType::ToString() const {
+    switch (value) {
+        case SocketType::udp: return "UDP";
+        case SocketType::tcp: return "TCP";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const SocketType& o)

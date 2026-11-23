@@ -21,7 +21,7 @@
 #include <string>
 #include "ModuleType.h"
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -56,8 +56,8 @@ struct  ParseErrorInfo
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static ParseErrorInfo FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static ParseErrorInfo FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ParseErrorInfo& o);

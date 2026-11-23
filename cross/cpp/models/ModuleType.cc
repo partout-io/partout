@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json ModuleType::ToJson() const
+::Partout::Json ModuleType::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-ModuleType ModuleType::FromJson(const nlohmann::json& j)
+ModuleType ModuleType::FromJson(const ::Partout::Json& j)
 {
-    ModuleType o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<ModuleType>();
 }
 
 void ModuleType::Validate() const
@@ -68,6 +64,21 @@ bool ModuleType::operator==(const ModuleType& other) const
 bool ModuleType::operator!=(const ModuleType& other) const
 {
     return !(*this == other);
+}
+
+std::string ModuleType::ToString() const {
+    switch (value) {
+        case ModuleType::Custom: return "Custom";
+        case ModuleType::DNS: return "DNS";
+        case ModuleType::HTTPProxy: return "HTTPProxy";
+        case ModuleType::IP: return "IP";
+        case ModuleType::OnDemand: return "OnDemand";
+        case ModuleType::OpenVPN: return "OpenVPN";
+        case ModuleType::Provider: return "Provider";
+        case ModuleType::WireGuard: return "WireGuard";
+        case ModuleType::Undefined: return "Undefined";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const ModuleType& o)

@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnTLSWrapStrategy::ToJson() const
+::Partout::Json OpenVpnTLSWrapStrategy::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnTLSWrapStrategy OpenVpnTLSWrapStrategy::FromJson(const nlohmann::json& j)
+OpenVpnTLSWrapStrategy OpenVpnTLSWrapStrategy::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnTLSWrapStrategy o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnTLSWrapStrategy>();
 }
 
 void OpenVpnTLSWrapStrategy::Validate() const
@@ -68,6 +64,15 @@ bool OpenVpnTLSWrapStrategy::operator==(const OpenVpnTLSWrapStrategy& other) con
 bool OpenVpnTLSWrapStrategy::operator!=(const OpenVpnTLSWrapStrategy& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnTLSWrapStrategy::ToString() const {
+    switch (value) {
+        case OpenVpnTLSWrapStrategy::auth: return "auth";
+        case OpenVpnTLSWrapStrategy::crypt: return "crypt";
+        case OpenVpnTLSWrapStrategy::cryptV2: return "crypt-v2";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnTLSWrapStrategy& o)

@@ -18,8 +18,8 @@
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static @NAME@ FromJson(const nlohmann::json& j);
+    @JSON_TYPE@ ToJson() const;
+    static @NAME@ FromJson(const @JSON_TYPE@& j);
 };
 
  void to_json(nlohmann::json& j, const @NAME@& o);

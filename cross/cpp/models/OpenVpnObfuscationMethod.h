@@ -6,7 +6,7 @@
 
 #pragma once
 // System headers
-#include "../json.h"
+#include "../Json.h"
 #include <variant>
 #include <string>
 #include "OpenVpnObfuscationMethodObfuscate.h"

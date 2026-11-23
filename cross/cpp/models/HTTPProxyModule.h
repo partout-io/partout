@@ -20,7 +20,7 @@
 
 #include <string>
 #include <vector>
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -55,8 +55,8 @@ struct  HTTPProxyModule
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static HTTPProxyModule FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static HTTPProxyModule FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const HTTPProxyModule& o);

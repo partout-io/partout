@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json HTTPProxyModule::ToJson() const
+::Partout::Json HTTPProxyModule::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-HTTPProxyModule HTTPProxyModule::FromJson(const nlohmann::json& j)
+HTTPProxyModule HTTPProxyModule::FromJson(const ::Partout::Json& j)
 {
-    HTTPProxyModule o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<HTTPProxyModule>();
 }
 
 void HTTPProxyModule::Validate() const

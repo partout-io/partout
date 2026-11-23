@@ -4,18 +4,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json @NAME@::ToJson() const
+@JSON_TYPE@ @NAME@::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return @JSON_TYPE@(*this);
 }
 
-@NAME@ @NAME@::FromJson(const nlohmann::json& j)
+@NAME@ @NAME@::FromJson(const @JSON_TYPE@& j)
 {
-    @NAME@ o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<@NAME@>();
 }
 
 void @NAME@::Validate() const

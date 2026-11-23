@@ -20,7 +20,7 @@
 
 #include <string>
 #include "OpenVpnCredentialsOTPMethod.h"
-#include "../json.h"
+#include "../Json.h"
 #include <optional>
 
 namespace Partout::Models
@@ -54,8 +54,8 @@ struct  OpenVpnCredentials
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnCredentials FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnCredentials FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnCredentials& o);

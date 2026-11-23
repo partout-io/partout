@@ -8,6 +8,17 @@ this migration. The existing Zig interface and output remain unchanged.
 C++ output uses `.h` headers and `.cc` sources, including `Helpers.cc`.
 The `cpp` language selector is unchanged.
 
+Generated C++ string enums expose `ToString()` for their canonical schema token.
+Presentation callers use this model API without accessing a JSON value or codec.
+Unset or invalid enum values throw `std::invalid_argument`; numeric enums do not
+expose this string-token API.
+
+C++ model `ToJson()`/`FromJson()` and opaque JSON properties use the shared
+`Partout::Json` value wrapper, declared in `<partout/Json.h>`. It owns parsing, encoding, checked value
+conversion, object/array operations, and JSON-library exception translation.
+Generated backend codecs retain nlohmann ADL functions internally; application
+code uses the wrapper without depending on those functions or backend types.
+
 ## Analysis and migration boundary
 
 Sharing the schema reader removes Java, OpenAPI Generator, Python, Perl, and

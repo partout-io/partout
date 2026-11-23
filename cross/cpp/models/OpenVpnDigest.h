@@ -18,7 +18,8 @@
 #ifndef OpenVpnDigest_H_
 #define OpenVpnDigest_H_
 
-#include "../json.h"
+#include <string>
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -40,6 +41,9 @@ struct  OpenVpnDigest
 
     OpenVpnDigest::eOpenVpnDigest value = OpenVpnDigest::eOpenVpnDigest::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const OpenVpnDigest& other) const;
     bool operator!=(const OpenVpnDigest& other) const;
 
@@ -60,8 +64,8 @@ struct  OpenVpnDigest
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static OpenVpnDigest FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static OpenVpnDigest FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const OpenVpnDigest& o);

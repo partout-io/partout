@@ -18,7 +18,7 @@
 #ifndef DataCount_H_
 #define DataCount_H_
 
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -49,8 +49,8 @@ struct  DataCount
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static DataCount FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static DataCount FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const DataCount& o);

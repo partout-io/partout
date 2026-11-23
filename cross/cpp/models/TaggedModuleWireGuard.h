@@ -20,7 +20,7 @@
 
 #include <string>
 #include "WireGuardModule.h"
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -51,8 +51,8 @@ struct  TaggedModuleWireGuard
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TaggedModuleWireGuard FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static TaggedModuleWireGuard FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedModuleWireGuard& o);

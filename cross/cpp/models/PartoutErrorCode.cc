@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json PartoutErrorCode::ToJson() const
+::Partout::Json PartoutErrorCode::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-PartoutErrorCode PartoutErrorCode::FromJson(const nlohmann::json& j)
+PartoutErrorCode PartoutErrorCode::FromJson(const ::Partout::Json& j)
 {
-    PartoutErrorCode o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<PartoutErrorCode>();
 }
 
 void PartoutErrorCode::Validate() const
@@ -68,6 +64,41 @@ bool PartoutErrorCode::operator==(const PartoutErrorCode& other) const
 bool PartoutErrorCode::operator!=(const PartoutErrorCode& other) const
 {
     return !(*this == other);
+}
+
+std::string PartoutErrorCode::ToString() const {
+    switch (value) {
+        case PartoutErrorCode::openVPN: return "openVPN";
+        case PartoutErrorCode::wireGuard: return "wireGuard";
+        case PartoutErrorCode::authentication: return "authentication";
+        case PartoutErrorCode::crypto: return "crypto";
+        case PartoutErrorCode::decoding: return "decoding";
+        case PartoutErrorCode::dnsFailure: return "dnsFailure";
+        case PartoutErrorCode::encoding: return "encoding";
+        case PartoutErrorCode::fdUnavailable: return "fdUnavailable";
+        case PartoutErrorCode::incompatibleModules: return "incompatibleModules";
+        case PartoutErrorCode::incompleteModule: return "incompleteModule";
+        case PartoutErrorCode::invalidField: return "invalidField";
+        case PartoutErrorCode::invalidValue: return "invalidValue";
+        case PartoutErrorCode::ioFailure: return "ioFailure";
+        case PartoutErrorCode::keychainAddItem: return "keychainAddItem";
+        case PartoutErrorCode::keychainItemNotFound: return "keychainItemNotFound";
+        case PartoutErrorCode::linkNotActive: return "linkNotActive";
+        case PartoutErrorCode::networkChanged: return "networkChanged";
+        case PartoutErrorCode::noActiveModules: return "noActiveModules";
+        case PartoutErrorCode::operationCancelled: return "operationCancelled";
+        case PartoutErrorCode::outOfMemory: return "outOfMemory";
+        case PartoutErrorCode::parsing: return "parsing";
+        case PartoutErrorCode::releasedObject: return "releasedObject";
+        case PartoutErrorCode::requiredImplementation: return "requiredImplementation";
+        case PartoutErrorCode::socketConfiguration: return "socketConfiguration";
+        case PartoutErrorCode::timeout: return "timeout";
+        case PartoutErrorCode::tunNotAvailable: return "tunNotAvailable";
+        case PartoutErrorCode::unhandled: return "unhandled";
+        case PartoutErrorCode::unknownImportedModule: return "unknownImportedModule";
+        case PartoutErrorCode::unknownModuleHandler: return "unknownModuleHandler";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const PartoutErrorCode& o)

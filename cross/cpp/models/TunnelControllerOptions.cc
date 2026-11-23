@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TunnelControllerOptions::ToJson() const
+::Partout::Json TunnelControllerOptions::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-TunnelControllerOptions TunnelControllerOptions::FromJson(const nlohmann::json& j)
+TunnelControllerOptions TunnelControllerOptions::FromJson(const ::Partout::Json& j)
 {
-    TunnelControllerOptions o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TunnelControllerOptions>();
 }
 
 void TunnelControllerOptions::Validate() const

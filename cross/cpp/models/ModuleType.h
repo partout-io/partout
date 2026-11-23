@@ -18,7 +18,8 @@
 #ifndef ModuleType_H_
 #define ModuleType_H_
 
-#include "../json.h"
+#include <string>
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -44,6 +45,9 @@ struct  ModuleType
 
     ModuleType::eModuleType value = ModuleType::eModuleType::INVALID_VALUE_OPENAPI_GENERATED;
 
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
+
     bool operator==(const ModuleType& other) const;
     bool operator!=(const ModuleType& other) const;
 
@@ -64,8 +68,8 @@ struct  ModuleType
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static ModuleType FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static ModuleType FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ModuleType& o);

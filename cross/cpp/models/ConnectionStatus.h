@@ -18,7 +18,8 @@
 #ifndef ConnectionStatus_H_
 #define ConnectionStatus_H_
 
-#include "../json.h"
+#include <string>
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -38,6 +39,9 @@ struct  ConnectionStatus
     };
 
     ConnectionStatus::eConnectionStatus value = ConnectionStatus::eConnectionStatus::INVALID_VALUE_OPENAPI_GENERATED;
+
+    // Canonical schema token, independent of the JSON representation.
+    std::string ToString() const;
 
     bool operator==(const ConnectionStatus& other) const;
     bool operator!=(const ConnectionStatus& other) const;
@@ -59,8 +63,8 @@ struct  ConnectionStatus
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static ConnectionStatus FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static ConnectionStatus FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const ConnectionStatus& o);

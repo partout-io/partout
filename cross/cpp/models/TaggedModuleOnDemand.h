@@ -20,7 +20,7 @@
 
 #include <string>
 #include "OnDemandModule.h"
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -51,8 +51,8 @@ struct  TaggedModuleOnDemand
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TaggedModuleOnDemand FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static TaggedModuleOnDemand FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedModuleOnDemand& o);

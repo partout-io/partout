@@ -20,7 +20,7 @@
 
 #include <string>
 #include "CustomModule.h"
-#include "../json.h"
+#include "../Json.h"
 
 namespace Partout::Models
 {
@@ -51,8 +51,8 @@ struct  TaggedModuleCustom
     /// </summary>
     bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    nlohmann::json ToJson() const;
-    static TaggedModuleCustom FromJson(const nlohmann::json& j);
+    ::Partout::Json ToJson() const;
+    static TaggedModuleCustom FromJson(const ::Partout::Json& j);
 };
 
  void to_json(nlohmann::json& j, const TaggedModuleCustom& o);

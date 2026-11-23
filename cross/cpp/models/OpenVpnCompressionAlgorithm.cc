@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnCompressionAlgorithm::ToJson() const
+::Partout::Json OpenVpnCompressionAlgorithm::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCompressionAlgorithm OpenVpnCompressionAlgorithm::FromJson(const nlohmann::json& j)
+OpenVpnCompressionAlgorithm OpenVpnCompressionAlgorithm::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnCompressionAlgorithm o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnCompressionAlgorithm>();
 }
 
 void OpenVpnCompressionAlgorithm::Validate() const

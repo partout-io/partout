@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json TaggedProfile::ToJson() const
+::Partout::Json TaggedProfile::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-TaggedProfile TaggedProfile::FromJson(const nlohmann::json& j)
+TaggedProfile TaggedProfile::FromJson(const ::Partout::Json& j)
 {
-    TaggedProfile o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<TaggedProfile>();
 }
 
 void TaggedProfile::Validate() const
@@ -150,7 +146,7 @@ void from_json(const nlohmann::json& j, TaggedProfile& o)
     }
 
     if (j.find("userInfo") != j.end()) {
-        nlohmann::json temporary_userInfo;
+        ::Partout::Json temporary_userInfo;
         ReadJsonValue(j.at("userInfo"), temporary_userInfo);
         parsed.userInfo = std::move(temporary_userInfo);
     }

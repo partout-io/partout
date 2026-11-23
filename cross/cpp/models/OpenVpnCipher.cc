@@ -16,18 +16,14 @@
 namespace Partout::Models
 {
 
-nlohmann::json OpenVpnCipher::ToJson() const
+::Partout::Json OpenVpnCipher::ToJson() const
 {
-    nlohmann::json j;
-    ::Partout::Models::to_json(j, *this);
-    return j;
+    return ::Partout::Json(*this);
 }
 
-OpenVpnCipher OpenVpnCipher::FromJson(const nlohmann::json& j)
+OpenVpnCipher OpenVpnCipher::FromJson(const ::Partout::Json& j)
 {
-    OpenVpnCipher o{};
-    ::Partout::Models::from_json(j, o);
-    return o;
+    return j.Get<OpenVpnCipher>();
 }
 
 void OpenVpnCipher::Validate() const
@@ -68,6 +64,18 @@ bool OpenVpnCipher::operator==(const OpenVpnCipher& other) const
 bool OpenVpnCipher::operator!=(const OpenVpnCipher& other) const
 {
     return !(*this == other);
+}
+
+std::string OpenVpnCipher::ToString() const {
+    switch (value) {
+        case OpenVpnCipher::aes128cbc: return "AES-128-CBC";
+        case OpenVpnCipher::aes192cbc: return "AES-192-CBC";
+        case OpenVpnCipher::aes256cbc: return "AES-256-CBC";
+        case OpenVpnCipher::aes128gcm: return "AES-128-GCM";
+        case OpenVpnCipher::aes192gcm: return "AES-192-GCM";
+        case OpenVpnCipher::aes256gcm: return "AES-256-GCM";
+        default: throw std::invalid_argument("Invalid string enum value");
+    }
 }
 
 void to_json(nlohmann::json& j, const OpenVpnCipher& o)
