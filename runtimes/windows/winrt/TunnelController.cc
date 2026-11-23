@@ -55,7 +55,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
 void TunnelController::AssociateUnconnected(Socket &socket) {
     // UDP sockets with multiple destinations keep their binds independent of the channel.
     // Link refresh may preserve the channel while replacing its independent socket.
-    const auto profile = Network::PhysicalProfile();
+    const auto profile = NetworkMonitor::PhysicalProfile();
     if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
     udp_adapter_ = profile.NetworkAdapter();
     socket.SetAdapter(udp_adapter_);

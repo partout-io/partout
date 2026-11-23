@@ -3,7 +3,6 @@
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include "NetworkMonitor.h"
-#include "NetworkInternal.h"
 #include <windows.h>
 #include <ipifcons.h>
 #include <iphlpapi.h>
@@ -38,18 +37,18 @@ std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
 }
 } // namespace
 
-bool Network::Preference::IsBetterThan(const Network::Preference &other) const {
+bool NetworkMonitor::Preference::IsBetterThan(const NetworkMonitor::Preference &other) const {
     if (metric == other.metric) return connectivity > other.connectivity;
     return metric && (!other.metric || *metric < *other.metric);
 }
 
 // A missing preference excludes an unusable profile from selection.
 std::optional<size_t>
-Network::SelectPhysical(
-    size_t count, const std::function<std::optional<Network::Preference>(size_t)> &preference
+NetworkMonitor::SelectPhysical(
+    size_t count, const std::function<std::optional<NetworkMonitor::Preference>(size_t)> &preference
 ) {
     std::optional<size_t> selected;
-    Network::Preference best{};
+    NetworkMonitor::Preference best{};
     for (size_t i = 0; i < count; ++i) {
         const auto candidate = preference(i);
         if (!candidate) continue;
@@ -61,7 +60,7 @@ Network::SelectPhysical(
     return selected;
 }
 
-bool Network::Path::Update(winrt::guid id, bool available) {
+bool NetworkMonitor::Path::Update(winrt::guid id, bool available) {
     if (initialized && available == reachable && id == adapter) return false;
     initialized = true;
     reachable = available;
@@ -70,7 +69,7 @@ bool Network::Path::Update(winrt::guid id, bool available) {
 }
 
 // Exclude the VPN interface itself when Windows reports it as the preferred path.
-winrt::Windows::Networking::Connectivity::ConnectionProfile Network::PhysicalProfile() {
+winrt::Windows::Networking::Connectivity::ConnectionProfile NetworkMonitor::PhysicalProfile() {
     using namespace winrt::Windows::Networking::Connectivity;
     const auto usable = [](ConnectionProfile const &profile) {
         if (!profile || !profile.NetworkAdapter()) return false;
@@ -93,10 +92,10 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile Network::PhysicalPro
     if (result != NO_ERROR) throw winrt::hresult_error(HRESULT_FROM_WIN32(result));
     const auto profiles = NetworkInformation::GetConnectionProfiles();
     const auto selected =
-        Network::SelectPhysical(profiles.Size(), [&](size_t i) -> std::optional<Network::Preference> {
+        NetworkMonitor::SelectPhysical(profiles.Size(), [&](size_t i) -> std::optional<NetworkMonitor::Preference> {
             const auto profile = profiles.GetAt(static_cast<uint32_t>(i));
             if (!usable(profile)) return std::nullopt;
-            return Network::Preference{
+            return NetworkMonitor::Preference{
                 static_cast<uint32_t>(profile.GetNetworkConnectivityLevel()),
                 DefaultRouteMetric(profile.NetworkAdapter().NetworkAdapterId(), routes.get())};
         });
@@ -106,13 +105,13 @@ winrt::Windows::Networking::Connectivity::ConnectionProfile Network::PhysicalPro
 struct NetworkMonitor::State {
     std::mutex mutex;
     std::function<void(bool, bool)> notify;
-    Network::Path path;
+    NetworkMonitor::Path path;
 
     void Refresh() noexcept {
         try {
             std::lock_guard lock(mutex);
             if (!notify) return;
-            const auto profile = Network::PhysicalProfile();
+            const auto profile = NetworkMonitor::PhysicalProfile();
             const bool available = bool(profile);
             // Use an empty adapter ID for the offline state so repeated offline
             // notifications compare equal, just like repeated adapter notifications.
