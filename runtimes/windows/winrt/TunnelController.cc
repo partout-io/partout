@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
+#include "TunnelController.h"
 #include "TunSettings.h"
 #include <windows.h>
-#include "Tun.h"
 #include "RuntimeLoop.h"
 #include "Socket.h"
 #include "windows/log.h"

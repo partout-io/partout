@@ -61,9 +61,11 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
 if(TARGET partout-bindings)
     set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WinRTRuntime)
     install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include/partout_winrt.h"
+    install(FILES runtimes/windows/winrt/include/partout_winrt.h
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+    install(DIRECTORY runtimes/windows/winrt/include/windows
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-    )
+        FILES_MATCHING PATTERN "*.h")
 endif()
 
 if(TARGET partout-posix-runtime)

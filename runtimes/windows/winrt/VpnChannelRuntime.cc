@@ -14,8 +14,8 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/OpenVPNExtensions.h>
-#include "partout_winrt.h"
-#include "Tun.h"
+#include "windows/VpnChannelRuntime.h"
+#include "TunnelController.h"
 #include "RuntimeLoop.h"
 
 #include <partout/models/ConnectionStatus.h>
