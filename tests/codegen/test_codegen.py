@@ -48,6 +48,9 @@ def main():
             # A different working directory, locale, timezone and output path must not matter.
             run(str(binary), str(schema_file), str(second), '--language', language,
                 cwd=ROOT, env={**os.environ, 'TZ': 'Pacific/Honolulu', 'LC_ALL': 'C'})
+            if language == 'cpp':
+                for header in first.rglob('*.h'):
+                    assert header.read_text().count('#include <partout/Json.h>') <= 1, header
             actual = snapshot(first)
             assert actual == snapshot(second), f'{language}: nondeterministic output'
             expected = snapshot(models)

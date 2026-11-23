@@ -1,9 +1,9 @@
 {
   "cpp": {
-    "include/partout/models/ABIEnvelope.h": "9826eb6cb1c5cab5278b4849f5b4df3b82ae5edf327a8ac1958786b2a76c12ed",
+    "include/partout/models/ABIEnvelope.h": "02a66c378d0aafda35cad8bfddfe9c9844c89eae391c5c37d0e7086623af3e6d",
     "include/partout/models/ConnectionStatus.h": "8dd8f29c6dd2b0bbb229184b1e29b47a4bdfbe47a6ee75d270eaa992a9f1d712",
     "include/partout/models/CryptoBackend.h": "256f7fb22e2ca6f84a06a3d6bbbfa130bf627e70d40e2d3bb392b225e613c776",
-    "include/partout/models/CustomModule.h": "43b16a41df6eaaae778ef1cee2c262568a76c2c7dc624df14ebee502556a4c1b",
+    "include/partout/models/CustomModule.h": "97ccd2f53980513f2cd0f3e6602e7524c81f263eddb3c89c1651088ffb127add",
     "include/partout/models/DNSModule.h": "62c68cffb023eeefe4f6496c045c291a0c54f29f4bdcfb1fc5ac318edbbec634",
     "include/partout/models/DNSModuleDomainPolicy.h": "5afcef7239d74767aafc6c96e9492eed419413a665dca2b6ca0236a4066c9d61",
     "include/partout/models/DNSModuleProtocolType.h": "1cabb0e3b412d0507a928ddc4d15966e5e5a35614accb87f9c82aaceb8426adc",
@@ -59,7 +59,7 @@
     "include/partout/models/TaggedModuleOnDemand.h": "dff9e423948505fb22b6dc155b7588211b50e3284ada03bee1035e584f1f8ca9",
     "include/partout/models/TaggedModuleOpenVpn.h": "7f529233c84469aa6970dfc03105089001cd0c26c8f85ce69aae3c98650ff01e",
     "include/partout/models/TaggedModuleWireGuard.h": "c5085e7b338e5016a3fa7ab662d7da45ec3ebf57091bb09cf8e8f37c4634898e",
-    "include/partout/models/TaggedProfile.h": "bfd2de20e4162e249985ddd81577fbca1707f0a93e37768abf870cde3e542b9b",
+    "include/partout/models/TaggedProfile.h": "e12266f382533fd7ea711fa76fbba14680c4528116bf298febde26bf83bc6e21",
     "include/partout/models/TunnelControllerOptions.h": "3a82c9a49890c2d599b48d106135c39a0d6c995ac6acb5f1a7f38293a9c7f5e0",
     "include/partout/models/TunnelRemoteInfoWrapper.h": "052501cd6398250509b121c5a3f0e38fb3e058d498fc1683f32ce2ce0b5b6626",
     "include/partout/models/TunnelSnapshot.h": "628e7f81b32a5026f919530cee2086cd115e0e082e1496165220b72e62b203cd",

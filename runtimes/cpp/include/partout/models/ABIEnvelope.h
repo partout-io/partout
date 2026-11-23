@@ -19,7 +19,6 @@
 #ifndef ABIEnvelope_H_
 #define ABIEnvelope_H_
 
-#include <partout/Json.h>
 #include <partout/models/PartoutErrorCode.h>
 #include <partout/Json.h>
 #include <optional>

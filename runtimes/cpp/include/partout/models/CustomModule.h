@@ -19,7 +19,6 @@
 #ifndef CustomModule_H_
 #define CustomModule_H_
 
-#include <partout/Json.h>
 #include <partout/models/ModuleType.h>
 #include <partout/Json.h>
 

@@ -499,9 +499,6 @@ fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8
             const t = try c.typ(spec, null, false);
             if (eq(t, "std::string")) {
                 try appendUnique(c.a, imports, "#include <string>");
-            } else if (eq(t, "::Partout::Json")) {
-                // PARITY: the legacy pipeline emits a duplicate JSON include.
-                try appendUnique(c.a, imports, "#include <nlohmann/json.hpp>");
             } else if (std.mem.startsWith(u8, t, c.package)) {
                 try appendUnique(c.a, imports, try c.fmt("#include \"{s}.h\"", .{t[c.package.len + 2 ..]}));
             }
