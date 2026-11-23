@@ -41,6 +41,9 @@ typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_addre
  */
 typedef struct winrt_transport winrt_transport;
 
+/* Releases an owned TUN transport. Accepts NULL. */
+PARTOUT_WINRT_API void winrt_tun_free(winrt_transport *transport);
+
 struct winrt_transport {
     void *context;
     void (*release)(void *);

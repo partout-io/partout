@@ -237,6 +237,11 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
 } // namespace Partout::ABI
 
 extern "C" {
+void winrt_tun_free(winrt_transport *transport) {
+    if (!transport) return;
+    transport->release(transport->context);
+}
+
 winrt_loop winrt_loop_create(void) {
     try {
         return new Partout::RuntimeLoop;

@@ -87,7 +87,7 @@ Java_io_partout_PartoutWrapper_partoutImportProfile(
     if (jni_name) (*env)->ReleaseStringUTFChars(env, name, jni_name);
 
     jstring j_json = json ? (*env)->NewStringUTF(env, json) : NULL;
-    free(json);
+    pp_free(json);
     return j_json;
 }
 
@@ -111,7 +111,7 @@ Java_io_partout_PartoutWrapper_partoutImportModule(
     if (jni_context) (*env)->ReleaseStringUTFChars(env, context, jni_context);
 
     jstring j_json = json ? (*env)->NewStringUTF(env, json) : NULL;
-    free(json);
+    pp_free(json);
     return j_json;
 }
 
@@ -123,7 +123,7 @@ Java_io_partout_PartoutWrapper_partoutExportModule(JNIEnv *env, jobject thiz, js
     char *output = partout_export_module(input);
     (*env)->ReleaseStringUTFChars(env, module, input);
     jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
-    free(output);
+    pp_free(output);
     return result;
 }
 
@@ -190,7 +190,7 @@ Java_io_partout_PartoutWrapper_partoutWireGuardGenKey(JNIEnv *env, jobject thiz)
     (void)thiz;
     char *output = partout_wireguard_genkey();
     jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
-    free(output);
+    pp_free(output);
     return result;
 }
 
@@ -202,7 +202,7 @@ Java_io_partout_PartoutWrapper_partoutWireGuardPubKey(JNIEnv *env, jobject thiz,
     char *output = partout_wireguard_pubkey(input);
     (*env)->ReleaseStringUTFChars(env, key, input);
     jstring result = output ? (*env)->NewStringUTF(env, output) : NULL;
-    free(output);
+    pp_free(output);
     return result;
 }
 

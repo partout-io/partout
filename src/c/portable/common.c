@@ -75,7 +75,7 @@ char *pp_file_read(const char *rel_path, const char *parent) {
     /* Open file at absolute path. */
     file = pp_fopen(abs_path, "rb");
     if (!file) goto failure;
-    free(abs_path);
+    pp_free(abs_path);
     abs_path = NULL;
 
     /* Compute file size. */
@@ -98,9 +98,9 @@ char *pp_file_read(const char *rel_path, const char *parent) {
     buffer[buffer_size] = '\0';
     return buffer;
 failure:
-    if (buffer) free(buffer);
+    if (buffer) pp_free(buffer);
     if (file) fclose(file);
-    if (abs_path) free(abs_path);
+    if (abs_path) pp_free(abs_path);
     return NULL;
 }
 
@@ -154,14 +154,14 @@ bool pp_file_create_directory(const char *path) {
         const char separator = *cursor;
         *cursor = '\0';
         if (!pp_file_create_single_directory(mutable_path)) {
-            free(mutable_path);
+            pp_free(mutable_path);
             return false;
         }
         *cursor = separator;
     }
 
     const bool created = pp_file_create_single_directory(mutable_path);
-    free(mutable_path);
+    pp_free(mutable_path);
     return created;
 }
 
