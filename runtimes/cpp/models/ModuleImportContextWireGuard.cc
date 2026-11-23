@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "ModuleImportContextWireGuard.h"
-#include "Helpers.h"
+#include <partout/models/ModuleImportContextWireGuard.h>
 
 namespace Partout::Models
 {

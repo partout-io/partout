@@ -15,7 +15,7 @@ using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
 
-TunSettings::TunSettings(const char *json) {
+TunSettings::TunSettings(const char *json, Models::TunnelControllerOptions controller_options) {
     if (!json) throw hresult_invalid_argument(L"Missing negotiated tunnel settings");
     try {
         const auto info = Models::TunnelRemoteInfoWrapper::FromJson(Json::Parse(json));
@@ -31,6 +31,12 @@ TunSettings::TunSettings(const char *json) {
         throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");
     } catch (const std::logic_error &) {
         throw hresult_invalid_argument(L"Invalid negotiated tunnel settings");
+    }
+    if (domains_.DomainNameList().Size() == 0 && !controller_options.dnsFallbackServers.empty()) {
+        Models::DNSModule fallback{};
+        fallback.protocolType = Models::DNSModuleProtocolTypeCleartext{};
+        fallback.servers = controller_options.dnsFallbackServers;
+        ApplyDNS(fallback);
     }
     Validate();
 }

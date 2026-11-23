@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
+#include "TunnelController.h"
 #include "TunSettings.h"
 #include <windows.h>
-#include "Tun.h"
 #include "RuntimeLoop.h"
 #include "Socket.h"
 #include "windows/log.h"
@@ -20,8 +20,9 @@ using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
 
-TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel)
-    : loop_(loop), state_(std::make_unique<Tun::State>(channel)) {}
+TunnelController::TunnelController(RuntimeLoop &loop, VpnChannel const &channel,
+                                   Models::TunnelControllerOptions controller_options)
+    : loop_(loop), controller_options_(std::move(controller_options)), state_(std::make_unique<Tun::State>(channel)) {}
 
 TunnelController::~TunnelController() {
     monitor_.Stop();
@@ -54,7 +55,7 @@ bool TunnelController::Associate(Socket &socket) noexcept {
 void TunnelController::AssociateUnconnected(Socket &socket) {
     // UDP sockets with multiple destinations keep their binds independent of the channel.
     // Link refresh may preserve the channel while replacing its independent socket.
-    const auto profile = PhysicalProfile();
+    const auto profile = NetworkMonitor::PhysicalProfile();
     if (!profile) throw hresult_error(E_FAIL, L"No physical network profile");
     udp_adapter_ = profile.NetworkAdapter();
     socket.SetAdapter(udp_adapter_);
@@ -67,7 +68,7 @@ void TunnelController::AssociateUnconnected(Socket &socket) {
         // only to satisfy the framework; application destinations use independent UDP sockets.
         // TEST-NET-1 avoids DNS and any dependency on a real server.
         const auto connect = idle.ConnectAsync(HostName{L"192.0.2.1"}, L"9");
-        if (connect.wait_for(std::chrono::seconds(5)) == AsyncStatus::Started) {
+        if (connect.wait_for(TunnelController::TransportSetupTimeout) == AsyncStatus::Started) {
             connect.Cancel();
             throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT));
         }
@@ -85,7 +86,7 @@ std::unique_ptr<Tun> TunnelController::Open(const char *info_json) {
     if (!state_->channel || !transport_) return nullptr;
     auto tun = std::make_unique<Tun>(*state_);
     if (!started_) {
-        const TunSettings settings{info_json};
+        const TunSettings settings{info_json, controller_options_};
         if (!idle_transport_) {
             auto receive =
                 socket_->TakeOver([state = state_.get()](const uint8_t *bytes, size_t length) {

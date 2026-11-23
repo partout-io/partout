@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: GPL-3.0
 #include "ABI.h"
 #include "RuntimeLoop.h"
-#include "Tun.h"
+#include "TunnelController.h"
 #include "windows/log.h"
 
-#include "partout_winrt.h"
+#include "partout.h"
 
 namespace Partout {
 partout_controller_functions ControllerFunctions() {

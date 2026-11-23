@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "DNSModuleDomainPolicy.h"
-#include "Helpers.h"
+#include <partout/models/DNSModuleDomainPolicy.h>
 
 namespace Partout::Models
 {

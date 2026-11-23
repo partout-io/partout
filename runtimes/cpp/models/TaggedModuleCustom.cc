@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "TaggedModuleCustom.h"
-#include "Helpers.h"
+#include <partout/models/TaggedModuleCustom.h>
 
 namespace Partout::Models
 {

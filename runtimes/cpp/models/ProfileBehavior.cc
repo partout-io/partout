@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "ProfileBehavior.h"
-#include "Helpers.h"
+#include <partout/models/ProfileBehavior.h>
 
 namespace Partout::Models
 {

@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "ConnectionStatus.h"
-#include "Helpers.h"
+#include <partout/models/ConnectionStatus.h>
 
 namespace Partout::Models
 {

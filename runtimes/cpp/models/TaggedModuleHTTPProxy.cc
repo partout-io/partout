@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "TaggedModuleHTTPProxy.h"
-#include "Helpers.h"
+#include <partout/models/TaggedModuleHTTPProxy.h>
 
 namespace Partout::Models
 {

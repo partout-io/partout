@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "IPSocketType.h"
-#include "Helpers.h"
+#include <partout/models/IPSocketType.h>
 
 namespace Partout::Models
 {

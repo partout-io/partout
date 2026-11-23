@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "DNSModuleProtocolTypeHttps.h"
-#include "Helpers.h"
+#include <partout/models/DNSModuleProtocolTypeHttps.h>
 
 namespace Partout::Models
 {

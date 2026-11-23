@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "DNSProtocol.h"
-#include "Helpers.h"
+#include <partout/models/DNSProtocol.h>
 
 namespace Partout::Models
 {

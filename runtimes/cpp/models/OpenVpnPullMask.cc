@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnPullMask.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnPullMask.h>
 
 namespace Partout::Models
 {

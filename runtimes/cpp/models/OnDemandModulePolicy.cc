@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OnDemandModulePolicy.h"
-#include "Helpers.h"
+#include <partout/models/OnDemandModulePolicy.h>
 
 namespace Partout::Models
 {

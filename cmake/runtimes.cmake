@@ -1,6 +1,29 @@
 # SPDX-FileCopyrightText: 2026 Davide De Rosa
 # SPDX-License-Identifier: GPL-3.0
 
+if(TARGET Partout::Models)
+    # Portable C++ lifecycle API and replaceable native mechanisms.
+    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/Tunnel.cc")
+    add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
+    target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
+    target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
+    if(MSVC)
+        target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
+        if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
+            set_target_properties(partout-cpp-runtime PROPERTIES
+                MSVC_RUNTIME_LIBRARY MultiThreadedDLL
+                MSVC_RUNTIME_CHECKS ""
+            )
+        endif()
+    endif()
+endif()
+
+option(PP_TEST_CPP_RUNTIME "Test the portable C++ tunnel lifecycle" OFF)
+if(PP_TEST_CPP_RUNTIME AND TARGET partout-cpp-runtime)
+    enable_testing()
+    add_subdirectory(tests/cpp)
+endif()
+
 if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
@@ -8,9 +31,9 @@ endif()
 # Native integration layers consume the public core ABI.
 if(TARGET partout-winrt-backend)
     add_library(partout-bindings STATIC
-        runtimes/windows/winrt/Tunnel.cc
-        runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/Platform.cc
+        runtimes/windows/winrt/VpnChannelRuntime.cc
+        runtimes/windows/winrt/WinRTTunnelStrategy.cc
     )
     add_library(Partout::WinRTRuntime ALIAS partout-bindings)
     target_include_directories(partout-bindings
@@ -28,7 +51,7 @@ if(TARGET partout-winrt-backend)
         MSVC_RUNTIME_CHECKS ""
     )
     target_link_libraries(partout-bindings
-        PUBLIC Partout::Partout Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Partout Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32
     )
 
@@ -39,7 +62,7 @@ if(TARGET partout-winrt-backend)
     endif()
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
-        runtimes/windows/wintun/controller.c
+        runtimes/windows/wintun/platform.c
     )
     add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
     target_include_directories(partout-wintun-runtime PUBLIC
@@ -50,7 +73,7 @@ elseif(PP_BUILD_WINTUN)
     set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
-        runtimes/android/native/controller.c
+        runtimes/android/native/platform.c
         runtimes/android/native/jni.c
         runtimes/android/native/partout_jni.c
     )
@@ -63,7 +86,7 @@ elseif(ANDROID)
     target_link_libraries(partout-android-runtime PUBLIC Partout::Partout android log)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
-        runtimes/posix/controller.c
+        runtimes/posix/platform.c
     )
     add_library(Partout::POSIXRuntime ALIAS partout-posix-runtime)
     target_include_directories(partout-posix-runtime
@@ -88,3 +111,6 @@ endif()
 add_library(partout-runtime INTERFACE)
 add_library(Partout::Runtime ALIAS partout-runtime)
 target_link_libraries(partout-runtime INTERFACE ${partout_selected_runtime})
+if(TARGET partout-cpp-runtime)
+    target_link_libraries(partout-runtime INTERFACE Partout::CppRuntime)
+endif()

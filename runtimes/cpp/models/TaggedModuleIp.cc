@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "TaggedModuleIp.h"
-#include "Helpers.h"
+#include <partout/models/TaggedModuleIp.h>
 
 namespace Partout::Models
 {

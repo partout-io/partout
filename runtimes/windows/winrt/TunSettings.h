@@ -1,6 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
+#include <partout/models/TunnelControllerOptions.h>
 #include <cstdint>
 #include <vector>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -19,7 +20,7 @@ struct Route;
 // Validated channel settings from negotiated IP/DNS modules.
 class TunSettings {
 public:
-    explicit TunSettings(const char *json);
+    explicit TunSettings(const char *json, Models::TunnelControllerOptions controller_options = {});
 
     const auto &IPv4() const {
         return ipv4_;

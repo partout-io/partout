@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "ABIEnvelope.h"
-#include "Helpers.h"
+#include <partout/models/ABIEnvelope.h>
 
 namespace Partout::Models
 {

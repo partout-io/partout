@@ -27,7 +27,8 @@ add_library(partout-winrt-backend ${partout_backend_type}
     runtimes/windows/winrt/TunSettings.cc
     runtimes/windows/winrt/Log.cc
 )
-target_include_directories(partout-winrt-backend PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
+target_include_directories(partout-winrt-backend PUBLIC
+    "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 if(PP_BUILD_LIBRARY)
     set_target_properties(partout-winrt-backend PROPERTIES

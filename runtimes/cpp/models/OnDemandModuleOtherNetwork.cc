@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OnDemandModuleOtherNetwork.h"
-#include "Helpers.h"
+#include <partout/models/OnDemandModuleOtherNetwork.h>
 
 namespace Partout::Models
 {

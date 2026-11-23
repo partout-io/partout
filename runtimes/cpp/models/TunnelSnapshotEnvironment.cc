@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "TunnelSnapshotEnvironment.h"
-#include "Helpers.h"
+#include <partout/models/TunnelSnapshotEnvironment.h>
 
 namespace Partout::Models
 {

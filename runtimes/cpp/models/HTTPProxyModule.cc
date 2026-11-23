@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "HTTPProxyModule.h"
-#include "Helpers.h"
+#include <partout/models/HTTPProxyModule.h>
 
 namespace Partout::Models
 {

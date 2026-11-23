@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "IPModule.h"
-#include "Helpers.h"
+#include <partout/models/IPModule.h>
 
 namespace Partout::Models
 {

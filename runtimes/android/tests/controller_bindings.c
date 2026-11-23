@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 // Only Android OS services and the tunnel wrapper are substituted. The test
-// links the production controller.c and jni.c and calls their function table.
+// links the production platform.c and jni.c and calls their function table.
 int __android_log_print(int priority, const char *tag, const char *format, ...) {
     (void)priority;
     (void)tag;

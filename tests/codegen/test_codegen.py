@@ -12,13 +12,13 @@ ROOT = Path(__file__).resolve().parents[2]
 MODELS = {
     'swift': ROOT / 'runtimes/apple/Sources/PartoutCore/OpenAPI/Codegen',
     'kotlin': ROOT / 'runtimes/android/src/io/partout/models',
-    'cpp': ROOT / 'runtimes/cpp/models',
+    'cpp': ROOT / 'runtimes/cpp',
 }
 
 
 def snapshot(directory):
-    return {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-            for p in sorted(directory.iterdir()) if p.is_file()}
+    return {p.relative_to(directory).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(directory.rglob('*')) if p.is_file()}
 
 
 def run(*args, **kwargs):
@@ -48,9 +48,27 @@ def main():
             # A different working directory, locale, timezone and output path must not matter.
             run(str(binary), str(schema_file), str(second), '--language', language,
                 cwd=ROOT, env={**os.environ, 'TZ': 'Pacific/Honolulu', 'LC_ALL': 'C'})
+            if language == 'kotlin':
+                for source in first.glob('*.kt'):
+                    assert '#include' not in source.read_text(), source
+            if language == 'cpp':
+                for source in first.rglob('*'):
+                    if source.suffix not in ('.h', '.cc'):
+                        continue
+                    includes = [line for line in source.read_text().splitlines() if line.startswith('#include ')]
+                    assert all('"' not in line for line in includes), source
+                    if source.suffix == '.h' and source.name != 'Helpers.h':
+                        assert includes[0] == '#include <partout/models/Helpers.h>', source
+                        assert includes.count('#include <partout/models/Helpers.h>') == 1, source
+                        assert '#include <partout/Json.h>' not in includes, source
+                        assert '#include <partout/Export.h>' not in includes, source
             actual = snapshot(first)
             assert actual == snapshot(second), f'{language}: nondeterministic output'
-            assert actual == snapshot(models), f'{language}: checked-in model drift'
+            expected = snapshot(models)
+            if language == 'cpp':
+                expected = {name: digest for name, digest in expected.items()
+                            if name.startswith(('models/', 'include/partout/models/'))}
+            assert actual == expected, f'{language}: checked-in model drift'
             assert actual == golden[language], f'{language}: golden compatibility drift'
             print(f'{language}: {len(actual)} files match byte for byte', flush=True)
 
@@ -61,7 +79,7 @@ def main():
             mutated = tmp / (language + '-mutated')
             run(str(binary), str(schema_file), str(mutated), '--language', language, cwd=tmp)
             extension = {'swift': 'swift', 'kotlin': 'kt', 'cpp': 'h'}[language]
-            assert 'regressionProbe' in (mutated / ('ABIEnvelope.' + extension)).read_text()
+            assert 'regressionProbe' in (mutated / ('include/partout/models/ABIEnvelope.h' if language == 'cpp' else 'ABIEnvelope.' + extension)).read_text()
             assert snapshot(mutated) != actual
             manifest = tmp / 'golden.json'
             manifest.write_text(json.dumps(golden), encoding='utf-8')
@@ -118,7 +136,7 @@ def main():
             run(*command, cwd=tmp)
             models = target / 'src/main/kotlin/io/partout/models' if language == 'kotlin' else target
             assert snapshot(models) == golden[language]
-            (models / 'stale-file').write_text('stale')
+            (models / ('models/stale-file' if language == 'cpp' else 'stale-file')).write_text('stale')
             run(*command, cwd=tmp)
             assert snapshot(models) == golden[language], 'stale generated file survived'
             manifest = tmp / 'wrapper-golden.json'

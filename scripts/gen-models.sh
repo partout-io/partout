@@ -61,10 +61,19 @@ if [[ -n $golden_path ]]; then
     set -- "$@" --update-golden "$staging/golden.json"
 fi
 zig run "$script_dir/../tools/openapi_codegen.zig" -- "$@"
-if [[ -e "$destination" ]]; then
-    mv "$destination" "$staging/previous"
+if [[ $language == cpp && -z $extra_imports ]]; then
+    # Publish only generated directories; preserve handwritten runtime files.
+    mkdir -p "$destination/include/partout"
+    for directory in models include/partout/models; do
+        rm -rf "$destination/$directory"
+        mv "$staging/models/$directory" "$destination/$directory"
+    done
+else
+    if [[ -e "$destination" ]]; then
+        mv "$destination" "$staging/previous"
+    fi
+    mv "$staging/models" "$destination"
 fi
-mv "$staging/models" "$destination"
 if [[ -n $golden_path ]]; then
     mv "$staging/golden.json" "$golden_path"
 fi

@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnObfuscationMethodXormask.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnObfuscationMethodXormask.h>
 
 namespace Partout::Models
 {

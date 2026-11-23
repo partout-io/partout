@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "DataCount.h"
-#include "Helpers.h"
+#include <partout/models/DataCount.h>
 
 namespace Partout::Models
 {

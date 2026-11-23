@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "ModuleImportContextOpenVpn.h"
-#include "Helpers.h"
+#include <partout/models/ModuleImportContextOpenVpn.h>
 
 namespace Partout::Models
 {

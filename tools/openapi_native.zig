@@ -171,6 +171,11 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     for (files.items) |*f| {
         if (language == .cpp and options.external.len != 0) f.contents = try externalCpp(c, f.contents);
     }
+    if (language == .cpp and options.external.len == 0) {
+        for (files.items) |*f| {
+            f.name = try c.fmt("{s}/{s}", .{ if (std.mem.endsWith(u8, f.name, ".h")) "include/partout/models" else "models", f.name });
+        }
+    }
     const cwd = std.Io.Dir.cwd();
     // Validate the existing baseline before writing any output.
     const golden: ?File = if (options.golden_path) |path| .{
@@ -179,7 +184,9 @@ pub fn generate(a: std.mem.Allocator, io: std.Io, doc: api.Document, language: L
     } else null;
     try cwd.createDirPath(io, directory);
     for (files.items) |f| {
-        try cwd.writeFile(io, .{ .sub_path = try c.fmt("{s}/{s}", .{ directory, f.name }), .data = f.contents });
+        const path = try c.fmt("{s}/{s}", .{ directory, f.name });
+        try cwd.createDirPath(io, std.fs.path.dirname(path) orelse directory);
+        try cwd.writeFile(io, .{ .sub_path = path, .data = f.contents });
     }
     if (golden) |file| {
         try cwd.writeFile(io, .{ .sub_path = file.name, .data = file.contents });
@@ -401,8 +408,14 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
-    const result = try replace(c.a, named, "Partout::Models", c.package);
+    var result = try replace(c.a, named, "Partout::Models", c.package);
+    result = try replace(c.a, result, "@EXPORT@", if (c.options.external.len == 0) "PARTOUT_MODELS_API " else "");
     return replace(c.a, result, "@JSON_TYPE@", "::Partout::Json");
+}
+
+fn cppModelInclude(c: Context, name: []const u8) ![]const u8 {
+    if (c.options.external.len == 0 or c.external(name)) return c.fmt("#include <partout/models/{s}.h>", .{name});
+    return c.fmt("#include \"{s}.h\"", .{name});
 }
 
 fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
@@ -413,6 +426,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     const is_enum = s.enum_values.items.len != 0;
     try w.writeAll(@embedFile("openapi_templates/cpp-banner.txt"));
     try w.print("/*\n * {s}.h\n *\n *{s}{s}\n */\n\n#ifndef {s}_H_\n#define {s}_H_\n\n", .{ n, if (s.description.len != 0) " " else "", try html(c, s.description), n, n });
+    try w.writeAll("#include <partout/models/Helpers.h>\n");
     var imports: std.ArrayList([]const u8) = .empty;
     if (!is_enum) for (s.properties.items) |p| {
         if (p.map_value) |map_value| {
@@ -421,13 +435,8 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
             try cppImports(c, map_value, &imports);
         } else try cppImports(c, p.spec, &imports);
     };
-    // PARITY: old HashSet iteration order. Replace with lexical imports after parity.
-    var capacity: u32 = 16;
-    while (imports.items.len > capacity * 3 / 4) capacity *= 2;
-    std.mem.sort([]const u8, imports.items, capacity, importLess);
     for (imports.items) |imp| try w.print("{s}\n", .{imp});
     if (is_enum and !eq(s.typ orelse "", "integer")) try w.writeAll("#include <string>\n");
-    try w.writeAll("#include \"../Json.h\"\n");
     var optional = false;
     for (s.properties.items) |p| {
         if (!required(s, p.name)) optional = true;
@@ -458,16 +467,6 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
     return cppWhitespace(c, out.written());
 }
 
-fn javaHash(raw: []const u8) u32 {
-    var h: u32 = 0;
-    for (raw) |ch| h = h *% 31 +% ch;
-    return h ^ (h >> 16);
-}
-fn importLess(capacity: u32, a: []const u8, b: []const u8) bool {
-    const ah = javaHash(a) & (capacity - 1);
-    const bh = javaHash(b) & (capacity - 1);
-    return if (ah == bh) less({}, a, b) else ah < bh;
-}
 fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8)) anyerror!void {
     switch (spec) {
         .array => |child| {
@@ -476,17 +475,14 @@ fn cppImports(c: Context, spec: api.TypeSpec, imports: *std.ArrayList([]const u8
         },
         else => {
             if (spec == .ref and c.external(spec.ref)) {
-                try appendUnique(c.a, imports, try c.fmt("#include \"{s}.h\"", .{spec.ref}));
+                try appendUnique(c.a, imports, try cppModelInclude(c, spec.ref));
                 return;
             }
             const t = try c.typ(spec, null, false);
             if (eq(t, "std::string")) {
                 try appendUnique(c.a, imports, "#include <string>");
-            } else if (eq(t, "::Partout::Json")) {
-                // PARITY: the legacy pipeline emits a duplicate JSON include.
-                try appendUnique(c.a, imports, "#include <nlohmann/json.hpp>");
             } else if (std.mem.startsWith(u8, t, c.package)) {
-                try appendUnique(c.a, imports, try c.fmt("#include \"{s}.h\"", .{t[c.package.len + 2 ..]}));
+                try appendUnique(c.a, imports, try cppModelInclude(c, t[c.package.len + 2 ..]));
             }
         },
     }
@@ -500,6 +496,7 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
     const numeric = eq(s.typ orelse "", "integer");
     try w.writeAll(@embedFile("openapi_templates/cpp-banner.txt"));
     try w.writeByte('\n');
+    try w.print("{s}\n", .{try cppModelInclude(c, n)});
     try w.writeAll(try template(c, @embedFile("openapi_templates/cpp-source-prefix.txt"), n));
     if (is_enum) {
         try w.print("\n    if (value == {s}::e{s}::INVALID_VALUE_OPENAPI_GENERATED)\n    {{\n        success = false;\n        msg << _pathPrefix << \": has no value;\";\n    }}\n", .{ n, n });
@@ -607,7 +604,7 @@ fn cppArrayValidation(c: Context, s: api.Schema, p: api.Property, w: *std.Io.Wri
 }
 
 fn cppWhitespace(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include <nlohmann/json.hpp>", "#include \"../Json.h\"");
+    var result = source;
     while (std.mem.indexOf(u8, result, "\n\n\n") != null) result = try replace(c.a, result, "\n\n\n", "\n\n");
     return result;
 }
@@ -641,16 +638,15 @@ fn cppUnion(c: Context, s: api.Schema) ![]const u8 {
             }
         }
         if (has_array) try w.writeAll("#include <vector>\n");
-        std.mem.sort([]const u8, dependencies.items, {}, less);
-        for (dependencies.items) |dep| try w.print("#include \"{s}.h\"\n", .{dep});
-    } else for (variants) |v| try w.print("#include \"{s}.h\"\n", .{try c.name(v.schema)});
+        for (dependencies.items) |dep| try w.print("{s}\n", .{try cppModelInclude(c, dep)});
+    } else for (variants) |v| try w.print("{s}\n", .{try cppModelInclude(c, try c.name(v.schema))});
     // PARITY: httplib leaked imports from the last discriminator child into its parent.
     if (variants.len != 0 and c.options.external.len == 0) {
         const last = c.doc.schema(variants[variants.len - 1].schema) orelse return error.UnknownReference;
         for (last.properties.items) |p| {
             if (p.spec != .ref) continue;
             const ref = c.doc.schema(p.spec.ref) orelse return error.UnknownReference;
-            if (ref.properties.items.len != 0) try w.print("#include \"{s}.h\"\n", .{try c.name(ref.name)});
+            if (ref.properties.items.len != 0) try w.print("{s}\n", .{try cppModelInclude(c, try c.name(ref.name))});
         }
     }
     try w.print("\nnamespace {s} {{\n\n// oneOf schema - type alias for std::variant\nusing {s} = std::variant<\n", .{ c.package, n });
@@ -827,13 +823,6 @@ fn swiftPrefixedBody(c: Context, s: api.Schema, n: []const u8, w: *std.Io.Writer
 }
 
 fn externalCpp(c: Context, source: []const u8) ![]const u8 {
-    var result = try replace(c.a, source, "#include \"../Json.h\"", "#include <partout/Json.h>");
-    result = try replace(c.a, result, "#include \"Helpers.h\"", "#include <partout/models/Helpers.h>");
-    var names = std.mem.splitScalar(u8, c.options.external, ',');
-    while (names.next()) |raw| {
-        const n = std.mem.trim(u8, raw, " ");
-        result = try replace(c.a, result, try c.fmt("#include \"{s}.h\"", .{n}), try c.fmt("#include <partout/models/{s}.h>", .{n}));
-    }
-    result = try replace(c.a, result, "ReadJsonValue(", "Partout::Models::ReadJsonValue(");
+    const result = try replace(c.a, source, "ReadJsonValue(", "Partout::Models::ReadJsonValue(");
     return replace(c.a, result, "ValidateModel(", "Partout::Models::ValidateModel(");
 }

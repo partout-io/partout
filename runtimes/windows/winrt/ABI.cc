@@ -4,7 +4,7 @@
 #include "ABI.h"
 #include "RuntimeLoop.h"
 #include "Socket.h"
-#include "Tun.h"
+#include "TunnelController.h"
 #include <algorithm>
 #include <cstring>
 #include <optional>

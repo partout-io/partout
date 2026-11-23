@@ -4,14 +4,38 @@
 #include "windows/export.h"
 
 #include <winrt/Windows.Networking.Connectivity.h>
+#include <cstddef>
+#include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 
 namespace Partout {
-winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile();
-
 class NetworkMonitor {
 public:
+    // Adapter identity matters even when reachability remains true during a handoff.
+    struct Path {
+        winrt::guid adapter{};
+        bool reachable = false;
+        bool initialized = false;
+
+        bool Update(winrt::guid id, bool available);
+    };
+
+    // A default route outranks a local-only path; lower combined metrics win.
+    struct Preference {
+        uint32_t connectivity = 0;
+        std::optional<uint64_t> metric;
+
+        bool IsBetterThan(const Preference &other) const;
+    };
+
+    // A missing preference excludes an unusable profile from selection.
+    static std::optional<size_t> SelectPhysical(
+        size_t count, const std::function<std::optional<Preference>(size_t)> &preference
+    );
+    static winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile();
+
     PARTOUT_WINRT_API NetworkMonitor();
     PARTOUT_WINRT_API ~NetworkMonitor();
 

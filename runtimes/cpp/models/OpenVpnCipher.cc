@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnCipher.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnCipher.h>
 
 namespace Partout::Models
 {

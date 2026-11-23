@@ -10,8 +10,7 @@
 * Do not edit the class manually.
 */
 
-#include "OpenVpnCompressionAlgorithm.h"
-#include "Helpers.h"
+#include <partout/models/OpenVpnCompressionAlgorithm.h>
 
 namespace Partout::Models
 {
