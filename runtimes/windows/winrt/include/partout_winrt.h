@@ -3,9 +3,9 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
-#include <partout/models/TunnelControllerOptions.h>
 #include "partout.h"
 #include <partout/tunnel/Tunnel.h>
+#include <partout/models/TunnelControllerOptions.h>
 
 #if defined(_WIN32) && defined(__cplusplus)
 #include <memory>

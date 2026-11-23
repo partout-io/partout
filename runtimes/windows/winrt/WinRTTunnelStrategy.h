@@ -5,6 +5,9 @@
 #pragma once
 #include <partout/tunnel/TunnelStrategy.h>
 #include <atomic>
+#include <optional>
+#include <string>
+#include <winrt/base.h>
 
 namespace Partout {
 class WinRTTunnelStrategy final : public TunnelStrategy {
@@ -23,4 +26,8 @@ private:
     std::atomic_bool canceled_{false};
     std::map<std::string, std::string> observationErrors_;
 };
+}
+
+namespace Partout::WinRT::Profiles {
+std::optional<std::string> DecodeId(const winrt::hstring &xml);
 }

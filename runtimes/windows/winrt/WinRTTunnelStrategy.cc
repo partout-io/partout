@@ -9,7 +9,6 @@
 #include <netioapi.h>
 #include "partout_winrt.h"
 #include "WinRTTunnelStrategy.h"
-#include "TunnelProfile.h"
 #include "TunnelInternal.h"
 #include "partout/models/TaggedProfile.h"
 #include "partout/models/TunnelSnapshot.h"
