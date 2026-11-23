@@ -11,8 +11,6 @@
 #include <mutex>
 
 namespace Partout {
-class RuntimeLoop;
-
 // Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {

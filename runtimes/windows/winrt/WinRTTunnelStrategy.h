@@ -7,12 +7,10 @@
 #include <ws2ipdef.h>
 #include <netioapi.h>
 #include <partout/tunnel/TunnelStrategy.h>
-#include <partout/models/TunnelSnapshotEnvironment.h>
 #include <atomic>
 #include <functional>
 #include <optional>
 #include <string>
-#include <winrt/base.h>
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {

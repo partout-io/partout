@@ -9,6 +9,8 @@
 #include <memory>
 
 namespace Partout {
+class RuntimeLoop;
+
 // Association, Open and Close run on the same native worker. Destruction follows
 // daemon shutdown. Native receives share Tun's gate.
 class TunnelController {
