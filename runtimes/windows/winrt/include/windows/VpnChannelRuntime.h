@@ -28,7 +28,7 @@ public:
         const char *profile,
         const partout_init_args &init_args,
         const partout_daemon_options &options,
-        Models::TunnelControllerOptions controllerOptions = {}
+        Models::TunnelControllerOptions controller_options = {}
     );
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;
     VpnChannelRuntime &operator=(const VpnChannelRuntime &) = delete;

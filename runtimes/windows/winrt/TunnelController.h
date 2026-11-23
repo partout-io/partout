@@ -21,7 +21,7 @@ public:
 
     PARTOUT_WINRT_API TunnelController(
         RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-        Models::TunnelControllerOptions controllerOptions = {}
+        Models::TunnelControllerOptions controller_options = {}
     );
     PARTOUT_WINRT_API ~TunnelController();
     TunnelController(const TunnelController &) = delete;
@@ -45,7 +45,7 @@ public:
 private:
     void AssociateUnconnected(Socket &socket);
     RuntimeLoop &loop_; // Runtime closes and destroys the controller before the loop.
-    Models::TunnelControllerOptions controllerOptions_;
+    Models::TunnelControllerOptions controller_options_;
     NetworkMonitor monitor_;
 
     // Handles and socket writers are drained before controller destruction.

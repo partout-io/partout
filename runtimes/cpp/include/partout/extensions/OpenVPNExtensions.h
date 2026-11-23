@@ -11,7 +11,7 @@ namespace Partout::OpenVPN {
 // The supplied prompt returns a username and either a password or an OTP in
 // password. Preserve the OTP method for encoding by the OpenVPN session.
 // The returned profile is connection-local and must never be saved.
-using CredentialPrompt = std::function<TunnelCredentials(bool needsOTP)>;
+using CredentialPrompt = std::function<TunnelCredentials(bool needs_otp)>;
 PARTOUT_MODELS_API Models::TaggedProfile PrepareInteractiveProfile(
     const Models::TaggedProfile &profile, const CredentialPrompt &prompt
 );

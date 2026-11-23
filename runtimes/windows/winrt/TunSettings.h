@@ -20,7 +20,7 @@ struct Route;
 // Validated channel settings from negotiated IP/DNS modules.
 class TunSettings {
 public:
-    explicit TunSettings(const char *json, Models::TunnelControllerOptions controllerOptions = {});
+    explicit TunSettings(const char *json, Models::TunnelControllerOptions controller_options = {});
 
     const auto &IPv4() const {
         return ipv4_;

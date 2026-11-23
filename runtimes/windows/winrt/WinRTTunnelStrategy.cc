@@ -31,12 +31,12 @@ struct Apartment {
     Apartment() {
         // WinRT activation factories are cached across workers. Keep their MTA
         // alive for the process lifetime, including after a worker has exited.
-        static const auto processApartment = [] {
+        static const auto process_apartment = [] {
             CO_MTA_USAGE_COOKIE cookie{};
             winrt::check_hresult(CoIncrementMTAUsage(&cookie));
             return cookie;
         }();
-        (void)processApartment;
+        (void)process_apartment;
         winrt::init_apartment(winrt::apartment_type::multi_threaded);
     }
 
@@ -164,13 +164,13 @@ std::optional<std::string> WinRTTunnelStrategy::DecodeId(const winrt::hstring &x
         if (!root || root.TagName() != L"PartoutProfile" || root.GetAttribute(L"version") != L"1")
             return std::nullopt;
         std::wstring json;
-        bool hasConnectionDetails = false;
+        bool has_connection_details = false;
         for (const auto &node : root.ChildNodes()) {
             if (node.NodeType() == NodeType::TextNode || node.NodeType() == NodeType::DataSectionNode) {
                 json += node.InnerText();
             } else if (node.NodeType() == NodeType::ElementNode &&
-                       node.NodeName() == L"ConnectionDetails" && !hasConnectionDetails) {
-                hasConnectionDetails = true;
+                       node.NodeName() == L"ConnectionDetails" && !has_connection_details) {
+                has_connection_details = true;
             } else {
                 return std::nullopt;
             }
@@ -196,8 +196,8 @@ std::optional<Models::TunnelSnapshotEnvironment> WinRTTunnelStrategy::InterfaceE
     return environment;
 }
 
-WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &serverUri) : serverUri_(serverUri) {
-    if (serverUri_.empty()) throw std::invalid_argument("The server URI is empty.");
+WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server_uri_(server_uri) {
+    if (server_uri_.empty()) throw std::invalid_argument("The server URI is empty.");
     winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
 }
 
@@ -242,7 +242,7 @@ std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {
             if (info.status.value == Models::TunnelStatus::active) info.environment = Environment(profile);
             result.push_back(std::move(info));
         }
-        observationErrors_ = std::move(failures);
+        observation_errors_ = std::move(failures);
         return result;
     });
 }
@@ -253,7 +253,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
     WithAgent(canceled_, "Save profile", [&](const auto &agent) {
         const auto name = winrt::to_hstring(profile.name);
         VpnPlugInProfile existing{nullptr};
-        std::vector<VpnPlugInProfile> previousNames;
+        std::vector<VpnPlugInProfile> previous_names;
         for (const auto &owned : OwnedProfiles(agent)) {
             if (owned.id != profile.id) continue;
             if (owned.profile.ConnectionStatus() != VpnManagementConnectionStatus::Disconnected)
@@ -261,7 +261,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
             // Case-only renames refer to the same Windows entry: update it and
             // never queue that entry for deletion after saving.
             if (WinRTTunnelStrategy::NamesEqual(owned.profile.ProfileName(), name)) existing = owned.profile;
-            else previousNames.push_back(owned.profile);
+            else previous_names.push_back(owned.profile);
         }
         using namespace winrt::Windows::Data::Xml::Dom;
         const XmlDocument document;
@@ -291,7 +291,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
         target.VpnPluginPackageFamilyName(Family());
         target.ServerUris().Clear();
         // Required by Windows; Partout obtains actual endpoints from the profile.
-        target.ServerUris().Append(Uri(winrt::to_hstring(serverUri_)));
+        target.ServerUris().Append(Uri(winrt::to_hstring(server_uri_)));
         target.CustomConfiguration(xml);
         target.RememberCredentials(false);
         // Despite its name, true makes the entry visible in Windows VPN Settings.
@@ -300,7 +300,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
         // the old disconnected registration remains available.
         Check("Save VPN profile", existing ? Await("Update VPN profile", agent.UpdateProfileFromObjectAsync(target))
                        : Await("Add VPN profile", agent.AddProfileFromObjectAsync(target)));
-        for (const auto &previous : previousNames) {
+        for (const auto &previous : previous_names) {
             Check("Remove renamed VPN profile", Await("Remove renamed VPN profile", agent.DeleteProfileAsync(previous)));
         }
     });
@@ -325,11 +325,11 @@ void WinRTTunnelStrategy::ConnectWithCredentials(const std::string &id, const Tu
     WithAgent(canceled_, "Connect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
-        const winrt::Windows::Security::Credentials::PasswordCredential passwordCredential(
+        const winrt::Windows::Security::Credentials::PasswordCredential password_credential(
             profile.ProfileName(), winrt::to_hstring(username), winrt::to_hstring(password));
         Check("Connect VPN profile",
             Await("Connect VPN profile",
-                agent.ConnectProfileWithPasswordCredentialAsync(profile, passwordCredential),
+                agent.ConnectProfileWithPasswordCredentialAsync(profile, password_credential),
                 WinRTTunnelStrategy::ConnectRequestTimeout
             )
         );
@@ -355,6 +355,6 @@ void WinRTTunnelStrategy::Remove(const std::string &id) {
 }
 
 std::map<std::string, std::string> WinRTTunnelStrategy::ObservationErrors() const {
-    return observationErrors_;
+    return observation_errors_;
 }
 }

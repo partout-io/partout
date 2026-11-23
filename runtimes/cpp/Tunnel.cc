@@ -13,9 +13,9 @@ void Tunnel::Cancel() noexcept {
 }
 
 Tunnel::Tunnel(std::unique_ptr<TunnelStrategy> strategy,
-               std::chrono::milliseconds handoverTimeout
+               std::chrono::milliseconds handover_timeout
 )
-    : strategy_(std::move(strategy)), handoverTimeout_(handoverTimeout) {
+    : strategy_(std::move(strategy)), handover_timeout_(handover_timeout) {
     if (!strategy_) throw std::invalid_argument("A tunnel strategy is required.");
 }
 
@@ -68,9 +68,9 @@ void Tunnel::RollbackRegistration(const std::string &id) {
 
 void Tunnel::Connect(const Models::TaggedProfile &profile, std::optional<TunnelCredentials> credentials) {
     pending_.reset();
-    pendingCredentials_.reset();
-    connectionRequested_ = false;
-    sawConnecting_ = false;
+    pending_credentials_.reset();
+    connection_requested_ = false;
+    saw_connecting_ = false;
     const auto tunnels = Fetch();
     const auto errors = ObservationErrors();
     if (const auto failure = errors.find(profile.id); failure != errors.end())
@@ -85,8 +85,8 @@ void Tunnel::Connect(const Models::TaggedProfile &profile, std::optional<TunnelC
         strategy_->Disconnect(tunnel.id);
     }
     pending_ = profile;
-    pendingCredentials_ = std::move(credentials);
-    handoverStarted_ = std::chrono::steady_clock::now();
+    pending_credentials_ = std::move(credentials);
+    handover_started_ = std::chrono::steady_clock::now();
     Advance();
 }
 
@@ -97,19 +97,19 @@ void Tunnel::Advance() {
         const auto errors = ObservationErrors();
         if (const auto failure = errors.find(pending_->id); failure != errors.end())
             throw std::runtime_error(failure->second);
-        if (connectionRequested_) {
+        if (connection_requested_) {
             const auto target = std::find_if(tunnels.begin(), tunnels.end(), [&](const auto &tunnel) {
                 return tunnel.id == pending_->id;
             });
             if (target != tunnels.end() && target->status.value == Models::TunnelStatus::active) {
                 pending_.reset();
-                pendingCredentials_.reset();
+                pending_credentials_.reset();
                 return;
             }
-            if (target != tunnels.end() && target->status.value == Models::TunnelStatus::activating) sawConnecting_ = true;
-            if (sawConnecting_ && (target == tunnels.end() || target->status.value == Models::TunnelStatus::inactive))
+            if (target != tunnels.end() && target->status.value == Models::TunnelStatus::activating) saw_connecting_ = true;
+            if (saw_connecting_ && (target == tunnels.end() || target->status.value == Models::TunnelStatus::inactive))
                 throw std::runtime_error("The VPN disconnected before activation completed.");
-            if (std::chrono::steady_clock::now() - handoverStarted_ >= handoverTimeout_)
+            if (std::chrono::steady_clock::now() - handover_started_ >= handover_timeout_)
                 throw std::runtime_error("Timed out waiting for the requested VPN to connect.");
             return;
         }
@@ -117,21 +117,21 @@ void Tunnel::Advance() {
             return tunnel.status.value != Models::TunnelStatus::inactive;
         });
         if (active) {
-            if (std::chrono::steady_clock::now() - handoverStarted_ >= handoverTimeout_)
+            if (std::chrono::steady_clock::now() - handover_started_ >= handover_timeout_)
                 throw std::runtime_error("Timed out waiting for the active VPN to disconnect.");
             return;
         }
         // Wait for observed connections; unavailable registrations are neither
         // treated as disconnected nor selected for automatic disconnection.
-        if (pendingCredentials_) strategy_->ConnectWithCredentials(pending_->id, *pendingCredentials_);
+        if (pending_credentials_) strategy_->ConnectWithCredentials(pending_->id, *pending_credentials_);
         else strategy_->Connect(pending_->id);
-        pendingCredentials_.reset();
-        connectionRequested_ = true;
-        handoverStarted_ = std::chrono::steady_clock::now();
+        pending_credentials_.reset();
+        connection_requested_ = true;
+        handover_started_ = std::chrono::steady_clock::now();
         Advance();
     } catch (...) {
         pending_.reset();
-        pendingCredentials_.reset();
+        pending_credentials_.reset();
         throw;
     }
 }
@@ -144,13 +144,13 @@ std::optional<std::string> Tunnel::PendingProfile() const {
 void Tunnel::CancelPending(const std::string &id) {
     if (pending_ && pending_->id == id) {
         pending_.reset();
-        pendingCredentials_.reset();
+        pending_credentials_.reset();
     }
 }
 
 void Tunnel::Disconnect(const std::string &id) {
     pending_.reset();
-    pendingCredentials_.reset();
+    pending_credentials_.reset();
     RequireActive();
     strategy_->Disconnect(id);
 }
@@ -158,7 +158,7 @@ void Tunnel::Disconnect(const std::string &id) {
 void Tunnel::Remove(const std::string &id) {
     if (pending_ && pending_->id == id) {
         pending_.reset();
-        pendingCredentials_.reset();
+        pending_credentials_.reset();
     }
     const auto tunnels = Fetch();
     if (ObservationErrors().count(id))
@@ -167,10 +167,10 @@ void Tunnel::Remove(const std::string &id) {
         if (tunnel.id != id || tunnel.status.value == Models::TunnelStatus::inactive) continue;
         strategy_->Disconnect(id);
         // An accepted disconnect is not necessarily a completed disconnect.
-        const auto currentTunnels = Fetch();
+        const auto current_tunnels = Fetch();
         if (ObservationErrors().count(id))
             throw std::runtime_error("Unable to observe the VPN profile after disconnection.");
-        for (const auto &current : currentTunnels) {
+        for (const auto &current : current_tunnels) {
             if (current.id == id && current.status.value != Models::TunnelStatus::inactive)
                 throw std::runtime_error("The VPN is still disconnecting. Retry removal when disconnected.");
         }

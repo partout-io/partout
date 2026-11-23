@@ -32,7 +32,7 @@ public:
     );
     static std::optional<Models::TunnelSnapshotEnvironment> InterfaceEnvironment(const MIB_IF_ROW2 &row);
 
-    explicit WinRTTunnelStrategy(const std::string &serverUri);
+    explicit WinRTTunnelStrategy(const std::string &server_uri);
 
     std::vector<Models::TunnelSnapshot> Fetch() override;
     std::map<std::string, std::string> ObservationErrors() const override;
@@ -43,8 +43,8 @@ public:
     void Remove(const std::string &id) override;
     void Cancel() noexcept override;
 private:
-    std::string serverUri_;
+    std::string server_uri_;
     std::atomic_bool canceled_{false};
-    std::map<std::string, std::string> observationErrors_;
+    std::map<std::string, std::string> observation_errors_;
 };
 }

@@ -18,7 +18,7 @@ public:
 
     // Call from a serialized background executor. Cancel may run concurrently.
     explicit Tunnel(std::unique_ptr<TunnelStrategy> strategy,
-                    std::chrono::milliseconds handoverTimeout = HandoverTimeout
+                    std::chrono::milliseconds handover_timeout = HandoverTimeout
     );
     // Advance pending activation when polling on the owning executor.
     void Advance();
@@ -43,10 +43,10 @@ private:
     std::atomic_bool canceled_{false};
     std::unique_ptr<TunnelStrategy> strategy_;
     std::optional<Models::TaggedProfile> pending_;
-    std::optional<TunnelCredentials> pendingCredentials_;
-    bool connectionRequested_ = false;
-    bool sawConnecting_ = false;
-    std::chrono::steady_clock::time_point handoverStarted_;
-    std::chrono::milliseconds handoverTimeout_;
+    std::optional<TunnelCredentials> pending_credentials_;
+    bool connection_requested_ = false;
+    bool saw_connecting_ = false;
+    std::chrono::steady_clock::time_point handover_started_;
+    std::chrono::milliseconds handover_timeout_;
 };
 }

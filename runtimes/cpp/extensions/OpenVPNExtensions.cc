@@ -33,16 +33,16 @@ Models::TaggedProfile Partout::OpenVPN::PrepareInteractiveProfile(
         if (!interactive) continue;
 
         const auto method = saved ? saved->otpMethod.value : Method::none;
-        const bool needsOTP = method != Method::none;
-        const auto response = prompt(needsOTP);
+        const bool needs_otp = method != Method::none;
+        const auto response = prompt(needs_otp);
         Models::OpenVpnCredentials entered{};
         entered.username = response.username;
         entered.password = response.password;
-        if (IsBlank(entered.username) || (needsOTP && IsBlank(entered.password))) {
+        if (IsBlank(entered.username) || (needs_otp && IsBlank(entered.password))) {
             throw std::invalid_argument("Incomplete interactive credentials");
         }
         entered.otpMethod.value = method;
-        if (needsOTP) {
+        if (needs_otp) {
             if (method != Method::append && method != Method::encode)
                 throw std::invalid_argument("Unsupported OTP method");
             // The OpenVPN session applies append/SCRV1 encoding once, at authentication.

@@ -76,11 +76,11 @@ int main() try {
     const auto fallback = Settings(automatic, {{"1.1.1.1", "1.0.0.1"}, false});
     assert(fallback.Domains().DomainNameList().Size() == 1);
     assert(fallback.Domains().DomainNameList().GetAt(0).DnsServers().Size() == 2);
-    const auto explicitDNS = Settings(R"({"modules":[
+    const auto explicit_dns = Settings(R"({"modules":[
         {"type":"IP","value":{"id":"ip","ipv4":{"includedRoutes":[],"excludedRoutes":[],"subnets":["10.8.0.2"]}}},
         {"type":"DNS","value":{"id":"dns","protocolType":{"type":"cleartext"},"servers":["10.8.0.1"]}}
     ]})", {{"1.1.1.1"}, false});
-    assert(explicitDNS.Domains().DomainNameList().GetAt(0).DnsServers().GetAt(0).CanonicalName() == L"10.8.0.1");
+    assert(explicit_dns.Domains().DomainNameList().GetAt(0).DnsServers().GetAt(0).CanonicalName() == L"10.8.0.1");
 
     // Multiple IP modules accumulate addresses and routes; zero preserves an explicit MTU.
     const auto combined = Settings(R"({"modules":[
@@ -93,22 +93,22 @@ int main() try {
     const auto excluded = combined.Routes().Ipv4ExclusionRoutes();
     assert(excluded.Size() == 1 && excluded.GetAt(0).PrefixSize() == 0);
 
-    const auto matchingDNS = Settings(R"({"modules":[
+    const auto matching_dns = Settings(R"({"modules":[
         {"type":"IP","value":{"id":"ip","ipv4":{"includedRoutes":[],"excludedRoutes":[],"subnets":["10.8.0.2"]}}},
         {"type":"DNS","value":{"id":"dns","protocolType":{"type":"cleartext"},"servers":["10.8.0.1"],"searchDomains":["one.example","two.example"],
             "domainPolicy":"matchAndSearch","domainName":"three.example"}}
     ]})");
-    const auto matched = matchingDNS.Domains().DomainNameList();
+    const auto matched = matching_dns.Domains().DomainNameList();
     assert(matched.Size() == 3);
     assert(matched.GetAt(0).DomainName().CanonicalName() == L"one.example");
     assert(matched.GetAt(2).DomainName().CanonicalName() == L"three.example");
 
-    const auto clearedDNS = Settings(R"({"modules":[
+    const auto cleared_dns = Settings(R"({"modules":[
         {"type":"IP","value":{"id":"ip","ipv4":{"includedRoutes":[],"excludedRoutes":[],"subnets":["10.8.0.2"]}}},
         {"type":"DNS","value":{"id":"dns","protocolType":{"type":"cleartext"},"servers":["10.8.0.1"]}},
         {"type":"DNS","value":{"id":"dns","protocolType":{"type":"cleartext"},"servers":[]}}
     ]})");
-    assert(clearedDNS.Domains().DomainNameList().Size() == 0);
+    assert(cleared_dns.Domains().DomainNameList().Size() == 0);
 
     for (const auto json :
          {static_cast<const char *>(nullptr), R"({"modules":[]})",

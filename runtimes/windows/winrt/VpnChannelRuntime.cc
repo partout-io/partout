@@ -32,7 +32,7 @@ struct VpnChannelRuntime::Impl {
     std::string cache_dir;
     partout_init_args init_args;
     partout_daemon_options options;
-    Models::TunnelControllerOptions controllerOptions;
+    Models::TunnelControllerOptions controller_options;
     std::atomic_bool canceled{false};
     bool daemon_started = false;
     std::unique_ptr<RuntimeLoop> loop;
@@ -92,10 +92,10 @@ struct VpnChannelRuntime::Impl {
     }
 
     Impl(VpnChannel const &value, const char *profile_json, const partout_init_args &initialization,
-         const partout_daemon_options &daemon_options, Models::TunnelControllerOptions controllerOptionsValue)
+         const partout_daemon_options &daemon_options, Models::TunnelControllerOptions controller_options_value)
         : channel(value), profile(profile_json ? profile_json : ""),
           cache_dir(daemon_options.cache_dir ? daemon_options.cache_dir : ""),
-          init_args(initialization), options(daemon_options), controllerOptions(std::move(controllerOptionsValue)) {
+          init_args(initialization), options(daemon_options), controller_options(std::move(controller_options_value)) {
         if (!channel || profile.empty() || options.is_daemon) {
             throw hresult_invalid_argument();
         }
@@ -159,10 +159,10 @@ struct VpnChannelRuntime::Impl {
         try {
             const auto prepared = OpenVPN::PrepareInteractiveProfile(
                 Models::TaggedProfile::FromJson(Json::Parse(profile)),
-                [this](bool needsOTP) {
+                [this](bool needs_otp) {
                     using winrt::Windows::Foundation::AsyncStatus;
                     if (canceled.load()) throw hresult_canceled();
-                    const auto type = needsOTP ? VpnCredentialType::UsernameOtpPin :
+                    const auto type = needs_otp ? VpnCredentialType::UsernameOtpPin :
                         VpnCredentialType::UsernamePassword;
                     const auto operation = channel.RequestCredentialsAsync(type);
                     const auto deadline = std::chrono::steady_clock::now() + VpnChannelRuntime::CredentialPromptTimeout;
@@ -190,15 +190,15 @@ struct VpnChannelRuntime::Impl {
             );
             if (canceled.load()) throw hresult_canceled();
             // Neither the registration nor the stored profile receives these credentials.
-            const auto connectionProfile = prepared.ToJson().Encode();
+            const auto connection_profile = prepared.ToJson().Encode();
             loop = std::make_unique<RuntimeLoop>();
             partout_daemon_start_args args{};
-            args.profile = connectionProfile.c_str();
+            args.profile = connection_profile.c_str();
             args.options = options;
             partout_daemon_bindings bindings{};
             {
                 std::lock_guard lock(controller_mutex);
-                controller = std::make_unique<TunnelController>(*loop, channel, controllerOptions);
+                controller = std::make_unique<TunnelController>(*loop, channel, controller_options);
                 bindings.controller = controller.get();
                 bindings.controller_functions = ControllerFunctions();
             }
@@ -242,8 +242,8 @@ VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
                                      const char *profile,
                                      const partout_init_args &init_args,
                                      const partout_daemon_options &options,
-                                     Models::TunnelControllerOptions controllerOptions)
-    : impl_(std::make_unique<Impl>(channel, profile, init_args, options, std::move(controllerOptions))) {}
+                                     Models::TunnelControllerOptions controller_options)
+    : impl_(std::make_unique<Impl>(channel, profile, init_args, options, std::move(controller_options))) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
 

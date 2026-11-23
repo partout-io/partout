@@ -26,7 +26,11 @@
   helpers together rather than interleaving anonymous namespace blocks with
   implementations. Use explicit qualification inside helpers where needed.
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.
-- Use PascalCase for all methods, public and private.
+- Use PascalCase for all methods, public and private, and named constants.
+- Use snake_case for C++ variables, parameters, and data members. Preserve the
+  trailing underscore convention for private data members (for example,
+  `controller_options_`). Keep generated model identifiers and externally owned
+  API/ABI names unchanged; follow their declared spelling at call sites.
 - Use namespaces to express a function's domain instead of embedding domain or
   protocol names in long function names. For example, use
   `Partout::OpenVPN::PrepareInteractiveProfile`, not

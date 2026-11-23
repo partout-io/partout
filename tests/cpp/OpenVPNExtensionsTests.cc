@@ -17,13 +17,13 @@ int main() {
         ]
     })"));
     unsigned prompts = 0;
-    bool expectsOTP = false;
-    const auto prompt = [&](bool needsOTP) {
+    bool expects_otp = false;
+    const auto prompt = [&](bool needs_otp) {
         ++prompts;
-        assert(needsOTP == expectsOTP);
+        assert(needs_otp == expects_otp);
         TunnelCredentials entered{};
         entered.username = "entered-user";
-        entered.password = needsOTP ? "123456" : "entered-password";
+        entered.password = needs_otp ? "123456" : "entered-password";
         return entered;
     };
     const auto original = profile.ToJson();
@@ -48,7 +48,7 @@ int main() {
     OpenVPN::PrepareInteractiveProfile(profile, prompt);
     assert(prompts == 3);
 
-    expectsOTP = true;
+    expects_otp = true;
     saved.credentials->otpMethod.value = Method::append;
     saved.credentials->otp = "stale-code";
     prepared = OpenVPN::PrepareInteractiveProfile(profile, prompt);
@@ -65,7 +65,7 @@ int main() {
     const auto encoded = std::get<Models::TaggedModuleOpenVpn>(prepared.modules.front()).value.credentials;
     assert(encoded->otpMethod.value == Method::encode && encoded->otp == "123456");
 
-    const auto beforeCancellation = profile.ToJson();
+    const auto before_cancellation = profile.ToJson();
     bool canceled = false;
     try {
         OpenVPN::PrepareInteractiveProfile(profile, [](bool) -> TunnelCredentials {
@@ -75,7 +75,7 @@ int main() {
     } catch (const std::runtime_error &) {
         canceled = true;
     }
-    assert(canceled && profile.ToJson() == beforeCancellation);
+    assert(canceled && profile.ToJson() == before_cancellation);
     bool rejected = false;
     try {
         OpenVPN::PrepareInteractiveProfile(profile, [](bool) {
@@ -88,9 +88,9 @@ int main() {
     } catch (const std::invalid_argument &) {
         rejected = true;
     }
-    assert(rejected && profile.ToJson() == beforeCancellation);
+    assert(rejected && profile.ToJson() == before_cancellation);
     profile.activeModulesIds.clear();
-    const auto beforeInactive = prompts;
+    const auto before_inactive = prompts;
     assert(OpenVPN::PrepareInteractiveProfile(profile, prompt).ToJson() == profile.ToJson());
-    assert(prompts == beforeInactive);
+    assert(prompts == before_inactive);
 }
