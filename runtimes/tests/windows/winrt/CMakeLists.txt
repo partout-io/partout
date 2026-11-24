@@ -16,7 +16,7 @@ add_custom_command(TARGET partout-runtime-link-test POST_BUILD
 add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
 add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLINKER=${CMAKE_LINKER}"
-    "-DLIBRARY=$<TARGET_FILE:Partout::Core>"
+    "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/exports.cmake")
 set(winrt_tests log network tun_settings winrt-tunnel-strategy runtime-loop)
 set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests WinRTTunnelStrategyTests RuntimeLoopTests)

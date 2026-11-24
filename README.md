@@ -37,7 +37,7 @@ targets: [
 ### CMake
 
 CMake builds the native shared library and its selected backends.
-Native runtime targets link against `Partout::Core`.
+Native runtime targets link against `Partout::Partout`.
 
 Dependencies are resolved from installed CMake packages first.
 Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During
