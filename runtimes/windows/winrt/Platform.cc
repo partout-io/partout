@@ -1,15 +1,13 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
+#include "Platform.h"
 #include "backend/ABI.h"
 #include "backend/RuntimeLoop.h"
 #include "backend/TunnelController.h"
 #include "windows/log.h"
 
-#include "partout.h"
-
 namespace Partout {
 partout_controller_functions ControllerFunctions() {
-
     partout_controller_functions functions{};
     functions.set_delegate = [](void *raw, const partout_controller_delegate *delegate) {
         auto controller = static_cast<Partout::TunnelController *>(raw);

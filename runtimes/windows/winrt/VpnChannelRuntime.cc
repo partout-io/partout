@@ -15,6 +15,7 @@
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/ProfileExtensions.h>
 #include "windows/VpnChannelRuntime.h"
+#include "Platform.h"
 #include "backend/TunnelController.h"
 #include "backend/RuntimeLoop.h"
 
@@ -24,8 +25,6 @@ using namespace winrt;
 using namespace winrt::Windows::Networking::Vpn;
 
 namespace Partout {
-partout_controller_functions ControllerFunctions();
-
 struct VpnChannelRuntime::Impl {
     enum class StartupStatus {
         waiting,
