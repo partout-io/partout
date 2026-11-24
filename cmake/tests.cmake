@@ -6,10 +6,10 @@ option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
 
 if(PP_TEST_CPP_RUNTIME AND TARGET Partout::CppRuntime)
     enable_testing()
-    add_subdirectory(tests/cpp)
+    add_subdirectory(runtimes/tests/cpp)
 endif()
 
 if(PP_TEST_WINRT_RUNTIME AND TARGET Partout::WinRTRuntime)
     enable_testing()
-    add_subdirectory(tests/c/windows/winrt)
+    add_subdirectory(runtimes/tests/windows/winrt)
 endif()

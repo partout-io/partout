@@ -1,8 +1,17 @@
+cmake_minimum_required(VERSION 3.28)
+if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
+    project(PartoutCppTests LANGUAGES CXX)
+    find_package(Partout CONFIG REQUIRED)
+    enable_testing()
+endif()
+
 add_executable(partout-cpp-tunnel-test TunnelTests.cc)
 add_executable(partout-cpp-profile-extensions-test ProfileExtensionsTests.cc)
 target_link_libraries(partout-cpp-tunnel-test PRIVATE Partout::CppRuntime)
 target_link_libraries(partout-cpp-profile-extensions-test PRIVATE Partout::CppRuntime)
-foreach(test IN ITEMS tunnel profile-extensions)
+add_executable(partout-cpp-models-test ModelsTests.cc)
+target_link_libraries(partout-cpp-models-test PRIVATE Partout::CppRuntime)
+foreach(test IN ITEMS tunnel profile-extensions models)
     set(target partout-cpp-${test}-test)
     if(MSVC)
         target_compile_options(${target} PRIVATE /EHsc /UNDEBUG)
@@ -16,7 +25,7 @@ foreach(test IN ITEMS tunnel profile-extensions)
         target_compile_options(${target} PRIVATE -UNDEBUG)
     endif()
     add_test(NAME partout-cpp-${test} COMMAND ${target})
-    if(WIN32 AND PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
+    if(WIN32)
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_RUNTIME_DLLS:${target}>

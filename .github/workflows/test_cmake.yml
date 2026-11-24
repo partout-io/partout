@@ -54,16 +54,16 @@ jobs:
             -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DPP_BUILD_CPP_RUNTIME=ON
           cmake --build .cmake --parallel 2
           cmake --install .cmake
-      - name: Configure C++ model tests
+      - name: Configure C++ runtime tests
         shell: bash
         run: >-
-          cmake -S tests/c/models -B .cmake-model-tests
+          cmake -S runtimes/tests/cpp -B .cmake-cpp-tests
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/$INSTALL_DIR"
-      - name: Build C++ model tests
-        run: cmake --build .cmake-model-tests --config Release --parallel 2
-      - name: Run C++ model tests
-        run: ctest --test-dir .cmake-model-tests -C Release --output-on-failure --no-tests=error
+      - name: Build C++ runtime tests
+        run: cmake --build .cmake-cpp-tests --config Release --parallel 2
+      - name: Run C++ runtime tests
+        run: ctest --test-dir .cmake-cpp-tests -C Release --output-on-failure --no-tests=error
       - name: Verify output
         if: runner.os == 'Windows'
         shell: pwsh
@@ -75,7 +75,7 @@ jobs:
       - name: Configure installed SDK consumer
         shell: bash
         run: >-
-          cmake -S tests/c/sdk -B .cmake-sdk-consumer
+          cmake -S runtimes/tests/sdk -B .cmake-sdk-consumer
           -DCMAKE_BUILD_TYPE=Release
           -DCMAKE_PREFIX_PATH="$GITHUB_WORKSPACE/$INSTALL_DIR"
           -DCMAKE_FIND_USE_PACKAGE_REGISTRY=OFF
