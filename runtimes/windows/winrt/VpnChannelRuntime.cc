@@ -14,7 +14,7 @@
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/ProfileExtensions.h>
-#include "partout/winrt/VpnChannelRuntime.h"
+#include <partout/winrt/VpnChannelRuntime.h>
 #include "Platform.h"
 #include "backend/TunnelController.h"
 #include "backend/RuntimeLoop.h"

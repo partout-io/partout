@@ -4,7 +4,7 @@
 
 #pragma once
 #include <chrono>
-#include "partout.h"
+#include <partout.h>
 #include <partout/models/TunnelControllerOptions.h>
 #include <memory>
 #include <winrt/Windows.Networking.Vpn.h>

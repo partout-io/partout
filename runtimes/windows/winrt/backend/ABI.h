@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
-#include "partout/winrt/abi.h"
+#include <partout/winrt/abi.h>
 #include <memory>
 
 namespace Partout {
