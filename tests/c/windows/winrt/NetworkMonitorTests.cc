@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "../../../../runtimes/windows/winrt/NetworkMonitor.h"
+#include "../../../../runtimes/windows/winrt/backend/NetworkMonitor.h"
 #include <cassert>
 #include <array>
 

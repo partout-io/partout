@@ -46,6 +46,6 @@ endforeach()
 
 # Exercise private implementations without adding them to the backend DLL exports.
 target_sources(partout-network-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/NetworkMonitor.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/NetworkMonitor.cc")
 target_sources(partout-tun_settings-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/TunSettings.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/TunSettings.cc")

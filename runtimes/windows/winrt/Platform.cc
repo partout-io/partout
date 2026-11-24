@@ -1,8 +1,8 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "ABI.h"
-#include "RuntimeLoop.h"
-#include "TunnelController.h"
+#include "backend/ABI.h"
+#include "backend/RuntimeLoop.h"
+#include "backend/TunnelController.h"
 #include "windows/log.h"
 
 #include "partout.h"

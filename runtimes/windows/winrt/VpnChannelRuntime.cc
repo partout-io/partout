@@ -15,8 +15,8 @@
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/ProfileExtensions.h>
 #include "windows/VpnChannelRuntime.h"
-#include "TunnelController.h"
-#include "RuntimeLoop.h"
+#include "backend/TunnelController.h"
+#include "backend/RuntimeLoop.h"
 
 #include <partout/models/ConnectionStatus.h>
 

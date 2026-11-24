@@ -18,14 +18,14 @@ if(PP_BUILD_LIBRARY)
     set(partout_backend_type SHARED)
 endif()
 add_library(partout-winrt-backend ${partout_backend_type}
-    runtimes/windows/winrt/ABI.cc
-    runtimes/windows/winrt/TunnelController.cc
-    runtimes/windows/winrt/RuntimeLoop.cc
-    runtimes/windows/winrt/NetworkMonitor.cc
-    runtimes/windows/winrt/Socket.cc
-    runtimes/windows/winrt/Tun.cc
-    runtimes/windows/winrt/TunSettings.cc
-    runtimes/windows/winrt/Log.cc
+    runtimes/windows/winrt/backend/ABI.cc
+    runtimes/windows/winrt/backend/TunnelController.cc
+    runtimes/windows/winrt/backend/RuntimeLoop.cc
+    runtimes/windows/winrt/backend/NetworkMonitor.cc
+    runtimes/windows/winrt/backend/Socket.cc
+    runtimes/windows/winrt/backend/Tun.cc
+    runtimes/windows/winrt/backend/TunSettings.cc
+    runtimes/windows/winrt/backend/Log.cc
 )
 target_include_directories(partout-winrt-backend PUBLIC
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
