@@ -7,7 +7,7 @@
 #include <windows.h>
 
 #include "Socket.h"
-#include "windows/log.h"
+#include "partout/winrt/log.h"
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Networking.h>

@@ -7,7 +7,7 @@
 #include "portable/tun.h"
 
 #if PARTOUT_WINDOWS && PARTOUT_WINRT
-#include "windows/abi.h"
+#include "partout/winrt/abi.h"
 
 void pp_tun_free(pp_tun tun) {
     winrt_tun_free((winrt_transport *)tun);

@@ -4,7 +4,7 @@
 #include "backend/ABI.h"
 #include "backend/RuntimeLoop.h"
 #include "backend/TunnelController.h"
-#include "windows/log.h"
+#include "partout/winrt/log.h"
 
 namespace Partout {
 partout_controller_functions ControllerFunctions() {
