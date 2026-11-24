@@ -39,12 +39,9 @@ bool TunnelSnapshotEnvironment::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TunnelSnapshotEnvironment::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TunnelSnapshotEnvironment::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TunnelSnapshotEnvironment" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool TunnelSnapshotEnvironment::operator==(const TunnelSnapshotEnvironment& other) const

@@ -39,50 +39,29 @@ bool TaggedProfile::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TaggedProfile::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TaggedProfile::Validate(std::stringstream& msg, const std::string& path_prefix) const
 {
     bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TaggedProfile" : pathPrefix;
+    const std::string model_path = path_prefix.empty() ? "TaggedProfile" : path_prefix;
 
-    /* modules */ {
-        const std::vector<Partout::Models::TaggedModule>& value = modules;
-        const std::string currentValuePath = _pathPrefix + ".modules";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::TaggedModule& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".modules") && success;
-
-                i++;
-            }
+    {
+        const auto& items = this->modules;
+        const std::string field_path = model_path + ".modules";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".modules") && success;
+            ++index;
         }
-
     }
 
-    /* activeModulesIds */ {
-        const std::vector<std::string>& value = activeModulesIds;
-        const std::string currentValuePath = _pathPrefix + ".activeModulesIds";
-
-        if (!Partout::Helpers::hasOnlyUniqueItems(value))
-        {
+    {
+        const auto& items = this->activeModulesIds;
+        const std::string field_path = model_path + ".activeModulesIds";
+        if (!Partout::Helpers::hasOnlyUniqueItems(items)) {
             success = false;
-            msg << currentValuePath << ": may not contain the same item more than once;";
+            msg << field_path << ": may not contain the same item more than once;";
         }
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
-        }
-
     }
 
     return success;

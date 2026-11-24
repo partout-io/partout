@@ -39,181 +39,64 @@ bool OpenVpnConfiguration::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnConfiguration::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnConfiguration::Validate(std::stringstream& msg, const std::string& path_prefix) const
 {
     bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnConfiguration" : pathPrefix;
+    const std::string model_path = path_prefix.empty() ? "OpenVpnConfiguration" : path_prefix;
 
-    if (dataCiphers.has_value())
-    {
-        const std::vector<Partout::Models::OpenVpnCipher>& value = dataCiphers.value();
-        const std::string currentValuePath = _pathPrefix + ".dataCiphers";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::OpenVpnCipher& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath) && success;
-
-                i++;
-            }
+    if (this->dataCiphers.has_value()) {
+        const auto& items = this->dataCiphers.value();
+        const std::string field_path = model_path + ".dataCiphers";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path) && success;
+            ++index;
         }
-
     }
 
-    if (remotes.has_value())
-    {
-        const std::vector<std::string>& value = remotes.value();
-        const std::string currentValuePath = _pathPrefix + ".remotes";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
+    if (this->routes4.has_value()) {
+        const auto& items = this->routes4.value();
+        const std::string field_path = model_path + ".routes4";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".routes4") && success;
+            ++index;
         }
-
     }
 
-    if (routes4.has_value())
-    {
-        const std::vector<Partout::Models::Route>& value = routes4.value();
-        const std::string currentValuePath = _pathPrefix + ".routes4";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::Route& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".routes4") && success;
-
-                i++;
-            }
+    if (this->routes6.has_value()) {
+        const auto& items = this->routes6.value();
+        const std::string field_path = model_path + ".routes6";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".routes6") && success;
+            ++index;
         }
-
     }
 
-    if (routes6.has_value())
-    {
-        const std::vector<Partout::Models::Route>& value = routes6.value();
-        const std::string currentValuePath = _pathPrefix + ".routes6";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::Route& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".routes6") && success;
-
-                i++;
-            }
+    if (this->routingPolicies.has_value()) {
+        const auto& items = this->routingPolicies.value();
+        const std::string field_path = model_path + ".routingPolicies";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path) && success;
+            ++index;
         }
-
     }
 
-    if (dnsServers.has_value())
-    {
-        const std::vector<std::string>& value = dnsServers.value();
-        const std::string currentValuePath = _pathPrefix + ".dnsServers";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
+    if (this->noPullMask.has_value()) {
+        const auto& items = this->noPullMask.value();
+        const std::string field_path = model_path + ".noPullMask";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path) && success;
+            ++index;
         }
-
-    }
-
-    if (searchDomains.has_value())
-    {
-        const std::vector<std::string>& value = searchDomains.value();
-        const std::string currentValuePath = _pathPrefix + ".searchDomains";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
-        }
-
-    }
-
-    if (proxyBypassDomains.has_value())
-    {
-        const std::vector<std::string>& value = proxyBypassDomains.value();
-        const std::string currentValuePath = _pathPrefix + ".proxyBypassDomains";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
-        }
-
-    }
-
-    if (routingPolicies.has_value())
-    {
-        const std::vector<Partout::Models::OpenVpnRoutingPolicy>& value = routingPolicies.value();
-        const std::string currentValuePath = _pathPrefix + ".routingPolicies";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::OpenVpnRoutingPolicy& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath) && success;
-
-                i++;
-            }
-        }
-
-    }
-
-    if (noPullMask.has_value())
-    {
-        const std::vector<Partout::Models::OpenVpnPullMask>& value = noPullMask.value();
-        const std::string currentValuePath = _pathPrefix + ".noPullMask";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::OpenVpnPullMask& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath) && success;
-
-                i++;
-            }
-        }
-
     }
 
     return success;

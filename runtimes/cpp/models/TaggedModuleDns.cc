@@ -39,12 +39,9 @@ bool TaggedModuleDns::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TaggedModuleDns::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TaggedModuleDns::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TaggedModuleDns" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool TaggedModuleDns::operator==(const TaggedModuleDns& other) const

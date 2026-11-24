@@ -498,14 +498,24 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
     try w.writeByte('\n');
     try w.print("{s}\n", .{try cppModelInclude(c, n)});
     try w.writeAll(try template(c, @embedFile("openapi_templates/cpp-source-prefix.txt"), n));
+    var has_validation = is_enum;
+    for (s.properties.items) |p| {
+        if (p.spec == .array and (p.unique or try cppValidatesElements(c, p))) has_validation = true;
+    }
+    if (has_validation) {
+        try w.print("bool {s}::Validate(std::stringstream& msg, const std::string& path_prefix) const\n{{\n    bool success = true;\n    const std::string model_path = path_prefix.empty() ? \"{s}\" : path_prefix;\n", .{ n, n });
+    } else {
+        try w.print("bool {s}::Validate(std::stringstream&, const std::string&) const\n{{\n", .{n});
+    }
     if (is_enum) {
-        try w.print("\n    if (value == {s}::e{s}::INVALID_VALUE_OPENAPI_GENERATED)\n    {{\n        success = false;\n        msg << _pathPrefix << \": has no value;\";\n    }}\n", .{ n, n });
+        try w.print("\n    if (value == {s}::e{s}::INVALID_VALUE_OPENAPI_GENERATED)\n    {{\n        success = false;\n        msg << model_path << \": has no value;\";\n    }}\n", .{ n, n });
     } else {
         for (s.properties.items) |p| {
             if (p.spec == .array) try cppArrayValidation(c, s, p, w);
         }
     }
-    try w.print("\n    return success;\n}}\n\nbool {s}::operator==(const {s}& other) const\n{{\n    return\n", .{ n, n });
+    try w.writeAll(if (has_validation) "\n    return success;\n" else "    return true;\n");
+    try w.print("}}\n\nbool {s}::operator==(const {s}& other) const\n{{\n    return\n", .{ n, n });
     if (is_enum) {
         try w.writeAll("    value == other.value\n    ;\n");
     } else {
@@ -581,26 +591,33 @@ fn cppSource(c: Context, s: api.Schema) ![]const u8 {
     return cppWhitespace(c, out.written());
 }
 
+fn cppValidatesElements(c: Context, p: api.Property) !bool {
+    const element = try c.typ(p.spec.array.*, null, false);
+    return std.mem.startsWith(u8, element, c.package);
+}
+
 fn cppArrayValidation(c: Context, s: api.Schema, p: api.Property, w: *std.Io.Writer) !void {
+    const validates_elements = try cppValidatesElements(c, p);
+    if (!p.unique and !validates_elements) return;
     const f = try field(c, p.name);
-    const t = try propertyType(c, p);
-    const child = p.spec.array.*;
-    const element = try c.typ(child, null, false);
     if (required(s, p.name)) {
-        try w.print("\n    /* {s} */ {{\n        const {s}& value = {s};\n", .{ f, t, f });
+        try w.writeAll("\n    {\n");
+        try w.print("        const auto& items = this->{s};\n", .{f});
     } else {
-        try w.print("\n    if ({s}.has_value())\n    {{\n        const {s}& value = {s}.value();\n", .{ f, t, f });
+        try w.print("\n    if (this->{s}.has_value()) {{\n        const auto& items = this->{s}.value();\n", .{ f, f });
     }
-    try w.print("        const std::string currentValuePath = _pathPrefix + \".{s}\";\n\n", .{f});
-    if (p.unique) try w.writeAll("        if (!Partout::Helpers::hasOnlyUniqueItems(value))\n        {\n            success = false;\n            msg << currentValuePath << \": may not contain the same item more than once;\";\n        }\n");
-    try w.print("        {{ // Recursive validation of array elements\n            const std::string oldValuePath = currentValuePath;\n            int i = 0;\n            for (const {s}& value : value)\n            {{\n                const std::string currentValuePath = oldValuePath + \"[\" + std::to_string(i) + \"]\";\n\n", .{element});
-    if (std.mem.startsWith(u8, element, c.package)) {
+    try w.print("        const std::string field_path = model_path + \".{s}\";\n", .{f});
+    if (p.unique) try w.writeAll("        if (!Partout::Helpers::hasOnlyUniqueItems(items)) {\n            success = false;\n            msg << field_path << \": may not contain the same item more than once;\";\n        }\n");
+    if (validates_elements) {
+        const child = p.spec.array.*;
         const ref = if (child == .ref) c.doc.schema(child.ref) else null;
+        // Preserve existing diagnostic paths for model arrays.
         const suffix = if (ref) |r| if (r.enum_values.items.len != 0) "" else try c.fmt(" + \".{s}\"", .{f}) else "";
-        // PARITY: legacy validation omits scalar models and repeats array field paths.
-        try w.print("        success = ValidateModel(value, msg, currentValuePath{s}) && success;\n\n", .{suffix});
+        try w.writeAll("        std::size_t index = 0;\n        for (const auto& item : items) {\n            const std::string item_path = field_path + \"[\" + std::to_string(index) + \"]\";\n");
+        try w.print("            success = ValidateModel(item, msg, item_path{s}) && success;\n", .{suffix});
+        try w.writeAll("            ++index;\n        }\n");
     }
-    try w.writeAll("                i++;\n            }\n        }\n\n    }\n");
+    try w.writeAll("    }\n");
 }
 
 fn cppWhitespace(c: Context, source: []const u8) ![]const u8 {

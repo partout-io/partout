@@ -39,29 +39,9 @@ bool WireGuardLocalInterface::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool WireGuardLocalInterface::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool WireGuardLocalInterface::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "WireGuardLocalInterface" : pathPrefix;
-
-    /* addresses */ {
-        const std::vector<std::string>& value = addresses;
-        const std::string currentValuePath = _pathPrefix + ".addresses";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
-        }
-
-    }
-
-    return success;
+    return true;
 }
 
 bool WireGuardLocalInterface::operator==(const WireGuardLocalInterface& other) const

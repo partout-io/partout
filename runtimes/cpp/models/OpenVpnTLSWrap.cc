@@ -39,12 +39,9 @@ bool OpenVpnTLSWrap::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnTLSWrap::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnTLSWrap::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnTLSWrap" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool OpenVpnTLSWrap::operator==(const OpenVpnTLSWrap& other) const

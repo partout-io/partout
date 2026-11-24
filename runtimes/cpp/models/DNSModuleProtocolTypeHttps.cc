@@ -39,12 +39,9 @@ bool DNSModuleProtocolTypeHttps::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool DNSModuleProtocolTypeHttps::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool DNSModuleProtocolTypeHttps::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "DNSModuleProtocolTypeHttps" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool DNSModuleProtocolTypeHttps::operator==(const DNSModuleProtocolTypeHttps& other) const

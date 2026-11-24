@@ -39,12 +39,9 @@ bool ModuleImportContextOpenVpn::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool ModuleImportContextOpenVpn::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool ModuleImportContextOpenVpn::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "ModuleImportContextOpenVpn" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool ModuleImportContextOpenVpn::operator==(const ModuleImportContextOpenVpn& other) const

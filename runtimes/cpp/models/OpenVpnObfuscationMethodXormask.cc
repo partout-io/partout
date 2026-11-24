@@ -39,12 +39,9 @@ bool OpenVpnObfuscationMethodXormask::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnObfuscationMethodXormask::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnObfuscationMethodXormask::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnObfuscationMethodXormask" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool OpenVpnObfuscationMethodXormask::operator==(const OpenVpnObfuscationMethodXormask& other) const
