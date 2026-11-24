@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "RuntimeLoop.h"
-#include <partout/winrt/log.h>
+#include "Log.h"
 #include <winrt/base.h>
 #include <stdexcept>
 #include <atomic>

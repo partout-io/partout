@@ -10,7 +10,7 @@ set_target_properties(partout-runtime-link-test PROPERTIES
 target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:Partout::Core>" "$<TARGET_FILE:partout-winrt-backend>"
+        "$<TARGET_FILE:Partout::Core>"
         "$<TARGET_FILE_DIR:partout-runtime-link-test>"
 )
 foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
@@ -23,13 +23,14 @@ add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
 add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLINKER=${CMAKE_LINKER}"
     "-DLIBRARY=$<TARGET_FILE:Partout::Core>"
-    "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/exports.cmake")
-set(winrt_tests log network tun_settings winrt-tunnel-strategy)
-set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests WinRTTunnelStrategyTests)
+set(winrt_tests log network tun_settings winrt-tunnel-strategy runtime-loop)
+set(winrt_test_sources LogTests NetworkMonitorTests TunSettingsTests WinRTTunnelStrategyTests RuntimeLoopTests)
 foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
     add_executable(partout-${test}-test ${source}.cc)
-    target_include_directories(partout-${test}-test PRIVATE "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt")
+    target_include_directories(partout-${test}-test PRIVATE
+        "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt"
+        "${PROJECT_SOURCE_DIR}/src/c/portable/include")
     target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
     set_target_properties(partout-${test}-test PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
@@ -43,16 +44,3 @@ foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
         COMMAND_EXPAND_LISTS)
     add_test(NAME partout-${test} COMMAND partout-${test}-test)
 endforeach()
-
-# Exercise private implementations without adding them to the backend DLL exports.
-target_sources(partout-network-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/NetworkMonitor.cc")
-target_sources(partout-tun_settings-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/TunSettings.cc")
-# These implementations are compiled locally, so their definitions must not
-# inherit dllimport from the shared models/backend interface.
-set_source_files_properties(
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/NetworkMonitor.cc"
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/TunSettings.cc"
-    PROPERTIES COMPILE_OPTIONS /UPARTOUT_API_USE_DLL
-)

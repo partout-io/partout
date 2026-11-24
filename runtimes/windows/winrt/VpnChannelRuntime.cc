@@ -15,6 +15,8 @@
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/ProfileExtensions.h>
 #include <partout/winrt/VpnChannelRuntime.h>
+#include "backend/Log.h"
+#include "backend/ABI.h"
 #include "Platform.h"
 #include "backend/TunnelController.h"
 #include "backend/RuntimeLoop.h"
@@ -151,6 +153,7 @@ void VpnChannelRuntime::Impl::Start() {
     }
     Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
     partout_init(&init_args);
+    winrt_set_core_logger(&init_args);
     try {
         const auto prepared = Profile::PrepareInteractive(
             Models::TaggedProfile::FromJson(Json::Parse(profile)),
@@ -190,7 +193,22 @@ void VpnChannelRuntime::Impl::Start() {
         partout_daemon_start_args args{};
         args.profile = connection_profile.c_str();
         args.options = options;
+        partout_winrt_callbacks callbacks{};
+        callbacks.context = loop.get();
+        callbacks.connect = [](
+            void *context, const char *host, partout_socket_proto proto, uint16_t port,
+            const partout_socket_open_options *options
+        ) noexcept {
+            return ABI::ConnectOnLoop(static_cast<RuntimeLoop *>(context), host, proto, port, options);
+        };
+        callbacks.submit = [](void *context, void (*execute)(void *), void *task) noexcept {
+            return ABI::SubmitLoop(static_cast<RuntimeLoop *>(context), execute, task);
+        };
+        callbacks.drain = [](void *context) noexcept {
+            ABI::DrainLoop(static_cast<RuntimeLoop *>(context));
+        };
         partout_daemon_bindings bindings{};
+        bindings.winrt = &callbacks;
         {
             std::lock_guard lock(controller_mutex);
             controller = std::make_unique<TunnelController>(*loop, channel, controller_options);

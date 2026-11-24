@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
-#include <partout/Export.h>
 
-#include <partout/IOTypes.h>
+#include "IOTypes.h"
 #include "Socket.h"
 #include <winrt/Windows.Networking.Vpn.h>
 #include <atomic>
@@ -39,7 +38,7 @@ class Tun {
 
 public:
     explicit Tun(State &state);
-    PARTOUT_API ~Tun() noexcept;
+    ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 

@@ -505,11 +505,11 @@ const WindowsAdmissionProbe = struct {
 // Exercises native producer admission without requiring a VPN channel host.
 const WindowsProducer = struct {
     const c = source.ffi.io;
-    callback: c.winrt_receive = null,
+    callback: c.partout_transport_receive = null,
     context: ?*anyopaque = null,
     released: bool = false,
 
-    fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+    fn subscribe(raw: ?*anyopaque, callback: c.partout_transport_receive, context: ?*anyopaque) callconv(.c) bool {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.callback = callback;
         self.context = context;
@@ -525,16 +525,16 @@ const WindowsProducer = struct {
         return true;
     }
     fn stop(_: ?*anyopaque) callconv(.c) void {}
-    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.partout_socket_address) callconv(.c) i32 {
         return 0;
     }
-    fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+    fn address(_: ?*anyopaque, _: [*c]c.partout_socket_address) callconv(.c) bool {
         return false;
     }
     fn send(self: *@This(), bytes: []const u8, code: i32) bool {
         return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
     }
-    fn capability(self: *@This()) c.winrt_transport {
+    fn capability(self: *@This()) c.partout_transport {
         return .{
             .context = self,
             .release = release,
@@ -546,7 +546,7 @@ const WindowsProducer = struct {
             .unconnected = false,
         };
     }
-    fn pair(native: *c.winrt_transport, side: io.Side) !io.DescriptorPair {
+    fn pair(native: *c.partout_transport, side: io.Side) !io.DescriptorPair {
         return switch (side) {
             .link => .{ .link = try io.SocketWrapper.wrap(std.testing.allocator, native) },
             .tun => .{ .tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(native)) },

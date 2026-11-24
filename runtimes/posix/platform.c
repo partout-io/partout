@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "partout_platform.h"
+#include "partout.h"
 #include <errno.h>
 #include <unistd.h>
 

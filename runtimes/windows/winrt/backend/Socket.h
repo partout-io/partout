@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <partout/IOTypes.h>
+#include "IOTypes.h"
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Sockets.h>

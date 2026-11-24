@@ -5,7 +5,7 @@
 #include <windows.h>
 #include "RuntimeLoop.h"
 #include "Socket.h"
-#include <partout/winrt/log.h>
+#include "Log.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>

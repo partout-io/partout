@@ -50,7 +50,7 @@ fn noop_resolver_block(
 }
 
 pub fn noopSocketFactory() net.SocketFactory {
-    return .{ .vtable = &noop_socket_factory_vtable };
+    return .{ .vtable = &noop_socket_factory_vtable, .winrt = winrtCallbacks() };
 }
 
 const noop_socket_factory_vtable = net.SocketFactory.VTable{
@@ -259,20 +259,20 @@ pub fn createTun(allocator: std.mem.Allocator) std.mem.Allocator.Error!*net.TunW
     if (!net.uses_winrt) return net.TunWrapper.create(allocator, null);
     const Native = struct {
         fn release(_: ?*anyopaque) callconv(.c) void {}
-        fn subscribe(_: ?*anyopaque, _: ffi.io.winrt_receive, _: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(_: ?*anyopaque, _: ffi.io.partout_transport_receive, _: ?*anyopaque) callconv(.c) bool {
             return true;
         }
         fn resumeReads(_: ?*anyopaque) callconv(.c) bool {
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const ffi.io.winrt_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const ffi.io.partout_socket_address) callconv(.c) i32 {
             return 0;
         }
-        fn address(_: ?*anyopaque, _: [*c]ffi.io.winrt_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]ffi.io.partout_socket_address) callconv(.c) bool {
             return false;
         }
-        var capability: ffi.io.winrt_transport = .{
+        var capability: ffi.io.partout_transport = .{
             .context = null,
             .release = release,
             .subscribe = subscribe,
@@ -434,4 +434,10 @@ pub fn connectionProfileJson() [:0]const u8 {
     \\  "activeModulesIds": ["44444444-4444-4444-8444-444444444444"]
     \\}
     ;
+}
+
+/// Test-only callback provider. No native runtime is linked into core tests.
+pub var winrt_callbacks: ffi.io.partout_winrt_callbacks = .{};
+pub fn winrtCallbacks() ?ffi.io.partout_winrt_callbacks {
+    return if (net.uses_winrt) winrt_callbacks else null;
 }

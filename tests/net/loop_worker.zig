@@ -163,37 +163,20 @@ test "native receive removal drains the ABI callback before replacing its contex
     try std.testing.expectEqual(@as(usize, 1), replacement.calls.load(.acquire));
 }
 
-test "native setup requires an owner and runtime shutdown permits recreation" {
-    if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
-    try std.testing.expect(c.winrt_loop_current() == null);
-    try std.testing.expect(c.winrt_connect("127.0.0.1", 9, &.{ .unconnected = false, .timeout_ms = 1000 }) == null);
+test "injected executor drains accepted work before owner destruction" {
+    if (!source.net.uses_winrt) return error.SkipZigTest;
     const Probe = struct {
-        done: bool = false,
         fn run(raw: ?*anyopaque) callconv(.c) void {
-            const self: *@This() = @ptrCast(@alignCast(raw.?));
-            self.done = true;
+            const done: *bool = @ptrCast(@alignCast(raw.?));
+            done.* = true;
         }
     };
-    for (0..3) |_| {
-        var probe = Probe{};
-        {
-            const native_runtime = try NativeRuntime.init();
-            defer native_runtime.deinit();
-            const loop = c.winrt_loop_current().?;
-            // A failed second owner must leave the active runtime untouched.
-            try std.testing.expect(c.winrt_loop_create() == null);
-            try std.testing.expectEqual(loop, c.winrt_loop_current().?);
-            {
-                const socket = (try io.SocketWrapper.create(std.testing.allocator, null, .{ .ipv4 = true, .ipv6 = false })) orelse return error.SocketFailed;
-                defer socket.cleanup(); // Destruction is queued on the borrowed loop.
-                try std.testing.expectEqual(@as(i32, 0), socket.write("queued", try io.testing.socketAddress(.{ .address = "127.0.0.1", .proto = .init(.udp, 9) })));
-            }
-            try std.testing.expect(c.winrt_loop_submit(loop, Probe.run, &probe));
-        }
-        // Owner shutdown joins queued commands and leaves no active loop.
-        try std.testing.expect(probe.done);
-        try std.testing.expect(c.winrt_loop_current() == null);
-    }
+    var done = false;
+    const runtime = try NativeRuntime.init();
+    const callbacks = mock.winrtCallbacks().?;
+    try std.testing.expect(callbacks.submit.?(callbacks.context, Probe.run, &done));
+    runtime.deinit();
+    try std.testing.expect(done);
 }
 
 test "runtime-owned loop outlives preparation worker and serves borrowed transports" {
@@ -220,6 +203,7 @@ test "runtime-owned loop outlives preparation worker and serves borrowed transpo
                 .ipv6 = false,
                 .configure = configure,
                 .configure_ctx = self,
+                .winrt = mock.winrtCallbacks(),
             })) orelse error.LinkNotActive;
         }
         fn completed(raw: *anyopaque, context: *anyopaque, result: Worker.Completion) void {
@@ -233,7 +217,7 @@ test "runtime-owned loop outlives preparation worker and serves borrowed transpo
     var probe = Probe{};
     var table = mock.noopSocketFactory().vtable.*;
     table.create = Probe.socket;
-    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table }, null, .{ .context = &probe, .call = Probe.completed });
+    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table, .winrt = mock.winrtCallbacks() }, null, .{ .context = &probe, .call = Probe.completed });
     var destroyed = false;
     defer if (!destroyed) worker.destroy();
     try worker.submit(request, &probe);
@@ -283,7 +267,7 @@ test "RuntimeLoop close drains each accepted completion and rejects new requests
     var probe = Probe{};
     var table = mock.noopSocketFactory().vtable.*;
     table.create = Probe.socket;
-    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table }, null, .{ .context = &probe, .call = Probe.completed });
+    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table, .winrt = mock.winrtCallbacks() }, null, .{ .context = &probe, .call = Probe.completed });
     var destroyed = false;
     defer if (!destroyed) {
         probe.released.store(true, .release);
@@ -353,7 +337,7 @@ test "RuntimeLoop transport teardown does not wait for a blocked rebind" {
     var probe = Probe{};
     var table = mock.noopSocketFactory().vtable.*;
     table.create = Probe.socket;
-    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table }, null, .{ .context = &probe, .call = Probe.completed });
+    const worker = try Worker.create(std.testing.allocator, mock.noopDNSResolver(), .{ .ptr = &probe, .vtable = &table, .winrt = mock.winrtCallbacks() }, null, .{ .context = &probe, .call = Probe.completed });
     defer {
         probe.released.store(true, .release);
         worker.destroy();

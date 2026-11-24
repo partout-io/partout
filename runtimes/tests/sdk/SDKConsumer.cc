@@ -2,9 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #include <partout.h>
 #ifdef _WIN32
-#include <partout_winrt.h>
-#else
-#include <partout_platform.h>
+#include <partout/winrt/VpnChannelRuntime.h>
 #endif
 
 int main() {

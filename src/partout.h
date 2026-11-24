@@ -122,6 +122,9 @@ typedef uintptr_t partout_socket_descriptor;
 typedef int partout_socket_descriptor;
 #endif
 
+/* Optional platform-specific operation table. */
+typedef struct partout_winrt_callbacks partout_winrt_callbacks;
+
 typedef struct {
     void *ctx;
     void (*on_reachability)(void *ctx, const partout_reachability *reachability);
@@ -142,7 +145,7 @@ typedef struct {
                               const partout_socket_descriptor *sockets, size_t count);
 } partout_controller_functions;
 
-/* Runtime callbacks and context. The core copies the bindings.
+/* Runtime callbacks and context. The core copies the bindings and WinRT table.
  * The runtime must keep controller/context resources alive until release.
  * Callback strings and arrays are borrowed for the duration of each call.
  * Callbacks must not propagate language exceptions across this boundary. */
@@ -154,7 +157,14 @@ typedef struct __partout_daemon_bindings {
     /* Optional cleanup, called on startup failure or daemon destruction.
      * Releases referenced resources, not this struct. */
     void (*release)(struct __partout_daemon_bindings *);
+    /* Required for WinRT builds, otherwise ignored. Nullable on other platforms. */
+    const partout_winrt_callbacks *winrt;
 } partout_daemon_bindings;
+
+/* Provided by the POSIX and Wintun runtimes. Initializes controller ownership
+ * and preserves the caller's event callbacks. Pass bindings to daemon_start,
+ * which owns release even on startup failure. */
+bool partout_platform_bindings_init(partout_daemon_bindings *bindings);
 
 /* Crypto backends. */
 typedef enum {

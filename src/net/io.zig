@@ -29,6 +29,7 @@ pub const Error = common.Error;
 pub const ReachabilityInfo = common.ReachabilityInfo;
 pub const Side = common.Side;
 pub const SocketOptions = common.SocketOptions;
+pub const WinRTCallbacks = ffi.io.partout_winrt_callbacks;
 pub const Waiter = common.Waiter;
 
 // Native ABI types, independent of the platform's link representation.

@@ -1,6 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include <partout/winrt/log.h>
+#include "backend/Log.h"
 #include <cassert>
 #include <cstdio>
 #include <stdexcept>

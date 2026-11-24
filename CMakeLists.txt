@@ -80,7 +80,6 @@ target_include_directories(partout-headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-include("cmake/winrt-backend.cmake")
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")
 include("cmake/runtimes.cmake")

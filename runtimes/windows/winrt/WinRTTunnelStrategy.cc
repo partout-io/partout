@@ -10,7 +10,7 @@
 #include <partout/winrt/WinRTTunnelStrategy.h>
 #include <partout/models/TaggedProfile.h>
 #include <partout/models/TunnelSnapshot.h>
-#include <partout/winrt/log.h>
+#include "backend/Log.h"
 #include <appmodel.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.Foundation.Collections.h>

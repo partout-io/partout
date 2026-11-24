@@ -971,7 +971,7 @@ test "I/O modes control socket creation, attachment, and descriptor handoff" {
                 var factory_table = mock_mod.noopSocketFactory().vtable.*;
                 factory_table.create = Probe.socket;
                 const sut = try Daemon.create(allocator, &profile, .{
-                    .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                    .objects = .{ .registry = &registry, .controller = .{ .ptr = &probe.controller, .vtable = &controller_table }, .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table, .winrt = mock_mod.winrtCallbacks() }, .monitor = monitor.interface() },
                     .options = .{ .connection_options = .{ .connect_udp = connect_udp }, .reconnection_delay_ms = 60_000, .events = .{ .ctx = &probe, .status = Probe.status, .last_error = Probe.lastErrorEvent, .data_count = Probe.reportDataCount, .remove_key = Probe.remove } },
                 });
                 defer sut.destroy();
@@ -1194,7 +1194,7 @@ test "looper owns TUN across startup and optional rebind replacement" {
             .registry = &registry,
             .controller = .{ .ptr = &probe.controller, .vtable = &controller_table },
             .resolver = mock_mod.noopDNSResolver(),
-            .factory = .{ .vtable = &factory_table },
+            .factory = .{ .vtable = &factory_table, .winrt = mock_mod.winrtCallbacks() },
             .monitor = monitor.interface(),
         },
         .options = .{ .reconnection_delay_ms = 60_000 },
@@ -1421,7 +1421,7 @@ test "daemon-created link is released on failed start or rebind" {
         var factory_table = mock_mod.noopSocketFactory().vtable.*;
         factory_table.create = Probe.socket;
         const sut = try Daemon.create(allocator, &profile, .{
-            .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+            .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = mock_mod.noopDNSResolver(), .factory = .{ .ptr = &probe, .vtable = &factory_table, .winrt = mock_mod.winrtCallbacks() }, .monitor = monitor.interface() },
             .options = .{ .reconnection_delay_ms = 60_000 },
         });
         defer sut.destroy();
@@ -1621,7 +1621,7 @@ test "event loop flushes graceful shutdown and finalizes terminal failure on its
                 .registry = &registry,
                 .controller = controller.interface(),
                 .resolver = mock_mod.noopDNSResolver(),
-                .factory = .{ .ptr = &probe, .vtable = &factory_table },
+                .factory = .{ .ptr = &probe, .vtable = &factory_table, .winrt = mock_mod.winrtCallbacks() },
                 .monitor = monitor.interface(),
             },
             .options = .{ .starts_immediately = true, .reconnection_delay_ms = 1, .connection_options = .{ .connect_udp = true } },
@@ -2160,7 +2160,7 @@ test "worker preserves loop progress and rejects stale preparation results" {
             resolver.ptr = &probe;
             resolver.resolve_address_block = Probe.map;
             const sut = try Daemon.create(allocator, &profile, .{
-                .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = resolver, .factory = .{ .ptr = &probe, .vtable = &factory_table }, .monitor = monitor.interface() },
+                .objects = .{ .registry = &registry, .controller = controller.interface(), .resolver = resolver, .factory = .{ .ptr = &probe, .vtable = &factory_table, .winrt = mock_mod.winrtCallbacks() }, .monitor = monitor.interface() },
                 .options = .{ .reconnection_delay_ms = 60_000, .connection_options = .{ .connect_udp = true } },
             });
             defer sut.destroy();
@@ -2359,9 +2359,9 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
     if (comptime builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
     const c = source.ffi.io;
     const Probe = struct {
-        callback: c.winrt_receive = null,
+        callback: c.partout_transport_receive = null,
         callback_context: ?*anyopaque = null,
-        capability: c.winrt_transport = undefined,
+        capability: c.partout_transport = undefined,
         actor: std.Thread.Id = 0,
         reads: usize = 0,
         failures: usize = 0,
@@ -2374,7 +2374,7 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
         measure_timer: bool = false,
         reads_at_timer: ?usize = null,
 
-        fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+        fn subscribe(raw: ?*anyopaque, callback: c.partout_transport_receive, context: ?*anyopaque) callconv(.c) bool {
             const self: *@This() = @ptrCast(@alignCast(raw.?));
             self.callback = callback;
             self.callback_context = context;
@@ -2389,10 +2389,10 @@ test "Windows native input preserves mailbox behavior and submission OOM termina
             return true;
         }
         fn stop(_: ?*anyopaque) callconv(.c) void {}
-        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+        fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.partout_socket_address) callconv(.c) i32 {
             return 0;
         }
-        fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+        fn address(_: ?*anyopaque, _: [*c]c.partout_socket_address) callconv(.c) bool {
             return false;
         }
 

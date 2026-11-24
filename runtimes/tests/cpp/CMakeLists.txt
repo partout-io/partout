@@ -25,11 +25,4 @@ foreach(test IN ITEMS tunnel profile-extensions models)
         target_compile_options(${target} PRIVATE -UNDEBUG)
     endif()
     add_test(NAME partout-cpp-${test} COMMAND ${target})
-    if(WIN32)
-        add_custom_command(TARGET ${target} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_if_different
-                $<TARGET_RUNTIME_DLLS:${target}>
-                $<TARGET_FILE_DIR:${target}>
-            COMMAND_EXPAND_LISTS)
-    endif()
 endforeach()

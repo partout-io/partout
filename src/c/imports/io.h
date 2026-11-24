@@ -10,7 +10,4 @@
 #if PARTOUT_WINTUN
 #include <winerror.h>
 #endif
-#if PARTOUT_WINDOWS
-#include <partout/winrt/abi.h>
-#include <partout/winrt/log.h>
-#endif
+#include <partout_io.h>

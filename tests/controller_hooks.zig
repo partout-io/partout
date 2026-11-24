@@ -34,7 +34,7 @@ pub const functions: c.partout_controller_functions = .{
     .cancel_tunnel = report,
     .configure_sockets = configure,
 };
-pub const bindings: c.partout_daemon_bindings = .{ .controller_functions = functions };
+pub const bindings: c.partout_daemon_bindings = .{ .controller_functions = functions, .winrt = @ptrCast(&source.mock.winrt_callbacks) };
 pub fn nativeFunctions() io.pp_tun_ctrl_fnt {
     return .{ .set_delegate = @ptrCast(functions.set_delegate), .set_tunnel = @ptrCast(functions.set_tunnel), .report_snapshot = @ptrCast(functions.report_snapshot), .set_environment_value = @ptrCast(functions.set_environment_value), .clear_tunnel = @ptrCast(functions.clear_tunnel), .cancel_tunnel = @ptrCast(functions.cancel_tunnel) };
 }
@@ -44,5 +44,5 @@ pub fn initPlatform(options: struct {
     socket_configurator: ?io.pp_socket_configurator = null,
     socket_buf_size: c_int = 1024 * 1024,
 }) !Platform {
-    return Platform.init(.{ .ref = options.ref, .fnt = options.fnt orelse nativeFunctions(), .socket_configurator = options.socket_configurator orelse .{ .ctx = options.ref, .configure = @ptrCast(functions.configure_sockets) }, .socket_buf_size = options.socket_buf_size });
+    return Platform.init(.{ .ref = options.ref, .fnt = options.fnt orelse nativeFunctions(), .winrt = source.mock.winrtCallbacks(), .socket_configurator = options.socket_configurator orelse .{ .ctx = options.ref, .configure = @ptrCast(functions.configure_sockets) }, .socket_buf_size = options.socket_buf_size });
 }

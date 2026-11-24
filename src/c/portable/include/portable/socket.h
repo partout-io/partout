@@ -6,6 +6,7 @@
 
 #pragma once
 #include "conditionals.h"
+#include "partout_io.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -15,11 +16,9 @@
 
 #pragma clang assume_nonnull begin
 
-/* The available protocols. */
-typedef enum {
-    PPSocketProtoTCP,
-    PPSocketProtoUDP
-} pp_socket_proto;
+typedef partout_socket_proto pp_socket_proto;
+#define PPSocketProtoTCP PartoutSocketProtoTCP
+#define PPSocketProtoUDP PartoutSocketProtoUDP
 
 /* The opaque socket type. */
 typedef struct __pp_socket_struct *pp_socket;
@@ -47,31 +46,15 @@ bool pp_socket_configure_descriptors(pp_socket_configurator configurator,
  * Unconnected IPv6 is IPv6-only unless dual_stack is enabled; configuration runs before bind.
  * Dual-stack wildcard binds fall back to IPv4 when IPv6 is unsupported.
  * timeout_ms applies only to connected sockets. */
-typedef bool (*pp_socket_configure)(void *_Nullable ctx,
-                                    pp_socket_fd fd,
-                                    const pp_reachability *_Nullable reachability);
-
-typedef struct {
-    bool unconnected;
-    bool dual_stack; /* Only for unconnected IPv6 UDP; accepts IPv4-mapped traffic. */
-    int timeout_ms;
-    const pp_reachability *_Nullable reachability;
-    pp_socket_configure _Nullable configure;
-    void *_Nullable configure_ctx;
-} pp_socket_open_options;
+typedef partout_socket_configure pp_socket_configure;
+typedef partout_socket_open_options pp_socket_open_options;
 
 pp_socket _Nullable pp_socket_open(const char *hostname,
                                    pp_socket_proto proto,
                                    uint16_t port,
                                    const pp_socket_open_options *options);
 
-/* Numeric UDP endpoint. family is 4 or 6; port and scope_id are host endian. */
-typedef struct {
-    uint8_t address[16];
-    uint32_t scope_id;
-    uint16_t port;
-    uint8_t family;
-} pp_socket_address;
+typedef partout_socket_address pp_socket_address;
 
 /* I/O. Returns PPIOErrorWouldBlock when a non-blocking operation would block.
  * Unconnected UDP writes require destination; reads require source.

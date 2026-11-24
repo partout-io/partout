@@ -17,9 +17,9 @@ fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        native: *c.winrt_transport,
+        native: *c.partout_transport,
 
-        pub fn wrap(allocator: std.mem.Allocator, native: *c.winrt_transport) std.mem.Allocator.Error!*Self {
+        pub fn wrap(allocator: std.mem.Allocator, native: *c.partout_transport) std.mem.Allocator.Error!*Self {
             const self = try allocator.create(Self);
             self.* = .{ .allocator = allocator, .native = native };
             return self;
@@ -80,17 +80,20 @@ fn NativeTransport(comptime side: io.Side) type {
             var host: core.util.TemporaryCString = .{};
             try host.init(allocator, peer.address);
             defer host.deinit();
-            const options_ctx = @constCast(&options);
-            const native: *c.winrt_transport = c.winrt_connect(
+            const reachability = options.reachability orelse io.reachabilityNone();
+            const callbacks = options.winrt orelse return null;
+            const native: *c.partout_transport = callbacks.connect.?(
+                callbacks.context,
                 host.ptr(),
+                io.socketProto(peer),
                 peer.proto.port,
                 &.{
-                    .tcp = peer.plainSocketType() == .tcp,
                     .unconnected = endpoint == null,
                     .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
                     .timeout_ms = options.timeout_ms,
-                    .configure = configure,
-                    .context = options_ctx,
+                    .reachability = &reachability,
+                    .configure = options.configure,
+                    .configure_ctx = options.configure_ctx,
                 },
             ) orelse return null;
             // Release the native transport if allocating its Zig wrapper fails.
@@ -100,13 +103,6 @@ fn NativeTransport(comptime side: io.Side) type {
 
         fn createTun(allocator: std.mem.Allocator, tun: c.pp_tun) std.mem.Allocator.Error!*Self {
             return wrap(allocator, @ptrCast(@alignCast(tun)));
-        }
-
-        fn configure(raw: ?*anyopaque, token: usize) callconv(.c) bool {
-            const options: *io.SocketOptions = @ptrCast(@alignCast(raw.?));
-            const callback = options.configure orelse return true;
-            const reachability = options.reachability orelse io.reachabilityNone();
-            return callback(options.configure_ctx, token, &reachability);
         }
     };
 }
