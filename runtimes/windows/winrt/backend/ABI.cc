@@ -218,11 +218,6 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
     return controller->Associate(*handle->socket);
 }
 
-void FreeTun(partout_transport *transport) {
-    if (!transport) return;
-    transport->release(transport->context);
-}
-
 RuntimeLoop *CreateLoop() {
     try {
         return new Partout::RuntimeLoop;
@@ -254,13 +249,6 @@ void DrainLoop(RuntimeLoop *loop) {
 
 void FreeLoop(RuntimeLoop *loop) {
     delete loop;
-}
-
-partout_transport *Connect(
-    const char *host, partout_socket_proto proto, uint16_t port,
-    const partout_socket_open_options *options
-) {
-    return ConnectOnLoop(Partout::RuntimeLoop::Current(), host, proto, port, options);
 }
 
 partout_transport *ConnectOnLoop(

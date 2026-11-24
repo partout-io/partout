@@ -14,16 +14,10 @@ namespace ABI {
 partout_transport *WrapTun(RuntimeLoop &, std::unique_ptr<Tun>);
 bool ConfigureSocket(TunnelController *, uintptr_t token);
 
-void FreeTun(partout_transport *transport);
-
 /* Creates, configures and opens a link in one operation. configure receives a
  * temporary native policy token; it must not retain or dereference that token.
- * Borrows the active runtime's loop; fails if no runtime is active. The owner
- * must outlive all transports and drain their queued destruction. */
-partout_transport *Connect(
-    const char *host, partout_socket_proto proto, uint16_t port,
-    const partout_socket_open_options *options
-);
+ * Borrows the supplied loop; its owner must outlive all transports and drain
+ * their queued destruction. */
 partout_transport *ConnectOnLoop(
     RuntimeLoop *, const char *, partout_socket_proto, uint16_t,
     const partout_socket_open_options *
