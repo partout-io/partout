@@ -37,19 +37,19 @@ struct SocketHandle {
         }
     }
 
-    bool GetAddress(Partout::SocketAddress *address) {
+    bool GetAddress(partout_socket_address *address) {
         return loop.Perform([this, address] {
             return socket->GetAddress(address);
         });
     }
 
-    int32_t Write(const uint8_t *bytes, size_t size, const Partout::SocketAddress *destination) {
+    int32_t Write(const uint8_t *bytes, size_t size, const partout_socket_address *destination) {
         if (auto status = socket->WriteStatus()) return status;
         if (socket->IsUnconnected() && !destination) return E_INVALIDARG;
         if (!socket->Accepts(destination)) return E_INVALIDARG;
         try {
             auto buffer = CopyBuffer(bytes, size);
-            std::optional<Partout::SocketAddress> address;
+            std::optional<partout_socket_address> address;
             if (destination) address = *destination;
             loop.Schedule([this, buffer = std::move(buffer), address]() mutable {
                 if (socket->WriteStatus()) return;
@@ -68,7 +68,7 @@ struct SocketHandle {
         if (!receive) return socket->SetOnReceive({});
         return loop.Perform([this, receive, context] {
             return socket->SetOnReceive([receive, context](const uint8_t *bytes, size_t size,
-                                                           const Partout::SocketAddress *source,
+                                                           const partout_socket_address *source,
                                                            int32_t error) {
                 return receive(context, bytes, size, source, error);
             });

@@ -7,14 +7,7 @@
 #include <functional>
 
 namespace Partout {
-using SocketProto = partout_socket_proto;
-constexpr SocketProto SocketProtoTCP = PartoutSocketProtoTCP;
-constexpr SocketProto SocketProtoUDP = PartoutSocketProtoUDP;
-using SocketOpenOptions = partout_socket_open_options;
-using SocketAddress = partout_socket_address;
-
 using SocketOnReceive =
-    std::function<bool(const uint8_t *, size_t, const SocketAddress *, int32_t)>;
-constexpr int SocketEOF = PartoutTransportEOF;
+    std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
 using TunOnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
 } // namespace Partout

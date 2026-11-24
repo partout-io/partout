@@ -28,11 +28,11 @@ void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int 
     action.GetResults();
 }
 
-Partout::SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host, winrt::hstring const &port) {
+partout_socket_address ParseAddress(winrt::Windows::Networking::HostName const &host, winrt::hstring const &port) {
     if (!host || (host.Type() != winrt::Windows::Networking::HostNameType::Ipv4 &&
                   host.Type() != winrt::Windows::Networking::HostNameType::Ipv6))
         throw winrt::hresult_invalid_argument();
-    Partout::SocketAddress result{};
+    partout_socket_address result{};
     auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
     if (zone != std::wstring::npos) {
@@ -95,20 +95,20 @@ struct Socket::State {
         if (error && !channel_owned) DeliverLocked(nullptr, 0, nullptr, error);
     }
 
-    void Deliver(const uint8_t *bytes, size_t size, const SocketAddress *source, int32_t error) {
+    void Deliver(const uint8_t *bytes, size_t size, const partout_socket_address *source, int32_t error) {
         std::lock_guard lock(mutex);
         if (!error) ++received;
         DeliverLocked(bytes, size, source, error);
     }
 
-    void DeliverLocked(const uint8_t *bytes, size_t size, const SocketAddress *source,
+    void DeliverLocked(const uint8_t *bytes, size_t size, const partout_socket_address *source,
                        int32_t error) {
-        if (error && error != SocketEOF) {
+        if (error && error != PartoutTransportEOF) {
             int32_t expected = 0;
             write_status.compare_exchange_strong(expected, error);
         }
         if (!callback || (paused && !error)) return;
-        if (error == SocketEOF) {
+        if (error == PartoutTransportEOF) {
             Log::Write(PartoutLogLevelInfo, "Partout::Socket: TCP peer closed the connection");
         } else if (error) {
             Log::Write(PartoutLogLevelError,
@@ -119,12 +119,12 @@ struct Socket::State {
     }
 };
 
-Socket::Socket(SocketProto proto, bool unconnected) {
-    if (proto != SocketProtoUDP && proto != SocketProtoTCP) throw hresult_invalid_argument();
-    if (unconnected && proto != SocketProtoUDP) throw hresult_invalid_argument();
+Socket::Socket(partout_socket_proto proto, bool unconnected) {
+    if (proto != PartoutSocketProtoUDP && proto != PartoutSocketProtoTCP) throw hresult_invalid_argument();
+    if (unconnected && proto != PartoutSocketProtoUDP) throw hresult_invalid_argument();
     unconnected_ = unconnected;
     state_ = std::make_shared<State>();
-    if (proto == SocketProtoUDP)
+    if (proto == PartoutSocketProtoUDP)
         datagram_ = DatagramSocket{};
     else
         stream_ = StreamSocket{};
@@ -171,7 +171,7 @@ void Socket::SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter
     adapter_ = adapter;
 }
 
-bool Socket::Open(const char *hostname, uint16_t port, const SocketOpenOptions *options) {
+bool Socket::Open(const char *hostname, uint16_t port, const partout_socket_open_options *options) {
     try {
         if (!hostname || !*hostname || !options || options->timeout_ms < 0 ||
             (options->dual_stack && !unconnected_)) {
@@ -253,7 +253,7 @@ void Socket::RegisterForDatagrams() {
                     return;
                 auto reader = args.GetDataReader();
                 const auto buffer = reader.ReadBuffer(reader.UnconsumedBufferLength());
-                SocketAddress source{};
+                partout_socket_address source{};
                 if (unconnected) source = ParseAddress(args.RemoteAddress(), args.RemotePort());
                 state->Deliver(buffer.data(), buffer.Length(), unconnected ? &source : nullptr, 0);
             } catch (...) {
@@ -262,7 +262,7 @@ void Socket::RegisterForDatagrams() {
         });
 }
 
-bool Socket::GetAddress(SocketAddress *address) {
+bool Socket::GetAddress(partout_socket_address *address) {
     if (!address) return false;
     try {
         HostName host{nullptr};
@@ -360,7 +360,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
             auto received = co_await read;
             if (received.Length() == 0) {
                 std::lock_guard lock(state->mutex);
-                state->FinishReadLocked(SocketEOF);
+                state->FinishReadLocked(PartoutTransportEOF);
                 co_return;
             }
             state->Deliver(received.data(), received.Length(), nullptr, 0);
@@ -371,7 +371,7 @@ IAsyncAction Socket::ReadStream(std::shared_ptr<State> state, StreamSocket strea
     }
 }
 
-int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
+int32_t Socket::Write(Buffer buffer, const partout_socket_address *destination) {
     uint32_t length = 0;
     try {
         if (!buffer) throw hresult_invalid_argument();
@@ -394,7 +394,7 @@ int32_t Socket::Write(Buffer buffer, const SocketAddress *destination) {
     return 0;
 }
 
-void Socket::EnqueueWrite(Buffer buffer, const SocketAddress *destination) {
+void Socket::EnqueueWrite(Buffer buffer, const partout_socket_address *destination) {
     const auto state = state_;
     State::WriteRequest request;
     if (unconnected_) {
