@@ -1,7 +1,7 @@
 add_executable(partout-cpp-tunnel-test TunnelTests.cc)
 add_executable(partout-cpp-profile-extensions-test ProfileExtensionsTests.cc)
 target_link_libraries(partout-cpp-tunnel-test PRIVATE Partout::CppRuntime)
-target_link_libraries(partout-cpp-profile-extensions-test PRIVATE Partout::Models)
+target_link_libraries(partout-cpp-profile-extensions-test PRIVATE Partout::CppRuntime)
 foreach(test IN ITEMS tunnel profile-extensions)
     set(target partout-cpp-${test}-test)
     if(MSVC)

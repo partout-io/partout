@@ -7,7 +7,7 @@ project(Partout LANGUAGES C)
 include(GNUInstallDirs)
 
 option(PP_BUILD_LIBRARY "Build the Partout library" ON)
-option(PP_BUILD_MODELS "Build the portable C++ models" OFF)
+option(PP_BUILD_CPP_RUNTIME "Build the portable C++ runtime and models" OFF)
 set(partout_winrt_default ${WIN32})
 if(PP_BUILD_WINTUN)
     set(partout_winrt_default OFF)
@@ -80,10 +80,6 @@ target_include_directories(partout-headers INTERFACE
     "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>"
     "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
 
-if(PP_BUILD_MODELS OR PP_BUILD_WINRT)
-    enable_language(CXX)
-    include("cmake/models.cmake")
-endif()
 include("cmake/winrt-backend.cmake")
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")

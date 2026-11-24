@@ -1,10 +1,10 @@
 cmake_minimum_required(VERSION 3.28)
 project(PartoutModelTests LANGUAGES CXX)
 
-# Exercise the installed SDK through its exported model target.
+# Exercise the installed SDK through its exported C++ runtime target.
 find_package(Partout CONFIG REQUIRED)
 add_executable(partout-models-test ModelsTests.cc)
-target_link_libraries(partout-models-test PRIVATE Partout::Models)
+target_link_libraries(partout-models-test PRIVATE Partout::CppRuntime)
 if(WIN32)
     add_custom_command(TARGET partout-models-test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
