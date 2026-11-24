@@ -526,6 +526,7 @@ fn configureCHeadersAndMacros(
     consumer.addIncludePath(b.path("src/c/portable/include"));
     consumer.addIncludePath(b.path("src/c/crypto/include"));
     if (config.target.result.os.tag == .windows) {
+        consumer.addIncludePath(b.path("runtimes/cpp/include"));
         consumer.addIncludePath(b.path("runtimes/windows/winrt/include"));
     }
     if (config.openvpn) {

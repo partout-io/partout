@@ -3,7 +3,7 @@
 
 if(TARGET Partout::Models)
     # Portable C++ lifecycle API and replaceable native mechanisms.
-    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/Tunnel.cc")
+    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
     add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
     target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
     target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
@@ -43,7 +43,7 @@ if(TARGET partout-winrt-backend)
         PRIVATE src
     )
     target_compile_features(partout-bindings PUBLIC cxx_std_20)
-    target_compile_definitions(partout-bindings PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_WINRT_USE_DLL)
+    target_compile_definitions(partout-bindings PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_API_USE_DLL)
     target_compile_options(partout-bindings PRIVATE /EHsc /permissive- /W4)
     # AppContainer consumers use a CRT without the /RTC helpers.
     set_target_properties(partout-bindings PROPERTIES

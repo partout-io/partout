@@ -1,13 +1,12 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
-#include "windows/log.h"
+#include <partout/winrt/log.h>
 #include <windows.h>
 #include <atomic>
 #include <cstdarg>
 #include <cstdio>
 #include <vector>
 
-namespace Partout {
 namespace {
 
 std::atomic<winrt_log_callback> logger{nullptr};
@@ -39,18 +38,17 @@ void Log(winrt_log_level level, const char *format, va_list args) noexcept {
 }
 
 } // namespace
-} // namespace Partout
 
 extern "C" {
 
 void winrt_set_logger(winrt_log_callback callback) {
-    Partout::SetLogger(callback);
+    SetLogger(callback);
 }
 
 void winrt_log(winrt_log_level level, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    Partout::Log(level, format, args);
+    Log(level, format, args);
     va_end(args);
 }
 }

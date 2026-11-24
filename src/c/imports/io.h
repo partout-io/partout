@@ -11,6 +11,6 @@
 #include <winerror.h>
 #endif
 #if PARTOUT_WINDOWS
-#include <windows/abi.h>
-#include <windows/log.h>
+#include <partout/winrt/abi.h>
+#include <partout/winrt/log.h>
 #endif

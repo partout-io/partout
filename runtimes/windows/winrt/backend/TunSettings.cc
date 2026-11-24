@@ -3,7 +3,7 @@
 #include <winsock2.h>
 #include <ws2tcpip.h>
 #include "TunSettings.h"
-#include "windows/log.h"
+#include <partout/winrt/log.h>
 #include <partout/models/TunnelRemoteInfoWrapper.h>
 #include <charconv>
 #include <stdexcept>

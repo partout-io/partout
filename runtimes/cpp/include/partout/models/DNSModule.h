@@ -40,32 +40,32 @@ struct  DNSModule
     std::optional<Partout::Models::DNSModuleDomainPolicy> domainPolicy;
     std::optional<bool> routesThroughVPN;
 
-    PARTOUT_MODELS_API bool operator==(const DNSModule& other) const;
-    PARTOUT_MODELS_API bool operator!=(const DNSModule& other) const;
+    PARTOUT_API bool operator==(const DNSModule& other) const;
+    PARTOUT_API bool operator!=(const DNSModule& other) const;
 
     /// <summary>
     /// Validate the current data in the model. Throws a ValidationException on failure.
     /// </summary>
-    PARTOUT_MODELS_API void Validate() const;
+    PARTOUT_API void Validate() const;
 
     /// <summary>
     /// Validate the current data in the model. Returns false on error and writes an error
     /// message into the given stringstream.
     /// </summary>
-    PARTOUT_MODELS_API bool Validate(std::stringstream& msg) const;
+    PARTOUT_API bool Validate(std::stringstream& msg) const;
 
     /// <summary>
     /// Helper overload for validate. Used when one model stores another model and calls it's validate.
     /// Not meant to be called outside that case.
     /// </summary>
-    PARTOUT_MODELS_API bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
+    PARTOUT_API bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    PARTOUT_MODELS_API ::Partout::Json ToJson() const;
-    PARTOUT_MODELS_API static DNSModule FromJson(const ::Partout::Json& j);
+    PARTOUT_API ::Partout::Json ToJson() const;
+    PARTOUT_API static DNSModule FromJson(const ::Partout::Json& j);
 };
 
- PARTOUT_MODELS_API void to_json(nlohmann::json& j, const DNSModule& o);
- PARTOUT_MODELS_API void from_json(const nlohmann::json& j, DNSModule& o);
+ PARTOUT_API void to_json(nlohmann::json& j, const DNSModule& o);
+ PARTOUT_API void from_json(const nlohmann::json& j, DNSModule& o);
 
 } // namespace Partout::Models
 

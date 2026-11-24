@@ -1,17 +1,17 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #include "RuntimeLoop.h"
-#include "windows/log.h"
+#include <partout/winrt/log.h>
 #include <winrt/base.h>
 #include <stdexcept>
 #include <atomic>
 
-namespace Partout {
 namespace {
-std::atomic<RuntimeLoop *> current_loop = nullptr;
+std::atomic<Partout::RuntimeLoop *> current_loop = nullptr;
 std::mutex runtime_mutex;
 } // namespace
 
+namespace Partout {
 RuntimeLoop *RuntimeLoop::Current() {
     return current_loop.load();
 }

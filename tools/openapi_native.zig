@@ -409,7 +409,7 @@ fn propertyType(c: Context, p: api.Property) ![]const u8 {
 fn template(c: Context, raw: []const u8, n: []const u8) ![]const u8 {
     const named = try replace(c.a, raw, "@NAME@", n);
     var result = try replace(c.a, named, "Partout::Models", c.package);
-    result = try replace(c.a, result, "@EXPORT@", if (c.options.external.len == 0) "PARTOUT_MODELS_API " else "");
+    result = try replace(c.a, result, "@EXPORT@", if (c.options.external.len == 0) "PARTOUT_API " else "");
     return replace(c.a, result, "@JSON_TYPE@", "::Partout::Json");
 }
 

@@ -4,7 +4,7 @@
 
 #pragma once
 #include <chrono>
-#include "partout.h"
+#include <partout.h>
 #include <partout/models/TunnelControllerOptions.h>
 #include <memory>
 #include <winrt/Windows.Networking.Vpn.h>
@@ -36,12 +36,6 @@ public:
 
     void Connect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
     void Disconnect(winrt::Windows::Networking::Vpn::VpnChannel const &channel);
-    // Wakes startup; may run concurrently with Connect. Teardown stays serialized.
-    void Cancel() noexcept;
-    void GetKeepAlivePayload(
-        winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-        winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet
-    );
     void Encapsulate(
         winrt::Windows::Networking::Vpn::VpnChannel const &channel,
         winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets,
@@ -53,6 +47,12 @@ public:
         winrt::Windows::Networking::Vpn::VpnPacketBufferList const &decapsulated_packets,
         winrt::Windows::Networking::Vpn::VpnPacketBufferList const &control_packets
     );
+    void GetKeepAlivePayload(
+        winrt::Windows::Networking::Vpn::VpnChannel const &channel,
+        winrt::Windows::Networking::Vpn::VpnPacketBuffer &keep_alive_packet
+    );
+    // Wakes startup; may run concurrently with Connect. Teardown stays serialized.
+    void Cancel() noexcept;
 
 private:
     struct Impl;

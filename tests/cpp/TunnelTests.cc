@@ -30,7 +30,14 @@ public:
         Partout::Models::TunnelSnapshot snapshot{};
         snapshot.id = profile.id;
         snapshot.status.value = Partout::Models::TunnelStatus::inactive;
-        snapshots.push_back(snapshot);
+        const auto existing = std::find_if(snapshots.begin(), snapshots.end(), [&](const auto &item) {
+            return item.id == profile.id;
+        });
+        if (existing == snapshots.end()) {
+            snapshots.push_back(snapshot);
+            return;
+        }
+        *existing = snapshot;
     }
 
     void Connect(const std::string &id) override {
@@ -93,19 +100,23 @@ int main() {
     Tunnel tunnel(std::move(backend));
     const auto first = Profile("first");
     const auto second = Profile("second");
-    tunnel.Register(first);
-    tunnel.Register(second);
-    Throws([&] {
-        tunnel.Register(first);
-    });
+    tunnel.Save(first);
+    tunnel.Save(second);
+    tunnel.Save(first);
+    assert(native->snapshots.size() == 2);
     native->SetStatus(first.id, Models::TunnelStatus::active);
+    Throws([&] {
+        tunnel.Save(first);
+    });
 
     // Handover waits for observed disconnection and never persists login data.
     TunnelCredentials credentials{};
     credentials.username = "user";
     credentials.password = "one-time";
     tunnel.Connect(second, credentials);
-    assert(tunnel.PendingProfile() == second.id);
+    Throws([&] {
+        tunnel.Save(first);
+    });
     assert(native->connections.empty());
     tunnel.Advance();
     assert(native->connections.empty());
@@ -113,16 +124,18 @@ int main() {
     tunnel.Advance();
     assert(native->connections == std::vector<std::string>{second.id});
     assert(native->credentials->password == "one-time");
-    assert(native->saves == 2);
-    assert(tunnel.PendingProfile() == second.id);
+    assert(native->saves == 3);
+    Throws([&] {
+        tunnel.Save(first);
+    });
     native->SetStatus(second.id, Models::TunnelStatus::active);
     tunnel.Advance();
-    assert(!tunnel.PendingProfile());
+    tunnel.Save(first);
 
     // An unobservable registration must not be treated as an absent one.
     native->errors[first.id] = "Unavailable";
     Throws([&] {
-        tunnel.ValidateNew(first);
+        tunnel.Save(first);
     });
     Throws([&] {
         tunnel.Connect(first);
@@ -144,13 +157,12 @@ int main() {
     Throws([&] {
         tunnel.Advance();
     });
-    assert(!tunnel.PendingProfile());
+    tunnel.Save(first);
 
     // Cancellation ends management without asking the backend to disconnect.
     tunnel.Connect(first);
     tunnel.Cancel();
     assert(native->canceled);
-    assert(!tunnel.PendingProfile());
     Throws([&] {
         tunnel.Advance();
     });

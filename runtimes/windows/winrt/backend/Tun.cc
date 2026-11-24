@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #include <windows.h>
 #include "Tun.h"
-#include "windows/log.h"
+#include <partout/winrt/log.h>
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>

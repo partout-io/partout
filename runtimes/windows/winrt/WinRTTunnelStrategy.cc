@@ -7,10 +7,10 @@
 #include <windows.h>
 #include <iphlpapi.h>
 #include <netioapi.h>
-#include "windows/WinRTTunnelStrategy.h"
-#include "partout/models/TaggedProfile.h"
-#include "partout/models/TunnelSnapshot.h"
-#include "windows/log.h"
+#include <partout/winrt/WinRTTunnelStrategy.h>
+#include <partout/models/TaggedProfile.h>
+#include <partout/models/TunnelSnapshot.h>
+#include <partout/winrt/log.h>
 #include <appmodel.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -24,7 +24,6 @@
 #include <limits>
 #include <thread>
 
-namespace Partout {
 namespace {
 thread_local const std::atomic_bool *cancellation = nullptr;
 struct Apartment {
@@ -54,7 +53,7 @@ std::runtime_error WindowsError(const char *operation, winrt::hresult code) {
 
 template<typename Operation>
 auto Await(const char *name, const Operation &operation,
-           std::chrono::seconds timeout = WinRTTunnelStrategy::ManagementOperationTimeout
+           std::chrono::seconds timeout = Partout::WinRTTunnelStrategy::ManagementOperationTimeout
 ) {
     try {
         const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -63,7 +62,7 @@ auto Await(const char *name, const Operation &operation,
                 operation.Cancel();
                 throw std::runtime_error(std::string(name) + " canceled or timed out.");
             }
-            std::this_thread::sleep_for(WinRTTunnelStrategy::AsyncPollInterval);
+            std::this_thread::sleep_for(Partout::WinRTTunnelStrategy::AsyncPollInterval);
         }
         return operation.get();
     } catch (const winrt::hresult_error &error) {
@@ -101,7 +100,7 @@ std::vector<OwnedProfile> OwnedProfiles(const winrt::Windows::Networking::Vpn::V
     for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
         const auto profile = item.try_as<winrt::Windows::Networking::Vpn::VpnPlugInProfile>();
         if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
-        if (const auto id = WinRTTunnelStrategy::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
+        if (const auto id = Partout::WinRTTunnelStrategy::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
     }
     return result;
 }
@@ -113,13 +112,13 @@ winrt::Windows::Networking::Vpn::VpnPlugInProfile Find(const winrt::Windows::Net
     return nullptr;
 }
 
-std::optional<Models::TunnelSnapshotEnvironment> Environment(const winrt::Windows::Networking::Vpn::VpnPlugInProfile &profile) {
+std::optional<Partout::Models::TunnelSnapshotEnvironment> Environment(const winrt::Windows::Networking::Vpn::VpnPlugInProfile &profile) {
     // VpnManagementAgent has no counters. Resolve only this VPN's interface;
     // never substitute physical-adapter or machine-wide traffic.
     MIB_IF_ROW2 row{};
     if (ConvertInterfaceAliasToLuid(profile.ProfileName().c_str(), &row.InterfaceLuid) != NO_ERROR ||
         GetIfEntry2(&row) != NO_ERROR) return std::nullopt;
-    return WinRTTunnelStrategy::InterfaceEnvironment(row);
+    return Partout::WinRTTunnelStrategy::InterfaceEnvironment(row);
 }
 
 template<typename Action>
@@ -145,6 +144,7 @@ auto WithAgent(const std::atomic_bool &canceled, const char *operation, Action a
 using namespace winrt::Windows::Networking::Vpn;
 using namespace winrt::Windows::Foundation;
 
+namespace Partout {
 bool WinRTTunnelStrategy::NamesEqual(const winrt::hstring &left, const winrt::hstring &right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }
@@ -196,15 +196,6 @@ std::optional<Models::TunnelSnapshotEnvironment> WinRTTunnelStrategy::InterfaceE
     return environment;
 }
 
-WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server_uri_(server_uri) {
-    if (server_uri_.empty()) throw std::invalid_argument("The server URI is empty.");
-    winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
-}
-
-void WinRTTunnelStrategy::Cancel() noexcept {
-    canceled_.store(true);
-}
-
 std::optional<VpnManagementConnectionStatus> WinRTTunnelStrategy::ReadConnectionStatus(
     const std::function<VpnManagementConnectionStatus()> &read, std::string &error
 ) {
@@ -217,6 +208,11 @@ std::optional<VpnManagementConnectionStatus> WinRTTunnelStrategy::ReadConnection
     }
 }
 
+WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server_uri_(server_uri) {
+    if (server_uri_.empty()) throw std::invalid_argument("The server URI is empty.");
+    winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
+}
+
 std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {
     return WithAgent(canceled_, "Fetch profiles", [&](const auto &agent) {
         std::vector<Models::TunnelSnapshot> result;
@@ -224,7 +220,7 @@ std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {
         for (const auto &owned : OwnedProfiles(agent)) {
             const auto &profile = owned.profile;
             std::string error;
-            const auto status = WinRTTunnelStrategy::ReadConnectionStatus([&] { return profile.ConnectionStatus(); }, error);
+            const auto status = ReadConnectionStatus([&] { return profile.ConnectionStatus(); }, error);
             if (!status) {
                 failures.emplace(owned.id, std::move(error));
                 continue;
@@ -247,11 +243,16 @@ std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {
     });
 }
 
+std::map<std::string, std::string> WinRTTunnelStrategy::ObservationErrors() const {
+    return observation_errors_;
+}
+
 void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
     if (profile.id.empty()) throw std::invalid_argument("The profile ID is empty.");
     if (profile.name.empty()) throw std::invalid_argument("The profile name is empty.");
     WithAgent(canceled_, "Save profile", [&](const auto &agent) {
         const auto name = winrt::to_hstring(profile.name);
+        const auto family = Family();
         VpnPlugInProfile existing{nullptr};
         std::vector<VpnPlugInProfile> previous_names;
         for (const auto &owned : OwnedProfiles(agent)) {
@@ -260,7 +261,7 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
                 throw std::runtime_error("Disconnect the VPN before updating its configuration.");
             // Case-only renames refer to the same Windows entry: update it and
             // never queue that entry for deletion after saving.
-            if (WinRTTunnelStrategy::NamesEqual(owned.profile.ProfileName(), name)) existing = owned.profile;
+            if (NamesEqual(owned.profile.ProfileName(), name)) existing = owned.profile;
             else previous_names.push_back(owned.profile);
         }
         using namespace winrt::Windows::Data::Xml::Dom;
@@ -279,16 +280,16 @@ void WinRTTunnelStrategy::Save(const Models::TaggedProfile &profile) {
         // Windows identifies updates by entry name. Never update another entry
         // just because its display name matches this profile.
         for (const auto &other : Await("Check VPN profile names", agent.GetProfilesAsync())) {
-            if (!WinRTTunnelStrategy::NamesEqual(other.ProfileName(), name))
+            if (!NamesEqual(other.ProfileName(), name))
                 continue;
             const auto plugin = other.try_as<VpnPlugInProfile>();
-            if (!plugin || plugin.VpnPluginPackageFamilyName() != Family() ||
-                WinRTTunnelStrategy::DecodeId(plugin.CustomConfiguration()) != profile.id)
+            if (!plugin || plugin.VpnPluginPackageFamilyName() != family ||
+                DecodeId(plugin.CustomConfiguration()) != profile.id)
                 throw std::runtime_error("Another Windows VPN profile already uses this name.");
         }
         auto target = existing ? existing : VpnPlugInProfile{};
-        target.ProfileName(winrt::to_hstring(profile.name));
-        target.VpnPluginPackageFamilyName(Family());
+        target.ProfileName(name);
+        target.VpnPluginPackageFamilyName(family);
         target.ServerUris().Clear();
         // Required by Windows; Partout obtains actual endpoints from the profile.
         target.ServerUris().Append(Uri(winrt::to_hstring(server_uri_)));
@@ -313,24 +314,23 @@ void WinRTTunnelStrategy::Connect(const std::string &id) {
         // Allow the native credential prompt and subsequent engine startup.
         Check("Connect VPN profile",
             Await("Connect VPN profile", agent.ConnectProfileAsync(profile),
-                WinRTTunnelStrategy::ConnectRequestTimeout
+                ConnectRequestTimeout
             )
         );
     });
 }
 
 void WinRTTunnelStrategy::ConnectWithCredentials(const std::string &id, const TunnelCredentials &credentials) {
-    const auto &username = credentials.username;
-    const auto &password = credentials.password;
     WithAgent(canceled_, "Connect profile", [&](const auto &agent) {
         const auto profile = Find(agent, id);
         if (!profile) throw std::runtime_error("The Windows VPN profile is missing.");
         const winrt::Windows::Security::Credentials::PasswordCredential password_credential(
-            profile.ProfileName(), winrt::to_hstring(username), winrt::to_hstring(password));
+            profile.ProfileName(), winrt::to_hstring(credentials.username), winrt::to_hstring(credentials.password)
+        );
         Check("Connect VPN profile",
             Await("Connect VPN profile",
                 agent.ConnectProfileWithPasswordCredentialAsync(profile, password_credential),
-                WinRTTunnelStrategy::ConnectRequestTimeout
+                ConnectRequestTimeout
             )
         );
     });
@@ -354,7 +354,7 @@ void WinRTTunnelStrategy::Remove(const std::string &id) {
     });
 }
 
-std::map<std::string, std::string> WinRTTunnelStrategy::ObservationErrors() const {
-    return observation_errors_;
+void WinRTTunnelStrategy::Cancel() noexcept {
+    canceled_.store(true);
 }
 }

@@ -36,32 +36,32 @@ struct  OnDemandModule
     std::map<std::string, bool> withSSIDs;
     std::vector<Partout::Models::OnDemandModuleOtherNetwork> withOtherNetworks;
 
-    PARTOUT_MODELS_API bool operator==(const OnDemandModule& other) const;
-    PARTOUT_MODELS_API bool operator!=(const OnDemandModule& other) const;
+    PARTOUT_API bool operator==(const OnDemandModule& other) const;
+    PARTOUT_API bool operator!=(const OnDemandModule& other) const;
 
     /// <summary>
     /// Validate the current data in the model. Throws a ValidationException on failure.
     /// </summary>
-    PARTOUT_MODELS_API void Validate() const;
+    PARTOUT_API void Validate() const;
 
     /// <summary>
     /// Validate the current data in the model. Returns false on error and writes an error
     /// message into the given stringstream.
     /// </summary>
-    PARTOUT_MODELS_API bool Validate(std::stringstream& msg) const;
+    PARTOUT_API bool Validate(std::stringstream& msg) const;
 
     /// <summary>
     /// Helper overload for validate. Used when one model stores another model and calls it's validate.
     /// Not meant to be called outside that case.
     /// </summary>
-    PARTOUT_MODELS_API bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
+    PARTOUT_API bool Validate(std::stringstream& msg, const std::string& pathPrefix) const;
 
-    PARTOUT_MODELS_API ::Partout::Json ToJson() const;
-    PARTOUT_MODELS_API static OnDemandModule FromJson(const ::Partout::Json& j);
+    PARTOUT_API ::Partout::Json ToJson() const;
+    PARTOUT_API static OnDemandModule FromJson(const ::Partout::Json& j);
 };
 
- PARTOUT_MODELS_API void to_json(nlohmann::json& j, const OnDemandModule& o);
- PARTOUT_MODELS_API void from_json(const nlohmann::json& j, OnDemandModule& o);
+ PARTOUT_API void to_json(nlohmann::json& j, const OnDemandModule& o);
+ PARTOUT_API void from_json(const nlohmann::json& j, OnDemandModule& o);
 
 } // namespace Partout::Models
 

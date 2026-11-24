@@ -19,17 +19,18 @@ endif()
 
 file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_CPP_ROOT}/models/*.cc")
 add_library(partout-models-impl STATIC ${model_sources}
-    "${PARTOUT_CPP_ROOT}/extensions/OpenVPNExtensions.cc")
+    "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
+    "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc")
 set_target_properties(partout-models-impl PROPERTIES UNITY_BUILD ON)
 
 # WinRT exposes models through its DLL; other platforms link the static archive.
 set(model_targets partout-models-impl)
 set(model_scopes PUBLIC)
 if(partout_models_dll)
-    target_compile_definitions(partout-models-impl PRIVATE PARTOUT_MODELS_BUILD_DLL)
+    target_compile_definitions(partout-models-impl PRIVATE PARTOUT_API_BUILD_DLL)
     add_library(partout-models-interface INTERFACE)
     add_library(Partout::Models ALIAS partout-models-interface)
-    target_compile_definitions(partout-models-interface INTERFACE PARTOUT_MODELS_USE_DLL)
+    target_compile_definitions(partout-models-interface INTERFACE PARTOUT_API_USE_DLL)
     target_link_libraries(partout-models-interface INTERFACE partout-winrt-backend)
     list(APPEND model_targets partout-models-interface)
     list(APPEND model_scopes INTERFACE)

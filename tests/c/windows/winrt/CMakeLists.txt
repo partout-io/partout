@@ -46,6 +46,13 @@ endforeach()
 
 # Exercise private implementations without adding them to the backend DLL exports.
 target_sources(partout-network-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/NetworkMonitor.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/NetworkMonitor.cc")
 target_sources(partout-tun_settings-test PRIVATE
-    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/TunSettings.cc")
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/TunSettings.cc")
+# These implementations are compiled locally, so their definitions must not
+# inherit dllimport from the shared models/backend interface.
+set_source_files_properties(
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/NetworkMonitor.cc"
+    "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt/backend/TunSettings.cc"
+    PROPERTIES COMPILE_OPTIONS /UPARTOUT_API_USE_DLL
+)

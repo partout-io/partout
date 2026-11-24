@@ -7,7 +7,7 @@
 #include <windows.h>
 
 #include "Socket.h"
-#include "windows/log.h"
+#include <partout/winrt/log.h>
 #include <winrt/Windows.Networking.Sockets.h>
 #include <winrt/Windows.Storage.Streams.h>
 #include <winrt/Windows.Networking.h>
@@ -19,7 +19,6 @@
 #include <mutex>
 #include <string>
 
-namespace Partout {
 namespace {
 void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int timeout_ms) {
     if (action.wait_for(std::chrono::milliseconds(timeout_ms)) == winrt::Windows::Foundation::AsyncStatus::Started) {
@@ -29,11 +28,11 @@ void WaitForConnect(winrt::Windows::Foundation::IAsyncAction const &action, int 
     action.GetResults();
 }
 
-SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host, winrt::hstring const &port) {
+Partout::SocketAddress ParseAddress(winrt::Windows::Networking::HostName const &host, winrt::hstring const &port) {
     if (!host || (host.Type() != winrt::Windows::Networking::HostNameType::Ipv4 &&
                   host.Type() != winrt::Windows::Networking::HostNameType::Ipv6))
         throw winrt::hresult_invalid_argument();
-    SocketAddress result{};
+    Partout::SocketAddress result{};
     auto text = std::wstring(host.CanonicalName());
     const auto zone = text.find(L'%');
     if (zone != std::wstring::npos) {
@@ -57,6 +56,7 @@ using namespace winrt::Windows::Networking;
 using namespace winrt::Windows::Networking::Sockets;
 using namespace winrt::Windows::Storage::Streams;
 
+namespace Partout {
 // Outstanding reads and writes retain this state rather than the socket wrapper.
 // Serializing delivery also lets callback removal drain the borrowed context.
 struct Socket::State {

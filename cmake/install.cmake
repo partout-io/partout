@@ -63,7 +63,7 @@ if(TARGET partout-bindings)
     install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(FILES runtimes/windows/winrt/include/partout_winrt.h
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-    install(DIRECTORY runtimes/windows/winrt/include/windows
+    install(DIRECTORY runtimes/windows/winrt/include/partout
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
 endif()
