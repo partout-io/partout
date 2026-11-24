@@ -123,7 +123,7 @@ set_target_properties(partout PROPERTIES
     LINK_DEPENDS "${PARTOUT_ZIG_LIBRARY}"
 )
 add_dependencies(partout partout-zig)
-add_library(Partout::Partout ALIAS partout)
+add_library(Partout::Core ALIAS partout)
 target_link_libraries(partout INTERFACE Partout::Headers)
 target_link_libraries(partout PRIVATE
     "$<LINK_LIBRARY:WHOLE_ARCHIVE,${PARTOUT_ZIG_LIBRARY}>"

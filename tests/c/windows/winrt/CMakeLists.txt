@@ -10,7 +10,7 @@ set_target_properties(partout-runtime-link-test PROPERTIES
 target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:Partout::Partout>" "$<TARGET_FILE:partout-winrt-backend>"
+        "$<TARGET_FILE:Partout::Core>" "$<TARGET_FILE:partout-winrt-backend>"
         "$<TARGET_FILE_DIR:partout-runtime-link-test>"
 )
 foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
@@ -22,7 +22,7 @@ endforeach()
 add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
 add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLINKER=${CMAKE_LINKER}"
-    "-DLIBRARY=$<TARGET_FILE:Partout::Partout>"
+    "-DLIBRARY=$<TARGET_FILE:Partout::Core>"
     "-DBACKEND=$<TARGET_FILE:partout-winrt-backend>"
     -P "${CMAKE_CURRENT_SOURCE_DIR}/exports.cmake")
 set(winrt_tests log network tun_settings winrt-tunnel-strategy)

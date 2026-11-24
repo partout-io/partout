@@ -23,7 +23,7 @@ if(TARGET partout-winrt-backend)
     endif()
 endif()
 if(PP_BUILD_LIBRARY)
-    set_target_properties(partout PROPERTIES EXPORT_NAME Partout)
+    set_target_properties(partout PROPERTIES EXPORT_NAME Core)
     install(TARGETS partout ${partout_install_sdk_export}
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"

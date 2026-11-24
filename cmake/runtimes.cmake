@@ -51,7 +51,7 @@ if(TARGET partout-winrt-backend)
         MSVC_RUNTIME_CHECKS ""
     )
     target_link_libraries(partout-bindings
-        PUBLIC Partout::Partout Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Core Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32
     )
 
@@ -69,7 +69,7 @@ elseif(PP_BUILD_WINTUN)
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
-    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE ole32)
+    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Core PRIVATE ole32)
     set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
 elseif(ANDROID)
     add_library(partout-android-runtime OBJECT
@@ -83,7 +83,7 @@ elseif(ANDROID)
         C_VISIBILITY_PRESET hidden
     )
     target_include_directories(partout-android-runtime PRIVATE src)
-    target_link_libraries(partout-android-runtime PUBLIC Partout::Partout android log)
+    target_link_libraries(partout-android-runtime PUBLIC Partout::Core android log)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
         runtimes/posix/platform.c
@@ -95,7 +95,7 @@ elseif(UNIX)
             "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
         PRIVATE src
     )
-    target_link_libraries(partout-posix-runtime PUBLIC Partout::Partout)
+    target_link_libraries(partout-posix-runtime PUBLIC Partout::Core)
 endif()
 
 # Desktop consumers link the runtime selected by the platform configuration.
