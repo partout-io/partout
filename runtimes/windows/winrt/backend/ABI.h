@@ -23,14 +23,6 @@ partout_transport *ConnectOnLoop(
     const partout_socket_open_options *
 );
 
-/* Explicit owner API for standalone native consumers and tests. Only one loop
- * may be active. VpnChannelRuntime owns its loop directly in C++.
- * Before free: stop producers, drain preparation, release every transport and
- * drain teardown. Never free a borrowed handle or free on the worker itself. */
-RuntimeLoop *CreateLoop();
-void FreeLoop(RuntimeLoop *);
-/* Borrowed lookup: the runtime owner must outlive every user of this handle. */
-RuntimeLoop *CurrentLoop();
 /* Accepted work executes once on the runtime worker. Drain is a barrier for
  * previously submitted commands; callers must first quiesce their producers. */
 bool SubmitLoop(RuntimeLoop *, void (*execute)(void *), void *context);

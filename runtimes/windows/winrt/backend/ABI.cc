@@ -218,18 +218,6 @@ bool ConfigureSocket(TunnelController *controller, uintptr_t token) {
     return controller->Associate(*handle->socket);
 }
 
-RuntimeLoop *CreateLoop() {
-    try {
-        return new Partout::RuntimeLoop;
-    } catch (...) {
-        return nullptr;
-    }
-}
-
-RuntimeLoop *CurrentLoop() {
-    return Partout::RuntimeLoop::Current();
-}
-
 bool SubmitLoop(RuntimeLoop *loop, void (*execute)(void *), void *context) {
     try {
         if (!loop) return false;
@@ -245,10 +233,6 @@ bool SubmitLoop(RuntimeLoop *loop, void (*execute)(void *), void *context) {
 void DrainLoop(RuntimeLoop *loop) {
     if (!loop) return;
     loop->Drain();
-}
-
-void FreeLoop(RuntimeLoop *loop) {
-    delete loop;
 }
 
 partout_transport *ConnectOnLoop(
