@@ -1,16 +1,17 @@
 cmake_minimum_required(VERSION 3.28)
 project(PartoutModelTests LANGUAGES CXX)
 
-# Platform-independent model decoding tests.
-find_package(nlohmann_json CONFIG REQUIRED)
-get_filename_component(PARTOUT_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/../../.." ABSOLUTE)
-file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_ROOT}/runtimes/cpp/models/*.cc")
-add_executable(partout-models-test ModelsTests.cc ${model_sources})
-target_include_directories(partout-models-test PRIVATE
-    "${PARTOUT_ROOT}/runtimes/cpp/include")
-target_compile_features(partout-models-test PRIVATE cxx_std_17)
-target_compile_definitions(partout-models-test PRIVATE NOMINMAX)
-target_link_libraries(partout-models-test PRIVATE nlohmann_json::nlohmann_json)
+# Exercise the installed SDK through its exported model target.
+find_package(Partout CONFIG REQUIRED)
+add_executable(partout-models-test ModelsTests.cc)
+target_link_libraries(partout-models-test PRIVATE Partout::Models)
+if(WIN32)
+    add_custom_command(TARGET partout-models-test POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different
+            $<TARGET_RUNTIME_DLLS:partout-models-test>
+            $<TARGET_FILE_DIR:partout-models-test>
+        COMMAND_EXPAND_LISTS)
+endif()
 if(MSVC)
     target_compile_options(partout-models-test PRIVATE /UNDEBUG)
 else()
