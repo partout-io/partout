@@ -11,7 +11,7 @@
 
 void pp_tun_free(pp_tun tun) {
     partout_transport *transport = (partout_transport *)tun;
-    if (!transport) return;
+    if (!transport || !transport->release) return;
     transport->release(transport->context);
 }
 #else

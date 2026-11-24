@@ -255,7 +255,7 @@ fn mockSetTunnelSettings(ptr: ?*anyopaque, info: api.TunnelRemoteInfoWrapper) ne
 }
 
 /// Settings-only tests use an explicit inert native capability on Windows.
-pub fn createTun(allocator: std.mem.Allocator) std.mem.Allocator.Error!*net.TunWrapper {
+pub fn createTun(allocator: std.mem.Allocator) error{ OutOfMemory, InvalidArgs }!*net.TunWrapper {
     if (!net.uses_winrt) return net.TunWrapper.create(allocator, null);
     const Native = struct {
         fn release(_: ?*anyopaque) callconv(.c) void {}

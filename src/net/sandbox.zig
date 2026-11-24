@@ -38,6 +38,7 @@ pub const TunnelController = struct {
     vtable: *const VTable,
 
     pub const Error = std.mem.Allocator.Error || error{
+        InvalidArgs,
         TunNotAvailable,
     };
 
@@ -165,6 +166,7 @@ pub const DNSRecord = struct {
 /// Provides a factory of portable sockets, exposed as link descriptors.
 pub const SocketFactory = struct {
     pub const Error = std.mem.Allocator.Error || error{
+        InvalidArgs,
         LinkNotActive,
         SocketConfiguration,
     };

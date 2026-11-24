@@ -43,6 +43,7 @@ pub const Error = api.DecodeError || conn_mod.CreateError || error{
     AlreadyStarted,
     Closed,
     IdGeneration,
+    InvalidArgs,
     InvalidProfile,
     LooperFailure,
 };
@@ -1603,6 +1604,7 @@ fn partoutCodeForDaemonStartError(err: StartError) api.PartoutErrorCode {
         error.AlreadyStarted,
         error.Closed,
         error.IdGeneration,
+        error.InvalidArgs,
         error.LooperFailure,
         error.UnableToStart,
         => .unhandled,
