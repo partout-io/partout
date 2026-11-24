@@ -19,7 +19,8 @@ endif()
 
 file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_CPP_ROOT}/models/*.cc")
 add_library(partout-models-impl STATIC ${model_sources}
-    "${PARTOUT_CPP_ROOT}/extensions/OpenVPNExtensions.cc")
+    "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
+    "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc")
 set_target_properties(partout-models-impl PROPERTIES UNITY_BUILD ON)
 
 # WinRT exposes models through its DLL; other platforms link the static archive.

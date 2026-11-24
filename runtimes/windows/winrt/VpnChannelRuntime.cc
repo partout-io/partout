@@ -13,7 +13,7 @@
 #include <thread>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Security.Credentials.h>
-#include <partout/extensions/OpenVPNExtensions.h>
+#include <partout/extensions/ProfileExtensions.h>
 #include "windows/VpnChannelRuntime.h"
 #include "TunnelController.h"
 #include "RuntimeLoop.h"
@@ -157,7 +157,7 @@ struct VpnChannelRuntime::Impl {
         Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
         partout_init(&init_args);
         try {
-            const auto prepared = OpenVPN::PrepareInteractiveProfile(
+            const auto prepared = Profile::PrepareInteractive(
                 Models::TaggedProfile::FromJson(Json::Parse(profile)),
                 [this](bool needs_otp) {
                     using winrt::Windows::Foundation::AsyncStatus;
