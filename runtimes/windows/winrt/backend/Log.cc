@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: GPL-3.0
 #include "Log.h"
 #include <windows.h>
-#include <atomic>
 #include <cstdarg>
 #include <cstdio>
 #include <vector>
@@ -10,19 +9,10 @@
 
 namespace {
 
-std::atomic<winrt_log_callback> logger{nullptr};
 std::mutex logger_mutex;
 partout_init_args core_logger{};
 
-void SetLogger(winrt_log_callback callback) noexcept {
-    {
-        std::lock_guard lock(logger_mutex);
-        core_logger = {};
-    }
-    logger.store(callback);
-}
-
-void Log(winrt_log_level level, const char *format, va_list args) noexcept {
+void WriteMessage(partout_log_level level, const char *format, va_list args) noexcept {
     if (!format) return;
     va_list copy;
     va_copy(copy, args);
@@ -33,45 +23,35 @@ void Log(winrt_log_level level, const char *format, va_list args) noexcept {
     try {
         std::vector<char> message(static_cast<size_t>(size) + 1);
         if (std::vsnprintf(message.data(), message.size(), format, args) != size) return;
-        const auto sink = logger.load();
-        if (!sink) {
-            partout_init_args args{};
-            {
-                std::lock_guard lock(logger_mutex);
-                args = core_logger;
-            }
-            if (args.logger_fn) {
-                if (static_cast<int>(level) <= static_cast<int>(args.log_level))
-                    args.logger_fn(args.logger_ctx, nullptr, static_cast<partout_log_level>(level), message.data());
-                return;
-            }
+        partout_init_args sink{};
+        {
+            std::lock_guard lock(logger_mutex);
+            sink = core_logger;
+        }
+        if (!sink.logger_fn) {
             OutputDebugStringA(message.data());
             return;
         }
-        sink(level, message.data());
+        if (static_cast<int>(level) <= sink.log_level)
+            sink.logger_fn(sink.logger_ctx, nullptr, level, message.data());
     } catch (...) {
-        // Diagnostics must not throw across the C ABI.
+        // Diagnostics must not propagate exceptions to the caller.
     }
 }
 
 } // namespace
 
-extern "C" {
+namespace Partout::Log {
 
-void winrt_set_core_logger(const partout_init_args *args) {
+void SetLogger(const partout_init_args *args) {
     std::lock_guard lock(logger_mutex);
     core_logger = args ? *args : partout_init_args{};
-    logger.store(nullptr);
 }
 
-void winrt_set_logger(winrt_log_callback callback) {
-    SetLogger(callback);
-}
-
-void winrt_log(winrt_log_level level, const char *format, ...) {
+void Write(partout_log_level level, const char *format, ...) {
     va_list args;
     va_start(args, format);
-    Log(level, format, args);
+    WriteMessage(level, format, args);
     va_end(args);
 }
-}
+} // namespace Partout::Log

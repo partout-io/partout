@@ -210,7 +210,7 @@ std::optional<VpnManagementConnectionStatus> WinRTTunnelStrategy::ReadConnection
 
 WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server_uri_(server_uri) {
     if (server_uri_.empty()) throw std::invalid_argument("The server URI is empty.");
-    winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
+    Log::Write(PartoutLogLevelInfo, "Partout::Tunnel initialized\n");
 }
 
 std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {

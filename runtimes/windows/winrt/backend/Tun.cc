@@ -49,8 +49,8 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
         flush();
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(
-            WindowsLogError,
+        Log::Write(
+            PartoutLogLevelError,
             "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.

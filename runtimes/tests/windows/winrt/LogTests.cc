@@ -9,43 +9,55 @@
 namespace {
 
 std::string message;
-winrt_log_level level = WindowsLogFault;
+int level = PartoutLogLevelFault;
 unsigned int received = 0;
 
-void receive(winrt_log_level value, const char *text) {
+void Receive(void *context, const char *profile_id, int value, const char *text) {
+    assert(context == &received && profile_id == nullptr);
     level = value;
     message = text;
     ++received;
 }
 
-void fail(winrt_log_level, const char *) {
+void Fail(void *, const char *, int, const char *) {
     throw std::runtime_error("Log sink failed");
 }
 
 } // namespace
 
 int main() {
-    winrt_set_logger(receive);
-    winrt_log(WindowsLogNotice, "%s %d", "packet", 42);
-    assert(level == WindowsLogNotice && message == "packet 42" && received == 1);
+    partout_init_args args{};
+    args.log_level = PartoutLogLevelDebug;
+    args.logger_fn = Receive;
+    args.logger_ctx = &received;
+    Partout::Log::SetLogger(&args);
+    Partout::Log::Write(PartoutLogLevelNotice, "%s %d", "packet", 42);
+    assert(level == PartoutLogLevelNotice && message == "packet 42" && received == 1);
 
     const std::string long_message(8192, 'x');
-    winrt_log(WindowsLogDebug, "%s", long_message.c_str());
-    assert(level == WindowsLogDebug && message == long_message && received == 2);
+    Partout::Log::Write(PartoutLogLevelDebug, "%s", long_message.c_str());
+    assert(level == PartoutLogLevelDebug && message == long_message && received == 2);
 
-    winrt_log(WindowsLogInfo, "");
+    Partout::Log::Write(PartoutLogLevelInfo, "");
     assert(message.empty() && received == 3);
-    winrt_log(WindowsLogError, nullptr);
+    Partout::Log::Write(PartoutLogLevelError, nullptr);
     assert(received == 3);
 
-    winrt_set_logger(fail);
-    winrt_log(WindowsLogError, "Sink exceptions must not escape");
-    winrt_set_logger(receive);
-    winrt_log(WindowsLogInfo, "Delivery resumes after a sink failure");
+    args.logger_fn = Fail;
+    Partout::Log::SetLogger(&args);
+    Partout::Log::Write(PartoutLogLevelError, "Sink exceptions must not escape");
+    args.logger_fn = Receive;
+    Partout::Log::SetLogger(&args);
+    Partout::Log::Write(PartoutLogLevelInfo, "Delivery resumes after a sink failure");
     assert(received == 4 && message == "Delivery resumes after a sink failure");
 
-    winrt_set_logger(nullptr);
-    winrt_log(WindowsLogDebug, "Windows log test: debugger fallback");
+    args.log_level = PartoutLogLevelError;
+    Partout::Log::SetLogger(&args);
+    Partout::Log::Write(PartoutLogLevelDebug, "Filtered message");
+    assert(received == 4);
+
+    Partout::Log::SetLogger(nullptr);
+    Partout::Log::Write(PartoutLogLevelDebug, "Windows log test: debugger fallback");
     assert(received == 4);
     puts("Logging tests passed");
 }

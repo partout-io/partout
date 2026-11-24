@@ -153,7 +153,7 @@ void VpnChannelRuntime::Impl::Start() {
     }
     Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: connect requested");
     partout_init(&init_args);
-    winrt_set_core_logger(&init_args);
+    Log::SetLogger(&init_args);
     try {
         const auto prepared = Profile::PrepareInteractive(
             Models::TaggedProfile::FromJson(Json::Parse(profile)),
