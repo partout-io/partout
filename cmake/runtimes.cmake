@@ -3,7 +3,7 @@
 
 if(TARGET Partout::Models)
     # Portable C++ lifecycle API and replaceable native mechanisms.
-    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/Tunnel.cc")
+    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
     add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
     target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
     target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
