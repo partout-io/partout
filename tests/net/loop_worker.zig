@@ -173,8 +173,8 @@ test "injected executor drains accepted work before owner destruction" {
     };
     var done = false;
     const runtime = try NativeRuntime.init();
-    const callbacks = mock.winrtCallbacks().?;
-    try std.testing.expect(callbacks.submit.?(callbacks.context, Probe.run, &done));
+    const winrt = mock.winrtCallbacks().?;
+    try std.testing.expect(winrt.submit.?(winrt.context, Probe.run, &done));
     runtime.deinit();
     try std.testing.expect(done);
 }

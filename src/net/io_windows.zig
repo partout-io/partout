@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Windows setup and owned transport capabilities. Native I/O runs on one C++
-//! command worker; callbacks enqueue daemon messages or feed passive consumers.
+//! command worker; winrt enqueue daemon messages or feed passive consumers.
 const std = @import("std");
 const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
@@ -81,9 +81,9 @@ fn NativeTransport(comptime side: io.Side) type {
             try host.init(allocator, peer.address);
             defer host.deinit();
             const reachability = options.reachability orelse io.reachabilityNone();
-            const callbacks = options.winrt orelse return null;
-            const native: *c.partout_transport = callbacks.connect.?(
-                callbacks.context,
+            const winrt = options.winrt orelse return null;
+            const native: *c.partout_transport = winrt.connect.?(
+                winrt.context,
                 host.ptr(),
                 io.socketProto(peer),
                 peer.proto.port,

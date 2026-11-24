@@ -200,7 +200,7 @@ pub const DaemonRuntime = struct {
         self.options = options;
         self.bindings = if (bindings) |b| b.* else null;
         if (self.bindings) |*owned| {
-            owned.winrt = if (self.platform.winrt) |*callbacks| @ptrCast(callbacks) else null;
+            owned.winrt = if (self.platform.winrt) |*winrt| @ptrCast(winrt) else null;
         }
         return self;
     }
@@ -238,10 +238,10 @@ fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{In
     var winrt: ?ffi.io.partout_winrt_callbacks = null;
     if (build_options.winrt) {
         const raw = value.winrt orelse return error.InvalidArgs;
-        const callbacks: *const ffi.io.partout_winrt_callbacks = @ptrCast(@alignCast(raw));
-        if (callbacks.connect == null or callbacks.submit == null or callbacks.drain == null)
+        const winrt_ptr: *const ffi.io.partout_winrt_callbacks = @ptrCast(@alignCast(raw));
+        if (winrt_ptr.connect == null or winrt_ptr.submit == null or winrt_ptr.drain == null)
             return error.InvalidArgs;
-        winrt = callbacks.*;
+        winrt = winrt_ptr.*;
     }
     // Check that all controller bindings are non-NULL.
     inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".field_names) |field_name| {

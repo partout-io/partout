@@ -225,12 +225,12 @@ test "daemon bindings copy supplied controller hooks and release after detach" {
     args.options.cache_dir = cache_root.ptr;
     const options = try abi_runtime.DaemonOptions.init(allocator, args, null);
     var probe: ControllerProbe = .{};
-    var callbacks = mock.winrt_callbacks;
+    var winrt = mock.winrt_callbacks;
     var bindings: partout_c.partout_daemon_bindings = .{
         .controller = &probe,
         .controller_functions = ControllerProbe.functions(),
         .release = ControllerProbe.release,
-        .winrt = @ptrCast(&callbacks),
+        .winrt = @ptrCast(&winrt),
     };
     const runtime = abi_runtime.DaemonRuntime.init(allocator, options, &bindings) catch |err| {
         options.deinit(allocator);
@@ -240,7 +240,7 @@ test "daemon bindings copy supplied controller hooks and release after detach" {
         defer runtime.destroy(allocator);
         // The original bindings need not survive initialization.
         bindings = std.mem.zeroes(partout_c.partout_daemon_bindings);
-        callbacks = .{};
+        winrt = .{};
         if (source.winrt_enabled) {
             try std.testing.expect(runtime.platform.winrt.?.submit != null);
             try std.testing.expect(runtime.bindings.?.winrt != null);
@@ -424,7 +424,7 @@ test "WinRT daemon bindings require a complete operation table" {
     defer options.deinit(allocator);
     var bindings: partout_c.partout_daemon_bindings = .{ .controller_functions = ControllerProbe.functions() };
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &bindings));
-    var callbacks: source.ffi.io.partout_winrt_callbacks = .{};
-    bindings.winrt = @ptrCast(&callbacks);
+    var winrt: source.ffi.io.partout_winrt_callbacks = .{};
+    bindings.winrt = @ptrCast(&winrt);
     try std.testing.expectError(error.InvalidArgs, abi_runtime.DaemonRuntime.init(allocator, options, &bindings));
 }
