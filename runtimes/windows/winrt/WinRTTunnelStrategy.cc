@@ -24,7 +24,6 @@
 #include <limits>
 #include <thread>
 
-namespace Partout {
 namespace {
 thread_local const std::atomic_bool *cancellation = nullptr;
 struct Apartment {
@@ -54,7 +53,7 @@ std::runtime_error WindowsError(const char *operation, winrt::hresult code) {
 
 template<typename Operation>
 auto Await(const char *name, const Operation &operation,
-           std::chrono::seconds timeout = WinRTTunnelStrategy::ManagementOperationTimeout
+           std::chrono::seconds timeout = Partout::WinRTTunnelStrategy::ManagementOperationTimeout
 ) {
     try {
         const auto deadline = std::chrono::steady_clock::now() + timeout;
@@ -63,7 +62,7 @@ auto Await(const char *name, const Operation &operation,
                 operation.Cancel();
                 throw std::runtime_error(std::string(name) + " canceled or timed out.");
             }
-            std::this_thread::sleep_for(WinRTTunnelStrategy::AsyncPollInterval);
+            std::this_thread::sleep_for(Partout::WinRTTunnelStrategy::AsyncPollInterval);
         }
         return operation.get();
     } catch (const winrt::hresult_error &error) {
@@ -101,7 +100,7 @@ std::vector<OwnedProfile> OwnedProfiles(const winrt::Windows::Networking::Vpn::V
     for (const auto &item : Await("Enumerate VPN profiles", agent.GetProfilesAsync())) {
         const auto profile = item.try_as<winrt::Windows::Networking::Vpn::VpnPlugInProfile>();
         if (!profile || profile.VpnPluginPackageFamilyName() != family) continue;
-        if (const auto id = WinRTTunnelStrategy::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
+        if (const auto id = Partout::WinRTTunnelStrategy::DecodeId(profile.CustomConfiguration())) result.push_back({profile, *id});
     }
     return result;
 }
@@ -113,13 +112,13 @@ winrt::Windows::Networking::Vpn::VpnPlugInProfile Find(const winrt::Windows::Net
     return nullptr;
 }
 
-std::optional<Models::TunnelSnapshotEnvironment> Environment(const winrt::Windows::Networking::Vpn::VpnPlugInProfile &profile) {
+std::optional<Partout::Models::TunnelSnapshotEnvironment> Environment(const winrt::Windows::Networking::Vpn::VpnPlugInProfile &profile) {
     // VpnManagementAgent has no counters. Resolve only this VPN's interface;
     // never substitute physical-adapter or machine-wide traffic.
     MIB_IF_ROW2 row{};
     if (ConvertInterfaceAliasToLuid(profile.ProfileName().c_str(), &row.InterfaceLuid) != NO_ERROR ||
         GetIfEntry2(&row) != NO_ERROR) return std::nullopt;
-    return WinRTTunnelStrategy::InterfaceEnvironment(row);
+    return Partout::WinRTTunnelStrategy::InterfaceEnvironment(row);
 }
 
 template<typename Action>
@@ -145,6 +144,7 @@ auto WithAgent(const std::atomic_bool &canceled, const char *operation, Action a
 using namespace winrt::Windows::Networking::Vpn;
 using namespace winrt::Windows::Foundation;
 
+namespace Partout {
 bool WinRTTunnelStrategy::NamesEqual(const winrt::hstring &left, const winrt::hstring &right) {
     return CompareStringOrdinal(left.c_str(), -1, right.c_str(), -1, TRUE) == CSTR_EQUAL;
 }

@@ -11,7 +11,6 @@
 #include <mutex>
 #include <utility>
 
-namespace Partout {
 namespace {
 std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
                                            const MIB_IPFORWARD_TABLE2 *routes) {
@@ -37,6 +36,7 @@ std::optional<uint64_t> DefaultRouteMetric(winrt::guid adapter,
 }
 } // namespace
 
+namespace Partout {
 bool NetworkMonitor::Preference::IsBetterThan(const NetworkMonitor::Preference &other) const {
     if (metric == other.metric) return connectivity > other.connectivity;
     return metric && (!other.metric || *metric < *other.metric);

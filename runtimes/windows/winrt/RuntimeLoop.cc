@@ -6,12 +6,12 @@
 #include <stdexcept>
 #include <atomic>
 
-namespace Partout {
 namespace {
-std::atomic<RuntimeLoop *> current_loop = nullptr;
+std::atomic<Partout::RuntimeLoop *> current_loop = nullptr;
 std::mutex runtime_mutex;
 } // namespace
 
+namespace Partout {
 RuntimeLoop *RuntimeLoop::Current() {
     return current_loop.load();
 }
