@@ -462,7 +462,7 @@ fn cppHeader(c: Context, s: api.Schema) ![]const u8 {
         try w.writeByte('\n');
     }
     if (is_enum and !eq(s.typ orelse "", "integer"))
-        try w.writeAll("    // Canonical schema token, independent of the JSON representation.\n    std::string ToString() const;\n\n");
+        try w.writeAll(try template(c, "    // Canonical schema token, independent of the JSON representation.\n    @EXPORT@std::string ToString() const;\n\n", n));
     try w.writeAll(try template(c, @embedFile("openapi_templates/cpp-header-tail.txt"), n));
     return cppWhitespace(c, out.written());
 }

@@ -40,7 +40,7 @@ struct  OpenVpnPullMask
     OpenVpnPullMask::eOpenVpnPullMask value = OpenVpnPullMask::eOpenVpnPullMask::INVALID_VALUE_OPENAPI_GENERATED;
 
     // Canonical schema token, independent of the JSON representation.
-    std::string ToString() const;
+    PARTOUT_API std::string ToString() const;
 
     PARTOUT_API bool operator==(const OpenVpnPullMask& other) const;
     PARTOUT_API bool operator!=(const OpenVpnPullMask& other) const;

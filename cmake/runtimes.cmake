@@ -33,7 +33,6 @@ if(PP_BUILD_CPP_RUNTIME OR PP_BUILD_WINRT)
         target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
         if(MSVC)
             target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
-            set_source_files_properties(${model_sources} PROPERTIES COMPILE_OPTIONS /w)
         endif()
     endif()
     add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
@@ -79,7 +78,6 @@ if(PP_BUILD_WINRT)
         PUBLIC NOMINMAX
         PRIVATE PARTOUT_API_BUILD_DLL WINRT_LEAN_AND_MEAN
         INTERFACE PARTOUT_API_USE_DLL)
-    set_source_files_properties(${model_sources} PROPERTIES COMPILE_OPTIONS /w)
     target_compile_options(partout-winrt-runtime PRIVATE /EHsc /permissive- /W4)
     set_target_properties(partout-winrt-runtime PROPERTIES
         OUTPUT_NAME partout-runtime

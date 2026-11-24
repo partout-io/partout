@@ -39,7 +39,7 @@ struct  DNSModuleDomainPolicy
     DNSModuleDomainPolicy::eDNSModuleDomainPolicy value = DNSModuleDomainPolicy::eDNSModuleDomainPolicy::INVALID_VALUE_OPENAPI_GENERATED;
 
     // Canonical schema token, independent of the JSON representation.
-    std::string ToString() const;
+    PARTOUT_API std::string ToString() const;
 
     PARTOUT_API bool operator==(const DNSModuleDomainPolicy& other) const;
     PARTOUT_API bool operator!=(const DNSModuleDomainPolicy& other) const;
