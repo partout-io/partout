@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include "IOTypes.h"
+#include <partout_io.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Sockets.h>
@@ -12,6 +12,8 @@
 #include <memory>
 
 namespace Partout {
+using SocketOnReceive =
+    std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
 
 // Setup and I/O calls run on RuntimeLoop's MTA worker.
 // Callers serialize writes with other writes, open/configuration, channel

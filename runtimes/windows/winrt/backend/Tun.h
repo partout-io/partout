@@ -3,13 +3,15 @@
 
 #pragma once
 
-#include "IOTypes.h"
 #include "Socket.h"
 #include <winrt/Windows.Networking.Vpn.h>
 #include <atomic>
+#include <functional>
 #include <mutex>
 
 namespace Partout {
+using TunOnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
+
 // Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
