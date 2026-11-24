@@ -10,15 +10,9 @@ set_target_properties(partout-runtime-link-test PROPERTIES
 target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
-        "$<TARGET_FILE:Partout::Core>"
-        "$<TARGET_FILE_DIR:partout-runtime-link-test>"
-)
-foreach(runtime IN LISTS PARTOUT_RUNTIME_LIBRARIES)
-    add_custom_command(TARGET partout-runtime-link-test POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_if_different
-            "$<TARGET_FILE:${runtime}>"
-            "$<TARGET_FILE_DIR:partout-runtime-link-test>")
-endforeach()
+        $<TARGET_RUNTIME_DLLS:partout-runtime-link-test>
+        $<TARGET_FILE_DIR:partout-runtime-link-test>
+    COMMAND_EXPAND_LISTS)
 add_test(NAME partout-runtime-link COMMAND partout-runtime-link-test)
 add_test(NAME partout-exports COMMAND ${CMAKE_COMMAND}
     "-DLINKER=${CMAKE_LINKER}"
