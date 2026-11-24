@@ -76,7 +76,7 @@ Tun::~Tun() noexcept {
     if (state_.tun == this) state_.tun = nullptr;
 }
 
-bool Tun::SetOnReceive(TunOnReceive callback) {
+bool Tun::SetOnReceive(OnReceive callback) {
     std::lock_guard lock(state_.receive_mutex);
     if (callback && callback_) return false;
     callback_ = std::move(callback);

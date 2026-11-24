@@ -76,7 +76,7 @@ struct Socket::State {
     // The front slot stays queued until completion, including while suspended.
     // A nonempty queue therefore already has a writer.
     std::deque<WriteRequest> writes;
-    SocketOnReceive callback = nullptr;
+    OnReceive callback = nullptr;
     bool reading = false;
     bool paused = false;
     bool channel_owned = false;
@@ -286,7 +286,7 @@ bool Socket::GetAddress(partout_socket_address *address) {
     return true;
 }
 
-bool Socket::SetOnReceive(SocketOnReceive callback) {
+bool Socket::SetOnReceive(OnReceive callback) {
     const auto state = state_;
     const bool registering = static_cast<bool>(callback);
     {

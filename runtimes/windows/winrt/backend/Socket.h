@@ -12,15 +12,13 @@
 #include <memory>
 
 namespace Partout {
-using SocketOnReceive =
-    std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
-
 // Setup and I/O calls run on RuntimeLoop's MTA worker.
 // Callers serialize writes with other writes, open/configuration, channel
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
 public:
+    using OnReceive = std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
     using Receiver = std::function<void(const uint8_t *, size_t)>;
     using Writer = std::function<int32_t(const uint8_t *, size_t)>;
 
@@ -47,7 +45,7 @@ public:
     bool GetAddress(partout_socket_address *address);
 
     // Removing the callback waits for in-flight delivery under the state mutex.
-    bool SetOnReceive(SocketOnReceive callback);
+    bool SetOnReceive(OnReceive callback);
     void ReportError(int32_t error);
     int32_t WriteStatus() const;
     bool ResumeReading();

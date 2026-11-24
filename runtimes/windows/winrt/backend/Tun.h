@@ -10,8 +10,6 @@
 #include <mutex>
 
 namespace Partout {
-using TunOnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
-
 // Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
 class Tun {
@@ -39,13 +37,15 @@ class Tun {
     friend class TunnelController;
 
 public:
+    using OnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
+
     explicit Tun(State &state);
     ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
     // Removing the callback waits for in-flight delivery under the receive mutex.
-    bool SetOnReceive(TunOnReceive callback);
+    bool SetOnReceive(OnReceive callback);
     void ReportError(int32_t error);
 
     int32_t WriteStatus() const {
@@ -57,7 +57,7 @@ public:
 
 private:
     State &state_; // Borrowed; the controller outlives every TUN handle.
-    TunOnReceive callback_ = nullptr;
+    OnReceive callback_ = nullptr;
     std::atomic<int32_t> write_status_{0};
 };
 } // namespace Partout
