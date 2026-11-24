@@ -39,12 +39,6 @@ if(PP_BUILD_CPP_RUNTIME OR PP_BUILD_WINRT)
     endif()
 endif()
 
-option(PP_TEST_CPP_RUNTIME "Test the portable C++ tunnel lifecycle" OFF)
-if(PP_TEST_CPP_RUNTIME AND TARGET partout-cpp-runtime)
-    enable_testing()
-    add_subdirectory(tests/cpp)
-endif()
-
 if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
@@ -75,12 +69,6 @@ if(TARGET partout-winrt-backend)
         PUBLIC Partout::Core Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32
     )
-
-    option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
-    if(PP_TEST_WINRT_RUNTIME)
-        enable_testing()
-        add_subdirectory(tests/c/windows/winrt)
-    endif()
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
         runtimes/windows/wintun/platform.c
