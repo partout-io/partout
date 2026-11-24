@@ -102,10 +102,8 @@ pub const ConnectionWorker = struct {
             self.endpoint_resolver = resolver_mod.EndpointResolver.init(allocator, owned);
         }
         errdefer self.deinitEndpoints();
-        self.executor = if (builtin.os.tag == .windows and build_options.winrt)
-            try Executor.create(allocator, self)
-        else
-            Executor.create(allocator, self) catch return error.OutOfMemory;
+        self.executor = Executor.create(allocator, self) catch |err|
+            return if (err == error.InvalidArgs) error.InvalidArgs else error.OutOfMemory;
         return self;
     }
 
