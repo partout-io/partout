@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
-#include <partout/winrt/export.h>
+#include <partout/Export.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -42,7 +42,7 @@ typedef bool (*winrt_receive)(void *, const uint8_t *, size_t, const winrt_addre
 typedef struct winrt_transport winrt_transport;
 
 /* Releases an owned TUN transport. Accepts NULL. */
-PARTOUT_WINRT_API void winrt_tun_free(winrt_transport *transport);
+PARTOUT_API void winrt_tun_free(winrt_transport *transport);
 
 struct winrt_transport {
     void *context;
@@ -70,21 +70,21 @@ typedef struct {
  * temporary native policy token; it must not retain or dereference that token.
  * Borrows the active runtime's loop; fails if no runtime is active. The owner
  * must outlive all transports and drain their queued destruction. */
-PARTOUT_WINRT_API winrt_transport *winrt_connect(const char *host, uint16_t port,
+PARTOUT_API winrt_transport *winrt_connect(const char *host, uint16_t port,
                                                        const winrt_connect_options *options);
 
 /* Explicit owner API for standalone native consumers and tests. Only one loop
  * may be active. VpnChannelRuntime owns its loop directly in C++.
  * Before free: stop producers, drain preparation, release every transport and
  * drain teardown. Never free a borrowed handle or free on the worker itself. */
-PARTOUT_WINRT_API winrt_loop winrt_loop_create(void);
-PARTOUT_WINRT_API void winrt_loop_free(winrt_loop);
+PARTOUT_API winrt_loop winrt_loop_create(void);
+PARTOUT_API void winrt_loop_free(winrt_loop);
 /* Borrowed lookup: the runtime owner must outlive every user of this handle. */
-PARTOUT_WINRT_API winrt_loop winrt_loop_current(void);
+PARTOUT_API winrt_loop winrt_loop_current(void);
 /* Accepted work executes once on the runtime worker. Drain is a barrier for
  * previously submitted commands; callers must first quiesce their producers. */
-PARTOUT_WINRT_API bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
-PARTOUT_WINRT_API void winrt_loop_drain(winrt_loop);
+PARTOUT_API bool winrt_loop_submit(winrt_loop, void (*execute)(void *), void *context);
+PARTOUT_API void winrt_loop_drain(winrt_loop);
 #ifdef __cplusplus
 }
 #endif

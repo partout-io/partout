@@ -38,8 +38,7 @@ if(PP_BUILD_LIBRARY)
         ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
     )
-    target_compile_definitions(partout-winrt-backend PRIVATE
-        PARTOUT_WINRT_BUILD_DLL PARTOUT_MODELS_BUILD_DLL)
+    target_compile_definitions(partout-winrt-backend PRIVATE PARTOUT_API_BUILD_DLL)
 endif()
 target_link_libraries(partout-winrt-backend
     PUBLIC windowsapp runtimeobject ws2_32 iphlpapi

@@ -15,7 +15,7 @@ using CredentialPrompt = std::function<TunnelCredentials(bool needs_otp)>;
 namespace Partout::Module {
 // Prepare connection-local credentials when required; preserve other modules.
 // The returned module must never be saved.
-PARTOUT_MODELS_API Models::TaggedModule PrepareInteractive(
+PARTOUT_API Models::TaggedModule PrepareInteractive(
     const Models::TaggedModule &module, const CredentialPrompt &prompt
 );
 }

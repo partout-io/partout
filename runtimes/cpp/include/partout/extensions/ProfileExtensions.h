@@ -7,7 +7,7 @@
 
 namespace Partout::Profile {
 // Prepare every active module. The connection-local result must never be saved.
-PARTOUT_MODELS_API Models::TaggedProfile PrepareInteractive(
+PARTOUT_API Models::TaggedProfile PrepareInteractive(
     const Models::TaggedProfile &profile, const CredentialPrompt &prompt
 );
 }
