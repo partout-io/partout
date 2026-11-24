@@ -63,7 +63,10 @@ Write-Host "Using dumpbin: $dumpbin"
 Write-Host "Verifying install directory: $installRoot"
 
 $requiredArtifacts = @(
-    "bin\partout.dll"
+    "bin\partout.dll",
+    "lib\partout.lib",
+    "bin\partout-runtime.dll",
+    "lib\partout-runtime.lib"
 )
 
 foreach ($artifact in $requiredArtifacts) {

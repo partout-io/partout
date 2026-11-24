@@ -20,6 +20,6 @@ execute_process(COMMAND "${LINKER}" /dump /imports "${LIBRARY}"
 if(NOT result EQUAL 0)
     message(FATAL_ERROR "Cannot inspect core DLL imports: ${error}")
 endif()
-if(imports MATCHES "winrt_" OR imports MATCHES "partout-winrt")
+if(imports MATCHES "winrt_" OR imports MATCHES "partout-winrt" OR imports MATCHES "partout-runtime")
     message(FATAL_ERROR "The core DLL must not import the WinRT runtime")
 endif()

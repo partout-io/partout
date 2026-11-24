@@ -15,28 +15,28 @@ if(PP_BUILD_CPP_RUNTIME OR PP_BUILD_WINRT)
     set(PARTOUT_CPP_ROOT "${CMAKE_CURRENT_LIST_DIR}/../runtimes/cpp")
     set(PARTOUT_CPP_INCLUDE "${PARTOUT_CPP_ROOT}/include")
     file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_CPP_ROOT}/models/*.cc")
-    add_library(partout-cpp-runtime STATIC ${model_sources}
+    set(partout_cpp_sources ${model_sources}
         "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc"
         "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
-    add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
-    set_target_properties(partout-cpp-runtime PROPERTIES UNITY_BUILD ON)
-    target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
-    target_compile_definitions(partout-cpp-runtime PUBLIC NOMINMAX)
-    target_include_directories(partout-cpp-runtime SYSTEM PUBLIC
-        "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-    target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
-    if(MSVC)
-        target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
-        set_source_files_properties(${model_sources} PROPERTIES COMPILE_OPTIONS /w)
-        if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
-            set_target_properties(partout-cpp-runtime PROPERTIES
-                MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-                MSVC_RUNTIME_CHECKS ""
-            )
+    if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
+        add_library(partout-cpp-runtime INTERFACE)
+        target_link_libraries(partout-cpp-runtime INTERFACE Partout::WinRTRuntime)
+    else()
+        add_library(partout-cpp-runtime STATIC ${partout_cpp_sources})
+        set_target_properties(partout-cpp-runtime PROPERTIES UNITY_BUILD ON)
+        target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
+        target_compile_definitions(partout-cpp-runtime PUBLIC NOMINMAX)
+        target_include_directories(partout-cpp-runtime SYSTEM PUBLIC
+            "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
+            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+        target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
+        if(MSVC)
+            target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
+            set_source_files_properties(${model_sources} PROPERTIES COMPILE_OPTIONS /w)
         endif()
     endif()
+    add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
 endif()
 
 if(NOT PP_BUILD_LIBRARY)
@@ -52,7 +52,7 @@ if(PP_BUILD_WINRT)
         message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
     endif()
 
-    add_library(partout-winrt-runtime STATIC
+    add_library(partout-winrt-runtime SHARED ${partout_cpp_sources}
         runtimes/windows/winrt/Platform.cc
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/WinRTTunnelStrategy.cc
@@ -67,16 +67,25 @@ if(PP_BUILD_WINRT)
     )
     add_library(Partout::WinRTRuntime ALIAS partout-winrt-runtime)
     target_include_directories(partout-winrt-runtime PUBLIC
+        "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
         "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-winrt-runtime PRIVATE src/c/portable/include)
     target_link_libraries(partout-winrt-runtime
-        PUBLIC Partout::Core Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Core nlohmann_json::nlohmann_json windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32)
     target_compile_features(partout-winrt-runtime PUBLIC cxx_std_20)
-    target_compile_definitions(partout-winrt-runtime PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN)
+    target_compile_definitions(partout-winrt-runtime
+        PUBLIC NOMINMAX
+        PRIVATE PARTOUT_API_BUILD_DLL WINRT_LEAN_AND_MEAN
+        INTERFACE PARTOUT_API_USE_DLL)
+    set_source_files_properties(${model_sources} PROPERTIES COMPILE_OPTIONS /w)
     target_compile_options(partout-winrt-runtime PRIVATE /EHsc /permissive- /W4)
     set_target_properties(partout-winrt-runtime PROPERTIES
+        OUTPUT_NAME partout-runtime
+        WINDOWS_EXPORT_ALL_SYMBOLS ON
+        RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+        ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS "")
 elseif(PP_BUILD_WINTUN)
@@ -121,6 +130,6 @@ endif()
 add_library(partout-runtime INTERFACE)
 add_library(Partout::Runtime ALIAS partout-runtime)
 target_link_libraries(partout-runtime INTERFACE ${partout_selected_runtime})
-if(TARGET partout-cpp-runtime)
+if(TARGET partout-cpp-runtime AND NOT TARGET partout-winrt-runtime)
     target_link_libraries(partout-runtime INTERFACE Partout::CppRuntime)
 endif()

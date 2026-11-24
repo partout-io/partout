@@ -39,6 +39,13 @@ if(PP_BUILD_WINTUN AND PP_BUILD_LIBRARY)
     install(FILES "${WINTUN_DIR}/wintun.dll" DESTINATION "${CMAKE_INSTALL_BINDIR}")
 endif()
 
+if(TARGET partout-winrt-runtime)
+    set_target_properties(partout-winrt-runtime PROPERTIES EXPORT_NAME WinRTRuntime)
+    install(TARGETS partout-winrt-runtime ${partout_install_sdk_export}
+        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+endif()
+
 # App installations need shared runtimes, but not the development SDK.
 if(NOT partout_install_sdk)
     return()
@@ -48,8 +55,6 @@ install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
 if(TARGET partout-winrt-runtime)
-    set_target_properties(partout-winrt-runtime PROPERTIES EXPORT_NAME WinRTRuntime)
-    install(TARGETS partout-winrt-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(DIRECTORY runtimes/windows/winrt/include/partout
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
