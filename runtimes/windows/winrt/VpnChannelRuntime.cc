@@ -50,47 +50,6 @@ struct VpnChannelRuntime::Impl {
     std::condition_variable startup_changed;
     StartupStatus startup_status = StartupStatus::waiting;
 
-    bool StartupCompleteLocked() const {
-        return startup_status == StartupStatus::connected ||
-               startup_status == StartupStatus::failed;
-    }
-
-    // Called by the daemon, including during partout_daemon_start(). Only
-    // publish state here: stopping the daemon from its callback would deadlock.
-    void OnConnectionStatus(const Models::ConnectionStatus &status) noexcept {
-        using Status = Models::ConnectionStatus;
-        std::scoped_lock lock(startup_mutex);
-        if (StartupCompleteLocked()) return;
-        switch (status.value) {
-        case Status::connecting:
-            startup_status = StartupStatus::connecting;
-            break;
-        case Status::connected:
-            startup_status = StartupStatus::connected;
-            break;
-        case Status::disconnected:
-            if (startup_status == StartupStatus::connecting) startup_status = StartupStatus::failed;
-            break;
-        default:
-            break;
-        }
-        // The daemon emits an initial disconnected status before connecting.
-        startup_changed.notify_all();
-    }
-
-    void WaitForConnection() {
-        std::unique_lock lock(startup_mutex);
-        const bool completed = startup_changed.wait_for(lock, VpnChannelRuntime::StartupTimeout, [this] {
-            return StartupCompleteLocked();
-        });
-        if (!completed) {
-            throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Partout connection timed out");
-        }
-        if (startup_status == StartupStatus::failed) {
-            throw hresult_error(E_FAIL, L"Partout disconnected during startup");
-        }
-    }
-
     Impl(VpnChannel const &value, const char *profile_json, const partout_init_args &initialization,
          const partout_daemon_options &daemon_options, Models::TunnelControllerOptions controller_options_value)
         : channel(value), profile(profile_json ? profile_json : ""),
@@ -106,48 +65,7 @@ struct VpnChannelRuntime::Impl {
         Stop();
     }
 
-    void CheckChannel(VpnChannel const &value) const {
-        if (!value || value != channel) throw hresult_invalid_argument();
-    }
-
-    void Log(partout_log_level level, std::wstring_view message) const noexcept {
-        try {
-            channel.LogDiagnosticMessage(hstring{message});
-        } catch (...) {}
-        try {
-            if (init_args.logger_fn) {
-                const auto text = to_string(hstring{message});
-                init_args.logger_fn(init_args.logger_ctx, nullptr, level, text.c_str());
-            }
-        } catch (...) {}
-    }
-
-    void Stop() noexcept {
-        // Destroying the daemon joins its actor and drains accepted preparation,
-        // detaches native receive callbacks, and releases its transports.
-        if (daemon_started) {
-            partout_daemon_stop();
-            daemon_started = false;
-        }
-        if (loop) {
-            std::unique_ptr<TunnelController> closing;
-            {
-                // Wait for current plugin callbacks and reject later ones.
-                std::lock_guard lock(controller_mutex);
-                closing = std::move(controller);
-            }
-            // Do not hold the callback gate while calling VpnChannel.Stop.
-            // Destroy after all accepted commands, including transport release:
-            // TUN handles and socket writers borrow the controller's TUN state.
-            loop->Perform([&closing] {
-                closing.reset();
-            });
-            loop->Drain();
-            loop.reset(); // Drains remaining commands, joins, then uninitializes MTA.
-        }
-    }
-
-    void Connect() {
+    void Start() {
         Stop();
         {
             std::scoped_lock lock(startup_mutex);
@@ -236,6 +154,88 @@ struct VpnChannelRuntime::Impl {
             throw;
         }
     }
+
+    void Stop() noexcept {
+        // Destroying the daemon joins its actor and drains accepted preparation,
+        // detaches native receive callbacks, and releases its transports.
+        if (daemon_started) {
+            partout_daemon_stop();
+            daemon_started = false;
+        }
+        if (loop) {
+            std::unique_ptr<TunnelController> closing;
+            {
+                // Wait for current plugin callbacks and reject later ones.
+                std::lock_guard lock(controller_mutex);
+                closing = std::move(controller);
+            }
+            // Do not hold the callback gate while calling VpnChannel.Stop.
+            // Destroy after all accepted commands, including transport release:
+            // TUN handles and socket writers borrow the controller's TUN state.
+            loop->Perform([&closing] {
+                closing.reset();
+            });
+            loop->Drain();
+            loop.reset(); // Drains remaining commands, joins, then uninitializes MTA.
+        }
+    }
+
+    void CheckChannel(VpnChannel const &value) const {
+        if (!value || value != channel) throw hresult_invalid_argument();
+    }
+
+    void Log(partout_log_level level, std::wstring_view message) const noexcept {
+        try {
+            channel.LogDiagnosticMessage(hstring{message});
+        } catch (...) {}
+        try {
+            if (init_args.logger_fn) {
+                const auto text = to_string(hstring{message});
+                init_args.logger_fn(init_args.logger_ctx, nullptr, level, text.c_str());
+            }
+        } catch (...) {}
+    }
+
+    bool StartupCompleteLocked() const {
+        return startup_status == StartupStatus::connected ||
+               startup_status == StartupStatus::failed;
+    }
+
+    // Called by the daemon, including during partout_daemon_start(). Only
+    // publish state here: stopping the daemon from its callback would deadlock.
+    void OnConnectionStatus(const Models::ConnectionStatus &status) noexcept {
+        using Status = Models::ConnectionStatus;
+        std::scoped_lock lock(startup_mutex);
+        if (StartupCompleteLocked()) return;
+        switch (status.value) {
+        case Status::connecting:
+            startup_status = StartupStatus::connecting;
+            break;
+        case Status::connected:
+            startup_status = StartupStatus::connected;
+            break;
+        case Status::disconnected:
+            if (startup_status == StartupStatus::connecting) startup_status = StartupStatus::failed;
+            break;
+        default:
+            break;
+        }
+        // The daemon emits an initial disconnected status before connecting.
+        startup_changed.notify_all();
+    }
+
+    void WaitForConnection() {
+        std::unique_lock lock(startup_mutex);
+        const bool completed = startup_changed.wait_for(lock, VpnChannelRuntime::StartupTimeout, [this] {
+            return StartupCompleteLocked();
+        });
+        if (!completed) {
+            throw hresult_error(HRESULT_FROM_WIN32(ERROR_TIMEOUT), L"Partout connection timed out");
+        }
+        if (startup_status == StartupStatus::failed) {
+            throw hresult_error(E_FAIL, L"Partout disconnected during startup");
+        }
+    }
 };
 
 VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
@@ -247,16 +247,9 @@ VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
 
-void VpnChannelRuntime::Cancel() noexcept {
-    impl_->canceled.store(true);
-    std::scoped_lock lock(impl_->startup_mutex);
-    impl_->startup_status = Impl::StartupStatus::failed;
-    impl_->startup_changed.notify_all();
-}
-
 void VpnChannelRuntime::Connect(VpnChannel const &channel) {
     impl_->CheckChannel(channel);
-    impl_->Connect();
+    impl_->Start();
 }
 
 void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
@@ -264,15 +257,6 @@ void VpnChannelRuntime::Disconnect(VpnChannel const &channel) {
     impl_->Log(PartoutLogLevelDebug, L"Partout::VpnChannelRuntime: disconnect requested");
     impl_->Stop();
     impl_->Log(PartoutLogLevelInfo, L"Partout::VpnChannelRuntime: disconnected");
-}
-
-// FIXME: ###, Windows, Supply the protocol keepalive payload when required.
-void VpnChannelRuntime::GetKeepAlivePayload(VpnChannel const &channel,
-                                            VpnPacketBuffer &keep_alive_packet) {
-    impl_->CheckChannel(channel);
-    keep_alive_packet = nullptr;
-    impl_->Log(PartoutLogLevelDebug,
-               L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
 }
 
 void VpnChannelRuntime::Encapsulate(VpnChannel const &channel, VpnPacketBufferList const &packets,
@@ -291,6 +275,22 @@ void VpnChannelRuntime::Decapsulate(VpnChannel const &channel, VpnPacketBuffer c
     (void)control_packets;
     std::lock_guard lock(impl_->controller_mutex);
     if (impl_->controller) impl_->controller->Decapsulate(packet);
+}
+
+// FIXME: ###, Windows, Supply the protocol keepalive payload when required.
+void VpnChannelRuntime::GetKeepAlivePayload(VpnChannel const &channel,
+                                            VpnPacketBuffer &keep_alive_packet) {
+    impl_->CheckChannel(channel);
+    keep_alive_packet = nullptr;
+    impl_->Log(PartoutLogLevelDebug,
+               L"Partout::VpnChannelRuntime: keepalive requested: payload=none");
+}
+
+void VpnChannelRuntime::Cancel() noexcept {
+    impl_->canceled.store(true);
+    std::scoped_lock lock(impl_->startup_mutex);
+    impl_->startup_status = Impl::StartupStatus::failed;
+    impl_->startup_changed.notify_all();
 }
 
 } // namespace Partout
