@@ -76,8 +76,9 @@ char *partout_export_module(const char *module_json);
 char *partout_wireguard_genkey(void);
 char *partout_wireguard_pubkey(const char *key);
 
-/* Runtime-dependent ABI.
- * Consumers may implement the TUN and controller contracts below. This ABI
+/* Runtime-dependent ABI. */
+
+/* Consumers may implement the TUN and controller contracts below. This ABI
  * does not expose replacement hooks for socket transports or executors. */
 
 /* Packet callback results: nonnegative byte count, or a negative error.
@@ -91,12 +92,6 @@ typedef enum {
 /* Opaque TUN handle. */
 typedef struct __partout_tun_struct *partout_tun;
 
-/* Wraps a native TUN descriptor, or returns NULL on failure.
- * If owned, the core takes ownership on success and closes it on release.
- * Otherwise, the caller must keep the descriptor open until TUN release.
- * Failure leaves the descriptor with the caller. */
-partout_tun partout_tun_wrap_fd(int fd, bool owned);
-
 /* Nonblocking packet I/O uses raw IP packets without platform headers. */
 typedef struct {
     int (*read)(void *ctx, uint8_t *dst, size_t len);
@@ -106,6 +101,9 @@ typedef struct {
     intptr_t (*watch)(void *ctx);
 } partout_tun_callbacks;
 
+#if defined(_WIN32)
+typedef uintptr_t partout_socket_descriptor;
+
 /* Wraps an existing device context; does not create a device.
  * All callbacks are required and copied. On success, close(ctx) is called
  * exactly once on release; on failure, ownership remains with the caller.
@@ -113,10 +111,14 @@ typedef struct {
  * TUN wrapping is unsupported by the selected runtime. */
 partout_tun partout_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks);
 
-#if defined(_WIN32)
-typedef uintptr_t partout_socket_descriptor;
 #else
 typedef int partout_socket_descriptor;
+
+/* Wraps a native TUN descriptor, or returns NULL on failure.
+ * If owned, the core takes ownership on success and closes it on release.
+ * Otherwise, the caller must keep the descriptor open until TUN release.
+ * Failure leaves the descriptor with the caller. */
+partout_tun partout_tun_wrap_fd(int fd, bool owned);
 #endif
 
 typedef struct {
