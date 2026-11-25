@@ -82,5 +82,6 @@ target_include_directories(partout-headers INTERFACE
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")
 include("cmake/runtimes.cmake")
+include("cmake/exports.cmake")
 include("cmake/install.cmake")
 include("cmake/tests.cmake")

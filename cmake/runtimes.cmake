@@ -5,26 +5,7 @@ if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
 
-# Embed static implementations in the shared library.
-function(partout_embed_runtime target)
-    set_target_properties(${target} PROPERTIES
-        POSITION_INDEPENDENT_CODE ON
-        CXX_VISIBILITY_PRESET hidden
-        VISIBILITY_INLINES_HIDDEN ON)
-    target_link_libraries(partout PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${target}>")
-    foreach(property IN ITEMS INCLUDE_DIRECTORIES COMPILE_FEATURES COMPILE_DEFINITIONS LINK_LIBRARIES)
-        get_target_property(requirements ${target} INTERFACE_${property})
-        if(requirements)
-            set_property(TARGET partout APPEND PROPERTY INTERFACE_${property} "${requirements}")
-        endif()
-    endforeach()
-    if(MSVC)
-        target_compile_definitions(${target} PRIVATE PARTOUT_API_BUILD_DLL)
-        set_target_properties(${target} PROPERTIES
-            MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
-        target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
-    endif()
-endfunction()
+set(partout_runtime_targets)
 
 if(NOT ANDROID)
     enable_language(CXX)
@@ -55,8 +36,7 @@ if(NOT ANDROID)
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
     endif()
-    partout_embed_runtime(partout-cpp-runtime)
-    set_target_properties(partout PROPERTIES LINKER_LANGUAGE CXX)
+    list(APPEND partout_runtime_targets partout-cpp-runtime)
 endif()
 
 # Native integration layers are linked into the shared library.
@@ -94,14 +74,14 @@ if(PP_BUILD_WINRT)
         PUBLIC NOMINMAX
         PRIVATE WINRT_LEAN_AND_MEAN)
     target_compile_options(partout-winrt-runtime PRIVATE /EHsc /permissive- /W4)
-    partout_embed_runtime(partout-winrt-runtime)
+    list(APPEND partout_runtime_targets partout-winrt-runtime)
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
         runtimes/windows/wintun/platform.c
     )
     target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
     target_link_libraries(partout-wintun-runtime PUBLIC Partout::Headers PRIVATE ole32)
-    partout_embed_runtime(partout-wintun-runtime)
+    list(APPEND partout_runtime_targets partout-wintun-runtime)
 elseif(ANDROID)
     add_library(partout-android-runtime STATIC
         runtimes/android/native/platform.c
@@ -114,11 +94,11 @@ elseif(ANDROID)
     )
     target_include_directories(partout-android-runtime PRIVATE src)
     target_link_libraries(partout-android-runtime PUBLIC Partout::Headers PRIVATE android log)
-    partout_embed_runtime(partout-android-runtime)
+    list(APPEND partout_runtime_targets partout-android-runtime)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
         runtimes/posix/platform.c
     )
     target_link_libraries(partout-posix-runtime PUBLIC Partout::Headers)
-    partout_embed_runtime(partout-posix-runtime)
+    list(APPEND partout_runtime_targets partout-posix-runtime)
 endif()
