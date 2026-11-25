@@ -89,7 +89,6 @@ elseif(ANDROID)
         runtimes/android/native/platform.c
     )
     set_target_properties(partout-android-runtime PROPERTIES
-        POSITION_INDEPENDENT_CODE ON
         C_VISIBILITY_PRESET hidden
     )
     target_include_directories(partout-android-runtime PRIVATE src)

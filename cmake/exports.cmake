@@ -44,9 +44,6 @@ foreach(target IN LISTS partout_runtime_targets)
     endforeach()
     if(MSVC)
         target_compile_definitions(${target} PRIVATE PARTOUT_API_BUILD_DLL)
-        set_target_properties(${target} PROPERTIES
-            MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
-        target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
     endif()
 endforeach()
 
@@ -78,13 +75,13 @@ if(APPLE)
 endif()
 
 if(WIN32)
-    # With no native object files, MSVC cannot infer the machine from the Zig
-    # archive passed through /WHOLEARCHIVE.
+    # Match the DLL architecture to the configured native toolchain.
     target_link_options(partout PRIVATE "LINKER:/MACHINE:${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
+    set_target_properties(partout ${partout_runtime_targets} PROPERTIES
+        MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
+    target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
     set_target_properties(partout PROPERTIES
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
-        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-        MSVC_RUNTIME_CHECKS ""
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
     # C++ exports are annotated in the static runtime implementations.
@@ -96,13 +93,11 @@ elseif(NOT APPLE)
     find_package(Threads REQUIRED)
     target_link_libraries(partout PRIVATE Threads::Threads ${CMAKE_DL_LIBS} m)
     set_target_properties(partout PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
-    if(ANDROID)
-        target_link_libraries(partout PRIVATE android)
-        list(APPEND partout_exports JNI_OnLoad "Java_io_partout_PartoutWrapper_*")
-    endif()
     target_link_options(partout PRIVATE "LINKER:-z,defs")
     # Android exports only the Zig C ABI and JNI entry points.
     if(ANDROID)
+        target_link_libraries(partout PRIVATE android)
+        list(APPEND partout_exports JNI_OnLoad "Java_io_partout_PartoutWrapper_*")
         list(JOIN partout_exports "; " partout_elf_exports)
         file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
             CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY
