@@ -15,6 +15,8 @@
 extern "C" {
 #endif
 
+/* Core intrinsic ABI. */
+
 /* Returns the library version. The returned string must not be freed. */
 const char *partout_version(void);
 
@@ -74,9 +76,9 @@ char *partout_export_module(const char *module_json);
 char *partout_wireguard_genkey(void);
 char *partout_wireguard_pubkey(const char *key);
 
-/* Runtime integration: consumers may implement the TUN and controller contracts
- * below. Socket transport and executor implementations remain owned by the core
- * and its bundled platform runtime; they are not public replacement hooks. */
+/* Runtime-dependent ABI.
+ * Consumers may implement the TUN and controller contracts below. This ABI
+ * does not expose replacement hooks for socket transports or executors. */
 
 /* Packet callback results: nonnegative byte count, or a negative error.
  * Other failures return -1 and preserve the platform's native last error. */
@@ -100,15 +102,15 @@ typedef struct {
     int (*read)(void *ctx, uint8_t *dst, size_t len);
     int (*write)(void *ctx, const uint8_t *src, size_t len);
     void (*close)(void *ctx);
-    /* Native readiness fd, or a Windows wait HANDLE cast to intptr_t. */
+    /* Readiness token in the representation required by the selected runtime. */
     intptr_t (*watch)(void *ctx);
 } partout_tun_callbacks;
 
 /* Wraps an existing device context; does not create a device.
  * All callbacks are required and copied. On success, close(ctx) is called
  * exactly once on release; on failure, ownership remains with the caller.
- * Callback code must remain loaded until release. Supported by readiness
- * backends (POSIX and Windows/Wintun); returns NULL on WinRT. */
+ * Callback code must remain loaded until release. Returns NULL if callback-based
+ * TUN wrapping is unsupported by the selected runtime. */
 partout_tun partout_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks);
 
 #if defined(_WIN32)
@@ -153,7 +155,7 @@ typedef struct {
     void (*remove)(void *ctx, const char *key);
 } partout_daemon_events;
 
-/* Runtime callbacks and context. The core copies the bindings and WinRT table.
+/* Runtime callbacks and context. The core copies the bindings.
  * The runtime must keep controller/context resources alive until release.
  * Callback strings and arrays are borrowed for the duration of each call.
  * Callbacks must not propagate language exceptions across this boundary. */
@@ -171,10 +173,12 @@ typedef struct __partout_daemon_bindings {
     const struct partout_winrt_callbacks *winrt;
 } partout_daemon_bindings;
 
-/* Provided by the POSIX and Wintun runtimes. Initializes controller ownership
+/* Initializes default controller bindings, if provided by the selected runtime,
  * and preserves the caller's event callbacks. Pass bindings to daemon_start,
- * which owns release even on startup failure. */
+ * which owns release even on startup failure. Availability is build-dependent. */
 bool partout_platform_bindings_init(partout_daemon_bindings *bindings);
+
+/* Core daemon ABI. */
 
 /* Crypto backends. */
 typedef enum {

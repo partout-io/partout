@@ -4,6 +4,8 @@
 
 # Public C ABI symbols exported by the core library (Mach-O spelling).
 
+# Core intrinsic ABI
+
 # Initialization and logging
 _partout_version
 _partout_init
@@ -20,9 +22,13 @@ _partout_export_module
 _partout_wireguard_genkey
 _partout_wireguard_pubkey
 
+# Runtime-dependent ABI
+
 # TUN descriptors
 _partout_tun_wrap_fd
 _partout_tun_wrap_callbacks
+
+# Core daemon ABI
 
 # Daemon lifecycle
 _partout_daemon_start
