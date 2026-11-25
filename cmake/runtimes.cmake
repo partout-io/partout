@@ -7,7 +7,10 @@ endif()
 
 # Embed static implementations in the shared library.
 function(partout_embed_runtime target)
-    set_target_properties(${target} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    set_target_properties(${target} PROPERTIES
+        POSITION_INDEPENDENT_CODE ON
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON)
     target_link_libraries(partout PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${target}>")
     foreach(property IN ITEMS INCLUDE_DIRECTORIES COMPILE_FEATURES COMPILE_DEFINITIONS LINK_LIBRARIES)
         get_target_property(requirements ${target} INTERFACE_${property})

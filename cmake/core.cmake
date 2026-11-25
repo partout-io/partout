@@ -138,13 +138,9 @@ if(PP_BUILD_WINTUN OR (UNIX AND NOT ANDROID))
     list(APPEND partout_exports partout_platform_bindings_init)
 endif()
 
+# Desktop exports use Zig export declarations and C++ PARTOUT_API visibility.
+# A linker allowlist would hide the annotated C++ API as well.
 if(APPLE)
-    set(partout_apple_exports ${partout_exports})
-    list(TRANSFORM partout_apple_exports PREPEND "_")
-    list(APPEND partout_apple_exports "__ZN7Partout*" "__ZNK7Partout*" "__ZT?N7Partout*")
-    list(JOIN partout_apple_exports "\n" partout_apple_exports)
-    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
-        CONTENT "@partout_apple_exports@\n" @ONLY)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
         "Install name for the Apple shared library"
     )
@@ -153,10 +149,6 @@ if(APPLE)
         "LINKER:-install_name,${PP_BUILD_APPLE_INSTALL_NAME}"
         "LINKER:-compatibility_version,1.0.0" "LINKER:-current_version,1.0.0"
         "LINKER:-dead_strip" "LINKER:-rpath,@loader_path"
-        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
-    )
-    set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
-        "${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
     )
     target_link_libraries(partout PRIVATE "-framework CoreFoundation" "-framework Security")
 endif()
@@ -184,13 +176,16 @@ elseif(NOT APPLE)
         target_link_libraries(partout PRIVATE android)
         list(APPEND partout_exports JNI_OnLoad "Java_io_partout_PartoutWrapper_*")
     endif()
-    list(APPEND partout_exports "_ZN7Partout*" "_ZNK7Partout*" "_ZT?N7Partout*")
-    list(JOIN partout_exports "; " partout_elf_exports)
-    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
-        CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY
-    )
-    target_link_options(partout PRIVATE "LINKER:-z,defs"
-        "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map"
-    )
-    set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+    target_link_options(partout PRIVATE "LINKER:-z,defs")
+    # Android exports only the Zig C ABI and JNI entry points.
+    if(ANDROID)
+        list(JOIN partout_exports "; " partout_elf_exports)
+        file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
+            CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY
+        )
+        target_link_options(partout PRIVATE
+            "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map"
+        )
+        set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+    endif()
 endif()
