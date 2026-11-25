@@ -246,14 +246,14 @@ pub export fn partout_daemon_hold() callconv(.c) void {
 }
 
 pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
-    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_fd")) return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
-    return null;
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_fd")) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
 }
 
-pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const ffi.io.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return null;
     if (callbacks == null) return null;
-    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
-    return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, callbacks));
 }
 
 pub export fn partout_daemon_stop() callconv(.c) void {
