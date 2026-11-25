@@ -213,6 +213,8 @@ WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server
     Log::Write(PartoutLogLevelInfo, "Partout::Tunnel initialized\n");
 }
 
+WinRTTunnelStrategy::~WinRTTunnelStrategy() = default;
+
 std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {
     return WithAgent(canceled_, "Fetch profiles", [&](const auto &agent) {
         std::vector<Models::TunnelSnapshot> result;

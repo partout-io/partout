@@ -25,7 +25,8 @@ foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
     target_include_directories(partout-${test}-test PRIVATE
         "${PROJECT_SOURCE_DIR}/runtimes/windows/winrt"
         "${PROJECT_SOURCE_DIR}/src/c/portable/include")
-    target_compile_options(partout-${test}-test PRIVATE /EHsc /UNDEBUG)
+    target_compile_options(partout-${test}-test PRIVATE /EHsc
+        "/FI${CMAKE_CURRENT_LIST_DIR}/../../Assertions.h")
     set_target_properties(partout-${test}-test PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""

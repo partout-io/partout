@@ -16,7 +16,7 @@
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
-class PARTOUT_API WinRTTunnelStrategy final : public TunnelStrategy {
+class WinRTTunnelStrategy final : public TunnelStrategy {
 public:
     // Maximum wait for a connect request, including credentials and engine startup.
     static constexpr auto ConnectRequestTimeout = std::chrono::seconds(120);
@@ -25,24 +25,26 @@ public:
     // Delay between checks for asynchronous completion, cancellation, or timeout.
     static constexpr auto AsyncPollInterval = std::chrono::milliseconds(20);
 
-    static std::optional<std::string> DecodeId(const winrt::hstring &xml);
-    static bool NamesEqual(const winrt::hstring &left, const winrt::hstring &right);
-    static std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadConnectionStatus(
+    PARTOUT_API static std::optional<std::string> DecodeId(const winrt::hstring &xml);
+    PARTOUT_API static bool NamesEqual(const winrt::hstring &left, const winrt::hstring &right);
+    PARTOUT_API static std::optional<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus> ReadConnectionStatus(
         const std::function<winrt::Windows::Networking::Vpn::VpnManagementConnectionStatus()> &read,
         std::string &error
     );
-    static std::optional<Models::TunnelSnapshotEnvironment> InterfaceEnvironment(const MIB_IF_ROW2 &row);
+    PARTOUT_API static std::optional<Models::TunnelSnapshotEnvironment> InterfaceEnvironment(const MIB_IF_ROW2 &row);
 
-    explicit WinRTTunnelStrategy(const std::string &server_uri);
+    PARTOUT_API explicit WinRTTunnelStrategy(const std::string &server_uri);
 
-    std::vector<Models::TunnelSnapshot> Fetch() override;
-    std::map<std::string, std::string> ObservationErrors() const override;
-    void Save(const Models::TaggedProfile &profile) override;
-    void Connect(const std::string &id) override;
-    void ConnectWithCredentials(const std::string &id, const TunnelCredentials &credentials) override;
-    void Disconnect(const std::string &id) override;
-    void Remove(const std::string &id) override;
-    void Cancel() noexcept override;
+    PARTOUT_API ~WinRTTunnelStrategy() override;
+
+    PARTOUT_API std::vector<Models::TunnelSnapshot> Fetch() override;
+    PARTOUT_API std::map<std::string, std::string> ObservationErrors() const override;
+    PARTOUT_API void Save(const Models::TaggedProfile &profile) override;
+    PARTOUT_API void Connect(const std::string &id) override;
+    PARTOUT_API void ConnectWithCredentials(const std::string &id, const TunnelCredentials &credentials) override;
+    PARTOUT_API void Disconnect(const std::string &id) override;
+    PARTOUT_API void Remove(const std::string &id) override;
+    PARTOUT_API void Cancel() noexcept override;
 private:
     std::string server_uri_;
     std::atomic_bool canceled_{false};

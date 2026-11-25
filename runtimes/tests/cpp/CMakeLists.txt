@@ -14,7 +14,8 @@ target_link_libraries(partout-cpp-models-test PRIVATE Partout::Partout)
 foreach(test IN ITEMS tunnel profile-extensions models)
     set(target partout-cpp-${test}-test)
     if(MSVC)
-        target_compile_options(${target} PRIVATE /EHsc /UNDEBUG)
+        target_compile_options(${target} PRIVATE /EHsc
+            "/FI${CMAKE_CURRENT_LIST_DIR}/../Assertions.h")
         set_target_properties(${target} PROPERTIES
             MSVC_RUNTIME_LIBRARY MultiThreadedDLL
             MSVC_RUNTIME_CHECKS ""

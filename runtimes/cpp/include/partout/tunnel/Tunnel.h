@@ -12,27 +12,29 @@
 namespace Partout {
 // Owns registration, connection handover, and pending activation. Snapshots use
 // the same runtime models as the Apple and Android tunnel facades.
-class PARTOUT_API Tunnel {
+class Tunnel {
 public:
     // Default wait for each observed disconnect/connect phase when switching tunnels.
     static constexpr auto HandoverTimeout = std::chrono::seconds(60);
 
     // Call from a serialized background executor. Cancel may run concurrently.
-    explicit Tunnel(
+    PARTOUT_API explicit Tunnel(
         std::unique_ptr<TunnelStrategy> strategy,
         std::chrono::milliseconds handover_timeout = HandoverTimeout
     );
 
-    std::vector<Models::TunnelSnapshot> Fetch();
-    std::map<std::string, std::string> ObservationErrors() const;
+    PARTOUT_API ~Tunnel();
 
-    void Save(const Models::TaggedProfile &profile);
-    void Connect(const Models::TaggedProfile &profile, std::optional<TunnelCredentials> credentials = {});
-    void Disconnect(const std::string &id);
-    void Remove(const std::string &id);
+    PARTOUT_API std::vector<Models::TunnelSnapshot> Fetch();
+    PARTOUT_API std::map<std::string, std::string> ObservationErrors() const;
 
-    void Advance();
-    void Cancel() noexcept;
+    PARTOUT_API void Save(const Models::TaggedProfile &profile);
+    PARTOUT_API void Connect(const Models::TaggedProfile &profile, std::optional<TunnelCredentials> credentials = {});
+    PARTOUT_API void Disconnect(const std::string &id);
+    PARTOUT_API void Remove(const std::string &id);
+
+    PARTOUT_API void Advance();
+    PARTOUT_API void Cancel() noexcept;
 
 private:
     void RequireActive() const;

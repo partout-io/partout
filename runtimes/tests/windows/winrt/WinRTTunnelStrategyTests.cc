@@ -5,6 +5,7 @@
 #include <partout/winrt/WinRTTunnelStrategy.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <cassert>
+#include <cstdint>
 #include <limits>
 
 namespace {
@@ -44,8 +45,8 @@ void TestInterfaceEnvironment() {
     row.InOctets = 5ULL * 1024 * 1024 * 1024;
     row.OutOctets = 7ULL * 1024 * 1024 * 1024;
     auto environment = Partout::WinRTTunnelStrategy::InterfaceEnvironment(row);
-    assert(environment && environment->dataCount.received == row.InOctets);
-    assert(environment->dataCount.sent == row.OutOctets);
+    assert(environment && environment->dataCount.received == static_cast<std::int64_t>(row.InOctets));
+    assert(environment->dataCount.sent == static_cast<std::int64_t>(row.OutOctets));
     row.InOctets = 0;
     row.OutOctets = 0;
     environment = Partout::WinRTTunnelStrategy::InterfaceEnvironment(row);
