@@ -84,9 +84,9 @@ elseif(PP_BUILD_WINTUN)
     list(APPEND partout_runtime_targets partout-wintun-runtime)
 elseif(ANDROID)
     add_library(partout-android-runtime STATIC
-        runtimes/android/native/platform.c
         runtimes/android/native/jni.c
         runtimes/android/native/partout_jni.c
+        runtimes/android/native/platform.c
     )
     set_target_properties(partout-android-runtime PROPERTIES
         POSITION_INDEPENDENT_CODE ON
