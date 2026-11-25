@@ -21,6 +21,9 @@
 
 ## C++
 
+- Apply `PARTOUT_API` to individual out-of-line functions that cross the library
+  boundary, not to entire classes or structs. Inline methods, pure virtual
+  declarations, and data-only types do not need export annotations.
 - Order `.cc` content after includes consistently: anonymous namespace helpers,
   then file-level `using` directives, then Partout entity implementations. Keep
   helpers together rather than interleaving anonymous namespace blocks with
