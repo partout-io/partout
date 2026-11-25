@@ -25,13 +25,17 @@
   boundary, not to entire classes or structs. Inline methods, pure virtual
   declarations, and data-only types do not need export annotations.
 - Order `.cc` content after includes consistently: anonymous namespace helpers,
-  then file-level `using` directives, then Partout entity implementations. Keep
+  then any necessary file-level `using` directives, then entity implementations. Keep
   helpers together rather than interleaving anonymous namespace blocks with
   implementations. Anonymous namespaces must be standalone at file scope, never
   nested inside a named namespace. Place them before file-level `using`
   directives and named entity implementations. Explicitly qualify references to
   project types and functions inside helpers; do not use a namespace-wide `using`
   directive there to recreate the enclosing namespace's lookup.
+- Omit redundant `using namespace` directives. Names in the enclosing namespace
+  are already visible, including in the parameters and body of a qualified
+  function definition. Retain directives only where unqualified names need them,
+  such as return types or class names before a qualified function's declarator.
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.
 - Use PascalCase for all methods, public and private, and named constants.
 - Use snake_case for C++ variables, parameters, and data members. Preserve the
