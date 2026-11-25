@@ -199,6 +199,28 @@ pub export fn partout_export_module(
     };
 }
 
+pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    return wireguard.generatePrivateKey(allocator) catch return null;
+}
+
+pub export fn partout_wireguard_pubkey(
+    c_key: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    const key_ptr = c_key orelse return null;
+    return wireguard.derivePublicKey(
+        allocator,
+        core.util.borrowedCString(key_ptr),
+    ) catch return null;
+}
+
 pub export fn partout_daemon_start(
     args_pointer: ?*const partout_c.partout_daemon_start_args,
 ) callconv(.c) c_int {
@@ -263,28 +285,6 @@ pub export fn partout_daemon_stop() callconv(.c) void {
     runtime.destroy(allocator);
     daemon_runtime = null;
     if (is_daemon) daemon_process_lock.release();
-}
-
-pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
-    if (!build_options.wireguard) {
-        log.write(.fault, "WireGuard is not implemented");
-        return null;
-    }
-    return wireguard.generatePrivateKey(allocator) catch return null;
-}
-
-pub export fn partout_wireguard_pubkey(
-    c_key: ?[*:0]const u8,
-) callconv(.c) ?[*:0]u8 {
-    if (!build_options.wireguard) {
-        log.write(.fault, "WireGuard is not implemented");
-        return null;
-    }
-    const key_ptr = c_key orelse return null;
-    return wireguard.derivePublicKey(
-        allocator,
-        core.util.borrowedCString(key_ptr),
-    ) catch return null;
 }
 
 fn releaseDaemonBindings(bindings: ?*const partout_c.partout_daemon_bindings) void {
