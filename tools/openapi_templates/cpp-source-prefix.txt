@@ -26,7 +26,3 @@ bool @NAME@::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool @NAME@::Validate(std::stringstream& msg, const std::string& pathPrefix) const
-{
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "@NAME@" : pathPrefix;

@@ -45,6 +45,7 @@ pub const Platform = struct {
 
         /// The tunnel controller implementation.
         fnt: FunctionTable,
+        winrt: ?io.WinRTCallbacks = null,
 
         /// Platform socket policy, independent of the tunnel function table.
         socket_configurator: io_c.pp_socket_configurator,
@@ -57,6 +58,7 @@ pub const Platform = struct {
 
     ref: ?*anyopaque,
     fnt: FunctionTable,
+    winrt: ?io.WinRTCallbacks,
     dns: PlatformDNS,
     socket_configurator: io_c.pp_socket_configurator,
     socket_buf_size: c_int,
@@ -83,6 +85,7 @@ pub const Platform = struct {
         return .{
             .ref = options.ref,
             .fnt = options.fnt,
+            .winrt = options.winrt,
             .dns = .{},
             .socket_configurator = options.socket_configurator,
             .socket_buf_size = options.socket_buf_size,
@@ -140,6 +143,7 @@ pub const Platform = struct {
         return .{
             .ptr = self,
             .vtable = &platform_socket_factory_vtable,
+            .winrt = self.winrt,
         };
     }
 
@@ -239,6 +243,7 @@ pub const Platform = struct {
             .reachability = reachability,
             .configure = cConfigureSocket,
             .configure_ctx = self,
+            .winrt = self.winrt,
         };
     }
 

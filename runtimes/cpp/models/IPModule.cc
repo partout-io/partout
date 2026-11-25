@@ -39,12 +39,9 @@ bool IPModule::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool IPModule::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool IPModule::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "IPModule" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool IPModule::operator==(const IPModule& other) const

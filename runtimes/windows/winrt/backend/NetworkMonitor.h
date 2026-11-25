@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
-#include <partout/Export.h>
 
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <cstddef>
@@ -36,13 +35,13 @@ public:
     );
     static winrt::Windows::Networking::Connectivity::ConnectionProfile PhysicalProfile();
 
-    PARTOUT_API NetworkMonitor();
-    PARTOUT_API ~NetworkMonitor();
+    NetworkMonitor();
+    ~NetworkMonitor();
 
     // Callback arguments are (reachable, path_changed). The initial snapshot
     // reports path_changed=false; duplicate snapshots do not invoke the callback.
-    PARTOUT_API void Start(std::function<void(bool, bool)> notify);
-    PARTOUT_API void Stop();
+    void Start(std::function<void(bool, bool)> notify);
+    void Stop();
 
 private:
     struct State;

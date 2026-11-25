@@ -4,6 +4,7 @@
 
 #pragma once
 #include <chrono>
+#include <partout/Export.h>
 #include <winsock2.h>
 #include <ws2ipdef.h>
 #include <netioapi.h>
@@ -15,7 +16,7 @@
 #include <winrt/Windows.Networking.Vpn.h>
 
 namespace Partout {
-class WinRTTunnelStrategy final : public TunnelStrategy {
+class PARTOUT_API WinRTTunnelStrategy final : public TunnelStrategy {
 public:
     // Maximum wait for a connect request, including credentials and engine startup.
     static constexpr auto ConnectRequestTimeout = std::chrono::seconds(120);

@@ -39,12 +39,9 @@ bool WireGuardModule::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool WireGuardModule::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool WireGuardModule::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "WireGuardModule" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool WireGuardModule::operator==(const WireGuardModule& other) const

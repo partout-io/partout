@@ -13,7 +13,9 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
         const Self = @This();
         allocator: std.mem.Allocator,
         context: *Context,
-        loop: c.winrt_loop,
+        winrt_context: ?*anyopaque,
+        submit: std.meta.Child(@FieldType(c.partout_winrt_callbacks, "submit")),
+        drain: std.meta.Child(@FieldType(c.partout_winrt_callbacks, "drain")),
 
         const Task = struct {
             owner: *Self,
@@ -27,25 +29,33 @@ pub fn Executor(comptime Context: type, comptime Message: type, comptime execute
             }
         };
 
-        pub fn create(allocator: std.mem.Allocator, context: *Context) error{OutOfMemory}!*Self {
+        pub fn create(allocator: std.mem.Allocator, context: *Context) error{ OutOfMemory, InvalidArgs }!*Self {
             const self = try allocator.create(Self);
             errdefer allocator.destroy(self);
-            const loop = c.winrt_loop_current() orelse return error.OutOfMemory;
-            self.* = .{ .allocator = allocator, .context = context, .loop = loop };
+            const winrt = context.factory.winrt orelse return error.InvalidArgs;
+            const submit = winrt.submit orelse return error.InvalidArgs;
+            const drain = winrt.drain orelse return error.InvalidArgs;
+            self.* = .{
+                .allocator = allocator,
+                .context = context,
+                .winrt_context = winrt.context,
+                .submit = submit,
+                .drain = drain,
+            };
             return self;
         }
 
-        pub fn schedule(self: *Self, message: Message) error{OutOfMemory}!void {
+        pub fn schedule(self: *Self, message: Message) error{ OutOfMemory, SubmitRejected }!void {
             const task = try self.allocator.create(Task);
             errdefer self.allocator.destroy(task);
             task.* = .{ .owner = self, .message = message };
-            if (!c.winrt_loop_submit(self.loop, Task.run, task)) return error.OutOfMemory;
+            if (!self.submit(self.winrt_context, Task.run, task)) return error.SubmitRejected;
         }
 
         pub fn destroy(self: *Self) void {
             // Drain accepted preparation before freeing its Zig context. The
             // native loop is borrowed and remains owned by VpnChannelRuntime.
-            c.winrt_loop_drain(self.loop);
+            self.drain(self.winrt_context);
             self.allocator.destroy(self);
         }
     };

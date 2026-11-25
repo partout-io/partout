@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
 
-#if defined(PARTOUT_API_BUILD_DLL)
+#if !defined(_WIN32)
+#define PARTOUT_API __attribute__((visibility("default")))
+#elif defined(PARTOUT_API_BUILD_DLL)
 #define PARTOUT_API __declspec(dllexport)
 #elif defined(PARTOUT_API_USE_DLL)
 #define PARTOUT_API __declspec(dllimport)

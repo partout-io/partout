@@ -505,11 +505,11 @@ const WindowsAdmissionProbe = struct {
 // Exercises native producer admission without requiring a VPN channel host.
 const WindowsProducer = struct {
     const c = source.ffi.io;
-    callback: c.winrt_receive = null,
+    callback: c.partout_transport_receive = null,
     context: ?*anyopaque = null,
     released: bool = false,
 
-    fn subscribe(raw: ?*anyopaque, callback: c.winrt_receive, context: ?*anyopaque) callconv(.c) bool {
+    fn subscribe(raw: ?*anyopaque, callback: c.partout_transport_receive, context: ?*anyopaque) callconv(.c) bool {
         const self: *@This() = @ptrCast(@alignCast(raw.?));
         self.callback = callback;
         self.context = context;
@@ -525,16 +525,16 @@ const WindowsProducer = struct {
         return true;
     }
     fn stop(_: ?*anyopaque) callconv(.c) void {}
-    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.winrt_address) callconv(.c) i32 {
+    fn write(_: ?*anyopaque, _: [*c]const u8, _: usize, _: [*c]const c.partout_socket_address) callconv(.c) i32 {
         return 0;
     }
-    fn address(_: ?*anyopaque, _: [*c]c.winrt_address) callconv(.c) bool {
+    fn address(_: ?*anyopaque, _: [*c]c.partout_socket_address) callconv(.c) bool {
         return false;
     }
     fn send(self: *@This(), bytes: []const u8, code: i32) bool {
         return self.callback.?(self.context, bytes.ptr, bytes.len, null, code);
     }
-    fn capability(self: *@This()) c.winrt_transport {
+    fn capability(self: *@This()) c.partout_transport {
         return .{
             .context = self,
             .release = release,
@@ -546,13 +546,57 @@ const WindowsProducer = struct {
             .unconnected = false,
         };
     }
-    fn pair(native: *c.winrt_transport, side: io.Side) !io.DescriptorPair {
+    fn pair(native: *c.partout_transport, side: io.Side) !io.DescriptorPair {
         return switch (side) {
             .link => .{ .link = try io.SocketWrapper.wrap(std.testing.allocator, native) },
             .tun => .{ .tun = try io.TunWrapper.create(std.testing.allocator, @ptrCast(native)) },
         };
     }
 };
+
+test "Windows transport wrap rejects each missing callback without taking ownership" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    inline for (.{ io.SocketWrapper, io.TunWrapper }) |Wrapper| {
+        inline for (.{ "release", "subscribe", "resume", "stop", "write", "local_address" }) |field| {
+            var producer: WindowsProducer = .{};
+            var capability = producer.capability();
+            @field(capability, field) = null;
+            try std.testing.expectError(error.InvalidArgs, Wrapper.wrap(std.testing.allocator, &capability));
+            try std.testing.expect(!producer.released);
+        }
+    }
+}
+
+test "Windows transport wrap preserves valid callbacks and releases on destroy" {
+    if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;
+    const Receiver = struct {
+        fn receive(raw: ?*anyopaque, bytes: [*c]const u8, size: usize, _: [*c]const source.ffi.io.partout_socket_address, code: i32) callconv(.c) bool {
+            const received: *bool = @ptrCast(@alignCast(raw.?));
+            received.* = code == 0 and std.mem.eql(u8, bytes[0..size], "packet");
+            return received.*;
+        }
+    };
+    inline for (.{ io.SocketWrapper, io.TunWrapper }) |Wrapper| {
+        var producer: WindowsProducer = .{};
+        var capability = producer.capability();
+        var received = false;
+        {
+            const wrapper = try Wrapper.wrap(std.testing.allocator, &capability);
+            defer wrapper.destroy();
+            try std.testing.expect(!producer.released);
+            try wrapper.setOnReceive(Receiver.receive, &received);
+            try std.testing.expect(producer.send("packet", 0));
+            try std.testing.expect(received);
+            try wrapper.resumeReading();
+            try std.testing.expectEqual(@as(i32, 0), wrapper.write("packet", null));
+            try std.testing.expectError(error.LibcFailure, wrapper.localAddress());
+            wrapper.stopWrites();
+            try wrapper.setOnReceive(null, null);
+            try std.testing.expect(producer.callback == null);
+        }
+        try std.testing.expect(producer.released);
+    }
+}
 
 test "Windows paused TUN drops new input but admits failures and resumes delivery" {
     if (builtin.os.tag != .windows or !source.winrt_enabled) return error.SkipZigTest;

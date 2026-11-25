@@ -212,6 +212,7 @@ pub const SocketOptions = struct {
     reachability: ?io_c.pp_reachability = null,
     configure: io_c.pp_socket_configure = null,
     configure_ctx: ?*anyopaque = null,
+    winrt: ?io_c.partout_winrt_callbacks = null,
 };
 
 pub fn socketProto(endpoint: api.ExtendedEndpoint) io_c.pp_socket_proto {
@@ -255,7 +256,7 @@ fn socketAddress(endpoint: api.ExtendedEndpoint) SocketAddressError!SocketAddres
 
 /// Packet callbacks borrow their payload and source until return. Clearing the
 /// receiver drains delivery before its context can be released.
-pub const PacketReceiveCallback = ?*const fn (?*anyopaque, [*c]const u8, usize, [*c]const SocketAddress, i32) callconv(.c) bool;
+pub const PacketReceiveCallback = io_c.partout_transport_receive;
 pub const PacketWriteResult = enum { ok, again, dropped, failed };
 
 pub const testing = struct {

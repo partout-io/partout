@@ -76,15 +76,6 @@ pub export fn partout_init(args_pointer: ?*const partout_c.partout_init_args) ca
     const args = args_pointer orelse return;
     const level = std.enums.fromInt(log.Level, args.log_level) orelse .debug;
     log.init(level, args.logs_private_data, args.logger_fn, args.logger_ctx);
-    if (comptime builtin.os.tag == .windows and build_options.winrt) {
-        ffi.io.winrt_set_logger(nativeLogger);
-    }
-}
-
-fn nativeLogger(level: c_int, message: [*c]const u8) callconv(.c) void {
-    if (message == null) return;
-    const severity = std.enums.fromInt(log.Level, level) orelse return;
-    log.writeCString(severity, @ptrCast(message));
 }
 
 pub export fn partout_import_profile(
@@ -208,6 +199,39 @@ pub export fn partout_export_module(
     };
 }
 
+pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    return wireguard.generatePrivateKey(allocator) catch return null;
+}
+
+pub export fn partout_wireguard_pubkey(
+    c_key: ?[*:0]const u8,
+) callconv(.c) ?[*:0]u8 {
+    if (!build_options.wireguard) {
+        log.write(.fault, "WireGuard is not implemented");
+        return null;
+    }
+    const key_ptr = c_key orelse return null;
+    return wireguard.derivePublicKey(
+        allocator,
+        core.util.borrowedCString(key_ptr),
+    ) catch return null;
+}
+
+pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_fd")) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
+}
+
+pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return null;
+    if (callbacks == null) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
+}
+
 pub export fn partout_daemon_start(
     args_pointer: ?*const partout_c.partout_daemon_start_args,
 ) callconv(.c) c_int {
@@ -254,17 +278,6 @@ pub export fn partout_daemon_hold() callconv(.c) void {
     runtime.hold();
 }
 
-pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
-    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_fd")) return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
-    return null;
-}
-
-pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
-    if (callbacks == null) return null;
-    if (comptime @hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
-    return null;
-}
-
 pub export fn partout_daemon_stop() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     const is_daemon = runtime.options.is_daemon;
@@ -272,28 +285,6 @@ pub export fn partout_daemon_stop() callconv(.c) void {
     runtime.destroy(allocator);
     daemon_runtime = null;
     if (is_daemon) daemon_process_lock.release();
-}
-
-pub export fn partout_wireguard_genkey() callconv(.c) ?[*:0]u8 {
-    if (!build_options.wireguard) {
-        log.write(.fault, "WireGuard is not implemented");
-        return null;
-    }
-    return wireguard.generatePrivateKey(allocator) catch return null;
-}
-
-pub export fn partout_wireguard_pubkey(
-    c_key: ?[*:0]const u8,
-) callconv(.c) ?[*:0]u8 {
-    if (!build_options.wireguard) {
-        log.write(.fault, "WireGuard is not implemented");
-        return null;
-    }
-    const key_ptr = c_key orelse return null;
-    return wireguard.derivePublicKey(
-        allocator,
-        core.util.borrowedCString(key_ptr),
-    ) catch return null;
 }
 
 fn releaseDaemonBindings(bindings: ?*const partout_c.partout_daemon_bindings) void {

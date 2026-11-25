@@ -16,6 +16,7 @@ Usage: scripts/build.ps1 [options]
 Options:
 "@ | Write-Host
     Show-CommonHelp
+    Write-Host "  -backend <winrt|wintun>          Required with -gen for Windows builds"
 }
 
 if ($args -contains "-h" -or $args -contains "--help") {
@@ -34,6 +35,8 @@ try {
     $crypto_mbedtls = $false
     $do_build = $args.Count -eq 0
     $gen_build = $false
+    $windows_backend = $null
+    $android = $false
     $install_dir = $null
     $positional_args = @()
     $cmake_opts = @()
@@ -107,7 +110,19 @@ try {
                 $do_build = $true
                 $index += 1
             }
+            "-backend" {
+                $value = Require-Value "-backend" $index $args
+                if ($value -notin @("winrt", "wintun")) {
+                    throw "Unknown Windows backend '$value'; choose winrt or wintun"
+                }
+                if ($windows_backend) {
+                    throw "Specify -backend only once"
+                }
+                $windows_backend = $value
+                $index += 2
+            }
             "-android" {
+                $android = $true
                 $build_dir = ".cmake-android"
                 $cmake_opts += "-DCMAKE_TOOLCHAIN_FILE=${env:ANDROID_NDK_HOME}/build/cmake/android.toolchain.cmake"
                 $cmake_opts += "-DANDROID_PLATFORM=android-24"
@@ -143,6 +158,17 @@ try {
         }
     }
 
+    if ($windows_backend -and ($android -or -not $gen_build)) {
+        throw "-backend requires -gen and cannot be combined with -android"
+    }
+    if ($gen_build -and -not $android) {
+        if (-not $windows_backend) {
+            throw "Windows configuration requires -backend winrt or -backend wintun"
+        }
+        $cmake_opts += "-DPP_BUILD_WINRT=$(ConvertTo-CMakeBool ($windows_backend -eq 'winrt'))"
+        $cmake_opts += "-DPP_BUILD_WINTUN=$(ConvertTo-CMakeBool ($windows_backend -eq 'wintun'))"
+    }
+
     if ($crypto_selected) {
         $cmake_opts += "-DPP_BUILD_USE_OPENSSL=$(ConvertTo-CMakeBool $crypto_openssl)"
         $cmake_opts += "-DPP_BUILD_USE_MBEDTLS=$(ConvertTo-CMakeBool $crypto_mbedtls)"
@@ -156,7 +182,7 @@ try {
         & cmake @configure_args
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
     } elseif ($do_build -and -not (Test-Path -Path (Join-Path $build_dir "CMakeCache.txt") -PathType Leaf)) {
-        Write-Error "Build directory is not configured; run scripts/build.ps1 -gen first"
+        Write-Error "Build directory is not configured; run scripts/build.ps1 -gen -backend <winrt|wintun> (or -gen -android) first"
         exit 1
     }
 

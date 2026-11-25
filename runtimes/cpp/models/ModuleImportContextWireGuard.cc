@@ -39,12 +39,9 @@ bool ModuleImportContextWireGuard::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool ModuleImportContextWireGuard::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool ModuleImportContextWireGuard::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "ModuleImportContextWireGuard" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool ModuleImportContextWireGuard::operator==(const ModuleImportContextWireGuard& other) const

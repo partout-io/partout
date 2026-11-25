@@ -11,17 +11,6 @@ else()
     set(PARTOUT_RUNTIME_INSTALL_DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
-if(TARGET partout-winrt-backend)
-    set_target_properties(partout-winrt-backend PROPERTIES EXPORT_NAME WinRTBackend)
-    install(TARGETS partout-winrt-backend ${partout_install_sdk_export}
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
-        RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-    if(PP_BUILD_LIBRARY)
-        install(FILES "$<TARGET_PDB_FILE:partout-winrt-backend>"
-            DESTINATION "${CMAKE_INSTALL_BINDIR}"
-            CONFIGURATIONS Debug RelWithDebInfo OPTIONAL)
-    endif()
-endif()
 if(PP_BUILD_LIBRARY)
     set_target_properties(partout PROPERTIES EXPORT_NAME Partout)
     install(TARGETS partout ${partout_install_sdk_export}
@@ -58,42 +47,19 @@ endif()
 install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
     DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
 )
-if(TARGET partout-bindings)
-    set_target_properties(partout-bindings PROPERTIES EXPORT_NAME WinRTRuntime)
-    install(TARGETS partout-bindings EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES runtimes/windows/winrt/include/partout_winrt.h
-        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+if(TARGET partout-winrt-runtime)
     install(DIRECTORY runtimes/windows/winrt/include/partout
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
 endif()
 
-if(TARGET partout-posix-runtime)
-    set_target_properties(partout-posix-runtime PROPERTIES EXPORT_NAME POSIXRuntime)
-    install(TARGETS partout-posix-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES runtimes/include/partout_platform.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()
-
 set_target_properties(partout-headers PROPERTIES EXPORT_NAME Headers)
 install(TARGETS partout-headers EXPORT PartoutTargets)
-set(PARTOUT_PACKAGE_MODELS OFF)
-if(TARGET Partout::Models)
-    set(PARTOUT_PACKAGE_MODELS ON)
-    get_target_property(model_target Partout::Models ALIASED_TARGET)
-    set_target_properties(${model_target} PROPERTIES EXPORT_NAME Models)
-    install(TARGETS ${model_target} EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
+set(PARTOUT_PACKAGE_CPP_RUNTIME OFF)
+if(TARGET partout-cpp-runtime)
+    set(PARTOUT_PACKAGE_CPP_RUNTIME ON)
     install(DIRECTORY "${PARTOUT_CPP_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
-endif()
-
-if(TARGET partout-cpp-runtime)
-    set_target_properties(partout-cpp-runtime PROPERTIES EXPORT_NAME CppRuntime)
-    install(TARGETS partout-cpp-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-endif()
-
-if(TARGET partout-runtime)
-    set_target_properties(partout-runtime PROPERTIES EXPORT_NAME Runtime)
-    install(TARGETS partout-runtime EXPORT PartoutTargets)
 endif()
 
 include(CMakePackageConfigHelpers)
@@ -105,9 +71,3 @@ install(FILES "${CMAKE_CURRENT_BINARY_DIR}/PartoutConfig.cmake"
     DESTINATION "${partout_package_dir}")
 install(EXPORT PartoutTargets NAMESPACE Partout::
     DESTINATION "${partout_package_dir}")
-
-if(TARGET partout-wintun-runtime)
-    set_target_properties(partout-wintun-runtime PROPERTIES EXPORT_NAME WintunRuntime)
-    install(TARGETS partout-wintun-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    install(FILES runtimes/include/partout_platform.h DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
-endif()

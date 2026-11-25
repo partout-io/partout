@@ -39,29 +39,9 @@ bool TunnelControllerOptions::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TunnelControllerOptions::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TunnelControllerOptions::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TunnelControllerOptions" : pathPrefix;
-
-    /* dnsFallbackServers */ {
-        const std::vector<std::string>& value = dnsFallbackServers;
-        const std::string currentValuePath = _pathPrefix + ".dnsFallbackServers";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
-        }
-
-    }
-
-    return success;
+    return true;
 }
 
 bool TunnelControllerOptions::operator==(const TunnelControllerOptions& other) const

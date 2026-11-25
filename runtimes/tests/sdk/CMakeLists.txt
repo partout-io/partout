@@ -7,7 +7,7 @@ project(PartoutSDKConsumer LANGUAGES CXX)
 find_package(Partout CONFIG REQUIRED)
 
 add_executable(partout-sdk-consumer SDKConsumer.cc)
-target_link_libraries(partout-sdk-consumer PRIVATE Partout::Runtime)
+target_link_libraries(partout-sdk-consumer PRIVATE Partout::Partout)
 if(WIN32)
     target_compile_options(partout-sdk-consumer PRIVATE /EHsc)
     add_custom_command(TARGET partout-sdk-consumer POST_BUILD

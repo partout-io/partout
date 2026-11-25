@@ -75,7 +75,7 @@ pub const ConnectionWorker = struct {
         factory: sandbox.SocketFactory,
         endpoints: ?[]const api.ExtendedEndpoint,
         callback: Callback,
-    ) error{OutOfMemory}!*Self {
+    ) error{ OutOfMemory, InvalidArgs }!*Self {
         const self = try allocator.create(Self);
         errdefer allocator.destroy(self);
         self.* = .{
@@ -102,12 +102,13 @@ pub const ConnectionWorker = struct {
             self.endpoint_resolver = resolver_mod.EndpointResolver.init(allocator, owned);
         }
         errdefer self.deinitEndpoints();
-        self.executor = Executor.create(allocator, self) catch return error.OutOfMemory;
+        self.executor = Executor.create(allocator, self) catch |err|
+            return if (err == error.InvalidArgs) error.InvalidArgs else error.OutOfMemory;
         return self;
     }
 
     /// Accepted requests always deliver exactly one completion, including on close.
-    pub fn submit(self: *Self, request: Request, completion_context: *anyopaque) error{ Closed, OutOfMemory }!void {
+    pub fn submit(self: *Self, request: Request, completion_context: *anyopaque) error{ Closed, OutOfMemory, SubmitRejected }!void {
         if (self.closed.load(.acquire)) return error.Closed;
         try self.executor.schedule(.{ .request = request, .completion_context = completion_context });
     }

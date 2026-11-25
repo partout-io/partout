@@ -39,33 +39,24 @@ bool OnDemandModule::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OnDemandModule::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OnDemandModule::Validate(std::stringstream& msg, const std::string& path_prefix) const
 {
     bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OnDemandModule" : pathPrefix;
+    const std::string model_path = path_prefix.empty() ? "OnDemandModule" : path_prefix;
 
-    /* withOtherNetworks */ {
-        const std::vector<Partout::Models::OnDemandModuleOtherNetwork>& value = withOtherNetworks;
-        const std::string currentValuePath = _pathPrefix + ".withOtherNetworks";
-
-        if (!Partout::Helpers::hasOnlyUniqueItems(value))
-        {
+    {
+        const auto& items = this->withOtherNetworks;
+        const std::string field_path = model_path + ".withOtherNetworks";
+        if (!Partout::Helpers::hasOnlyUniqueItems(items)) {
             success = false;
-            msg << currentValuePath << ": may not contain the same item more than once;";
+            msg << field_path << ": may not contain the same item more than once;";
         }
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::OnDemandModuleOtherNetwork& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath) && success;
-
-                i++;
-            }
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path) && success;
+            ++index;
         }
-
     }
 
     return success;

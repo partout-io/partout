@@ -39,29 +39,20 @@ bool TunnelRemoteInfoWrapper::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TunnelRemoteInfoWrapper::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TunnelRemoteInfoWrapper::Validate(std::stringstream& msg, const std::string& path_prefix) const
 {
     bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TunnelRemoteInfoWrapper" : pathPrefix;
+    const std::string model_path = path_prefix.empty() ? "TunnelRemoteInfoWrapper" : path_prefix;
 
-    if (modules.has_value())
-    {
-        const std::vector<Partout::Models::TaggedModule>& value = modules.value();
-        const std::string currentValuePath = _pathPrefix + ".modules";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::TaggedModule& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".modules") && success;
-
-                i++;
-            }
+    if (this->modules.has_value()) {
+        const auto& items = this->modules.value();
+        const std::string field_path = model_path + ".modules";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".modules") && success;
+            ++index;
         }
-
     }
 
     return success;

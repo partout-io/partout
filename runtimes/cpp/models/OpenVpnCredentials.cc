@@ -39,12 +39,9 @@ bool OpenVpnCredentials::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnCredentials::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnCredentials::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnCredentials" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool OpenVpnCredentials::operator==(const OpenVpnCredentials& other) const

@@ -19,11 +19,11 @@ public:
     // Maximum wait to establish the transport required before tunnel startup.
     static constexpr auto TransportSetupTimeout = std::chrono::seconds(5);
 
-    PARTOUT_API TunnelController(
+    TunnelController(
         RuntimeLoop &, winrt::Windows::Networking::Vpn::VpnChannel const &channel,
         Models::TunnelControllerOptions controller_options = {}
     );
-    PARTOUT_API ~TunnelController();
+    ~TunnelController();
     TunnelController(const TunnelController &) = delete;
     TunnelController &operator=(const TunnelController &) = delete;
 
@@ -37,10 +37,10 @@ public:
         return monitor_;
     }
 
-    PARTOUT_API std::unique_ptr<Tun> Open(const char *info_json);
-    PARTOUT_API void Close() noexcept;
-    PARTOUT_API void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
-    PARTOUT_API void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
+    std::unique_ptr<Tun> Open(const char *info_json);
+    void Close() noexcept;
+    void Encapsulate(winrt::Windows::Networking::Vpn::VpnPacketBufferList const &packets);
+    void Decapsulate(winrt::Windows::Networking::Vpn::VpnPacketBuffer const &packet);
 
 private:
     void AssociateUnconnected(Socket &socket);

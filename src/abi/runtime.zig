@@ -199,6 +199,9 @@ pub const DaemonRuntime = struct {
 
         self.options = options;
         self.bindings = if (bindings) |b| b.* else null;
+        if (self.bindings) |*owned| {
+            owned.winrt = if (self.platform.winrt) |*winrt| @ptrCast(winrt) else null;
+        }
         return self;
     }
 
@@ -232,6 +235,14 @@ pub const DaemonRuntime = struct {
 fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{InvalidArgs}!net.Platform.Options {
     const value = bindings orelse return error.InvalidArgs;
     const functions = value.controller_functions;
+    var winrt: ?ffi.io.partout_winrt_callbacks = null;
+    if (build_options.winrt) {
+        const raw = value.winrt orelse return error.InvalidArgs;
+        const winrt_ptr: *const ffi.io.partout_winrt_callbacks = @ptrCast(@alignCast(raw));
+        if (winrt_ptr.connect == null or winrt_ptr.submit == null or winrt_ptr.drain == null)
+            return error.InvalidArgs;
+        winrt = winrt_ptr.*;
+    }
     // Check that all controller bindings are non-NULL.
     inline for (@typeInfo(partout_c.partout_controller_functions).@"struct".field_names) |field_name| {
         if (@field(functions, field_name) == null) return error.InvalidArgs;
@@ -249,6 +260,7 @@ fn platformOptions(bindings: ?*const partout_c.partout_daemon_bindings) error{In
             .clear_tunnel = @ptrCast(functions.clear_tunnel),
             .cancel_tunnel = @ptrCast(functions.cancel_tunnel),
         },
+        .winrt = winrt,
         .socket_configurator = .{
             .ctx = value.controller,
             .configure = @ptrCast(functions.configure_sockets),

@@ -3,7 +3,7 @@
 
 #pragma once
 
-#include <partout/IOTypes.h>
+#include <partout_io.h>
 #include <winrt/Windows.Foundation.h>
 #include <winrt/Windows.Networking.Connectivity.h>
 #include <winrt/Windows.Networking.Sockets.h>
@@ -12,17 +12,17 @@
 #include <memory>
 
 namespace Partout {
-
 // Setup and I/O calls run on RuntimeLoop's MTA worker.
 // Callers serialize writes with other writes, open/configuration, channel
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
 class Socket {
 public:
+    using OnReceive = std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
     using Receiver = std::function<void(const uint8_t *, size_t)>;
     using Writer = std::function<int32_t(const uint8_t *, size_t)>;
 
-    Socket(SocketProto proto, bool unconnected);
+    Socket(partout_socket_proto proto, bool unconnected);
     ~Socket() noexcept;
     Socket(const Socket &) = delete;
     Socket &operator=(const Socket &) = delete;
@@ -33,7 +33,7 @@ public:
     // Whether the socket uses application-owned, unconnected UDP.
     bool IsUnconnected() const;
 
-    bool Accepts(const SocketAddress *destination) const {
+    bool Accepts(const partout_socket_address *destination) const {
         return !unconnected_ || (destination && ((destination->family == 4 && accepts_ipv4_) ||
                                                  (destination->family == 6 && accepts_ipv6_)));
     }
@@ -41,16 +41,16 @@ public:
     // Before open: constrain independent UDP to the selected physical adapter.
     void SetAdapter(winrt::Windows::Networking::Connectivity::NetworkAdapter const &adapter);
 
-    bool Open(const char *hostname, uint16_t port, const SocketOpenOptions *options);
-    bool GetAddress(SocketAddress *address);
+    bool Open(const char *hostname, uint16_t port, const partout_socket_open_options *options);
+    bool GetAddress(partout_socket_address *address);
 
     // Removing the callback waits for in-flight delivery under the state mutex.
-    bool SetOnReceive(SocketOnReceive callback);
+    bool SetOnReceive(OnReceive callback);
     void ReportError(int32_t error);
     int32_t WriteStatus() const;
     bool ResumeReading();
     int32_t Write(winrt::Windows::Storage::Streams::Buffer buffer,
-                  const SocketAddress *destination);
+                  const partout_socket_address *destination);
     void StopWrites();
 
     // Drain direct I/O and install the channel writer. Store the returned receiver
@@ -65,7 +65,7 @@ private:
     ReadStream(std::shared_ptr<State> state,
                winrt::Windows::Networking::Sockets::StreamSocket stream);
     void EnqueueWrite(winrt::Windows::Storage::Streams::Buffer buffer,
-                      const SocketAddress *destination);
+                      const partout_socket_address *destination);
     static winrt::Windows::Foundation::IAsyncAction
     WriteQueued(std::shared_ptr<State> state,
                 winrt::Windows::Networking::Sockets::DatagramSocket datagram,

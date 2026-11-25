@@ -43,7 +43,7 @@ struct  IPSocketType
     IPSocketType::eIPSocketType value = IPSocketType::eIPSocketType::INVALID_VALUE_OPENAPI_GENERATED;
 
     // Canonical schema token, independent of the JSON representation.
-    std::string ToString() const;
+    PARTOUT_API std::string ToString() const;
 
     PARTOUT_API bool operator==(const IPSocketType& other) const;
     PARTOUT_API bool operator!=(const IPSocketType& other) const;

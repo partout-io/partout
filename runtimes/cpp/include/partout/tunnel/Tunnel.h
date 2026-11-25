@@ -4,6 +4,7 @@
 
 #pragma once
 #include "TunnelStrategy.h"
+#include <partout/Export.h>
 #include <atomic>
 #include <chrono>
 #include <optional>
@@ -11,7 +12,7 @@
 namespace Partout {
 // Owns registration, connection handover, and pending activation. Snapshots use
 // the same runtime models as the Apple and Android tunnel facades.
-class Tunnel {
+class PARTOUT_API Tunnel {
 public:
     // Default wait for each observed disconnect/connect phase when switching tunnels.
     static constexpr auto HandoverTimeout = std::chrono::seconds(60);

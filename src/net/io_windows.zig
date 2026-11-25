@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 
 //! Windows setup and owned transport capabilities. Native I/O runs on one C++
-//! command worker; callbacks enqueue daemon messages or feed passive consumers.
+//! command worker; winrt enqueue daemon messages or feed passive consumers.
 const std = @import("std");
 const build_options = @import("build_options");
 const ffi = @import("../c/exports.zig");
@@ -17,9 +17,12 @@ fn NativeTransport(comptime side: io.Side) type {
     return struct {
         const Self = @This();
         allocator: std.mem.Allocator,
-        native: *c.winrt_transport,
+        native: *c.partout_transport,
 
-        pub fn wrap(allocator: std.mem.Allocator, native: *c.winrt_transport) std.mem.Allocator.Error!*Self {
+        pub fn wrap(allocator: std.mem.Allocator, native: *c.partout_transport) error{ OutOfMemory, InvalidArgs }!*Self {
+            inline for (.{ "release", "subscribe", "resume", "stop", "write", "local_address" }) |field| {
+                if (@field(native, field) == null) return error.InvalidArgs;
+            }
             const self = try allocator.create(Self);
             self.* = .{ .allocator = allocator, .native = native };
             return self;
@@ -70,7 +73,7 @@ fn NativeTransport(comptime side: io.Side) type {
         // operation; Zig never creates or configures a native socket object.
         pub const create = if (side == .link) createLink else createTun;
 
-        fn createLink(allocator: std.mem.Allocator, endpoint: ?core.api.ExtendedEndpoint, options: io.SocketOptions) std.mem.Allocator.Error!?*Self {
+        fn createLink(allocator: std.mem.Allocator, endpoint: ?core.api.ExtendedEndpoint, options: io.SocketOptions) error{ OutOfMemory, InvalidArgs }!?*Self {
             if (!build_options.winrt) return null;
             if (endpoint == null and !options.ipv4 and !options.ipv6) return null;
             const peer = endpoint orelse core.api.ExtendedEndpoint{
@@ -80,33 +83,30 @@ fn NativeTransport(comptime side: io.Side) type {
             var host: core.util.TemporaryCString = .{};
             try host.init(allocator, peer.address);
             defer host.deinit();
-            const options_ctx = @constCast(&options);
-            const native: *c.winrt_transport = c.winrt_connect(
+            const reachability = options.reachability orelse io.reachabilityNone();
+            const winrt = options.winrt orelse return error.InvalidArgs;
+            const connect = winrt.connect orelse return error.InvalidArgs;
+            const native: *c.partout_transport = connect(
+                winrt.context,
                 host.ptr(),
+                io.socketProto(peer),
                 peer.proto.port,
                 &.{
-                    .tcp = peer.plainSocketType() == .tcp,
                     .unconnected = endpoint == null,
                     .dual_stack = endpoint == null and options.ipv4 and options.ipv6,
                     .timeout_ms = options.timeout_ms,
-                    .configure = configure,
-                    .context = options_ctx,
+                    .reachability = &reachability,
+                    .configure = options.configure,
+                    .configure_ctx = options.configure_ctx,
                 },
             ) orelse return null;
-            // Release the native transport if allocating its Zig wrapper fails.
-            errdefer native.release.?(native.context);
+            // Release the native transport if validating or allocating its wrapper fails.
+            errdefer if (native.release) |release| release(native.context);
             return try wrap(allocator, native);
         }
 
-        fn createTun(allocator: std.mem.Allocator, tun: c.pp_tun) std.mem.Allocator.Error!*Self {
-            return wrap(allocator, @ptrCast(@alignCast(tun)));
-        }
-
-        fn configure(raw: ?*anyopaque, token: usize) callconv(.c) bool {
-            const options: *io.SocketOptions = @ptrCast(@alignCast(raw.?));
-            const callback = options.configure orelse return true;
-            const reachability = options.reachability orelse io.reachabilityNone();
-            return callback(options.configure_ctx, token, &reachability);
+        fn createTun(allocator: std.mem.Allocator, tun: c.pp_tun) error{ OutOfMemory, InvalidArgs }!*Self {
+            return wrap(allocator, @ptrCast(@alignCast(tun orelse return error.InvalidArgs)));
         }
     };
 }

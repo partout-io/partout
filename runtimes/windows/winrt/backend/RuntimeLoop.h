@@ -1,7 +1,6 @@
 // SPDX-FileCopyrightText: 2026 Davide De Rosa
 // SPDX-License-Identifier: GPL-3.0
 #pragma once
-#include <partout/Export.h>
 #include <functional>
 #include <future>
 #include <memory>
@@ -16,18 +15,18 @@ namespace Partout {
 // (or WireGuard's passive adapter); this class never dispatches protocol code.
 class RuntimeLoop {
 public:
-    PARTOUT_API RuntimeLoop();
-    PARTOUT_API ~RuntimeLoop();
+    RuntimeLoop();
+    ~RuntimeLoop();
     RuntimeLoop(const RuntimeLoop &) = delete;
     RuntimeLoop &operator=(const RuntimeLoop &) = delete;
 
     // Borrowed process runtime. Its owner must quiesce all users before destruction.
     // Only one runtime may be active, matching the daemon's process-wide lifetime.
-    PARTOUT_API static RuntimeLoop *Current();
-    PARTOUT_API bool IsWorker() const;
+    static RuntimeLoop *Current();
+    bool IsWorker() const;
     // Queue a command without waiting for its completion.
-    PARTOUT_API void Schedule(std::function<void()> command);
-    PARTOUT_API void Drain();
+    void Schedule(std::function<void()> command);
+    void Drain();
 
     // Run inline on the worker, otherwise wait for the result. Setup and lifecycle
     // barriers only; packet writes and resumes use Schedule.

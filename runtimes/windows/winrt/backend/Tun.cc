@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0
 #include <windows.h>
 #include "Tun.h"
-#include <partout/winrt/log.h>
+#include "Log.h"
 #include <winrt/Windows.Foundation.Collections.h>
 #include <winrt/Windows.Networking.h>
 #include <winrt/Windows.Storage.Streams.h>
@@ -49,8 +49,8 @@ int32_t Tun::State::Write(const uint8_t *bytes, size_t length, bool send) {
         flush();
     } catch (...) {
         const auto error = to_hresult().value;
-        winrt_log(
-            WindowsLogError,
+        Log::Write(
+            PartoutLogLevelError,
             "Partout::Tun: %s write failed: stage=%s, HRESULT=0x%08x, length=%zu, capacity=%u",
             send ? "link" : "TUN", stage, static_cast<unsigned int>(error), length, capacity);
         // Return an unused pool buffer even if preparing the packet failed.
@@ -76,7 +76,7 @@ Tun::~Tun() noexcept {
     if (state_.tun == this) state_.tun = nullptr;
 }
 
-bool Tun::SetOnReceive(TunOnReceive callback) {
+bool Tun::SetOnReceive(OnReceive callback) {
     std::lock_guard lock(state_.receive_mutex);
     if (callback && callback_) return false;
     callback_ = std::move(callback);

@@ -1,116 +1,103 @@
 # SPDX-FileCopyrightText: 2026 Davide De Rosa
 # SPDX-License-Identifier: GPL-3.0
 
-if(TARGET Partout::Models)
-    # Portable C++ lifecycle API and replaceable native mechanisms.
-    add_library(partout-cpp-runtime STATIC "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
-    add_library(Partout::CppRuntime ALIAS partout-cpp-runtime)
-    target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
-    target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
-    if(MSVC)
-        target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
-        if(PP_BUILD_LIBRARY AND PP_BUILD_WINRT)
-            set_target_properties(partout-cpp-runtime PROPERTIES
-                MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-                MSVC_RUNTIME_CHECKS ""
-            )
-        endif()
-    endif()
-endif()
-
-option(PP_TEST_CPP_RUNTIME "Test the portable C++ tunnel lifecycle" OFF)
-if(PP_TEST_CPP_RUNTIME AND TARGET partout-cpp-runtime)
-    enable_testing()
-    add_subdirectory(tests/cpp)
-endif()
-
 if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
 
-# Native integration layers consume the public core ABI.
-if(TARGET partout-winrt-backend)
-    add_library(partout-bindings STATIC
+set(partout_runtime_targets)
+
+if(NOT ANDROID)
+    enable_language(CXX)
+    if(NOT TARGET nlohmann_json::nlohmann_json)
+        include(FetchContent)
+        FetchContent_Declare(json
+            URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
+            URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
+        )
+        set(JSON_Install ${partout_install_sdk})
+        FetchContent_MakeAvailable(json)
+    endif()
+    set(PARTOUT_CPP_ROOT "${CMAKE_CURRENT_LIST_DIR}/../runtimes/cpp")
+    set(PARTOUT_CPP_INCLUDE "${PARTOUT_CPP_ROOT}/include")
+    file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_CPP_ROOT}/models/*.cc")
+    set(partout_cpp_sources ${model_sources}
+        "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
+        "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc"
+        "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
+    add_library(partout-cpp-runtime STATIC ${partout_cpp_sources})
+    set_target_properties(partout-cpp-runtime PROPERTIES UNITY_BUILD ON)
+    target_compile_features(partout-cpp-runtime PUBLIC cxx_std_17)
+    target_compile_definitions(partout-cpp-runtime PUBLIC NOMINMAX)
+    target_include_directories(partout-cpp-runtime SYSTEM PUBLIC
+        "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
+    if(MSVC)
+        target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
+    endif()
+    list(APPEND partout_runtime_targets partout-cpp-runtime)
+endif()
+
+# Native integration layers are linked into the shared library.
+if(PP_BUILD_WINRT)
+    if(CMAKE_VERSION VERSION_LESS 4.0)
+        message(FATAL_ERROR "PP_BUILD_WINRT requires CMake 4.0 or newer")
+    endif()
+    if(NOT WIN32 OR NOT MSVC)
+        message(FATAL_ERROR "PP_BUILD_WINRT requires MSVC and the Windows SDK")
+    endif()
+
+    add_library(partout-winrt-runtime STATIC
         runtimes/windows/winrt/Platform.cc
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/WinRTTunnelStrategy.cc
+        runtimes/windows/winrt/backend/ABI.cc
+        runtimes/windows/winrt/backend/Log.cc
+        runtimes/windows/winrt/backend/NetworkMonitor.cc
+        runtimes/windows/winrt/backend/RuntimeLoop.cc
+        runtimes/windows/winrt/backend/Socket.cc
+        runtimes/windows/winrt/backend/Tun.cc
+        runtimes/windows/winrt/backend/TunnelController.cc
+        runtimes/windows/winrt/backend/TunSettings.cc
     )
-    add_library(Partout::WinRTRuntime ALIAS partout-bindings)
-    target_include_directories(partout-bindings
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
-            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-        PRIVATE src
-    )
-    target_compile_features(partout-bindings PUBLIC cxx_std_20)
-    target_compile_definitions(partout-bindings PRIVATE NOMINMAX WINRT_LEAN_AND_MEAN PARTOUT_API_USE_DLL)
-    target_compile_options(partout-bindings PRIVATE /EHsc /permissive- /W4)
-    # AppContainer consumers use a CRT without the /RTC helpers.
-    set_target_properties(partout-bindings PROPERTIES
-        MSVC_RUNTIME_LIBRARY MultiThreadedDLL
-        MSVC_RUNTIME_CHECKS ""
-    )
-    target_link_libraries(partout-bindings
-        PUBLIC Partout::Partout Partout::CppRuntime windowsapp runtimeobject ws2_32 iphlpapi
-        PRIVATE ole32
-    )
-
-    option(PP_TEST_WINRT_RUNTIME "Test the WinRT runtime" OFF)
-    if(PP_TEST_WINRT_RUNTIME)
-        enable_testing()
-        add_subdirectory(tests/c/windows/winrt)
-    endif()
+    target_include_directories(partout-winrt-runtime PUBLIC
+        "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
+        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/windows/winrt/include>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_include_directories(partout-winrt-runtime PRIVATE src/c/portable/include)
+    target_link_libraries(partout-winrt-runtime
+        PUBLIC Partout::Headers nlohmann_json::nlohmann_json windowsapp runtimeobject ws2_32 iphlpapi
+        PRIVATE ole32)
+    target_compile_features(partout-winrt-runtime PUBLIC cxx_std_20)
+    target_compile_definitions(partout-winrt-runtime
+        PUBLIC NOMINMAX
+        PRIVATE WINRT_LEAN_AND_MEAN)
+    target_compile_options(partout-winrt-runtime PRIVATE /EHsc /permissive- /W4)
+    list(APPEND partout_runtime_targets partout-winrt-runtime)
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
         runtimes/windows/wintun/platform.c
     )
-    add_library(Partout::WintunRuntime ALIAS partout-wintun-runtime)
-    target_include_directories(partout-wintun-runtime PUBLIC
-        "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/include>"
-        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
-    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Partout PRIVATE ole32)
-    set_target_properties(partout-wintun-runtime PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    target_link_libraries(partout-wintun-runtime PUBLIC Partout::Headers PRIVATE ole32)
+    list(APPEND partout_runtime_targets partout-wintun-runtime)
 elseif(ANDROID)
-    add_library(partout-android-runtime OBJECT
-        runtimes/android/native/platform.c
+    add_library(partout-android-runtime STATIC
         runtimes/android/native/jni.c
         runtimes/android/native/partout_jni.c
+        runtimes/android/native/platform.c
     )
-    add_library(Partout::AndroidRuntime ALIAS partout-android-runtime)
     set_target_properties(partout-android-runtime PROPERTIES
-        POSITION_INDEPENDENT_CODE ON
         C_VISIBILITY_PRESET hidden
     )
     target_include_directories(partout-android-runtime PRIVATE src)
-    target_link_libraries(partout-android-runtime PUBLIC Partout::Partout android log)
+    target_link_libraries(partout-android-runtime PUBLIC Partout::Headers PRIVATE android log)
+    list(APPEND partout_runtime_targets partout-android-runtime)
 elseif(UNIX)
     add_library(partout-posix-runtime STATIC
         runtimes/posix/platform.c
     )
-    add_library(Partout::POSIXRuntime ALIAS partout-posix-runtime)
-    target_include_directories(partout-posix-runtime
-        PUBLIC
-            "$<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/runtimes/include>"
-            "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>"
-        PRIVATE src
-    )
-    target_link_libraries(partout-posix-runtime PUBLIC Partout::Partout)
-endif()
-
-# Desktop consumers link the runtime selected by the platform configuration.
-if(TARGET Partout::WinRTRuntime)
-    set(partout_selected_runtime Partout::WinRTRuntime)
-elseif(TARGET Partout::WintunRuntime)
-    set(partout_selected_runtime Partout::WintunRuntime)
-elseif(TARGET Partout::POSIXRuntime)
-    set(partout_selected_runtime Partout::POSIXRuntime)
-else()
-    return()
-endif()
-add_library(partout-runtime INTERFACE)
-add_library(Partout::Runtime ALIAS partout-runtime)
-target_link_libraries(partout-runtime INTERFACE ${partout_selected_runtime})
-if(TARGET partout-cpp-runtime)
-    target_link_libraries(partout-runtime INTERFACE Partout::CppRuntime)
+    target_link_libraries(partout-posix-runtime PUBLIC Partout::Headers)
+    list(APPEND partout_runtime_targets partout-posix-runtime)
 endif()

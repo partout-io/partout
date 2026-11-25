@@ -39,12 +39,9 @@ bool OpenVpnObfuscationMethodXorptrpos::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnObfuscationMethodXorptrpos::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnObfuscationMethodXorptrpos::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnObfuscationMethodXorptrpos" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool OpenVpnObfuscationMethodXorptrpos::operator==(const OpenVpnObfuscationMethodXorptrpos& other) const

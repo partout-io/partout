@@ -10,7 +10,7 @@
 #include <partout/winrt/WinRTTunnelStrategy.h>
 #include <partout/models/TaggedProfile.h>
 #include <partout/models/TunnelSnapshot.h>
-#include <partout/winrt/log.h>
+#include "backend/Log.h"
 #include <appmodel.h>
 #include <winrt/Windows.Data.Xml.Dom.h>
 #include <winrt/Windows.Foundation.Collections.h>
@@ -210,7 +210,7 @@ std::optional<VpnManagementConnectionStatus> WinRTTunnelStrategy::ReadConnection
 
 WinRTTunnelStrategy::WinRTTunnelStrategy(const std::string &server_uri) : server_uri_(server_uri) {
     if (server_uri_.empty()) throw std::invalid_argument("The server URI is empty.");
-    winrt_log(WindowsLogInfo, "Partout::Tunnel initialized\n");
+    Log::Write(PartoutLogLevelInfo, "Partout::Tunnel initialized\n");
 }
 
 std::vector<Models::TunnelSnapshot> WinRTTunnelStrategy::Fetch() {

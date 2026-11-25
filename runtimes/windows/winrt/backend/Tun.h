@@ -2,12 +2,11 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
-#include <partout/Export.h>
 
-#include <partout/IOTypes.h>
 #include "Socket.h"
 #include <winrt/Windows.Networking.Vpn.h>
 #include <atomic>
+#include <functional>
 #include <mutex>
 
 namespace Partout {
@@ -38,13 +37,15 @@ class Tun {
     friend class TunnelController;
 
 public:
+    using OnReceive = std::function<bool(const uint8_t *, size_t, int32_t)>;
+
     explicit Tun(State &state);
-    PARTOUT_API ~Tun() noexcept;
+    ~Tun() noexcept;
     Tun(const Tun &) = delete;
     Tun &operator=(const Tun &) = delete;
 
     // Removing the callback waits for in-flight delivery under the receive mutex.
-    bool SetOnReceive(TunOnReceive callback);
+    bool SetOnReceive(OnReceive callback);
     void ReportError(int32_t error);
 
     int32_t WriteStatus() const {
@@ -56,7 +57,7 @@ public:
 
 private:
     State &state_; // Borrowed; the controller outlives every TUN handle.
-    TunOnReceive callback_ = nullptr;
+    OnReceive callback_ = nullptr;
     std::atomic<int32_t> write_status_{0};
 };
 } // namespace Partout

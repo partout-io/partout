@@ -39,64 +39,31 @@ bool IPSettings::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool IPSettings::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool IPSettings::Validate(std::stringstream& msg, const std::string& path_prefix) const
 {
     bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "IPSettings" : pathPrefix;
+    const std::string model_path = path_prefix.empty() ? "IPSettings" : path_prefix;
 
-    /* subnets */ {
-        const std::vector<std::string>& value = subnets;
-        const std::string currentValuePath = _pathPrefix + ".subnets";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const std::string& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-                i++;
-            }
+    {
+        const auto& items = this->includedRoutes;
+        const std::string field_path = model_path + ".includedRoutes";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".includedRoutes") && success;
+            ++index;
         }
-
     }
 
-    /* includedRoutes */ {
-        const std::vector<Partout::Models::Route>& value = includedRoutes;
-        const std::string currentValuePath = _pathPrefix + ".includedRoutes";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::Route& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".includedRoutes") && success;
-
-                i++;
-            }
+    {
+        const auto& items = this->excludedRoutes;
+        const std::string field_path = model_path + ".excludedRoutes";
+        std::size_t index = 0;
+        for (const auto& item : items) {
+            const std::string item_path = field_path + "[" + std::to_string(index) + "]";
+            success = ValidateModel(item, msg, item_path + ".excludedRoutes") && success;
+            ++index;
         }
-
-    }
-
-    /* excludedRoutes */ {
-        const std::vector<Partout::Models::Route>& value = excludedRoutes;
-        const std::string currentValuePath = _pathPrefix + ".excludedRoutes";
-
-        { // Recursive validation of array elements
-            const std::string oldValuePath = currentValuePath;
-            int i = 0;
-            for (const Partout::Models::Route& value : value)
-            {
-                const std::string currentValuePath = oldValuePath + "[" + std::to_string(i) + "]";
-
-        success = ValidateModel(value, msg, currentValuePath + ".excludedRoutes") && success;
-
-                i++;
-            }
-        }
-
     }
 
     return success;

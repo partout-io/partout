@@ -79,8 +79,8 @@ pub const WindowsLooper = struct {
         if (receipt.code != 0) {
             if (arguments.on_failure) |callback| callback.call(.{ .io = .{
                 .side = receipt.side,
-                .cause = if (receipt.code == c.WindowsEOF) error.EndOfStream else error.LibcFailure,
-                .code = if (receipt.code == c.WindowsEOF) null else receipt.code,
+                .cause = if (receipt.code == c.PartoutTransportEOF) error.EndOfStream else error.LibcFailure,
+                .code = if (receipt.code == c.PartoutTransportEOF) null else receipt.code,
             } });
             attachment.setReading(receipt.generation, false);
             return;

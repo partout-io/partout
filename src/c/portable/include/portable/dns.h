@@ -5,6 +5,7 @@
  */
 
 #pragma once
+#include "partout.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -14,12 +15,7 @@
 #pragma clang assume_nonnull begin
 
 /* Network reachability. */
-typedef struct {
-    bool reachable;
-#if PARTOUT_ANDROID
-    int64_t network_handle;
-#endif
-} pp_reachability;
+typedef partout_reachability pp_reachability;
 static inline pp_reachability pp_reachability_none(void) {
 #if PARTOUT_ANDROID
     static const pp_reachability none = {

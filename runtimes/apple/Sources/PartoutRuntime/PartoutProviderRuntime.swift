@@ -83,7 +83,8 @@ public final class PartoutProviderRuntime: Sendable {
                 if let rawEnvironment = bindings?.pointee.events.ctx {
                     Unmanaged<UserDefaultsEnvironment>.fromOpaque(rawEnvironment).release()
                 }
-            }
+            },
+            winrt: nil
         )
         controller.setNetworkLoggingEnabled(true)
         let result = profileJSON.withCString { profile in

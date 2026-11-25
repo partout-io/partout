@@ -42,7 +42,7 @@ class PartoutWrapper: PartoutWrapperProtocol {
     init {
         runCatching {
             // JNI shared library built by this module's CMake target.
-            System.loadLibrary("partout-jni")
+            System.loadLibrary("partout")
         }.onFailure {
             it.printStackTrace()
             error("Unable to load Partout JNI wrapper")

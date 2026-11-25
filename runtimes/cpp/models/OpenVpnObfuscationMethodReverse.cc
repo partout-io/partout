@@ -39,12 +39,9 @@ bool OpenVpnObfuscationMethodReverse::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool OpenVpnObfuscationMethodReverse::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool OpenVpnObfuscationMethodReverse::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "OpenVpnObfuscationMethodReverse" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool OpenVpnObfuscationMethodReverse::operator==(const OpenVpnObfuscationMethodReverse& other) const

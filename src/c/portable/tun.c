@@ -7,10 +7,12 @@
 #include "portable/tun.h"
 
 #if PARTOUT_WINDOWS && PARTOUT_WINRT
-#include "partout/winrt/abi.h"
+#include "partout_io.h"
 
 void pp_tun_free(pp_tun tun) {
-    winrt_tun_free((winrt_transport *)tun);
+    partout_transport *transport = (partout_transport *)tun;
+    if (!transport || !transport->release) return;
+    transport->release(transport->context);
 }
 #else
 

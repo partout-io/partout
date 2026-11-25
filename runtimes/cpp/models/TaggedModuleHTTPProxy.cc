@@ -39,12 +39,9 @@ bool TaggedModuleHTTPProxy::Validate(std::stringstream& msg) const
     return Validate(msg, "");
 }
 
-bool TaggedModuleHTTPProxy::Validate(std::stringstream& msg, const std::string& pathPrefix) const
+bool TaggedModuleHTTPProxy::Validate(std::stringstream&, const std::string&) const
 {
-    bool success = true;
-    const std::string _pathPrefix = pathPrefix.empty() ? "TaggedModuleHTTPProxy" : pathPrefix;
-
-    return success;
+    return true;
 }
 
 bool TaggedModuleHTTPProxy::operator==(const TaggedModuleHTTPProxy& other) const
