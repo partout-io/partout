@@ -58,17 +58,8 @@ install(TARGETS partout-headers EXPORT PartoutTargets)
 set(PARTOUT_PACKAGE_CPP_RUNTIME OFF)
 if(TARGET partout-cpp-runtime)
     set(PARTOUT_PACKAGE_CPP_RUNTIME ON)
-    if(NOT TARGET partout-cpp-runtime-interface)
-        set_target_properties(partout-cpp-runtime PROPERTIES EXPORT_NAME CppRuntime)
-        install(TARGETS partout-cpp-runtime EXPORT PartoutTargets ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
-    endif()
     install(DIRECTORY "${PARTOUT_CPP_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
-endif()
-
-if(TARGET partout-runtime)
-    set_target_properties(partout-runtime PROPERTIES EXPORT_NAME Runtime)
-    install(TARGETS partout-runtime EXPORT PartoutTargets)
 endif()
 
 include(CMakePackageConfigHelpers)

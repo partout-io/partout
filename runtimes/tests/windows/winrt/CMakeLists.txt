@@ -7,7 +7,7 @@ set_target_properties(partout-runtime-link-test PROPERTIES
     MSVC_RUNTIME_LIBRARY MultiThreadedDLL
     MSVC_RUNTIME_CHECKS ""
 )
-target_link_libraries(partout-runtime-link-test PRIVATE Partout::WinRTRuntime)
+target_link_libraries(partout-runtime-link-test PRIVATE Partout::Partout)
 add_custom_command(TARGET partout-runtime-link-test POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_if_different
         $<TARGET_RUNTIME_DLLS:partout-runtime-link-test>
@@ -30,7 +30,7 @@ foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL
         MSVC_RUNTIME_CHECKS ""
     )
-    target_link_libraries(partout-${test}-test PRIVATE Partout::WinRTRuntime)
+    target_link_libraries(partout-${test}-test PRIVATE Partout::Partout)
     add_custom_command(TARGET partout-${test}-test POST_BUILD
         COMMAND ${CMAKE_COMMAND} -E copy_if_different
             $<TARGET_RUNTIME_DLLS:partout-${test}-test>

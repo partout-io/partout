@@ -38,10 +38,9 @@ targets: [
 
 CMake links the static Zig core, C++ runtime/models, and selected native runtime
 into one shared library: `partout.dll`, `libpartout.so`, or `libpartout.dylib`.
-Link `Partout::Partout`; the component targets also select this shared library.
-C++ runtime/models are enabled by default on desktop builds.
-Android combines the Zig core and JNI runtime in `libpartout.so`. With
-`PP_BUILD_LIBRARY=OFF`, `PP_BUILD_CPP_RUNTIME=ON` builds only the static C++ runtime.
+Link `Partout::Partout`. Desktop builds include the C++ runtime/models; Android
+combines the Zig core and JNI runtime in `libpartout.so`.
+`PP_BUILD_LIBRARY=OFF` exposes only `Partout::Headers`.
 
 Dependencies are resolved from installed CMake packages first.
 Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During
