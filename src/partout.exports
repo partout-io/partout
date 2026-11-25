@@ -16,15 +16,15 @@ _partout_import_module
 _partout_import_module_raw
 _partout_export_module
 
-# Daemon lifecycle
-_partout_daemon_start
-_partout_daemon_hold
-_partout_daemon_stop
+# WireGuard keys
+_partout_wireguard_genkey
+_partout_wireguard_pubkey
 
 # TUN descriptors
 _partout_tun_wrap_fd
 _partout_tun_wrap_callbacks
 
-# WireGuard keys
-_partout_wireguard_genkey
-_partout_wireguard_pubkey
+# Daemon lifecycle
+_partout_daemon_start
+_partout_daemon_hold
+_partout_daemon_stop

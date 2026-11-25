@@ -18,6 +18,14 @@ extern "C" {
 /* Returns the library version. The returned string must not be freed. */
 const char *partout_version(void);
 
+/* Operation result codes (e.g. daemon startup). */
+typedef enum {
+    PartoutCompletionCodeOK         = 0,
+    PartoutCompletionCodeMemory     = -3,
+    PartoutCompletionCodeArgs       = -2,
+    PartoutCompletionCodeFailure    = -1
+} partout_completion_code;
+
 /* Logging configuration. */
 typedef enum {
     PartoutLogLevelFault = 0,
@@ -26,10 +34,12 @@ typedef enum {
     PartoutLogLevelInfo,
     PartoutLogLevelDebug
 } partout_log_level;
+
 /* profile_id is a full UUID, or NULL for global records. message has no context
  * prefix. Both strings are borrowed for the duration of the callback only.
  * ctx is the caller-owned logger_ctx, independent of the record's profile. */
 typedef void (*partout_logger_cb)(void *ctx, const char *profile_id, int level, const char *message);
+
 typedef struct {
     /* Maximum accepted severity (PartoutLogLevel*). Invalid values use Debug. */
     int log_level;
@@ -39,14 +49,6 @@ typedef struct {
 } partout_init_args;
 /* Configures process-wide logging. Keep logger_ctx alive while registered. */
 void partout_init(const partout_init_args *args);
-
-/* Daemon startup result codes. */
-typedef enum {
-    PartoutCompletionCodeOK         = 0,
-    PartoutCompletionCodeMemory     = -3,
-    PartoutCompletionCodeArgs       = -2,
-    PartoutCompletionCodeFailure    = -1
-} partout_completion_code;
 
 /* Import functions return an ABIEnvelope JSON string containing a result or error.
  * The caller must free the returned string. NULL means no result was produced. */
@@ -67,14 +69,22 @@ char *partout_import_module_raw(const char *text, const char *context_json);
  * The caller must free the returned string. */
 char *partout_export_module(const char *module_json);
 
-/* Optional daemon event callbacks. */
-typedef struct {
-    void *ctx;
-    void (*set_connection_status)(void *ctx, const char *status);
-    void (*set_data_count)(void *ctx, uint64_t received, uint64_t sent);
-    void (*set_last_error_code)(void *ctx, const char *code);
-    void (*remove)(void *ctx, const char *key);
-} partout_daemon_events;
+/* WireGuard keys are base64-encoded. Returns NULL on failure or if WireGuard
+ * is unavailable. The caller must free returned strings. */
+char *partout_wireguard_genkey(void);
+char *partout_wireguard_pubkey(const char *key);
+
+/* Runtime integration: consumers may implement the TUN and controller contracts
+ * below. Socket transport and executor implementations remain owned by the core
+ * and its bundled platform runtime; they are not public replacement hooks. */
+
+/* Packet callback results: nonnegative byte count, or a negative error.
+ * Other failures return -1 and preserve the platform's native last error. */
+typedef enum {
+    PartoutIOWouldBlock = -11,
+    PartoutIONoBufs = -12,
+    PartoutIONoSpace = -13
+} partout_io_result;
 
 /* Opaque TUN handle. */
 typedef struct __partout_tun_struct *partout_tun;
@@ -84,14 +94,6 @@ typedef struct __partout_tun_struct *partout_tun;
  * Otherwise, the caller must keep the descriptor open until TUN release.
  * Failure leaves the descriptor with the caller. */
 partout_tun partout_tun_wrap_fd(int fd, bool owned);
-
-/* Packet callback results: nonnegative byte count, or a negative error.
- * Other failures return -1 and preserve the platform's native last error. */
-typedef enum {
-    PartoutIOWouldBlock = -11,
-    PartoutIONoBufs = -12,
-    PartoutIONoSpace = -13
-} partout_io_result;
 
 /* Nonblocking packet I/O uses raw IP packets without platform headers. */
 typedef struct {
@@ -109,21 +111,18 @@ typedef struct {
  * backends (POSIX and Windows/Wintun); returns NULL on WinRT. */
 partout_tun partout_tun_wrap_callbacks(void *ctx, const partout_tun_callbacks *callbacks);
 
-typedef struct {
-    bool reachable;
-#if defined(__ANDROID__)
-    int64_t network_handle;
-#endif
-} partout_reachability;
-
 #if defined(_WIN32)
 typedef uintptr_t partout_socket_descriptor;
 #else
 typedef int partout_socket_descriptor;
 #endif
 
-/* Optional platform-specific operation table. */
-typedef struct partout_winrt_callbacks partout_winrt_callbacks;
+typedef struct {
+    bool reachable;
+#if defined(__ANDROID__)
+    int64_t network_handle;
+#endif
+} partout_reachability;
 
 typedef struct {
     void *ctx;
@@ -145,6 +144,15 @@ typedef struct {
                               const partout_socket_descriptor *sockets, size_t count);
 } partout_controller_functions;
 
+/* Optional daemon event callbacks. */
+typedef struct {
+    void *ctx;
+    void (*set_connection_status)(void *ctx, const char *status);
+    void (*set_data_count)(void *ctx, uint64_t received, uint64_t sent);
+    void (*set_last_error_code)(void *ctx, const char *code);
+    void (*remove)(void *ctx, const char *key);
+} partout_daemon_events;
+
 /* Runtime callbacks and context. The core copies the bindings and WinRT table.
  * The runtime must keep controller/context resources alive until release.
  * Callback strings and arrays are borrowed for the duration of each call.
@@ -157,8 +165,10 @@ typedef struct __partout_daemon_bindings {
     /* Optional cleanup, called on startup failure or daemon destruction.
      * Releases referenced resources, not this struct. */
     void (*release)(struct __partout_daemon_bindings *);
-    /* Required for WinRT builds, otherwise ignored. Nullable on other platforms. */
-    const partout_winrt_callbacks *winrt;
+    /* Reserved for the bundled WinRT runtime; custom runtimes must leave NULL.
+     * A WinRT core requires these capabilities, so custom bindings alone cannot
+     * start it. See the internal ABI note below. */
+    const struct partout_winrt_callbacks *winrt;
 } partout_daemon_bindings;
 
 /* Provided by the POSIX and Wintun runtimes. Initializes controller ownership
@@ -204,10 +214,15 @@ int partout_daemon_start(const partout_daemon_start_args *args);
 void partout_daemon_hold(void);
 void partout_daemon_stop(void);
 
-/* WireGuard keys are base64-encoded. Returns NULL on failure or if WireGuard
- * is unavailable. The caller must free returned strings. */
-char *partout_wireguard_genkey(void);
-char *partout_wireguard_pubkey(const char *key);
+/* Internal ABI -- not a consumer extension point.
+ *
+ * The bundled WinRT runtime supplies this opaque transport/executor capability
+ * table through daemon_bindings.winrt. Its definition is private and is not
+ * installed with the SDK. Consumers must not construct or replace it. The
+ * pointer remains in the bindings layout solely for core/runtime integration;
+ * it does not expose a supported custom transport or executor API.
+ */
+typedef struct partout_winrt_callbacks partout_winrt_callbacks;
 
 #ifdef __cplusplus
 }
