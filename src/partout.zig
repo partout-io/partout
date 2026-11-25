@@ -221,6 +221,17 @@ pub export fn partout_wireguard_pubkey(
     ) catch return null;
 }
 
+pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_fd")) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
+}
+
+pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
+    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return null;
+    if (callbacks == null) return null;
+    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
+}
+
 pub export fn partout_daemon_start(
     args_pointer: ?*const partout_c.partout_daemon_start_args,
 ) callconv(.c) c_int {
@@ -265,17 +276,6 @@ pub export fn partout_daemon_start(
 pub export fn partout_daemon_hold() callconv(.c) void {
     const runtime = daemon_runtime orelse return;
     runtime.hold();
-}
-
-pub export fn partout_tun_wrap_fd(fd: c_int, owned: bool) callconv(.c) partout_c.partout_tun {
-    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_fd")) return null;
-    return @ptrCast(ffi.io.pp_tun_wrap_fd(fd, owned));
-}
-
-pub export fn partout_tun_wrap_callbacks(ctx: ?*anyopaque, callbacks: [*c]const partout_c.partout_tun_callbacks) callconv(.c) partout_c.partout_tun {
-    if (comptime !@hasDecl(ffi.io, "pp_tun_wrap_callbacks")) return null;
-    if (callbacks == null) return null;
-    return @ptrCast(ffi.io.pp_tun_wrap_callbacks(ctx, @ptrCast(callbacks)));
 }
 
 pub export fn partout_daemon_stop() callconv(.c) void {
