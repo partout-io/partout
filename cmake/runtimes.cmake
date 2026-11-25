@@ -80,11 +80,13 @@ elseif(PP_BUILD_WINTUN)
         runtimes/windows/wintun/platform.c
         runtimes/windows/wintun/NetworkSettings.cc
     )
-    target_include_directories(partout-wintun-runtime PRIVATE src/c/portable/include "${WINTUN_DIR}")
+    target_include_directories(partout-wintun-runtime PRIVATE
+        src/c/portable/include "${WINTUN_DIR}" "${PARTOUT_CPP_INCLUDE}")
     target_compile_definitions(partout-wintun-runtime PRIVATE NOMINMAX WIN32_LEAN_AND_MEAN)
+    target_compile_features(partout-wintun-runtime PRIVATE cxx_std_17)
     target_compile_options(partout-wintun-runtime PRIVATE /EHsc)
     target_link_libraries(partout-wintun-runtime PUBLIC Partout::Headers
-        PRIVATE partout-cpp-runtime ole32 iphlpapi ws2_32)
+        PRIVATE nlohmann_json::nlohmann_json ole32 iphlpapi ws2_32)
     list(APPEND partout_runtime_targets partout-wintun-runtime)
 elseif(ANDROID)
     add_library(partout-android-runtime STATIC
