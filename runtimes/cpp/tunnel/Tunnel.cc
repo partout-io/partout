@@ -14,6 +14,8 @@ Tunnel::Tunnel(
     if (!strategy_) throw std::invalid_argument("A tunnel strategy is required.");
 }
 
+Tunnel::~Tunnel() = default;
+
 std::vector<Models::TunnelSnapshot> Tunnel::Fetch() {
     RequireActive();
     return strategy_->Fetch();
