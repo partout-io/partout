@@ -36,8 +36,12 @@ targets: [
 
 ### CMake
 
-CMake builds the native shared library and its selected backends.
-Native runtime targets link against `Partout::Partout`.
+CMake links the static Zig core, C++ runtime/models, and selected native runtime
+into one shared library: `partout.dll`, `libpartout.so`, or `libpartout.dylib`.
+Link `Partout::Partout`; the component targets also select this shared library.
+C++ runtime/models are enabled by default on desktop builds.
+Android combines the Zig core and JNI runtime in `libpartout.so`. With
+`PP_BUILD_LIBRARY=OFF`, `PP_BUILD_CPP_RUNTIME=ON` builds only the static C++ runtime.
 
 Dependencies are resolved from installed CMake packages first.
 Use `CMAKE_PREFIX_PATH`, `OpenSSL_DIR`, or `MbedTLS_DIR` to supply packages. During

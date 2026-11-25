@@ -134,7 +134,17 @@ file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports R
 list(TRANSFORM partout_exports REPLACE "^_" "")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
 
+if(PP_BUILD_WINTUN OR (UNIX AND NOT ANDROID))
+    list(APPEND partout_exports partout_platform_bindings_init)
+endif()
+
 if(APPLE)
+    set(partout_apple_exports ${partout_exports})
+    list(TRANSFORM partout_apple_exports PREPEND "_")
+    list(APPEND partout_apple_exports "__ZN7Partout*" "__ZNK7Partout*" "__ZT?N7Partout*")
+    list(JOIN partout_apple_exports "\n" partout_apple_exports)
+    file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
+        CONTENT "@partout_apple_exports@\n" @ONLY)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
         "Install name for the Apple shared library"
     )
@@ -143,10 +153,10 @@ if(APPLE)
         "LINKER:-install_name,${PP_BUILD_APPLE_INSTALL_NAME}"
         "LINKER:-compatibility_version,1.0.0" "LINKER:-current_version,1.0.0"
         "LINKER:-dead_strip" "LINKER:-rpath,@loader_path"
-        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
     )
     set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
-        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+        "${CMAKE_CURRENT_BINARY_DIR}/partout.exports"
     )
     target_link_libraries(partout PRIVATE "-framework CoreFoundation" "-framework Security")
 endif()
@@ -161,7 +171,7 @@ if(WIN32)
         MSVC_RUNTIME_CHECKS ""
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
-    # The core DLL exports only the public Zig/C ABI.
+    # C++ exports are annotated in the static runtime implementations.
     foreach(symbol IN LISTS partout_exports)
         target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
     endforeach()
@@ -172,7 +182,9 @@ elseif(NOT APPLE)
     set_target_properties(partout PROPERTIES BUILD_RPATH "$ORIGIN" INSTALL_RPATH "$ORIGIN")
     if(ANDROID)
         target_link_libraries(partout PRIVATE android)
+        list(APPEND partout_exports JNI_OnLoad "Java_io_partout_PartoutWrapper_*")
     endif()
+    list(APPEND partout_exports "_ZN7Partout*" "_ZNK7Partout*" "_ZT?N7Partout*")
     list(JOIN partout_exports "; " partout_elf_exports)
     file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
         CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY

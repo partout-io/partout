@@ -13,7 +13,7 @@ int main() {
     Partout::Tunnel tunnel(std::make_unique<Partout::WinRTTunnelStrategy>("https://localhost"));
     tunnel.Cancel();
     try {
-        // Resolves runtime methods against the shared core and runtime.
+        // Resolves runtime methods against the combined shared library.
         // Rejects an absent channel before touching OS VPN configuration.
         Partout::VpnChannelRuntime runtime(nullptr, "{}", {}, {});
         return 2;

@@ -6,13 +6,9 @@ execute_process(COMMAND "${LINKER}" /dump /exports "${LIBRARY}"
 if(NOT result EQUAL 0)
     message(FATAL_ERROR "Cannot inspect DLL exports: ${error}")
 endif()
-# MSVC template instantiations start with ??$. Exporting them pulls private STL
-# implementation code and long decorated names into the public export table.
-if(exports MATCHES "\\?\\?\\$")
-    message(FATAL_ERROR "The DLL exports private template instantiations")
-endif()
-if(NOT exports MATCHES "partout_version" OR exports MATCHES "\\?")
-    message(FATAL_ERROR "The core DLL must export only its C API")
+if(NOT exports MATCHES "partout_version" OR NOT exports MATCHES "VpnChannelRuntime"
+   OR NOT exports MATCHES "Tunnel@Partout" OR NOT exports MATCHES "ToString")
+    message(FATAL_ERROR "The DLL must export the core, C++ models, and WinRT runtime")
 endif()
 
 execute_process(COMMAND "${LINKER}" /dump /imports "${LIBRARY}"

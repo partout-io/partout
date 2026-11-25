@@ -21,6 +21,9 @@ jobs:
           - name: Linux x64
             runs_on: ubuntu-latest
             arch: x64
+          - name: macOS ARM64
+            runs_on: macos-latest
+            arch: arm64
     steps:
       - uses: actions/checkout@v7
       - name: Set up Visual Studio
@@ -47,7 +50,7 @@ jobs:
         shell: pwsh
         run: ctest --test-dir .cmake -C Release --output-on-failure --no-tests=error
       - name: Build with CMake (no vendors)
-        if: runner.os == 'Linux'
+        if: runner.os != 'Windows'
         shell: bash
         run: |
           cmake -G Ninja -S . -B .cmake -DCMAKE_BUILD_TYPE=Release \

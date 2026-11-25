@@ -38,3 +38,9 @@ foreach(test source IN ZIP_LISTS winrt_tests winrt_test_sources)
         COMMAND_EXPAND_LISTS)
     add_test(NAME partout-${test} COMMAND partout-${test}-test)
 endforeach()
+
+# Backend unit tests use the private static implementation; the public link test
+# above exercises the installed DLL API without exporting internal helpers.
+foreach(test IN ITEMS log network tun_settings runtime-loop)
+    target_link_libraries(partout-${test}-test PRIVATE partout-winrt-runtime)
+endforeach()
