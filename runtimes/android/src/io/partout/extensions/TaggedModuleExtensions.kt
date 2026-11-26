@@ -40,3 +40,12 @@ val TaggedModule.isInteractive: Boolean
         is TaggedModuleOpenVPN -> value.isInteractive
         else -> false
     }
+
+fun TaggedModule.withInteractiveLogin(
+    username: String,
+    password: String,
+    otp: String? = null
+): TaggedModule = when (this) {
+    is TaggedModuleOpenVPN -> copy(value = value.withInteractiveLogin(username, password, otp))
+    else -> this
+}

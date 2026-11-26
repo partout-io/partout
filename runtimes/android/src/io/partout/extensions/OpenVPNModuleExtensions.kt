@@ -39,3 +39,33 @@ fun OpenVPNCredentialsOTPMethod.encodedPassword(
         }
     }
 }
+
+internal fun OpenVPNModule.withInteractiveLogin(
+    username: String,
+    password: String,
+    otp: String?
+): OpenVPNModule {
+    if (!isInteractive) return this
+    val existingCredentials = credentials
+    val otpMethod = existingCredentials?.otpMethod ?: OpenVPNCredentialsOTPMethod.none
+    val credentialUsername = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
+        username
+    } else {
+        existingCredentials?.username.orEmpty()
+    }
+    val credentialPassword = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
+        password
+    } else {
+        otpMethod.encodedPassword(
+            password = existingCredentials?.password.orEmpty(),
+            otp = otp.orEmpty()
+        )
+    }
+    return copy(
+        credentials = OpenVPNCredentials(
+            otpMethod = OpenVPNCredentialsOTPMethod.none,
+            password = credentialPassword,
+            username = credentialUsername
+        )
+    )
+}

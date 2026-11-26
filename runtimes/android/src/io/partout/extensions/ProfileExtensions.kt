@@ -4,10 +4,7 @@
 
 package io.partout.extensions
 
-import io.partout.models.OpenVPNCredentials
-import io.partout.models.OpenVPNCredentialsOTPMethod
 import io.partout.models.TaggedModule
-import io.partout.models.TaggedModuleOpenVPN
 import io.partout.models.TaggedProfile
 import io.partout.models.TunnelRemoteInfoWrapper
 
@@ -51,44 +48,16 @@ val TaggedProfile.interactiveModule: TaggedModule?
         it.moduleId in activeModulesIds && it.isInteractive
     }
 
-fun TaggedProfile.withInteractiveOpenVPNCredentials(
+fun TaggedProfile.withInteractiveLogin(
     username: String,
     password: String,
     otp: String? = null
 ): TaggedProfile {
-    val candidate = interactiveModule
-    if (candidate !is TaggedModuleOpenVPN) {
-        return this
-    }
-    val module = candidate.value
-    val existingCredentials = module.credentials
-    val otpMethod = existingCredentials?.otpMethod ?: OpenVPNCredentialsOTPMethod.none
-    val credentialUsername = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
-        username
-    } else {
-        existingCredentials?.username.orEmpty()
-    }
-    val credentialPassword = if (otpMethod == OpenVPNCredentialsOTPMethod.none) {
-        password
-    } else {
-        otpMethod.encodedPassword(
-            password = existingCredentials?.password.orEmpty(),
-            otp = otp.orEmpty()
-        )
-    }
-    val credentials = OpenVPNCredentials(
-        otpMethod = OpenVPNCredentialsOTPMethod.none,
-        password = credentialPassword,
-        username = credentialUsername
-    )
+    val candidate = interactiveModule ?: return this
     return copy(
         modules = modules.map { tagged ->
-            if (tagged is TaggedModuleOpenVPN && tagged.value.id == module.id) {
-                tagged.copy(
-                    value = tagged.value.copy(
-                        credentials = credentials
-                    )
-                )
+            if (tagged.moduleId == candidate.moduleId) {
+                tagged.withInteractiveLogin(username, password, otp)
             } else {
                 tagged
             }
