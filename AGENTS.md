@@ -21,10 +21,32 @@
 
 ## C++
 
+- Declare concrete classes `final` by default. Use inheritance only from
+  pure-virtual interfaces, UI classes, or exception classes (such as
+  `std::exception` and `std::runtime_error`). Pure-virtual interfaces expose
+  abstract operations and may have a default virtual destructor. Outside UI and
+  exception hierarchies, do not inherit implementation; use composition instead.
+  Leave UI and exception classes extensible only when they are intentional bases;
+  do not leave classes open for
+  hypothetical future subclasses. This rule applies to both `class` and `struct`.
+  Apply changes to generated classes through their generator rather than editing
+  generated output.
+
+- Apply `PARTOUT_API` to individual out-of-line functions that cross the library
+  boundary, not to entire classes or structs. Inline methods, pure virtual
+  declarations, and data-only types do not need export annotations.
 - Order `.cc` content after includes consistently: anonymous namespace helpers,
-  then file-level `using` directives, then Partout entity implementations. Keep
+  then any necessary file-level `using` directives, then entity implementations. Keep
   helpers together rather than interleaving anonymous namespace blocks with
-  implementations. Use explicit qualification inside helpers where needed.
+  implementations. Anonymous namespaces must be standalone at file scope, never
+  nested inside a named namespace. Place them before file-level `using`
+  directives and named entity implementations. Explicitly qualify references to
+  project types and functions inside helpers; do not use a namespace-wide `using`
+  directive there to recreate the enclosing namespace's lookup.
+- Omit redundant `using namespace` directives. Names in the enclosing namespace
+  are already visible, including in the parameters and body of a qualified
+  function definition. Retain directives only where unqualified names need them,
+  such as return types or class names before a qualified function's declarator.
 - Use C++20 features only for designated initializers. Prefer clear, conventional pre-C++20 constructs and avoid obscure patterns.
 - Use PascalCase for all methods, public and private, and named constants.
 - Use snake_case for C++ variables, parameters, and data members. Preserve the

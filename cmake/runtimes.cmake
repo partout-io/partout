@@ -49,12 +49,12 @@ if(PP_BUILD_WINRT)
     endif()
 
     add_library(partout-winrt-runtime STATIC
-        runtimes/windows/winrt/Platform.cc
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/WinRTTunnelStrategy.cc
         runtimes/windows/winrt/backend/ABI.cc
         runtimes/windows/winrt/backend/Log.cc
         runtimes/windows/winrt/backend/NetworkMonitor.cc
+        runtimes/windows/winrt/backend/Platform.cc
         runtimes/windows/winrt/backend/RuntimeLoop.cc
         runtimes/windows/winrt/backend/Socket.cc
         runtimes/windows/winrt/backend/Tun.cc

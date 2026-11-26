@@ -18,7 +18,7 @@ struct Route;
 } // namespace Models
 
 // Validated channel settings from negotiated IP/DNS modules.
-class TunSettings {
+class TunSettings final {
 public:
     explicit TunSettings(const char *json, Models::TunnelControllerOptions controller_options = {});
 

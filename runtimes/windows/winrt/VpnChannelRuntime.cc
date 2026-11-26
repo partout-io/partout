@@ -17,7 +17,7 @@
 #include <partout/winrt/VpnChannelRuntime.h>
 #include "backend/Log.h"
 #include "backend/ABI.h"
-#include "Platform.h"
+#include "backend/Platform.h"
 #include "backend/TunnelController.h"
 #include "backend/RuntimeLoop.h"
 
