@@ -10,7 +10,7 @@
 #include <optional>
 
 namespace Partout {
-class NetworkMonitor {
+class NetworkMonitor final {
 public:
     // Adapter identity matters even when reachability remains true during a handoff.
     struct Path {

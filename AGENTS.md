@@ -21,6 +21,17 @@
 
 ## C++
 
+- Declare concrete classes `final` by default. Use inheritance only from
+  pure-virtual interfaces, UI classes, or exception classes (such as
+  `std::exception` and `std::runtime_error`). Pure-virtual interfaces expose
+  abstract operations and may have a default virtual destructor. Outside UI and
+  exception hierarchies, do not inherit implementation; use composition instead.
+  Leave UI and exception classes extensible only when they are intentional bases;
+  do not leave classes open for
+  hypothetical future subclasses. This rule applies to both `class` and `struct`.
+  Apply changes to generated classes through their generator rather than editing
+  generated output.
+
 - Apply `PARTOUT_API` to individual out-of-line functions that cross the library
   boundary, not to entire classes or structs. Inline methods, pure virtual
   declarations, and data-only types do not need export annotations.

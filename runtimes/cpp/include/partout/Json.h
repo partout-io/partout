@@ -17,7 +17,7 @@
 namespace Partout {
 
 // Application-facing JSON value. The backend and its exceptions stay behind this API.
-class Json {
+class Json final {
     template<typename Operation>
     static auto TranslateErrors(Operation operation) -> decltype(operation()) {
         try {
@@ -27,7 +27,7 @@ class Json {
         }
     }
 public:
-    class Error : public std::runtime_error {
+    class Error final : public std::runtime_error {
     public:
         using std::runtime_error::runtime_error;
     };

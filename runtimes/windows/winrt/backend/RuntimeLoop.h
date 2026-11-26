@@ -13,7 +13,7 @@
 namespace Partout {
 // One native command worker. Completions go directly to the consumer's mailbox
 // (or WireGuard's passive adapter); this class never dispatches protocol code.
-class RuntimeLoop {
+class RuntimeLoop final {
 public:
     RuntimeLoop();
     ~RuntimeLoop();

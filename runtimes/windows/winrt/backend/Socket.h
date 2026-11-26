@@ -16,7 +16,7 @@ namespace Partout {
 // Callers serialize writes with other writes, open/configuration, channel
 // takeover, and destruction. Keep the socket alive until
 // all calls return. StopWrites and receive callback management may overlap Write.
-class Socket {
+class Socket final {
 public:
     using OnReceive = std::function<bool(const uint8_t *, size_t, const partout_socket_address *, int32_t)>;
     using Receiver = std::function<void(const uint8_t *, size_t)>;
