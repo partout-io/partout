@@ -34,6 +34,10 @@ extension Module {
         false
     }
 
+    public func withInteractiveLogin(username: String, password: String, otp: String?) throws -> Module {
+        self
+    }
+
     public var isMutuallyExclusive: Bool {
         true
     }

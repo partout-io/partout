@@ -12,6 +12,21 @@ extension OpenVPNModule: Module, BuildableType {
         return configuration?.staticChallenge ?? requiresInteractiveCredentials ?? false
     }
 
+    public func withInteractiveLogin(username: String, password: String, otp: String?) throws -> Module {
+        guard isInteractive else { return self }
+        var builder = builder()
+        var credentials = credentials?.builder() ?? OpenVPN.Credentials.Builder()
+        credentials.username = username
+        if credentials.otpMethod == .none {
+            credentials.password = password
+            credentials.otp = nil
+        } else {
+            credentials.otp = otp
+        }
+        builder.credentials = credentials.build()
+        return try builder.build()
+    }
+
     public func builder() -> Builder {
         Builder(
             id: id,

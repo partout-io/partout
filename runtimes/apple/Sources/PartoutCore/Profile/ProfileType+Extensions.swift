@@ -131,3 +131,15 @@ extension ProfileType where GenericModuleType == Module {
         }
     }
 }
+
+extension Profile {
+    public func withInteractiveLogin(username: String, password: String, otp: String? = nil) throws -> Profile {
+        guard let candidate = interactiveModules?.first else { return self }
+        var builder = builder()
+        builder.modules = try modules.map { module in
+            guard module.id == candidate.id else { return module }
+            return try module.withInteractiveLogin(username: username, password: password, otp: otp)
+        }
+        return try builder.build()
+    }
+}
