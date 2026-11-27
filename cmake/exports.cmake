@@ -105,7 +105,8 @@ elseif(NOT APPLE)
     # Android exports only the Zig C ABI and JNI entry points.
     if(ANDROID)
         target_link_libraries(partout PRIVATE android)
-        list(APPEND partout_exports JNI_OnLoad "Java_io_partout_PartoutWrapper_*")
+        set(PARTOUT_JNI_PREFIX "Java_io_partout_")
+        list(APPEND partout_exports JNI_OnLoad "${PARTOUT_JNI_PREFIX}*")
         list(JOIN partout_exports "; " partout_elf_exports)
         file(CONFIGURE OUTPUT "${CMAKE_CURRENT_BINARY_DIR}/partout.map"
             CONTENT "{ global: @partout_elf_exports@; local: *; };\n" @ONLY
@@ -114,5 +115,13 @@ elseif(NOT APPLE)
             "LINKER:--version-script,${CMAKE_CURRENT_BINARY_DIR}/partout.map"
         )
         set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/partout.map")
+        set(partout_jni_check "${CMAKE_CURRENT_SOURCE_DIR}/runtimes/android/verify-jni.cmake")
+        set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS "${partout_jni_check}")
+        add_custom_command(TARGET partout POST_BUILD
+            COMMAND "${CMAKE_COMMAND}" "-DNM=${CMAKE_NM}" "-DLIBRARY=$<TARGET_FILE:partout>"
+                "-DJNI_PREFIX=${PARTOUT_JNI_PREFIX}"
+                -P "${partout_jni_check}"
+            COMMENT "Verifying Android JNI exports"
+            VERBATIM)
     endif()
 endif()
