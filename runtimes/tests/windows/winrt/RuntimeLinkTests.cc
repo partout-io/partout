@@ -15,7 +15,13 @@ int main() {
     try {
         // Resolves runtime methods against the combined shared library.
         // Rejects an absent channel before touching OS VPN configuration.
-        Partout::VpnChannelRuntime runtime(nullptr, "{}", {}, {});
+        Partout::Runtime::InitializationOptions initialization{};
+        initialization.log_level = Partout::Runtime::LogLevel::Info;
+        Partout::Runtime::DaemonOptions options{};
+        options.cache_dir = std::string("temporary-cache");
+        options.starts_immediately = true;
+        options.crypto = Partout::Runtime::CryptoBackend::MbedTLS;
+        Partout::VpnChannelRuntime runtime(nullptr, std::string("{}"), initialization, options);
         return 2;
     } catch (const winrt::hresult_invalid_argument &) {
         return 0;

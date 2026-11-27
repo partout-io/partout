@@ -5,7 +5,7 @@
 #pragma once
 #include <chrono>
 #include <partout/Export.h>
-#include <partout.h>
+#include <partout/Runtime.h>
 #include <partout/models/TunnelControllerOptions.h>
 #include <memory>
 #include <winrt/Windows.Networking.Vpn.h>
@@ -26,9 +26,9 @@ public:
     // Runtime preferences shared with the Apple and Android controllers.
     PARTOUT_RUNTIME_API VpnChannelRuntime(
         winrt::Windows::Networking::Vpn::VpnChannel const &channel,
-        const char *profile,
-        const partout_init_args &init_args,
-        const partout_daemon_options &options,
+        const std::string &profile,
+        const Runtime::InitializationOptions &init_args,
+        const Runtime::DaemonOptions &options,
         Models::TunnelControllerOptions controller_options = {}
     );
     VpnChannelRuntime(const VpnChannelRuntime &) = delete;

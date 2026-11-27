@@ -15,6 +15,7 @@
 #include <winrt/Windows.Security.Credentials.h>
 #include <partout/extensions/ProfileExtensions.h>
 #include <partout/winrt/VpnChannelRuntime.h>
+#include <partout.h>
 #include "backend/Log.h"
 #include "backend/ABI.h"
 #include "backend/Platform.h"
@@ -53,8 +54,8 @@ struct VpnChannelRuntime::Impl {
     std::condition_variable startup_changed;
     StartupStatus startup_status = StartupStatus::waiting;
 
-    Impl(VpnChannel const &value, const char *profile_json, const partout_init_args &initialization,
-         const partout_daemon_options &daemon_options, Models::TunnelControllerOptions controller_options_value
+    Impl(VpnChannel const &value, const std::string &profile_json, const Runtime::InitializationOptions &initialization,
+         const Runtime::DaemonOptions &daemon_options, Models::TunnelControllerOptions controller_options_value
     );
     ~Impl();
 
@@ -68,10 +69,11 @@ struct VpnChannelRuntime::Impl {
 };
 
 VpnChannelRuntime::VpnChannelRuntime(VpnChannel const &channel,
-                                     const char *profile,
-                                     const partout_init_args &init_args,
-                                     const partout_daemon_options &options,
-                                     Models::TunnelControllerOptions controller_options)
+                                     const std::string &profile,
+                                     const Runtime::InitializationOptions &init_args,
+                                     const Runtime::DaemonOptions &options,
+                                     Models::TunnelControllerOptions controller_options
+)
     : impl_(std::make_unique<Impl>(channel, profile, init_args, options, std::move(controller_options))) {}
 
 VpnChannelRuntime::~VpnChannelRuntime() = default;
@@ -126,18 +128,32 @@ void VpnChannelRuntime::Cancel() noexcept {
 
 VpnChannelRuntime::Impl::Impl(
     VpnChannel const &value,
-    const char *profile_json,
-    const partout_init_args &initialization,
-    const partout_daemon_options &daemon_options,
+    const std::string &profile_json,
+    const Runtime::InitializationOptions &initialization,
+    const Runtime::DaemonOptions &daemon_options,
     Models::TunnelControllerOptions controller_options_value
 )
-    : channel(value), profile(profile_json ? profile_json : ""),
-      cache_dir(daemon_options.cache_dir ? daemon_options.cache_dir : ""),
-      init_args(initialization), options(daemon_options), controller_options(std::move(controller_options_value)) {
-    if (!channel || profile.empty() || options.is_daemon) {
+    : channel(value), profile(profile_json),
+      cache_dir(daemon_options.cache_dir.value_or(std::string())),
+      init_args{}, options{}, controller_options(std::move(controller_options_value)) {
+    if (!channel || profile.empty()) {
         throw hresult_invalid_argument();
     }
+    init_args.log_level = static_cast<int>(initialization.log_level);
+    init_args.logs_private_data = initialization.logs_private_data;
+    init_args.logger_fn = initialization.logger_fn;
+    init_args.logger_ctx = initialization.logger_ctx;
+    options.starts_immediately = daemon_options.starts_immediately;
+    options.cancels_unrecoverable = daemon_options.cancels_unrecoverable;
     options.cache_dir = daemon_options.cache_dir ? cache_dir.c_str() : nullptr;
+    options.min_data_count_delta = daemon_options.min_data_count_delta;
+    switch (daemon_options.crypto) {
+        case Runtime::CryptoBackend::Default: options.crypto = PartoutCryptoDefault; break;
+        case Runtime::CryptoBackend::OpenSSL: options.crypto = PartoutCryptoOpenSSL; break;
+        case Runtime::CryptoBackend::MbedTLS: options.crypto = PartoutCryptoMbedTLS; break;
+        case Runtime::CryptoBackend::Native: options.crypto = PartoutCryptoNative; break;
+        default: throw hresult_invalid_argument();
+    }
 }
 
 VpnChannelRuntime::Impl::~Impl() {

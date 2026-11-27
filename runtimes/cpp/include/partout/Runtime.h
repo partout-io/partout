@@ -4,6 +4,7 @@
 #include <partout/Export.h>
 #include <partout/models/TaggedProfile.h>
 #include <optional>
+#include <cstdint>
 #include <string>
 
 namespace Partout::Runtime {
@@ -19,6 +20,17 @@ struct InitializationOptions final {
 };
 
 PARTOUT_RUNTIME_API void Initialize(const InitializationOptions &options);
+
+enum class CryptoBackend { Default, OpenSSL, MbedTLS, Native };
+
+struct DaemonOptions final {
+    bool starts_immediately = false;
+    bool cancels_unrecoverable = false;
+    // Absent selects the system temporary directory; the runtime copies storage.
+    std::optional<std::string> cache_dir;
+    std::uint64_t min_data_count_delta = 0;
+    CryptoBackend crypto = CryptoBackend::Default;
+};
 
 // Throws a sanitized runtime_error on import failure, without configuration data.
 PARTOUT_RUNTIME_API Models::TaggedProfile ImportProfile(
