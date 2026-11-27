@@ -80,7 +80,7 @@ void pp_clog_v(pp_log_level level, const char *fmt, ...) {
         return;
     }
     const size_t msg_len = (size_t)formatted_len + 1;
-    char *msg = pp_alloc(msg_len);
+    char *msg = (char *)pp_alloc(msg_len);
     va_start(args, fmt);
     vsnprintf(msg, msg_len, fmt, args);
     va_end(args);

@@ -7,8 +7,15 @@ project(Partout LANGUAGES C)
 include(GNUInstallDirs)
 
 option(PP_BUILD_LIBRARY "Build the Partout library" ON)
+option(PP_BUILD_CPP_RUNTIME "Build the portable C++ runtime" OFF)
 option(PP_BUILD_WINRT "Build the WinRT VpnChannel runtime" OFF)
 option(PP_BUILD_WINTUN "Build the Wintun/Winsock runtime" OFF)
+if(PP_BUILD_WINRT)
+    set(PP_BUILD_CPP_RUNTIME ON)
+endif()
+if(APPLE AND PP_BUILD_CPP_RUNTIME)
+    message(FATAL_ERROR "The C++ runtime is not supported on Apple platforms; set PP_BUILD_CPP_RUNTIME=OFF")
+endif()
 if(WIN32 AND NOT PP_BUILD_WINRT AND NOT PP_BUILD_WINTUN)
     message(FATAL_ERROR "Windows builds require either PP_BUILD_WINRT or PP_BUILD_WINTUN")
 endif()
@@ -60,6 +67,15 @@ endif()
 # Distribute as SDK only if built as top level project.
 set(partout_install_sdk ${PROJECT_IS_TOP_LEVEL})
 
+# ABI visibility is independent of whether the C++ runtime is built.
+set(partout_export_c_abi ON)
+set(partout_export_cpp_abi ${PP_BUILD_CPP_RUNTIME})
+if(PP_BUILD_WINRT)
+    set(partout_export_c_abi OFF)
+elseif(PP_BUILD_WINTUN)
+    set(partout_export_cpp_abi OFF)
+endif()
+
 # Resolve the Apple SDK once for both Zig and the Go bridge.
 if(APPLE)
     if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")
@@ -84,6 +100,7 @@ target_include_directories(partout-headers INTERFACE
 
 include("cmake/vendors.cmake")
 include("cmake/core.cmake")
+include("cmake/models.cmake")
 include("cmake/runtimes.cmake")
 include("cmake/exports.cmake")
 include("cmake/install.cmake")

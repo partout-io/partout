@@ -10,8 +10,10 @@ add_executable(partout-cpp-profile-extensions-test ProfileExtensionsTests.cc)
 target_link_libraries(partout-cpp-tunnel-test PRIVATE Partout::Partout)
 target_link_libraries(partout-cpp-profile-extensions-test PRIVATE Partout::Partout)
 add_executable(partout-cpp-models-test ModelsTests.cc)
-target_link_libraries(partout-cpp-models-test PRIVATE Partout::Partout)
-foreach(test IN ITEMS tunnel profile-extensions models)
+add_executable(partout-cpp-runtime-test RuntimeTests.cc)
+target_link_libraries(partout-cpp-runtime-test PRIVATE Partout::Partout)
+target_link_libraries(partout-cpp-models-test PRIVATE Partout::Models)
+foreach(test IN ITEMS tunnel profile-extensions models runtime)
     set(target partout-cpp-${test}-test)
     if(MSVC)
         target_compile_options(${target} PRIVATE /EHsc
@@ -23,7 +25,7 @@ foreach(test IN ITEMS tunnel profile-extensions models)
     else()
         target_compile_options(${target} PRIVATE -UNDEBUG)
     endif()
-    if(WIN32)
+    if(WIN32 AND NOT test STREQUAL "models")
         add_custom_command(TARGET ${target} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_if_different
                 $<TARGET_RUNTIME_DLLS:${target}> $<TARGET_FILE_DIR:${target}>
@@ -31,3 +33,10 @@ foreach(test IN ITEMS tunnel profile-extensions models)
     endif()
     add_test(NAME partout-cpp-${test} COMMAND ${target})
 endforeach()
+
+if(WIN32)
+    add_test(NAME partout-cpp-models-static COMMAND ${CMAKE_COMMAND}
+        "-DLINKER=${CMAKE_LINKER}"
+        "-DEXECUTABLE=$<TARGET_FILE:partout-cpp-models-test>"
+        -P "${CMAKE_CURRENT_SOURCE_DIR}/models-static.cmake")
+endif()

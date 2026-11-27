@@ -25,6 +25,13 @@
 #undef _Nonnull
 #endif
 
+/* Nullability annotations are a Clang extension. */
+#if !defined(__clang__)
+#define _Nonnull
+#define _Nullable
+#define _Null_unspecified
+#endif
+
 #if defined(__APPLE__)
 #include <TargetConditionals.h>
 #define PARTOUT_APPLE       1
