@@ -109,8 +109,11 @@ bin/linux-aarch64/partout/lib/libpartout.so
 # Android
 bin/android-aarch64/partout/lib/libpartout.so
 # Windows
-bin/windows-arm64/partout/bin/partout.dll
+bin/windows-arm64/partout/bin/Release/partout.dll
 ```
+
+Multi-config generators keep build outputs in `Debug` or `Release` subdirectories;
+installation still places libraries in the configured install destinations.
 
 Partout must be bundled with the enabled shared vendor libraries to work. Building for Android requires access to the Android NDK.
 

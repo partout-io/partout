@@ -283,11 +283,11 @@ fn pathOption(
         if (required) std.debug.panic("-{s} is required by the selected build options", .{name});
         return null;
     };
-    // Path existence and vendor framework probes affect the configured graph.
-    b.graph.poisonCache();
     if (raw.len == 0) std.debug.panic("-{s} cannot be empty", .{name});
 
     const path = if (std.fs.path.isAbsolute(raw)) raw else (b.root.joinString(b.allocator, raw) catch @panic("OOM"));
+    // Track existence checks without disabling the build configuration cache.
+    b.dependOnDirectoryContents(.{ .cwd_relative = std.fs.path.dirname(path) orelse path });
     std.Io.Dir.cwd().access(b.graph.io, path, .{}) catch
         std.debug.panic("-{s} path is missing: {s}", .{ name, path });
     return b.dupe(path);
@@ -533,6 +533,7 @@ fn addVendorIncludePaths(
         const include_path = paths.include orelse continue;
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
+            b.dependOnDirectoryContents(.{ .cwd_relative = include_path });
             const framework = b.fmt("{s}/{s}.framework", .{ include_path, framework_name });
             std.Io.Dir.cwd().access(b.graph.io, framework, .{}) catch {
                 consumer.addSystemIncludePath(.{ .cwd_relative = include_path });
@@ -565,6 +566,7 @@ fn linkTestLibraries(
         };
         const framework_name = paths.vendor.frameworkName();
         if (config.target.result.os.tag.isDarwin()) {
+            b.dependOnDirectoryContents(.{ .cwd_relative = library_path });
             const framework = b.fmt("{s}/{s}.framework", .{ library_path, framework_name });
             std.Io.Dir.cwd().access(b.graph.io, framework, .{}) catch {
                 const archive = b.fmt(

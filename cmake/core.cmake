@@ -5,7 +5,7 @@ endif()
 if(WIN32 AND NOT MSVC)
     message(FATAL_ERROR "The Windows core DLL requires MSVC")
 endif()
-set(PARTOUT_ZIG_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/zig-core")
+set(PARTOUT_ZIG_PREFIX "${CMAKE_CURRENT_BINARY_DIR}/zig-core/$<CONFIG>")
 
 # Build options and enabled backends.
 set(PARTOUT_ZIG_ARGS build install
@@ -98,6 +98,8 @@ endif()
 # Zig compiles the static core; CMake owns the final shared library.
 find_program(PARTOUT_ZIG_EXECUTABLE zig REQUIRED)
 set(PARTOUT_ZIG_LIBRARY "${PARTOUT_ZIG_PREFIX}/lib/${CMAKE_STATIC_LIBRARY_PREFIX}partout${CMAKE_STATIC_LIBRARY_SUFFIX}")
+# Let Zig track transitive Zig/C/SDK inputs and reuse its build cache. A CMake
+# source-only stamp would miss dependencies discovered by Zig.
 add_custom_target(partout-zig ALL
     COMMAND "${PARTOUT_ZIG_EXECUTABLE}" ${PARTOUT_ZIG_ARGS}
     BYPRODUCTS ${PARTOUT_ZIG_LIBRARY}

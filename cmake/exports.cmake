@@ -16,9 +16,9 @@ if(MSVC)
 endif()
 set_target_properties(partout PROPERTIES
     LINKER_LANGUAGE C
-    LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
-    RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
-    ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/$<0:>"
+    LIBRARY_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/${PARTOUT_OUTPUT_CONFIG}$<0:>"
+    RUNTIME_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/${PARTOUT_OUTPUT_CONFIG}$<0:>"
+    ARCHIVE_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/lib/${PARTOUT_OUTPUT_CONFIG}$<0:>"
     LINK_DEPENDS "${PARTOUT_ZIG_LIBRARY}"
 )
 add_dependencies(partout partout-zig)
@@ -81,7 +81,7 @@ if(WIN32)
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
     target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
     set_target_properties(partout PROPERTIES
-        PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/$<0:>"
+        PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/${PARTOUT_OUTPUT_CONFIG}$<0:>"
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
     # C++ exports are annotated in the static runtime implementations.
