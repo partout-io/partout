@@ -45,6 +45,7 @@ if(NOT ANDROID AND PP_BUILD_CPP)
     endif()
 
     set(partout_cpp_sources
+        "${PARTOUT_CPP_ROOT}/Runtime.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc"
         "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
@@ -56,9 +57,13 @@ if(NOT ANDROID AND PP_BUILD_CPP)
         "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
+    target_link_libraries(partout-cpp-runtime PRIVATE Partout::Headers)
+    target_include_directories(partout-cpp-runtime PRIVATE src/c/portable/include)
     target_precompile_headers(partout-cpp-runtime PRIVATE <partout/Json.h>)
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
+        # The portable allocation helpers use Clang nullability annotations.
+        target_compile_definitions(partout-cpp-runtime PRIVATE _Nullable= _Nonnull=)
     endif()
     list(APPEND partout_runtime_targets partout-cpp-runtime)
 endif()
