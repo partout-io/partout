@@ -62,6 +62,10 @@ $dumpbin = Get-RequiredCommandPath "dumpbin.exe"
 Write-Host "Using dumpbin: $dumpbin"
 Write-Host "Verifying install directory: $installRoot"
 
+if (Test-Path -LiteralPath (Join-Path $installRoot "include\partout.h")) {
+    throw "The Windows SDK must not install the internal C ABI header"
+}
+
 $requiredArtifacts = @(
     "bin\partout.dll",
     "lib\partout.lib",

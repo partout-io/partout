@@ -46,9 +46,10 @@ if(NOT partout_install_sdk)
     return()
 endif()
 
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
-    DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
-)
+if(partout_export_c_abi)
+    install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.h"
+        DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}")
+endif()
 if(TARGET partout-winrt-runtime)
     install(DIRECTORY runtimes/windows/winrt/include/partout
         DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"

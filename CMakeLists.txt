@@ -67,6 +67,12 @@ endif()
 # Distribute as SDK only if built as top level project.
 set(partout_install_sdk ${PROJECT_IS_TOP_LEVEL})
 
+# Windows consumers use the C++ runtime; other platforms retain the C ABI.
+set(partout_export_c_abi ON)
+if(WIN32)
+    set(partout_export_c_abi OFF)
+endif()
+
 # Resolve the Apple SDK once for both Zig and the Go bridge.
 if(APPLE)
     if(IS_DIRECTORY "${CMAKE_OSX_SYSROOT}")

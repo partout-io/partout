@@ -52,9 +52,12 @@ if(TARGET partout-cpp-runtime)
     set_target_properties(partout PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
-list(TRANSFORM partout_exports REPLACE "^_" "")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
+set(partout_exports)
+if(partout_export_c_abi)
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
+    list(TRANSFORM partout_exports REPLACE "^_" "")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
+endif()
 
 if(APPLE)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
@@ -85,10 +88,7 @@ if(WIN32)
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/${PARTOUT_OUTPUT_CONFIG}$<0:>"
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
-    # C++ exports are annotated in the static runtime implementations.
-    foreach(symbol IN LISTS partout_exports)
-        target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
-    endforeach()
+    # Windows exposes only the annotated C++ runtime. The C ABI stays internal.
     target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32 ntdll)
 elseif(NOT APPLE)
     find_package(Threads REQUIRED)
