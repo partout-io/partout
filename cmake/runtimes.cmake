@@ -7,7 +7,7 @@ endif()
 
 set(partout_runtime_targets)
 
-if(NOT ANDROID)
+if(NOT ANDROID AND PP_BUILD_CPP)
     enable_language(CXX)
     if(NOT TARGET nlohmann_json::nlohmann_json)
         include(FetchContent)
