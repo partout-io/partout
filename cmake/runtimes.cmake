@@ -28,10 +28,6 @@ if(NOT ANDROID AND PP_BUILD_CPP_RUNTIME)
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
     endif()
-    # The portable allocation helpers use Clang nullability annotations.
-    if(NOT CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-        target_compile_definitions(partout-cpp-runtime PRIVATE _Nullable= _Nonnull=)
-    endif()
     list(APPEND partout_runtime_targets partout-cpp-runtime)
 endif()
 
