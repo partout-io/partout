@@ -9,7 +9,7 @@ set(partout_runtime_targets)
 set_source_files_properties(runtimes/platform_stub.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 # Wintun uses models internally even without the portable C++ runtime.
-if(NOT ANDROID AND (PP_BUILD_CPP OR PP_BUILD_WINTUN))
+if(NOT ANDROID AND (PP_BUILD_CPP_RUNTIME OR PP_BUILD_WINTUN))
     enable_language(CXX)
     if(NOT TARGET nlohmann_json::nlohmann_json)
         include(FetchContent)
@@ -49,7 +49,7 @@ if(NOT ANDROID AND (PP_BUILD_CPP OR PP_BUILD_WINTUN))
     endif()
 endif()
 
-if(NOT ANDROID AND PP_BUILD_CPP)
+if(NOT ANDROID AND PP_BUILD_CPP_RUNTIME)
     set(partout_cpp_sources
         "${PARTOUT_CPP_ROOT}/Runtime.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
