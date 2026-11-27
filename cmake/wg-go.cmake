@@ -143,9 +143,9 @@ add_custom_command(OUTPUT "${wg_library}" ${wg_implib}
 # Keep compilation outputs local to each CMake configuration. Publish runtimes
 # beside Partout as well, so the build output can be loaded before installation.
 if(NOT APPLE)
-    set(wg_runtime_destination "${wg_output}/lib")
+    set(wg_runtime_destination "${wg_output}/lib/${PARTOUT_OUTPUT_CONFIG}")
     if(WIN32)
-        set(wg_runtime_destination "${wg_output}/bin")
+        set(wg_runtime_destination "${wg_output}/bin/${PARTOUT_OUTPUT_CONFIG}")
         set(wg_copy_implib
             COMMAND "${CMAKE_COMMAND}" -E make_directory "${wg_output}/lib"
             COMMAND "${CMAKE_COMMAND}" -E copy_if_different "${wg_implib}" "${wg_output}/lib/"

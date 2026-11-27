@@ -33,6 +33,7 @@ if(NOT ANDROID)
         "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
+    target_precompile_headers(partout-cpp-runtime PRIVATE <partout/Json.h>)
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
     endif()
@@ -74,6 +75,18 @@ if(PP_BUILD_WINRT)
         PUBLIC NOMINMAX
         PRIVATE WINRT_LEAN_AND_MEAN)
     target_compile_options(partout-winrt-runtime PRIVATE /EHsc /permissive- /W4)
+    # Parse the common Windows projections once. Winsock must precede windows.h.
+    target_precompile_headers(partout-winrt-runtime PRIVATE
+        <winsock2.h>
+        <winrt/Windows.Foundation.h>
+        <winrt/Windows.Foundation.Collections.h>
+        <winrt/Windows.Networking.h>
+        <winrt/Windows.Networking.Connectivity.h>
+        <winrt/Windows.Networking.Sockets.h>
+        <winrt/Windows.Networking.Vpn.h>
+        <winrt/Windows.Storage.Streams.h>
+        <partout/Json.h>
+    )
     list(APPEND partout_runtime_targets partout-winrt-runtime)
 elseif(PP_BUILD_WINTUN)
     add_library(partout-wintun-runtime STATIC
