@@ -3,4 +3,4 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pub const identifier = "io.partout";
-pub const number = "0.175.1";
+pub const number = "0.175.2";
