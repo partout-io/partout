@@ -114,6 +114,7 @@ int main() {
     credentials.username = "user";
     credentials.password = "one-time";
     tunnel.Connect(second, credentials);
+    assert(tunnel.PendingProfile() == second.id);
     Throws([&] {
         tunnel.Save(first);
     });
@@ -124,12 +125,13 @@ int main() {
     tunnel.Advance();
     assert(native->connections == std::vector<std::string>{second.id});
     assert(native->credentials->password == "one-time");
-    assert(native->saves == 3);
+    assert(native->saves == 4);
     Throws([&] {
         tunnel.Save(first);
     });
     native->SetStatus(second.id, Models::TunnelStatus::active);
     tunnel.Advance();
+    assert(!tunnel.PendingProfile());
     tunnel.Save(first);
 
     // An unobservable registration must not be treated as an absent one.
@@ -158,6 +160,20 @@ int main() {
         tunnel.Advance();
     });
     tunnel.Save(first);
+
+    // Connect installs a new profile; removal waits for native disconnection.
+    const auto third = Profile("third");
+    tunnel.Connect(third);
+    assert(native->connections.back() == third.id);
+    assert(tunnel.PendingProfile() == third.id);
+    tunnel.Remove(third.id);
+    assert(!tunnel.PendingProfile());
+    assert(native->snapshots.size() == 3);
+    tunnel.Advance();
+    assert(native->snapshots.size() == 3);
+    native->SetStatus(third.id, Models::TunnelStatus::inactive);
+    tunnel.Advance();
+    assert(native->snapshots.size() == 2);
 
     // Cancellation ends management without asking the backend to disconnect.
     tunnel.Connect(first);

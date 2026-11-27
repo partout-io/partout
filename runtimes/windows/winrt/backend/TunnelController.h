@@ -14,7 +14,7 @@ class RuntimeLoop;
 
 // Association, Open and Close run on the same native worker. Destruction follows
 // daemon shutdown. Native receives share Tun's gate.
-class TunnelController {
+class TunnelController final {
 public:
     // Maximum wait to establish the transport required before tunnel startup.
     static constexpr auto TransportSetupTimeout = std::chrono::seconds(5);

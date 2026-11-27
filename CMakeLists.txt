@@ -50,6 +50,13 @@ set(PP_BUILD_OUTPUT "${CMAKE_CURRENT_SOURCE_DIR}/bin/${PLATFORM_NAME}-${ARCH_NAM
     CACHE PATH "Build output directory")
 file(TO_CMAKE_PATH "${PP_BUILD_OUTPUT}" PP_BUILD_OUTPUT)
 
+# Multi-config generators must not overwrite another configuration's runtimes.
+get_property(partout_multi_config GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+set(PARTOUT_OUTPUT_CONFIG "")
+if(partout_multi_config)
+    set(PARTOUT_OUTPUT_CONFIG "$<CONFIG>/")
+endif()
+
 # Distribute as SDK only if built as top level project.
 set(partout_install_sdk ${PROJECT_IS_TOP_LEVEL})
 

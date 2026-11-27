@@ -7,7 +7,6 @@ package io.partout.extensions
 import io.partout.models.OpenVPNCredentials
 import io.partout.models.OpenVPNCredentialsOTPMethod
 import io.partout.models.OpenVPNModule
-import kotlin.io.encoding.Base64
 
 val OpenVPNModule.isInteractive: Boolean
     get() {
@@ -25,17 +24,20 @@ val OpenVPNModule.requiresCredentials: Boolean
 val OpenVPNCredentials.isEmpty: Boolean
     get() = username.isEmpty() && password.isEmpty()
 
-fun OpenVPNCredentialsOTPMethod.encodedPassword(
+internal fun OpenVPNModule.withInteractiveLogin(
+    username: String,
     password: String,
-    otp: String
-): String {
-    return when (this) {
-        OpenVPNCredentialsOTPMethod.none -> password
-        OpenVPNCredentialsOTPMethod.append -> password + otp
-        OpenVPNCredentialsOTPMethod.encode -> {
-            val base64Password = Base64.encode(password.toByteArray(Charsets.UTF_8))
-            val base64OTP = Base64.encode(otp.toByteArray(Charsets.UTF_8))
-            "SCRV1:$base64Password:$base64OTP"
-        }
-    }
+    otp: String?
+): OpenVPNModule {
+    if (!isInteractive) return this
+    val existingCredentials = credentials
+    val otpMethod = existingCredentials?.otpMethod ?: OpenVPNCredentialsOTPMethod.none
+    return copy(
+        credentials = OpenVPNCredentials(
+            username = username,
+            password = if (otpMethod == OpenVPNCredentialsOTPMethod.none) password else existingCredentials?.password.orEmpty(),
+            otpMethod = otpMethod,
+            otp = if (otpMethod == OpenVPNCredentialsOTPMethod.none) null else otp
+        )
+    )
 }

@@ -14,7 +14,7 @@ namespace Partout {
 // One runtime per channel. Callbacks must be serialized by the consumer.
 // Profile and cache_dir are copied; logger_ctx must outlive the runtime and
 // remain valid while registered with Partout's process-wide logger.
-class VpnChannelRuntime {
+class VpnChannelRuntime final {
 public:
     // Maximum wait for the started tunnel engine to report a connected state.
     static constexpr auto StartupTimeout = std::chrono::seconds(30);

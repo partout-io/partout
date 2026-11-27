@@ -1,8 +1,10 @@
 include(GNUInstallDirs)
 
 set(partout_install_sdk_export)
+set(partout_install_sdk_archive)
 if(partout_install_sdk)
     set(partout_install_sdk_export EXPORT PartoutTargets)
+    set(partout_install_sdk_archive ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
 endif()
 
 if(WIN32)
@@ -16,7 +18,7 @@ if(PP_BUILD_LIBRARY)
     install(TARGETS partout ${partout_install_sdk_export}
         LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
         RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}"
-        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
+        ${partout_install_sdk_archive}
     )
 endif()
 if(PARTOUT_RUNTIME_LIBRARIES)

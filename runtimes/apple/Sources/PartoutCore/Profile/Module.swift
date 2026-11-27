@@ -21,6 +21,9 @@ public protocol Module: UniquelyIdentifiable, Sendable {
     /// True if requires user input before connecting.
     var isInteractive: Bool { get }
 
+    /// Applies input for an interactive connection without changing the saved module.
+    func withInteractiveLogin(username: String, password: String, otp: String?) throws -> Module
+
     /// True if only one module of this type can be active in a ``Profile``.
     var isMutuallyExclusive: Bool { get }
 

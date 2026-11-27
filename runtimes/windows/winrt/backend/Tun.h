@@ -12,9 +12,9 @@
 namespace Partout {
 // Lifecycle and writes run on the native command worker. StopWrites is atomic.
 // Receive callbacks only enqueue borrowed input and must not reenter TUN APIs.
-class Tun {
+class Tun final {
     // Owned by the controller; TUN handles and the socket writer borrow it.
-    class State {
+    class State final {
     public:
         winrt::Windows::Networking::Vpn::VpnChannel channel;
         // Held throughout native delivery and callback removal. The current Tun is

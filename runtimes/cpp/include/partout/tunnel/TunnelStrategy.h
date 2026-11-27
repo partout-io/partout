@@ -3,7 +3,6 @@
 // SPDX-License-Identifier: GPL-3.0
 
 #pragma once
-#include <partout/Export.h>
 #include <partout/models/TaggedProfile.h>
 #include <partout/models/TunnelSnapshot.h>
 #include "TunnelCredentials.h"
@@ -12,7 +11,7 @@
 #include <stdexcept>
 
 namespace Partout {
-class PARTOUT_API TunnelStrategy {
+class TunnelStrategy {
 public:
     virtual ~TunnelStrategy() = default;
 

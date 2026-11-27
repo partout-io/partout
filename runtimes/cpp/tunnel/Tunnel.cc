@@ -47,8 +47,6 @@ void Tunnel::Connect(const Models::TaggedProfile &profile, std::optional<TunnelC
     const auto errors = ObservationErrors();
     if (const auto failure = errors.find(profile.id); failure != errors.end())
         throw std::runtime_error(failure->second);
-    if (std::none_of(tunnels.begin(), tunnels.end(), [&](const auto &tunnel) { return tunnel.id == profile.id; }))
-        throw std::runtime_error("The VPN profile is not installed.");
     for (const auto &tunnel : tunnels) {
         if (tunnel.id == profile.id && tunnel.status.value == Models::TunnelStatus::active) return;
     }
@@ -79,20 +77,31 @@ void Tunnel::Remove(const std::string &id) {
         throw std::runtime_error("Unable to observe the VPN profile before removal.");
     for (const auto &tunnel : tunnels) {
         if (tunnel.id != id || tunnel.status.value == Models::TunnelStatus::inactive) continue;
-        strategy_->Disconnect(id);
+        if (tunnel.status.value != Models::TunnelStatus::deactivating) strategy_->Disconnect(id);
         // An accepted disconnect is not necessarily a completed disconnect.
         const auto current_tunnels = Fetch();
         if (ObservationErrors().count(id))
             throw std::runtime_error("Unable to observe the VPN profile after disconnection.");
         for (const auto &current : current_tunnels) {
-            if (current.id == id && current.status.value != Models::TunnelStatus::inactive)
-                throw std::runtime_error("The VPN is still disconnecting. Retry removal when disconnected.");
+            if (current.id == id && current.status.value != Models::TunnelStatus::inactive) {
+                pending_removals_.insert(id);
+                return;
+            }
         }
     }
     strategy_->Remove(id);
+    pending_removals_.erase(id);
+}
+
+std::optional<std::string> Tunnel::PendingProfile() const {
+    if (!pending_profile_) return {};
+    return pending_profile_->id;
 }
 
 void Tunnel::Advance() {
+    auto removals = std::move(pending_removals_);
+    pending_removals_.clear();
+    for (const auto &id : removals) Remove(id);
     if (!pending_profile_) return;
     try {
         const auto tunnels = Fetch();
@@ -125,6 +134,7 @@ void Tunnel::Advance() {
         }
         // Wait for observed connections; unavailable registrations are neither
         // treated as disconnected nor selected for automatic disconnection.
+        strategy_->Save(*pending_profile_);
         if (pending_credentials_) strategy_->ConnectWithCredentials(pending_profile_->id, *pending_credentials_);
         else strategy_->Connect(pending_profile_->id);
         pending_credentials_.reset();

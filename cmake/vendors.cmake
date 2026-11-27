@@ -102,8 +102,10 @@ function(partout_find_vendor package vendor target)
         set(version 3)
     endif()
     if(NOT (APPLE AND PP_BUILD_APPLE_PREBUILTS))
-        # Never discover host packages implicitly while cross-compiling.
-        if(CMAKE_CROSSCOMPILING)
+        # MSVC can target another Windows architecture without CMake reporting
+        # cross-compilation. Prefer explicit package paths or matching prebuilts,
+        # never an implicitly discovered host installation (e.g. runner OpenSSL).
+        if(CMAKE_CROSSCOMPILING OR WIN32)
             set(search_options NO_CMAKE_SYSTEM_PATH NO_SYSTEM_ENVIRONMENT_PATH
                 NO_CMAKE_PACKAGE_REGISTRY NO_CMAKE_SYSTEM_PACKAGE_REGISTRY
             )
@@ -125,7 +127,8 @@ function(partout_find_vendor package vendor target)
         endif()
         find_package(${package} ${version} QUIET CONFIG GLOBAL ${search_options})
         # Many system OpenSSL installations expose only CMake's FindOpenSSL module.
-        if(NOT TARGET ${target} AND package STREQUAL "OpenSSL" AND NOT CMAKE_CROSSCOMPILING)
+        if(NOT TARGET ${target} AND package STREQUAL "OpenSSL" AND
+            NOT CMAKE_CROSSCOMPILING AND NOT WIN32)
             find_package(OpenSSL 3 QUIET MODULE GLOBAL)
         endif()
     endif()
