@@ -177,7 +177,8 @@ typedef struct __partout_daemon_bindings {
 
 /* Initializes default controller bindings, if provided by the selected runtime,
  * and preserves the caller's event callbacks. Pass bindings to daemon_start,
- * which owns release even on startup failure. Availability is build-dependent. */
+ * which owns release even on startup failure. Returns false without changing
+ * bindings when the selected runtime does not provide default bindings. */
 bool partout_platform_bindings_init(partout_daemon_bindings *bindings);
 
 /* Core daemon ABI. */

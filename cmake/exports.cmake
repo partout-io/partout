@@ -55,12 +55,6 @@ file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports R
 list(TRANSFORM partout_exports REPLACE "^_" "")
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
 
-if(PP_BUILD_WINTUN OR (UNIX AND NOT ANDROID))
-    list(APPEND partout_exports partout_platform_bindings_init)
-endif()
-
-# Desktop exports use Zig export declarations and C++ PARTOUT_API visibility.
-# A linker allowlist would hide the annotated C++ API as well.
 if(APPLE)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
         "Install name for the Apple shared library"
@@ -72,6 +66,12 @@ if(APPLE)
         "LINKER:-dead_strip" "LINKER:-rpath,@loader_path"
     )
     target_link_libraries(partout PRIVATE "-framework CoreFoundation" "-framework Security")
+    target_link_options(partout PRIVATE
+        "LINKER:-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+    )
+    set_property(TARGET partout APPEND PROPERTY LINK_DEPENDS
+        "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports"
+    )
 endif()
 
 if(WIN32)

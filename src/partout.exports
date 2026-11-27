@@ -28,6 +28,9 @@ _partout_wireguard_pubkey
 _partout_tun_wrap_fd
 _partout_tun_wrap_callbacks
 
+# Platform bindings
+_partout_platform_bindings_init
+
 # Core daemon ABI
 
 # Daemon lifecycle
