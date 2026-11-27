@@ -22,7 +22,29 @@ if(NOT ANDROID AND PP_BUILD_CPP)
     set(PARTOUT_CPP_ROOT "${CMAKE_CURRENT_LIST_DIR}/../runtimes/cpp")
     set(PARTOUT_CPP_INCLUDE "${PARTOUT_CPP_ROOT}/include")
     file(GLOB model_sources CONFIGURE_DEPENDS "${PARTOUT_CPP_ROOT}/models/*.cc")
-    set(partout_cpp_sources ${model_sources}
+    # Model implementations belong to consumers, not the DLL export surface.
+    # Keep one object per model so each link pulls only the models it needs.
+    add_library(partout-models STATIC ${model_sources})
+    add_library(Partout::Models ALIAS partout-models)
+    set_target_properties(partout-models PROPERTIES
+        UNITY_BUILD OFF
+        POSITION_INDEPENDENT_CODE ON
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON)
+    target_compile_features(partout-models PUBLIC cxx_std_17)
+    target_compile_definitions(partout-models PUBLIC NOMINMAX)
+    target_include_directories(partout-models SYSTEM PUBLIC
+        "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
+        "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
+    target_link_libraries(partout-models PUBLIC nlohmann_json::nlohmann_json)
+    target_precompile_headers(partout-models PRIVATE <partout/Json.h>)
+    if(MSVC)
+        target_compile_options(partout-models PRIVATE /EHsc /permissive- /W4)
+        set_target_properties(partout-models PROPERTIES
+            MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
+    endif()
+
+    set(partout_cpp_sources
         "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ProfileExtensions.cc"
         "${PARTOUT_CPP_ROOT}/tunnel/Tunnel.cc")
@@ -33,7 +55,7 @@ if(NOT ANDROID AND PP_BUILD_CPP)
     target_include_directories(partout-cpp-runtime SYSTEM PUBLIC
         "$<BUILD_INTERFACE:${PARTOUT_CPP_INCLUDE}>"
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
-    target_link_libraries(partout-cpp-runtime PUBLIC nlohmann_json::nlohmann_json)
+    target_link_libraries(partout-cpp-runtime PUBLIC Partout::Models)
     target_precompile_headers(partout-cpp-runtime PRIVATE <partout/Json.h>)
     if(MSVC)
         target_compile_options(partout-cpp-runtime PRIVATE /EHsc /permissive- /W4)
@@ -70,7 +92,7 @@ if(PP_BUILD_WINRT)
         "$<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>")
     target_include_directories(partout-winrt-runtime PRIVATE src/c/portable/include)
     target_link_libraries(partout-winrt-runtime
-        PUBLIC Partout::Headers nlohmann_json::nlohmann_json windowsapp runtimeobject ws2_32 iphlpapi
+        PUBLIC Partout::Headers Partout::Models windowsapp runtimeobject ws2_32 iphlpapi
         PRIVATE ole32)
     target_compile_features(partout-winrt-runtime PUBLIC cxx_std_20)
     target_compile_definitions(partout-winrt-runtime

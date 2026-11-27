@@ -60,6 +60,9 @@ install(TARGETS partout-headers EXPORT PartoutTargets)
 set(PARTOUT_PACKAGE_CPP_RUNTIME OFF)
 if(TARGET partout-cpp-runtime)
     set(PARTOUT_PACKAGE_CPP_RUNTIME ON)
+    set_target_properties(partout-models PROPERTIES EXPORT_NAME Models)
+    install(TARGETS partout-models EXPORT PartoutTargets
+        ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}")
     install(DIRECTORY "${PARTOUT_CPP_INCLUDE}/partout" DESTINATION "${CMAKE_INSTALL_INCLUDEDIR}"
         FILES_MATCHING PATTERN "*.h")
 endif()

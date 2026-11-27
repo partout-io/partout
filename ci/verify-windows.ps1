@@ -64,7 +64,8 @@ Write-Host "Verifying install directory: $installRoot"
 
 $requiredArtifacts = @(
     "bin\partout.dll",
-    "lib\partout.lib"
+    "lib\partout.lib",
+    "lib\partout-models.lib"
 )
 
 foreach ($artifact in $requiredArtifacts) {

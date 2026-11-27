@@ -29,7 +29,8 @@ target_link_libraries(partout PRIVATE
     ${PARTOUT_CORE_LIBRARIES}
 )
 
-# Embed static implementations in the shared library.
+# Embed the runtime implementations. Their Partout::Models dependency is linked
+# normally, and propagated to consumers below, rather than force-loaded here.
 foreach(target IN LISTS partout_runtime_targets)
     set_target_properties(${target} PROPERTIES
         POSITION_INDEPENDENT_CODE ON

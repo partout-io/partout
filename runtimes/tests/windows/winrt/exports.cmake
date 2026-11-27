@@ -7,8 +7,12 @@ if(NOT result EQUAL 0)
     message(FATAL_ERROR "Cannot inspect DLL exports: ${error}")
 endif()
 if(NOT exports MATCHES "partout_version" OR NOT exports MATCHES "VpnChannelRuntime"
-   OR NOT exports MATCHES "Tunnel@Partout" OR NOT exports MATCHES "ToString")
-    message(FATAL_ERROR "The DLL must export the core, C++ models, and WinRT runtime")
+   OR NOT exports MATCHES "Tunnel@Partout")
+    message(FATAL_ERROR "The DLL must export the core, C++ tunnel, and WinRT runtime")
+endif()
+# Match the exported name, not a model mentioned in a runtime method's signature.
+if(exports MATCHES "[ \t][?][^ @\r\n]+(@[^ @\r\n]+)?@Models@Partout@@" OR exports MATCHES "validateRfc3339")
+    message(FATAL_ERROR "Models must be linked statically, not exported from the DLL")
 endif()
 
 execute_process(COMMAND "${LINKER}" /dump /imports "${LIBRARY}"
