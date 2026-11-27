@@ -214,11 +214,6 @@ pub fn build(b: *std.Build) void {
     const test_module = createPartoutModule(b, config, c_bindings, "tests/all.zig", true);
     if (target.result.os.tag != .windows) {
         addCSourceFiles(test_module, &.{"runtimes/posix/platform.c"});
-    } else if (config.wintun) {
-        if (config.wintun_include) |path| {
-            test_module.addSystemIncludePath(.{ .cwd_relative = path });
-            addCSourceFiles(test_module, &.{"runtimes/windows/wintun/platform.c"});
-        }
     }
     test_module.addImport("source", test_source_module);
 

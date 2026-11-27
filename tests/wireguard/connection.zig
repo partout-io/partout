@@ -1569,9 +1569,13 @@ test "WireGuard requests tunnel setup except for active Wintun" {
     }
 }
 
-test "Wintun defaults to active WireGuard startup without a native TUN" {
+test "Wintun defaults to callback WireGuard with controller-owned TUN settings" {
     if (!source.wintun_enabled) return error.SkipZigTest;
-    try std.testing.expectEqual(.none, adapter.WireGuardAdapter.default_daemon_io);
+    try std.testing.expectEqual(.link, adapter.WireGuardAdapter.default_daemon_io);
+}
+
+test "Explicit active WireGuard startup can use a dummy native TUN" {
+    if (!source.wintun_enabled) return error.SkipZigTest;
     const tun = try io.TunWrapper.create(std.testing.allocator, null);
     defer tun.destroy();
     const descriptor = try tun.tunDescriptor();
