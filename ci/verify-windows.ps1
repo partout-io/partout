@@ -62,10 +62,31 @@ $dumpbin = Get-RequiredCommandPath "dumpbin.exe"
 Write-Host "Using dumpbin: $dumpbin"
 Write-Host "Verifying install directory: $installRoot"
 
+$exports = (& $dumpbin /exports (Join-Path $installRoot "bin\partout.dll")) -join "`n"
+if ($LASTEXITCODE -ne 0) { throw "Cannot inspect DLL exports" }
+$hasCHeader = Test-Path -LiteralPath (Join-Path $installRoot "include\partout.h")
+$hasCppHeaders = Test-Path -LiteralPath (Join-Path $installRoot "include\partout")
+if ($exports -match '\bpartout_version\b') {
+    if (-not $hasCHeader) { throw "The Wintun SDK must install partout.h" }
+    if ($hasCppHeaders) { throw "The Wintun SDK must not install C++ headers" }
+    if (Test-Path -LiteralPath (Join-Path $installRoot "lib\partout-models.lib")) {
+        throw "The Wintun SDK must not install the internal models library"
+    }
+    if ($exports -match '\s\?\S+') { throw "The Wintun DLL must not export C++ symbols" }
+} else {
+    if ($hasCHeader) { throw "The WinRT SDK must not install the internal C ABI header" }
+    if (-not $hasCppHeaders) { throw "The WinRT SDK must install C++ headers" }
+    if ($exports -match '\s+partout_\w+') { throw "The WinRT DLL must not export C ABI symbols" }
+    if ($exports -notmatch 'VpnChannelRuntime') { throw "Missing WinRT C++ runtime exports" }
+}
+
 $requiredArtifacts = @(
     "bin\partout.dll",
     "lib\partout.lib"
 )
+if (Test-Path -LiteralPath (Join-Path $installRoot "include\partout\models")) {
+    $requiredArtifacts += "lib\partout-models.lib"
+}
 
 foreach ($artifact in $requiredArtifacts) {
     $path = Get-RequiredArtifact -Root $installRoot -RelativePath $artifact

@@ -29,31 +29,37 @@ target_link_libraries(partout PRIVATE
     ${PARTOUT_CORE_LIBRARIES}
 )
 
-# Embed static implementations in the shared library.
+# Embed the runtime implementations. Their Partout::Models dependency is linked
+# normally, and propagated to consumers below, rather than force-loaded here.
 foreach(target IN LISTS partout_runtime_targets)
     set_target_properties(${target} PROPERTIES
         POSITION_INDEPENDENT_CODE ON
         CXX_VISIBILITY_PRESET hidden
         VISIBILITY_INLINES_HIDDEN ON)
     target_link_libraries(partout PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,${target}>")
-    foreach(property IN ITEMS INCLUDE_DIRECTORIES COMPILE_FEATURES COMPILE_DEFINITIONS LINK_LIBRARIES)
-        get_target_property(requirements ${target} INTERFACE_${property})
-        if(requirements)
-            set_property(TARGET partout APPEND PROPERTY INTERFACE_${property} "${requirements}")
-        endif()
-    endforeach()
-    if(MSVC)
+    if(partout_export_cpp_abi)
+        foreach(property IN ITEMS INCLUDE_DIRECTORIES COMPILE_FEATURES COMPILE_DEFINITIONS LINK_LIBRARIES)
+            get_target_property(requirements ${target} INTERFACE_${property})
+            if(requirements)
+                set_property(TARGET partout APPEND PROPERTY INTERFACE_${property} "${requirements}")
+            endif()
+        endforeach()
+    endif()
+    if(MSVC AND partout_export_cpp_abi)
         target_compile_definitions(${target} PRIVATE PARTOUT_API_BUILD_DLL)
     endif()
 endforeach()
 
-if(TARGET partout-cpp-runtime)
+if(TARGET partout-models)
     set_target_properties(partout PROPERTIES LINKER_LANGUAGE CXX)
 endif()
 
-file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
-list(TRANSFORM partout_exports REPLACE "^_" "")
-set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
+set(partout_exports)
+if(partout_export_c_abi)
+    file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/src/partout.exports" partout_exports REGEX "^_")
+    list(TRANSFORM partout_exports REPLACE "^_" "")
+    set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS src/partout.exports)
+endif()
 
 if(APPLE)
     set(PP_BUILD_APPLE_INSTALL_NAME "@rpath/libpartout.dylib" CACHE STRING
@@ -79,7 +85,9 @@ if(WIN32)
     target_link_options(partout PRIVATE "LINKER:/MACHINE:${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
     set_target_properties(partout ${partout_runtime_targets} PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
-    target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
+    if(partout_export_cpp_abi)
+        target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
+    endif()
     set_target_properties(partout PROPERTIES
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/${PARTOUT_OUTPUT_CONFIG}$<0:>"
         WINDOWS_EXPORT_ALL_SYMBOLS OFF

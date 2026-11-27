@@ -64,3 +64,4 @@ echo "Verifying install directory: $install_root"
 
 get_required_artifact partout_library "$install_root" "lib/libpartout.so"
 assert_x64_artifact "$partout_library"
+get_required_artifact partout_models "$install_root" "lib/libpartout-models.a"

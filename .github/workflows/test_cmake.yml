@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           cmake -G Ninja -S . -B .cmake -DCMAKE_BUILD_TYPE=Release \
-            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DPP_BUILD_CPP=ON
+            -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR" -DPP_BUILD_CPP_RUNTIME=ON
           cmake --build .cmake --parallel 2
           cmake --install .cmake
       - name: Configure C++ runtime tests
