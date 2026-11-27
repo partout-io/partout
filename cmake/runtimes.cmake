@@ -6,6 +6,7 @@ if(NOT PP_BUILD_LIBRARY)
 endif()
 
 set(partout_runtime_targets)
+set_source_files_properties(runtimes/platform_stub.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
 if(NOT ANDROID AND PP_BUILD_CPP)
     enable_language(CXX)
@@ -50,6 +51,7 @@ if(PP_BUILD_WINRT)
     endif()
 
     add_library(partout-winrt-runtime STATIC
+        runtimes/platform_stub.c
         runtimes/windows/winrt/VpnChannelRuntime.cc
         runtimes/windows/winrt/WinRTTunnelStrategy.cc
         runtimes/windows/winrt/backend/ABI.cc
@@ -97,6 +99,7 @@ elseif(PP_BUILD_WINTUN)
     list(APPEND partout_runtime_targets partout-wintun-runtime)
 elseif(ANDROID)
     add_library(partout-android-runtime STATIC
+        runtimes/platform_stub.c
         runtimes/android/native/jni.c
         runtimes/android/native/partout_jni.c
         runtimes/android/native/platform.c
