@@ -8,6 +8,8 @@
 #include <string>
 
 namespace Partout::Runtime {
+PARTOUT_RUNTIME_API std::string Version();
+
 enum class LogLevel { Fault, Error, Notice, Info, Debug };
 
 struct InitializationOptions final {

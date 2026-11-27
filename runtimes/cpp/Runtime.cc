@@ -8,6 +8,10 @@
 #include <stdexcept>
 
 namespace Partout::Runtime {
+std::string Version() {
+    return partout_version();
+}
+
 void Initialize(const InitializationOptions &options) {
     partout_init_args args{};
     args.log_level = static_cast<int>(options.log_level);
