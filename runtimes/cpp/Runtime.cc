@@ -33,9 +33,11 @@ Models::TaggedProfile ImportProfile(
         );
         if (!json) throw std::runtime_error("Import failed");
         const auto envelope = Models::ABIEnvelope::FromJson(Json::Parse(json.get()));
+        // FIXME: ### Interpret ABIEnvelope errors as fully as Swift/Kotlin and expose typed C++ errors.
         if (envelope.code || !envelope.payload) throw std::runtime_error("Import failed");
         return Models::TaggedProfile::FromJson(*envelope.payload);
     } catch (...) {
+        // FIXME: ### Preserve structured ABI errors and distinguish decoding failures while keeping configuration data private.
         throw std::runtime_error("Partout could not import this configuration.");
     }
 }
