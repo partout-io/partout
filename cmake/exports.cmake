@@ -43,7 +43,7 @@ foreach(target IN LISTS partout_runtime_targets)
             set_property(TARGET partout APPEND PROPERTY INTERFACE_${property} "${requirements}")
         endif()
     endforeach()
-    if(MSVC)
+    if(MSVC AND partout_export_cpp_abi)
         target_compile_definitions(${target} PRIVATE PARTOUT_API_BUILD_DLL)
     endif()
 endforeach()
@@ -83,12 +83,17 @@ if(WIN32)
     target_link_options(partout PRIVATE "LINKER:/MACHINE:${CMAKE_C_COMPILER_ARCHITECTURE_ID}")
     set_target_properties(partout ${partout_runtime_targets} PROPERTIES
         MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
-    target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
+    if(partout_export_cpp_abi)
+        target_compile_definitions(partout INTERFACE PARTOUT_API_USE_DLL)
+    endif()
     set_target_properties(partout PROPERTIES
         PDB_OUTPUT_DIRECTORY "${PP_BUILD_OUTPUT}/partout/bin/${PARTOUT_OUTPUT_CONFIG}$<0:>"
         WINDOWS_EXPORT_ALL_SYMBOLS OFF
     )
-    # Windows exposes only the annotated C++ runtime. The C ABI stays internal.
+    # C++ exports are annotated in the static runtime implementations.
+    foreach(symbol IN LISTS partout_exports)
+        target_link_options(partout PRIVATE "LINKER:/EXPORT:${symbol}")
+    endforeach()
     target_link_libraries(partout PRIVATE msvcrt bcrypt ole32 ws2_32 ntdll)
 elseif(NOT APPLE)
     find_package(Threads REQUIRED)

@@ -10,7 +10,7 @@ option(PP_BUILD_LIBRARY "Build the Partout library" ON)
 option(PP_BUILD_CPP "Build the portable C++ runtime" OFF)
 option(PP_BUILD_WINRT "Build the WinRT VpnChannel runtime" OFF)
 option(PP_BUILD_WINTUN "Build the Wintun/Winsock runtime" OFF)
-if(PP_BUILD_WINRT OR PP_BUILD_WINTUN)
+if(PP_BUILD_WINRT)
     set(PP_BUILD_CPP ON)
 endif()
 if(APPLE AND PP_BUILD_CPP)
@@ -67,10 +67,13 @@ endif()
 # Distribute as SDK only if built as top level project.
 set(partout_install_sdk ${PROJECT_IS_TOP_LEVEL})
 
-# Windows consumers use the C++ runtime; other platforms retain the C ABI.
+# ABI visibility is independent of whether the C++ runtime is built.
 set(partout_export_c_abi ON)
-if(WIN32)
+set(partout_export_cpp_abi ${PP_BUILD_CPP})
+if(PP_BUILD_WINRT)
     set(partout_export_c_abi OFF)
+elseif(PP_BUILD_WINTUN)
+    set(partout_export_cpp_abi OFF)
 endif()
 
 # Resolve the Apple SDK once for both Zig and the Go bridge.
