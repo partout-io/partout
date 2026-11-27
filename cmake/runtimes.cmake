@@ -8,7 +8,8 @@ endif()
 set(partout_runtime_targets)
 set_source_files_properties(runtimes/platform_stub.c PROPERTIES SKIP_PRECOMPILE_HEADERS ON)
 
-if(NOT ANDROID AND PP_BUILD_CPP)
+# Wintun uses models internally even without the portable C++ runtime.
+if(NOT ANDROID AND (PP_BUILD_CPP OR PP_BUILD_WINTUN))
     enable_language(CXX)
     if(NOT TARGET nlohmann_json::nlohmann_json)
         include(FetchContent)
@@ -16,7 +17,10 @@ if(NOT ANDROID AND PP_BUILD_CPP)
             URL https://github.com/nlohmann/json/releases/download/v3.12.0/json.tar.xz
             URL_HASH SHA256=42f6e95cad6ec532fd372391373363b62a14af6d771056dbfc86160e6dfff7aa
         )
-        set(JSON_Install ${partout_install_sdk})
+        set(JSON_Install OFF)
+        if(partout_install_sdk AND partout_export_cpp_abi)
+            set(JSON_Install ON)
+        endif()
         FetchContent_MakeAvailable(json)
     endif()
     set(PARTOUT_CPP_ROOT "${CMAKE_CURRENT_LIST_DIR}/../runtimes/cpp")
@@ -43,7 +47,9 @@ if(NOT ANDROID AND PP_BUILD_CPP)
         set_target_properties(partout-models PROPERTIES
             MSVC_RUNTIME_LIBRARY MultiThreadedDLL MSVC_RUNTIME_CHECKS "")
     endif()
+endif()
 
+if(NOT ANDROID AND PP_BUILD_CPP)
     set(partout_cpp_sources
         "${PARTOUT_CPP_ROOT}/Runtime.cc"
         "${PARTOUT_CPP_ROOT}/extensions/ModuleExtensions.cc"
