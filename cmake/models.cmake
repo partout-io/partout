@@ -5,8 +5,8 @@ if(NOT PP_BUILD_LIBRARY)
     return()
 endif()
 
-# Wintun uses models internally even without the portable C++ runtime.
-if(NOT ANDROID AND (PP_BUILD_CPP_RUNTIME OR PP_BUILD_WINTUN))
+# Desktop consumers can use the models without the portable C++ runtime.
+if(NOT ANDROID AND NOT APPLE)
     enable_language(CXX)
     if(NOT TARGET nlohmann_json::nlohmann_json)
         include(FetchContent)
